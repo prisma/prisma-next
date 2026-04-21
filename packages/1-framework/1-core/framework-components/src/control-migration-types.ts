@@ -402,37 +402,6 @@ export interface TargetMigrationsCapability<
     contract: Contract | null,
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
   ): unknown;
-
-  /**
-   * Optional: in-process emit capability for class-flow migration files.
-   *
-   * Targets that author `migration.ts` as an executable class implement
-   * `emit` to produce `ops.json` from the source file directly. The
-   * framework dispatches to `emit` whenever the CLI needs to serialize a
-   * migration's operations for storage or display.
-   *
-   * The capability runs in the same Node process as the CLI:
-   *  - The target dynamically imports `<dir>/migration.ts`, locates the
-   *    authored class on the module's default export, and invokes whatever
-   *    runtime machinery it needs to obtain the operations list.
-   *  - Structured errors thrown during evaluation (notably
-   *    `errorUnfilledPlaceholder` with code `PN-MIG-2001`) propagate as
-   *    real JS exceptions so the CLI's normal error envelope can render
-   *    them with full structured metadata. No subprocess is spawned.
-   *  - The target is responsible for calling `writeMigrationOps(dir, ops)`
-   *    so that `ops.json` ends up on disk before `emit` returns. The
-   *    framework's `emitMigration` helper is the single owner of
-   *    `attestMigration(dir)` — the target MUST NOT call
-   *    `attestMigration` itself.
-   *  - The returned `MigrationPlanOperation[]` is the display-oriented
-   *    shape the CLI uses for output (id, label, operationClass).
-   */
-  emit?(options: {
-    readonly dir: string;
-    readonly frameworkComponents: ReadonlyArray<
-      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-    >;
-  }): Promise<readonly MigrationPlanOperation[]>;
 }
 
 // ============================================================================

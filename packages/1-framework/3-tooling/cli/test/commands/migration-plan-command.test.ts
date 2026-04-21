@@ -12,7 +12,6 @@ const mocks = vi.hoisted(() => ({
   readFile: vi.fn(),
   loadAllBundles: vi.fn(),
   findLatestMigration: vi.fn(),
-  emitMigration: vi.fn(),
   writeMigrationPackage: vi.fn(),
   copyFilesWithRename: vi.fn(),
   writeMigrationTs: vi.fn(),
@@ -60,10 +59,6 @@ vi.mock('@prisma-next/migration-tools/io', async () => {
 
 vi.mock('@prisma-next/migration-tools/migration-ts', () => ({
   writeMigrationTs: mocks.writeMigrationTs,
-}));
-
-vi.mock('../../src/lib/migration-emit', () => ({
-  emitMigration: mocks.emitMigration,
 }));
 
 vi.mock('../../src/utils/framework-components', () => ({
@@ -141,7 +136,7 @@ describe('migration plan command', () => {
   });
 
   describe('no-op short-circuit', () => {
-    it('returns noOp envelope without migrationId or dir when hashes match', async () => {
+    it('returns noOp envelope without dir when hashes match', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
       mocks.loadAllBundles.mockResolvedValue({
@@ -170,15 +165,13 @@ describe('migration plan command', () => {
         operations: [],
         summary: 'No changes detected between contracts',
       });
-      expect(result).not.toHaveProperty('migrationId');
       expect(result).not.toHaveProperty('dir');
-      expect(mocks.emitMigration).not.toHaveBeenCalled();
       expect(mocks.writeMigrationTs).not.toHaveBeenCalled();
     });
   });
 
-  describe('emit-after-scaffold ordering', () => {
-    it('calls emitMigration after writeMigrationTs in non-no-op path', async () => {
+  describe('non-no-op plan', () => {
+    it('scaffolds migration.ts from the planner result and reports operations', async () => {
       setupBaseConfig();
       const OLD_HASH = 'sha256:old-hash';
       const NEW_HASH = 'sha256:new-hash';
@@ -198,26 +191,25 @@ describe('migration plan command', () => {
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
-      const callOrder: string[] = [];
-      mocks.writeMigrationTs.mockImplementation(async () => {
-        callOrder.push('writeMigrationTs');
-      });
-      mocks.emitMigration.mockImplementation(async () => {
-        callOrder.push('emitMigration');
-        return {
-          operations: [
-            { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
-          ],
-          migrationId: 'sha256:new-id',
-        };
-      });
-
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
 
       expect(exitCode).toBe(0);
-      expect(callOrder).toEqual(['writeMigrationTs', 'emitMigration']);
-      expect(mocks.emitMigration).toHaveBeenCalledTimes(1);
+      expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result).toMatchObject({
+        ok: true,
+        noOp: false,
+        from: OLD_HASH,
+        to: NEW_HASH,
+        operations: [
+          { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
+        ],
+      });
+      expect(result).not.toHaveProperty('migrationId');
     });
   });
 
@@ -298,10 +290,9 @@ describe('migration plan command', () => {
       });
       expect(result.summary).toContain('placeholder');
       expect(result.dir).toBeDefined();
-      expect(result.migrationId).toBeUndefined();
     });
 
-    it('writes migration.ts but does not call emitMigration when placeholders are present', async () => {
+    it('writes migration.ts and returns pendingPlaceholders when placeholders are present', async () => {
       setupClassBasedConfig(() => {
         throw errorUnfilledPlaceholder('backfill-users-status:run');
       });
@@ -324,7 +315,6 @@ describe('migration plan command', () => {
       await executeCommand(command, ['--json']);
 
       expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
-      expect(mocks.emitMigration).not.toHaveBeenCalled();
     });
   });
 
@@ -344,10 +334,6 @@ describe('migration plan command', () => {
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
-      mocks.emitMigration.mockResolvedValue({
-        operations: [],
-        migrationId: 'sha256:new-id',
-      });
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);
@@ -385,10 +371,6 @@ describe('migration plan command', () => {
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
-      mocks.emitMigration.mockResolvedValue({
-        operations: [],
-        migrationId: 'sha256:new-id',
-      });
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);

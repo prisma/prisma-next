@@ -279,7 +279,7 @@ describe('migration plan → emit end-to-end', () => {
       expect(result1.ok).toBe(false);
       expect(result1.reason).toBe('draft');
 
-      // Attest (same as what migration emit does for drafts)
+      // Attest (same as what self-emit does for drafts)
       const migrationId = await attestMigration(packageDir);
       expect(migrationId).toMatch(/^sha256:/);
 

@@ -16,7 +16,6 @@ import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
-import { emitMigration } from '../lib/migration-emit';
 import {
   type CliErrorConflict,
   CliStructuredError,
@@ -54,7 +53,6 @@ export interface MigrationPlanResult {
   readonly noOp: boolean;
   readonly from: string;
   readonly to: string;
-  readonly migrationId?: string;
   readonly dir?: string;
   readonly operations: readonly {
     readonly id: string;
@@ -66,7 +64,7 @@ export interface MigrationPlanResult {
   /**
    * When true, `migration.ts` was written but contains unfilled
    * `placeholder(...)` calls. The user must edit the file and then run
-   * `migration emit` to finalize `ops.json` / `migration.json`.
+   * `node migration.ts` to self-emit `ops.json` / `migration.json`.
    */
   readonly pendingPlaceholders?: boolean;
   readonly timings: {
@@ -183,7 +181,7 @@ async function executeMigrationPlanCommand(
       return notOk(
         errorRuntime('A draft migration to this contract already exists', {
           why: `Draft migration at "${existingDraft.dirName}" already targets ${toStorageHash}`,
-          fix: `Run 'prisma-next migration emit --dir ${migrationsRelative}/${existingDraft.dirName}' to attest it, or delete it and re-plan.`,
+          fix: `Run 'node ${migrationsRelative}/${existingDraft.dirName}/migration.ts' to self-emit and attest it, or delete it and re-plan.`,
         }),
       );
     }
@@ -352,17 +350,18 @@ async function executeMigrationPlanCommand(
         operations: [],
         pendingPlaceholders: true,
         summary:
-          'Planned migration with placeholder(s) — edit migration.ts then run `migration emit`',
+          'Planned migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
         timings: { total: Date.now() - startTime },
       };
       return ok(result);
     }
 
-    const { operations, migrationId } = await emitMigration(packageDir, {
-      targetId: config.target.targetId,
-      migrations,
-      frameworkComponents,
-    });
+    // The planner's operations list is the source of truth for the CLI
+    // display. Users attest the migration (`ops.json` + `migrationId`)
+    // by running `node migration.ts` from the package directory; that
+    // self-emit path also surfaces any `errorUnfilledPlaceholder`
+    // (PN-MIG-2001) when a hand-authored slot is still empty.
+    const operations = plannerResult.plan.operations;
 
     const sql = extractSqlDdl(operations);
     const result: MigrationPlanResult = {
@@ -370,7 +369,6 @@ async function executeMigrationPlanCommand(
       noOp: false,
       from: fromHash,
       to: toStorageHash,
-      migrationId,
       dir: relative(process.cwd(), packageDir),
       operations: operations.map((op) => ({
         id: op.id,
@@ -486,9 +484,6 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
 
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
-  if (result.migrationId) {
-    lines.push(dim_(`migrationId: ${result.migrationId}`));
-  }
   if (result.dir) {
     lines.push(dim_(`dir:    ${result.dir}`));
   }

@@ -136,10 +136,6 @@ export interface MigrationApplyCommandOutputResult {
   };
 }
 
-export interface MigrationEmitCommandOutputResult {
-  readonly migrationId: string;
-}
-
 export function formatMigrationApplyCommandOutput(
   result: MigrationApplyCommandOutputResult,
   flags: GlobalFlags,
@@ -178,25 +174,6 @@ export function formatMigrationApplyCommandOutput(
     lines.push('');
     lines.push(formatDimText(`Total time: ${result.timings.total}ms`));
   }
-
-  return lines.join('\n');
-}
-
-export function formatMigrationEmitCommandOutput(
-  result: MigrationEmitCommandOutputResult,
-  flags: GlobalFlags,
-): string {
-  if (flags.quiet) {
-    return '';
-  }
-
-  const lines: string[] = [];
-  const useColor = flags.color !== false;
-  const formatGreen = createColorFormatter(useColor, green);
-  const formatDimText = (text: string) => formatDim(useColor, text);
-
-  lines.push(`${formatGreen('✔')} Emitted ops.json and attested migration`);
-  lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
 
   return lines.join('\n');
 }

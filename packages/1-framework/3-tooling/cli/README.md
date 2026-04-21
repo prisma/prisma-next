@@ -1041,18 +1041,23 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 
 **Ref-based routing:** With `--ref`, apply targets the ref's hash instead of the contract hash. This enables multi-environment workflows where staging and production track different points in the migration graph.
 
-### `prisma-next migration emit`
+### Emitting `ops.json` and computing `migrationId`
 
-Emit `ops.json` from `migration.ts` and compute the content-addressed `migrationId`.
+There is no dedicated CLI command for emitting a migration — class-flow
+migrations self-emit. After scaffolding (via `migration plan` or
+`migration new`), run `migration.ts` directly with Node to produce
+`ops.json` and attest `migration.json`:
 
 ```bash
-prisma-next migration emit --dir <path>
+node migrations/<dir>/migration.ts
 ```
 
-Evaluates `migration.ts` in the package directory, resolves it to `ops.json`, then
-computes and persists `migrationId` in `migration.json`. If `migration.ts` contains
-unfilled `placeholder()` slots, emit fails with `PN-MIG-2001` and reports the slot
-to fill in.
+The scaffolded `migration.ts` calls `Migration.run(import.meta.url, ...)`
+when invoked as the entrypoint, which serializes operations to
+`ops.json` and writes the content-addressed `migrationId` into
+`migration.json`. If `migration.ts` contains unfilled `placeholder()`
+slots, the script exits with `PN-MIG-2001` and reports the slot to
+fill in.
 
 ### `prisma-next migration ref`
 
@@ -1423,7 +1428,6 @@ The CLI package exports several subpaths for different use cases:
 - **`@prisma-next/cli/commands/migration-show`**: Exports `createMigrationShowCommand`
 - **`@prisma-next/cli/commands/migration-status`**: Exports `createMigrationStatusCommand`
 - **`@prisma-next/cli/commands/migration-apply`**: Exports `createMigrationApplyCommand`
-- **`@prisma-next/cli/commands/migration-emit`**: Exports `createMigrationEmitCommand`
 - **`@prisma-next/cli/config-loader`**: Exports `loadConfig` function
 
 **Important**: `loadContractFromTs` is exported from the main package (`@prisma-next/cli`). See `.cursor/rules/cli-package-exports.mdc` for import patterns.
