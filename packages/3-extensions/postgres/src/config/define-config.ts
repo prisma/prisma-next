@@ -1,13 +1,14 @@
-import { pathToFileURL } from 'node:url';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
-import type { ContractSourceContext, PrismaNextConfig } from '@prisma-next/config/config-types';
+import type { PrismaNextConfig } from '@prisma-next/config/config-types';
 import { defineConfig as coreDefineConfig } from '@prisma-next/config/config-types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { prismaContract } from '@prisma-next/sql-contract-psl/provider';
+import { typescriptContractFromPath } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
-import { extname, isAbsolute, resolve } from 'pathe';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { extname } from 'pathe';
 
 export interface PostgresConfigOptions {
   readonly contract: string;
@@ -33,23 +34,9 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
   const output = deriveOutputPath(options.contract);
   const ext = extname(options.contract);
 
-  const absoluteContractPath = isAbsolute(options.contract)
-    ? options.contract
-    : resolve(process.cwd(), options.contract);
-
   const contractConfig =
     ext === '.ts'
-      ? {
-          source: async (context: ContractSourceContext) => {
-            const { typescriptContract } = await import(
-              '@prisma-next/sql-contract-ts/config-types'
-            );
-            const mod = await import(pathToFileURL(absoluteContractPath).href);
-            const contract = mod.default ?? mod.contract;
-            return typescriptContract(contract, output).source(context);
-          },
-          output,
-        }
+      ? typescriptContractFromPath(options.contract, output)
       : prismaContract(options.contract, {
           output,
           target: postgres,
@@ -62,7 +49,7 @@ export function defineConfig(options: PostgresConfigOptions): PrismaNextConfig<'
     driver: postgresDriver,
     extensionPacks: extensions,
     contract: contractConfig,
-    ...(options.db !== undefined ? { db: options.db } : {}),
-    ...(options.migrations !== undefined ? { migrations: options.migrations } : {}),
+    ...ifDefined('db', options.db),
+    ...ifDefined('migrations', options.migrations),
   });
 }

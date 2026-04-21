@@ -33,7 +33,8 @@ describe('defineConfig facade', () => {
     expect(facadeConfig.driver).toBe(manualConfig.driver);
     expect(facadeConfig.extensionPacks).toEqual(manualConfig.extensionPacks);
     expect(facadeConfig.contract?.output).toBe(manualConfig.contract?.output);
-    expect(typeof facadeConfig.contract?.source).toBe('function');
+    expect(facadeConfig.contract?.source.inputs).toEqual(manualConfig.contract?.source.inputs);
+    expect(typeof facadeConfig.contract?.source.load).toBe('function');
   });
 
   it('derives output path by swapping .prisma to .json', () => {
@@ -52,8 +53,9 @@ describe('defineConfig facade', () => {
     const tsConfig = defineConfig({ contract: './prisma/contract.ts' });
     const pslConfig = defineConfig({ contract: './prisma/contract.prisma' });
 
-    expect(typeof tsConfig.contract?.source).toBe('function');
+    expect(typeof tsConfig.contract?.source.load).toBe('function');
     expect(tsConfig.contract?.output).toBe('./prisma/contract.json');
+    expect(tsConfig.contract?.source.inputs).toEqual(['./prisma/contract.ts']);
     expect(tsConfig.contract?.source).not.toBe(pslConfig.contract?.source);
   });
 
@@ -73,6 +75,15 @@ describe('defineConfig facade', () => {
     });
 
     expect(config.migrations?.dir).toBe('custom-migrations');
+  });
+
+  it('omits db and migrations when they are not provided', () => {
+    const config = defineConfig({
+      contract: './prisma/contract.prisma',
+    });
+
+    expect(Object.hasOwn(config, 'db')).toBe(false);
+    expect(Object.hasOwn(config, 'migrations')).toBe(false);
   });
 
   it('passes extensions through to config', () => {

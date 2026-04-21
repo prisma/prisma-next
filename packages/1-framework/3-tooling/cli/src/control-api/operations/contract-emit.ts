@@ -1,10 +1,10 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
-import { emit } from '@prisma-next/emitter';
+import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { dirname, isAbsolute, join, resolve } from 'pathe';
+import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
@@ -72,27 +72,23 @@ export async function executeContractEmit(
       why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
     });
   }
-  if (!contractConfig.output.endsWith('.json')) {
-    throw errorContractConfigMissing({
-      why: 'Contract config output path must end with .json (e.g., "src/prisma/contract.json")',
-    });
-  }
 
   // Validate source exists and is callable
-  if (typeof contractConfig.source !== 'function') {
+  if (typeof contractConfig.source?.load !== 'function') {
     throw errorContractConfigMissing({
-      why: 'Contract config must include a valid source provider function',
+      why: 'Contract config must include a valid source provider object',
     });
   }
 
-  // Normalize configPath and resolve artifact paths relative to config file directory
-  const normalizedConfigPath = resolve(configPath);
-  const configDir = dirname(normalizedConfigPath);
-  const outputJsonPath = isAbsolute(contractConfig.output)
-    ? contractConfig.output
-    : join(configDir, contractConfig.output);
-  // Colocate .d.ts with .json (contract.json → contract.d.ts)
-  const outputDtsPath = `${outputJsonPath.slice(0, -5)}.d.ts`;
+  let outputPaths: ReturnType<typeof getEmittedArtifactPaths>;
+  try {
+    outputPaths = getEmittedArtifactPaths(contractConfig.output);
+  } catch (error) {
+    throw errorContractConfigMissing({
+      why: error instanceof Error ? error.message : String(error),
+    });
+  }
+  const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
 
   const stack = createControlStack(config);
 
@@ -102,39 +98,40 @@ export async function executeContractEmit(
     authoringContributions: stack.authoringContributions,
     codecLookup: stack.codecLookup,
     controlMutationDefaults: stack.controlMutationDefaults,
+    resolvedInputs: contractConfig.source.inputs ?? [],
   };
 
-  let providerResult: Awaited<ReturnType<typeof contractConfig.source>>;
+  let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
-    providerResult = await unlessAborted(contractConfig.source(sourceContext));
+    providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
   } catch (error) {
     if (signal.aborted || isAbortError(error)) {
       throw error;
     }
     throw errorRuntime('Failed to resolve contract source', {
       why: error instanceof Error ? error.message : String(error),
-      fix: 'Ensure contract.source resolves to ok(Contract) or returns structured diagnostics.',
+      fix: 'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
     });
   }
 
   if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed result shape.',
-      fix: 'Ensure contract.source resolves to ok(Contract) or notOk({ summary, diagnostics }).',
+      fix: 'Ensure contract.source.load resolves to ok(Contract) or notOk({ summary, diagnostics }).',
     });
   }
 
   if (providerResult.ok && !('value' in providerResult)) {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed success result: missing value.',
-      fix: 'Ensure contract.source success payload is ok(Contract).',
+      fix: 'Ensure contract.source.load success payload is ok(Contract).',
     });
   }
 
   if (!providerResult.ok && !isProviderFailureLike(providerResult.failure)) {
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed failure result: expected summary and diagnostics.',
-      fix: 'Ensure contract.source failure payload is notOk({ summary, diagnostics, meta? }).',
+      fix: 'Ensure contract.source.load failure payload is notOk({ summary, diagnostics, meta? }).',
     });
   }
 
@@ -160,7 +157,11 @@ export async function executeContractEmit(
   const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
 
   familyInstance.validateContract(enrichedIR);
-  const emitResult = await unlessAborted(emit(enrichedIR, stack, config.family.emission));
+  const emitResult = await unlessAborted(
+    emit(enrichedIR, stack, config.family.emission, {
+      outputJsonPath: outputJsonPath,
+    }),
+  );
 
   // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));

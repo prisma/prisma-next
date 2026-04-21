@@ -248,7 +248,7 @@ export interface EmitContractConfig {
   /**
    * Contract source provider.
    */
-  readonly sourceProvider: ContractSourceProvider;
+  readonly source: ContractSourceProvider;
   /**
    * Output path for contract.json.
    * The .d.ts types file will be colocated (e.g., contract.json → contract.d.ts).
