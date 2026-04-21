@@ -43,16 +43,37 @@ All five concrete Mongo call classes (`CreateIndexCall`, `DropIndexCall`, `Creat
 
 ### Family-SQL `Migration` alias
 
-`packages/2-sql/9-family/src/exports/migration.ts` (new file, or extend existing):
+Mirrors Mongo's layout exactly: implementation under `src/core/`, a one-line re-export barrel under `src/exports/`. `src/exports/` is for re-exports only — no implementation.
+
+**Implementation** — `packages/2-sql/9-family/src/core/sql-migration.ts` (new file):
 
 ```ts
-import { Migration as FrameworkMigration } from '@prisma-next/framework-components/migration';
-import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from '@prisma-next/sql-operations';
+import { Migration } from '@prisma-next/migration-tools/migration';
+import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from '../core/types';
 
-export class Migration<TDetails extends SqlPlanTargetDetails> extends FrameworkMigration<SqlMigrationPlanOperation<TDetails>> {}
+/**
+ * Family-owned base class for class-flow SQL migrations.
+ *
+ * Unlike `MongoMigration`, this class stays generic over `TDetails` because
+ * the SQL family serves multiple concrete targets (Postgres today, others
+ * later). Each target-specific migration class binds `TDetails` and fixes
+ * `targetId` in its own core module.
+ */
+export abstract class SqlMigration<TDetails extends SqlPlanTargetDetails>
+  extends Migration<SqlMigrationPlanOperation<TDetails>> {}
 ```
 
-Exact shape mirrors `@prisma-next/target-mongo/migration`. Postgres re-exports a bound alias from `@prisma-next/target-postgres/migration`.
+**Re-export barrel** — `packages/2-sql/9-family/src/exports/migration.ts` (new file):
+
+```ts
+export { SqlMigration as Migration } from '../core/sql-migration';
+```
+
+**Package.json** — add a `./migration` subpath to `packages/2-sql/9-family/package.json`'s `exports`, mirroring how Mongo family exposes `@prisma-next/mongo-family/migration`.
+
+**`architecture.config.json`** — register the new subpath under the migration plane (cross-reference `multi-plane-entrypoints.mdc`).
+
+Postgres does not re-export `SqlMigration` directly. Postgres's own concrete migration class (`TypeScriptRenderablePostgresMigration`, defined in the target package's `src/core/`) extends `SqlMigration<PostgresPlanTargetDetails>` and fixes `targetId = 'postgres'`, mirroring how Mongo's concrete classes extend `MongoMigration`.
 
 ### Postgres IR — `op-factory-call.ts`
 
