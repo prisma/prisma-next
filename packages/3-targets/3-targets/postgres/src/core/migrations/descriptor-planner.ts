@@ -365,6 +365,14 @@ export interface DescriptorPlannerOptions {
   readonly issues: readonly SchemaIssue[];
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
+  readonly schemaName?: string;
+  readonly codecHooks?: ReadonlyMap<
+    string,
+    import('@prisma-next/family-sql/control').CodecControlHooks
+  >;
+  readonly storageTypes?: Readonly<
+    Record<string, import('@prisma-next/sql-contract/types').StorageTypeInstance>
+  >;
   readonly strategies?: readonly MigrationStrategy[];
 }
 
@@ -378,6 +386,9 @@ export function planDescriptors(
   const context: StrategyContext = {
     toContract: options.toContract,
     fromContract: options.fromContract,
+    schemaName: options.schemaName ?? 'public',
+    codecHooks: options.codecHooks ?? new Map(),
+    storageTypes: options.storageTypes ?? options.toContract.storage.types ?? {},
   };
 
   const strategies = options.strategies ?? migrationPlanStrategies;
