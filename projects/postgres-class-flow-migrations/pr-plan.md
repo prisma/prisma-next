@@ -20,10 +20,10 @@ The project is carved at the points where behavior change lands: PR 1 is pure fo
 
 ### Contents
 
-- Extract pure factory functions from `operation-resolver.ts` (Phase 0).
-- Add `placeholderClosure` / `isPlaceholderClosure` / `PLACEHOLDER_SLOT` helpers to `packages/1-framework/1-core/errors/src/migration.ts` (Phase 0).
+- Extract pure factory functions from `operation-resolver.ts` (Phase 0). No new helpers are added to `@prisma-next/errors/migration` in this phase.
 - Introduce the framework `OpFactoryCall` interface in `packages/1-framework/1-core/framework-components/src/control-migration-types.ts` and the `MigrationPlanWithAuthoringSurface` interface (Phase 1).
-- Introduce the Postgres class-flow IR in `packages/3-targets/3-targets/postgres/src/core/`: `PostgresOpFactoryCallNode` internal base class, one frozen concrete class per factory, the `PostgresOpFactoryCallVisitor<R>` interface, `renderOps`, `renderCallsToTypeScript`, `TypeScriptRenderablePostgresMigration` (Phase 1).
+- Retrofit Mongo's `OpFactoryCallNode` with an explicit `implements OpFactoryCall` annotation; add the Family-SQL `SqlMigration<TDetails>` alias (Phase 1).
+- Introduce the Postgres class-flow IR in `packages/3-targets/3-targets/postgres/src/core/migrations/`: the abstract `MigrationTsExpression` base, the concrete `PlaceholderExpression` node, the internal `PostgresOpFactoryCallNode` base extending `MigrationTsExpression` and implementing `OpFactoryCall`, one frozen concrete call class per factory, the `PostgresOpFactoryCallVisitor<R>` interface, the `renderOps` visitor (with its local `bodyToClosure` helper), the polymorphic `renderCallsToTypeScript`, and `TypeScriptRenderablePostgresMigration` (Phase 1).
 - Retarget the walk-schema planner (`planner-reconciliation.ts` + `planner.ts`'s `buildX` helpers) to produce `PostgresOpFactoryCall[]` internally, then rendering to `SqlMigrationPlanOperation<PostgresPlanTargetDetails>[]` via `renderOps` at the tail (Phase 1).
 
 ### Behavior change
@@ -57,7 +57,8 @@ Revert the PR. Walk-schema planner returns to its pre-IR shape. No user impact.
 ### Contents
 
 - Retarget every strategy in `migrationPlanStrategies` and the default-mapping layer in `issue-planner.ts` to emit `PostgresOpFactoryCall[]` (Phase 2).
-- Emit `dataTransform` stubs using `placeholderClosure` for `check` and `run`; the renderer translates these to `() => placeholder("slot")` in the scaffolded `migration.ts` (Phase 2).
+- Emit `dataTransform` stubs using `new PlaceholderExpression(slot)` for `check` and `run`; `renderCallsToTypeScript` renders these as `() => placeholder("slot")` in the scaffolded `migration.ts` and adds the `placeholder` import automatically (Phase 2).
+- Wire the `migration plan` CLI to catch `errorUnfilledPlaceholder` at the `ops.json` / `migration.json` serialization boundary and skip both derived artifacts when placeholders are present, writing `migration.ts` only (Phase 3, R2.11).
 - Add per-strategy apply/verify tests that run each emitted recipe against a fresh Postgres and assert the runner's post-apply `verifySqlSchema` passes, for each of the four data-safety scenarios (Phase 2).
 - Flip Postgres's `migrationStrategy` registration: remove `resolveDescriptors`, register `emit` instead (Phase 3).
 - Remove descriptor-flow entry points from the Postgres `TargetMigrationsCapability` (`planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`). The framework-level interface still has these methods — deletion from the interface happens in PR 3 — but Postgres no longer implements them (Phase 3).

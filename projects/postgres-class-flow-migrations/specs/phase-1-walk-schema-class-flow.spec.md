@@ -13,7 +13,7 @@ Introduce the class-flow IR (`OpFactoryCall` interface + Postgres concrete call 
 
 ## Prerequisites
 
-- Phase 0 has landed: pure factories in `op-factories.ts`, `placeholderClosure` in `@prisma-next/errors/migration`.
+- Phase 0 has landed: pure factories in `op-factories.ts`. No placeholder-related work was folded into Phase 0 — the placeholder-as-AST-node machinery ships with this phase.
 - Walk-schema audit (`assets/walk-schema-audit.md`) is committed and the call-class inventory has been cross-referenced against it.
 
 ## Scope
@@ -75,12 +75,68 @@ export { SqlMigration as Migration } from '../core/sql-migration';
 
 Postgres does not re-export `SqlMigration` directly. Postgres's own concrete migration class (`TypeScriptRenderablePostgresMigration`, defined in the target package's `src/core/`) extends `SqlMigration<PostgresPlanTargetDetails>` and fixes `targetId = 'postgres'`, mirroring how Mongo's concrete classes extend `MongoMigration`.
 
+### Postgres IR — expression hierarchy
+
+Every node that can appear as a TypeScript expression in the generated `migration.ts` — whether a top-level `PostgresOpFactoryCall` or a `dataTransform` body — shares a common Postgres-internal abstract base, `MigrationTsExpression`, in `packages/3-targets/3-targets/postgres/src/core/migrations/migration-ts-expression.ts`:
+
+```ts
+export interface ImportRequirement {
+  readonly moduleSpecifier: string;
+  readonly symbol: string;
+}
+
+export abstract class MigrationTsExpression {
+  /**
+   * Render this node as a TypeScript expression suitable for embedding in
+   * the generated `migration.ts` source.
+   */
+  abstract renderTypeScript(): string;
+
+  /**
+   * Declare every top-level symbol `renderTypeScript()` references. Used by
+   * `renderCallsToTypeScript` to build the module-level import block.
+   */
+  abstract importRequirements(): readonly ImportRequirement[];
+}
+```
+
+`MigrationTsExpression` is **not** exported from the package. External consumers never see it — they interact with `PostgresOpFactoryCall` through the framework-level `OpFactoryCall` interface. The class exists purely to give every TypeScript-renderable node a uniform shape for the polymorphic `renderCallsToTypeScript` walk, and for uniform import aggregation.
+
+Two subtypes participate in Phase 1:
+
+- `PostgresOpFactoryCallNode` — abstract base for every concrete call class. Extends `MigrationTsExpression`, implements `OpFactoryCall`, and adds the visitor `accept()` for the `renderOps` side (see below).
+- `PlaceholderExpression` — concrete. Represents a planner-generated stub for a `dataTransform` `check` or `run` body. It is **not** an `OpFactoryCall` and never appears in the `PostgresOpFactoryCall` union; it appears only as a field value inside `DataTransformCall`.
+
+```ts
+// packages/3-targets/3-targets/postgres/src/core/migrations/placeholder-expression.ts
+import { MigrationTsExpression, type ImportRequirement } from './migration-ts-expression';
+
+export class PlaceholderExpression extends MigrationTsExpression {
+  constructor(readonly slot: string) {
+    super();
+    Object.freeze(this);
+  }
+
+  renderTypeScript(): string {
+    return `() => placeholder(${JSON.stringify(this.slot)})`;
+  }
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [{ moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' }];
+  }
+}
+```
+
+The hierarchy is deliberately open to future expression variants (for example a `ClosureExpression` wrapping a pre-computed transformation, once we need one). `DataTransformCall` accepts any `MigrationTsExpression` for its `check` and `run` fields — narrowing to `PlaceholderExpression` would collapse the abstraction to "the slot string plus a bit of ceremony" and foreclose that extension.
+
 ### Postgres IR — `op-factory-call.ts`
 
-Layout mirrors `packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`:
+Layout mirrors `packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`, with the `MigrationTsExpression` ancestry layered in:
 
 ```ts
 import type { MigrationOperationClass, OpFactoryCall } from '@prisma-next/framework-components/control';
+import { MigrationTsExpression, type ImportRequirement } from './migration-ts-expression';
+import { PlaceholderExpression } from './placeholder-expression';
 
 export interface PostgresOpFactoryCallVisitor<R> {
   createTable(call: CreateTableCall): R;
@@ -107,7 +163,7 @@ export interface PostgresOpFactoryCallVisitor<R> {
   dataTransform(call: DataTransformCall): R;
 }
 
-abstract class PostgresOpFactoryCallNode implements OpFactoryCall {
+abstract class PostgresOpFactoryCallNode extends MigrationTsExpression implements OpFactoryCall {
   abstract readonly factory: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
@@ -148,9 +204,59 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
   accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
     return visitor.createTable(this);
   }
+
+  renderTypeScript(): string {
+    return `createTable(${stringifyArgs(this.schemaName, this.tableName, this.columns, this.options)})`;
+  }
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [{ moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'createTable' }];
+  }
 }
 
-// … one class per factory in Phase 0's inventory …
+// … one class per factory in Phase 0's inventory. Each class supplies a literal
+// `factory` / `operationClass`, computes its `label` in the constructor from
+// literal args, implements `accept()` (one-liner), `renderTypeScript()` (one-liner
+// over `stringifyArgs(...)`), and `importRequirements()` (a single entry for its
+// factory symbol). …
+
+export class DataTransformCall extends PostgresOpFactoryCallNode {
+  readonly factory = 'dataTransform' as const;
+  readonly operationClass: MigrationOperationClass;
+  readonly label: string;
+  readonly check: MigrationTsExpression;
+  readonly run: MigrationTsExpression;
+
+  constructor(
+    label: string,
+    check: MigrationTsExpression,
+    run: MigrationTsExpression,
+    operationClass: MigrationOperationClass = 'data',
+  ) {
+    super();
+    this.label = label;
+    this.check = check;
+    this.run = run;
+    this.operationClass = operationClass;
+    this.freeze();
+  }
+
+  accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R {
+    return visitor.dataTransform(this);
+  }
+
+  renderTypeScript(): string {
+    return `dataTransform(${JSON.stringify(this.label)}, ${this.check.renderTypeScript()}, ${this.run.renderTypeScript()})`;
+  }
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [
+      { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
+      ...this.check.importRequirements(),
+      ...this.run.importRequirements(),
+    ];
+  }
+}
 
 export type PostgresOpFactoryCall =
   | CreateTableCall
@@ -177,19 +283,35 @@ export type PostgresOpFactoryCall =
   | DataTransformCall;
 ```
 
-- Constructor arg shapes mirror Phase 0's pure factory signatures 1:1.
+Key design points:
+
+- Constructor arg shapes mirror Phase 0's pure factory signatures 1:1, except that `DataTransformCall`'s `check` and `run` are `MigrationTsExpression` rather than plain closures. The pure `createDataTransform` factory still takes closures; the adaptation happens in `render-ops.ts` (see below).
 - Every concrete class is frozen at construction.
 - `operationClass` is a literal constant per class for additive / destructive variants. `DataTransformCall.operationClass` is the only one the caller supplies (defaults to `'data'`).
 - `label` is computed in the constructor from the literal args. The planner doesn't inject labels.
+- **Two dispatch mechanisms, one per audience.** The `accept(visitor)` method is for `renderOps` — a single exhaustive switch over the `PostgresOpFactoryCall` union. The `renderTypeScript()` / `importRequirements()` polymorphic methods are for `renderCallsToTypeScript` — the walk must recurse into `MigrationTsExpression` children of `DataTransformCall` uniformly, which is exactly what polymorphism does well and what a visitor rooted at the `PostgresOpFactoryCall` union cannot express.
+- `PostgresOpFactoryCallNode` is package-private. External consumers see only `OpFactoryCall` (framework) and the `PostgresOpFactoryCall` union. The internal abstract class gives the Postgres IR the Mongo-parity structure without leaking any Postgres-specific abstraction into cross-package signatures.
 
-### Postgres IR — visitor renderers
+### Postgres IR — `render-ops.ts` (visitor; `OpFactoryCall` → runtime op)
 
-`packages/3-targets/3-targets/postgres/src/core/migrations/render-ops.ts`:
+`renderOps` stays a visitor. Its job is one-to-one with the `PostgresOpFactoryCall` union, and the visitor pattern is what gives us compile-time exhaustiveness over that union.
 
 ```ts
+// packages/3-targets/3-targets/postgres/src/core/migrations/render-ops.ts
 class OpsRenderer implements PostgresOpFactoryCallVisitor<SqlMigrationPlanOperation<PostgresPlanTargetDetails>> {
-  createTable(call: CreateTableCall) { return createTable(call.schemaName, call.tableName, call.columns, call.options); }
+  createTable(call: CreateTableCall) {
+    return createTable(call.schemaName, call.tableName, call.columns, call.options);
+  }
   // …one method per factory, each delegating to the Phase 0 pure factory…
+
+  dataTransform(call: DataTransformCall) {
+    return dataTransform(
+      call.label,
+      bodyToClosure(call.check),
+      bodyToClosure(call.run),
+      call.operationClass,
+    );
+  }
 }
 
 export function renderOps(
@@ -200,34 +322,63 @@ export function renderOps(
 }
 ```
 
-`packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts`:
+`bodyToClosure(expr: MigrationTsExpression): () => SqlQueryPlan` is a local helper whose single responsibility is: "given a `MigrationTsExpression` used as a `dataTransform` body, produce the closure the pure `dataTransform` factory expects." In Phase 1 the only variant it handles is `PlaceholderExpression`:
 
 ```ts
-class TypeScriptRenderer implements PostgresOpFactoryCallVisitor<string> {
-  createTable(call: CreateTableCall) {
-    return `ops.push(createTable(${stringifyArgs(call.schemaName, call.tableName, call.columns, call.options)}));`;
-  }
-  // …
-  dataTransform(call: DataTransformCall) {
-    const check = isPlaceholderClosure(call.check)
-      ? `() => placeholder("${extractSlot(call.check)}")`
-      : stringifyClosure(call.check);
-    const run = isPlaceholderClosure(call.run)
-      ? `() => placeholder("${extractSlot(call.run)}")`
-      : stringifyClosure(call.run);
-    return `ops.push(dataTransform(${JSON.stringify(call.label)}, ${check}, ${run}));`;
-  }
-}
+import { placeholder } from '@prisma-next/errors/migration';
 
-export function renderCallsToTypeScript(
-  calls: readonly PostgresOpFactoryCall[],
-  meta: { readonly contractPath: string /* and any other metadata */ },
-): string { /* …produces a complete migration.ts source string… */ }
+function bodyToClosure(expr: MigrationTsExpression): () => never {
+  if (expr instanceof PlaceholderExpression) {
+    return () => placeholder(expr.slot); // invocation throws errorUnfilledPlaceholder
+  }
+  // Future variants (e.g. ClosureExpression) extend this switch. Any unsupported
+  // variant is a planner bug, surfaced as an internal-invariant throw.
+  throw new Error(`DataTransformCall body: unsupported expression variant ${expr.constructor.name}`);
+}
 ```
 
-- Output format mirrors today's `renderDescriptorTypeScript` output shape (imports, class, `plan()` method, `Migration.run(...)`) so that Phase 3's flip produces byte-equivalent `migration.ts` source where possible.
-- Output shape is finalized against the existing Mongo `renderCallsToTypeScript` output, with Postgres-specific imports substituted.
-- Non-placeholder closures in `DataTransformCall` are never produced by Phase 1 (the walk-schema planner never synthesizes user-authored closures), but the renderer paths for them exist so Phase 2's issue planner can exercise them. In Phase 1, hitting a non-placeholder closure during rendering is an assertion failure.
+The invariant this helper establishes — and which the rest of the system relies on — is: when the planner emits a `DataTransformCall` with placeholder bodies, the closures the pure `dataTransform` factory receives **throw** when invoked. The factory invokes `check()` / `run()` to materialize their `SqlQueryPlan`s into the runtime op's pre/postcheck / execute steps, so the throw propagates out through `renderOps` → `instance.operations` → `Migration.run`'s JSON-serialization path.
+
+`renderOps` itself does not catch. It is the shared path between `db update` (walk-schema today, issue-planner post-Phase 4) and `migration plan` (post-Phase 3); catching belongs at the CLI boundary. See plan.md §"Phase 3" for the catch.
+
+### Postgres IR — `render-typescript.ts` (polymorphic; `OpFactoryCall` → migration.ts source)
+
+`renderCallsToTypeScript` is **not** a visitor. Each node renders itself via `renderTypeScript()` and declares its own imports via `importRequirements()`; the top-level function composes the module source:
+
+```ts
+// packages/3-targets/3-targets/postgres/src/core/migrations/render-typescript.ts
+export function renderCallsToTypeScript(
+  calls: readonly PostgresOpFactoryCall[],
+  meta: { readonly contractRelativePath: string /* and any other metadata */ },
+): string {
+  const imports = deduplicate(calls.flatMap((call) => call.importRequirements()));
+  const body = calls
+    .map((call) => `      ${call.renderTypeScript()},`)
+    .join('\n');
+  return [
+    '#!/usr/bin/env -S node --experimental-strip-types',
+    renderImportBlock(imports, meta),
+    '',
+    renderContractImport(meta),
+    '',
+    'export default class extends Migration {',
+    '  plan() {',
+    '    return [',
+    body,
+    '    ];',
+    '  }',
+    '}',
+    '',
+    'Migration.run(import.meta.url, (await import(import.meta.url)).default);',
+    '',
+  ].join('\n');
+}
+```
+
+- Polymorphism is sufficient here because `DataTransformCall.renderTypeScript()` recurses into `this.check.renderTypeScript()` / `this.run.renderTypeScript()` uniformly — whether the children are `PlaceholderExpression`s today or a future `ClosureExpression` tomorrow. A visitor rooted at `PostgresOpFactoryCallVisitor` would require a separate `MigrationTsExpressionVisitor` to handle the children, which is more machinery than the polymorphic methods buy.
+- `renderImportBlock(imports, meta)` collapses `ImportRequirement[]` entries by `moduleSpecifier` and emits a sorted `import { a, b, c } from "…"` block. The `Migration` import from `@prisma-next/family-sql/migration` is always emitted (meta-driven, not derived from any node).
+- Output shape (shebang, `Migration` import from `@prisma-next/family-sql/migration`, contract import, `export default class … extends Migration`, `Migration.run(import.meta.url, …)`) mirrors today's `renderDescriptorTypeScript` output and Mongo's `renderCallsToTypeScript` output, so Phase 3's flip produces structurally-equivalent files.
+- Non-placeholder `MigrationTsExpression` variants are not produced by Phase 1. If one appears in a `DataTransformCall` during Phase 1 it's a planner bug. The renderer itself prints it polymorphically without objection; the invariant is enforced by `bodyToClosure` on the ops side.
 
 ### Postgres IR — `planner-produced-postgres-migration.ts`
 
@@ -235,8 +386,8 @@ Named to mirror Mongo's `planner-produced-migration.ts`. Contents:
 
 ```ts
 export class TypeScriptRenderablePostgresMigration
-  extends Migration<PostgresPlanTargetDetails>
-  implements MigrationPlanWithAuthoringSurface
+  extends SqlMigration<PostgresPlanTargetDetails>
+  implements MigrationPlanWithAuthoringSurface<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>
 {
   readonly targetId = 'postgres' as const;
 
@@ -257,7 +408,9 @@ export class TypeScriptRenderablePostgresMigration
 }
 ```
 
-Structurally identical to Mongo's `PlannerProducedMongoMigration` modulo the target-bound `Migration` alias and the call union.
+Structurally identical to Mongo's `PlannerProducedMongoMigration` modulo the target-bound `SqlMigration` alias and the call union.
+
+**Behavior with placeholder-bearing plans.** When `this.calls` contains a `DataTransformCall` whose `check` or `run` is a `PlaceholderExpression`, accessing `this.operations` runs `renderOps`, which invokes the pure `dataTransform` factory, which invokes the placeholder closures to build the runtime op's precheck / execute steps, which throws `errorUnfilledPlaceholder(slot)` (`PN-MIG-2001`). `this.renderTypeScript()` is unaffected — it walks nodes polymorphically and never invokes closures, so it always produces a valid `migration.ts` source including `() => placeholder("slot")` at the right spots. This is the asymmetry Option B in Phase 3 relies on: the class can always produce its TypeScript source, but only produces its runtime operations when the user has filled every placeholder slot.
 
 ### Walk-schema planner retargeting
 
@@ -275,18 +428,27 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 
 - [ ] `OpFactoryCall` interface exported from `framework-components/control`.
 - [ ] Mongo's `OpFactoryCallNode` abstract class declares `implements OpFactoryCall`; `pnpm -r typecheck` passes without additional per-class changes.
-- [ ] Family-SQL `Migration` alias exists and is re-exported by `@prisma-next/target-postgres/migration`.
-- [ ] `op-factory-call.ts`, `render-ops.ts`, `render-typescript.ts`, `planner-produced-postgres-migration.ts` all exist under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
-- [ ] `PostgresOpFactoryCallNode` is not exported (verify via `rg "PostgresOpFactoryCallNode" packages/3-targets/3-targets/postgres/src/exports/` returning zero matches).
-- [ ] No non-Postgres file in `packages/` references `PostgresOpFactoryCallNode` (verify via `rg "PostgresOpFactoryCallNode" packages/ --glob '!packages/3-targets/3-targets/postgres/**'`).
+- [ ] Family-SQL `Migration` alias exists (implementation in `packages/2-sql/9-family/src/core/sql-migration.ts`, one-line re-export in `packages/2-sql/9-family/src/exports/migration.ts`) and is re-exported by `@prisma-next/target-postgres/migration`.
+- [ ] `migration-ts-expression.ts`, `placeholder-expression.ts`, `op-factory-call.ts`, `render-ops.ts`, `render-typescript.ts`, `planner-produced-postgres-migration.ts` all exist under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
+- [ ] `MigrationTsExpression` and `PostgresOpFactoryCallNode` are not exported (verify via `rg "MigrationTsExpression|PostgresOpFactoryCallNode" packages/3-targets/3-targets/postgres/src/exports/` returning zero matches).
+- [ ] No non-Postgres file in `packages/` references `MigrationTsExpression`, `PlaceholderExpression`, or `PostgresOpFactoryCallNode` (verify via `rg` scoped outside the Postgres package).
+- [ ] `PostgresOpFactoryCallNode` extends `MigrationTsExpression` and implements `OpFactoryCall`.
+- [ ] `PlaceholderExpression` extends `MigrationTsExpression`, is frozen at construction, and is **not** a member of the `PostgresOpFactoryCall` union.
+- [ ] `DataTransformCall.check` and `DataTransformCall.run` are typed as `MigrationTsExpression` (not narrowed to `PlaceholderExpression`).
+- [ ] Every concrete `PostgresOpFactoryCall` class implements `renderTypeScript()` and `importRequirements()` in addition to `accept()`.
+- [ ] `renderCallsToTypeScript` is a plain function (no visitor): it calls `node.renderTypeScript()` / `node.importRequirements()` polymorphically and deduplicates the import list.
+- [ ] `renderOps` is a visitor and satisfies `PostgresOpFactoryCallVisitor<SqlMigrationPlanOperation<PostgresPlanTargetDetails>>`. Its `dataTransform` case routes `check` / `run` through a local `bodyToClosure(expr)` helper.
+- [ ] `bodyToClosure(expr)` returns `() => placeholder(slot)` for `PlaceholderExpression` (invocation throws `PN-MIG-2001`) and throws an internal-invariant error for any other variant.
 - [ ] Every `private buildX` method on `PostgresMigrationPlanner` returns `PostgresOpFactoryCall[]`.
 - [ ] `planner-reconciliation.ts` produces `PostgresOpFactoryCall[]`.
 - [ ] `PostgresMigrationPlanner.plan()`'s external `MigrationPlannerResult` shape is unchanged.
 - [ ] `pnpm -r typecheck`, `pnpm -r lint` pass.
 - [ ] Every existing Postgres planner test passes unchanged: `planner.integration.test.ts`, `planner.behavior.test.ts`, `planner.storage-types.integration.test.ts`, `planner.reconciliation.integration.test.ts`, `planner.authoring-surface.test.ts`.
-- [ ] New unit tests per concrete call class: construct with literal args, assert frozen, assert `accept()` dispatches to the correct visitor method, assert `label` is what the planner would produce.
-- [ ] New unit tests per `renderOps` / `renderCallsToTypeScript` case: every variant in the union has an assertion.
-- [ ] New unit test for `TypeScriptRenderablePostgresMigration`: construct with a fixed `calls` array + meta, assert `operations` = `renderOps(calls)`, assert `renderTypeScript()` produces parseable TypeScript whose dynamic import reconstructs the same `operations`.
+- [ ] New unit tests per concrete call class: construct with literal args, assert frozen, assert `accept()` dispatches to the correct visitor method, assert `label` is what the planner would produce, assert `renderTypeScript()` and `importRequirements()` outputs.
+- [ ] New unit tests for `PlaceholderExpression`: `renderTypeScript()` returns `() => placeholder("slot")`, `importRequirements()` returns the `placeholder` entry, `bodyToClosure` of it returns a closure whose invocation throws `PN-MIG-2001`.
+- [ ] New unit tests per `renderOps` case: every variant in the union has an assertion; `dataTransform` of a placeholder-bearing `DataTransformCall` produces a runtime op whose `check` / `run` closures throw `PN-MIG-2001` when invoked.
+- [ ] New unit test for `renderCallsToTypeScript`: every variant round-trips through `renderTypeScript()`, the import block is deduplicated and sorted, and a `DataTransformCall` with placeholder bodies emits `() => placeholder("slot")` in-line while contributing a `placeholder` import.
+- [ ] New unit test for `TypeScriptRenderablePostgresMigration`: construct with a fixed `calls` array + meta, assert `operations` = `renderOps(calls)` (for placeholder-free inputs), assert `renderTypeScript()` produces parseable TypeScript whose dynamic import reconstructs the same `operations`.
 - [ ] `db update` end-to-end smoke via existing CLI integration tests — applies against a live Postgres and the runner's post-apply `verifySqlSchema` check passes, confirming the retargeted walk-schema path still produces equivalent recipes.
 - [ ] `satisfies PostgresOpFactoryCallVisitor<R>` is present on every visitor implementation — compile-time exhaustiveness for future variant additions.
 
@@ -316,4 +478,5 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 - [ADR 193 — Class-flow as the canonical migration authoring strategy](../../../docs/architecture%20docs/adrs/ADR%20193%20-%20Class-flow%20as%20the%20canonical%20migration%20authoring%20strategy.md)
 - [ADR 194 — Plans carry their own authoring surface](../../../docs/architecture%20docs/adrs/ADR%20194%20-%20Plans%20carry%20their%20own%20authoring%20surface.md)
 - [ADR 195 — Planner IR with two renderers](../../../docs/architecture%20docs/adrs/ADR%20195%20-%20Planner%20IR%20with%20two%20renderers.md)
+- [ADR 200 — Placeholder utility for scaffolded migration slots](../../../docs/architecture%20docs/adrs/ADR%20200%20-%20Placeholder%20utility%20for%20scaffolded%20migration%20slots.md)
 - Mongo reference: `packages/3-mongo-target/1-mongo-target/src/core/{op-factory-call.ts,planner-produced-migration.ts,render-typescript.ts}`
