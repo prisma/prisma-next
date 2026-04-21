@@ -23,7 +23,9 @@ import {
   AddUniqueCall,
   AlterColumnTypeCall,
   CreateEnumTypeCall,
+  CreateExtensionCall,
   CreateIndexCall,
+  CreateSchemaCall,
   CreateTableCall,
   DataTransformCall,
   DropColumnCall,
@@ -34,6 +36,7 @@ import {
   DropNotNullCall,
   DropTableCall,
   type PostgresOpFactoryCallVisitor,
+  RawSqlCall,
   RenameTypeCall,
   SetDefaultCall,
   SetNotNullCall,
@@ -179,7 +182,16 @@ describe('renderCallsToTypeScript', () => {
 });
 
 describe('renderOps', () => {
-  it('lowers every non-dataTransform variant via its corresponding pure factory', () => {
+  it('lowers each variant via its pure factory, pinning id/operationClass/target.details', () => {
+    const liftedOp = {
+      id: 'custom.op.1',
+      label: 'Custom raw op',
+      operationClass: 'additive' as const,
+      target: { id: 'postgres' as const },
+      precheck: [],
+      execute: [{ description: 'run', sql: 'SELECT 1' }],
+      postcheck: [],
+    };
     const calls = [
       new CreateTableCall('public', 'user', [
         { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
@@ -217,15 +229,145 @@ describe('renderOps', () => {
       new AddEnumValuesCall('public', 'status', 'public.status', ['pending']),
       new DropEnumTypeCall('public', 'status'),
       new RenameTypeCall('public', 'status_old', 'status'),
+      new RawSqlCall(liftedOp),
+      new CreateExtensionCall('citext'),
+      new CreateSchemaCall('app'),
     ];
 
     const ops = renderOps(calls);
 
-    expect(ops).toHaveLength(calls.length);
-    for (const op of ops) {
-      expect(op.id).toBeTypeOf('string');
-      expect(op.execute).toBeInstanceOf(Array);
+    const schemaObject = (objectType: string, name: string, table?: string) => ({
+      schema: 'public',
+      objectType,
+      name,
+      ...(table !== undefined ? { table } : {}),
+    });
+    const expectations: Array<{
+      id: string;
+      operationClass: string;
+      details: Record<string, unknown> | undefined;
+    }> = [
+      { id: 'table.user', operationClass: 'additive', details: schemaObject('table', 'user') },
+      {
+        id: 'dropTable.stale',
+        operationClass: 'destructive',
+        details: schemaObject('table', 'stale'),
+      },
+      {
+        id: 'column.user.email',
+        operationClass: 'additive',
+        details: schemaObject('column', 'email', 'user'),
+      },
+      {
+        id: 'dropColumn.user.legacy',
+        operationClass: 'destructive',
+        details: schemaObject('column', 'legacy', 'user'),
+      },
+      {
+        id: 'alterType.user.age',
+        operationClass: 'destructive',
+        details: schemaObject('column', 'age', 'user'),
+      },
+      {
+        id: 'alterNullability.user.email',
+        operationClass: 'destructive',
+        details: schemaObject('column', 'email', 'user'),
+      },
+      {
+        id: 'alterNullability.user.nickname',
+        operationClass: 'widening',
+        details: schemaObject('column', 'nickname', 'user'),
+      },
+      {
+        id: 'setDefault.user.created_at',
+        operationClass: 'additive',
+        details: schemaObject('column', 'created_at', 'user'),
+      },
+      {
+        id: 'dropDefault.user.updated_at',
+        operationClass: 'destructive',
+        details: schemaObject('column', 'updated_at', 'user'),
+      },
+      {
+        id: 'primaryKey.user.user_pkey',
+        operationClass: 'additive',
+        details: schemaObject('primaryKey', 'user_pkey', 'user'),
+      },
+      {
+        id: 'unique.user.user_email_key',
+        operationClass: 'additive',
+        details: schemaObject('unique', 'user_email_key', 'user'),
+      },
+      {
+        id: 'foreignKey.user.user_org_fk',
+        operationClass: 'additive',
+        details: schemaObject('foreignKey', 'user_org_fk', 'user'),
+      },
+      {
+        id: 'dropConstraint.user.user_email_key',
+        operationClass: 'destructive',
+        details: schemaObject('unique', 'user_email_key', 'user'),
+      },
+      {
+        id: 'index.user.user_email_idx',
+        operationClass: 'additive',
+        details: schemaObject('index', 'user_email_idx', 'user'),
+      },
+      {
+        id: 'dropIndex.user.stale_idx',
+        operationClass: 'destructive',
+        details: schemaObject('index', 'stale_idx', 'user'),
+      },
+      { id: 'type.status', operationClass: 'additive', details: schemaObject('type', 'status') },
+      {
+        id: 'type.status.addValues',
+        operationClass: 'additive',
+        details: schemaObject('type', 'status'),
+      },
+      {
+        id: 'type.status.drop',
+        operationClass: 'destructive',
+        details: schemaObject('type', 'status'),
+      },
+      {
+        id: 'type.status_old.rename',
+        operationClass: 'destructive',
+        details: schemaObject('type', 'status_old'),
+      },
+      { id: 'custom.op.1', operationClass: 'additive', details: undefined },
+      { id: 'extension.citext', operationClass: 'additive', details: undefined },
+      { id: 'schema.app', operationClass: 'additive', details: undefined },
+    ];
+
+    expect(ops).toHaveLength(expectations.length);
+    for (const [i, expected] of expectations.entries()) {
+      const op = ops[i];
+      expect(op, `ops[${i}]`).toMatchObject({
+        id: expected.id,
+        operationClass: expected.operationClass,
+        target: {
+          id: 'postgres',
+          ...(expected.details !== undefined ? { details: expected.details } : {}),
+        },
+      });
     }
+  });
+
+  it('RawSqlCall returns its stored op verbatim', () => {
+    const op = {
+      id: 'raw.identity',
+      label: 'raw identity',
+      operationClass: 'widening' as const,
+      target: { id: 'postgres' as const, details: { schema: 'x', objectType: 'table', name: 't' } },
+      precheck: [],
+      execute: [{ description: 'do', sql: 'SELECT 1' }],
+      postcheck: [],
+      meta: { note: 'roundtrip' },
+    };
+
+    const [rendered] = renderOps([new RawSqlCall(op)]);
+
+    expect(rendered).toBe(op);
   });
 
   it('throws PN-MIG-2001 on DataTransformCall (always an unfilled stub at plan time)', () => {
