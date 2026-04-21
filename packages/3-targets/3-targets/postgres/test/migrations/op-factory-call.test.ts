@@ -291,6 +291,16 @@ describe('Postgres call classes', () => {
       expectFactoryImport(rename, 'renameType');
     });
 
+    it('RenameTypeCall prechecks both fromName existence and toName non-existence', () => {
+      const op = new RenameTypeCall('public', 'status_old', 'status').toOp();
+      const prechecks = op.precheck.map((s) => s.sql);
+      expect(prechecks).toHaveLength(2);
+      expect(prechecks[0]).toContain("t.typname = 'status_old'");
+      expect(prechecks[0]).toContain('EXISTS (');
+      expect(prechecks[1]).toContain("t.typname = 'status'");
+      expect(prechecks[1]).toContain('NOT EXISTS (');
+    });
+
     it('CreateExtensionCall / CreateSchemaCall emit a single-arg factory call', () => {
       const ext = new CreateExtensionCall('citext');
       expect(ext.renderTypeScript()).toBe('createExtension("citext")');

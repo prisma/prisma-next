@@ -95,7 +95,13 @@ export function renameType(schemaName: string, fromName: string, toName: string)
     label: `Rename type "${fromName}" to "${toName}"`,
     operationClass: 'destructive',
     target: targetDetails('type', fromName, schemaName),
-    precheck: [step(`ensure type "${fromName}" exists`, enumTypeExistsCheck(schemaName, fromName))],
+    precheck: [
+      step(`ensure type "${fromName}" exists`, enumTypeExistsCheck(schemaName, fromName)),
+      step(
+        `ensure type "${toName}" does not already exist`,
+        enumTypeExistsCheck(schemaName, toName, false),
+      ),
+    ],
     execute: [
       step(
         `rename type "${fromName}" to "${toName}"`,
