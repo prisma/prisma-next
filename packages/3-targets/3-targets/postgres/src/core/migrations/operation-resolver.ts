@@ -256,9 +256,9 @@ function resolveAddForeignKey(
 
 function resolveDropConstraint(
   desc: DropConstraintDescriptor,
-  _ctx: OperationResolverContext,
+  ctx: OperationResolverContext,
 ): ResolvedOp {
-  return createDropConstraint(_ctx.schemaName, desc.table, desc.constraintName);
+  return createDropConstraint(ctx.schemaName, desc.table, desc.constraintName);
 }
 
 function resolveCreateIndex(
