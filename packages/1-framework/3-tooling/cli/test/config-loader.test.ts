@@ -123,7 +123,7 @@ describe('config loader', () => {
   );
 
   it(
-    'loads provider config with omitted inputs',
+    'loads provider config with omitted inputs and default output',
     async () => {
       const configPath = join(testDir, 'prisma-next.config.ts');
       writeFileSync(
@@ -141,6 +141,7 @@ describe('config loader', () => {
       const config = await loadConfig(configPath);
 
       expect(config.contract?.source.inputs).toBeUndefined();
+      expect(config.contract?.output).toBe(join(testDir, 'src/prisma/contract.json'));
     },
     timeouts.typeScriptCompilation,
   );

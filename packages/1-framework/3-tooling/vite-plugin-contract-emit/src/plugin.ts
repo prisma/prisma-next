@@ -63,6 +63,7 @@ export function prismaVitePlugin(
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
   let emitRequestId = 0;
+  let didWarnConfigWatchFallback = false;
 
   function log(message: string, level: 'info' | 'debug' = 'info') {
     if (logLevel === 'silent') return;
@@ -77,6 +78,11 @@ export function prismaVitePlugin(
     if (error instanceof Error && error.stack && logLevel === 'debug') {
       console.error(error.stack);
     }
+  }
+
+  function logWarning(message: string) {
+    if (logLevel === 'silent') return;
+    console.warn(`[${PLUGIN_NAME}] ${message}`);
   }
 
   function handleTrackedFileChange(file: string) {
@@ -236,6 +242,7 @@ export function prismaVitePlugin(
 
     try {
       const config = await loadConfig(absoluteConfigPath);
+      didWarnConfigWatchFallback = false;
       const contract = config.contract;
 
       if (!contract) {
@@ -266,7 +273,13 @@ export function prismaVitePlugin(
 
       return files;
     } catch (error) {
-      logError('Failed to resolve watched files:', error);
+      if (!didWarnConfigWatchFallback) {
+        didWarnConfigWatchFallback = true;
+        const reason = error instanceof Error ? ` ${error.message}` : '';
+        logWarning(
+          `Watching only ${absoluteConfigPath} because Prisma Next config inputs could not be resolved.${reason} Contract watch coverage is partial.`,
+        );
+      }
       return new Set([absoluteConfigPath]);
     }
   }
@@ -338,6 +351,7 @@ export function prismaVitePlugin(
         viteServer.watcher.off?.('add', onTrackedWatcherEvent);
         viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
         ignoredOutputFiles.clear();
+        didWarnConfigWatchFallback = false;
         server = null;
         watchedFiles.clear();
         log('Server closed, cleaned up resources', 'debug');

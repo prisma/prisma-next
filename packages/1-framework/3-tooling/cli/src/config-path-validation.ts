@@ -7,6 +7,8 @@ import { ConfigValidationError } from '@prisma-next/config/config-validation';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { resolve } from 'pathe';
 
+const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
+
 function throwValidation(field: string, why: string): never {
   throw new ConfigValidationError(field, why);
 }
@@ -59,10 +61,8 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
   }
 
   const source = finalizeContractSource(config.contract.source, configDir);
-  const output =
-    config.contract.output === undefined ? undefined : resolve(configDir, config.contract.output);
-  const contract =
-    output === undefined ? { ...config.contract, source } : { ...config.contract, source, output };
+  const output = resolve(configDir, config.contract.output ?? DEFAULT_CONTRACT_OUTPUT);
+  const contract = { ...config.contract, source, output };
 
   validateContractPathDisjointness(contract);
 

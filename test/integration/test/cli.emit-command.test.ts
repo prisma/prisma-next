@@ -626,7 +626,7 @@ describe('emit command', () => {
   );
 
   it(
-    'throws error when contract config output is missing',
+    'uses default output path for plain-object configs without defineConfig',
     { timeout: timeouts.typeScriptCompilation },
     async () => {
       const command = createContractEmitCommand();
@@ -641,20 +641,21 @@ describe('emit command', () => {
         const originalCwd = process.cwd();
         try {
           process.chdir(testDirMissing);
-          // Command should throw for missing output
-          await expect(
-            executeCommand(command, [
-              'node',
-              'cli.js',
-              'emit',
-              '--config',
-              'prisma-next.config.ts',
-              '--json',
-            ]),
-          ).rejects.toThrow();
+          const exitCode = await executeCommand(command, [
+            'node',
+            'cli.js',
+            'emit',
+            '--config',
+            'prisma-next.config.ts',
+            '--json',
+          ]);
+          expect(exitCode).toBe(0);
         } finally {
           process.chdir(originalCwd);
         }
+
+        expect(existsSync(join(testDirMissing, 'src/prisma/contract.json'))).toBe(true);
+        expect(existsSync(join(testDirMissing, 'src/prisma/contract.d.ts'))).toBe(true);
       } finally {
         cleanupMissing();
       }

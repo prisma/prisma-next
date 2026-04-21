@@ -5,13 +5,13 @@ import { typescriptContract } from '@prisma-next/sql-contract-ts/config-types';
 import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './contract';
 
-// Manually create config without using defineConfig to test error path
+// Manually create config without using defineConfig to verify loader finalization.
 export default {
   family: sql,
   target: postgres,
   adapter: postgresAdapter,
   driver: postgresDriver,
   extensionPacks: [],
-  // Missing output to test error path (defineConfig defaults are intentionally bypassed)
+  // Omit output intentionally; loadConfig should finalize it to src/prisma/contract.json.
   contract: typescriptContract(contract),
 };
