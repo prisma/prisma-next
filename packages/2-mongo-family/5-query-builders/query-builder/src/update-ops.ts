@@ -1,4 +1,7 @@
-import type { MongoUpdatePipelineStage } from '@prisma-next/mongo-query-ast/execution';
+import type {
+  MongoUpdatePipelineStage,
+  MongoUpdateSpec,
+} from '@prisma-next/mongo-query-ast/execution';
 import type { MongoValue } from '@prisma-next/mongo-value';
 
 /**
@@ -91,19 +94,33 @@ export const setOnInsertOp = (path: string, value: MongoValue): TypedUpdateOp =>
 });
 
 /**
- * Fold an array of `TypedUpdateOp` into the `Record<string, MongoValue>`
- * shape that `MongoUpdateSpec` accepts as the non-pipeline form.
- *
- * Result: `{ $set: { 'foo': 1, 'bar.baz': 2 }, $inc: { 'count': 1 }, … }`.
+ * Per-operator bucket: `{ '<fieldPath>': <operatorValue> }`. Every value is
+ * already a `MongoValue` (operators store numbers/strings/booleans/arrays
+ * directly), so no blind casts are needed at assignment sites.
+ */
+type UpdateOpBucket = Record<string, MongoValue>;
+
+/**
+ * The full nested shape that `foldUpdateOps` accumulates before returning a
+ * `MongoUpdateSpec`: `operator → fieldPath → value`. Each inner bucket is
+ * itself a `MongoDocument`-compatible record, which is why the outer map is
+ * structurally a `MongoUpdateSpec` (`Record<string, MongoValue>` where every
+ * value is a document).
+ */
+type UpdateOpBuckets = Record<string, UpdateOpBucket>;
+
+/**
+ * Fold an array of `TypedUpdateOp` into the non-pipeline variant of
+ * `MongoUpdateSpec` (`{ $set: { … }, $inc: { … }, … }`).
  *
  * Throws if the same operator targets the same path twice — a clear authoring
  * error that Mongo would otherwise silently coalesce.
  */
-export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): Record<string, MongoValue> {
-  const buckets: Record<string, Record<string, MongoValue>> = {};
+export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): MongoUpdateSpec {
+  const buckets: UpdateOpBuckets = {};
   const seen = new Set<string>();
 
-  const ensure = (key: string): Record<string, MongoValue> => {
+  const ensure = (key: string): UpdateOpBucket => {
     let bucket = buckets[key];
     if (!bucket) {
       bucket = {};
@@ -135,10 +152,10 @@ export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): Record<string,
         ensure(entry.op)[entry.path] = entry.value;
         break;
       case '$unset':
-        ensure('$unset')[entry.path] = '' as unknown as MongoValue;
+        ensure('$unset')[entry.path] = '';
         break;
       case '$rename':
-        ensure('$rename')[entry.path] = entry.newName as unknown as MongoValue;
+        ensure('$rename')[entry.path] = entry.newName;
         break;
       case '$inc':
         ensure('$inc')[entry.path] = entry.amount;
@@ -150,15 +167,15 @@ export function foldUpdateOps(ops: ReadonlyArray<TypedUpdateOp>): Record<string,
         ensure('$pop')[entry.path] = entry.direction;
         break;
       case '$pullAll':
-        ensure('$pullAll')[entry.path] = entry.values as unknown as MongoValue;
+        ensure('$pullAll')[entry.path] = entry.values;
         break;
       case '$currentDate':
-        ensure('$currentDate')[entry.path] = true as unknown as MongoValue;
+        ensure('$currentDate')[entry.path] = true;
         break;
     }
   }
 
-  return buckets as unknown as Record<string, MongoValue>;
+  return buckets;
 }
 
 export type UpdaterItem = TypedUpdateOp | MongoUpdatePipelineStage;
@@ -178,9 +195,7 @@ export type UpdaterResult = ReadonlyArray<TypedUpdateOp> | ReadonlyArray<MongoUp
  * - All `MongoUpdatePipelineStage` → return as-is (pipeline-style update)
  * - Mixed → throw (also a type error at the call site via the union shape)
  */
-export function resolveUpdaterResult(
-  items: ReadonlyArray<UpdaterItem>,
-): Record<string, MongoValue> | ReadonlyArray<MongoUpdatePipelineStage> {
+export function resolveUpdaterResult(items: ReadonlyArray<UpdaterItem>): MongoUpdateSpec {
   if (items.length === 0) {
     throw new Error(
       'Updater returned no operations. Return at least one update from the callback (e.g. `[f.amount.set(0)]`).',
