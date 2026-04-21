@@ -93,7 +93,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
       cwd: tmpDir,
     });
     expect(stderr).toBe('');
-    expect(stdout).toContain('');
+    expect(stdout).toContain('Wrote ops.json + migration.json to ');
 
     const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
     const ops = JSON.parse(opsJson);
