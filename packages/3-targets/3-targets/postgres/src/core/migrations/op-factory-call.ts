@@ -54,13 +54,13 @@ export interface PostgresOpFactoryCallVisitor<R> {
 }
 
 abstract class PostgresOpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
-  abstract readonly factory: string;
+  abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
   abstract accept<R>(visitor: PostgresOpFactoryCallVisitor<R>): R;
 
   importRequirements(): readonly ImportRequirement[] {
-    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factory }];
+    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
   }
 
   protected freeze(): void {
@@ -77,7 +77,7 @@ export interface CreateTablePrimaryKey {
 }
 
 export class CreateTableCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'createTable' as const;
+  readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -116,7 +116,7 @@ export class CreateTableCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropTableCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropTable' as const;
+  readonly factoryName = 'dropTable' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -144,7 +144,7 @@ export class DropTableCall extends PostgresOpFactoryCallNode {
 // ============================================================================
 
 export class AddColumnCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'addColumn' as const;
+  readonly factoryName = 'addColumn' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -170,7 +170,7 @@ export class AddColumnCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropColumnCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropColumn' as const;
+  readonly factoryName = 'dropColumn' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -203,7 +203,7 @@ export interface AlterColumnTypeOptions {
 }
 
 export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'alterColumnType' as const;
+  readonly factoryName = 'alterColumnType' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -236,7 +236,7 @@ export class AlterColumnTypeCall extends PostgresOpFactoryCallNode {
 }
 
 export class SetNotNullCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'setNotNull' as const;
+  readonly factoryName = 'setNotNull' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -262,7 +262,7 @@ export class SetNotNullCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropNotNullCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropNotNull' as const;
+  readonly factoryName = 'dropNotNull' as const;
   readonly operationClass = 'widening' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -288,7 +288,7 @@ export class DropNotNullCall extends PostgresOpFactoryCallNode {
 }
 
 export class SetDefaultCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'setDefault' as const;
+  readonly factoryName = 'setDefault' as const;
   readonly operationClass: 'additive' | 'widening';
   readonly schemaName: string;
   readonly tableName: string;
@@ -332,7 +332,7 @@ export class SetDefaultCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropDefaultCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropDefault' as const;
+  readonly factoryName = 'dropDefault' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -362,7 +362,7 @@ export class DropDefaultCall extends PostgresOpFactoryCallNode {
 // ============================================================================
 
 export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'addPrimaryKey' as const;
+  readonly factoryName = 'addPrimaryKey' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -395,7 +395,7 @@ export class AddPrimaryKeyCall extends PostgresOpFactoryCallNode {
 }
 
 export class AddUniqueCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'addUnique' as const;
+  readonly factoryName = 'addUnique' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -428,7 +428,7 @@ export class AddUniqueCall extends PostgresOpFactoryCallNode {
 }
 
 export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'addForeignKey' as const;
+  readonly factoryName = 'addForeignKey' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -454,7 +454,7 @@ export class AddForeignKeyCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropConstraintCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropConstraint' as const;
+  readonly factoryName = 'dropConstraint' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -499,7 +499,7 @@ export class DropConstraintCall extends PostgresOpFactoryCallNode {
 // ============================================================================
 
 export class CreateIndexCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'createIndex' as const;
+  readonly factoryName = 'createIndex' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -532,7 +532,7 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropIndexCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropIndex' as const;
+  readonly factoryName = 'dropIndex' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly tableName: string;
@@ -562,7 +562,7 @@ export class DropIndexCall extends PostgresOpFactoryCallNode {
 // ============================================================================
 
 export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'createEnumType' as const;
+  readonly factoryName = 'createEnumType' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly typeName: string;
@@ -588,7 +588,7 @@ export class CreateEnumTypeCall extends PostgresOpFactoryCallNode {
 }
 
 export class AddEnumValuesCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'addEnumValues' as const;
+  readonly factoryName = 'addEnumValues' as const;
   readonly operationClass = 'additive' as const;
   readonly schemaName: string;
   readonly typeName: string;
@@ -616,7 +616,7 @@ export class AddEnumValuesCall extends PostgresOpFactoryCallNode {
 }
 
 export class DropEnumTypeCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dropEnumType' as const;
+  readonly factoryName = 'dropEnumType' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly typeName: string;
@@ -640,7 +640,7 @@ export class DropEnumTypeCall extends PostgresOpFactoryCallNode {
 }
 
 export class RenameTypeCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'renameType' as const;
+  readonly factoryName = 'renameType' as const;
   readonly operationClass = 'destructive' as const;
   readonly schemaName: string;
   readonly fromName: string;
@@ -682,7 +682,7 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
  * see `render-ops.ts`.
  */
 export class DataTransformCall extends PostgresOpFactoryCallNode {
-  readonly factory = 'dataTransform' as const;
+  readonly factoryName = 'dataTransform' as const;
   readonly operationClass: MigrationOperationClass;
   readonly label: string;
   readonly check: TsExpression;
@@ -712,7 +712,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
-      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factory },
+      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
       ...this.check.importRequirements(),
       ...this.run.importRequirements(),
     ];

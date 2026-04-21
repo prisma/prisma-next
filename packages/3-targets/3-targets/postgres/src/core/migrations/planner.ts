@@ -91,7 +91,7 @@ import { renderDescriptorTypeScript } from './scaffolding';
 type PlanItem = PostgresOpFactoryCall | SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 function isOpFactoryCall(item: PlanItem): item is PostgresOpFactoryCall {
-  return typeof (item as { factory?: unknown }).factory === 'string' && 'accept' in item;
+  return typeof (item as { factoryName?: unknown }).factoryName === 'string' && 'accept' in item;
 }
 
 function materializePlanItems(
