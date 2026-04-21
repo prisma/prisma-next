@@ -32,7 +32,14 @@ export interface OpFactoryCall {
 
 Exported through the existing `framework-components/control` entrypoint. No abstract base class at framework level. No changes to existing framework interfaces. Adding `OpFactoryCall` is a pure addition.
 
-Mongo's existing `OpFactoryCallNode` concrete classes satisfy the interface structurally. No retrofit is required in this project; adding explicit `implements OpFactoryCall` annotations is a follow-up (plan.md §"Known follow-ups").
+### Mongo retrofit
+
+Mongo's existing `OpFactoryCallNode` (in `packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`) declares `factory`, `operationClass`, and `label` — the exact three members of the new framework interface. Retrofit is a two-line change:
+
+1. Import `OpFactoryCall` from `@prisma-next/framework-components/control`.
+2. Add `implements OpFactoryCall` to the `OpFactoryCallNode` abstract class declaration.
+
+All five concrete Mongo call classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) inherit interface satisfaction from the base class — no per-class changes. No behavior change, no new tests needed beyond confirming `pnpm -r typecheck` still passes.
 
 ### Family-SQL `Migration` alias
 
@@ -246,6 +253,7 @@ No changes to `packages/3-targets/3-targets/postgres/src/exports/control.ts` in 
 ## Acceptance criteria
 
 - [ ] `OpFactoryCall` interface exported from `framework-components/control`.
+- [ ] Mongo's `OpFactoryCallNode` abstract class declares `implements OpFactoryCall`; `pnpm -r typecheck` passes without additional per-class changes.
 - [ ] Family-SQL `Migration` alias exists and is re-exported by `@prisma-next/target-postgres/migration`.
 - [ ] `op-factory-call.ts`, `render-ops.ts`, `render-typescript.ts`, `planner-produced-postgres-migration.ts` all exist under `packages/3-targets/3-targets/postgres/src/core/migrations/`.
 - [ ] `PostgresOpFactoryCallNode` is not exported (verify via `rg "PostgresOpFactoryCallNode" packages/3-targets/3-targets/postgres/src/exports/` returning zero matches).
