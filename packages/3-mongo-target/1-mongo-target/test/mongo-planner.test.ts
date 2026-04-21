@@ -1193,7 +1193,7 @@ describe('MongoMigrationPlanner', () => {
       const calls = planCallsSuccess(planner, contract, origin);
 
       expect(calls).toHaveLength(1);
-      expect(calls[0]!.factory).toBe('dropIndex');
+      expect(calls[0]!.factoryName).toBe('dropIndex');
     });
 
     it('returns failure with conflicts for immutable option changes', () => {

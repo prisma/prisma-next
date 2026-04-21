@@ -67,7 +67,7 @@ export function buildReconciliationPlan(options: {
       // extra_unique_constraint and extra_index on the same object). Dedupe
       // by rendering each call and keying on the runtime id.
       const [op] = renderOps([call]);
-      invariant(op !== undefined, `renderOps returned empty for call ${call.factory}`);
+      invariant(op !== undefined, `renderOps returned empty for call ${call.factoryName}`);
       if (!seenOperationIds.has(op.id)) {
         seenOperationIds.add(op.id);
         if (options.policy.allowedOperationClasses.includes(call.operationClass)) {

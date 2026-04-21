@@ -33,13 +33,13 @@ export interface OpFactoryCallVisitor<R> {
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-mongo/migration';
 
 abstract class OpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
-  abstract readonly factory: string;
+  abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
   abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
 
   importRequirements(): readonly ImportRequirement[] {
-    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factory }];
+    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
   }
 
   protected freeze(): void {
@@ -52,7 +52,7 @@ function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
 }
 
 export class CreateIndexCall extends OpFactoryCallNode {
-  readonly factory = 'createIndex' as const;
+  readonly factoryName = 'createIndex' as const;
   readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
@@ -84,7 +84,7 @@ export class CreateIndexCall extends OpFactoryCallNode {
 }
 
 export class DropIndexCall extends OpFactoryCallNode {
-  readonly factory = 'dropIndex' as const;
+  readonly factoryName = 'dropIndex' as const;
   readonly operationClass = 'destructive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
@@ -108,7 +108,7 @@ export class DropIndexCall extends OpFactoryCallNode {
 }
 
 export class CreateCollectionCall extends OpFactoryCallNode {
-  readonly factory = 'createCollection' as const;
+  readonly factoryName = 'createCollection' as const;
   readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly options: CreateCollectionOptions | undefined;
@@ -134,7 +134,7 @@ export class CreateCollectionCall extends OpFactoryCallNode {
 }
 
 export class DropCollectionCall extends OpFactoryCallNode {
-  readonly factory = 'dropCollection' as const;
+  readonly factoryName = 'dropCollection' as const;
   readonly operationClass = 'destructive' as const;
   readonly collection: string;
   readonly label: string;
@@ -156,7 +156,7 @@ export class DropCollectionCall extends OpFactoryCallNode {
 }
 
 export class CollModCall extends OpFactoryCallNode {
-  readonly factory = 'collMod' as const;
+  readonly factoryName = 'collMod' as const;
   readonly collection: string;
   readonly options: CollModOptions;
   readonly meta: CollModMeta | undefined;

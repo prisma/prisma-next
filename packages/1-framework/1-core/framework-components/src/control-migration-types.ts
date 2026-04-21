@@ -125,21 +125,11 @@ export interface MigrationPlanOperation {
  * Framework-level contract for a single factory call in a target's class-flow
  * planner IR.
  *
- * Each target defines concrete classes (e.g. `CreateTableCall`,
- * `CreateIndexCall`) that satisfy this interface plus target-specific fields
- * (table name, columns, options, …). Target-side renderers — both runtime-op
- * materialization (`renderOps`) and TypeScript source emission
- * (`renderCallsToTypeScript`) — consume arrays of these.
- *
- * Consumers depend on the interface, not on a target-specific base class;
- * no abstract base ships at framework or family level. Targets are free to
- * use package-private abstract base classes internally to share plumbing
- * (visitor `accept`, `MigrationTsExpression`) across their concrete call
- * classes, but those bases are not part of the public API.
+ * @see ADR 195
  */
 export interface OpFactoryCall {
   /** The name of the factory that would produce this call's runtime op. */
-  readonly factory: string;
+  readonly factoryName: string;
   /** The operation's safety class (additive, widening, destructive, data). */
   readonly operationClass: MigrationOperationClass;
   /** Human-readable label for CLI output and diagnostics. */

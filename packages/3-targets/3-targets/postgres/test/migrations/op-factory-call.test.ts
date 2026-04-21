@@ -72,7 +72,7 @@ describe('Postgres call classes', () => {
       );
 
       expect(Object.isFrozen(call)).toBe(true);
-      expect(call.factory).toBe('createTable');
+      expect(call.factoryName).toBe('createTable');
       expect(call.operationClass).toBe('additive');
       expect(call.label).toBe('Create table "user"');
 
