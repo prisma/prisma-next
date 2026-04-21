@@ -102,6 +102,23 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     expect(ops).toEqual(expected);
   });
 
+  it('renders an empty calls list whose executed scaffold emits []', async () => {
+    const migration = new TypeScriptRenderablePostgresMigration([], META);
+
+    const tsSource = migration
+      .renderTypeScript()
+      .replace("'@prisma-next/family-sql/migration'", `'${familySqlMigrationExport}'`);
+    await writeFile(join(tmpDir, 'migration.ts'), tsSource);
+
+    const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
+    expect(stderr).toBe('');
+
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
+    expect(ops).toEqual([]);
+  });
+
   it('preserves RawSqlCall ops byte-for-byte through the render → execute round-trip', async () => {
     const op = {
       id: 'raw.custom.1',

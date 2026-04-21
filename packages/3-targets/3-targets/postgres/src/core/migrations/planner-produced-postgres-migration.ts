@@ -13,12 +13,14 @@
  * shape and keeps CLI wiring one step removed from target internals.
  *
  * Placeholder-bearing plans: `renderTypeScript()` always succeeds and embeds
- * `() => placeholder("slot")` at each stub. `operations` dispatches each
- * call's `toOp()`; `DataTransformCall.toOp()` throws `PN-MIG-2001` because a
- * planner-stubbed closure cannot be lowered to a runtime op. In practice the
- * walk-schema planner does not emit `DataTransformCall`s today, so this
- * throw is reserved for future issue-planner integrations that author data
- * transforms and require a user edit before execution.
+ * `() => placeholder("slot")` at each stub. `operations`, in contrast, is
+ * _not safe to enumerate_ on a stub-bearing plan — `DataTransformCall.toOp()`
+ * throws `PN-MIG-2001` because a planner-stubbed closure cannot be lowered
+ * to a runtime op. Callers that know a plan may carry stubs must render to
+ * `migration.ts`, let the user fill the slots, and re-load the edited
+ * migration before enumerating ops. The walk-schema planner does not emit
+ * `DataTransformCall`s today, so this asymmetry is invisible until the
+ * issue-planner integration lands in Phase 2.
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
