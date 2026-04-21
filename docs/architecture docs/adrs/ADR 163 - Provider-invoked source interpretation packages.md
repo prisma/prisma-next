@@ -10,7 +10,7 @@ Prisma Next supports multiple authoring inputs (TS-first and PSL-first) that mus
 
 `provider (input-specific) → Contract → validate/normalize → canonicalize/hash → emit`
 
-We introduced provider-based contract sources (`config.contract.source: (context: ContractSourceContext) => Promise<Result<Contract, ContractSourceDiagnostics>>`) to keep the CLI/control plane **source-agnostic**. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
+We introduced provider-based contract sources (`config.contract.source: { inputs?: readonly string[]; load: (context: ContractSourceContext) => Promise<Result<Contract, ContractSourceDiagnostics>> }`) to keep the CLI/control plane **source-agnostic**. `inputs` is the user-declared list of source paths (e.g. `./schema.prisma`); the CLI loader resolves them to absolute paths and exposes them to `load` via `context.resolvedInputs`. At the same time, we want to keep input-specific logic (like PSL parsing + interpretation) pluggable and out of the CLI and control plane wiring.
 
 During initial implementation, SQL PSL interpretation code lived in the TS authoring package (`@prisma-next/sql-contract-ts`). That mixed concerns and increased the dependency surface of the TS authoring surface with PSL-specific logic.
 
@@ -19,7 +19,7 @@ During initial implementation, SQL PSL interpretation code lived in the TS autho
 Input-specific parsing and interpretation live in **provider-invoked authoring packages** that:
 
 - export **pure** interpretation APIs (no config loading, no CLI coupling)
-- perform **no file I/O**
+- keep the interpreter itself free of file I/O; the provider's `load` may read from paths supplied via `context.resolvedInputs` and pass their contents to the interpreter
 - return structured diagnostics with stable codes and spans when available
 
 For SQL PSL-first, we create `@prisma-next/sql-contract-psl` as the dedicated package that interprets PSL input into a SQL `Contract<SqlStorage, SqlModelStorage>`.
