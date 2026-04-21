@@ -257,7 +257,8 @@ export class CollectionHandle<
  *    the accumulator, so the eventual write/find-and-modify terminal can
  *    splat the AND-folded filter into the wire command's `filter` slot.
  *  - **Filtered writes** (M2): `updateMany`, `updateOne`, `deleteMany`,
- *    `deleteOne`, `upsertOne`, `upsertMany`. Stubbed in M1.
+ *    `deleteOne`, `upsertOne`. Stubbed in M1. (Upsert-many is an open
+ *    question in the spec — see TML-2267 — and is intentionally absent.)
  *  - **Find-and-modify** (M3): `findOneAndUpdate`, `findOneAndDelete`.
  *    Stubbed in M1.
  *
