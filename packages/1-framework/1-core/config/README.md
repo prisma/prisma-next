@@ -12,6 +12,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - `PrismaNextConfig` and `ContractConfig` types
 - contract source provider + diagnostics protocol
+- provider-declared input metadata for tooling integrations
 - `defineConfig()` normalization/defaulting
 - `validateConfig()` structural/runtime-shape validation
 
@@ -19,6 +20,7 @@ This package owns the shared config contract used by tooling and authoring packa
 
 - Type-safe config composition for `family`, `target`, `adapter`, optional `driver`, and optional `extensionPacks` (`extensions` is rejected at runtime)
 - Contract source provider protocol (`contract.source`) and diagnostics shape
+- Tool-agnostic provider input metadata for build integrations via `contract.source.inputs`
 - Pure config validation and normalization with no file system access
 
 ## Non-responsibilities
@@ -38,9 +40,19 @@ const config = defineConfig({
   target: postgresTargetDescriptor,
   adapter: postgresAdapterDescriptor,
   contract: {
-    source: async () => /* Result<Contract, ContractSourceDiagnostics> */ null as never,
+    source: {
+      inputs: ['./prisma/schema.prisma'],
+      load: async (_context) =>
+        /* Result<Contract, ContractSourceDiagnostics> */ null as never,
+    },
   },
 });
 
 validateConfig(config);
 ```
+
+Declare `source.inputs` only for source files that are not already covered by the config module
+graph, such as PSL schema paths or TypeScript contract paths passed as strings. Do not include
+emitted artifact paths derived from `contract.output` (for example `contract.json` or the
+colocated `contract.d.ts`); the CLI loader resolves and validates those paths before emit/watch
+commands run. Tooling should always treat the config module graph as watched by default.

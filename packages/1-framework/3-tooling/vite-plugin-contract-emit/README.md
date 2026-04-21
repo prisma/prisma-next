@@ -9,7 +9,7 @@ This plugin integrates with Vite's dev server to automatically emit contract art
 ## Features
 
 - **Emit on startup**: Emits contract artifacts when the Vite dev server starts
-- **Watch mode**: Re-emits on changes to the config file and its transitive imports
+- **Config graph + inputs**: Re-emits from the config module graph plus `contract.source.inputs`
 - **Debounce**: Configurable debounce prevents rapid re-emission during rapid edits
 - **Last-change-wins**: Overlapping emit requests are cancelled to avoid stale results
 - **Error overlay**: Emission failures are surfaced via Vite's error overlay
@@ -60,11 +60,12 @@ interface PrismaVitePluginOptions {
 
 ## How It Works
 
-1. **On server start**: The plugin loads your config module through Vite's SSR loader
-2. **Module graph crawling**: It crawls the module graph to find all transitive imports
-3. **Watch setup**: All discovered files are added to Vite's watcher
-4. **Initial emit**: The contract is emitted immediately on server start
-5. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
+1. **On server start**: The plugin loads `prisma-next.config.ts` via the CLI config loader
+2. **Resolve watched files**: It crawls the Vite module graph from the config entrypoint
+3. **Merge declared inputs**: It adds any explicit `contract.source.inputs`, and treats JS/TS inputs as additional module-graph roots
+4. **Filter emitted artifacts**: Output files are removed from the watch set to avoid self-trigger loops
+5. **Initial emit**: The contract is emitted immediately on server start
+6. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
 
 ## Architecture
 
@@ -72,17 +73,19 @@ interface PrismaVitePluginOptions {
 graph TD
     A[Vite Dev Server] --> B[prismaVitePlugin]
     B --> C[configureServer hook]
-    C --> D[Load config via SSR]
-    D --> E[Crawl module graph]
-    E --> F[Add files to watcher]
-    F --> G[Initial emit]
+    C --> D[Load config via CLI loader]
+    D --> E[Collect config module graph]
+    E --> F[Merge source.inputs]
+    F --> G[Filter emitted artifacts]
+    G --> H[Add files to watcher]
+    H --> I[Initial emit]
     
-    H[File change] --> I[handleHotUpdate hook]
-    I --> J[Schedule debounced emit]
-    J --> K[executeContractEmit]
-    K --> L[Write artifacts]
+    J[File change] --> K[handleHotUpdate hook]
+    K --> L[Schedule debounced emit]
+    L --> M[executeContractEmit]
+    M --> N[Write artifacts]
     
-    M[Error] --> N[Error overlay + console]
+    P[Error] --> Q[Overlay or console logging]
 ```
 
 ## Dependencies
