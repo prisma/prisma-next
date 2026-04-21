@@ -2,8 +2,8 @@
  * Unit coverage for the Postgres class-flow IR:
  *
  * - Every `*Call` class constructs with literal args, is frozen, computes its
- *   label, dispatches through `accept()` to the right visitor method, and
- *   emits the expected TypeScript expression + import requirements.
+ *   label, lowers to the matching runtime op via `toOp()`, and emits the
+ *   expected TypeScript expression + import requirements.
  * - `DataTransformCall` renders its body as `() => placeholder("slot")`
  *   closures around the authored slot names and always throws
  *   `PN-MIG-2001` from `toOp()` because the planner can only emit
@@ -14,7 +14,7 @@
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
  */
 
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -35,7 +35,6 @@ import {
   DropIndexCall,
   DropNotNullCall,
   DropTableCall,
-  type PostgresOpFactoryCallVisitor,
   RawSqlCall,
   RenameTypeCall,
   SetDefaultCall,
@@ -48,8 +47,8 @@ import { renderCallsToTypeScript } from '../../src/core/migrations/render-typesc
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 
 describe('Postgres call classes', () => {
-  describe('construction + dispatch', () => {
-    it('CreateTableCall freezes, labels from the table name, and dispatches createTable', () => {
+  describe('construction + toOp parity', () => {
+    it('CreateTableCall freezes, labels from the table name, and lowers to a createTable op', () => {
       const call = new CreateTableCall(
         'public',
         'user',
@@ -62,21 +61,24 @@ describe('Postgres call classes', () => {
       expect(call.operationClass).toBe('additive');
       expect(call.label).toBe('Create table "user"');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.createTable).toHaveBeenCalledWith(call);
+      expect(call.toOp()).toMatchObject({
+        id: 'table.user',
+        operationClass: 'additive',
+        target: {
+          id: 'postgres',
+          details: { schema: 'public', objectType: 'table', name: 'user' },
+        },
+      });
     });
 
-    it('DataTransformCall carries its slot names and a caller-supplied operationClass', () => {
+    it('DataTransformCall carries its slot names and a caller-supplied operationClass; toOp throws PN-MIG-2001', () => {
       const call = new DataTransformCall('Backfill', 'slot-check', 'slot-run', 'widening');
 
       expect(call.checkSlot).toBe('slot-check');
       expect(call.runSlot).toBe('slot-run');
       expect(call.operationClass).toBe('widening');
 
-      const visitor = makeDispatchSpy();
-      call.accept(visitor);
-      expect(visitor.dataTransform).toHaveBeenCalledWith(call);
+      expect(() => call.toOp()).toThrow(/Unfilled migration placeholder/);
     });
   });
 
@@ -609,31 +611,3 @@ describe('TypeScriptRenderablePostgresMigration', () => {
     expect(source).toContain('dropTable("public", "stale")');
   });
 });
-
-function makeDispatchSpy(): PostgresOpFactoryCallVisitor<void> {
-  return {
-    createTable: vi.fn(),
-    dropTable: vi.fn(),
-    addColumn: vi.fn(),
-    dropColumn: vi.fn(),
-    alterColumnType: vi.fn(),
-    setNotNull: vi.fn(),
-    dropNotNull: vi.fn(),
-    setDefault: vi.fn(),
-    dropDefault: vi.fn(),
-    addPrimaryKey: vi.fn(),
-    addForeignKey: vi.fn(),
-    addUnique: vi.fn(),
-    createIndex: vi.fn(),
-    dropIndex: vi.fn(),
-    dropConstraint: vi.fn(),
-    createEnumType: vi.fn(),
-    addEnumValues: vi.fn(),
-    dropEnumType: vi.fn(),
-    renameType: vi.fn(),
-    rawSql: vi.fn(),
-    createExtension: vi.fn(),
-    createSchema: vi.fn(),
-    dataTransform: vi.fn(),
-  };
-}
