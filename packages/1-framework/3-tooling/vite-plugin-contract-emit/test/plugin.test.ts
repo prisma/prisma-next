@@ -550,7 +550,7 @@ describe('prismaVitePlugin', () => {
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
     });
 
-    it('updates watched files when config imports and authoritative inputs change', async () => {
+    it('updates watched files when config imports and resolved inputs change', async () => {
       let currentConfig = createLoadedConfig({
         inputs: ['./prisma/schema.prisma'],
       });
