@@ -48,8 +48,8 @@ export type UsersResponse = SimplifyDeep<Awaited<ReturnType<typeof getUsers>>>;
 // Pipeline DSL queries — type-safe aggregation pipelines
 // ---------------------------------------------------------------------------
 
-export async function getAuthorLeaderboard(pipeline: Db['pipeline'], runtime: Db['runtime']) {
-  const plan = pipeline
+export async function getAuthorLeaderboard(query: Db['query'], runtime: Db['runtime']) {
+  const plan = query
     .from('posts')
     .group((f) => ({
       _id: f.authorId,
@@ -68,8 +68,8 @@ export async function getAuthorLeaderboard(pipeline: Db['pipeline'], runtime: Db
   return runtime.execute(plan);
 }
 
-export async function getRecentPostSummaries(pipeline: Db['pipeline'], runtime: Db['runtime']) {
-  const plan = pipeline
+export async function getRecentPostSummaries(query: Db['query'], runtime: Db['runtime']) {
+  const plan = query
     .from('posts')
     .sort({ createdAt: -1 })
     .limit(3)
@@ -82,8 +82,8 @@ export async function getRecentPostSummaries(pipeline: Db['pipeline'], runtime: 
   return runtime.execute(plan);
 }
 
-export async function getPostsWithAuthors(pipeline: Db['pipeline'], runtime: Db['runtime']) {
-  const plan = pipeline
+export async function getPostsWithAuthors(query: Db['query'], runtime: Db['runtime']) {
+  const plan = query
     .from('posts')
     .lookup({
       from: 'users',
@@ -97,8 +97,8 @@ export async function getPostsWithAuthors(pipeline: Db['pipeline'], runtime: Db[
   return runtime.execute(plan);
 }
 
-export async function getDashboard(pipeline: Db['pipeline'], runtime: Db['runtime']) {
-  const plan = pipeline
+export async function getDashboard(query: Db['query'], runtime: Db['runtime']) {
+  const plan = query
     .from('posts')
     .facet({
       totalPosts: [new MongoCountStage('count')],
@@ -140,7 +140,7 @@ async function main() {
     console.log(`In-memory MongoDB ready at ${uri}`);
   }
 
-  const { orm, runtime, pipeline } = await createClient(uri, DB_NAME);
+  const { orm, runtime, query } = await createClient(uri, DB_NAME);
 
   if (!externalUrl) {
     console.log('Seeding data...');
@@ -159,13 +159,13 @@ async function main() {
       } else if (req.method === 'GET' && req.url === '/api/users') {
         jsonResponse(res, await getUsers(orm));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/leaderboard') {
-        jsonResponse(res, await getAuthorLeaderboard(pipeline, runtime));
+        jsonResponse(res, await getAuthorLeaderboard(query, runtime));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/recent') {
-        jsonResponse(res, await getRecentPostSummaries(pipeline, runtime));
+        jsonResponse(res, await getRecentPostSummaries(query, runtime));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/posts-with-authors') {
-        jsonResponse(res, await getPostsWithAuthors(pipeline, runtime));
+        jsonResponse(res, await getPostsWithAuthors(query, runtime));
       } else if (req.method === 'GET' && req.url === '/api/pipeline/dashboard') {
-        jsonResponse(res, await getDashboard(pipeline, runtime));
+        jsonResponse(res, await getDashboard(query, runtime));
       } else {
         jsonResponse(res, { error: 'Not found' }, 404);
       }

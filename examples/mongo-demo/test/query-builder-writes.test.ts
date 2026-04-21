@@ -83,7 +83,7 @@ describe(
         expect(rows).toHaveLength(1);
 
         const all = await usersCol().find().toArray();
-        expect(all.every((d) => d.bio === 'filled')).toBe(true);
+        expect(all.every((d) => d['bio'] === 'filled')).toBe(true);
       });
 
       it('match → deleteOne + verify', async () => {
@@ -108,7 +108,7 @@ describe(
         await runtime.execute(plan);
 
         const all = await usersCol().find().toArray();
-        expect(all.every((d) => d.bio === 'all-updated')).toBe(true);
+        expect(all.every((d) => d['bio'] === 'all-updated')).toBe(true);
       });
 
       it('insertMany ordered + verify ids', async () => {
@@ -121,7 +121,7 @@ describe(
 
         const all = await usersCol().find().toArray();
         expect(all).toHaveLength(2);
-        expect(all.map((d) => d.name).sort()).toEqual(['Alice', 'Bob']);
+        expect(all.map((d) => d['name']).sort()).toEqual(['Alice', 'Bob']);
       });
     });
 
@@ -174,9 +174,9 @@ describe(
         );
         const rows = await runtime.execute(plan);
         expect(rows).toHaveLength(1);
-        const result = rows[0] as Record<string, unknown>;
-        expect(result.upsertedCount).toBe(1);
-        expect(result.upsertedId).toBeDefined();
+        const result = rows[0] as unknown as Record<string, unknown>;
+        expect(result['upsertedCount']).toBe(1);
+        expect(result['upsertedId']).toBeDefined();
 
         const all = await usersCol().find().toArray();
         expect(all).toHaveLength(1);
@@ -190,9 +190,9 @@ describe(
         );
         const rows = await runtime.execute(plan);
         expect(rows).toHaveLength(1);
-        const result = rows[0] as Record<string, unknown>;
-        expect(result.modifiedCount).toBe(1);
-        expect(result.upsertedId).toBeUndefined();
+        const result = rows[0] as unknown as Record<string, unknown>;
+        expect(result['modifiedCount']).toBe(1);
+        expect(result['upsertedId']).toBeUndefined();
 
         const all = await usersCol().find().toArray();
         expect(all).toHaveLength(1);
