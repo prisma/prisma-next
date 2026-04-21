@@ -14,7 +14,11 @@ import {
   dropCollection,
   dropIndex,
 } from '../src/core/migration-factories';
-import { MongoMigrationPlanner } from '../src/core/mongo-planner';
+import {
+  MongoMigrationPlanner,
+  type PlanCallsOptions,
+  type PlanCallsResult,
+} from '../src/core/mongo-planner';
 import {
   CollModCall,
   CreateCollectionCall,
@@ -23,6 +27,15 @@ import {
   DropIndexCall,
 } from '../src/core/op-factory-call';
 import { renderOps } from '../src/core/render-ops';
+
+function invokePlanCalls(
+  planner: MongoMigrationPlanner,
+  options: PlanCallsOptions,
+): PlanCallsResult {
+  return (
+    planner as unknown as { planCalls(options: PlanCallsOptions): PlanCallsResult }
+  ).planCalls(options);
+}
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -149,7 +162,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
@@ -181,7 +194,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
@@ -217,7 +230,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
@@ -249,7 +262,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
@@ -294,7 +307,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,
@@ -349,7 +362,7 @@ describe('renderOps', () => {
         fromHash: 'sha256:00',
         frameworkComponents: [],
       });
-      const callsResult = planner.planCalls({
+      const callsResult = invokePlanCalls(planner, {
         contract,
         schema,
         policy: ALL_CLASSES_POLICY,

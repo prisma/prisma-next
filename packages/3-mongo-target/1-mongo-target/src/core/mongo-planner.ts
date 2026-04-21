@@ -102,13 +102,15 @@ export type PlanCallsResult =
   | { readonly kind: 'success'; readonly calls: OpFactoryCall[] }
   | { readonly kind: 'failure'; readonly conflicts: MigrationPlannerConflict[] };
 
+export interface PlanCallsOptions {
+  readonly contract: unknown;
+  readonly schema: unknown;
+  readonly policy: MigrationOperationPolicy;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
+}
+
 export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'> {
-  planCalls(options: {
-    readonly contract: unknown;
-    readonly schema: unknown;
-    readonly policy: MigrationOperationPolicy;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
-  }): PlanCallsResult {
+  private planCalls(options: PlanCallsOptions): PlanCallsResult {
     const contract = options.contract as MongoContract;
     const originIR = options.schema as MongoSchemaIR;
     const destinationIR = contractToMongoSchemaIR(contract);

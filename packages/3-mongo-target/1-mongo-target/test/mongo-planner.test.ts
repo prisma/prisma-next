@@ -16,8 +16,21 @@ import {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
-import { MongoMigrationPlanner } from '../src/core/mongo-planner';
+import {
+  MongoMigrationPlanner,
+  type PlanCallsOptions,
+  type PlanCallsResult,
+} from '../src/core/mongo-planner';
 import { CollModCall, CreateIndexCall } from '../src/core/op-factory-call';
+
+function invokePlanCalls(
+  planner: MongoMigrationPlanner,
+  options: PlanCallsOptions,
+): PlanCallsResult {
+  return (
+    planner as unknown as { planCalls(options: PlanCallsOptions): PlanCallsResult }
+  ).planCalls(options);
+}
 
 const ALL_CLASSES_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],
@@ -1167,7 +1180,7 @@ describe('MongoMigrationPlanner', () => {
       schema: MongoSchemaIR,
       policy = ALL_CLASSES_POLICY,
     ) {
-      const result = p.planCalls({ contract, schema, policy, frameworkComponents: [] });
+      const result = invokePlanCalls(p, { contract, schema, policy, frameworkComponents: [] });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') throw new Error('Expected success');
       return result.calls;
@@ -1208,7 +1221,7 @@ describe('MongoMigrationPlanner', () => {
         }),
       ]);
 
-      const result = planner.planCalls({
+      const result = invokePlanCalls(planner, {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
@@ -1225,7 +1238,7 @@ describe('MongoMigrationPlanner', () => {
         users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
       });
 
-      const result = planner.planCalls({
+      const result = invokePlanCalls(planner, {
         contract,
         schema: emptyIR(),
         policy: { allowedOperationClasses: ['destructive'] },
