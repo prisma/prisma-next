@@ -29,12 +29,12 @@
     "node": ">=20"
   },
   "exports": {
-    ".": {
-      "types": "./dist/ts-render.d.mts",
-      "import": "./dist/ts-render.mjs"
-    },
+    ".": "./dist/index.mjs",
     "./package.json": "./package.json"
   },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
   "repository": {
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
