@@ -87,7 +87,6 @@ class MongoAdapterImpl implements MongoAdapter {
           this.#lowerUpdate(command.update),
           command.upsert,
           command.sort,
-          undefined,
           command.returnDocument,
         );
       case 'findOneAndDelete':
@@ -119,16 +118,10 @@ class MongoAdapterImpl implements MongoAdapter {
           command.update,
           command.upsert,
           command.sort,
-          command.skip,
           command.returnDocument,
         );
       case 'rawFindOneAndDelete':
-        return new FindOneAndDeleteWireCommand(
-          command.collection,
-          command.filter,
-          command.sort,
-          command.skip,
-        );
+        return new FindOneAndDeleteWireCommand(command.collection, command.filter, command.sort);
       // v8 ignore next 4
       default: {
         const _exhaustive: never = command;

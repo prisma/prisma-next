@@ -184,7 +184,6 @@ describe('MongoDriver', () => {
           { $set: { age: 31 } },
           false,
           undefined,
-          undefined,
           'after',
         );
         const rows = await collect(driver.execute(cmd));
@@ -206,7 +205,6 @@ describe('MongoDriver', () => {
           { name: 'Heidi' },
           { $set: { age: 25 } },
           true,
-          undefined,
           undefined,
           'after',
         );
