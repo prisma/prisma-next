@@ -119,7 +119,6 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
   readonly update: MongoUpdateSpec;
   readonly upsert: boolean;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
   readonly returnDocument: 'before' | 'after';
 
   constructor(
@@ -128,7 +127,6 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
     update: MongoUpdateSpec,
     upsert = false,
     sort?: Record<string, 1 | -1>,
-    skip?: number,
     returnDocument: 'before' | 'after' = 'after',
   ) {
     super();
@@ -137,7 +135,6 @@ export class FindOneAndUpdateCommand extends MongoAstNode {
     this.update = update;
     this.upsert = upsert;
     this.sort = sort;
-    this.skip = skip;
     this.returnDocument = returnDocument;
     this.freeze();
   }
@@ -148,19 +145,12 @@ export class FindOneAndDeleteCommand extends MongoAstNode {
   readonly collection: string;
   readonly filter: MongoFilterExpr;
   readonly sort: Record<string, 1 | -1> | undefined;
-  readonly skip: number | undefined;
 
-  constructor(
-    collection: string,
-    filter: MongoFilterExpr,
-    sort?: Record<string, 1 | -1>,
-    skip?: number,
-  ) {
+  constructor(collection: string, filter: MongoFilterExpr, sort?: Record<string, 1 | -1>) {
     super();
     this.collection = collection;
     this.filter = filter;
     this.sort = sort;
-    this.skip = skip;
     this.freeze();
   }
 }
