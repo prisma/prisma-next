@@ -1,4 +1,4 @@
-# ADR 170 — Codec trait system
+# ADR 202 — Codec trait system
 
 ## Context
 

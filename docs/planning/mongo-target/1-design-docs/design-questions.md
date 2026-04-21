@@ -357,7 +357,7 @@ This is the most interesting architectural implication: **encryption algorithm d
 - **Random encryption**: produces different ciphertext each time. Supports NO queries at all — the field is write-only from a query perspective.
 - **Queryable Encryption (QE, MongoDB 6.0+)**: supports equality queries and (in newer versions) range queries on encrypted data, via server-side encrypted indexes.
 
-This maps directly to the codec trait system ([ADR 170](../../../architecture%20docs/adrs/ADR%20170%20-%20Codec%20trait%20system.md)). An encrypted field's effective traits are the *intersection* of its codec's declared traits and the traits permitted by its encryption algorithm:
+This maps directly to the codec trait system ([ADR 202](../../../architecture%20docs/adrs/ADR%20202%20-%20Codec%20trait%20system.md)). An encrypted field's effective traits are the *intersection* of its codec's declared traits and the traits permitted by its encryption algorithm:
 
 | Algorithm | Effective traits |
 |---|---|
