@@ -9,9 +9,9 @@ Refactor `packages/3-targets/3-targets/postgres/src/core/migrations/operation-re
 
 One-to-many resolvers split into multiple pure factories, each returning exactly one operation.
 
-Introduce a `placeholderClosure(slot): () => never` helper in `packages/1-framework/1-core/errors/src/migration.ts` for the `dataTransform` stub path.
-
 **Descriptor flow continues to work identically throughout.** This is a behavior-preserving refactor; the only external change is that pure factories become available as building blocks for Phase 1.
+
+Phase 0 introduces no new types or helpers outside the factory extraction itself. The `dataTransform` placeholder machinery (the AST node hierarchy for scaffolded `check` / `run` bodies) is Phase 1's concern and is not touched here.
 
 ## Why
 
@@ -24,7 +24,6 @@ Introduce a `placeholderClosure(slot): () => never` helper in `packages/1-framew
 
 - New file: `packages/3-targets/3-targets/postgres/src/core/migrations/op-factories.ts` (default export: none; named exports: every `createX`).
 - `operation-resolver.ts` stays in place for Phase 0. It now contains only the thin `resolveX` wrappers. It is deleted in Phase 5.
-- `packages/1-framework/1-core/errors/src/migration.ts` gains `placeholderClosure`.
 
 ### `createX` inventory (one per operation class)
 
@@ -71,54 +70,17 @@ Today's `resolveCreateDependency(descriptor, context)` returns an array of ops (
 
 Any other one-to-many resolver (verify by grepping `return [`) gets the same treatment.
 
-### `dataTransform` + placeholder closure
+### `dataTransform` during Phase 0
 
-Today the descriptor carries `check` and `run` as either closures or the `TODO` sentinel. Tomorrow (Phase 1+), planner construction passes `check` and `run` as closures *always*.
-
-Add to `packages/1-framework/1-core/errors/src/migration.ts`:
-
-```ts
-const PLACEHOLDER_SLOT: unique symbol = Symbol('placeholder-slot');
-
-export interface PlaceholderClosure<T> {
-  (): T;
-  readonly [PLACEHOLDER_SLOT]: string;
-}
-
-export function placeholderClosure<T>(slot: string): PlaceholderClosure<T> {
-  const fn = (() => placeholder(slot)) as PlaceholderClosure<T>;
-  Object.defineProperty(fn, PLACEHOLDER_SLOT, {
-    value: slot,
-    enumerable: false,
-    writable: false,
-    configurable: false,
-  });
-  return fn;
-}
-
-export function isPlaceholderClosure<T>(fn: unknown): fn is PlaceholderClosure<T> {
-  return typeof fn === 'function' && PLACEHOLDER_SLOT in fn;
-}
-
-export { PLACEHOLDER_SLOT };
-```
-
-Rationale:
-- The closure **is** a `() => T` — `DataTransformCall` holds `check: () => SqlQueryPlan` and `run: () => SqlQueryPlan` without caring whether the closure is a placeholder.
-- Invoking the closure throws `errorUnfilledPlaceholder(slot)` (via the existing `placeholder()` function) — runtime parity with the user hand-authoring `() => placeholder("slot")` themselves.
-- The renderer in Phase 1 uses `isPlaceholderClosure` to detect the closure and emit `() => placeholder("slot")` in the TypeScript source. No other consumer of `DataTransformCall` touches the symbol.
-
-In `operation-resolver.ts`'s thin `resolveDataTransform` wrapper: if the descriptor's `check` or `run` is the `TODO` sentinel, replace with `placeholderClosure(slot)` before calling the pure `createDataTransform`. The pure `createDataTransform` does not know about `TODO` or placeholder closures; it just accepts a closure.
-
-**The existing `placeholder(slot)` function stays as-is** and continues to be what user-authored `migration.ts` files call. `placeholderClosure` is a convenience for internal synthesis of those closures.
+The pure `createDataTransform(label, check, run, operationClass?)` factory accepts `check` and `run` as plain closures (`() => SqlQueryPlan`) and otherwise looks like every other pure factory. The thin `resolveDataTransform(descriptor, context)` wrapper keeps the same semantics it has today: if the descriptor's `check` or `run` is the `TODO` sentinel, the wrapper constructs a user-equivalent closure (e.g. `() => placeholder(slot)` via the existing `placeholder()` helper in `@prisma-next/errors/migration`) and passes that to the pure factory. No new helpers are introduced in this phase; placeholder-as-AST-node is a Phase 1 concept and does not leak into Phase 0.
 
 ## Acceptance criteria
 
 - [ ] Every `resolveX` in `operation-resolver.ts` is reduced to an argument-materialization + call to `createX`.
 - [ ] No pure factory in `op-factories.ts` imports `@prisma-next/framework-components`, `@prisma-next/contract`, or references `OperationResolverContext`.
 - [ ] Each pure factory returns exactly one `SqlMigrationPlanOperation`.
-- [ ] `placeholderClosure`, `isPlaceholderClosure`, and the `PLACEHOLDER_SLOT` symbol are added to `@prisma-next/errors/migration`.
-- [ ] `resolveDataTransform` constructs placeholder closures for `TODO` sentinels; the existing descriptor-flow test that surfaces `PN-MIG-2001` still passes.
+- [ ] `resolveDataTransform` preserves today's `TODO`-sentinel behavior: the existing descriptor-flow test that surfaces `PN-MIG-2001` still passes.
+- [ ] No new helpers are added to `@prisma-next/errors/migration` — placeholder-as-AST-node work is Phase 1.
 - [ ] `pnpm -r typecheck` and `pnpm -r lint` pass.
 - [ ] All existing Postgres package tests pass unchanged.
 - [ ] Integration test `schema-evolution-migrations.e2e.test.ts` passes unchanged.
@@ -140,7 +102,6 @@ In `operation-resolver.ts`'s thin `resolveDataTransform` wrapper: if the descrip
 Phase 0 is behavior-preserving; new tests are minimal:
 
 - Per-factory unit tests for `op-factories.ts` — one per factory, constructing a known input and asserting the returned op matches a hand-written expected op. These tests catch literal-arg preservation regressions in Phase 1.
-- `isPlaceholderClosure` / `placeholderClosure` tests: slot round-trips, invocation throws `PN-MIG-2001`, non-placeholder closures return `false` from the predicate.
 - Existing tests are the behavior-preservation gate.
 
 ## Risks
@@ -156,6 +117,5 @@ Phase 0 is behavior-preserving; new tests are minimal:
 
 - Plan: [`plan.md`](../plan.md) §"Phase 0"
 - Spec: [`spec.md`](../spec.md) §R3.1, §R3.2
-- [ADR 200 — Placeholder utility for scaffolded migration slots](../../../docs/architecture%20docs/adrs/ADR%20200%20-%20Placeholder%20utility%20for%20scaffolded%20migration%20slots.md)
 - `packages/3-targets/3-targets/postgres/src/core/migrations/operation-resolver.ts`
-- `packages/1-framework/1-core/errors/src/migration.ts` (existing `placeholder` function + `errorUnfilledPlaceholder`)
+- `packages/1-framework/1-core/errors/src/migration.ts` (existing `placeholder` function + `errorUnfilledPlaceholder` — unchanged by this phase)
