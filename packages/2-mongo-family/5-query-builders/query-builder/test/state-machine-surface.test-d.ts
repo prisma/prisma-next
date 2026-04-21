@@ -68,43 +68,57 @@ describe('state-machine surface (negative type tests)', () => {
     unwound.findOneAndDelete();
   });
 
-  it('no-arg updateMany / updateOne unavailable after UpdateEnabled-clearing stages', () => {
-    // .group() clears both markers
+  it('updateMany / updateOne unavailable after UpdateEnabled-clearing stages', () => {
+    // Each `@ts-expect-error` below pairs a shape-compatible updater
+    // (`(f) => [f.amount.inc(1)]` against the surviving `orders` shape, or
+    // `[f._id.set(null)]` after `group`) with the forbidden write terminal,
+    // so the type error must come from the state gate (method absent from
+    // this state) rather than from a missing callback argument. Without a
+    // real updater, a regression that accidentally re-surfaces
+    // `updateMany` onto the wrong state would still satisfy the
+    // `@ts-expect-error` via "expected N arguments, got 0" and slip past
+    // review.
+
+    // .group() clears both markers — the shape collapses to `{ _id: null }`
+    // so we use a `_id`-targeted updater that would typecheck against the
+    // grouped shape if the method were wrongly re-surfaced.
     const grouped = handle()
       .match(MongoFieldFilter.eq('status', 'new'))
       .group(() => ({ _id: null }));
     // @ts-expect-error — group clears UpdateEnabled
-    grouped.updateMany();
+    grouped.updateMany((f) => [f._id.set(null)]);
     // @ts-expect-error — group clears UpdateEnabled
-    grouped.updateOne();
+    grouped.updateOne((f) => [f._id.set(null)]);
 
-    // .limit() clears both markers
+    // .limit() clears both markers — shape preserved, so a standard
+    // `amount.inc(1)` updater typechecks against the orders shape.
     const limited = handle().match(MongoFieldFilter.eq('status', 'new')).limit(1);
     // @ts-expect-error — limit clears UpdateEnabled
-    limited.updateMany();
+    limited.updateMany((f) => [f.amount.inc(1)]);
     // @ts-expect-error — limit clears UpdateEnabled
-    limited.updateOne();
+    limited.updateOne((f) => [f.amount.inc(1)]);
 
-    // .sort() clears UpdateEnabled (preserves FindAndModifyEnabled)
+    // .sort() clears UpdateEnabled (preserves FindAndModifyEnabled) — shape
+    // preserved, so we pair with a valid orders-shape updater.
     const sorted = handle().match(MongoFieldFilter.eq('status', 'new')).sort({ amount: -1 });
     // @ts-expect-error — sort clears UpdateEnabled
-    sorted.updateMany();
+    sorted.updateMany((f) => [f.amount.inc(1)]);
     // @ts-expect-error — sort clears UpdateEnabled
-    sorted.updateOne();
+    sorted.updateOne((f) => [f.amount.inc(1)]);
 
     // .match(...).addFields(...).match(...) — the second .match() sits past
     // the leading-match prefix. `deconstructUpdateChain` only peels *leading*
     // `$match` stages into the wire-command filter, so the chain must clear
-    // UpdateEnabled at the type level to stop the no-arg write terminals
-    // compiling (even though each individual stage preserves UpdateEnabled).
+    // UpdateEnabled at the type level to stop the write terminals compiling
+    // (even though each individual stage preserves UpdateEnabled).
     const pastLeadingMatch = handle()
       .match(MongoFieldFilter.eq('status', 'new'))
       .addFields((f) => ({ doubled: f.amount }))
       .match(MongoFieldFilter.gt('amount', 100));
     // @ts-expect-error — match past the leading-match prefix clears UpdateEnabled
-    pastLeadingMatch.updateMany();
+    pastLeadingMatch.updateMany((f) => [f.amount.inc(1)]);
     // @ts-expect-error — match past the leading-match prefix clears UpdateEnabled
-    pastLeadingMatch.updateOne();
+    pastLeadingMatch.updateOne((f) => [f.amount.inc(1)]);
   });
 
   it('FilteredCollection does not expose insert / unqualified-write terminals', () => {
