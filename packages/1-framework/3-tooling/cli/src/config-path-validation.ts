@@ -1,8 +1,4 @@
-import type {
-  ContractConfig,
-  ContractSourceProvider,
-  PrismaNextConfig,
-} from '@prisma-next/config/config-types';
+import type { ContractSourceProvider, PrismaNextConfig } from '@prisma-next/config/config-types';
 import { ConfigValidationError } from '@prisma-next/config/config-validation';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { resolve } from 'pathe';
@@ -26,10 +22,10 @@ function finalizeContractSource(
   };
 }
 
-export function validateContractPathDisjointness(contract: ContractConfig): void {
-  const inputs = contract.source.inputs;
-  const output = contract.output;
-
+function validateNoOutputsAreInputs(
+  inputs: readonly string[] | undefined,
+  output: string | undefined,
+): void {
   if (inputs === undefined || output === undefined) {
     return;
   }
@@ -61,10 +57,11 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
   const source = finalizeContractSource(config.contract.source, configDir);
   const output =
     config.contract.output === undefined ? undefined : resolve(configDir, config.contract.output);
+
+  validateNoOutputsAreInputs(source.inputs, output);
+
   const contract =
     output === undefined ? { ...config.contract, source } : { ...config.contract, source, output };
-
-  validateContractPathDisjointness(contract);
 
   return {
     ...config,
