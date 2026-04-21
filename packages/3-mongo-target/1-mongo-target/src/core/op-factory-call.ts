@@ -1,3 +1,22 @@
+/**
+ * Mongo class-flow IR: one concrete `*Call` class per pure factory under
+ * `migration-factories.ts`, plus a shared `OpFactoryCallNode` abstract
+ * base. Every call class carries the literal arguments its backing
+ * factory would receive, computes a human-readable `label` in its
+ * constructor, and implements two polymorphic hooks:
+ *
+ * - `toOp()` — converts the IR node to a runtime
+ *   `MongoMigrationPlanOperation` by delegating to the matching pure
+ *   factory in `migration-factories.ts`.
+ * - `renderTypeScript()` / `importRequirements()` — inherited from
+ *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call
+ *   as a TypeScript expression inside the scaffolded `migration.ts`.
+ *
+ * The abstract base and all concrete classes are package-private.
+ * External consumers see only the framework-level `OpFactoryCall`
+ * interface and the `OpFactoryCall` union.
+ */
+
 import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   MigrationOperationClass,
@@ -7,6 +26,7 @@ import type {
   CreateCollectionOptions,
   CreateIndexOptions,
   MongoIndexKey,
+  MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type {
   MongoSchemaCollection,
@@ -15,19 +35,18 @@ import type {
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import {
+  collMod,
+  createCollection,
+  createIndex,
+  dropCollection,
+  dropIndex,
+} from './migration-factories';
 
 export interface CollModMeta {
   readonly id?: string;
   readonly label?: string;
   readonly operationClass?: MigrationOperationClass;
-}
-
-export interface OpFactoryCallVisitor<R> {
-  createIndex(call: CreateIndexCall): R;
-  dropIndex(call: DropIndexCall): R;
-  createCollection(call: CreateCollectionCall): R;
-  dropCollection(call: DropCollectionCall): R;
-  collMod(call: CollModCall): R;
 }
 
 const TARGET_MIGRATION_MODULE = '@prisma-next/target-mongo/migration';
@@ -36,7 +55,7 @@ abstract class OpFactoryCallNode extends TsExpression implements FrameworkOpFact
   abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+  abstract toOp(): MongoMigrationPlanOperation;
 
   importRequirements(): readonly ImportRequirement[] {
     return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
@@ -72,8 +91,8 @@ export class CreateIndexCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.createIndex(this);
+  toOp(): MongoMigrationPlanOperation {
+    return createIndex(this.collection, this.keys, this.options);
   }
 
   renderTypeScript(): string {
@@ -98,8 +117,8 @@ export class DropIndexCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.dropIndex(this);
+  toOp(): MongoMigrationPlanOperation {
+    return dropIndex(this.collection, this.keys);
   }
 
   renderTypeScript(): string {
@@ -122,8 +141,8 @@ export class CreateCollectionCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.createCollection(this);
+  toOp(): MongoMigrationPlanOperation {
+    return createCollection(this.collection, this.options);
   }
 
   renderTypeScript(): string {
@@ -146,8 +165,8 @@ export class DropCollectionCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.dropCollection(this);
+  toOp(): MongoMigrationPlanOperation {
+    return dropCollection(this.collection);
   }
 
   renderTypeScript(): string {
@@ -173,8 +192,8 @@ export class CollModCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.collMod(this);
+  toOp(): MongoMigrationPlanOperation {
+    return collMod(this.collection, this.options, this.meta);
   }
 
   renderTypeScript(): string {
