@@ -1,9 +1,8 @@
 import { readFile } from 'node:fs/promises';
-import type { ContractConfig, ContractSourceContext } from '@prisma-next/config/config-types';
+import type { ContractConfig } from '@prisma-next/config/config-types';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { resolve } from 'pathe';
 import { interpretPslDocumentToMongoContract } from './interpreter';
 
 export interface MongoContractOptions {
@@ -12,41 +11,49 @@ export interface MongoContractOptions {
 
 export function mongoContract(schemaPath: string, options?: MongoContractOptions): ContractConfig {
   return {
-    source: async (context: ContractSourceContext) => {
-      const absoluteSchemaPath = resolve(schemaPath);
-      let schema: string;
-      try {
-        schema = await readFile(absoluteSchemaPath, 'utf-8');
-      } catch (error) {
-        const message = String(error);
-        return notOk({
-          summary: `Failed to read Prisma schema at "${schemaPath}"`,
-          diagnostics: [
-            {
-              code: 'PSL_SCHEMA_READ_FAILED',
-              message,
-              sourceId: schemaPath,
-            },
-          ],
-          meta: { schemaPath, absoluteSchemaPath, cause: message },
+    source: {
+      inputs: [schemaPath],
+      load: async (context) => {
+        const [absoluteSchemaPath] = context.resolvedInputs;
+        if (absoluteSchemaPath === undefined) {
+          throw new Error(
+            'mongoContract: context.resolvedInputs is empty. The CLI config loader should populate it positional-matched with source.inputs.',
+          );
+        }
+        let schema: string;
+        try {
+          schema = await readFile(absoluteSchemaPath, 'utf-8');
+        } catch (error) {
+          const message = String(error);
+          return notOk({
+            summary: `Failed to read Prisma schema at "${schemaPath}"`,
+            diagnostics: [
+              {
+                code: 'PSL_SCHEMA_READ_FAILED',
+                message,
+                sourceId: schemaPath,
+              },
+            ],
+            meta: { schemaPath, absoluteSchemaPath, cause: message },
+          });
+        }
+
+        const document = parsePslDocument({
+          schema,
+          sourceId: schemaPath,
         });
-      }
 
-      const document = parsePslDocument({
-        schema,
-        sourceId: schemaPath,
-      });
+        const interpreted = interpretPslDocumentToMongoContract({
+          document,
+          scalarTypeDescriptors: context.scalarTypeDescriptors,
+          codecLookup: context.codecLookup,
+        });
+        if (!interpreted.ok) {
+          return interpreted;
+        }
 
-      const interpreted = interpretPslDocumentToMongoContract({
-        document,
-        scalarTypeDescriptors: context.scalarTypeDescriptors,
-        codecLookup: context.codecLookup,
-      });
-      if (!interpreted.ok) {
-        return interpreted;
-      }
-
-      return ok(interpreted.value);
+        return ok(interpreted.value);
+      },
     },
     ...ifDefined('output', options?.output),
   };
