@@ -5,7 +5,7 @@ import type {
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type { AnyMongoCommand, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import { type CollectionHandle, createCollectionHandle } from './state-classes';
+import { asMongoContract, type CollectionHandle, createCollectionHandle } from './state-classes';
 
 /**
  * Public entry point of the query builder. `mongoQuery(...).from(rootName)`
@@ -36,7 +36,7 @@ export function mongoQuery<
       return createCollectionHandle(contract, rootName);
     },
     rawCommand<C extends AnyMongoCommand>(command: C): MongoQueryPlan<unknown, C> {
-      const c = contract as unknown as MongoContract;
+      const c = asMongoContract(contract);
       const storageHash = c.storage?.storageHash;
       if (!storageHash) {
         throw new Error(

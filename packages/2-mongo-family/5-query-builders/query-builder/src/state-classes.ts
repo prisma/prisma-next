@@ -487,6 +487,20 @@ function foldAnd(filters: ReadonlyArray<MongoFilterExpr>): MongoFilterExpr {
 }
 
 /**
+ * Narrow a `MongoContractWithTypeMaps`-shaped value down to its underlying
+ * `MongoContract` view. `MongoContractWithTypeMaps<C, ...>` is defined as
+ * `C & { readonly [phantom]?: TTypeMaps }`, so every contract we accept is
+ * structurally a `MongoContract` — the phantom is type-only. This helper
+ * centralises that narrowing so callers don't reach for `as unknown as
+ * MongoContract` double-casts.
+ */
+export function asMongoContract(
+  contract: MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,
+): MongoContract {
+  return contract;
+}
+
+/**
  * Bound execution context shared across the three state classes.
  */
 export interface BindingContext<
@@ -508,7 +522,7 @@ export function createCollectionHandle<
   contract: TContract,
   rootName: RootName,
 ): CollectionHandle<TContract, TContract['roots'][RootName] & string & keyof TContract['models']> {
-  const c = contract as unknown as MongoContract;
+  const c = asMongoContract(contract);
   const modelName = c.roots[rootName];
   if (!modelName) {
     const validRoots = Object.keys(c.roots).join(', ');
