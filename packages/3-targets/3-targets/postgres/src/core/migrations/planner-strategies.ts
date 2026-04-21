@@ -11,8 +11,9 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
+import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   addColumn,
   addEnumValues,
@@ -34,6 +35,9 @@ import {
 export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
+  readonly schemaName: string;
+  readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
 }
 
 /**
