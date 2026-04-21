@@ -129,6 +129,211 @@ describe('Postgres call classes', () => {
       ]);
     });
   });
+
+  describe('per-class renderTypeScript coverage', () => {
+    const migrationModule = '@prisma-next/target-postgres/migration';
+    const expectFactoryImport = (
+      call: { importRequirements(): readonly unknown[] },
+      symbol: string,
+    ) => {
+      expect(call.importRequirements()).toEqual([{ moduleSpecifier: migrationModule, symbol }]);
+    };
+
+    it('CreateTableCall emits columns as an array literal; omits the primary-key arg when absent', () => {
+      const withoutPk = new CreateTableCall('public', 'user', [
+        { name: 'id', typeSql: 'text', defaultSql: '', nullable: false },
+      ]);
+      expect(withoutPk.renderTypeScript()).toBe(
+        'createTable("public", "user", [{ name: "id", typeSql: "text", defaultSql: "", nullable: false }])',
+      );
+      expectFactoryImport(withoutPk, 'createTable');
+
+      const withPk = new CreateTableCall(
+        'public',
+        'user',
+        [{ name: 'id', typeSql: 'text', defaultSql: '', nullable: false }],
+        { columns: ['id'] },
+      );
+      expect(withPk.renderTypeScript()).toBe(
+        'createTable("public", "user", [{ name: "id", typeSql: "text", defaultSql: "", nullable: false }], { columns: ["id"] })',
+      );
+    });
+
+    it('AddColumnCall emits the column literal and imports addColumn', () => {
+      const call = new AddColumnCall('public', 'user', {
+        name: 'email',
+        typeSql: 'text',
+        defaultSql: '',
+        nullable: true,
+      });
+      expect(call.renderTypeScript()).toBe(
+        'addColumn("public", "user", { name: "email", typeSql: "text", defaultSql: "", nullable: true })',
+      );
+      expectFactoryImport(call, 'addColumn');
+    });
+
+    it('DropColumnCall emits three positional args and imports dropColumn', () => {
+      const call = new DropColumnCall('public', 'user', 'legacy');
+      expect(call.renderTypeScript()).toBe('dropColumn("public", "user", "legacy")');
+      expectFactoryImport(call, 'dropColumn');
+    });
+
+    it('AlterColumnTypeCall inlines the options object and imports alterColumnType', () => {
+      const call = new AlterColumnTypeCall('public', 'user', 'age', {
+        qualifiedTargetType: 'integer',
+        formatTypeExpected: 'integer',
+        rawTargetTypeForLabel: 'integer',
+      });
+      const rendered = call.renderTypeScript();
+      expect(rendered.startsWith('alterColumnType("public", "user", "age", {')).toBe(true);
+      expect(rendered).toContain('qualifiedTargetType: "integer"');
+      expect(rendered).toContain('formatTypeExpected: "integer"');
+      expect(rendered).toContain('rawTargetTypeForLabel: "integer"');
+      expectFactoryImport(call, 'alterColumnType');
+    });
+
+    it('AlterColumnTypeCall preserves an explicit USING clause in the options literal', () => {
+      const call = new AlterColumnTypeCall('public', 'user', 'age', {
+        qualifiedTargetType: 'integer',
+        formatTypeExpected: 'integer',
+        rawTargetTypeForLabel: 'integer',
+        using: '"age"::integer',
+      });
+      expect(call.renderTypeScript()).toContain('using: "\\"age\\"::integer"');
+    });
+
+    it('SetNotNullCall / DropNotNullCall / DropDefaultCall emit three positional args', () => {
+      expect(new SetNotNullCall('public', 'user', 'email').renderTypeScript()).toBe(
+        'setNotNull("public", "user", "email")',
+      );
+      expect(new DropNotNullCall('public', 'user', 'nickname').renderTypeScript()).toBe(
+        'dropNotNull("public", "user", "nickname")',
+      );
+      expect(new DropDefaultCall('public', 'user', 'updated_at').renderTypeScript()).toBe(
+        'dropDefault("public", "user", "updated_at")',
+      );
+      expectFactoryImport(new SetNotNullCall('public', 'user', 'email'), 'setNotNull');
+      expectFactoryImport(new DropNotNullCall('public', 'user', 'nickname'), 'dropNotNull');
+      expectFactoryImport(new DropDefaultCall('public', 'user', 'updated_at'), 'dropDefault');
+    });
+
+    it('AddPrimaryKeyCall / AddUniqueCall emit (schema, table, constraint, columns)', () => {
+      const pk = new AddPrimaryKeyCall('public', 'user', 'user_pkey', ['id']);
+      expect(pk.renderTypeScript()).toBe('addPrimaryKey("public", "user", "user_pkey", ["id"])');
+      expectFactoryImport(pk, 'addPrimaryKey');
+
+      const uq = new AddUniqueCall('public', 'user', 'user_email_key', ['email']);
+      expect(uq.renderTypeScript()).toBe(
+        'addUnique("public", "user", "user_email_key", ["email"])',
+      );
+      expectFactoryImport(uq, 'addUnique');
+    });
+
+    it('AddForeignKeyCall serializes the full ForeignKeySpec including optional referential actions', () => {
+      const minimal = new AddForeignKeyCall('public', 'post', {
+        name: 'fk',
+        columns: ['a'],
+        references: { table: 'u', columns: ['id'] },
+      });
+      expect(minimal.renderTypeScript()).toBe(
+        'addForeignKey("public", "post", { name: "fk", columns: ["a"], references: { table: "u", columns: ["id"] } })',
+      );
+      expectFactoryImport(minimal, 'addForeignKey');
+
+      const withActions = new AddForeignKeyCall('public', 'post', {
+        name: 'post_author_fk',
+        columns: ['author_id'],
+        references: { table: 'user', columns: ['id'] },
+        onDelete: 'cascade',
+        onUpdate: 'restrict',
+      });
+      expect(withActions.renderTypeScript()).toContain('onDelete: "cascade"');
+      expect(withActions.renderTypeScript()).toContain('onUpdate: "restrict"');
+    });
+
+    it('CreateIndexCall / DropIndexCall emit their positional args and import createIndex/dropIndex', () => {
+      const ci = new CreateIndexCall('public', 'user', 'user_email_idx', ['email']);
+      expect(ci.renderTypeScript()).toBe(
+        'createIndex("public", "user", "user_email_idx", ["email"])',
+      );
+      expectFactoryImport(ci, 'createIndex');
+
+      const di = new DropIndexCall('public', 'user', 'stale_idx');
+      expect(di.renderTypeScript()).toBe('dropIndex("public", "user", "stale_idx")');
+      expectFactoryImport(di, 'dropIndex');
+    });
+
+    it('CreateEnumTypeCall emits the enum values as an array literal', () => {
+      const call = new CreateEnumTypeCall('public', 'status', ['active', 'archived']);
+      expect(call.renderTypeScript()).toBe(
+        'createEnumType("public", "status", ["active", "archived"])',
+      );
+      expectFactoryImport(call, 'createEnumType');
+    });
+
+    it('AddEnumValuesCall distinguishes typeName from nativeType in its positional args', () => {
+      const call = new AddEnumValuesCall('public', 'status', 'public.status_native', ['pending']);
+      expect(call.renderTypeScript()).toBe(
+        'addEnumValues("public", "status", "public.status_native", ["pending"])',
+      );
+      expectFactoryImport(call, 'addEnumValues');
+    });
+
+    it('DropEnumTypeCall / RenameTypeCall emit matching positional args', () => {
+      const drop = new DropEnumTypeCall('public', 'status');
+      expect(drop.renderTypeScript()).toBe('dropEnumType("public", "status")');
+      expectFactoryImport(drop, 'dropEnumType');
+
+      const rename = new RenameTypeCall('public', 'status_old', 'status');
+      expect(rename.renderTypeScript()).toBe('renameType("public", "status_old", "status")');
+      expectFactoryImport(rename, 'renameType');
+    });
+
+    it('CreateExtensionCall / CreateSchemaCall emit a single-arg factory call', () => {
+      const ext = new CreateExtensionCall('citext');
+      expect(ext.renderTypeScript()).toBe('createExtension("citext")');
+      expectFactoryImport(ext, 'createExtension');
+
+      const schema = new CreateSchemaCall('app');
+      expect(schema.renderTypeScript()).toBe('createSchema("app")');
+      expectFactoryImport(schema, 'createSchema');
+    });
+
+    it('RawSqlCall serializes the stored op as a JSON literal and imports rawSql', () => {
+      const op = {
+        id: 'raw.1',
+        label: 'raw 1',
+        operationClass: 'additive' as const,
+        target: { id: 'postgres' as const },
+        precheck: [],
+        execute: [{ description: 'do', sql: 'SELECT 1' }],
+        postcheck: [],
+      };
+      const call = new RawSqlCall(op);
+
+      const rendered = call.renderTypeScript();
+      expect(rendered.startsWith('rawSql({')).toBe(true);
+      expect(rendered).toContain('id: "raw.1"');
+      expect(rendered).toContain('sql: "SELECT 1"');
+      expectFactoryImport(call, 'rawSql');
+    });
+
+    it('RawSqlCall carries the stored op unchanged; operationClass + label mirror the op', () => {
+      const op = {
+        id: 'raw.widening.1',
+        label: 'raw widening label',
+        operationClass: 'widening' as const,
+        target: { id: 'postgres' as const },
+        precheck: [],
+        execute: [],
+        postcheck: [],
+      };
+      const call = new RawSqlCall(op);
+      expect(call.operationClass).toBe('widening');
+      expect(call.label).toBe('raw widening label');
+      expect(call.op).toBe(op);
+    });
+  });
 });
 
 describe('renderCallsToTypeScript', () => {
