@@ -14,6 +14,7 @@ export type {
   Index,
   OperationTypesOf,
   PrimaryKey,
+  QueryOperationArgSpec,
   QueryOperationTypeEntry,
   QueryOperationTypesBase,
   QueryOperationTypesOf,

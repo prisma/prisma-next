@@ -29,7 +29,6 @@ describe('ast/predicate', () => {
     'gte',
     'lte',
     'like',
-    'ilike',
     'in',
     'notIn',
   ] as const)('stores the %s operator', (op) => {

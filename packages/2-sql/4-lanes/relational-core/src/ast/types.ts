@@ -4,17 +4,7 @@ import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
 export type Direction = 'asc' | 'desc';
 
-export type BinaryOp =
-  | 'eq'
-  | 'neq'
-  | 'gt'
-  | 'lt'
-  | 'gte'
-  | 'lte'
-  | 'like'
-  | 'ilike'
-  | 'in'
-  | 'notIn';
+export type BinaryOp = 'eq' | 'neq' | 'gt' | 'lt' | 'gte' | 'lte' | 'like' | 'in' | 'notIn';
 
 export type AggregateCountFn = 'count';
 export type AggregateOpFn = 'sum' | 'avg' | 'min' | 'max';
@@ -799,10 +789,6 @@ export class BinaryExpr extends Expression {
 
   static like(left: AnyExpression, right: AnyExpression): BinaryExpr {
     return new BinaryExpr('like', left, right);
-  }
-
-  static ilike(left: AnyExpression, right: AnyExpression): BinaryExpr {
-    return new BinaryExpr('ilike', left, right);
   }
 
   static in(left: AnyExpression, right: AnyExpression): BinaryExpr {

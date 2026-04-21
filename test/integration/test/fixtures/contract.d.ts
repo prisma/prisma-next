@@ -13,6 +13,7 @@ import type { Timestamptz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Time } from '@prisma-next/adapter-postgres/codec-types';
 import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
+import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 
 import type {
   ContractWithTypeMaps,
@@ -34,7 +35,7 @@ export type ProfileHash =
 export type CodecTypes = PgTypes;
 export type OperationTypes = Record<string, never>;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = Record<string, never>;
+export type QueryOperationTypes = PgAdapterQueryOps;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;

@@ -105,16 +105,11 @@ describe('filters', () => {
     );
   });
 
-  it('wraps like and ilike in NotExpr', () => {
+  it('wraps like in NotExpr', () => {
     const user = createModelAccessor(context, 'User');
 
     expect(not(user['name']!.like('%a%'))).toEqual(
       new NotExpr(BinaryExpr.like(ColumnRef.of('users', 'name'), paramRef('users', 'name', '%a%'))),
-    );
-    expect(not(user['name']!.ilike('%a%'))).toEqual(
-      new NotExpr(
-        BinaryExpr.ilike(ColumnRef.of('users', 'name'), paramRef('users', 'name', '%a%')),
-      ),
     );
   });
 

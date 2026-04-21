@@ -340,7 +340,6 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
     gte: '>=',
     lte: '<=',
     like: 'LIKE',
-    ilike: 'ILIKE',
     in: 'IN',
     notIn: 'NOT IN',
   };

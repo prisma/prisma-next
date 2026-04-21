@@ -1,3 +1,4 @@
+import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
@@ -62,7 +63,22 @@ describe('createModelAccessor', () => {
     expectBinaryParam(post['id']!.lte(10), 'posts', 'id', 'lte', 10);
     expectBinaryParam(post['userId']!.eq(42), 'posts', 'user_id', 'eq', 42);
     expectBinaryParam(user['name']!.like('%Ali%'), 'users', 'name', 'like', '%Ali%');
-    expectBinaryParam(user['name']!.ilike('%ali%'), 'users', 'name', 'ilike', '%ali%');
+  });
+
+  it('creates ilike as trait-matched extension operation returning predicate', () => {
+    const user = createModelAccessor(context, 'User');
+    const ilike = user['name']!.ilike;
+    const result = ilike('%ali%');
+    expect(result).toBeInstanceOf(OperationExpr);
+    const op = result as OperationExpr;
+    expect(op.method).toBe('ilike');
+    expect(op.self).toEqual(ColumnRef.of('users', 'name'));
+  });
+
+  it('does not expose ilike on non-textual fields', () => {
+    const post = createModelAccessor(context, 'Post');
+    const field = post['views'] as unknown as Record<string, unknown>;
+    expect(field['ilike']).toBeUndefined();
   });
 
   it('creates list literal, null check, and order directive helpers', () => {
@@ -403,7 +419,6 @@ describe('createModelAccessor', () => {
       expect(field['gte']).toBeUndefined();
       expect(field['lte']).toBeUndefined();
       expect(field['like']).toBeUndefined();
-      expect(field['ilike']).toBeUndefined();
       expect(field['asc']).toBeUndefined();
       expect(field['desc']).toBeUndefined();
     });
@@ -423,7 +438,6 @@ describe('createModelAccessor', () => {
         'gte',
         'lte',
         'like',
-        'ilike',
         'in',
         'notIn',
         'isNull',
@@ -508,6 +522,43 @@ describe('createModelAccessor', () => {
       expect(order.dir).toBe('asc');
       expect(order.expr.kind).toBe('operation');
       expect((order.expr as OperationExpr).method).toBe('cosineDistance');
+    });
+
+    it('attaches trait-targeted op only when codec traits are a superset of required traits', () => {
+      const queryOperations = createSqlOperationRegistry();
+      queryOperations.register({
+        method: 'synthetic',
+        args: [{ traits: ['equality', 'textual'], nullable: false }],
+        returns: { codecId: 'pg/bool@1', nullable: false },
+        lowering: { targetFamily: 'sql', strategy: 'function', template: 'SYNTHETIC({{self}})' },
+      });
+
+      const codecs = createCodecRegistry();
+      for (const [id, traits] of Object.entries({
+        'pg/text@1': ['equality', 'textual'],
+        'pg/int4@1': ['equality'],
+        'pg/bool@1': ['equality', 'boolean'],
+      } as Record<string, readonly CodecTrait[]>)) {
+        codecs.register(
+          codec({
+            typeId: id,
+            targetTypes: [],
+            traits,
+            encode: (v: unknown) => v,
+            decode: (v: unknown) => v,
+          }),
+        );
+      }
+
+      const ctx = { ...context, queryOperations, codecs };
+      const user = createModelAccessor(ctx, 'User');
+      const post = createModelAccessor(ctx, 'Post');
+
+      const name = user['name'] as unknown as Record<string, unknown>;
+      expect(typeof name['synthetic']).toBe('function');
+
+      const views = post['views'] as unknown as Record<string, unknown>;
+      expect(views['synthetic']).toBeUndefined();
     });
   });
 });

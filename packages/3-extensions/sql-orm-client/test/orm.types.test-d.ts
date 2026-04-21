@@ -57,7 +57,7 @@ db.Post.where((post) => post.views.isNotNull());
 
 // @ts-expect-error int4 has no textual trait → like() not available
 db.Post.where((post) => post.views.like('%'));
-// @ts-expect-error int4 has no textual trait → ilike() not available
+// @ts-expect-error int4 has no textual trait → ilike extension op not available
 db.Post.where((post) => post.views.ilike('%'));
 
 // text has no numeric trait → sum/avg restricted

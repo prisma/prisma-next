@@ -463,14 +463,6 @@ describe('bindWhereExpr', () => {
       expect((bound.right as ParamRef).value).toBe('%alice%');
     });
 
-    it('ilike binds literal to param', () => {
-      const expr = BinaryExpr.ilike(ColumnRef.of('users', 'name'), LiteralExpr.of('%alice%'));
-      const bound = bindWhereExpr(contract, expr) as BinaryExpr;
-
-      expect(bound.op).toBe('ilike');
-      expect(bound.right.kind).toBe('param-ref');
-    });
-
     it('notIn binds list literals to params', () => {
       const expr = BinaryExpr.notIn(
         ColumnRef.of('users', 'id'),
