@@ -97,7 +97,8 @@ interface PipelineChainState {
  *    (`$limit`, `$group`, mutating stages, …).
  *
  * The marker semantics are encoded in the per-method return types — see the
- * marker table in `query-builder-unification.spec.md`.
+ * marker table (and rationale per row) in
+ * `docs/architecture docs/adrs/ADR 201 - State-machine pattern for typed DSL builders.md`.
  */
 export class PipelineChain<
   TContract extends MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>,

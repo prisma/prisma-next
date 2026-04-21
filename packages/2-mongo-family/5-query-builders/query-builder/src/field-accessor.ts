@@ -44,11 +44,12 @@ import {
  *    `push`, `addToSet`, `pop`, `pull`, `pullAll`, `currentDate`, `setOnInsert`)
  *    — consumed by write terminals (M2+).
  *
- * Operator surfaces are intentionally not trait-gated by codec in this revision
- * (see Open Item 4 in the spec). Calling, e.g. `.inc(1)` on a string-typed
- * expression compiles; the runtime relies on Mongo to surface the error.
- * Trait-gating can be tightened in a follow-up without changing the accessor's
- * public shape.
+ * Operator surfaces are intentionally not trait-gated by codec in this
+ * revision — tracked on Linear as TML-2259 (scope extended to cover the
+ * query-builder's `Expression<F>`). Calling, e.g. `.inc(1)` on a
+ * string-typed expression compiles; the runtime relies on Mongo to
+ * surface the error. Trait-gating can be tightened in a follow-up
+ * without changing the accessor's public shape.
  */
 export interface Expression<F extends DocField> extends TypedAggExpr<F> {
   readonly _path: string;

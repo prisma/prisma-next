@@ -35,11 +35,12 @@ import { resolveUpdaterResult, type UpdaterResult } from './update-ops';
 
 /**
  * "Match-all" filter used by the unqualified-write terminals
- * (`updateAll`/`deleteAll`). Spec Open Item #2 leaves the canonical
- * representation TBD; for now we use `_id $exists: true`, which is
- * trivially true on every document and avoids introducing a new AST node
- * before the wider question is resolved. Centralised so the eventual switch
- * to `MongoMatchAllExpr` is a one-line change.
+ * (`updateAll`/`deleteAll`). The canonical representation is still
+ * undecided — `MongoAndExpr` with an empty conjunction and a dedicated
+ * `MongoMatchAllExpr` node are both candidates. For now we use
+ * `_id $exists: true`, which is trivially true on every document and
+ * avoids introducing a new AST node before the wider question is
+ * resolved. Centralised so the eventual switch is a one-line change.
  */
 function matchAllFilter(): MongoFilterExpr {
   return MongoExistsExpr.exists('_id');

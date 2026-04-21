@@ -27,8 +27,7 @@ export class UpdateOneCommand extends MongoAstNode {
    * When true, the wire command becomes an upsert: if no document matches
    * `filter`, a new document is inserted derived from filter equality
    * fields plus the update spec. Defaults to false to preserve the
-   * pre-upsert constructor signature for existing call sites (see
-   * `query-builder-unification.spec.md` Open Item #1).
+   * pre-upsert constructor signature for existing call sites.
    */
   readonly upsert: boolean;
 
