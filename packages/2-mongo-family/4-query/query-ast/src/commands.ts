@@ -25,9 +25,8 @@ export class UpdateOneCommand extends MongoAstNode {
   readonly update: MongoUpdateSpec;
   /**
    * When true, the wire command becomes an upsert: if no document matches
-   * `filter`, a new document is inserted derived from filter equality
-   * fields plus the update spec. Defaults to false to preserve the
-   * pre-upsert constructor signature for existing call sites.
+   * `filter`, a new document is inserted, derived from the filter's
+   * equality fields plus the update spec. Defaults to false.
    */
   readonly upsert: boolean;
 
@@ -78,9 +77,9 @@ export class UpdateManyCommand extends MongoAstNode {
   readonly filter: MongoFilterExpr;
   readonly update: MongoUpdateSpec;
   /**
-   * Upsert flag — see `UpdateOneCommand.upsert`. For `updateMany`, the
-   * wire command inserts at most one document if no match exists (Mongo's
-   * own constraint, not ours).
+   * Upsert flag — see `UpdateOneCommand.upsert`. For `updateMany`, Mongo
+   * inserts at most one document when no match exists (driver-side
+   * constraint).
    */
   readonly upsert: boolean;
 
