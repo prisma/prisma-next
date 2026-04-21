@@ -66,6 +66,15 @@ describe('state-machine surface (negative type tests)', () => {
     unwound.findOneAndUpdate((f) => [f.amount.inc(1)]);
     // @ts-expect-error — unwind clears FindAndModifyEnabled
     unwound.findOneAndDelete();
+
+    // .skip() clears FindAndModifyEnabled — MongoDB's findAndModify wire
+    // command has no skip slot, so `deconstructFindAndModifyChain` rejects
+    // any `$skip` at runtime. The type system mirrors that here.
+    const skipped = handle().match(MongoFieldFilter.eq('status', 'new')).skip(1);
+    // @ts-expect-error — skip clears FindAndModifyEnabled
+    skipped.findOneAndUpdate((f) => [f.amount.inc(1)]);
+    // @ts-expect-error — skip clears FindAndModifyEnabled
+    skipped.findOneAndDelete();
   });
 
   it('updateMany / updateOne unavailable after UpdateEnabled-clearing stages', () => {
