@@ -29,6 +29,7 @@ Prisma Next separates `family → target → adapter → driver`. For D1 we add 
 
 - A driver package (`@prisma-next/driver-sqlite-d1` or similar, in `packages/3-targets/7-drivers/sqlite-d1/`) exporting both a runtime driver and a control driver.
 - A D1-specific migration runner. PR #341's runner cannot execute on D1 because it relies on interactive reads inside a `BEGIN EXCLUSIVE` transaction. The new runner reshapes the lifecycle around D1's import API, which accepts a self-contained SQL file and runs it atomically server-side.
+- An extension to the shared `ControlDriverInstance` interface adding a bulk-atomic-apply primitive alongside `query`. The D1 runner needs a way to ship a multi-statement script atomically; the existing `query` method is a read-with-results contract and a poor fit. See "Driver interface" below.
 - New capability declarations on the driver side to gate runtime operations that require interactive transactions.
 - An assertion-based gate in the ORM that checks this capability at mutation entry points and throws a typed error for unsupported operations on D1.
 
@@ -48,12 +49,34 @@ Credentials: the same API token works for both endpoints. R2 upload uses the pre
 
 **Trade-off accepted**: the import API is multi-round-trip (init → upload → ingest → poll). Migrations are latency-tolerant, so this is fine. Non-migration reads stay on `/query` because they don't need the import path's semantics and latency would matter more per-call.
 
+### Driver interface: `query` for reads, `applyScript` for atomic apply
+
+The current `ControlDriverInstance` interface (`packages/1-framework/1-core/framework-components/src/control-instances.ts`) exposes `query(sql, params?) → {rows}` and `close()`. That shape fits single-statement reads well and doesn't fit bulk atomic apply — the D1 runner needs to ship a multi-statement SQL file and get back a pass/fail signal, not individual rows.
+
+The interface grows one method:
+
+- `query(sql, params?)` — existing. Contract: execute a single statement, return rows. Used for introspection, marker reads, any other control-plane reads.
+- `applyScript(sql)` — new. Contract: execute the entire SQL blob atomically; either every statement succeeds and the changes commit, or nothing changes. No rows returned. The caller is responsible for encoding any assertions inside the script (e.g., `RAISE(ABORT)` on marker CAS failure or FK integrity violation).
+- `close()` — existing.
+
+How each target's control driver implements `applyScript`:
+
+- **D1**: uploads the SQL to the pre-signed R2 URL returned by the `import` init call, triggers ingestion, polls for completion. Atomicity is provided by the import pipeline's documented "returns to original state" guarantee on any failure.
+- **Native SQLite**: wraps `db.exec(script)` in `BEGIN IMMEDIATE … COMMIT`, rolls back on error.
+- **Postgres**: `BEGIN` then a single multi-statement `query(script)` then `COMMIT`, rolled back on error.
+
+The D1-specific migration runner reads linearly: pre-phase calls `driver.query(...)` for each introspection and marker read; then it composes a single SQL string containing PRAGMA, DDL, marker CAS, marker upsert, and ledger insert; then `driver.applyScript(script)`. No conditional routing inside the runner, and no way for the runner to accidentally ship a migration through the wrong endpoint.
+
+Considered and rejected: having the driver inspect the SQL string and auto-route (e.g., "multi-statement → import") from inside `query`. Fragile (what counts as multi-statement with PRAGMAs, comments, etc.) and implicit. `query` and `applyScript` differ in *intent* — read-with-results vs atomic side effect with no expected rows — and the interface surfaces the intent explicitly.
+
+PR #341's existing runner continues to use `query` throughout (it opens `BEGIN EXCLUSIVE` via `query('BEGIN EXCLUSIVE')` and does interactive reads inside). `applyScript` is additive; it doesn't require any change to that runner. If we later want to port PR #341's runner to the `applyScript` shape, the primitive is already available on native SQLite and Postgres control drivers.
+
 ### Runner shape: pre-import reads → import submission → done
 
 PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with interactive reads inside. D1's import API is not interactive — you submit a SQL file and poll for outcome. The lifecycle restructures into:
 
-1. **Pre-import reads** (via `/query`): introspect current schema, read the marker, compute which operations to skip based on their postchecks, verify origin-hash compatibility. Non-atomic reads. If any check aborts the migration, no state has changed.
-2. **Import submission**: construct a single SQL file containing, in order —
+1. **Pre-import reads** (via `driver.query`): introspect current schema, read the marker, compute which operations to skip based on their postchecks, verify origin-hash compatibility. Non-atomic reads. If any check aborts the migration, no state has changed.
+2. **Script composition and submission** (via `driver.applyScript`): construct a single SQL script containing, in order —
    - `PRAGMA foreign_keys = OFF;`
    - Control-table creation (idempotent): `CREATE TABLE IF NOT EXISTS _prisma_marker` / `_prisma_ledger`
    - Each non-skipped operation's DDL, including recreate-table operations for tables with incoming CASCADE FKs
@@ -62,7 +85,7 @@ PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with
    - Marker upsert via `INSERT … ON CONFLICT DO UPDATE`
    - Ledger insert
   
-   Submit to `/import`. The import pipeline runs the file atomically end-to-end: any failed statement triggers a full rollback to the pre-import state, so DDL and marker/ledger updates are atomic with each other.
+   Hand the script to `driver.applyScript`. On D1 that routes through the import API; on native SQLite and Postgres it wraps in `BEGIN`/`COMMIT`. Atomicity: any failed statement triggers a full rollback to the pre-apply state, so DDL and marker/ledger updates are atomic with each other.
 
 3. **Post-import**: nothing. Schema verification is dropped (see below).
 
