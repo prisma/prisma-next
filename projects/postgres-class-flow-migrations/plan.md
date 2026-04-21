@@ -48,7 +48,7 @@ packages/3-targets/3-targets/postgres/src/core/migrations/
 └── scaffolding.ts           # Only non-descriptor scaffolding helpers remain
 ```
 
-No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.) The Postgres target uses two internal abstract base classes inside `core/migrations/` to share plumbing across the concrete call classes — mirroring Mongo's `OpFactoryCallNode` (`packages/3-mongo-target/1-mongo-target/src/core/op-factory-call.ts`). The outer one, `MigrationTsExpression`, is the root of the TypeScript-renderable AST (`renderTypeScript()` + `importRequirements()`) and is also extended by `PlaceholderExpression`, the scaffolded `dataTransform` body. The inner one, `PostgresOpFactoryCallNode`, adds the visitor `accept()` plus the `OpFactoryCall` slots. Both are private to the Postgres package: not exported, not referenced in cross-package signatures, not visible to non-Postgres consumers.
+No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.) The Postgres target uses two internal abstract base classes inside `core/migrations/` to share plumbing across the concrete call classes. The outer one, `MigrationTsExpression`, is the root of the TypeScript-renderable AST (`renderTypeScript()` + `importRequirements()`) and is also extended by `PlaceholderExpression`, the scaffolded `dataTransform` body. The inner one, `PostgresOpFactoryCallNode`, adds the visitor `accept()` plus the `OpFactoryCall` slots. Both are private to the Postgres package: not exported, not referenced in cross-package signatures, not visible to non-Postgres consumers. Mongo receives a structurally identical hierarchy in Phase 1 (its existing `OpFactoryCallNode` is extended to `implements OpFactoryCall` and `extends MigrationTsExpression`, with its own package-private `MigrationTsExpression`) so the two targets stay aligned; cross-target lift of these abstractions to the framework is a known follow-up.
 
 **Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, `renderDescriptorTypeScript` from `scaffolding.ts`.
 
@@ -84,8 +84,8 @@ fromContract, toContract, schema
 | `Migration` | Abstract class implementing `MigrationPlan`. User-authored migration files extend it and override `plan()`. | `@prisma-next/framework-components/migration` |
 | `MigrationPlanWithAuthoringSurface` | A `MigrationPlan` that also carries `renderTypeScript()`. Produced by planners. | ADR 194, `framework-components/control` |
 | `OpFactoryCall` | **Interface, framework-level** (`{ factory, operationClass, label }`). Concrete call classes (`CreateTableCall`, `DataTransformCall`, …) implement it. The framework ships no abstract base class. | ADR 195, `framework-components/control-migration-types.ts` |
-| `MigrationTsExpression` | **Internal** abstract base class private to the Postgres package. Root of the Postgres IR expression hierarchy: any node renderable as a TypeScript expression in the generated `migration.ts` extends it and supplies `renderTypeScript(): string` plus `importRequirements(): readonly ImportRequirement[]`. Parent of `PostgresOpFactoryCallNode` (and therefore of every concrete call class) as well as `PlaceholderExpression`. Not exported, not in any cross-package signature. | `packages/3-targets/3-targets/postgres/src/core/migrations/migration-ts-expression.ts` |
-| `PostgresOpFactoryCallNode` | **Internal** abstract base class. Extends `MigrationTsExpression` and implements `OpFactoryCall`; adds visitor `accept()` for `renderOps`. Shared plumbing for every concrete call class. Mirrors Mongo's `OpFactoryCallNode`. Not exported. | `packages/3-targets/3-targets/postgres/src/core/migrations/op-factory-call.ts` |
+| `MigrationTsExpression` | **Internal** abstract base class. Root of the target's IR expression hierarchy: any node renderable as a TypeScript expression in the generated `migration.ts` extends it and supplies `renderTypeScript(): string` plus `importRequirements(): readonly ImportRequirement[]`. Each target carries its own package-private copy (Postgres and Mongo are byte-compatible siblings); a cross-target lift to the framework is a known follow-up. Not exported, not in any cross-package signature. | `packages/3-targets/3-targets/postgres/src/core/migrations/migration-ts-expression.ts`; sibling at `packages/3-mongo-target/1-mongo-target/src/core/migration-ts-expression.ts` |
+| `PostgresOpFactoryCallNode` / Mongo's `OpFactoryCallNode` | **Internal** abstract base class. Extends `MigrationTsExpression` and implements `OpFactoryCall`; adds visitor `accept()` for each target's runtime-op dispatch. Shared plumbing for every concrete call class. Both targets use the same structural shape. Not exported. | Postgres: `core/migrations/op-factory-call.ts`; Mongo: `core/op-factory-call.ts` |
 | `PlaceholderExpression` | Concrete `MigrationTsExpression`. Represents a planner-generated stub for a `dataTransform` `check` or `run` body. `renderTypeScript()` returns `() => placeholder("slot")`; `importRequirements()` declares `placeholder` from `@prisma-next/errors/migration`. Not a member of the `PostgresOpFactoryCall` union — it appears only inside `DataTransformCall`. | `packages/3-targets/3-targets/postgres/src/core/migrations/placeholder-expression.ts`, ADR 200 |
 | Concrete call class | Frozen class representing a single factory call (e.g. `CreateTableCall`, `DataTransformCall`) with literal args + planner-derived label/class. Discriminated union per target. Extends `PostgresOpFactoryCallNode` (Postgres) or `OpFactoryCallNode` (Mongo); satisfies `OpFactoryCall`. Postgres call classes implement `renderTypeScript()` / `importRequirements()` in addition to `accept()`. `DataTransformCall` holds `check: MigrationTsExpression` and `run: MigrationTsExpression`. | ADR 195, `op-factory-call.ts` |
 | `PostgresOpFactoryCallVisitor<R>` | `interface { createTable(c: CreateTableCall): R; … }`. Used by `renderOps` for compile-time-exhaustive dispatch over the `PostgresOpFactoryCall` union. | ADR 195 |
@@ -165,7 +165,18 @@ Phase 0 is a behavior-preserving internal refactor. Revert the PR if tests fail.
 **Framework lift** (`packages/1-framework/1-core/framework-components/src/control-migration-types.ts`):
 
 - Add `OpFactoryCall` interface: `{ readonly factory: string; readonly operationClass: MigrationOperationClass; readonly label: string }`. Re-exported through `framework-components`'s control entrypoint. No abstract base class at framework or family level.
-- Rationale: the structural shape is identical across targets (Mongo, Postgres, anything future). Lifting now means consumer-facing type positions (renderer signatures, planner returns, visitor inputs) reference a single framework-level interface rather than a target-specific or family-specific abstraction. Mongo's existing `OpFactoryCallNode` abstract base class is retrofitted with an explicit `implements OpFactoryCall` annotation as part of Phase 1 — a two-line change (one import + one annotation) that all five Mongo concrete call classes inherit without further edits.
+- Rationale: the structural shape is identical across targets (Mongo, Postgres, anything future). Lifting now means consumer-facing type positions (renderer signatures, planner returns, visitor inputs) reference a single framework-level interface rather than a target-specific or family-specific abstraction.
+
+**Mongo IR sync** (`packages/3-mongo-target/1-mongo-target/src/core/`):
+
+Mongo and Postgres ship the same IR shape — the abstract-expression hierarchy introduced for Postgres is applied to Mongo in this phase too, so the two targets don't drift. Mongo has no planner-emitted `dataTransform` (its planner only produces collection / index ops), so `PlaceholderExpression` has no Mongo counterpart; the hierarchy remains open to future variants.
+
+- `migration-ts-expression.ts` (new) — internal abstract base `MigrationTsExpression` (private; structurally identical to the Postgres sibling). Declares `renderTypeScript(): string` and `importRequirements(): readonly ImportRequirement[]`. Not exported, not referenced outside the Mongo package.
+- `op-factory-call.ts` — `OpFactoryCallNode` gains `extends MigrationTsExpression` (adding the two abstract methods) and `implements OpFactoryCall` (framework-level interface). Each of the five concrete call classes (`CreateIndexCall`, `DropIndexCall`, `CreateCollectionCall`, `DropCollectionCall`, `CollModCall`) grows `renderTypeScript()` and `importRequirements()` polymorphic methods. The `OpFactoryCallVisitor<R>` interface stays — still used by the runtime-op side (`renderOpsToMongoCommands` / `mongo-emit`).
+- `render-typescript.ts` — `renderCallsToTypeScript` switches from the existing visitor implementation to a polymorphic walk: `calls.map((c) => c.renderTypeScript())` for the body, and `calls.flatMap((c) => c.importRequirements())` + dedupe for the import block. The hand-rolled `collectFactoryNames` + `buildImports` helpers are deleted. Output format is preserved byte-for-byte — existing Mongo render-typescript snapshot tests are the regression net.
+- No change to `planner-produced-migration.ts` (Mongo's `PlannerProducedMongoMigration` is unaffected; it only wires `renderCallsToTypeScript` through). No change to `mongoEmit` or the Mongo planner.
+
+Rationale: the Postgres IR introduces the abstract-expression / polymorphic-render pattern for a concrete reason (`DataTransformCall` needs expression children, which polymorphism handles more cleanly than a second visitor). Landing the same shape in Mongo at the same time means the two targets converge rather than diverge, and the follow-up cross-target consolidation (see §"Known follow-ups") becomes a pure lift rather than a harmonize-then-lift.
 
 **Family-SQL abstractions** (`packages/2-sql/9-family`):
 
@@ -197,6 +208,7 @@ Phase 0 is a behavior-preserving internal refactor. Revert the PR if tests fail.
 - Visitor tests: every `renderOps` and `renderCallsToTypeScript` case.
 - Existing walk-schema integration tests pass unchanged (`planner.integration.test.ts`, `planner.behavior.test.ts`, `planner.storage-types.integration.test.ts`, `planner.reconciliation.integration.test.ts`).
 - `TypeScriptRenderablePostgresMigration` unit test: construct with a fixed call list, verify `operations` round-trips through `renderOps`, verify `renderTypeScript()` emits parseable TypeScript whose dynamic import reconstructs the same call list.
+- Mongo regression net: all existing Mongo `render-typescript` and `op-factory-call` unit / snapshot tests pass unchanged after the polymorphic rewrite (byte-identical output required). Mongo `migration plan` e2e for an empty scaffold and a non-empty planned migration unchanged.
 - `db update` end-to-end smoke (existing tests).
 - Full existing descriptor-flow `migration plan` e2e still passes (descriptor path is untouched).
 
@@ -438,7 +450,12 @@ Phase 3's PR exercises the runner post-apply verify per example: each re-scaffol
 
 `projects/mongo-migration-authoring/` (completed via PR #349) established the class-flow template. This project ports the architecture to Postgres and folds in the issue-based diff layer that Mongo does not need — Mongo operates directly on the target contract, while Postgres requires structured diff-over-schema because the live-DB schema can drift from the contract in ways the migration must reconcile.
 
-Mongo-side changes in this project are limited to Phase 6 deletions (`mongoEmit`, `TargetMigrationsCapability.emit`). No Mongo planner, factory, or renderer changes.
+Mongo-side changes in this project:
+
+- **Phase 1 (Mongo IR sync):** `OpFactoryCallNode` gains `implements OpFactoryCall` (framework interface) and `extends MigrationTsExpression` (new internal abstract). Each concrete call class grows `renderTypeScript()` + `importRequirements()`, and `renderCallsToTypeScript` switches from visitor-based to polymorphic. No planner, factory, or rendered-output change.
+- **Phase 6 (emit deletion):** `mongoEmit` and `TargetMigrationsCapability.emit` are removed.
+
+No Mongo planner change, no Mongo factory change, no change to rendered migration.ts output.
 
 ### Risk register
 
@@ -456,23 +473,22 @@ Mongo-side changes in this project are limited to Phase 6 deletions (`mongoEmit`
 
 These items are explicitly out of scope for this project but fall out naturally once it lands. Each is a self-contained future PR.
 
-### Cross-target consolidation of the renderable-migration class
+### Cross-target consolidation of the IR and renderable-migration class
 
-Once Postgres ships `TypeScriptRenderablePostgresMigration`, the codebase has two structurally identical implementations of the same concept (Mongo's `PlannerProducedMongoMigration` and Postgres's `TypeScriptRenderablePostgresMigration`). Both:
+Once Postgres ships, the codebase has two structurally identical IR / rendering stacks across Mongo and Postgres:
 
-- extend `Migration<TOp>` with a target-bound `TOp`,
-- implement `MigrationPlanWithAuthoringSurface<TOp>`,
-- hold `readonly calls: readonly TCall[]` where `TCall extends OpFactoryCall`,
-- inject `renderOps` and `renderCallsToTypeScript` callables via the constructor,
-- delegate `operations` and `renderTypeScript()` to those injected functions.
+- `MigrationTsExpression` abstract base (one copy per target, package-private).
+- `ImportRequirement` shape (one copy per target).
+- `OpFactoryCallNode` / `PostgresOpFactoryCallNode` abstract that extends `MigrationTsExpression` and implements the framework-level `OpFactoryCall` interface.
+- `TypeScriptRenderableXMigration` concrete class that extends `Migration<TOp>`, implements `MigrationPlanWithAuthoringSurface<TOp>`, holds `readonly calls`, and delegates `operations` and `renderTypeScript()` to injected / imported renderers.
 
-The follow-up:
+The follow-up lifts these into `framework-components`:
 
-1. Lift a `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` generic class into `framework-components`.
-2. Retrofit Mongo: `class PlannerProducedMongoMigration extends TypeScriptRenderableMigration<MongoOpFactoryCall, MongoMigrationPlanOperation>` (or a type alias). Rename to `TypeScriptRenderableMongoMigration` for naming parity.
-3. Retrofit Postgres: same treatment for `TypeScriptRenderablePostgresMigration`.
+1. Lift `MigrationTsExpression` and `ImportRequirement` to the framework. Each target re-exports / extends from the framework instead of maintaining a private copy.
+2. Lift a `TypeScriptRenderableMigration<TCall extends OpFactoryCall, TOp>` generic class. Retrofit Mongo (`PlannerProducedMongoMigration` → `TypeScriptRenderableMongoMigration`) and Postgres (`TypeScriptRenderablePostgresMigration`) to extend it. Optional alias types preserve existing names.
+3. Consider whether `PlaceholderExpression` belongs in the framework (it's Postgres-only today, but Mongo or a future target may adopt planner-emitted `dataTransform`-like operations).
 
-This is a purely structural refactor — no behavior change, no ADR change. It's deferred until both targets exist because lifting an abstraction with one concrete consumer is premature; lifting with two is justified. (Note: the `implements OpFactoryCall` annotation on Mongo's `OpFactoryCallNode` is *not* part of this follow-up — it's folded into Phase 1 of this project, where the interface is introduced.)
+This is a purely structural refactor — no behavior change, no ADR change. It's deferred until both targets have the full abstract-expression hierarchy so the lift is a true de-duplication rather than an up-front guess at the right shape. The Phase 1 Mongo IR sync in this project is designed so the Mongo and Postgres hierarchies are byte-compatible at lift time.
 
 ## References
 
