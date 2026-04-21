@@ -15,6 +15,17 @@ import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
+  AddColumnCall,
+  AddEnumValuesCall,
+  AlterColumnTypeCall,
+  CreateEnumTypeCall,
+  DataTransformCall,
+  DropEnumTypeCall,
+  type PostgresOpFactoryCall,
+  RenameTypeCall,
+  SetNotNullCall,
+} from './op-factory-call';
+import {
   addColumn,
   addEnumValues,
   alterColumnType,
@@ -26,6 +37,7 @@ import {
   setNotNull,
   TODO,
 } from './operation-descriptors';
+import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 
 // ============================================================================
 // Strategy types
@@ -263,4 +275,236 @@ export const migrationPlanStrategies: readonly MigrationStrategy[] = [
   notNullBackfillStrategy,
   typeChangeStrategy,
   nullableTighteningStrategy,
+];
+
+// ============================================================================
+// Class-flow call strategies (for issue planner)
+// ============================================================================
+
+export type CallMigrationStrategy = (
+  issues: readonly SchemaIssue[],
+  context: StrategyContext,
+) =>
+  | { kind: 'match'; issues: readonly SchemaIssue[]; calls: readonly PostgresOpFactoryCall[] }
+  | { kind: 'no_match' };
+
+function buildColumnSpec(
+  table: string,
+  column: string,
+  ctx: StrategyContext,
+  overrides?: { nullable?: boolean },
+) {
+  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
+  const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  return {
+    name: column,
+    typeSql: buildColumnTypeSql(col, mutableHooks, mutableTypes),
+    defaultSql: buildColumnDefaultSql(col.default, col),
+    nullable: overrides?.nullable ?? col.nullable,
+  };
+}
+
+function buildAlterTypeOptions(
+  table: string,
+  column: string,
+  ctx: StrategyContext,
+  using?: string,
+) {
+  const col = ctx.toContract.storage.tables[table]?.columns[column];
+  if (!col) throw new Error(`Column "${table}"."${column}" not found in destination contract`);
+  const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
+  const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
+  const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
+  return {
+    qualifiedTargetType,
+    formatTypeExpected: qualifiedTargetType,
+    rawTargetTypeForLabel: qualifiedTargetType,
+    ...(using !== undefined ? { using } : {}),
+  };
+}
+
+export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const calls: PostgresOpFactoryCall[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'missing_column' || !issue.table || !issue.column) continue;
+
+    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    if (!column) continue;
+    if (column.nullable === true || column.default !== undefined) continue;
+
+    matched.push(issue);
+    const spec = buildColumnSpec(issue.table, issue.column, ctx, { nullable: true });
+    calls.push(
+      new AddColumnCall(ctx.schemaName, issue.table, spec),
+      new DataTransformCall(
+        `backfill-${issue.table}-${issue.column}`,
+        `backfill-${issue.table}-${issue.column}:check`,
+        `backfill-${issue.table}-${issue.column}:run`,
+      ),
+      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+    );
+  }
+
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    calls,
+  };
+};
+
+const SAFE_WIDENINGS = new Set(['int2→int4', 'int2→int8', 'int4→int8', 'float4→float8']);
+
+export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const calls: PostgresOpFactoryCall[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'type_mismatch') continue;
+    if (!issue.table || !issue.column) continue;
+    const fromColumn = ctx.fromContract?.storage.tables[issue.table]?.columns[issue.column];
+    const toColumn = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    if (!fromColumn || !toColumn) continue;
+    const fromType = fromColumn.nativeType;
+    const toType = toColumn.nativeType;
+    if (fromType === toType) continue;
+    matched.push(issue);
+    const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
+    if (SAFE_WIDENINGS.has(`${fromType}→${toType}`)) {
+      calls.push(new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts));
+    } else {
+      calls.push(
+        new DataTransformCall(
+          `typechange-${issue.table}-${issue.column}`,
+          `typechange-${issue.table}-${issue.column}:check`,
+          `typechange-${issue.table}-${issue.column}:run`,
+        ),
+        new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts),
+      );
+    }
+  }
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    calls,
+  };
+};
+
+export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const calls: PostgresOpFactoryCall[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'nullability_mismatch' || !issue.table || !issue.column) continue;
+
+    const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
+    if (!column) continue;
+    if (column.nullable === true) continue;
+
+    matched.push(issue);
+    calls.push(
+      new DataTransformCall(
+        `handle-nulls-${issue.table}-${issue.column}`,
+        `handle-nulls-${issue.table}-${issue.column}:check`,
+        `handle-nulls-${issue.table}-${issue.column}:run`,
+      ),
+      new SetNotNullCall(ctx.schemaName, issue.table, issue.column),
+    );
+  }
+
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    calls,
+  };
+};
+
+function enumRebuildCallRecipe(
+  typeName: string,
+  ctx: StrategyContext,
+): readonly PostgresOpFactoryCall[] {
+  const toType = ctx.toContract.storage.types?.[typeName];
+  if (!toType) return [];
+  const nativeType = toType.nativeType;
+  const desiredValues = (toType.typeParams['values'] ?? []) as readonly string[];
+  const tempName = `${nativeType}${REBUILD_SUFFIX}`;
+
+  const columnRefs: { table: string; column: string }[] = [];
+  for (const [tableName, table] of Object.entries(ctx.toContract.storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (column.typeRef === typeName) {
+        columnRefs.push({ table: tableName, column: columnName });
+      }
+    }
+  }
+
+  return [
+    new CreateEnumTypeCall(ctx.schemaName, tempName, desiredValues),
+    ...columnRefs.map((ref) => {
+      const using = `${ref.column}::text::${tempName}`;
+      return new AlterColumnTypeCall(ctx.schemaName, ref.table, ref.column, {
+        qualifiedTargetType: tempName,
+        formatTypeExpected: tempName,
+        rawTargetTypeForLabel: tempName,
+        using,
+      });
+    }),
+    new DropEnumTypeCall(ctx.schemaName, nativeType),
+    new RenameTypeCall(ctx.schemaName, tempName, nativeType),
+  ];
+}
+
+export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  const matched: SchemaIssue[] = [];
+  const calls: PostgresOpFactoryCall[] = [];
+
+  for (const issue of issues) {
+    if (issue.kind !== 'enum_values_changed') continue;
+    matched.push(issue);
+
+    if (issue.removedValues.length > 0) {
+      calls.push(
+        new DataTransformCall(
+          `migrate-${issue.typeName}-values`,
+          `migrate-${issue.typeName}-values:check`,
+          `migrate-${issue.typeName}-values:run`,
+        ),
+        ...enumRebuildCallRecipe(issue.typeName, ctx),
+      );
+    } else if (issue.addedValues.length === 0) {
+      calls.push(...enumRebuildCallRecipe(issue.typeName, ctx));
+    } else {
+      const toType = ctx.toContract.storage.types?.[issue.typeName];
+      if (toType) {
+        calls.push(
+          new AddEnumValuesCall(
+            ctx.schemaName,
+            issue.typeName,
+            toType.nativeType,
+            issue.addedValues,
+          ),
+        );
+      }
+    }
+  }
+
+  if (matched.length === 0) return { kind: 'no_match' };
+  return {
+    kind: 'match',
+    issues: issues.filter((i) => !matched.includes(i)),
+    calls,
+  };
+};
+
+export const migrationPlanCallStrategies: readonly CallMigrationStrategy[] = [
+  enumChangeCallStrategy,
+  notNullBackfillCallStrategy,
+  typeChangeCallStrategy,
+  nullableTighteningCallStrategy,
 ];
