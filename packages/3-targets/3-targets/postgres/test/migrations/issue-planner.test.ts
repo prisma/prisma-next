@@ -452,6 +452,50 @@ describe('planIssues', () => {
     });
   });
 
+  describe('foreign_key_mismatch', () => {
+    it('returns foreignKeyConflict when the destination contract lacks a matching FK entry', () => {
+      const toContract = makeContract({
+        tables: {
+          order: {
+            columns: {
+              id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+              user_id: { nativeType: 'uuid', codecId: 'pg/uuid@1', nullable: false },
+            },
+            primaryKey: { columns: ['id'] },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      });
+      const issues: SchemaIssue[] = [
+        {
+          kind: 'foreign_key_mismatch',
+          table: 'order',
+          expected: 'user_id -> user(id)',
+          message: 'Foreign key on "order" is missing',
+        },
+      ];
+
+      const result = planIssues({
+        ...defaultCtx,
+        issues,
+        toContract,
+        fromContract: null,
+        storageTypes: toContract.storage.types ?? {},
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error('expected notOk');
+      expect(result.failure).toHaveLength(1);
+      expect(result.failure[0]).toMatchObject({
+        kind: 'foreignKeyConflict',
+        summary: expect.stringContaining('not found in destination contract'),
+        location: { table: 'order' },
+      });
+    });
+  });
+
   describe('strategies override', () => {
     it('bypasses data-safety strategies when strategies: [] is passed', () => {
       const toContract = makeContract({
