@@ -605,6 +605,24 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
+  packages/1-framework/1-core/ts-render:
+    devDependencies:
+      '@prisma-next/tsconfig':
+        specifier: workspace:*
+        version: link:../../../0-config/tsconfig
+      '@prisma-next/tsdown':
+        specifier: workspace:*
+        version: link:../../../0-config/tsdown
+      tsdown:
+        specifier: 'catalog:'
+        version: 0.18.4(typescript@5.9.3)
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
+
   packages/1-framework/2-authoring/contract:
     devDependencies:
       '@prisma-next/tsconfig':
@@ -1985,6 +2003,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/migration
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
@@ -2458,6 +2479,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-foundation/mongo-value
+      '@prisma-next/ts-render':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/ts-render
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/utils
@@ -2623,6 +2647,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/migration
       '@prisma-next/sql-builder':
         specifier: workspace:*
         version: link:../../../2-sql/4-lanes/sql-builder
@@ -2644,6 +2671,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/schema-ir
+      '@prisma-next/ts-render':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/ts-render
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils

@@ -1,9 +1,7 @@
 import {
   normalizeSchemaNativeType,
   parsePostgresDefault,
-  quoteIdentifier,
 } from '@prisma-next/adapter-postgres/control';
-import { errorPlanDoesNotSupportAuthoringSurface } from '@prisma-next/errors/migration';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -15,7 +13,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import {
   collectInitDependencies,
-  createMigrationPlan,
   extractCodecControlHooks,
   plannerFailure,
 } from '@prisma-next/family-sql/control';
@@ -35,8 +32,24 @@ import type {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { buildAddColumnSql, buildCreateTableSql, buildForeignKeySql } from './planner-ddl-builders';
+import {
+  AddColumnCall,
+  AddForeignKeyCall,
+  AddPrimaryKeyCall,
+  AddUniqueCall,
+  CreateIndexCall,
+  CreateTableCall,
+  type PostgresOpFactoryCall,
+  RawSqlCall,
+} from './op-factory-call';
+import type { ColumnSpec, ForeignKeySpec } from './operations/shared';
+import {
+  buildAddColumnSql,
+  buildColumnDefaultSql,
+  buildColumnTypeSql,
+} from './planner-ddl-builders';
 import { resolveIdentityValue } from './planner-identity-values';
+import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import {
   buildAddColumnOperationIdentity,
   buildAddNotNullColumnWithTemporaryDefaultOperation,
@@ -52,11 +65,8 @@ import {
 import {
   columnExistsCheck,
   columnNullabilityCheck,
-  constraintExistsCheck,
   qualifyTableName,
-  tableHasPrimaryKeyCheck,
   tableIsEmptyCheck,
-  toRegclassLiteral,
 } from './planner-sql-checks';
 import {
   buildTargetDetails,
@@ -64,7 +74,38 @@ import {
   type PlanningMode,
   type PostgresPlanTargetDetails,
 } from './planner-target-details';
-import { renderDescriptorTypeScript } from './scaffolding';
+
+/**
+ * Lift a pre-built `SqlMigrationPlanOperation` into class-flow IR.
+ *
+ * Ops produced outside the planner's direct IR emission — by codec control
+ * hooks (`planTypeOperations`), component database dependency install
+ * arrays, the multi-step add-NOT-NULL-with-temporary-default recipe, and any
+ * other raw-op escape hatch — are wrapped in a `RawSqlCall` so the entire
+ * plan can flow through a single `PostgresOpFactoryCall[]` pipeline.
+ *
+ * As upstream producers are retargeted to emit structured call classes
+ * (`CreateExtensionCall`, `CreateSchemaCall`, etc.) directly, call sites here
+ * shrink and this helper narrows to a last-resort launderer for truly opaque
+ * SQL snippets.
+ */
+function liftOpToCall(op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>): RawSqlCall {
+  return new RawSqlCall(op);
+}
+
+function toColumnSpec(
+  name: string,
+  column: StorageColumn,
+  codecHooks: Map<string, CodecControlHooks>,
+  storageTypes: Record<string, StorageTypeInstance>,
+): ColumnSpec {
+  return {
+    name,
+    typeSql: buildColumnTypeSql(column, codecHooks, storageTypes),
+    defaultSql: buildColumnDefaultSql(column.default, column),
+    nullable: column.nullable,
+  };
+}
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -104,44 +145,30 @@ export function createPostgresMigrationPlanner(
 }
 
 /**
- * Postgres planner success plan: the SQL-typed plan (so target-detail
- * typing is preserved for direct SQL callers, including this package's unit
- * tests) plus the framework-required `renderTypeScript()` stub.
- */
-export type PostgresPlanWithRender = ReturnType<
-  typeof createMigrationPlan<PostgresPlanTargetDetails>
-> & {
-  renderTypeScript(): string;
-};
-
-/**
- * Result of `PostgresMigrationPlanner.plan()`. A discriminated union that
- * satisfies both the framework's `MigrationPlannerResult` (success plan
- * carries `renderTypeScript()`) and the SQL family's typed result shape
- * (success plan is a `SqlMigrationPlan<PostgresPlanTargetDetails>`).
+ * Result of `PostgresMigrationPlanner.plan()`. A discriminated union whose
+ * success variant carries a `TypeScriptRenderablePostgresMigration` — a
+ * class-flow migration object that both the CLI (via
+ * `renderTypeScript()`) and the SQL-typed callers (via `operations`,
+ * `describe()`, etc.) consume uniformly.
  */
 export type PostgresPlanResult =
-  | { readonly kind: 'success'; readonly plan: PostgresPlanWithRender }
+  | { readonly kind: 'success'; readonly plan: TypeScriptRenderablePostgresMigration }
   | SqlPlannerFailureResult;
 
 /**
  * Postgres migration planner.
  *
- * Implements the framework's `MigrationPlanner<'sql', 'postgres'>` directly
- * — meaning it owns `emptyMigration()` and attaches the `renderTypeScript()`
- * stub to success plans (Postgres uses descriptor-flow authoring, so
- * `renderTypeScript()` throws on planner-produced plans). No external wrapper
- * is required at the descriptor level.
+ * Implements the framework's `MigrationPlanner<'sql', 'postgres'>` directly.
+ * Both `plan()` and `emptyMigration()` return a
+ * `TypeScriptRenderablePostgresMigration`: the class-flow IR
+ * (`PostgresOpFactoryCall[]`) drives both the runtime-ops view
+ * (via `renderOps`) and the `renderTypeScript()` authoring surface.
  *
  * `plan()` accepts the framework's option shape (with `contract`/`schema`
  * typed as `unknown`); SQL-typed callers may pass the more specific
  * `SqlMigrationPlannerPlanOptions`, since those structurally satisfy the
  * looser framework contract. Internally we treat options as the SQL-typed
  * superset so the existing planner logic stays identical.
- *
- * `fromHash` is accepted but ignored: Postgres is descriptor-flow and never
- * needs it (only class-flow planners like Mongo populate `describe()` from
- * `fromHash`).
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
   constructor(private readonly config: PlannerConfig) {}
@@ -154,21 +181,17 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions);
+    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
-    return {
-      targetId: 'postgres',
-      destination: { storageHash: context.toHash },
-      operations: [],
-      renderTypeScript(): string {
-        return renderDescriptorTypeScript([], context);
-      },
-    };
+    return new TypeScriptRenderablePostgresMigration([], {
+      from: context.fromHash,
+      to: context.toHash,
+    });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
+  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -182,7 +205,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // This avoids repeated iteration over frameworkComponents for each method that needs hooks.
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
 
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
     const storageTypes = options.contract.storage.types ?? {};
 
     const reconciliationPlan = buildReconciliationPlan({
@@ -208,8 +230,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     // Pre-compute constraint lookups once per schema table for O(1) checks across all builders.
     const schemaLookups = buildSchemaLookupMap(options.schema);
 
-    // Build extension operations from component-owned database dependencies
-    operations.push(
+    const calls: PostgresOpFactoryCall[] = [
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
       ...reconciliationPlan.operations,
@@ -233,25 +254,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ...this.buildIndexOperations(sortedTables, schemaLookups, schemaName),
       ...this.buildFkBackingIndexOperations(sortedTables, schemaLookups, schemaName),
       ...this.buildForeignKeyOperations(sortedTables, schemaLookups, schemaName),
-    );
-
-    const plan = createMigrationPlan<PostgresPlanTargetDetails>({
-      targetId: 'postgres',
-      origin: null,
-      destination: {
-        storageHash: options.contract.storage.storageHash,
-        ...ifDefined('profileHash', options.contract.profileHash),
-      },
-      operations,
-    });
+    ];
 
     return Object.freeze({
       kind: 'success' as const,
-      plan: Object.freeze({
-        ...plan,
-        renderTypeScript(): string {
-          throw errorPlanDoesNotSupportAuthoringSurface({ targetId: 'postgres' });
-        },
+      plan: new TypeScriptRenderablePostgresMigration(calls, {
+        from: fromHash,
+        to: options.contract.storage.storageHash,
       }),
     });
   }
@@ -271,13 +280,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
   /**
    * Builds migration operations from component-owned database dependencies.
-   * These operations install database-side persistence structures declared by components.
+   * These operations install database-side persistence structures declared
+   * by components. Each install op is wrapped via `liftOpToCall` so the
+   * planner output is a uniform `PostgresOpFactoryCall[]`.
    */
   private buildDatabaseDependencyOperations(
     options: PlannerOptionsWithComponents,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
+  ): readonly PostgresOpFactoryCall[] {
     const dependencies = this.collectDependencies(options);
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const calls: PostgresOpFactoryCall[] = [];
     const seenDependencyIds = new Set<string>();
     const seenOperationIds = new Set<string>();
 
@@ -298,11 +309,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           continue;
         }
         seenOperationIds.add(installOp.id);
-        operations.push(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>);
+        calls.push(liftOpToCall(installOp as SqlMigrationPlanOperation<PostgresPlanTargetDetails>));
       }
     }
 
-    return operations;
+    return calls;
   }
 
   private buildStorageTypeOperations(
@@ -310,10 +321,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
   ): {
-    readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+    readonly operations: readonly PostgresOpFactoryCall[];
     readonly conflicts: readonly SqlPlannerConflict[];
   } {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+    const calls: PostgresOpFactoryCall[] = [];
     const conflicts: SqlPlannerConflict[] = [];
     const storageTypes = options.contract.storage.types ?? {};
 
@@ -341,17 +352,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
           });
           continue;
         }
-        operations.push({
-          ...operation,
-          target: {
-            id: operation.target.id,
-            details: this.buildTargetDetails('type', typeName, schemaName),
-          },
-        });
+        calls.push(
+          liftOpToCall({
+            ...operation,
+            target: {
+              id: operation.target.id,
+              details: this.buildTargetDetails('type', typeName, schemaName),
+            },
+          }),
+        );
       }
     }
 
-    return { operations, conflicts };
+    return { operations: calls, conflicts };
   }
   private collectDependencies(
     options: PlannerOptionsWithComponents,
@@ -366,43 +379,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
     storageTypes: Record<string, StorageTypeInstance>,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       if (schema.tables[tableName]) {
         continue;
       }
-      const qualified = qualifyTableName(schemaName, tableName);
-      operations.push({
-        id: `table.${tableName}`,
-        label: `Create table ${tableName}`,
-        summary: `Creates table ${tableName} with required columns`,
-        operationClass: 'additive',
-        target: {
-          id: 'postgres',
-          details: this.buildTargetDetails('table', tableName, schemaName),
-        },
-        precheck: [
-          {
-            description: `ensure table "${tableName}" does not exist`,
-            sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
-          },
-        ],
-        execute: [
-          {
-            description: `create table "${tableName}"`,
-            sql: buildCreateTableSql(qualified, table, codecHooks, storageTypes),
-          },
-        ],
-        postcheck: [
-          {
-            description: `verify table "${tableName}" exists`,
-            sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
-          },
-        ],
-      });
+      const columns: ColumnSpec[] = Object.entries(table.columns).map(([name, column]) =>
+        toColumnSpec(name, column, codecHooks, storageTypes),
+      );
+      const primaryKey = table.primaryKey ? { columns: table.primaryKey.columns } : undefined;
+      calls.push(new CreateTableCall(schemaName, tableName, columns, primaryKey));
     }
-    return operations;
+    return calls;
   }
 
   private buildColumnOperations(
@@ -412,8 +401,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     schemaName: string,
     codecHooks: Map<string, CodecControlHooks>,
     storageTypes: Record<string, StorageTypeInstance>,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const schemaTable = schema.tables[tableName];
       if (!schemaTable) {
@@ -424,8 +413,8 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         if (schemaTable.columns[columnName]) {
           continue;
         }
-        operations.push(
-          this.buildAddColumnOperation({
+        calls.push(
+          ...this.buildAddColumnItem({
             schema: schemaName,
             tableName,
             table,
@@ -439,10 +428,31 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         );
       }
     }
-    return operations;
+    return calls;
   }
 
-  private buildAddColumnOperation(options: {
+  /**
+   * Add-column flows fall into three shapes, all expressed as
+   * `PostgresOpFactoryCall[]` so the overall plan is a single flat IR
+   * stream:
+   *
+   *  - Default: one `AddColumnCall`.
+   *  - NOT-NULL + no default, shared-temp-default safe: one `RawSqlCall`
+   *    wrapping the atomic composite op produced by
+   *    `buildAddNotNullColumnWithTemporaryDefaultOperation` (add nullable
+   *    → backfill → `SET NOT NULL` → `DROP DEFAULT`). Splitting the steps
+   *    into per-call subclasses would replace a single op's atomic
+   *    precheck/postcheck pair with four separate op boundaries, changing
+   *    execution semantics, so the composite is laundered as one op.
+   *  - NOT-NULL + no default, unsafe (requires empty-table check): one
+   *    `RawSqlCall` wrapping the hand-built op carrying the extra
+   *    `tableIsEmptyCheck` guard that the plain `AddColumnCall` factory
+   *    does not emit.
+   *
+   * Returning an array keeps the signature amenable to future
+   * decomposition if/when the recipe is split into structured calls.
+   */
+  private buildAddColumnItem(options: {
     readonly schema: string;
     readonly tableName: string;
     readonly table: StorageTable;
@@ -452,7 +462,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly column: StorageColumn;
     readonly codecHooks: Map<string, CodecControlHooks>;
     readonly storageTypes: Record<string, StorageTypeInstance>;
-  }): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
+  }): readonly PostgresOpFactoryCall[] {
     const {
       schema,
       tableName,
@@ -466,8 +476,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     } = options;
     const notNull = !column.nullable;
     const hasDefault = column.default !== undefined;
-    // Planner logic decides whether this column needs the coordinated multi-step
-    // strategy. The strategy recipe itself is built by a dedicated helper.
     const needsTemporaryDefault = notNull && !hasDefault;
     const temporaryDefault = needsTemporaryDefault
       ? resolveIdentityValue(column, codecHooks, storageTypes)
@@ -483,77 +491,94 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       });
 
     if (canUseSharedTemporaryDefault) {
-      return buildAddNotNullColumnWithTemporaryDefaultOperation({
-        schema,
-        tableName,
-        columnName,
-        column,
-        codecHooks,
-        storageTypes,
-        temporaryDefault,
-      });
-    }
-
-    const qualified = qualifyTableName(schema, tableName);
-    const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
-    return {
-      ...buildAddColumnOperationIdentity(schema, tableName, columnName),
-      operationClass: 'additive',
-      precheck: [
-        {
-          description: `ensure column "${columnName}" is missing`,
-          sql: columnExistsCheck({ schema, table: tableName, column: columnName, exists: false }),
-        },
-        ...(requiresEmptyTableCheck
-          ? [
-              {
-                description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
-                sql: tableIsEmptyCheck(qualified),
-              },
-            ]
-          : []),
-      ],
-      execute: [
-        {
-          description: `add column "${columnName}"`,
-          sql: buildAddColumnSql(
-            qualified,
+      return [
+        liftOpToCall(
+          buildAddNotNullColumnWithTemporaryDefaultOperation({
+            schema,
+            tableName,
             columnName,
             column,
             codecHooks,
-            undefined,
             storageTypes,
-          ),
-        },
-      ],
-      postcheck: [
-        {
-          description: `verify column "${columnName}" exists`,
-          sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
-        },
-        ...(notNull
-          ? [
-              {
-                description: `verify column "${columnName}" is NOT NULL`,
-                sql: columnNullabilityCheck({
-                  schema,
-                  table: tableName,
-                  column: columnName,
-                  nullable: false,
-                }),
-              },
-            ]
-          : []),
-      ],
-    };
+            temporaryDefault,
+          }),
+        ),
+      ];
+    }
+
+    // Edge case: NOT-NULL-without-default where shared temp-default is unsafe.
+    // Emit a hand-built op with an extra `table is empty` precheck so we
+    // fail fast with a clearer error than the raw PG DDL failure. The plain
+    // `AddColumnCall` factory doesn't carry this safety guard.
+    const requiresEmptyTableCheck = needsTemporaryDefault && !canUseSharedTemporaryDefault;
+    if (requiresEmptyTableCheck) {
+      const qualified = qualifyTableName(schema, tableName);
+      return [
+        liftOpToCall({
+          ...buildAddColumnOperationIdentity(schema, tableName, columnName),
+          operationClass: 'additive',
+          precheck: [
+            {
+              description: `ensure column "${columnName}" is missing`,
+              sql: columnExistsCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                exists: false,
+              }),
+            },
+            {
+              description: `ensure table "${tableName}" is empty before adding NOT NULL column without default`,
+              sql: tableIsEmptyCheck(qualified),
+            },
+          ],
+          execute: [
+            {
+              description: `add column "${columnName}"`,
+              sql: buildAddColumnSql(
+                qualified,
+                columnName,
+                column,
+                codecHooks,
+                undefined,
+                storageTypes,
+              ),
+            },
+          ],
+          postcheck: [
+            {
+              description: `verify column "${columnName}" exists`,
+              sql: columnExistsCheck({ schema, table: tableName, column: columnName }),
+            },
+            {
+              description: `verify column "${columnName}" is NOT NULL`,
+              sql: columnNullabilityCheck({
+                schema,
+                table: tableName,
+                column: columnName,
+                nullable: false,
+              }),
+            },
+          ],
+        }),
+      ];
+    }
+
+    return [
+      new AddColumnCall(
+        schema,
+        tableName,
+        toColumnSpec(columnName, column, codecHooks, storageTypes),
+      ),
+    ];
   }
 
   private buildPrimaryKeyOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schema: SqlSchemaIR,
     schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       if (!table.primaryKey) {
         continue;
@@ -563,46 +588,19 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
         continue;
       }
       const constraintName = table.primaryKey.name ?? `${tableName}_pkey`;
-      operations.push({
-        id: `primaryKey.${tableName}.${constraintName}`,
-        label: `Add primary key ${constraintName} on ${tableName}`,
-        summary: `Adds primary key ${constraintName} on ${tableName}`,
-        operationClass: 'additive',
-        target: {
-          id: 'postgres',
-          details: this.buildTargetDetails('table', tableName, schemaName),
-        },
-        precheck: [
-          {
-            description: `ensure primary key does not exist on "${tableName}"`,
-            sql: tableHasPrimaryKeyCheck(schemaName, tableName, false),
-          },
-        ],
-        execute: [
-          {
-            description: `add primary key "${constraintName}"`,
-            sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(constraintName)}
-PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
-          },
-        ],
-        postcheck: [
-          {
-            description: `verify primary key "${constraintName}" exists`,
-            sql: tableHasPrimaryKeyCheck(schemaName, tableName, true, constraintName),
-          },
-        ],
-      });
+      calls.push(
+        new AddPrimaryKeyCall(schemaName, tableName, constraintName, table.primaryKey.columns),
+      );
     }
-    return operations;
+    return calls;
   }
 
   private buildUniqueOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const lookup = schemaLookups.get(tableName);
       for (const unique of table.uniques) {
@@ -610,52 +608,18 @@ PRIMARY KEY (${table.primaryKey.columns.map(quoteIdentifier).join(', ')})`,
           continue;
         }
         const constraintName = unique.name ?? `${tableName}_${unique.columns.join('_')}_key`;
-        operations.push({
-          id: `unique.${tableName}.${constraintName}`,
-          label: `Add unique constraint ${constraintName} on ${tableName}`,
-          summary: `Adds unique constraint ${constraintName} on ${tableName}`,
-          operationClass: 'additive',
-          target: {
-            id: 'postgres',
-            details: this.buildTargetDetails('unique', constraintName, schemaName, tableName),
-          },
-          precheck: [
-            {
-              description: `ensure unique constraint "${constraintName}" is missing`,
-              sql: constraintExistsCheck({
-                constraintName,
-                schema: schemaName,
-                table: tableName,
-                exists: false,
-              }),
-            },
-          ],
-          execute: [
-            {
-              description: `add unique constraint "${constraintName}"`,
-              sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ADD CONSTRAINT ${quoteIdentifier(constraintName)}
-UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
-            },
-          ],
-          postcheck: [
-            {
-              description: `verify unique constraint "${constraintName}" exists`,
-              sql: constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
-            },
-          ],
-        });
+        calls.push(new AddUniqueCall(schemaName, tableName, constraintName, unique.columns));
       }
     }
-    return operations;
+    return calls;
   }
 
   private buildIndexOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const lookup = schemaLookups.get(tableName);
       for (const index of table.indexes) {
@@ -663,40 +627,10 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           continue;
         }
         const indexName = index.name ?? defaultIndexName(tableName, index.columns);
-        operations.push({
-          id: `index.${tableName}.${indexName}`,
-          label: `Create index ${indexName} on ${tableName}`,
-          summary: `Creates index ${indexName} on ${tableName}`,
-          operationClass: 'additive',
-          target: {
-            id: 'postgres',
-            details: this.buildTargetDetails('index', indexName, schemaName, tableName),
-          },
-          precheck: [
-            {
-              description: `ensure index "${indexName}" is missing`,
-              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-            },
-          ],
-          execute: [
-            {
-              description: `create index "${indexName}"`,
-              sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualifyTableName(
-                schemaName,
-                tableName,
-              )} (${index.columns.map(quoteIdentifier).join(', ')})`,
-            },
-          ],
-          postcheck: [
-            {
-              description: `verify index "${indexName}" exists`,
-              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-            },
-          ],
-        });
+        calls.push(new CreateIndexCall(schemaName, tableName, indexName, index.columns));
       }
     }
-    return operations;
+    return calls;
   }
 
   /**
@@ -707,63 +641,30 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
     tables: ReadonlyArray<[string, StorageTable]>,
     schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const lookup = schemaLookups.get(tableName);
-      // Collect column sets of user-declared indexes to avoid duplicates
       const declaredIndexColumns = new Set(table.indexes.map((idx) => idx.columns.join(',')));
 
       for (const fk of table.foreignKeys) {
         if (fk.index === false) continue;
-        // Skip if user already declared an index with these columns
         if (declaredIndexColumns.has(fk.columns.join(','))) continue;
-        // Skip if the index already exists in the database
         if (lookup && hasIndex(lookup, fk.columns)) continue;
 
         const indexName = defaultIndexName(tableName, fk.columns);
-        operations.push({
-          id: `index.${tableName}.${indexName}`,
-          label: `Create FK-backing index ${indexName} on ${tableName}`,
-          summary: `Creates FK-backing index ${indexName} on ${tableName}`,
-          operationClass: 'additive',
-          target: {
-            id: 'postgres',
-            details: this.buildTargetDetails('index', indexName, schemaName, tableName),
-          },
-          precheck: [
-            {
-              description: `ensure index "${indexName}" is missing`,
-              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-            },
-          ],
-          execute: [
-            {
-              description: `create FK-backing index "${indexName}"`,
-              sql: `CREATE INDEX ${quoteIdentifier(indexName)} ON ${qualifyTableName(
-                schemaName,
-                tableName,
-              )} (${fk.columns.map(quoteIdentifier).join(', ')})`,
-            },
-          ],
-          postcheck: [
-            {
-              description: `verify index "${indexName}" exists`,
-              sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-            },
-          ],
-        });
+        calls.push(new CreateIndexCall(schemaName, tableName, indexName, fk.columns));
       }
     }
-    return operations;
+    return calls;
   }
 
   private buildForeignKeyOperations(
     tables: ReadonlyArray<[string, StorageTable]>,
     schemaLookups: ReadonlyMap<string, SchemaTableLookup>,
     schemaName: string,
-  ): readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] {
-    const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  ): readonly PostgresOpFactoryCall[] {
+    const calls: PostgresOpFactoryCall[] = [];
     for (const [tableName, table] of tables) {
       const lookup = schemaLookups.get(tableName);
       for (const foreignKey of table.foreignKeys) {
@@ -772,46 +673,20 @@ UNIQUE (${unique.columns.map(quoteIdentifier).join(', ')})`,
           continue;
         }
         const fkName = foreignKey.name ?? `${tableName}_${foreignKey.columns.join('_')}_fkey`;
-        operations.push({
-          id: `foreignKey.${tableName}.${fkName}`,
-          label: `Add foreign key ${fkName} on ${tableName}`,
-          summary: `Adds foreign key ${fkName} referencing ${foreignKey.references.table}`,
-          operationClass: 'additive',
-          target: {
-            id: 'postgres',
-            details: this.buildTargetDetails('foreignKey', fkName, schemaName, tableName),
+        const fkSpec: ForeignKeySpec = {
+          name: fkName,
+          columns: foreignKey.columns,
+          references: {
+            table: foreignKey.references.table,
+            columns: foreignKey.references.columns,
           },
-          precheck: [
-            {
-              description: `ensure foreign key "${fkName}" is missing`,
-              sql: constraintExistsCheck({
-                constraintName: fkName,
-                schema: schemaName,
-                table: tableName,
-                exists: false,
-              }),
-            },
-          ],
-          execute: [
-            {
-              description: `add foreign key "${fkName}"`,
-              sql: buildForeignKeySql(schemaName, tableName, fkName, foreignKey),
-            },
-          ],
-          postcheck: [
-            {
-              description: `verify foreign key "${fkName}" exists`,
-              sql: constraintExistsCheck({
-                constraintName: fkName,
-                schema: schemaName,
-                table: tableName,
-              }),
-            },
-          ],
-        });
+          ...ifDefined('onDelete', foreignKey.onDelete),
+          ...ifDefined('onUpdate', foreignKey.onUpdate),
+        };
+        calls.push(new AddForeignKeyCall(schemaName, tableName, fkSpec));
       }
     }
-    return operations;
+    return calls;
   }
 
   private buildTargetDetails(

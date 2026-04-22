@@ -118,6 +118,25 @@ export interface MigrationPlanOperation {
 }
 
 // ============================================================================
+// Planner IR — Op Factory Calls
+// ============================================================================
+
+/**
+ * Framework-level contract for a single factory call in a target's class-flow
+ * planner IR.
+ *
+ * @see ADR 195
+ */
+export interface OpFactoryCall {
+  /** The name of the factory that would produce this call's runtime op. */
+  readonly factoryName: string;
+  /** The operation's safety class (additive, widening, destructive, data). */
+  readonly operationClass: MigrationOperationClass;
+  /** Human-readable label for CLI output and diagnostics. */
+  readonly label: string;
+}
+
+// ============================================================================
 // Plan Types (Display-Oriented)
 // ============================================================================
 

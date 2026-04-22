@@ -1,13 +1,6 @@
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
-import type {
-  CollModCall,
-  CreateCollectionCall,
-  CreateIndexCall,
-  DropCollectionCall,
-  DropIndexCall,
-  OpFactoryCall,
-  OpFactoryCallVisitor,
-} from './op-factory-call';
+import { type ImportRequirement, jsonToTsSource } from '@prisma-next/ts-render';
+import type { OpFactoryCall } from './op-factory-call';
 
 export interface RenderMigrationMeta {
   readonly from: string;
@@ -24,14 +17,21 @@ export interface RenderMigrationMeta {
  * always rendered — `describe()` is part of the `Migration` contract, so
  * even an empty stub must satisfy it; callers pass empty strings for a
  * migration-new scaffold.
+ *
+ * The walk is polymorphic: each call node contributes its own
+ * `renderTypeScript()` expression and declares its own
+ * `importRequirements()`. The top-level renderer aggregates imports
+ * across all nodes and emits one `import { … } from "…"` line per module.
+ * The `Migration` import from `@prisma-next/family-mongo/migration` is
+ * always emitted — it's driven by `meta` (the rendered scaffold always
+ * extends `Migration`), not by any node.
  */
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
   meta: RenderMigrationMeta,
 ): string {
-  const factoryNames = collectFactoryNames(calls);
-  const imports = buildImports(factoryNames);
-  const operationsBody = calls.map((c) => c.accept(renderCallVisitor)).join(',\n');
+  const imports = buildImports(calls);
+  const operationsBody = calls.map((c) => c.renderTypeScript()).join(',\n');
 
   return [
     shebangLineFor(detectScaffoldRuntime()),
@@ -52,20 +52,34 @@ export function renderCallsToTypeScript(
   ].join('\n');
 }
 
-function collectFactoryNames(calls: ReadonlyArray<OpFactoryCall>): string[] {
-  const names = new Set<string>();
+function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
+  const symbolsByModule = new Map<string, Set<string>>();
   for (const call of calls) {
-    names.add(call.factory);
+    for (const req of call.importRequirements()) {
+      collectRequirement(symbolsByModule, req);
+    }
   }
-  return [...names].sort();
-}
 
-function buildImports(factoryNames: string[]): string {
   const lines = ["import { Migration } from '@prisma-next/family-mongo/migration';"];
-  if (factoryNames.length > 0) {
-    lines.push(`import { ${factoryNames.join(', ')} } from '@prisma-next/target-mongo/migration';`);
+  // Maps preserve insertion order. Modules appear in the order the first call
+  // requiring them is processed, and we emit symbols sorted within each module.
+  for (const [moduleSpecifier, symbolSet] of symbolsByModule) {
+    const symbols = [...symbolSet].sort();
+    lines.push(`import { ${symbols.join(', ')} } from '${moduleSpecifier}';`);
   }
   return lines.join('\n');
+}
+
+function collectRequirement(
+  symbolsByModule: Map<string, Set<string>>,
+  req: ImportRequirement,
+): void {
+  let set = symbolsByModule.get(req.moduleSpecifier);
+  if (!set) {
+    set = new Set();
+    symbolsByModule.set(req.moduleSpecifier, set);
+  }
+  set.add(req.symbol);
 }
 
 function buildDescribeMethod(meta: RenderMigrationMeta): string {
@@ -78,64 +92,12 @@ function buildDescribeMethod(meta: RenderMigrationMeta): string {
     lines.push(`      kind: ${JSON.stringify(meta.kind)},`);
   }
   if (meta.labels && meta.labels.length > 0) {
-    lines.push(`      labels: ${renderLiteral(meta.labels)},`);
+    lines.push(`      labels: ${jsonToTsSource(meta.labels)},`);
   }
   lines.push('    };');
   lines.push('  }');
   lines.push('');
   return lines.join('\n');
-}
-
-const renderCallVisitor: OpFactoryCallVisitor<string> = {
-  createIndex(call: CreateIndexCall) {
-    return call.options
-      ? `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)}, ${renderLiteral(call.options)})`
-      : `createIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
-  },
-  dropIndex(call: DropIndexCall) {
-    return `dropIndex(${renderLiteral(call.collection)}, ${renderLiteral(call.keys)})`;
-  },
-  createCollection(call: CreateCollectionCall) {
-    return call.options
-      ? `createCollection(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`
-      : `createCollection(${renderLiteral(call.collection)})`;
-  },
-  dropCollection(call: DropCollectionCall) {
-    return `dropCollection(${renderLiteral(call.collection)})`;
-  },
-  collMod(call: CollModCall) {
-    return call.meta
-      ? `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)}, ${renderLiteral(call.meta)})`
-      : `collMod(${renderLiteral(call.collection)}, ${renderLiteral(call.options)})`;
-  },
-};
-
-function renderLiteral(value: unknown): string {
-  if (value === undefined) return 'undefined';
-  if (value === null) return 'null';
-  if (typeof value === 'string') return JSON.stringify(value);
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '[]';
-    const items = value.map((v) => renderLiteral(v));
-    const singleLine = `[${items.join(', ')}]`;
-    if (singleLine.length <= 80) return singleLine;
-    return `[\n${items.map((i) => `  ${i}`).join(',\n')},\n]`;
-  }
-  if (typeof value === 'object') {
-    const entries = Object.entries(value).filter(([, v]) => v !== undefined);
-    if (entries.length === 0) return '{}';
-    const items = entries.map(([k, v]) => `${renderKey(k)}: ${renderLiteral(v)}`);
-    const singleLine = `{ ${items.join(', ')} }`;
-    if (singleLine.length <= 80) return singleLine;
-    return `{\n${items.map((i) => `  ${i}`).join(',\n')},\n}`;
-  }
-  return String(value);
-}
-
-function renderKey(key: string): string {
-  if (key === '__proto__') return JSON.stringify(key);
-  return /^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key) ? key : JSON.stringify(key);
 }
 
 function indent(text: string, spaces: number): string {

@@ -33,6 +33,7 @@ export type {
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
   OperationDescriptor,
+  OpFactoryCall,
   SerializedQueryPlan,
   TargetMigrationsCapability,
 } from '../control-migration-types';

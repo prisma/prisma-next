@@ -1,9 +1,32 @@
-import type { MigrationOperationClass } from '@prisma-next/framework-components/control';
+/**
+ * Mongo class-flow IR: one concrete `*Call` class per pure factory under
+ * `migration-factories.ts`, plus a shared `OpFactoryCallNode` abstract
+ * base. Every call class carries the literal arguments its backing
+ * factory would receive, computes a human-readable `label` in its
+ * constructor, and implements two polymorphic hooks:
+ *
+ * - `toOp()` — converts the IR node to a runtime
+ *   `MongoMigrationPlanOperation` by delegating to the matching pure
+ *   factory in `migration-factories.ts`.
+ * - `renderTypeScript()` / `importRequirements()` — inherited from
+ *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call
+ *   as a TypeScript expression inside the scaffolded `migration.ts`.
+ *
+ * The abstract base and all concrete classes are package-private.
+ * External consumers see only the framework-level `OpFactoryCall`
+ * interface and the `OpFactoryCall` union.
+ */
+
+import type {
+  OpFactoryCall as FrameworkOpFactoryCall,
+  MigrationOperationClass,
+} from '@prisma-next/framework-components/control';
 import type {
   CollModOptions,
   CreateCollectionOptions,
   CreateIndexOptions,
   MongoIndexKey,
+  MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type {
   MongoSchemaCollection,
@@ -11,6 +34,14 @@ import type {
   MongoSchemaIndex,
   MongoSchemaValidator,
 } from '@prisma-next/mongo-schema-ir';
+import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
+import {
+  collMod,
+  createCollection,
+  createIndex,
+  dropCollection,
+  dropIndex,
+} from './migration-factories';
 
 export interface CollModMeta {
   readonly id?: string;
@@ -18,19 +49,17 @@ export interface CollModMeta {
   readonly operationClass?: MigrationOperationClass;
 }
 
-export interface OpFactoryCallVisitor<R> {
-  createIndex(call: CreateIndexCall): R;
-  dropIndex(call: DropIndexCall): R;
-  createCollection(call: CreateCollectionCall): R;
-  dropCollection(call: DropCollectionCall): R;
-  collMod(call: CollModCall): R;
-}
+const TARGET_MIGRATION_MODULE = '@prisma-next/target-mongo/migration';
 
-abstract class OpFactoryCallNode {
-  abstract readonly factory: string;
+abstract class OpFactoryCallNode extends TsExpression implements FrameworkOpFactoryCall {
+  abstract readonly factoryName: string;
   abstract readonly operationClass: MigrationOperationClass;
   abstract readonly label: string;
-  abstract accept<R>(visitor: OpFactoryCallVisitor<R>): R;
+  abstract toOp(): MongoMigrationPlanOperation;
+
+  importRequirements(): readonly ImportRequirement[] {
+    return [{ moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName }];
+  }
 
   protected freeze(): void {
     Object.freeze(this);
@@ -42,7 +71,7 @@ function formatKeys(keys: ReadonlyArray<MongoIndexKey>): string {
 }
 
 export class CreateIndexCall extends OpFactoryCallNode {
-  readonly factory = 'createIndex' as const;
+  readonly factoryName = 'createIndex' as const;
   readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
@@ -62,13 +91,19 @@ export class CreateIndexCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.createIndex(this);
+  toOp(): MongoMigrationPlanOperation {
+    return createIndex(this.collection, this.keys, this.options);
+  }
+
+  renderTypeScript(): string {
+    return this.options
+      ? `createIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)}, ${jsonToTsSource(this.options)})`
+      : `createIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)})`;
   }
 }
 
 export class DropIndexCall extends OpFactoryCallNode {
-  readonly factory = 'dropIndex' as const;
+  readonly factoryName = 'dropIndex' as const;
   readonly operationClass = 'destructive' as const;
   readonly collection: string;
   readonly keys: ReadonlyArray<MongoIndexKey>;
@@ -82,13 +117,17 @@ export class DropIndexCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.dropIndex(this);
+  toOp(): MongoMigrationPlanOperation {
+    return dropIndex(this.collection, this.keys);
+  }
+
+  renderTypeScript(): string {
+    return `dropIndex(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.keys)})`;
   }
 }
 
 export class CreateCollectionCall extends OpFactoryCallNode {
-  readonly factory = 'createCollection' as const;
+  readonly factoryName = 'createCollection' as const;
   readonly operationClass = 'additive' as const;
   readonly collection: string;
   readonly options: CreateCollectionOptions | undefined;
@@ -102,13 +141,19 @@ export class CreateCollectionCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.createCollection(this);
+  toOp(): MongoMigrationPlanOperation {
+    return createCollection(this.collection, this.options);
+  }
+
+  renderTypeScript(): string {
+    return this.options
+      ? `createCollection(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)})`
+      : `createCollection(${jsonToTsSource(this.collection)})`;
   }
 }
 
 export class DropCollectionCall extends OpFactoryCallNode {
-  readonly factory = 'dropCollection' as const;
+  readonly factoryName = 'dropCollection' as const;
   readonly operationClass = 'destructive' as const;
   readonly collection: string;
   readonly label: string;
@@ -120,13 +165,17 @@ export class DropCollectionCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.dropCollection(this);
+  toOp(): MongoMigrationPlanOperation {
+    return dropCollection(this.collection);
+  }
+
+  renderTypeScript(): string {
+    return `dropCollection(${jsonToTsSource(this.collection)})`;
   }
 }
 
 export class CollModCall extends OpFactoryCallNode {
-  readonly factory = 'collMod' as const;
+  readonly factoryName = 'collMod' as const;
   readonly collection: string;
   readonly options: CollModOptions;
   readonly meta: CollModMeta | undefined;
@@ -143,8 +192,14 @@ export class CollModCall extends OpFactoryCallNode {
     this.freeze();
   }
 
-  accept<R>(visitor: OpFactoryCallVisitor<R>): R {
-    return visitor.collMod(this);
+  toOp(): MongoMigrationPlanOperation {
+    return collMod(this.collection, this.options, this.meta);
+  }
+
+  renderTypeScript(): string {
+    return this.meta
+      ? `collMod(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)}, ${jsonToTsSource(this.meta)})`
+      : `collMod(${jsonToTsSource(this.collection)}, ${jsonToTsSource(this.options)})`;
   }
 }
 

@@ -16,6 +16,7 @@ import {
   constraintExistsCheck,
 } from '../../src/core/migrations/planner-sql-checks';
 import type { PlanningMode } from '../../src/core/migrations/planner-target-details';
+import { renderOps } from '../../src/core/migrations/render-ops';
 
 // ---------------------------------------------------------------------------
 // Policies
@@ -162,7 +163,7 @@ function plan(
     schemaName?: string;
   },
 ) {
-  return buildReconciliationPlan({
+  const result = buildReconciliationPlan({
     contract: options?.contract ?? emptyContract(),
     issues,
     schemaName: options?.schemaName ?? 'public',
@@ -170,6 +171,13 @@ function plan(
     policy: options?.policy ?? FULL_POLICY,
     codecHooks: new Map(),
   });
+  // buildReconciliationPlan now returns `PostgresOpFactoryCall[]`. Lower to
+  // runtime ops here so the existing assertions (.id, .operationClass,
+  // .execute[].sql, .meta, target.details.objectType, etc.) remain valid.
+  return {
+    operations: renderOps(result.operations),
+    conflicts: result.conflicts,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -302,7 +310,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       expect(result.operations[0]).toMatchObject({
-        id: 'alterNullability.user.bio',
+        id: 'alterNullability.dropNotNull.user.bio',
         operationClass: 'widening',
       });
       expect(result.operations[0]!.execute[0]!.sql).toContain('DROP NOT NULL');
@@ -322,7 +330,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations).toHaveLength(1);
       expect(result.operations[0]).toMatchObject({
-        id: 'alterNullability.user.email',
+        id: 'alterNullability.setNotNull.user.email',
         operationClass: 'destructive',
       });
       expect(result.operations[0]!.execute[0]!.sql).toContain('SET NOT NULL');
@@ -878,7 +886,7 @@ describe('buildReconciliationPlan', () => {
 
       expect(result.operations.map((op) => op.id)).toEqual([
         'dropTable.legacy_audit',
-        'alterNullability.user.bio',
+        'alterNullability.dropNotNull.user.bio',
       ]);
     });
   });

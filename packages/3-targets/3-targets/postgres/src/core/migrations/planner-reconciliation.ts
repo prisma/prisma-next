@@ -1,9 +1,7 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   MigrationOperationPolicy,
-  SqlMigrationPlanOperation,
   SqlPlannerConflict,
 } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
@@ -14,22 +12,22 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { invariant } from '@prisma-next/utils/assertions';
 import { ifDefined } from '@prisma-next/utils/defined';
+import {
+  AlterColumnTypeCall,
+  DropColumnCall,
+  DropConstraintCall,
+  DropDefaultCall,
+  DropIndexCall,
+  DropNotNullCall,
+  DropTableCall,
+  identityKeyFor,
+  type PostgresOpFactoryCall,
+  SetDefaultCall,
+  SetNotNullCall,
+} from './op-factory-call';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
-import {
-  buildExpectedFormatType,
-  columnDefaultExistsCheck,
-  columnExistsCheck,
-  columnNullabilityCheck,
-  columnTypeCheck,
-  constraintExistsCheck,
-  qualifyTableName,
-  toRegclassLiteral,
-} from './planner-sql-checks';
-import {
-  buildTargetDetails,
-  type PlanningMode,
-  type PostgresPlanTargetDetails,
-} from './planner-target-details';
+import { buildExpectedFormatType } from './planner-sql-checks';
+import type { PlanningMode } from './planner-target-details';
 
 // ============================================================================
 // Public API
@@ -43,10 +41,10 @@ export function buildReconciliationPlan(options: {
   readonly policy: MigrationOperationPolicy;
   readonly codecHooks: Map<string, CodecControlHooks>;
 }): {
-  readonly operations: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
+  readonly operations: readonly PostgresOpFactoryCall[];
   readonly conflicts: readonly SqlPlannerConflict[];
 } {
-  const operations: SqlMigrationPlanOperation<PostgresPlanTargetDetails>[] = [];
+  const calls: PostgresOpFactoryCall[] = [];
   const conflicts: SqlPlannerConflict[] = [];
   const { mode } = options;
   const seenOperationIds = new Set<string>();
@@ -56,7 +54,7 @@ export function buildReconciliationPlan(options: {
       continue;
     }
 
-    const operation = buildReconciliationOperationFromIssue({
+    const call = buildReconciliationCallFromIssue({
       issue,
       contract: options.contract,
       schemaName: options.schemaName,
@@ -64,13 +62,15 @@ export function buildReconciliationPlan(options: {
       codecHooks: options.codecHooks,
     });
 
-    if (operation) {
-      // Skip duplicates: different schema issues may produce the same operation id
-      // (e.g., extra_unique_constraint and extra_index on the same object).
-      if (!seenOperationIds.has(operation.id)) {
-        seenOperationIds.add(operation.id);
-        if (options.policy.allowedOperationClasses.includes(operation.operationClass)) {
-          operations.push(operation);
+    if (call) {
+      // Different schema issues may produce the same runtime op id (e.g.
+      // extra_unique_constraint and extra_index on the same object). Dedupe
+      // by the call's stable identity key.
+      const opId = identityKeyFor(call);
+      if (!seenOperationIds.has(opId)) {
+        seenOperationIds.add(opId);
+        if (options.policy.allowedOperationClasses.includes(call.operationClass)) {
+          calls.push(call);
         } else {
           const conflict = convertIssueToConflict(issue);
           if (conflict) {
@@ -87,7 +87,7 @@ export function buildReconciliationPlan(options: {
   }
 
   return {
-    operations,
+    operations: calls,
     conflicts: conflicts.sort(conflictComparator),
   };
 }
@@ -117,16 +117,16 @@ function isAdditiveIssue(issue: SchemaIssue): boolean {
 }
 
 // ============================================================================
-// Operation Builders
+// Call Builders
 // ============================================================================
 
-function buildReconciliationOperationFromIssue(options: {
+function buildReconciliationCallFromIssue(options: {
   readonly issue: SchemaIssue;
   readonly contract: Contract<SqlStorage>;
   readonly schemaName: string;
   readonly mode: PlanningMode;
   readonly codecHooks: Map<string, CodecControlHooks>;
-}): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
+}): PostgresOpFactoryCall | null {
   const { issue, contract, schemaName, mode, codecHooks } = options;
   const storageTypes = contract.storage.types ?? {};
   switch (issue.kind) {
@@ -134,32 +134,27 @@ function buildReconciliationOperationFromIssue(options: {
       if (!mode.allowDestructive || !issue.table) {
         return null;
       }
-      return buildDropTableOperation(schemaName, issue.table);
+      return new DropTableCall(schemaName, issue.table);
 
     case 'extra_column':
       if (!mode.allowDestructive || !issue.table || !issue.column) {
         return null;
       }
-      return buildDropColumnOperation(schemaName, issue.table, issue.column);
+      return new DropColumnCall(schemaName, issue.table, issue.column);
 
     case 'extra_index':
       if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
         return null;
       }
-      return buildDropIndexOperation(schemaName, issue.table, issue.indexOrConstraint);
+      return new DropIndexCall(schemaName, issue.table, issue.indexOrConstraint);
 
     case 'extra_foreign_key':
     case 'extra_unique_constraint': {
       if (!mode.allowDestructive || !issue.table || !issue.indexOrConstraint) {
         return null;
       }
-      const constraintKind = issue.kind === 'extra_foreign_key' ? 'foreignKey' : 'unique';
-      return buildDropConstraintOperation(
-        schemaName,
-        issue.table,
-        issue.indexOrConstraint,
-        constraintKind,
-      );
+      const kind = issue.kind === 'extra_foreign_key' ? 'foreignKey' : 'unique';
+      return new DropConstraintCall(schemaName, issue.table, issue.indexOrConstraint, kind);
     }
 
     case 'extra_primary_key': {
@@ -167,7 +162,7 @@ function buildReconciliationOperationFromIssue(options: {
         return null;
       }
       const constraintName = issue.indexOrConstraint ?? `${issue.table}_pkey`;
-      return buildDropConstraintOperation(schemaName, issue.table, constraintName, 'primaryKey');
+      return new DropConstraintCall(schemaName, issue.table, constraintName, 'primaryKey');
     }
 
     case 'nullability_mismatch': {
@@ -175,14 +170,14 @@ function buildReconciliationOperationFromIssue(options: {
         return null;
       }
       if (issue.expected === 'true') {
-        // Contract wants nullable, DB has NOT NULL → widening
+        // Contract wants nullable, DB has NOT NULL → widening.
         return mode.allowWidening
-          ? buildDropNotNullOperation(schemaName, issue.table, issue.column)
+          ? new DropNotNullCall(schemaName, issue.table, issue.column)
           : null;
       }
-      // Contract wants NOT NULL, DB has nullable → destructive
+      // Contract wants NOT NULL, DB has nullable → destructive.
       return mode.allowDestructive
-        ? buildSetNotNullOperation(schemaName, issue.table, issue.column)
+        ? new SetNotNullCall(schemaName, issue.table, issue.column)
         : null;
     }
 
@@ -194,7 +189,7 @@ function buildReconciliationOperationFromIssue(options: {
       if (!contractColumn) {
         return null;
       }
-      return buildAlterColumnTypeOperation(
+      return buildAlterColumnTypeCall(
         schemaName,
         issue.table,
         issue.column,
@@ -217,14 +212,13 @@ function buildReconciliationOperationFromIssue(options: {
         contractColMissing.default !== undefined,
         `default_missing issue for "${issue.table}"."${issue.column}" but contract column has no default`,
       );
-      return buildDefaultOperation(
+      return buildSetDefaultCall(
         schemaName,
         issue.table,
         issue.column,
         contractColMissing,
         contractColMissing.default,
         'additive',
-        'Set',
       );
     }
 
@@ -244,14 +238,13 @@ function buildReconciliationOperationFromIssue(options: {
         contractColMismatch.default !== undefined,
         `default_mismatch issue for "${issue.table}"."${issue.column}" but contract column has no default`,
       );
-      return buildDefaultOperation(
+      return buildSetDefaultCall(
         schemaName,
         issue.table,
         issue.column,
         contractColMismatch,
         contractColMismatch.default,
         'widening',
-        'Change',
       );
     }
 
@@ -262,7 +255,7 @@ function buildReconciliationOperationFromIssue(options: {
       if (!mode.allowDestructive) {
         return null;
       }
-      return buildDropDefaultOperation(schemaName, issue.table, issue.column);
+      return new DropDefaultCall(schemaName, issue.table, issue.column);
     }
 
     // Remaining issue kinds (primary_key_mismatch, unique_constraint_mismatch,
@@ -287,390 +280,36 @@ function getContractColumn(
   return table.columns[columnName] ?? null;
 }
 
-function buildDropTableOperation(
-  schemaName: string,
-  tableName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  return {
-    id: `dropTable.${tableName}`,
-    label: `Drop table ${tableName}`,
-    summary: `Drops extra table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('table', tableName, schemaName),
-    },
-    precheck: [
-      {
-        description: `ensure table "${tableName}" exists`,
-        sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NOT NULL`,
-      },
-    ],
-    execute: [
-      {
-        description: `drop table "${tableName}"`,
-        sql: `DROP TABLE ${qualifyTableName(schemaName, tableName)}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify table "${tableName}" is removed`,
-        sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, tableName)}) IS NULL`,
-      },
-    ],
-  };
-}
-
-function buildDropColumnOperation(
-  schemaName: string,
-  tableName: string,
-  columnName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  return {
-    id: `dropColumn.${tableName}.${columnName}`,
-    label: `Drop column ${columnName} from ${tableName}`,
-    summary: `Drops extra column ${columnName} from table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-    ],
-    execute: [
-      {
-        description: `drop column "${columnName}"`,
-        sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)} DROP COLUMN ${quoteIdentifier(columnName)}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify column "${columnName}" is removed`,
-        sql: columnExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: false,
-        }),
-      },
-    ],
-  };
-}
-
-function buildDropIndexOperation(
-  schemaName: string,
-  tableName: string,
-  indexName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  return {
-    id: `dropIndex.${tableName}.${indexName}`,
-    label: `Drop index ${indexName} on ${tableName}`,
-    summary: `Drops extra index ${indexName} on table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('index', indexName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure index "${indexName}" exists`,
-        sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NOT NULL`,
-      },
-    ],
-    execute: [
-      {
-        description: `drop index "${indexName}"`,
-        sql: `DROP INDEX ${qualifyTableName(schemaName, indexName)}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify index "${indexName}" is removed`,
-        sql: `SELECT to_regclass(${toRegclassLiteral(schemaName, indexName)}) IS NULL`,
-      },
-    ],
-  };
-}
-
-function buildDropConstraintOperation(
-  schemaName: string,
-  tableName: string,
-  constraintName: string,
-  constraintKind: 'foreignKey' | 'unique' | 'primaryKey',
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  return {
-    id: `dropConstraint.${tableName}.${constraintName}`,
-    label: `Drop constraint ${constraintName} on ${tableName}`,
-    summary: `Drops extra constraint ${constraintName} on table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails(constraintKind, constraintName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure constraint "${constraintName}" exists`,
-        sql: constraintExistsCheck({ constraintName, schema: schemaName, table: tableName }),
-      },
-    ],
-    execute: [
-      {
-        description: `drop constraint "${constraintName}"`,
-        sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-DROP CONSTRAINT ${quoteIdentifier(constraintName)}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify constraint "${constraintName}" is removed`,
-        sql: constraintExistsCheck({
-          constraintName,
-          schema: schemaName,
-          table: tableName,
-          exists: false,
-        }),
-      },
-    ],
-  };
-}
-
-function buildDropNotNullOperation(
-  schemaName: string,
-  tableName: string,
-  columnName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  return {
-    id: `alterNullability.${tableName}.${columnName}`,
-    label: `Relax nullability for ${columnName} on ${tableName}`,
-    summary: `Drops NOT NULL constraint for ${columnName} on table ${tableName}`,
-    operationClass: 'widening',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-    ],
-    execute: [
-      {
-        description: `drop NOT NULL from "${columnName}"`,
-        sql: `ALTER TABLE ${qualifyTableName(schemaName, tableName)}
-ALTER COLUMN ${quoteIdentifier(columnName)} DROP NOT NULL`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify "${columnName}" is nullable`,
-        sql: columnNullabilityCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          nullable: true,
-        }),
-      },
-    ],
-  };
-}
-
-function buildSetNotNullOperation(
-  schemaName: string,
-  tableName: string,
-  columnName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const qualified = qualifyTableName(schemaName, tableName);
-  return {
-    id: `alterNullability.${tableName}.${columnName}`,
-    label: `Enforce NOT NULL for ${columnName} on ${tableName}`,
-    summary: `Sets NOT NULL on ${columnName} for table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-      {
-        description: `ensure "${columnName}" has no NULL values`,
-        sql: `SELECT NOT EXISTS (
-  SELECT 1 FROM ${qualified}
-  WHERE ${quoteIdentifier(columnName)} IS NULL
-  LIMIT 1
-)`,
-      },
-    ],
-    execute: [
-      {
-        description: `set NOT NULL on "${columnName}"`,
-        sql: `ALTER TABLE ${qualified}
-ALTER COLUMN ${quoteIdentifier(columnName)} SET NOT NULL`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify "${columnName}" is NOT NULL`,
-        sql: columnNullabilityCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          nullable: false,
-        }),
-      },
-    ],
-  };
-}
-
-function buildAlterColumnTypeOperation(
+function buildAlterColumnTypeCall(
   schemaName: string,
   tableName: string,
   columnName: string,
   column: StorageColumn,
   codecHooks: Map<string, CodecControlHooks>,
   storageTypes: Record<string, StorageTypeInstance>,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const qualified = qualifyTableName(schemaName, tableName);
-  const expectedType = buildColumnTypeSql(column, codecHooks, storageTypes, false);
-  return {
-    id: `alterType.${tableName}.${columnName}`,
-    label: `Alter type for ${columnName} on ${tableName}`,
-    summary: `Changes type of ${columnName} to ${expectedType}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    meta: {
-      warning: 'TABLE_REWRITE',
-      detail:
-        'ALTER COLUMN TYPE requires a full table rewrite and acquires an ACCESS EXCLUSIVE lock. On large tables, this can cause significant downtime.',
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-    ],
-    execute: [
-      {
-        description: `alter type of "${columnName}"`,
-        sql: `ALTER TABLE ${qualified}
-ALTER COLUMN ${quoteIdentifier(columnName)}
-TYPE ${expectedType}
-USING ${quoteIdentifier(columnName)}::${expectedType}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify column "${columnName}" has type ${expectedType}`,
-        sql: columnTypeCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          expectedType: buildExpectedFormatType(column, codecHooks, storageTypes),
-        }),
-      },
-    ],
-  };
+): AlterColumnTypeCall {
+  const qualifiedTargetType = buildColumnTypeSql(column, codecHooks, storageTypes, false);
+  const formatTypeExpected = buildExpectedFormatType(column, codecHooks, storageTypes);
+  return new AlterColumnTypeCall(schemaName, tableName, columnName, {
+    qualifiedTargetType,
+    formatTypeExpected,
+    rawTargetTypeForLabel: qualifiedTargetType,
+  });
 }
 
-function buildDefaultOperation(
+function buildSetDefaultCall(
   schemaName: string,
   tableName: string,
   columnName: string,
   column: Omit<StorageColumn, 'default'>,
   columnDefault: NonNullable<StorageColumn['default']>,
   operationClass: 'additive' | 'widening',
-  verb: 'Set' | 'Change',
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> | null {
-  const qualified = qualifyTableName(schemaName, tableName);
+): SetDefaultCall | null {
   const defaultClause = buildColumnDefaultSql(columnDefault, column);
   // autoincrement defaults are handled by SERIAL types — buildColumnDefaultSql returns ''
   // for them. Until the IR is enriched to distinguish autoincrement (TML-2107), skip.
   if (!defaultClause) return null;
-  const verbLower = verb.toLowerCase();
-  return {
-    id: `setDefault.${tableName}.${columnName}`,
-    label: `${verb} default for ${columnName} on ${tableName}`,
-    summary: `${verb}s default on column ${columnName} of table ${tableName}`,
-    operationClass,
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-    ],
-    execute: [
-      {
-        description: `${verbLower} default on "${columnName}"`,
-        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} SET ${defaultClause}`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify column "${columnName}" has a default`,
-        sql: columnDefaultExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: true,
-        }),
-      },
-    ],
-  };
-}
-
-function buildDropDefaultOperation(
-  schemaName: string,
-  tableName: string,
-  columnName: string,
-): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
-  const qualified = qualifyTableName(schemaName, tableName);
-  return {
-    id: `dropDefault.${tableName}.${columnName}`,
-    label: `Drop default for ${columnName} on ${tableName}`,
-    summary: `Drops default on column ${columnName} of table ${tableName}`,
-    operationClass: 'destructive',
-    target: {
-      id: 'postgres',
-      details: buildTargetDetails('column', columnName, schemaName, tableName),
-    },
-    precheck: [
-      {
-        description: `ensure column "${columnName}" exists`,
-        sql: columnExistsCheck({ schema: schemaName, table: tableName, column: columnName }),
-      },
-    ],
-    execute: [
-      {
-        description: `drop default on "${columnName}"`,
-        sql: `ALTER TABLE ${qualified}\nALTER COLUMN ${quoteIdentifier(columnName)} DROP DEFAULT`,
-      },
-    ],
-    postcheck: [
-      {
-        description: `verify column "${columnName}" has no default`,
-        sql: columnDefaultExistsCheck({
-          schema: schemaName,
-          table: tableName,
-          column: columnName,
-          exists: false,
-        }),
-      },
-    ],
-  };
+  return new SetDefaultCall(schemaName, tableName, columnName, defaultClause, operationClass);
 }
 
 // ============================================================================
