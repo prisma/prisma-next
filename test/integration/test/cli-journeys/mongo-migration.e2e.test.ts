@@ -35,7 +35,7 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { join, resolve } from 'pathe';
+import { basename, join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
@@ -337,6 +337,15 @@ describe(
 
       const plan0 = await migrationPlan(ctx, ['--name', 'initial']);
       expect(plan0.exitCode, `migration plan initial: ${plan0.stdout}\n${plan0.stderr}`).toBe(0);
+
+      const emitInit = await migrationEmit(ctx, [
+        '--dir',
+        `migrations/${basename(getLatestMigrationDir(ctx))}`,
+      ]);
+      expect(
+        emitInit.exitCode,
+        `migration emit initial: ${emitInit.stdout}\n${emitInit.stderr}`,
+      ).toBe(0);
 
       const apply0 = await migrationApply(ctx);
       expect(apply0.exitCode, `migration apply initial: ${apply0.stdout}\n${apply0.stderr}`).toBe(
