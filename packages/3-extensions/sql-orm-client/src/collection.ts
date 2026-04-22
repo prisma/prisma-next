@@ -10,6 +10,7 @@ import {
   type ToWhereExpr,
   type WhereArg,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { normalizeAggregateResult } from './collection-aggregate-result';
 import { mapCursorValuesToColumns, mapFieldsToColumns } from './collection-column-mapping';
@@ -159,7 +160,7 @@ interface MtiCreateContext {
 export class Collection<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-  Row = InferRootRow<TContract, ModelName>,
+  Row = SimplifyDeep<InferRootRow<TContract, ModelName>>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
 > implements RowSelection<Row>
 {
@@ -317,15 +318,17 @@ export class Collection<
   ): Collection<
     TContract,
     ModelName,
-    Row & {
-      [K in RelName]: IncludeRefinementValue<
-        TContract,
-        ModelName,
-        K,
-        DefaultModelRow<TContract, RelatedName>,
-        RefinedResult
-      >;
-    },
+    SimplifyDeep<
+      Row & {
+        [K in RelName]: IncludeRefinementValue<
+          TContract,
+          ModelName,
+          K,
+          DefaultModelRow<TContract, RelatedName>,
+          RefinedResult
+        >;
+      }
+    >,
     State
   > {
     const relation = resolveIncludeRelation(this.contract, this.modelName, relationName as string);
@@ -391,15 +394,17 @@ export class Collection<
     };
 
     return this.#cloneWithRow<
-      Row & {
-        [K in RelName]: IncludeRefinementValue<
-          TContract,
-          ModelName,
-          K,
-          DefaultModelRow<TContract, RelatedName>,
-          RefinedResult
-        >;
-      },
+      SimplifyDeep<
+        Row & {
+          [K in RelName]: IncludeRefinementValue<
+            TContract,
+            ModelName,
+            K,
+            DefaultModelRow<TContract, RelatedName>,
+            RefinedResult
+          >;
+        }
+      >,
       State
     >({
       includes: [...this.state.includes, includeExpr],
@@ -416,15 +421,19 @@ export class Collection<
   ): Collection<
     TContract,
     ModelName,
-    Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
-      IncludedRelationsForRow<TContract, ModelName, Row>,
+    SimplifyDeep<
+      Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
+        IncludedRelationsForRow<TContract, ModelName, Row>
+    >,
     State
   > {
     const selectedFields = mapFieldsToColumns(this.contract, this.modelName, fields);
 
     return this.#cloneWithRow<
-      Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
-        IncludedRelationsForRow<TContract, ModelName, Row>,
+      SimplifyDeep<
+        Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
+          IncludedRelationsForRow<TContract, ModelName, Row>
+      >,
       State
     >({
       selectedFields,
