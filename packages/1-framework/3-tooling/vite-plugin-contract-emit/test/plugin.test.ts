@@ -4,6 +4,18 @@ import { executeContractEmit } from '@prisma-next/cli/control-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
+interface PromiseResolvers<T> {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+}
+
+declare global {
+  interface PromiseConstructor {
+    withResolvers<T>(): PromiseResolvers<T>;
+  }
+}
+
 vi.mock('@prisma-next/cli/control-api', () => ({
   executeContractEmit: vi.fn(),
 }));
