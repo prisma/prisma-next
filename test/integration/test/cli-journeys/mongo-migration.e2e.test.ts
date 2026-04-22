@@ -42,7 +42,7 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { basename, join, resolve } from 'pathe';
+import { basename, isAbsolute, join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
@@ -144,10 +144,12 @@ async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Pro
   if (dirIdx < 0 || dirIdx === rest.length - 1) {
     throw new Error('migrationEmit requires --dir <migration-dir>');
   }
-  const relDir = rest[dirIdx + 1]!;
+  const dirArg = rest[dirIdx + 1]!;
   rest.splice(dirIdx, 2);
 
-  const migrationTs = join(ctx.testDir, relDir, 'migration.ts');
+  const migrationTs = isAbsolute(dirArg)
+    ? join(dirArg, 'migration.ts')
+    : join(ctx.testDir, dirArg, 'migration.ts');
   try {
     const { stdout, stderr } = await execFileAsync(TSX_BIN, [migrationTs, ...rest], {
       cwd: ctx.testDir,

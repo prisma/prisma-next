@@ -31,7 +31,7 @@ import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
-import { join, resolve } from 'pathe';
+import { isAbsolute, join, resolve } from 'pathe';
 import { afterAll, beforeAll } from 'vitest';
 
 const execFileAsync = promisify(execFile);
@@ -414,10 +414,12 @@ export async function runMigrationEmit(
       'runMigrationEmit requires `--dir <migration-dir>` so we know which migration.ts to execute',
     );
   }
-  const relDir = args[dirIdx + 1]!;
+  const dirArg = args[dirIdx + 1]!;
   args.splice(dirIdx, 2);
 
-  const migrationTs = join(ctx.testDir, relDir, 'migration.ts');
+  const migrationTs = isAbsolute(dirArg)
+    ? join(dirArg, 'migration.ts')
+    : join(ctx.testDir, dirArg, 'migration.ts');
   try {
     const { stdout, stderr } = await execFileAsync(TSX_BIN, [migrationTs, ...args], {
       cwd: ctx.testDir,

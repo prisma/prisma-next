@@ -18,7 +18,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
-import { dbUpdateCallStrategies } from './planner-strategies';
+import { dbUpdateCallStrategies, migrationPlanCallStrategies } from './planner-strategies';
 import type { PlanningMode } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
@@ -83,6 +83,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly fromHash?: string;
+    /**
+     * The "from" contract (state the planner assumes the database starts
+     * at). Only `migration plan` supplies this; `db update` / `db init`
+     * reconcile against the live schema with no old contract. When present
+     * alongside the `'data'` operation class, strategies that need from/to
+     * column shape comparisons (unsafe type change, nullability tightening)
+     * activate.
+     */
+    readonly fromContract?: unknown;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
@@ -108,23 +117,31 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
 
+    // Dispatch on the `'data'` operation class: `migration plan` includes it
+    // and wants `DataTransformCall` placeholder stubs the user hand-fills;
+    // `db update` / `db init` do not include it and need direct destructive
+    // DDL so reconciliation completes without user intervention. The two
+    // strategy chains share the same issue planner but differ in how they
+    // resolve data-losing schema changes.
+    const allowsDataTransforms = options.policy.allowedOperationClasses.includes('data');
+    const strategies = allowsDataTransforms ? migrationPlanCallStrategies : dbUpdateCallStrategies;
+
     const result = planIssues({
       issues: schemaIssues,
       toContract: options.contract,
-      // `fromContract` is unavailable at `db update` time; absent old-contract
-      // data, strategies like `typeChangeCallStrategy` are inapplicable, so
-      // reconciliation is driven by direct destructive ops (via
-      // `mapIssueToCall`'s `type_mismatch` / `nullability_mismatch` handlers)
-      // rather than data-transform recipes — matching the old walk-schema
-      // planner's `db update` behavior.
-      fromContract: null,
+      // `fromContract` is only supplied by `migration plan`. It is `null` for
+      // `db update` / `db init`, which means data-safety strategies needing
+      // from/to comparisons (unsafe type change, nullable tightening) are
+      // inapplicable there — reconciliation falls through to
+      // `mapIssueToCall`'s direct destructive handlers.
+      fromContract: options.fromContract ?? null,
       schemaName,
       codecHooks,
       storageTypes,
       schema: options.schema,
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
-      strategies: dbUpdateCallStrategies,
+      strategies,
     });
 
     if (!result.ok) {
