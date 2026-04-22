@@ -407,7 +407,7 @@ describe('executeContractEmit', () => {
     expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
   });
 
-  it('does not expose split artifacts during commit steps', async () => {
+  it('publishes contract.d.ts before contract.json during pair-rename commit steps', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
     const previousJson = JSON.stringify({ generation: 'previous' });
@@ -456,21 +456,20 @@ describe('executeContractEmit', () => {
     });
 
     await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      await executeContractEmit({
-        configPath: join(tmpDir, 'prisma-next.config.ts'),
-        signal: new AbortController().signal,
-      });
+      await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
     });
 
-    expect(snapshots.length).toBeGreaterThan(0);
-    for (const snapshot of snapshots) {
-      expect([
-        { json: previousJson, dts: previousDts },
-        { json: nextJson, dts: nextDts },
-      ]).toContainEqual({
-        json: snapshot.json,
-        dts: snapshot.dts,
-      });
-    }
+    expect(snapshots).toEqual([
+      {
+        json: previousJson,
+        dts: nextDts,
+        to: outputDtsPath,
+      },
+      {
+        json: nextJson,
+        dts: nextDts,
+        to: outputJsonPath,
+      },
+    ]);
   });
 });
