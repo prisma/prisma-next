@@ -1043,10 +1043,10 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 
 ### Emitting `ops.json` and computing `migrationId`
 
-There is no dedicated CLI command for emitting a migration — class-flow
-migrations self-emit. After scaffolding (via `migration plan` or
-`migration new`), run `migration.ts` directly with Node to produce
-`ops.json` and attest `migration.json`:
+There is no dedicated CLI command for emitting a migration — migrations
+self-emit. After scaffolding (via `migration plan` or `migration new`),
+run `migration.ts` directly with Node to produce `ops.json` and attest
+`migration.json`:
 
 ```bash
 node migrations/<dir>/migration.ts
