@@ -35,7 +35,6 @@ import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import type { PostgresClient } from '@prisma-next/postgres/runtime';
 import postgres from '@prisma-next/postgres/runtime';
 import type { RuntimeVerifyOptions } from '@prisma-next/sql-runtime';
-import { budgets, lints } from '@prisma-next/sql-runtime';
 import type { Contract } from '../prisma/contract.d';
 import contractJson from '../prisma/contract.json' with { type: 'json' };
 import { InstrumentedPool } from './pool';
@@ -111,16 +110,12 @@ function createEntry(verifyMode: VerifyMode, poolMax: number): DbEntry {
     pg: pool,
     extensions: [pgvector],
     verify: { mode: verifyMode, requireMarker: false },
-    middleware: [
-      createTelemetryMiddleware(),
-      lints(),
-      budgets({
-        maxRows: 10_000,
-        defaultTableRows: 10_000,
-        tableRows: { user: 10_000, post: 10_000 },
-        maxLatencyMs: 5_000,
-      }),
-    ],
+    // Only telemetry. The demo app adds `lints()` and `budgets(...)`, but
+    // those flag ordinary queries the PoC issues (e.g. unbounded aggregates
+    // on small seed data) as errors, which distracts from what we're
+    // actually measuring. The PoC cares about runtime/pool behavior under
+    // RSC concurrency, not query-shape ergonomics.
+    middleware: [createTelemetryMiddleware()],
   });
 
   return { client, pool, verifyMode, poolMax };

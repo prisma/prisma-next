@@ -4,14 +4,22 @@
  * Counts:
  * - Connection acquires (`pool.connect()`) — every time the driver borrows a
  *   client from the pool, whether for `execute()` or for `query()`.
- * - Connection releases (`client.release()`) — so we can verify acquires and
- *   releases balance under load (H4).
+ * - Connection releases — observed via the pool's `'release'` event, which
+ *   `pg-pool` emits from `_release()` on every checkin. We intentionally do
+ *   NOT wrap `client.release`: `pg-pool` reassigns `client.release` inside
+ *   `_acquireClient()` on *every* checkout (see `_releaseOnce`), so any
+ *   wrapper we install gets clobbered on the second acquire of a pooled
+ *   client, producing the classic "acquires keep growing, releases stuck"
+ *   anomaly. The `'release'` event is emitted unconditionally and is the
+ *   supported observation point.
  * - Marker reads — identified by SQL text containing `prisma_contract.marker`,
  *   the stable fragment emitted by `PostgresAdapterImpl.readMarkerStatement()`.
  *   The runtime's `verifyPlanIfNeeded()` issues the marker read via
  *   `driver.query()`, which in `PostgresPoolDriverImpl` does
  *   `pool.connect()` → `client.query(sql, params)` → `client.release()`.
- *   So we detect it at the client level.
+ *   So we detect it at the client level by patching `client.query` (which,
+ *   unlike `release`, is NOT reassigned on every checkout). An idempotent
+ *   guard prevents double-wrapping when the same pooled client is reused.
  *
  * We subclass `pg.Pool` (rather than wrapping by composition) because the
  * bundled `@prisma-next/postgres` runtime uses `instanceof PgPool` in
@@ -32,7 +40,9 @@ export interface InstrumentedPoolOptions extends PoolConfig {
   readonly verifyMode: VerifyMode;
 }
 
-const INSTRUMENTED_MARKER = Symbol.for('prisma-next.rsc-poc-postgres.client.instrumented');
+const QUERY_INSTRUMENTED_MARKER = Symbol.for(
+  'prisma-next.rsc-poc-postgres.client.query-instrumented',
+);
 
 /**
  * Extracts the SQL text from the shapes `pg` accepts for `query()`. Returns
@@ -55,19 +65,20 @@ function extractSql(queryTextOrConfig: unknown): string | null {
 }
 
 /**
- * Instruments a `PoolClient` in place so that `query()` records marker reads
- * and `release()` bumps the release counter. Idempotent: multiple calls on the
- * same client are no-ops after the first.
+ * Patches `client.query` in place so that executed SQL matching the marker
+ * fragment bumps the marker-read counter. Idempotent via a symbol flag so
+ * re-acquires of the same pooled client don't double-wrap.
+ *
+ * We do NOT patch `client.release` here — see the module docstring for why.
  */
 function instrumentPoolClient(client: PoolClient, verifyMode: VerifyMode): PoolClient {
   const flag = client as unknown as Record<symbol, boolean>;
-  if (flag[INSTRUMENTED_MARKER]) {
+  if (flag[QUERY_INSTRUMENTED_MARKER]) {
     return client;
   }
-  flag[INSTRUMENTED_MARKER] = true;
+  flag[QUERY_INSTRUMENTED_MARKER] = true;
 
   const originalQuery = client.query.bind(client) as (...a: unknown[]) => unknown;
-  const originalRelease = client.release.bind(client) as (err?: Error | boolean) => void;
 
   const patchedQuery = (...args: unknown[]): unknown => {
     const sql = extractSql(args[0]);
@@ -77,21 +88,12 @@ function instrumentPoolClient(client: PoolClient, verifyMode: VerifyMode): PoolC
     return originalQuery(...args);
   };
 
-  const patchedRelease = (err?: Error | boolean): void => {
-    recordConnectionRelease(verifyMode);
-    originalRelease(err);
-  };
-
-  // pg's PoolClient types use overloaded signatures for query()/release() that
-  // are impractical to reproduce here without losing clarity. Assigning the
-  // patched functions back keeps the duck-typed driver call sites happy while
+  // pg's PoolClient types use overloaded signatures for query() that are
+  // impractical to reproduce here without losing clarity. Assigning the
+  // patched function back keeps the duck-typed driver call sites happy while
   // preserving runtime behavior.
-  const mutable = client as unknown as {
-    query: typeof patchedQuery;
-    release: typeof patchedRelease;
-  };
+  const mutable = client as unknown as { query: typeof patchedQuery };
   mutable.query = patchedQuery;
-  mutable.release = patchedRelease;
 
   return client;
 }
@@ -100,9 +102,12 @@ function instrumentPoolClient(client: PoolClient, verifyMode: VerifyMode): PoolC
  * `pg.Pool` subclass with diagnostic counters. Keeps `instanceof PgPool` true
  * so it satisfies `resolvePostgresBinding()`'s instance check.
  *
- * We only override `connect()` — the driver doesn't use `pool.query()` for
- * anything we care about (marker reads go through an acquired client, not
- * `pool.query`).
+ * Observations:
+ * - `connect()` is overridden to count acquires and instrument the returned
+ *   client's `query` method.
+ * - Releases are counted via the pool's `'release'` event (emitted by
+ *   `pg-pool`'s internal `_release()` on every checkin), so we stay robust
+ *   against `pg-pool` reassigning `client.release` on each acquire.
  */
 export class InstrumentedPool extends PgPool {
   readonly #verifyMode: VerifyMode;
@@ -111,6 +116,12 @@ export class InstrumentedPool extends PgPool {
     const { verifyMode, ...poolConfig } = options;
     super(poolConfig);
     this.#verifyMode = verifyMode;
+
+    // `pg-pool` emits `'release'` from `_release()` with signature
+    // `(err, client)`. We only care that it fired; the arguments are unused.
+    this.on('release', () => {
+      recordConnectionRelease(verifyMode);
+    });
   }
 
   override connect(): Promise<PoolClient> {

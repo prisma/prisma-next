@@ -6,16 +6,28 @@ import { snapshot } from '../lib/diag';
  * Dev-only diagnostics panel, rendered at the bottom of a Server Component
  * page to surface the counters that back hypotheses H2–H4.
  *
- * This is a Server Component itself — it reads the in-process diagnostic
- * snapshot at render time. Because the snapshot is updated by
- * `InstrumentedPool` as the page's other Server Components execute their
- * queries in parallel, the values reflect the state **at the moment this
- * component is rendered**, which in RSC may be partially or fully after the
- * parallel siblings have finished.
+ * ## Staleness caveat
  *
- * The panel does not cause its own query, so it won't perturb the counters
- * it's reporting. Numbers are cumulative since process start (not
- * per-request); a page reload shows monotonically increasing values.
+ * This is a Server Component that reads the in-process diagnostic snapshot
+ * at render time. React renders siblings concurrently but does **not**
+ * guarantee an ordering among siblings wrapped in separate `<Suspense>`
+ * boundaries. In practice this means `<DiagPanel />` usually resolves
+ * *before* its Suspense-wrapped siblings (none of its rendering is async),
+ * so the numbers it prints on the **first** load after process start
+ * reflect "what had finished before the panel was scheduled" — often zero
+ * or very few queries.
+ *
+ * Workaround: reload the page. Counters are cumulative since process
+ * start, so the second page render reads the post-work snapshot from the
+ * first render and the numbers settle into their intended meaning.
+ *
+ * For values that are always current (e.g. for the H3 integration test or
+ * k6 post-run inspection), prefer the `/diag` JSON route handler — it's
+ * read **after** any page render completes and has no ordering
+ * relationship to sibling Suspense boundaries.
+ *
+ * The panel does not issue its own query, so reading it doesn't perturb
+ * the counters it reports.
  */
 export interface DiagPanelProps {
   readonly verifyMode: VerifyMode;
@@ -58,7 +70,10 @@ export function DiagPanel({ verifyMode, poolMax }: DiagPanelProps) {
             {totalCount} total / {idleCount} idle / {waitingCount} waiting
           </span>
         </span>
-        <span className="muted">cumulative since process start</span>
+        <span className="muted">
+          cumulative since process start · reload for accurate snapshot · see{' '}
+          <a href="/diag">/diag</a>
+        </span>
       </div>
     </aside>
   );

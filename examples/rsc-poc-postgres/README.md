@@ -34,9 +34,10 @@ have none of these hazards by construction, so comparing the two
 
 ## Status
 
-**Scaffold only.** The five parallel Server Components, `/stress/always`
-route, Server Action, k6 scripts, and integration test land in subsequent
-PRs. See the project plan for the work breakdown.
+Five parallel Server Components and one Server Action are implemented and
+verified end-to-end against a local Postgres. The `/stress/always` route,
+k6 scripts, and the H3 integration test land in subsequent PRs. See the
+project plan for the work breakdown.
 
 ## Prerequisites
 
@@ -74,8 +75,54 @@ of the page for marker-read and connection-acquire counters.
 |-------------------|------------------------------------------------------|---------------|
 | `/`               | Five parallel Server Components (varied shapes).     | `onFirstUse`  |
 | `/stress/always`  | Same page, pinned to `always` mode to reproduce H3.  | `always`      |
+| `/diag`           | JSON snapshot of in-process counters.                | —             |
 
-Additional routes arrive in later PRs; this table is the planned surface.
+`/stress/always` arrives in a later PR; the other two are live.
+
+## The five Server Components
+
+Rendered in parallel on `/`, each wrapped in its own `<Suspense>` so one
+slow component doesn't block the others:
+
+1. **`<TopUsers />`** — ORM `orderBy(...).take(10).all()`. Baseline ORM
+   read path.
+2. **`<PostsWithAuthors />`** — ORM `include('user', ...)`. Exercises the
+   multi-query include dispatch path in `sql-orm-client`.
+3. **`<RecentPostsRaw />`** — SQL DSL via `db.sql.post...build()` +
+   `db.runtime().execute(plan)`. Only path that goes through
+   `runtime.execute()` rather than `acquireRuntimeScope()` — the most
+   direct way to exercise `verifyPlanIfNeeded()`.
+4. **`<UserKindBreakdown />`** — ORM `groupBy().having().aggregate()`.
+   Aggregate dispatch path.
+5. **`<SimilarPostsSample />`** — pgvector similarity search via ORM.
+   Exercises an extension-contributed operator (`cosineDistance`) on the
+   shared runtime.
+
+Plus **`<CreatePostForm />`** (client component) + `createPostAction`
+(Server Action) — one smoke-level mutation to confirm reads and writes
+can coexist on the shared runtime. Not exercised by k6; test by hand from
+the browser.
+
+## Observed behavior (initial manual run)
+
+First request after process start (pool default `max: 10`):
+
+```
+markerReads: 5, connectionAcquires: 11, connectionReleases: 11
+```
+
+Five marker reads for five parallel components on cold start **confirms
+hypothesis H2** — each of the five concurrent components raced through
+`verifyPlanIfNeeded()` before any of them flipped `verified` to true.
+Subsequent requests show `markerReads: 5` remaining constant, as expected.
+
+Under 10 parallel page requests, `connectionAcquires` and
+`connectionReleases` remain balanced; pool grows to its `max` but no
+requests wait. No runtime errors logged.
+
+These are observations from a single-session manual run, not a formal
+benchmark. The k6 scripts in a later PR replace this with reproducible
+measurements.
 
 ## Stress scripts
 
