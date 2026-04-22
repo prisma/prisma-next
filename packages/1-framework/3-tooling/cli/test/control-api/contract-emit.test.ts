@@ -56,16 +56,6 @@ function createSourceProvider(load: () => Promise<unknown>): {
   };
 }
 
-function createDeferred<T>() {
-  let resolve!: (value: T) => void;
-  let reject!: (reason?: unknown) => void;
-  const promise = new Promise<T>((nextResolve, nextReject) => {
-    resolve = nextResolve;
-    reject = nextReject;
-  });
-  return { promise, resolve, reject };
-}
-
 async function eventually(assertion: () => void): Promise<void> {
   let lastError: unknown;
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -308,8 +298,8 @@ describe('executeContractEmit', () => {
   it('keeps the newer generation on disk when an older emit finishes later', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const firstEmit = createDeferred<EmitResult>();
-    const secondEmit = createDeferred<EmitResult>();
+    const firstEmit = Promise.withResolvers<EmitResult>();
+    const secondEmit = Promise.withResolvers<EmitResult>();
 
     mockedEmit
       .mockImplementationOnce(() => firstEmit.promise)
@@ -373,7 +363,7 @@ describe('executeContractEmit', () => {
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
     const previousJson = JSON.stringify({ generation: 'previous' });
     const previousDts = "export type Generation = 'previous';\n";
-    const firstEmit = createDeferred<EmitResult>();
+    const firstEmit = Promise.withResolvers<EmitResult>();
 
     await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
     await writeFile(outputJsonPath, previousJson, 'utf-8');
