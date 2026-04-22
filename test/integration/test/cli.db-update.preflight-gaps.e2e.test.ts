@@ -154,8 +154,7 @@ withTempDir(({ createTempDir }) => {
                WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'handle'`,
             );
             expect(col.rows).toHaveLength(1);
-            expect(col.rows[0]!.is_nullable).toBe('NO');
-            expect(col.rows[0]!.column_default).toBeNull();
+            expect(col.rows[0]).toMatchObject({ is_nullable: 'NO', column_default: null });
 
             const uniq = await client.query<{ conname: string }>(
               `SELECT conname FROM pg_constraint
