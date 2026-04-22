@@ -12,6 +12,7 @@
 
 import { stat, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'pathe';
+import { format } from 'prettier';
 
 const MIGRATION_TS_FILE = 'migration.ts';
 
@@ -20,14 +21,30 @@ const MIGRATION_TS_FILE = 'migration.ts';
  * directory. If the source begins with a shebang, the file is written with
  * executable permissions (0o755) so it can be run directly via
  * `./migration.ts` by the authoring class's `Migration.run(...)` guard.
+ *
+ * The source is run through prettier before writing so class-flow
+ * renderers (and descriptor-flow emitters) can produce structurally-correct
+ * but loosely-indented source and rely on a single canonical format on
+ * disk. Matches what `@prisma-next/emitter` already does for generated
+ * `contract.d.ts`.
  */
 export async function writeMigrationTs(packageDir: string, content: string): Promise<void> {
-  const isExecutable = content.startsWith('#!');
+  const formatted = await formatMigrationTsSource(content);
+  const isExecutable = formatted.startsWith('#!');
   await writeFile(
     join(packageDir, MIGRATION_TS_FILE),
-    content,
+    formatted,
     isExecutable ? { mode: 0o755 } : undefined,
   );
+}
+
+async function formatMigrationTsSource(source: string): Promise<string> {
+  return format(source, {
+    parser: 'typescript',
+    singleQuote: true,
+    semi: true,
+    printWidth: 100,
+  });
 }
 
 /**
