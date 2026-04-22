@@ -2,7 +2,7 @@ import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { createServer, type ViteDevServer } from 'vite';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   fixtureAppDir,
   setupTestDirectoryFromFixtures,
@@ -65,6 +65,38 @@ function copyFixtureFiles(
   }
 }
 
+interface SendSpyLike {
+  readonly mock: {
+    readonly calls: ReadonlyArray<ReadonlyArray<unknown>>;
+  };
+}
+
+function hasWsMessageType(payload: unknown, messageType: string): boolean {
+  if (typeof payload !== 'object' || payload === null || !('type' in payload)) {
+    return false;
+  }
+
+  return typeof payload.type === 'string' && payload.type === messageType;
+}
+
+async function waitForWsMessageType(
+  sendSpy: SendSpyLike,
+  messageType: string,
+  timeoutMs: number,
+): Promise<void> {
+  const startTime = Date.now();
+  const pollIntervalMs = 25;
+
+  while (Date.now() - startTime < timeoutMs) {
+    if (sendSpy.mock.calls.some(([payload]) => hasWsMessageType(payload, messageType))) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+
+  throw new Error(`Timed out waiting for Vite ws message "${messageType}"`);
+}
+
 withTempDir(({ createTempDir }) => {
   describe('Vite plugin HMR (e2e)', () => {
     let server: ViteDevServer | null = null;
@@ -74,6 +106,7 @@ withTempDir(({ createTempDir }) => {
         await server.close();
         server = null;
       }
+      vi.restoreAllMocks();
     });
 
     it(
@@ -116,11 +149,7 @@ withTempDir(({ createTempDir }) => {
           },
         });
 
-        const { stat } = await import('node:fs/promises');
-        const initialStats = await stat(contractJsonPath);
-        const initialMtime = initialStats.mtimeMs;
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const sendSpy = vi.spyOn(server.ws, 'send');
 
         replaceInFileOrThrow(
           contractPath,
@@ -136,12 +165,7 @@ withTempDir(({ createTempDir }) => {
         }
         server.watcher.emit('change', contractPath);
 
-        const reEmitSuccess = await waitForFileChange(
-          contractJsonPath,
-          initialMtime,
-          timeouts.typeScriptCompilation,
-        );
-        expect(reEmitSuccess).toBe(true);
+        await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
 
         const updatedContract = JSON.parse(
           await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
@@ -203,22 +227,13 @@ withTempDir(({ createTempDir }) => {
         });
         expect(initialContract.storage.tables.user.columns).not.toHaveProperty('name');
 
-        const { stat } = await import('node:fs/promises');
-        const initialStats = await stat(contractJsonPath);
-        const initialMtime = initialStats.mtimeMs;
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const sendSpy = vi.spyOn(server.ws, 'send');
 
         replaceInFileOrThrow(schemaPath, '  email String\n', '  email String\n  name  String?\n');
 
         server.watcher.emit('change', schemaPath);
 
-        const reEmitSuccess = await waitForFileChange(
-          contractJsonPath,
-          initialMtime,
-          timeouts.typeScriptCompilation,
-        );
-        expect(reEmitSuccess).toBe(true);
+        await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
 
         const updatedContract = JSON.parse(
           await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
@@ -272,11 +287,7 @@ withTempDir(({ createTempDir }) => {
         );
         expect(initialContract.storage.tables.user.columns).not.toHaveProperty('name');
 
-        const { stat } = await import('node:fs/promises');
-        const initialStats = await stat(contractJsonPath);
-        const initialMtime = initialStats.mtimeMs;
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        const sendSpy = vi.spyOn(server.ws, 'send');
 
         replaceInFileOrThrow(configPath, './contract.prisma', './contract-alt.prisma');
 
@@ -288,12 +299,7 @@ withTempDir(({ createTempDir }) => {
         }
         server.watcher.emit('change', configPath);
 
-        const configReEmitSuccess = await waitForFileChange(
-          contractJsonPath,
-          initialMtime,
-          timeouts.typeScriptCompilation,
-        );
-        expect(configReEmitSuccess).toBe(true);
+        await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
 
         const contractAfterConfigChange = JSON.parse(
           await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
@@ -308,10 +314,7 @@ withTempDir(({ createTempDir }) => {
           },
         });
 
-        const updatedStats = await stat(contractJsonPath);
-        const updatedMtime = updatedStats.mtimeMs;
-
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        sendSpy.mockClear();
 
         replaceInFileOrThrow(
           altSchemaPath,
@@ -321,12 +324,7 @@ withTempDir(({ createTempDir }) => {
 
         server.watcher.emit('change', altSchemaPath);
 
-        const altSchemaReEmitSuccess = await waitForFileChange(
-          contractJsonPath,
-          updatedMtime,
-          timeouts.typeScriptCompilation,
-        );
-        expect(altSchemaReEmitSuccess).toBe(true);
+        await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
 
         const contractAfterAltEdit = JSON.parse(
           await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
@@ -342,6 +340,104 @@ withTempDir(({ createTempDir }) => {
         });
       },
       timeouts.spinUpPpgDev,
+    );
+
+    it(
+      'preserves the last good artifacts after a bad PSL edit and recovers on the next good edit',
+      async () => {
+        const testSetup = setupTestDirectoryFromFixtures(createTempDir, pslFixtureSubdir);
+        const testDir = testSetup.testDir;
+        const outputDir = testSetup.outputDir;
+        const schemaPath = join(testDir, 'contract.prisma');
+        const contractJsonPath = join(outputDir, 'contract.json');
+        const contractDtsPath = join(outputDir, 'contract.d.ts');
+
+        copyFixtureFiles(testDir, pslFixtureSubdir, [
+          'vite.config.ts',
+          'contract.prisma',
+          'contract-alt.prisma',
+        ]);
+
+        server = await createServer({
+          root: testDir,
+          logLevel: 'silent',
+          server: {
+            middlewareMode: true,
+          },
+        });
+
+        const [initialJsonEmitSuccess, initialDtsEmitSuccess] = await Promise.all([
+          waitForFileChange(contractJsonPath, null, timeouts.typeScriptCompilation),
+          waitForFileChange(contractDtsPath, null, timeouts.typeScriptCompilation),
+        ]);
+        expect(initialJsonEmitSuccess).toBe(true);
+        expect(initialDtsEmitSuccess).toBe(true);
+
+        const initialContractJson = await readJsonFileWhenReady(
+          contractJsonPath,
+          timeouts.typeScriptCompilation,
+        );
+        const initialContractDts = readFileSync(contractDtsPath, 'utf-8');
+        const initialContract = JSON.parse(initialContractJson);
+        expect(initialContract.storage.tables.user.columns).not.toHaveProperty('name');
+
+        const { stat } = await import('node:fs/promises');
+        const [initialJsonStats, initialDtsStats] = await Promise.all([
+          stat(contractJsonPath),
+          stat(contractDtsPath),
+        ]);
+        const sendSpy = vi.spyOn(server.ws, 'send');
+
+        // Introduce a PSL error and confirm the previous successful emit stays on disk.
+        replaceInFileOrThrow(
+          schemaPath,
+          '  email String\n\n  @@map("user")\n',
+          '  email String\n  @@broken\n\n  @@map("user")\n',
+        );
+
+        server.watcher.emit('change', schemaPath);
+
+        await waitForWsMessageType(sendSpy, 'error', timeouts.typeScriptCompilation);
+
+        const [jsonStatsAfterBadEdit, dtsStatsAfterBadEdit] = await Promise.all([
+          stat(contractJsonPath),
+          stat(contractDtsPath),
+        ]);
+        expect(jsonStatsAfterBadEdit.mtimeMs).toBe(initialJsonStats.mtimeMs);
+        expect(dtsStatsAfterBadEdit.mtimeMs).toBe(initialDtsStats.mtimeMs);
+        expect(await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation)).toBe(
+          initialContractJson,
+        );
+        expect(readFileSync(contractDtsPath, 'utf-8')).toBe(initialContractDts);
+
+        // Fix the schema and wait for the next valid emit to replace both artifacts.
+        sendSpy.mockClear();
+
+        replaceInFileOrThrow(
+          schemaPath,
+          '  email String\n  @@broken\n\n  @@map("user")\n',
+          '  email String\n  name  String?\n\n  @@map("user")\n',
+        );
+
+        server.watcher.emit('change', schemaPath);
+
+        await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
+
+        const recoveredContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
+        expect(recoveredContract.storage).toMatchObject({
+          tables: {
+            user: {
+              columns: {
+                name: { nullable: true },
+              },
+            },
+          },
+        });
+        expect(readFileSync(contractDtsPath, 'utf-8')).not.toBe(initialContractDts);
+      },
+      timeouts.spinUpPpgDev + timeouts.typeScriptCompilation * 2,
     );
   });
 });
