@@ -59,6 +59,18 @@ function issueEmitGeneration(outputJsonPath: string): number {
   return state.nextGeneration;
 }
 
+function isSuperseded(state: EmitOutputQueueState, generation: number): boolean {
+  return generation < state.nextGeneration;
+}
+
+function toQueueTail<T>(promise: Promise<T>): Promise<void> {
+  // Keep the per-output queue advancing even after a failed publication.
+  return promise.then(
+    () => undefined,
+    () => undefined,
+  );
+}
+
 function queueEmitWrite<T>(
   outputJsonPath: string,
   action: (state: EmitOutputQueueState) => Promise<T>,
@@ -68,10 +80,7 @@ function queueEmitWrite<T>(
     () => action(state),
     () => action(state),
   );
-  state.queue = run.then(
-    () => undefined,
-    () => undefined,
-  );
+  state.queue = toQueueTail(run);
   return run;
 }
 
@@ -93,7 +102,7 @@ async function writeContractArtifacts({
   return await queueEmitWrite(outputJsonPath, async (state) => {
     signal.throwIfAborted();
 
-    if (generation < state.nextGeneration) {
+    if (isSuperseded(state, generation)) {
       return 'superseded';
     }
 
@@ -105,7 +114,7 @@ async function writeContractArtifacts({
       publicationToken: String(generation),
       beforePublish: () => {
         signal.throwIfAborted();
-        return generation >= state.nextGeneration;
+        return !isSuperseded(state, generation);
       },
     });
     return didPublish ? 'written' : 'superseded';
