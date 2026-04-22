@@ -391,6 +391,7 @@ withTempDir(({ createTempDir }) => {
 
         await new Promise((resolve) => setTimeout(resolve, 100));
 
+        // Introduce a PSL error and confirm the previous successful emit stays on disk.
         replaceInFileOrThrow(
           schemaPath,
           '  email String\n\n  @@map("user")\n',
@@ -418,6 +419,7 @@ withTempDir(({ createTempDir }) => {
         );
         expect(readFileSync(contractDtsPath, 'utf-8')).toBe(initialContractDts);
 
+        // Fix the schema and wait for the next valid emit to replace both artifacts.
         replaceInFileOrThrow(
           schemaPath,
           '  email String\n  @@broken\n\n  @@map("user")\n',
