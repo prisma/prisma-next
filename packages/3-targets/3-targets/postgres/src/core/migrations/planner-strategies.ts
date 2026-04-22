@@ -38,6 +38,7 @@ import {
   TODO,
 } from './operation-descriptors';
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
+import { buildExpectedFormatType } from './planner-sql-checks';
 
 // ============================================================================
 // Strategy types
@@ -317,9 +318,14 @@ function buildAlterTypeOptions(
   const mutableHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
   const mutableTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
   const qualifiedTargetType = buildColumnTypeSql(col, mutableHooks, mutableTypes, false);
+  // The postcheck queries `format_type(atttypid, atttypmod)`, which
+  // canonicalises `int4` → `integer`, `varchar(100)` → `character
+  // varying(100)`, etc. Using the raw native-type literal here would
+  // make the postcheck spuriously fail.
+  const formatTypeExpected = buildExpectedFormatType(col, mutableHooks, mutableTypes);
   return {
     qualifiedTargetType,
-    formatTypeExpected: qualifiedTargetType,
+    formatTypeExpected,
     rawTargetTypeForLabel: qualifiedTargetType,
     ...(using !== undefined ? { using } : {}),
   };
