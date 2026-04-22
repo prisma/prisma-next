@@ -39,7 +39,8 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-type FsWriteFile = typeof import('node:fs/promises')['writeFile'];
+type FsModule = typeof import('node:fs/promises');
+type FsWriteFile = FsModule['writeFile'];
 
 const mockedEmit = vi.mocked(emitFn);
 const mockedRename = vi.mocked(rename);
@@ -138,20 +139,16 @@ function createSuccessfulConfig(output: string) {
 
 describe('executeContractEmit', () => {
   let tmpDir = '';
+  let actualFs: FsModule;
 
   beforeEach(async () => {
+    actualFs = await vi.importActual<FsModule>('node:fs/promises');
     tmpDir = await mkdtemp(join(tmpdir(), 'contract-emit-'));
     mockedEmit.mockReset();
     mockedRename.mockReset();
     mockedWriteFile.mockReset();
-
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) =>
-      actualFs.rename(...args),
-    );
-    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) =>
-      actualFs.writeFile(...args),
-    );
+    mockedRename.mockImplementation(async (...args) => actualFs.rename(...args));
+    mockedWriteFile.mockImplementation(async (...args) => actualFs.writeFile(...args));
   });
 
   afterEach(async () => {
@@ -204,107 +201,56 @@ describe('executeContractEmit', () => {
     );
   });
 
-  it('throws when contract source is not a valid provider object', async () => {
-    await withMockedConfig(
-      mockConfigWithContract({
-        source: { invalid: true },
-        output: './src/prisma/contract.json',
-      }),
-      async () => {
-        await expect(
-          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
-        ).rejects.toSatisfy(
-          (error: unknown) =>
-            error instanceof Error &&
-            'why' in error &&
-            typeof error.why === 'string' &&
-            error.why.includes('valid source provider object'),
-        );
-      },
-    );
-  });
-
-  it('throws runtime error when contract source provider returns failure result', async () => {
-    await withMockedConfig(
-      mockConfigWithContract({
-        source: createSourceProvider(async () => ({
-          ok: false,
-          failure: {
-            summary: 'Provider parse failed',
-            diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
-            meta: { sourceId: 'schema.prisma' },
-          },
-        })),
-        output: './src/prisma/contract.json',
-      }),
-      async () => {
-        await expect(
-          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
-        ).rejects.toSatisfy(
-          (error: unknown) =>
-            error instanceof Error &&
-            'code' in error &&
-            error.code === '3000' &&
-            'why' in error &&
-            typeof error.why === 'string' &&
-            error.why.includes('Provider parse failed'),
-        );
-      },
-    );
-  });
-
-  it('throws runtime error when contract source provider returns malformed failure result', async () => {
-    await withMockedConfig(
-      mockConfigWithContract({
-        source: createSourceProvider(
-          async () =>
-            ({
-              ok: false,
-            }) as unknown,
-        ),
-        output: './src/prisma/contract.json',
-      }),
-      async () => {
-        await expect(
-          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
-        ).rejects.toSatisfy(
-          (error: unknown) =>
-            error instanceof Error &&
-            'code' in error &&
-            error.code === '3000' &&
-            'why' in error &&
-            typeof error.why === 'string' &&
-            error.why.includes('malformed failure result'),
-        );
-      },
-    );
-  });
-
-  it('throws runtime error when contract source provider returns malformed success result', async () => {
-    await withMockedConfig(
-      mockConfigWithContract({
-        source: createSourceProvider(
-          async () =>
-            ({
-              ok: true,
-            }) as unknown,
-        ),
-        output: './src/prisma/contract.json',
-      }),
-      async () => {
-        await expect(
-          executeContractEmit({ configPath: 'prisma-next.config.ts' }),
-        ).rejects.toSatisfy(
-          (error: unknown) =>
-            error instanceof Error &&
-            'code' in error &&
-            error.code === '3000' &&
-            'why' in error &&
-            typeof error.why === 'string' &&
-            error.why.includes('malformed success result'),
-        );
-      },
-    );
+  describe.each([
+    {
+      label: 'rejects non-provider source object',
+      source: { invalid: true },
+      expectedSubstring: 'valid source provider object',
+    },
+    {
+      label: 'translates provider failure result to runtime error',
+      source: createSourceProvider(async () => ({
+        ok: false,
+        failure: {
+          summary: 'Provider parse failed',
+          diagnostics: [{ code: 'PSL_PARSE_ERROR', message: 'Unexpected token' }],
+          meta: { sourceId: 'schema.prisma' },
+        },
+      })),
+      expectedCode: '3000',
+      expectedSubstring: 'Provider parse failed',
+    },
+    {
+      label: 'rejects malformed failure result',
+      source: createSourceProvider(async () => ({ ok: false }) as unknown),
+      expectedCode: '3000',
+      expectedSubstring: 'malformed failure result',
+    },
+    {
+      label: 'rejects malformed success result',
+      source: createSourceProvider(async () => ({ ok: true }) as unknown),
+      expectedCode: '3000',
+      expectedSubstring: 'malformed success result',
+    },
+  ])('source provider validation', ({ label, source, expectedCode, expectedSubstring }) => {
+    it(label, async () => {
+      await withMockedConfig(
+        mockConfigWithContract({ source, output: './src/prisma/contract.json' }),
+        async () => {
+          await expect(
+            executeContractEmit({ configPath: 'prisma-next.config.ts' }),
+          ).rejects.toSatisfy((error: unknown) => {
+            if (!(error instanceof Error)) return false;
+            const why = (error as { why?: unknown }).why;
+            if (typeof why !== 'string' || !why.includes(expectedSubstring)) return false;
+            if (expectedCode !== undefined) {
+              return (error as { code?: unknown }).code === expectedCode;
+            }
+            return true;
+          });
+        },
+      );
+    });
   });
 
   it('keeps the newer generation on disk when an older emit finishes later', async () => {
@@ -339,71 +285,6 @@ describe('executeContractEmit', () => {
     expect(await readFile(outputDtsPath, 'utf-8')).toBe("export type Generation = 'newer';\n");
   });
 
-  it('preserves the previous artifacts when a new emit write fails', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    mockedEmit.mockResolvedValue(createEmitResult('next'));
-
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
-      const [path] = args;
-      if (String(path).includes('contract.d.ts')) {
-        throw new Error('simulated dts write failure');
-      }
-      return actualFs.writeFile(...args);
-    });
-
-    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      await expect(
-        executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') }),
-      ).rejects.toThrow('simulated dts write failure');
-    });
-
-    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
-  });
-
-  it('restores the previous artifacts when contract.json publish fails after replacing contract.d.ts', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-    const publishError = new Error('simulated json rename failure');
-
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    mockedEmit.mockResolvedValue(createEmitResult('next'));
-
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) => {
-      const [, to] = args;
-
-      if (String(to) === outputJsonPath) {
-        throw publishError;
-      }
-
-      return actualFs.rename(...args);
-    });
-
-    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      await expect(
-        executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') }),
-      ).rejects.toBe(publishError);
-    });
-
-    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
-  });
-
   it('keeps the last good artifacts when a newer request fails after superseding an older emit', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
@@ -420,7 +301,6 @@ describe('executeContractEmit', () => {
       .mockImplementationOnce(() => firstEmit.promise)
       .mockResolvedValueOnce(createEmitResult('newer'));
 
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
     mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
       const [path] = args;
       if (String(path).includes('.2.next.tmp')) {
@@ -454,71 +334,5 @@ describe('executeContractEmit', () => {
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
-  });
-
-  it('publishes contract.d.ts before contract.json during pair-rename commit steps', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-    const nextJson = JSON.stringify({ generation: 'next' });
-    const nextDts = "export type Generation = 'next';\n";
-
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    mockedEmit.mockResolvedValue({
-      storageHash: 'storage-next',
-      profileHash: 'profile-next',
-      contractJson: nextJson,
-      contractDts: nextDts,
-    });
-
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    const snapshots: Array<{
-      readonly json: string | undefined;
-      readonly dts: string | undefined;
-      readonly to: string;
-    }> = [];
-
-    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) => {
-      const [, to] = args;
-      await actualFs.rename(...args);
-
-      let json: string | undefined;
-      let dts: string | undefined;
-
-      try {
-        json = await actualFs.readFile(outputJsonPath, 'utf-8');
-      } catch {
-        json = undefined;
-      }
-
-      try {
-        dts = await actualFs.readFile(outputDtsPath, 'utf-8');
-      } catch {
-        dts = undefined;
-      }
-
-      snapshots.push({ json, dts, to: String(to) });
-    });
-
-    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      await executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-    });
-
-    expect(snapshots).toEqual([
-      {
-        json: previousJson,
-        dts: nextDts,
-        to: outputDtsPath,
-      },
-      {
-        json: nextJson,
-        dts: nextDts,
-        to: outputJsonPath,
-      },
-    ]);
   });
 });

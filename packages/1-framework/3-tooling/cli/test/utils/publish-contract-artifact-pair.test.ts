@@ -13,11 +13,28 @@ vi.mock('node:fs/promises', async () => {
 
 type FsPromisesModule = typeof import('node:fs/promises');
 
+const PREVIOUS_JSON = JSON.stringify({ generation: 'previous' });
+const PREVIOUS_DTS = "export type Generation = 'previous';\n";
+const NEXT_JSON = JSON.stringify({ generation: 'next' });
+const NEXT_DTS = "export type Generation = 'next';\n";
+
 describe('publishContractArtifactPair', () => {
   let tmpDir = '';
   let actualFs: FsPromisesModule;
   let mockedFs: FsPromisesModule;
   let publishContractArtifactPair: typeof import('../../src/utils/publish-contract-artifact-pair')['publishContractArtifactPair'];
+
+  async function seedPreviousArtifacts(): Promise<{
+    outputJsonPath: string;
+    outputDtsPath: string;
+  }> {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await actualFs.writeFile(outputJsonPath, PREVIOUS_JSON, 'utf-8');
+    await actualFs.writeFile(outputDtsPath, PREVIOUS_DTS, 'utf-8');
+    return { outputJsonPath, outputDtsPath };
+  }
 
   beforeEach(async () => {
     vi.restoreAllMocks();
@@ -47,85 +64,47 @@ describe('publishContractArtifactPair', () => {
   });
 
   it('publishes contract.d.ts before contract.json', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-    const nextJson = JSON.stringify({ generation: 'next' });
-    const nextDts = "export type Generation = 'next';\n";
-
-    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
-    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    const mockedRename = vi.mocked(mockedFs.rename);
+    const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
     const snapshots: Array<{
       readonly json: string | undefined;
       readonly dts: string | undefined;
       readonly to: string;
     }> = [];
 
-    mockedRename.mockImplementation(async (...args) => {
+    vi.mocked(mockedFs.rename).mockImplementation(async (...args) => {
       const [, to] = args;
       await actualFs.rename(...args);
-
-      let json: string | undefined;
-      let dts: string | undefined;
-
-      try {
-        json = await actualFs.readFile(outputJsonPath, 'utf-8');
-      } catch {
-        json = undefined;
-      }
-
-      try {
-        dts = await actualFs.readFile(outputDtsPath, 'utf-8');
-      } catch {
-        dts = undefined;
-      }
-
-      snapshots.push({ json, dts, to: String(to) });
+      snapshots.push({
+        json: await actualFs.readFile(outputJsonPath, 'utf-8').catch(() => undefined),
+        dts: await actualFs.readFile(outputDtsPath, 'utf-8').catch(() => undefined),
+        to: String(to),
+      });
     });
 
     await publishContractArtifactPair({
       outputJsonPath,
       outputDtsPath,
-      contractJson: nextJson,
-      contractDts: nextDts,
+      contractJson: NEXT_JSON,
+      contractDts: NEXT_DTS,
       publicationToken: 'publish',
     });
 
     expect(snapshots).toEqual([
-      {
-        json: previousJson,
-        dts: nextDts,
-        to: outputDtsPath,
-      },
-      {
-        json: nextJson,
-        dts: nextDts,
-        to: outputJsonPath,
-      },
+      { json: PREVIOUS_JSON, dts: NEXT_DTS, to: outputDtsPath },
+      { json: NEXT_JSON, dts: NEXT_DTS, to: outputJsonPath },
     ]);
   });
 
   it('rechecks beforePublish after snapshotting previous artifacts', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
+    const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
     const beforePublish = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
-
-    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
-    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
 
     await expect(
       publishContractArtifactPair({
         outputJsonPath,
         outputDtsPath,
-        contractJson: JSON.stringify({ generation: 'next' }),
-        contractDts: "export type Generation = 'next';\n",
+        contractJson: NEXT_JSON,
+        contractDts: NEXT_DTS,
         publicationToken: 'publish',
         beforePublish,
       }),
@@ -133,22 +112,14 @@ describe('publishContractArtifactPair', () => {
 
     expect(beforePublish).toHaveBeenCalledTimes(2);
     expect(vi.mocked(mockedFs.rename)).not.toHaveBeenCalled();
-    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(PREVIOUS_DTS);
   });
 
   it('preserves the previous artifacts when the next publish write fails', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
+    const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
 
-    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
-    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    const mockedWriteFile = vi.mocked(mockedFs.writeFile);
-    mockedWriteFile.mockImplementation(async (...args) => {
+    vi.mocked(mockedFs.writeFile).mockImplementation(async (...args) => {
       const [path] = args;
       if (String(path).includes('contract.d.ts') && String(path).includes('.next.tmp')) {
         throw new Error('simulated dts write failure');
@@ -160,42 +131,29 @@ describe('publishContractArtifactPair', () => {
       publishContractArtifactPair({
         outputJsonPath,
         outputDtsPath,
-        contractJson: JSON.stringify({ generation: 'next' }),
-        contractDts: "export type Generation = 'next';\n",
+        contractJson: NEXT_JSON,
+        contractDts: NEXT_DTS,
         publicationToken: 'publish',
       }),
     ).rejects.toThrow('simulated dts write failure');
 
-    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(PREVIOUS_DTS);
   });
 
   it('attaches rollback failures to the publish error cause', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-    const nextJson = JSON.stringify({ generation: 'next' });
-    const nextDts = "export type Generation = 'next';\n";
+    const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
     const publishError = new Error('simulated json rename failure');
     const rollbackError = new Error('simulated rollback rename failure');
 
-    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
-    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    const mockedRename = vi.mocked(mockedFs.rename);
-    mockedRename.mockImplementation(async (...args) => {
+    vi.mocked(mockedFs.rename).mockImplementation(async (...args) => {
       const [, to] = args;
-
       if (String(to) === outputJsonPath) {
         throw publishError;
       }
-
       if (String(to) === outputDtsPath && String(args[0]).includes('.rollback.tmp')) {
         throw rollbackError;
       }
-
       return actualFs.rename(...args);
     });
 
@@ -203,8 +161,8 @@ describe('publishContractArtifactPair', () => {
       publishContractArtifactPair({
         outputJsonPath,
         outputDtsPath,
-        contractJson: nextJson,
-        contractDts: nextDts,
+        contractJson: NEXT_JSON,
+        contractDts: NEXT_DTS,
         publicationToken: 'publish',
       }),
     ).rejects.toSatisfy((error: unknown) => {
@@ -215,7 +173,7 @@ describe('publishContractArtifactPair', () => {
       return true;
     });
 
-    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(nextDts);
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(NEXT_DTS);
   });
 });
