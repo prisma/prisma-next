@@ -127,6 +127,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../packages/3-mongo-target/1-mongo-target
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/0-foundation/utils
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0
@@ -885,6 +888,9 @@ importers:
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
+      prettier:
+        specifier: ^3.6.2
+        version: 3.6.2
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
@@ -1307,6 +1313,9 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../../1-foundation/mongo-value
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*

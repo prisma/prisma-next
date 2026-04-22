@@ -1,17 +1,25 @@
 /**
- * Descriptor planner scenario tests.
+ * Descriptor planner scenario tests — transient regression coverage.
  *
- * Tests the full planWithDescriptors path: contractToSchemaIR → verifySqlSchema → planDescriptors.
- * Each test builds a from-contract (or null) and a to-contract, runs the planner,
- * and asserts the descriptors produced.
+ * After Phase 3's capability flip, `planWithDescriptors` is no longer registered
+ * on the Postgres `TargetMigrationsCapability`. These tests now hand-assemble the
+ * descriptor pipeline (`contractToSchemaIR` → `verifySqlSchema` → `planDescriptors`
+ * called directly) to guard against regressions in `planDescriptors` and the
+ * descriptor strategies while they still ship in the module. Once the descriptor
+ * flow is deleted in a later phase, this file goes with it.
  *
  * See descriptor-planner.scenarios.md for the full scenario list.
  */
 
-import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
+import postgresAdapterDescriptor, {
+  normalizeSchemaNativeType,
+  parsePostgresDefault,
+} from '@prisma-next/adapter-postgres/control';
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
+import { contractToSchemaIR } from '@prisma-next/family-sql/control';
+import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ForeignKey,
@@ -23,7 +31,8 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
-import postgresTargetDescriptor from '../../src/exports/control';
+import { planDescriptors } from '../../src/core/migrations/issue-planner';
+import postgresTargetDescriptor, { postgresRenderDefault } from '../../src/exports/control';
 
 // ============================================================================
 // Test helpers
@@ -103,14 +112,31 @@ function contract(
 function plan(
   from: Contract<SqlStorage> | null,
   to: Contract<SqlStorage>,
-  components?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
+  _components?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', 'postgres'>>,
 ) {
-  const migrations = postgresTargetDescriptor.migrations!;
-  return migrations.planWithDescriptors!({
-    fromContract: from,
-    toContract: to,
-    frameworkComponents: components ?? defaultComponents,
+  const fromSchemaIR = contractToSchemaIR(from, {
+    annotationNamespace: 'pg',
+    renderDefault: postgresRenderDefault,
+    frameworkComponents: _components ?? defaultComponents,
   });
+  const verifyResult = verifySqlSchema({
+    contract: to,
+    schema: fromSchemaIR,
+    strict: true,
+    typeMetadataRegistry: new Map(),
+    frameworkComponents: _components ?? defaultComponents,
+    normalizeDefault: parsePostgresDefault,
+    normalizeNativeType: normalizeSchemaNativeType,
+  });
+  const planResult = planDescriptors({
+    issues: verifyResult.schema.issues,
+    toContract: to,
+    fromContract: from,
+  });
+  if (!planResult.ok) {
+    return { ok: false as const, conflicts: planResult.failure };
+  }
+  return { ok: true as const, descriptors: planResult.value.descriptors };
 }
 
 function descriptorKinds(result: { ok: true; descriptors: readonly { kind: string }[] }) {

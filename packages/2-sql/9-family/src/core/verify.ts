@@ -98,6 +98,27 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
 }
 
 /**
+ * Returns the SQL statement that probes for the existence of the marker table.
+ * Uses the SQL-standard `information_schema.tables` view so the query succeeds
+ * (returning zero rows) when the table has not been created yet — avoiding a
+ * `relation does not exist` error. Some Postgres wire-protocol implementations
+ * (e.g. PGlite's TCP proxy) do not fully recover from an extended-protocol
+ * parse error, so we probe first instead of relying on an error signal.
+ * @internal - Used internally by readMarker().
+ */
+export function markerTableExistsSql(): {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+} {
+  return {
+    sql: `select 1
+    from information_schema.tables
+    where table_schema = $1 and table_name = $2`,
+    params: ['prisma_contract', 'marker'],
+  };
+}
+
+/**
  * Reads the contract marker from the database using the provided driver.
  * Returns the parsed marker record or null if no marker is found.
  * This abstracts SQL-specific details from the Control Plane.
@@ -108,41 +129,38 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
 export async function readMarker(
   driver: ControlDriverInstance<'sql', string>,
 ): Promise<ContractMarkerRecord | null> {
-  const markerStatement = readMarkerSql();
-
-  try {
-    const queryResult = await driver.query<{
-      core_hash: string;
-      profile_hash: string;
-      contract_json: unknown | null;
-      canonical_version: number | null;
-      updated_at: Date | string;
-      app_tag: string | null;
-      meta: unknown | null;
-    }>(markerStatement.sql, markerStatement.params);
-
-    if (queryResult.rows.length === 0) {
-      return null;
-    }
-
-    const markerRow = queryResult.rows[0];
-    if (!markerRow) {
-      // If rows array has length > 0 but first element is undefined, this is an unexpected result structure
-      throw new Error('Database query returned unexpected result structure');
-    }
-
-    return parseContractMarkerRow(markerRow);
-  } catch (error) {
-    // Handle case where marker table doesn't exist yet (empty database)
-    // PostgreSQL error code 42P01 = undefined_table
-    if (
-      error instanceof Error &&
-      (error.message.includes('does not exist') || (error as { code?: string }).code === '42P01')
-    ) {
-      return null;
-    }
-    throw error;
+  // Probe for the marker table first so that a fresh database (no
+  // `prisma_contract` schema) returns null cleanly instead of surfacing a
+  // `relation does not exist` error. This keeps the control connection in a
+  // predictable state for driver implementations that are sensitive to
+  // extended-protocol parse errors.
+  const existsStatement = markerTableExistsSql();
+  const existsResult = await driver.query(existsStatement.sql, existsStatement.params);
+  if (existsResult.rows.length === 0) {
+    return null;
   }
+
+  const markerStatement = readMarkerSql();
+  const queryResult = await driver.query<{
+    core_hash: string;
+    profile_hash: string;
+    contract_json: unknown | null;
+    canonical_version: number | null;
+    updated_at: Date | string;
+    app_tag: string | null;
+    meta: unknown | null;
+  }>(markerStatement.sql, markerStatement.params);
+
+  if (queryResult.rows.length === 0) {
+    return null;
+  }
+
+  const markerRow = queryResult.rows[0];
+  if (!markerRow) {
+    throw new Error('Database query returned unexpected result structure');
+  }
+
+  return parseContractMarkerRow(markerRow);
 }
 
 /**

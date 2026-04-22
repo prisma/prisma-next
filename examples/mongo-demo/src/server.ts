@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { createServer, type ServerResponse } from 'node:http';
-import type { SimplifyDeep } from '@prisma-next/mongo-orm';
+import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 
 if (existsSync('.env')) {
   process.loadEnvFile('.env');

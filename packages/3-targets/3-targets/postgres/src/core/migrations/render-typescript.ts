@@ -10,7 +10,7 @@
  */
 
 import { detectScaffoldRuntime, shebangLineFor } from '@prisma-next/migration-tools/migration-ts';
-import { type ImportRequirement, jsonToTsSource } from '@prisma-next/ts-render';
+import { type ImportRequirement, jsonToTsSource, renderImports } from '@prisma-next/ts-render';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 
 export interface RenderMigrationMeta {
@@ -21,11 +21,17 @@ export interface RenderMigrationMeta {
 }
 
 /**
- * Always-present base import — the rendered scaffold always extends
- * `Migration` from the family-sql migration subpath.
+ * Always-present base import — the rendered scaffold always extends the
+ * target-owned `Migration` (i.e. `PostgresMigration`) re-exported from
+ * `@prisma-next/target-postgres/migration`. That re-export fixes the
+ * `SqlMigration` generic to `PostgresPlanTargetDetails` and the abstract
+ * `targetId` to `'postgres'`, so user-authored migrations don't need to
+ * thread target-details or redeclare `targetId`.
  */
-const BASE_IMPORT_MODULE = '@prisma-next/family-sql/migration';
-const BASE_IMPORT_SYMBOL = 'Migration';
+const BASE_IMPORT: ImportRequirement = {
+  moduleSpecifier: '@prisma-next/target-postgres/migration',
+  symbol: 'Migration',
+};
 
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<PostgresOpFactoryCall>,
@@ -38,7 +44,7 @@ export function renderCallsToTypeScript(
     shebangLineFor(detectScaffoldRuntime()),
     imports,
     '',
-    'class M extends Migration {',
+    'export default class M extends Migration {',
     buildDescribeMethod(meta),
     '  override get operations() {',
     '    return [',
@@ -47,38 +53,19 @@ export function renderCallsToTypeScript(
     '  }',
     '}',
     '',
-    'export default M;',
     'Migration.run(import.meta.url, M);',
     '',
   ].join('\n');
 }
 
 function buildImports(calls: ReadonlyArray<PostgresOpFactoryCall>): string {
-  const symbolsByModule = new Map<string, Set<string>>();
+  const requirements: ImportRequirement[] = [BASE_IMPORT];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
-      collectRequirement(symbolsByModule, req);
+      requirements.push(req);
     }
   }
-
-  const lines = [`import { ${BASE_IMPORT_SYMBOL} } from '${BASE_IMPORT_MODULE}';`];
-  for (const moduleSpecifier of [...symbolsByModule.keys()].sort()) {
-    const symbols = [...(symbolsByModule.get(moduleSpecifier) ?? [])].sort();
-    lines.push(`import { ${symbols.join(', ')} } from '${moduleSpecifier}';`);
-  }
-  return lines.join('\n');
-}
-
-function collectRequirement(
-  symbolsByModule: Map<string, Set<string>>,
-  req: ImportRequirement,
-): void {
-  let set = symbolsByModule.get(req.moduleSpecifier);
-  if (!set) {
-    set = new Set();
-    symbolsByModule.set(req.moduleSpecifier, set);
-  }
-  set.add(req.symbol);
+  return renderImports(requirements);
 }
 
 function buildDescribeMethod(meta: RenderMigrationMeta): string {

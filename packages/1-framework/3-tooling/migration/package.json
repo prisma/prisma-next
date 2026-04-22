@@ -19,7 +19,8 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "catalog:",
-    "pathe": "^2.0.3"
+    "pathe": "^2.0.3",
+    "prettier": "^3.6.2"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",
