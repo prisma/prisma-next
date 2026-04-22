@@ -450,9 +450,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
     lines.push(
       'Open migration.ts and replace each `placeholder(...)` call with your actual query.',
     );
-    lines.push(
-      `Then run: ${green_('prisma-next migration emit --dir ' + (result.dir ?? '<dir>'))}`,
-    );
+    lines.push(`Then run: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)}`);
     return lines.join('\n');
   }
 
@@ -487,6 +485,11 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   if (result.dir) {
     lines.push(dim_(`dir:    ${result.dir}`));
   }
+
+  lines.push('');
+  lines.push(
+    `Next: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)} to emit ops.json and attest migrationId before running ${green_('prisma-next migration apply')}.`,
+  );
 
   if (result.sql && result.sql.length > 0) {
     lines.push('');
