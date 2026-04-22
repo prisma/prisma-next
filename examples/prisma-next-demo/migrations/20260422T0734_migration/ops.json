@@ -1,0 +1,69 @@
+[
+  {
+    "id": "column.user.displayName",
+    "label": "Add column \"displayName\" to \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "displayName",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"displayName\" is missing",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add column \"displayName\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ADD COLUMN \"displayName\" text"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"displayName\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n)"
+      }
+    ]
+  },
+  {
+    "id": "alterType.post.embedding",
+    "label": "Alter type of \"post\".\"embedding\" to vector(1536)",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "embedding",
+        "table": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"embedding\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'post'\n    AND column_name = 'embedding'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "alter type of \"embedding\"",
+        "sql": "ALTER TABLE \"public\".\"post\" ALTER COLUMN \"embedding\" TYPE vector(1536) USING \"embedding\"::vector(1536)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"embedding\" has type \"vector(1536)\"",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_attribute a\n  JOIN pg_class c ON c.oid = a.attrelid\n  JOIN pg_namespace n ON n.oid = c.relnamespace\n  WHERE n.nspname = 'public'\n    AND c.relname = 'post'\n    AND a.attname = 'embedding'\n    AND format_type(a.atttypid, a.atttypmod) = 'vector(1536)'\n    AND NOT a.attisdropped\n)"
+      }
+    ],
+    "meta": {
+      "warning": "TABLE_REWRITE"
+    }
+  }
+]
