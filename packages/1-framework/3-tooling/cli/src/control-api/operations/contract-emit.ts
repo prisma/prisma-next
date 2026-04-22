@@ -195,12 +195,22 @@ async function writeContractArtifacts({
  * 2. Resolves the contract source from config
  * 3. Creates a control plane stack and family instance
  * 4. Emits contract artifacts (JSON and DTS)
- * 5. Writes files to the paths specified in config
+ * 5. Publishes staged artifacts to the configured output paths
  *
- * Supports AbortSignal for cancellation, enabling "last change wins" behavior.
+ * Publication is serialized per output JSON path. Each emit stages temp files,
+ * renames `contract.d.ts` before `contract.json`, and restores the previous
+ * pair if publication fails after either path has been replaced.
+ *
+ * If a newer generation has already claimed the same output path by the time
+ * this request reaches publication, the operation returns successfully with
+ * `publication: 'superseded'` and leaves the on-disk artifacts unchanged.
+ *
+ * Callers that can overlap emits for the same output should cancel older work
+ * before starting newer work. The queue prevents stale overwrites, but a newer
+ * failed emit can still supersede an older successful emit that arrives later.
  *
  * @param options - Options including configPath and optional signal
- * @returns File paths and hashes of emitted artifacts
+ * @returns File paths and hashes for the emitted bytes, plus whether they were published
  * @throws If config loading fails, contract is invalid, or file I/O fails
  * @throws signal.reason if cancelled via AbortSignal (typically DOMException with name 'AbortError')
  */
