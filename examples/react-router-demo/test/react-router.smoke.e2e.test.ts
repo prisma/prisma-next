@@ -70,13 +70,22 @@ describe('react-router-demo smoke (e2e)', () => {
   });
 
   afterEach(async () => {
+    // Revert the schema first so the still-running plugin re-emits clean
+    // artifacts, then close the server so nothing is left mid-flight, then tear
+    // down the dev database and unstub the env.
+    if (originalSchema !== null) {
+      const preRevertMtime = existsSync(contractJsonPath)
+        ? (await stat(contractJsonPath)).mtimeMs
+        : null;
+      writeFileSync(schemaPath, originalSchema);
+      originalSchema = null;
+      if (server) {
+        await waitForFileMtimeChange(contractJsonPath, preRevertMtime, 3_000);
+      }
+    }
     if (server) {
       await server.close();
       server = null;
-    }
-    if (originalSchema !== null) {
-      writeFileSync(schemaPath, originalSchema);
-      originalSchema = null;
     }
     if (dev) {
       await dev.close();
@@ -128,10 +137,13 @@ describe('react-router-demo smoke (e2e)', () => {
       if (originalSchema === null) {
         throw new Error('beforeEach must have captured originalSchema before the test body runs');
       }
-      writeFileSync(
-        schemaPath,
-        originalSchema.replace('  email     String\n', '  email     String\n  nickname  String?\n'),
+      const editedSchema = originalSchema.replace(
+        '  email     String\n',
+        '  email     String\n  nickname  String?\n',
       );
+      // Guard against schema reformats silently breaking the test.
+      expect(editedSchema).not.toBe(originalSchema);
+      writeFileSync(schemaPath, editedSchema);
 
       const reEmit = await waitForFileMtimeChange(
         contractJsonPath,
@@ -140,11 +152,13 @@ describe('react-router-demo smoke (e2e)', () => {
       );
       expect(reEmit).toBe(true);
 
-      const updatedContract = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
-      expect(updatedContract.storage).toMatchObject({
-        tables: {
-          user: {
-            columns: { nickname: expect.anything() },
+      const updatedContract: unknown = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+      expect(updatedContract).toMatchObject({
+        storage: {
+          tables: {
+            user: {
+              columns: { nickname: expect.anything() },
+            },
           },
         },
       });
