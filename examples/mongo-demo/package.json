@@ -26,6 +26,7 @@
     "@prisma-next/mongo-query-builder": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

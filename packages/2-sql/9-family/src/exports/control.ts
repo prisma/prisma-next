@@ -33,6 +33,7 @@ export {
 } from '../core/migrations/plan-helpers';
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
+  AnySqlMigrationOperation,
   CodecControlHooks,
   ComponentDatabaseDependencies,
   ComponentDatabaseDependency,

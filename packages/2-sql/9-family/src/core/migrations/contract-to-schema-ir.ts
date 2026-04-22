@@ -7,6 +7,7 @@ import type {
   SqlStorage,
   StorageColumn,
   StorageTable,
+  StorageTypeInstance,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
@@ -53,16 +54,26 @@ export type DefaultRenderer = (def: ColumnDefault, column: StorageColumn) => str
 function convertColumn(
   name: string,
   column: StorageColumn,
+  storageTypes: Record<string, StorageTypeInstance>,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlColumnIR {
+  // Resolve `typeRef` so columns that delegate their `nativeType`/`codecId`/
+  // `typeParams` to a named `storage.types` entry expand the same way as
+  // columns that inline those fields. Without this resolution, a
+  // `typeRef`-based column like `post.embedding → Embedding1536` would
+  // render as the bare `"vector"` (dropping the `length` parameter), while
+  // `verify-sql-schema.ts`'s `renderExpectedNativeType` resolves the
+  // typeRef and produces `"vector(1536)"` — making diffs on the same
+  // contract falsely report a `type_mismatch`.
+  const resolved = resolveColumnTypeMetadata(column, storageTypes);
   const nativeType = expandNativeType
     ? expandNativeType({
-        nativeType: column.nativeType,
-        codecId: column.codecId,
-        ...ifDefined('typeParams', column.typeParams),
+        nativeType: resolved.nativeType,
+        codecId: resolved.codecId,
+        ...ifDefined('typeParams', resolved.typeParams),
       })
-    : column.nativeType;
+    : resolved.nativeType;
   return {
     name,
     nativeType,
@@ -71,6 +82,26 @@ function convertColumn(
       'default',
       column.default != null && renderDefault ? renderDefault(column.default, column) : undefined,
     ),
+  };
+}
+
+function resolveColumnTypeMetadata(
+  column: StorageColumn,
+  storageTypes: Record<string, StorageTypeInstance>,
+): Pick<StorageColumn, 'codecId' | 'nativeType' | 'typeParams'> {
+  if (!column.typeRef) {
+    return column;
+  }
+  const referenced = storageTypes[column.typeRef];
+  if (!referenced) {
+    throw new Error(
+      `Column references storage type "${column.typeRef}" but it is not defined in storage.types.`,
+    );
+  }
+  return {
+    codecId: referenced.codecId,
+    nativeType: referenced.nativeType,
+    typeParams: referenced.typeParams,
   };
 }
 
@@ -101,12 +132,19 @@ function convertForeignKey(fk: ForeignKey): SqlForeignKeyIR {
 function convertTable(
   name: string,
   table: StorageTable,
+  storageTypes: Record<string, StorageTypeInstance>,
   expandNativeType: NativeTypeExpander | undefined,
   renderDefault: DefaultRenderer | undefined,
 ): SqlTableIR {
   const columns: Record<string, SqlColumnIR> = {};
   for (const [colName, colDef] of Object.entries(table.columns)) {
-    columns[colName] = convertColumn(colName, colDef, expandNativeType, renderDefault);
+    columns[colName] = convertColumn(
+      colName,
+      colDef,
+      storageTypes,
+      expandNativeType,
+      renderDefault,
+    );
   }
 
   const satisfiedIndexColumns = new Set([
@@ -217,11 +255,13 @@ export function contractToSchemaIR(
   }
 
   const storage = contract.storage;
+  const storageTypes = storage.types ?? {};
   const tables: Record<string, SqlTableIR> = {};
   for (const [tableName, tableDef] of Object.entries(storage.tables)) {
     tables[tableName] = convertTable(
       tableName,
       tableDef,
+      storageTypes,
       options.expandNativeType,
       options.renderDefault,
     );

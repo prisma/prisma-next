@@ -8,6 +8,7 @@ type UserRow = DefaultModelRow<Contract, 'User'>;
 export interface OrmClientUpsertUserInput {
   readonly id: string;
   readonly email: string;
+  readonly displayName: string;
   readonly kind: 'admin' | 'user';
   readonly createdAt?: Date | string;
 }
@@ -18,11 +19,13 @@ export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtim
     create: {
       id: toUserId(data.id),
       email: data.email,
+      displayName: data.displayName,
       kind: data.kind,
       createdAt: toUserCreatedAt(data.createdAt),
     },
     update: {
       email: data.email,
+      displayName: data.displayName,
       kind: data.kind,
     },
   });

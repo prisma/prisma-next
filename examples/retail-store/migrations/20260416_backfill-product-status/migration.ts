@@ -1,10 +1,10 @@
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import { dataTransform } from '@prisma-next/target-mongo/migration';
-import type { Contract } from './contract';
-import contractJson from './contract.json' with { type: 'json' };
+import type { Contract } from './end-contract';
+import endContractJson from './end-contract.json' with { type: 'json' };
 
-const query = mongoQuery<Contract>({ contractJson });
+const query = mongoQuery<Contract>({ contractJson: endContractJson });
 
 class BackfillProductStatus extends Migration {
   override describe() {

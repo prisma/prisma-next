@@ -1,5 +1,5 @@
 import { Migration } from '@prisma-next/migration-tools/migration';
-import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from './migrations/types';
+import type { AnySqlMigrationOperation, SqlPlanTargetDetails } from './migrations/types';
 
 /**
  * Family-owned base class for class-flow SQL migrations.
@@ -21,7 +21,13 @@ import type { SqlMigrationPlanOperation, SqlPlanTargetDetails } from './migratio
  * family-scoped runtime identity today — consumers reach the family via
  * target descriptors rather than by family-id lookup, so adding one would
  * be purely decorative. Introducing it later is a non-breaking superset.
+ *
+ * The operation type parameter is `AnySqlMigrationOperation<TDetails>` — the
+ * union of DDL-shaped `SqlMigrationPlanOperation` and `DataTransformOperation`
+ * — so subclasses can return a mix of schema operations (e.g. `setNotNull`,
+ * `addColumn`) and data-transform operations (e.g. `dataTransform`). Mirrors
+ * `MongoMigration`'s parameterization on `AnyMongoMigrationOperation`.
  */
 export abstract class SqlMigration<TDetails extends SqlPlanTargetDetails> extends Migration<
-  SqlMigrationPlanOperation<TDetails>
+  AnySqlMigrationOperation<TDetails>
 > {}

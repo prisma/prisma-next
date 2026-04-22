@@ -24,23 +24,21 @@
  */
 
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
-import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { MigrationPlanWithAuthoringSurface } from '@prisma-next/framework-components/control';
 import type { MigrationMeta } from '@prisma-next/migration-tools/migration';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { PostgresOpFactoryCall } from './op-factory-call';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
+import { PostgresMigration } from './postgres-migration';
 import { renderOps } from './render-ops';
 import { renderCallsToTypeScript } from './render-typescript';
 
 type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
 
 export class TypeScriptRenderablePostgresMigration
-  extends SqlMigration<PostgresPlanTargetDetails>
+  extends PostgresMigration
   implements MigrationPlanWithAuthoringSurface
 {
-  readonly targetId = 'postgres' as const;
-
   readonly #calls: readonly PostgresOpFactoryCall[];
   readonly #meta: MigrationMeta;
 

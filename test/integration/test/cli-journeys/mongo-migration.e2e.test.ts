@@ -4,8 +4,8 @@
  * Covers the gap that no Postgres-shaped journey test exercises for MongoDB:
  *
  *  1. `migration plan --target mongo` from the empty contract baseline:
- *     scaffolds a class-flow `migration.ts`, copies `contract.json` /
- *     `contract.d.ts` next to it, and emits attested `ops.json` with the
+ *     scaffolds a class-flow `migration.ts`, copies `end-contract.json` /
+ *     `end-contract.d.ts` next to it, and emits attested `ops.json` with the
  *     expected `createIndex` operation(s). Asserts that `migration plan`
  *     invokes the inline emit step on Mongo (i.e. the rendered
  *     `migration.ts` is round-trip executable: it gets imported by
@@ -25,6 +25,7 @@
 
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
 import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
@@ -33,7 +34,6 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { join } from 'pathe';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
@@ -196,13 +196,13 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     );
     expect(migrationTs).toContain('@prisma-next/target-mongo/migration');
     expect(migrationTs).toContain('createIndex');
-    expect(migrationTs).toContain('"users"');
+    expect(migrationTs).toContain("'users'");
     expect(migrationTs).toContain('Migration.run(import.meta.url');
 
-    expect(readFileSync(join(migrationDir, 'contract.json'), 'utf-8')).toBe(
+    expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
     );
-    expect(readFileSync(join(migrationDir, 'contract.d.ts'), 'utf-8')).toBe(
+    expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
     );
 
@@ -253,10 +253,10 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     // Empty stub: factory imports omitted because no calls were rendered.
     expect(migrationTs).not.toContain('@prisma-next/target-mongo/migration');
 
-    expect(readFileSync(join(migrationDir, 'contract.json'), 'utf-8')).toBe(
+    expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
     );
-    expect(readFileSync(join(migrationDir, 'contract.d.ts'), 'utf-8')).toBe(
+    expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
     );
 

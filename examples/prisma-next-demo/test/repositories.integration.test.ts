@@ -97,24 +97,28 @@ async function seedOrmClientData(runtime: Runtime): Promise<void> {
     {
       id: seededUserIds.admin,
       email: 'admin@example.com',
+      displayName: 'Admin',
       createdAt: new Date('2024-01-01T00:00:00.000Z'),
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.member,
       email: 'member@example.com',
+      displayName: 'Member',
       createdAt: new Date('2024-01-02T00:00:00.000Z'),
       kind: 'user' as const,
     },
     {
       id: seededUserIds.adminTwo,
       email: 'admin2@example.org',
+      displayName: 'Admin Two',
       createdAt: new Date('2024-01-03T00:00:00.000Z'),
       kind: 'admin' as const,
     },
     {
       id: seededUserIds.reader,
       email: 'reader@example.com',
+      displayName: 'Reader',
       createdAt: new Date('2024-01-04T00:00:00.000Z'),
       kind: 'user' as const,
     },
@@ -314,6 +318,7 @@ describe('ORM client integration examples', () => {
             {
               id: '00000000-0000-0000-0000-000000000099',
               email: 'created@example.com',
+              displayName: 'Created User',
               kind: 'user',
               createdAt: new Date('2024-02-01T00:00:00.000Z'),
             },
@@ -361,6 +366,7 @@ describe('ORM client integration examples', () => {
             {
               id: '00000000-0000-0000-0000-000000000088',
               email: 'addressed@example.com',
+              displayName: 'Addressed User',
               kind: 'user',
               createdAt: new Date('2024-02-01T00:00:00.000Z'),
               address,
@@ -614,6 +620,7 @@ describe('ORM client integration examples', () => {
             {
               id: seededUserIds.admin,
               email: 'admin-upserted@example.com',
+              displayName: 'Admin Upserted',
               kind: 'admin',
             },
             runtime,
@@ -622,6 +629,7 @@ describe('ORM client integration examples', () => {
             {
               id: insertedId,
               email: 'inserted-upsert@example.com',
+              displayName: 'Inserted Upsert',
               kind: 'user',
               createdAt: new Date('2024-02-01T00:00:00.000Z'),
             },

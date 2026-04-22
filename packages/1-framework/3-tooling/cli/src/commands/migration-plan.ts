@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
@@ -63,6 +64,12 @@ export interface MigrationPlanResult {
   }[];
   readonly sql?: readonly string[];
   readonly summary: string;
+  /**
+   * When true, `migration.ts` was written but contains unfilled
+   * `placeholder(...)` calls. The user must edit the file and then run
+   * `migration emit` to finalize `ops.json` / `migration.json`.
+   */
+  readonly pendingPlaceholders?: boolean;
   readonly timings: {
     readonly total: number;
   };
@@ -166,6 +173,7 @@ async function executeMigrationPlanCommand(
   // Read existing migrations and determine "from" contract
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
+  let fromContractSourceDir: string | null = null;
 
   try {
     const { attested: bundles, drafts, graph } = await loadAllBundles(migrationsDir);
@@ -199,6 +207,7 @@ async function executeMigrationPlanCommand(
       }
       fromHash = resolved.value.manifest.to;
       fromContract = resolved.value.manifest.toContract;
+      fromContractSourceDir = resolved.value.dirPath;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
@@ -206,6 +215,7 @@ async function executeMigrationPlanCommand(
         const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
         if (leafPkg) {
           fromContract = leafPkg.manifest.toContract;
+          fromContractSourceDir = leafPkg.dirPath;
         }
       }
     }
@@ -279,6 +289,7 @@ async function executeMigrationPlanCommand(
 
   try {
     let migrationTsContent: string;
+    let hasPlaceholders = false;
 
     if (strategy === 'descriptor') {
       if (!migrations.planWithDescriptors || !migrations.renderDescriptorTypeScript) {
@@ -326,6 +337,7 @@ async function executeMigrationPlanCommand(
         schema: fromSchema,
         policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
         fromHash,
+        fromContract,
         frameworkComponents,
       });
       if (plannerResult.kind === 'failure') {
@@ -335,31 +347,68 @@ async function executeMigrationPlanCommand(
           }),
         );
       }
-      if (plannerResult.plan.operations.length === 0) {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: [
-              {
-                kind: 'unsupportedChange',
-                summary:
-                  'Contract changed but planner produced no operations. ' +
-                  'This indicates unsupported or ignored changes.',
-              },
-            ],
-          }),
-        );
+      // Accessing .operations triggers toOp() on each call. If any call
+      // is a DataTransformCall with an unfilled placeholder stub, toOp()
+      // throws PN-MIG-2001. That means there ARE operations — they just
+      // need the user to fill in the placeholder before emit can succeed.
+      try {
+        if (plannerResult.plan.operations.length === 0) {
+          return notOk(
+            errorMigrationPlanningFailed({
+              conflicts: [
+                {
+                  kind: 'unsupportedChange',
+                  summary:
+                    'Contract changed but planner produced no operations. ' +
+                    'This indicates unsupported or ignored changes.',
+                },
+              ],
+            }),
+          );
+        }
+      } catch (e) {
+        if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
+          hasPlaceholders = true;
+        } else {
+          throw e;
+        }
       }
       migrationTsContent = plannerResult.plan.renderTypeScript();
     }
 
     await writeMigrationPackage(packageDir, manifest, []);
-    await copyContractToMigrationDir(packageDir, contractPathAbsolute);
+    const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
+    await copyFilesWithRename(packageDir, [
+      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
+      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+    ]);
+    if (fromContractSourceDir !== null) {
+      const sourceArtifacts = getEmittedArtifactPaths(
+        join(fromContractSourceDir, 'end-contract.json'),
+      );
+      await copyFilesWithRename(packageDir, [
+        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
+        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
+      ]);
+    }
     await writeMigrationTs(packageDir, migrationTsContent);
 
-    // Always run emit inline. If migration.ts contains unfilled
-    // placeholders (e.g. user must hand-author a dataTransform body),
-    // emitMigration throws errorUnfilledPlaceholder (PN-MIG-2001) and
-    // we propagate that structured error to the user.
+    if (hasPlaceholders) {
+      const result: MigrationPlanResult = {
+        ok: true,
+        noOp: false,
+        from: fromHash,
+        to: toStorageHash,
+        dir: relative(process.cwd(), packageDir),
+        operations: [],
+        pendingPlaceholders: true,
+        summary:
+          'Planned migration with placeholder(s) — edit migration.ts then run `migration emit`',
+        timings: { total: Date.now() - startTime },
+      };
+      return ok(result);
+    }
+
     const { operations, migrationId } = await emitMigration(packageDir, {
       targetId: config.target.targetId,
       migrations,
@@ -439,6 +488,24 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
     lines.push(`${green_('✔')} No changes detected`);
     lines.push(dim_(`  from: ${result.from}`));
     lines.push(dim_(`  to:   ${result.to}`));
+    return lines.join('\n');
+  }
+
+  if (result.pendingPlaceholders) {
+    lines.push(`${yellow_('⚠')} ${result.summary}`);
+    lines.push('');
+    lines.push(dim_(`from: ${result.from}`));
+    lines.push(dim_(`to:   ${result.to}`));
+    if (result.dir) {
+      lines.push(dim_(`dir:  ${result.dir}`));
+    }
+    lines.push('');
+    lines.push(
+      'Open migration.ts and replace each `placeholder(...)` call with your actual query.',
+    );
+    lines.push(
+      `Then run: ${green_('prisma-next migration emit --dir ' + (result.dir ?? '<dir>'))}`,
+    );
     return lines.join('\n');
   }
 

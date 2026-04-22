@@ -56,9 +56,10 @@ packages/3-targets/3-targets/postgres/src/core/migrations/
 ├── planner-sql-checks.ts    # Pure check-SQL builders (unchanged)
 ├── planner-identity-values.ts
 ├── planner-recipes.ts
-├── runner.ts                # Unchanged
-└── scaffolding.ts           # Only non-descriptor scaffolding helpers remain
+└── runner.ts                # Unchanged
 ```
+
+`scaffolding.ts` is gone entirely — it only ever hosted `renderDescriptorTypeScript`, and that deletes with descriptor-flow in Phase 5. No replacement file is added in its place.
 
 No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails extends SqlPlanTargetDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.)
 
@@ -66,7 +67,7 @@ TypeScript rendering primitives (`TsExpression`, `ImportRequirement`, `jsonToTsS
 
 `DataTransformCall` accepts `checkSlot` / `runSlot` strings directly. Its `renderTypeScript()` emits `() => placeholder("slot")` at the call site; its `toOp()` always throws `errorUnfilledPlaceholder(label)` (`PN-MIG-2001`) — a plan carrying a `DataTransformCall` is, by construction, an unfilled stub that only has TypeScript. Real (non-placeholder) data-transform execution happens at migration runtime through the pure `dataTransform` factory when the user runs the authored `migration.ts`. There is no standalone `PlaceholderExpression` AST node in the shipped implementation (W07 + user simplification).
 
-**Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, `renderDescriptorTypeScript` from `scaffolding.ts`.
+**Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, and `scaffolding.ts` in its entirety (the file only hosts `renderDescriptorTypeScript`, which has no remaining production callers after Phase 3).
 
 **The production pipeline becomes**:
 
@@ -116,7 +117,7 @@ fromContract, toContract, schema
 
 ## Phases at a glance
 
-Seven phases. Phase 0 prepares pure factories. Phase 1 retargets the **walk-schema** planner (the planner that backs `db update`) to produce class-flow IR — this proves the IR mechanics with the lowest blast radius because the walk-schema planner is **not** wired into `migration plan` today, so the CLI is unaffected. Phase 2 retargets the **issue planner** (the planner `migration plan` actually uses) to produce class-flow IR — at that point the strategies and `dataTransform(stub)` scaffolding light up. Phase 3 flips `migration plan` to call the class-flow path. Phases 4–6 fold the two planners together and delete the descriptor scaffolding.
+Eight phases. Phase 0 prepares pure factories. Phase 1 retargets the **walk-schema** planner (the planner that backs `db update`) to produce class-flow IR — this proves the IR mechanics with the lowest blast radius because the walk-schema planner is **not** wired into `migration plan` today, so the CLI is unaffected. Phase 2 retargets the **issue planner** (the planner `migration plan` actually uses) to produce class-flow IR — at that point the strategies and `dataTransform(stub)` scaffolding light up. Phase 3 flips `migration plan` to call the class-flow path. Phases 4–6 fold the two planners together and delete the descriptor scaffolding. Phase 7 scrubs the "class-flow" terminology from the project now that there is no alternative.
 
 | Phase | Theme | Shape | Blast radius |
 |---|---|---|---|
@@ -127,8 +128,9 @@ Seven phases. Phase 0 prepares pure factories. Phase 1 retargets the **walk-sche
 | **4. Collapse the two planners** | Fold walk-schema logic into the issue planner (or vice versa); delete `planner-reconciliation.ts`; reduce or delete `planner.ts` | Internal, planner-only | Medium |
 | **5. Delete descriptor IR** | Remove `OperationDescriptor`, capability methods, CLI branches | Cross-package delete | Medium |
 | **6. Delete `migration emit`** | Remove CLI command + `emit` capability + `postgresEmit` / `mongoEmit` | CLI + framework | Low |
+| **7. Terminology cleanup** | Remove "class-flow" from code, tests, docs, and ADR titles now that descriptor flow is gone and the term has no contrast | Repo-wide rename | Low |
 
-Phases 0–3 are load-bearing and sequential. Phases 4–6 are cleanup and can be reordered or combined pragmatically; the plan presents them in their natural order.
+Phases 0–3 are load-bearing and sequential. Phases 4–7 are cleanup and can be reordered or combined pragmatically; the plan presents them in their natural order.
 
 ## Spec-requirement to phase mapping
 
@@ -142,6 +144,7 @@ Phases 0–3 are load-bearing and sequential. Phases 4–6 are cleanup and can b
 | R3.1–R3.3 (pure factories, visitor discipline, module-scope query builder) | 0, 1 | Phase 0 creates pure factories; Phase 1 wires the visitor surface |
 | R4.1–R4.3 (unchanged wire format, unchanged runner) | all | Schema-equivalence invariant; runner's post-apply `verifySqlSchema` enforces per-example at Phase 3 |
 | Removal acceptance criteria | 5, 6 | |
+| Terminology: no remaining "class-flow" in code, tests, or current docs | 7 | Purely a rename sweep after the descriptor alternative is gone |
 
 ## Phase 0 — Code motion: pure factory extraction
 
@@ -380,7 +383,7 @@ Revert the PR; walk-schema planner returns.
 - `operation-descriptors.ts`
 - `operation-resolver.ts` — thin `resolveX` wrappers from Phase 0 die; pure `createX` factories live on as `op-factories.ts`.
 - `descriptor-planner.ts` (if not already renamed/merged into `issue-planner.ts` during Phase 2 or 4).
-- `renderDescriptorTypeScript` function in `scaffolding.ts`.
+- `scaffolding.ts` **in its entirety** (and its sibling `scaffolding.test.ts`). The file only ever hosted `renderDescriptorTypeScript`; as of PR 2 (Phase 3) it has no production callers — only its own test file imports it. Nothing needs to "remain" in the file.
 - `MigrationDescriptorArraySchema` in `exports/migration.ts`.
 
 **Framework deletes**:
@@ -402,7 +405,7 @@ Revert the PR; walk-schema planner returns.
 ### Validation
 
 - `pnpm -r typecheck`, `pnpm -r lint`.
-- Grep sweep: zero matches for `OperationDescriptor`, `PostgresMigrationOpDescriptor`, `DataTransformDescriptor`, `planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`, `MigrationDescriptorArraySchema`, `evaluateMigrationTs`, `emitDescriptorFlow`, `migrationStrategy` under `packages/` and `test/`.
+- Grep sweep: zero matches for `OperationDescriptor`, `PostgresMigrationOpDescriptor`, `DataTransformDescriptor`, `planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`, `MigrationDescriptorArraySchema`, `evaluateMigrationTs`, `emitDescriptorFlow`, `migrationStrategy` under `packages/` and `test/`. Also: zero remaining imports of `core/migrations/scaffolding` (file is deleted).
 - Full integration + e2e pass.
 
 ### Rollback
@@ -441,6 +444,36 @@ Pure delete; revert restores.
 
 Pure delete; revert restores.
 
+## Phase 7 — Terminology cleanup: drop "class-flow"
+
+**Why last?** "Class-flow" is a term we coined to contrast the new `OpFactoryCall`-based authoring surface with the legacy descriptor flow. Once Phase 5 deletes the descriptor IR and Phase 6 deletes `migration emit`, there is no other authoring model — the qualifier is dead weight and actively confusing for anyone reading the code or docs fresh. This phase removes it.
+
+**Principle**: by the end of this project there is no "class-flow" variant and no "descriptor" variant. There is just how migrations are authored. Anything left calling itself "class-flow" implies a contrast that no longer exists.
+
+### Scope
+
+Repo-wide scrub of `class-flow`, `classFlow`, and `ClassFlow` (case-insensitive). Each occurrence is either renamed or deleted depending on whether it still carries meaning:
+
+- **Code symbols and comments** — e.g. `class-flow` in TSDoc, variable names, log strings, error messages under `packages/**` and `test/**`. Rename to the plain term (usually just "migration" or drop the qualifier entirely).
+- **Test fixture and file names** — e.g. `test/integration/test/cli-journeys/class-flow-round-trip.e2e.test.ts`. Rename to the behavior under test (e.g. `migration-round-trip.e2e.test.ts`).
+- **Docs**:
+  - `docs/architecture docs/subsystems/7. Migration System.md`, `docs/architecture docs/subsystems/10. MongoDB Family.md` — rewrite any paragraphs that frame class-flow as "the new way"; at this point it is *the* way.
+  - ADRs: ADR 193 ("Class-flow as the canonical migration authoring strategy"), ADR 194, ADR 196, ADR 200. ADRs are historical records and are **not retitled or rewritten** — they continue to document the decision in the terms used at the time. A short "Status" addendum is added to ADR 193 noting that after this project completes, "class-flow" is simply how migrations work.
+- **README / CLI help output** — drop "class-flow" framing, prefer task-oriented language.
+- **Project docs under `projects/postgres-class-flow-migrations/`** — left as-is; these are archived project records. The directory name is not renamed.
+
+**Out of scope**: ADR content rewrites; renaming the project directory; changing `OpFactoryCall` or any public type name (those names do not contain "class-flow").
+
+### Validation
+
+- `pnpm -r typecheck`, `pnpm -r lint`.
+- Grep sweep: zero matches for `class-flow`, `classFlow`, `ClassFlow` under `packages/`, `test/`, `docs/`, `examples/`, and repo-root README/CLI help — except inside `projects/postgres-class-flow-migrations/` (archived) and inside ADR bodies (historical records).
+- Full integration + e2e pass. Purely a rename phase — no behavior change.
+
+### Rollback
+
+Pure rename; revert restores.
+
 ## Cross-cutting
 
 ### Validation policy
@@ -462,6 +495,7 @@ Phase 3's PR exercises the runner post-apply verify per example: each re-scaffol
 - **Internally parallel within Phase 1**: framework lift, Postgres IR (call classes + visitors), renderers, walk-schema retargeting can be developed in parallel and merged as a single PR.
 - **Internally parallel within Phase 2**: strategy retargeting, issue-planner retargeting, and the per-strategy apply/verify tests can be developed in parallel.
 - **Parallel after Phase 3**: Phases 4, 5, and 6 touch largely disjoint files and can overlap, though the natural order is 4 → 5 → 6.
+- **Phase 7 runs after 5 and 6** to avoid renaming symbols that are about to be deleted.
 
 ### Relationship to the Mongo sibling project
 
