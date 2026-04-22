@@ -34,6 +34,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
@@ -42,7 +43,6 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { basename, isAbsolute, join, resolve } from 'pathe';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
