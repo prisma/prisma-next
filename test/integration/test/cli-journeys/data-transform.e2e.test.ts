@@ -1,23 +1,21 @@
 /**
  * Data Transform Authoring Surface (Journey: migration new → emit → ops)
  *
- * Tests the authoring pipeline end-to-end:
- * 1. Set up a project with a base contract, plan + apply initial migration
- * 2. Swap to additive contract (adds a nullable column)
- * 3. Emit the new contract
- * 4. migration new → scaffolds package with migration.ts
- * 5. Fill in migration.ts with descriptors + dataTransform (raw_sql)
- * 6. migration emit → evaluates TS, resolves descriptors, writes ops.json, attests
- * 7. Inspect ops.json — verify the ops are correct
- * 8. migration apply → executes ops including data transform
- * 9. Verify data was transformed
+ * Tests the authoring pipeline end-to-end against the class-flow `dataTransform`
+ * factory exported from `@prisma-next/target-postgres/migration`:
  *
- * SKIPPED: This test exercises the descriptor-flow data transform authoring
- * surface (createBuilders, resolveDescriptors). Postgres now uses the
- * class-flow pipeline (postgresEmit). The class-flow data transform authoring
- * surface (user-editable DataTransformCall closures) is not yet complete.
- * Re-enable once the class-flow dataTransform factory is exported and supports
- * user-provided check/run closures.
+ * 1. Set up a project with a base contract, plan + apply initial migration
+ * 2. Insert test data (rows that need transforming)
+ * 3. Swap to additive contract (adds a nullable column)
+ * 4. Emit the new contract
+ * 5. migration new → scaffolds package with migration.ts + contract.json
+ * 6. Fill in migration.ts with class-flow operations: `addColumn(...)`,
+ *    `dataTransform(contract, 'backfill-user-name', { run: () => db.user.update(...) })`
+ * 7. migration emit → evaluates TS, factory lowers the plan + asserts contract
+ *    hashes match, writes ops.json, attests
+ * 8. Inspect ops.json — verify the ops are correct
+ * 9. migration apply → executes ops including data transform
+ * 10. Verify data was transformed
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -42,7 +40,7 @@ withTempDir(({ createTempDir }) => {
   describe('Journey: Data Transform Authoring', () => {
     const db = useDevDatabase();
 
-    it.skip(
+    it(
       'migration new → fill migration.ts → emit → apply → data correct',
       async () => {
         const ctx: JourneyContext = setupJourney({
@@ -100,19 +98,47 @@ withTempDir(({ createTempDir }) => {
         );
         expect(manifestBefore.migrationId).toBeNull();
 
-        // Step 5: Fill in migration.ts with descriptors using typed query builder
+        // Step 5: Fill in migration.ts with the class-flow authoring surface.
+        // Uses `dataTransform(contract, name, { run })` from
+        // `@prisma-next/target-postgres/migration`, wired through a
+        // user-managed `sql({ context })` so the closure can build a typed
+        // query plan and the factory can assert contract-hash consistency.
+        const manifestInitial = JSON.parse(
+          readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+        );
         const migrationTs = `
-import { createBuilders } from "@prisma-next/target-postgres/migration-builders"
+import { Migration } from '@prisma-next/family-sql/migration';
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import { addColumn, dataTransform } from '@prisma-next/target-postgres/migration';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import contract from './contract.json' with { type: 'json' };
 
-const { addColumn, dataTransform } = createBuilders()
-
-export default () => [
-  addColumn("user", "name"),
-  dataTransform("backfill-user-name", {
-    check: false,
-    run: (db) => db.user.update({ name: "unknown" }).where((f, fns) => fns.eq(f.name, null)),
+const db = sql({
+  context: createExecutionContext({
+    contract,
+    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
-]
+});
+
+class M extends Migration {
+  override describe() {
+    return { from: ${JSON.stringify(manifestInitial.from)}, to: ${JSON.stringify(manifestInitial.to)} };
+  }
+
+  override get operations() {
+    return [
+      addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
+      dataTransform(contract, 'backfill-user-name', {
+        run: () => db.user.update({ name: 'unknown' }).where((f, fns) => fns.eq(f.name, null)),
+      }),
+    ];
+  }
+}
+
+export default M;
+Migration.run(import.meta.url, M);
 `;
         writeFileSync(migrationTsPath, migrationTs);
 
