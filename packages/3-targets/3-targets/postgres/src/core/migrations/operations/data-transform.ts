@@ -3,10 +3,10 @@
  * surface. Invoked directly inside a `migration.ts` file:
  *
  * ```ts
- * import contract from './contract.json' with { type: 'json' };
+ * import endContract from './end-contract.json' with { type: 'json' };
  * import { dataTransform } from '@prisma-next/target-postgres/migration';
  *
- * dataTransform(contract, 'backfill emails', {
+ * dataTransform(endContract, 'backfill emails', {
  *   check: () => db.users.count().where(({ email }) => email.isNull()),
  *   run:   () => db.users.update({ email: '' }).where(({ email }) => email.isNull()),
  * });

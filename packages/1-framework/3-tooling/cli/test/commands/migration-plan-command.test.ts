@@ -348,12 +348,12 @@ describe('migration plan command', () => {
       expect(mocks.copyFilesWithRename).toHaveBeenCalledTimes(1);
       const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
       expect(destinationFiles).toEqual([
-        { sourcePath: '/tmp/test/contract.json', destName: 'contract.json' },
-        { sourcePath: '/tmp/test/contract.d.ts', destName: 'contract.d.ts' },
+        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
+        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
       ]);
     });
 
-    it('copies both destination contract.* and from-contract.* when there is a prior migration', async () => {
+    it('copies both destination end-contract.* and start-contract.* when there is a prior migration', async () => {
       setupBaseConfig();
       const OLD_HASH = 'sha256:old-hash';
       const NEW_HASH = 'sha256:new-hash';
@@ -390,17 +390,17 @@ describe('migration plan command', () => {
       const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
       const [, sourceFiles] = mocks.copyFilesWithRename.mock.calls[1]!;
       expect(destinationFiles).toEqual([
-        { sourcePath: '/tmp/test/contract.json', destName: 'contract.json' },
-        { sourcePath: '/tmp/test/contract.d.ts', destName: 'contract.d.ts' },
+        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
+        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
       ]);
       expect(sourceFiles).toEqual([
         {
-          sourcePath: '/tmp/test/migrations/20260301T0900_prev/contract.json',
-          destName: 'from-contract.json',
+          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.json',
+          destName: 'start-contract.json',
         },
         {
-          sourcePath: '/tmp/test/migrations/20260301T0900_prev/contract.d.ts',
-          destName: 'from-contract.d.ts',
+          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.d.ts',
+          destName: 'start-contract.d.ts',
         },
       ]);
     });

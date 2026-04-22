@@ -121,11 +121,11 @@ import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { Migration, addColumn, dataTransform, setNotNull } from '@prisma-next/target-postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import contract from './contract.json' with { type: 'json' };
+import endContract from './end-contract.json' with { type: 'json' };
 
 const db = sql({
   context: createExecutionContext({
-    contract,
+    contract: endContract,
     stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
 });
@@ -138,7 +138,7 @@ export default class M extends Migration {
   override get operations() {
     return [
       addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
-      dataTransform(contract, 'backfill-user-name', {
+      dataTransform(endContract, 'backfill-user-name', {
         check: () => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
         run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),

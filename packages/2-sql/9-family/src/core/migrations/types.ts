@@ -174,8 +174,8 @@ export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlan
  *
  * Mirrors `AnyMongoMigrationOperation` in shape — the runner already handles
  * both branches via `isDataTransformOperation`, and authored `migration.ts`
- * files must be able to intermix `dataTransform(contract, …)` calls with DDL
- * factory calls (e.g. `setNotNull(…)`) in a single `operations` array.
+ * files must be able to intermix `dataTransform(endContract, …)` calls with
+ * DDL factory calls (e.g. `setNotNull(…)`) in a single `operations` array.
  */
 export type AnySqlMigrationOperation<TTargetDetails> =
   | SqlMigrationPlanOperation<TTargetDetails>

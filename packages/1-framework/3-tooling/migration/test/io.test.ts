@@ -368,7 +368,7 @@ describe('copyFilesWithRename', () => {
     expect(await readFile(join(destDir, 'contract.d.ts'), 'utf-8')).toBe(dtsPayload);
   });
 
-  it('renames destination filenames according to destName (source → from-contract.*)', async () => {
+  it('renames destination filenames according to destName (source → start-contract.*)', async () => {
     const sourceDir = join(tmpDir, 'src/prisma');
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
@@ -379,12 +379,12 @@ describe('copyFilesWithRename', () => {
     const destDir = join(tmpDir, 'migrations/20260225T1430_renamed');
 
     await copyFilesWithRename(destDir, [
-      { sourcePath: sourceJson, destName: 'from-contract.json' },
-      { sourcePath: sourceDts, destName: 'from-contract.d.ts' },
+      { sourcePath: sourceJson, destName: 'start-contract.json' },
+      { sourcePath: sourceDts, destName: 'start-contract.d.ts' },
     ]);
 
-    expect(await readFile(join(destDir, 'from-contract.json'), 'utf-8')).toBe('{"renamed":true}');
-    expect(await readFile(join(destDir, 'from-contract.d.ts'), 'utf-8')).toBe('// dts');
+    expect(await readFile(join(destDir, 'start-contract.json'), 'utf-8')).toBe('{"renamed":true}');
+    expect(await readFile(join(destDir, 'start-contract.d.ts'), 'utf-8')).toBe('// dts');
   });
 
   it('creates the destination directory if it does not already exist', async () => {

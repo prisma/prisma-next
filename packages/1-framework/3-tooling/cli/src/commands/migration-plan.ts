@@ -386,18 +386,18 @@ async function executeMigrationPlanCommand(
     // artifacts for the source contract.
     const contractDtsAbsolute = `${contractPathAbsolute.slice(0, -'.json'.length)}.d.ts`;
     await copyFilesWithRename(packageDir, [
-      { sourcePath: contractPathAbsolute, destName: 'contract.json' },
-      { sourcePath: contractDtsAbsolute, destName: 'contract.d.ts' },
+      { sourcePath: contractPathAbsolute, destName: 'end-contract.json' },
+      { sourcePath: contractDtsAbsolute, destName: 'end-contract.d.ts' },
     ]);
     if (fromContractSourceDir !== null) {
       await copyFilesWithRename(packageDir, [
         {
-          sourcePath: join(fromContractSourceDir, 'contract.json'),
-          destName: 'from-contract.json',
+          sourcePath: join(fromContractSourceDir, 'end-contract.json'),
+          destName: 'start-contract.json',
         },
         {
-          sourcePath: join(fromContractSourceDir, 'contract.d.ts'),
-          destName: 'from-contract.d.ts',
+          sourcePath: join(fromContractSourceDir, 'end-contract.d.ts'),
+          destName: 'start-contract.d.ts',
         },
       ]);
     }

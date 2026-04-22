@@ -793,7 +793,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     return [
-      `dataTransform(contract, ${jsonToTsSource(this.label)}, {`,
+      `dataTransform(endContract, ${jsonToTsSource(this.label)}, {`,
       `  check: () => placeholder(${jsonToTsSource(this.checkSlot)}),`,
       `  run: () => placeholder(${jsonToTsSource(this.runSlot)}),`,
       '})',
@@ -808,8 +808,8 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
       // entrypoint.
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
       {
-        moduleSpecifier: './contract.json',
-        symbol: 'contract',
+        moduleSpecifier: './end-contract.json',
+        symbol: 'endContract',
         kind: 'default',
         attributes: { type: 'json' },
       },

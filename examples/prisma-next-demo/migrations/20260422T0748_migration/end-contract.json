@@ -116,12 +116,8 @@
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
+            "localFields": ["userId"],
+            "targetFields": ["id"]
           },
           "to": "User"
         }
@@ -209,12 +205,8 @@
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
+            "localFields": ["userId"],
+            "targetFields": ["id"]
           },
           "to": "User"
         }
@@ -271,7 +263,7 @@
           }
         },
         "displayName": {
-          "nullable": true,
+          "nullable": false,
           "type": {
             "codecId": "pg/text@1",
             "kind": "scalar"
@@ -306,24 +298,16 @@
         "posts": {
           "cardinality": "1:N",
           "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
+            "localFields": ["id"],
+            "targetFields": ["userId"]
           },
           "to": "Post"
         },
         "tasks": {
           "cardinality": "1:N",
           "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
+            "localFields": ["id"],
+            "targetFields": ["userId"]
           },
           "to": "Task"
         }
@@ -388,7 +372,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69",
+    "storageHash": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
     "tables": {
       "bug": {
         "columns": {
@@ -462,24 +446,18 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
+            "columns": ["userId"],
             "constraint": true,
             "index": true,
             "references": {
-              "columns": [
-                "id"
-              ],
+              "columns": ["id"],
               "table": "user"
             }
           }
         ],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       },
@@ -534,24 +512,18 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
+            "columns": ["userId"],
             "constraint": true,
             "index": true,
             "references": {
-              "columns": [
-                "id"
-              ],
+              "columns": ["id"],
               "table": "user"
             }
           }
         ],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       },
@@ -574,7 +546,7 @@
           "displayName": {
             "codecId": "pg/text@1",
             "nativeType": "text",
-            "nullable": true
+            "nullable": false
           },
           "email": {
             "codecId": "pg/text@1",
@@ -599,9 +571,7 @@
         "foreignKeys": [],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       }
@@ -618,10 +588,7 @@
         "codecId": "pg/enum@1",
         "nativeType": "user_type",
         "typeParams": {
-          "values": [
-            "admin",
-            "user"
-          ]
+          "values": ["admin", "user"]
         }
       }
     }

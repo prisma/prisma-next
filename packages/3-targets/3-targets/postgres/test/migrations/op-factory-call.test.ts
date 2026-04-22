@@ -120,12 +120,12 @@ describe('Postgres call classes', () => {
       );
     });
 
-    it('DataTransformCall renders slots as placeholder closures and imports factory + placeholder + contract', () => {
+    it('DataTransformCall renders slots as placeholder closures and imports factory + placeholder + endContract', () => {
       const call = new DataTransformCall('Backfill', 'check', 'run');
 
       expect(call.renderTypeScript()).toBe(
         [
-          'dataTransform(contract, "Backfill", {',
+          'dataTransform(endContract, "Backfill", {',
           '  check: () => placeholder("check"),',
           '  run: () => placeholder("run"),',
           '})',
@@ -135,8 +135,8 @@ describe('Postgres call classes', () => {
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'placeholder' },
         {
-          moduleSpecifier: './contract.json',
-          symbol: 'contract',
+          moduleSpecifier: './end-contract.json',
+          symbol: 'endContract',
           kind: 'default',
           attributes: { type: 'json' },
         },
@@ -395,7 +395,7 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain('createIndex(');
   });
 
-  it('emits DataTransformCall slots as placeholder closures and contributes placeholder + contract imports', () => {
+  it('emits DataTransformCall slots as placeholder closures and contributes placeholder + endContract imports', () => {
     const calls = [new DataTransformCall('Backfill user emails', 'check-emails', 'run-emails')];
 
     const source = renderCallsToTypeScript(calls, META);
@@ -406,10 +406,12 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain(
       "import { Migration, dataTransform, placeholder } from '@prisma-next/target-postgres/migration';",
     );
-    expect(source).toContain('import contract from \'./contract.json\' with { type: "json" };');
+    expect(source).toContain(
+      'import endContract from \'./end-contract.json\' with { type: "json" };',
+    );
     expect(source).toContain(
       [
-        '      dataTransform(contract, "Backfill user emails", {',
+        '      dataTransform(endContract, "Backfill user emails", {',
         '        check: () => placeholder("check-emails"),',
         '        run: () => placeholder("run-emails"),',
         '      })',

@@ -76,12 +76,8 @@
         "author": {
           "cardinality": "N:1",
           "on": {
-            "localFields": [
-              "authorId"
-            ],
-            "targetFields": [
-              "_id"
-            ]
+            "localFields": ["authorId"],
+            "targetFields": ["_id"]
           },
           "to": "User"
         }
@@ -163,12 +159,8 @@
         "posts": {
           "cardinality": "1:N",
           "on": {
-            "localFields": [
-              "_id"
-            ],
-            "targetFields": [
-              "authorId"
-            ]
+            "localFields": ["_id"],
+            "targetFields": ["authorId"]
           },
           "to": "Post"
         }
@@ -223,9 +215,7 @@
                 "bsonType": "string"
               }
             },
-            "required": [
-              "summary"
-            ]
+            "required": ["summary"]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -255,14 +245,7 @@
                 "bsonType": "string"
               }
             },
-            "required": [
-              "_id",
-              "authorId",
-              "content",
-              "createdAt",
-              "kind",
-              "title"
-            ]
+            "required": ["_id", "authorId", "content", "createdAt", "kind", "title"]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -280,10 +263,7 @@
                 "bsonType": "int"
               }
             },
-            "required": [
-              "difficulty",
-              "duration"
-            ]
+            "required": ["difficulty", "duration"]
           },
           "validationAction": "error",
           "validationLevel": "strict"
@@ -315,25 +295,15 @@
                         "bsonType": "string"
                       },
                       "zip": {
-                        "bsonType": [
-                          "null",
-                          "string"
-                        ]
+                        "bsonType": ["null", "string"]
                       }
                     },
-                    "required": [
-                      "city",
-                      "country",
-                      "street"
-                    ]
+                    "required": ["city", "country", "street"]
                   }
                 ]
               },
               "bio": {
-                "bsonType": [
-                  "null",
-                  "string"
-                ]
+                "bsonType": ["null", "string"]
               },
               "email": {
                 "bsonType": "string"
@@ -342,11 +312,7 @@
                 "bsonType": "string"
               }
             },
-            "required": [
-              "_id",
-              "email",
-              "name"
-            ]
+            "required": ["_id", "email", "name"]
           },
           "validationAction": "error",
           "validationLevel": "strict"
