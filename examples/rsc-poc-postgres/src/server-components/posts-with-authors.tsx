@@ -17,11 +17,12 @@ import { getDb } from '../lib/db';
  */
 export interface PostsWithAuthorsProps {
   readonly verifyMode: VerifyMode;
+  readonly poolMax?: number | undefined;
   readonly limit?: number;
 }
 
-export async function PostsWithAuthors({ verifyMode, limit = 10 }: PostsWithAuthorsProps) {
-  const db = getDb({ verifyMode });
+export async function PostsWithAuthors({ verifyMode, poolMax, limit = 10 }: PostsWithAuthorsProps) {
+  const db = getDb({ verifyMode, poolMax });
   const posts = await db.orm.Post.select('id', 'title', 'userId', 'createdAt')
     .include('user', (user) => user.select('id', 'email', 'kind'))
     .orderBy([(post) => post.createdAt.desc(), (post) => post.id.asc()])

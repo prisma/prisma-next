@@ -103,8 +103,13 @@ function instrumentPoolClient(client: PoolClient, verifyMode: VerifyMode): PoolC
  * so it satisfies `resolvePostgresBinding()`'s instance check.
  *
  * Observations:
- * - `connect()` is overridden to count acquires and instrument the returned
- *   client's `query` method.
+ * - `connect()` is overridden to count **successful** acquires (after the
+ *   promise resolves) and instrument the returned client's `query` method.
+ *   Counting before `super.connect()` resolved would inflate acquires by
+ *   the number of pool-timeout rejections, breaking the `acquires ==
+ *   releases` invariant on any run that exceeds pool capacity — see
+ *   `/stress/spike` under `poolMax: 10` where dozens of connects time out
+ *   with `connectionTimeoutMillis: 5000` and never deliver a client.
  * - Releases are counted via the pool's `'release'` event (emitted by
  *   `pg-pool`'s internal `_release()` on every checkin), so we stay robust
  *   against `pg-pool` reassigning `client.release` on each acquire.
@@ -125,7 +130,13 @@ export class InstrumentedPool extends PgPool {
   }
 
   override connect(): Promise<PoolClient> {
-    recordConnectionAcquire(this.#verifyMode);
-    return super.connect().then((client) => instrumentPoolClient(client, this.#verifyMode));
+    return super.connect().then((client) => {
+      // Count only after `super.connect()` resolves. If it rejects (pool
+      // timeout), no client was delivered and no `'release'` will ever
+      // fire — bumping the counter on entry would desync
+      // acquires/releases permanently for the remainder of the process.
+      recordConnectionAcquire(this.#verifyMode);
+      return instrumentPoolClient(client, this.#verifyMode);
+    });
   }
 }

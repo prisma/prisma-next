@@ -26,11 +26,16 @@ import type { Contract } from '../prisma/contract.d';
  */
 export interface SimilarPostsSampleProps {
   readonly verifyMode: VerifyMode;
+  readonly poolMax?: number | undefined;
   readonly limit?: number;
 }
 
-export async function SimilarPostsSample({ verifyMode, limit = 5 }: SimilarPostsSampleProps) {
-  const db = getDb({ verifyMode });
+export async function SimilarPostsSample({
+  verifyMode,
+  poolMax,
+  limit = 5,
+}: SimilarPostsSampleProps) {
+  const db = getDb({ verifyMode, poolMax });
 
   const seed = await db.orm.Post.select('id', 'title', 'embedding')
     .orderBy((post) => post.createdAt.asc())

@@ -72,14 +72,20 @@ export interface DbOptions {
    * `@prisma-next/postgres` default). The `/stress/always` route uses
    * `'always'` to reproduce hypothesis H3 (skipped-verification under
    * concurrency).
+   *
+   * Explicit `undefined` is accepted (with `exactOptionalPropertyTypes`) so
+   * pass-through call sites like `getDb({ verifyMode: props.verifyMode })`
+   * don't need conditional-spread boilerplate.
    */
-  readonly verifyMode?: VerifyMode;
+  readonly verifyMode?: VerifyMode | undefined;
   /**
    * Max pg pool size. The `pool-pressure` stress scenario uses a small value
    * (e.g. 5) to characterize hypothesis H4 (pool contention under RSC
    * concurrency). Defaults to 10 to match pg's default.
+   *
+   * Explicit `undefined` is accepted; see `verifyMode` above.
    */
-  readonly poolMax?: number;
+  readonly poolMax?: number | undefined;
 }
 
 function registryKey(verifyMode: VerifyMode, poolMax: number): string {

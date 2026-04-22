@@ -17,11 +17,16 @@ import { getDb } from '../lib/db';
  */
 export interface UserKindBreakdownProps {
   readonly verifyMode: VerifyMode;
+  readonly poolMax?: number | undefined;
   readonly minUsers?: number;
 }
 
-export async function UserKindBreakdown({ verifyMode, minUsers = 1 }: UserKindBreakdownProps) {
-  const db = getDb({ verifyMode });
+export async function UserKindBreakdown({
+  verifyMode,
+  poolMax,
+  minUsers = 1,
+}: UserKindBreakdownProps) {
+  const db = getDb({ verifyMode, poolMax });
   const grouped = await db.orm.User.groupBy('kind')
     .having((having) => having.count().gte(minUsers))
     .aggregate((aggregate) => ({

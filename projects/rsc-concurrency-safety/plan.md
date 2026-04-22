@@ -50,23 +50,49 @@ telemetry. Results are correct; the wasted roundtrips are a real bug worth
 fixing (dedupe in-flight verification via a shared promise). Severity:
 low-to-moderate, not a correctness violation.
 
-### H3 — `verified` / `startupVerified` in `always` mode: **real correctness bug**
-In `verify.mode === 'always'`, the method sets `this.verified = false` at
-entry, then awaits the marker read, then sets `this.verified = true`.
-Interleaving:
+### H3 — `verified` / `startupVerified` in `always` mode: **likely a non-issue** (revised)
 
-1. Query A: `verified = false`
-2. Query B: `verified = false`
-3. Query A: marker read → `verified = true`
-4. Query B: checks `if (this.verified) return` → **skips its own
-   verification**
+Original claim: under concurrent execution, one query flips
+`this.verified = true` between another query's `this.verified = false`
+reset and its own `if (this.verified) return` check, causing the second
+query to skip verification.
 
-This violates the `always` contract (every execution must verify). Severity
-depends on the semantics users rely on for `always`; at minimum it's a
-surprising silent violation.
+Re-reading `verifyPlanIfNeeded` against the proposed interleaving, the
+claim doesn't hold:
 
-**Expected outcome:** reproducible under load. Correctness violation, not
-just wasted work.
+```ts
+private async verifyPlanIfNeeded(_plan: ExecutionPlan): Promise<void> {
+  if (this.verify.mode === 'always') {
+    this.verified = false;          // (1) unconditional reset
+  }
+  if (this.verified) {              // (2) synchronous check on same tick
+    return;
+  }
+  ...
+  await driver.query(...)            // (3) first await
+  ...
+  this.verified = true;
+}
+```
+
+Lines (1) and (2) are synchronous; there is no `await` between them. In
+`always` mode every entry *unconditionally* sets `verified = false` and
+then immediately checks it, so the early-return at (2) is unreachable in
+`always` mode regardless of what any concurrent caller does to the flag.
+The flag can be flipped by a peer between (2) and (3) or between (3)
+and the final `this.verified = true`, but `always` mode doesn't read it
+again on this path — it just proceeds to verify.
+
+**Revised expected outcome:** `markerReads === queryCount` under
+concurrency in `always` mode. No skipped verifications, no correctness
+bug. The `/stress/always` route and its integration test become an
+**invariant test** (lock in the expected equality) rather than a
+regression reproducer.
+
+If the test surprisingly fails under real load — e.g. the interleaving
+produces some other skip I didn't anticipate — update this hypothesis
+and the findings doc accordingly. Part of the PoC's value is that
+running the code tells us what reading the code can't.
 
 ### H4 — Connection pool pressure is a sizing/liveness concern, not a safety bug
 5 parallel Server Components × N concurrent requests contend for the pg
@@ -97,6 +123,15 @@ different things on purpose.
 
 ### 3.1 Two Next.js 16 App Router apps
 
+Note on revised H3 (see §2): the `/stress/always` route and associated
+test below were originally designed to **reproduce** a predicted race.
+After re-reading the source, the race doesn't hold. The route and test
+are kept as-is because they still have value — they lock in the
+equality `markerReads === queryCount` as an invariant, and they provide
+the direct apples-to-apples comparison to the onFirstUse path (which
+*does* exhibit the benign H2 behavior). Treat them as invariant
+confirmations, not race reproducers.
+
 Both live under `examples/` so they survive project close-out.
 
 ```
@@ -113,7 +148,8 @@ Each app:
 - 5 parallel Server Components on `/` covering a **mix** of code paths
   (ORM + SQL DSL + includes + raw reads; see §4).
 - `/stress/always` route (Postgres only): same page but with the runtime
-  pinned to `verify.mode === 'always'` to reproduce H3.
+  pinned to `verify.mode === 'always'` to confirm the revised H3 —
+  `markerReads === queryCount` under concurrency.
 - One Server Action (`POST`-style): proves mutations alongside concurrent
   reads don't explode (ticket says reads; we agreed to add one smoke
   action).
@@ -143,21 +179,21 @@ Scripts emit JSON summaries we can commit as reference output.
 
 ### 3.3 One integration test (Postgres)
 
-`examples/rsc-poc-postgres/test/always-mode-race.test.ts`
+`examples/rsc-poc-postgres/test/always-mode-invariant.test.ts`
 
-Asserts the one race we can predict up-front (H3):
+Asserts the H3 invariant (revised):
 
 > When `verify.mode === 'always'` and K concurrent queries share a runtime,
 > the number of verification marker reads **equals** K.
 
-Implemented by counting marker-read statements via a spy driver (or the
-telemetry middleware + a pg-query-capture hook — pick the lighter one
-during implementation). If the test passes, we've reproduced the bug; if
-it fails, H3 was wrong and we update the findings doc.
+Implemented against the running app's `/diag` endpoint so the assertion
+runs against the real pool + real runtime + real RSC rendering, not a
+mock. If the invariant holds (expected), the test locks it in as a
+regression guard. If it fails, the findings doc gets a new surprise to
+document and H3 gets revised again.
 
 Observational output remains the primary deliverable per §3.1; this test
-exists specifically to lock in one predicted invariant so regressions are
-caught later.
+exists specifically to pin the invariant.
 
 ### 3.4 Findings doc (final)
 
@@ -174,11 +210,17 @@ covering:
 
 ### 3.5 ADR (conditional)
 
-If H3 reproduces and the fix isn't trivial (e.g. it requires changing the
-semantics of `verify.mode === 'always'` or introducing a mutex/ticket around
-verification), draft an ADR under
-`projects/rsc-concurrency-safety/adr-draft-verification-concurrency.md` and
+The revised H3 expects no correctness bug in `always` mode, so the most
+likely driver of an ADR is now **H2**: the redundant cold-start marker
+reads are wasted work that users will file as a bug. A simple fix
+(dedupe in-flight verification via a shared promise) resolves it
+cleanly. If the PoC confirms H2 and the team agrees on the fix, draft
+an ADR under
+`projects/rsc-concurrency-safety/adr-draft-verification-dedupe.md` and
 migrate to `docs/architecture docs/adrs/` at close-out.
+
+If the PoC turns up something genuinely surprising (e.g. a new race
+the source-level re-reading didn't catch), the ADR covers that instead.
 
 ## 4. The 5 Server Components (shape)
 
@@ -214,7 +256,7 @@ Explicit non-goals so reviewers don't ask:
 
 | Risk | Mitigation |
 |---|---|
-| H3 does not reproduce under k6 load | Add a deterministic test with `setImmediate`/manual scheduling to force interleaving; if still absent, update H3. |
+| H3 invariant unexpectedly fails (`markerReads !== queryCount`) | Capture the failing counts and revisit whether there's a newly-identified race or an instrumentation bug. Update H3 and the findings doc. |
 | pg driver's own internal serialization hides the race | Inspect `@prisma-next/driver-postgres` to confirm whether queries are serialized per connection; design stress to use N connections. |
 | Next.js 16 churn: RSC semantics / caching defaults shift under us during the PoC | Pin a specific Next.js 16 minor; document version in each app's README. |
 | "Telemetry counting" conflates retries, middleware hooks, and actual marker reads | Count at the driver level (spy), not at middleware level, for the H3 assertion. |
@@ -231,9 +273,10 @@ Each bullet is a candidate PR. Branches off `tml-2164-rsc-concurrency-safety-poc
    Server Component, `globalThis` singleton, dev-only diag panel, READMEs.
    Reuses `prisma-next-demo`'s contract/schema to avoid re-writing it.
 3. **Postgres: 5 Server Components + Server Action** — the actual page.
-4. **Postgres: `/stress/always` route + k6 scripts** — reproduce H3
-   observationally.
-5. **Postgres: integration test for H3** — deterministic assertion.
+4. **Postgres: `/stress/always` route + k6 scripts** — confirm the H3
+   invariant observationally.
+5. **Postgres: integration test for H3 invariant** — assert
+   `markerReads === queryCount` in `always` mode under concurrency.
 6. **Mongo app scaffold** — `examples/rsc-poc-mongo/`, reusing
    `retail-store`'s contract/seed.
 7. **Mongo: 5 Server Components + Server Action + k6 scripts**.

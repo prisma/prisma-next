@@ -14,11 +14,12 @@ import { getDb } from '../lib/db';
  */
 export interface TopUsersProps {
   readonly verifyMode: VerifyMode;
+  readonly poolMax?: number | undefined;
   readonly limit?: number;
 }
 
-export async function TopUsers({ verifyMode, limit = 10 }: TopUsersProps) {
-  const db = getDb({ verifyMode });
+export async function TopUsers({ verifyMode, poolMax, limit = 10 }: TopUsersProps) {
+  const db = getDb({ verifyMode, poolMax });
   const users = await db.orm.User.orderBy((user) => user.createdAt.desc())
     .select('id', 'email', 'kind', 'createdAt')
     .take(limit)

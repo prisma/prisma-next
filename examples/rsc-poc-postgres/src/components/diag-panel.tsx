@@ -31,12 +31,12 @@ import { snapshot } from '../lib/diag';
  */
 export interface DiagPanelProps {
   readonly verifyMode: VerifyMode;
-  readonly poolMax?: number;
+  readonly poolMax?: number | undefined;
 }
 
 export function DiagPanel({ verifyMode, poolMax }: DiagPanelProps) {
   const snap = snapshot(verifyMode);
-  const pool = getPool({ verifyMode, ...(poolMax !== undefined ? { poolMax } : {}) });
+  const pool = getPool({ verifyMode, poolMax });
 
   const totalCount = pool?.totalCount ?? 0;
   const idleCount = pool?.idleCount ?? 0;

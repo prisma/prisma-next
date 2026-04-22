@@ -103,9 +103,12 @@ Plus **`<CreatePostForm />`** (client component) + `createPostAction`
 can coexist on the shared runtime. Not exercised by k6; test by hand from
 the browser.
 
-## Observed behavior (initial manual run)
+## Observed behavior
 
-First request after process start (pool default `max: 10`):
+Numbers below come from single runs on a local pgvector/pg17 container;
+they're illustrative, not benchmarks.
+
+### Cold start (any route, first request)
 
 ```
 markerReads: 5, connectionAcquires: 11, connectionReleases: 11
@@ -114,15 +117,61 @@ markerReads: 5, connectionAcquires: 11, connectionReleases: 11
 Five marker reads for five parallel components on cold start **confirms
 hypothesis H2** — each of the five concurrent components raced through
 `verifyPlanIfNeeded()` before any of them flipped `verified` to true.
-Subsequent requests show `markerReads: 5` remaining constant, as expected.
+Subsequent requests show `markerReads: 5` remaining constant (the
+`onFirstUse` contract holds after first flip).
 
-Under 10 parallel page requests, `connectionAcquires` and
-`connectionReleases` remain balanced; pool grows to its `max` but no
-requests wait. No runtime errors logged.
+### Baseline — `/` @ 10 VUs × 30s (`onFirstUse`, `poolMax: 10`)
 
-These are observations from a single-session manual run, not a formal
-benchmark. The k6 scripts in a later PR replace this with reproducible
-measurements.
+```
+iterations:     8,850 over 30s (~295 req/s)
+markerReads Δ:  0          # runtime already warm
+acquires Δ:     53,100     # 6 per request × 8,850
+releases Δ:     53,100     # balanced
+pool final:     10 total / 10 idle / 0 waiting
+errors:         0
+```
+
+### Spike — `/stress/always` @ 50 VUs × 30s (`always`, `poolMax: 10`)
+
+```
+iterations:     ~240 over 30s (~8 req/s)
+markerReads Δ:  266        # every execute verifies, as always-mode promises
+acquires Δ:     447
+releases Δ:     447        # balanced
+pool final:     10 total / 10 idle / 0 waiting
+pg timeouts:    thousands  # expected under this pressure on poolMax=10
+```
+
+Throughput collapses relative to baseline because every query carries an
+extra marker-read round-trip in `always` mode — this is the whole point
+of `always`. The invariant `acquiresΔ == releasesΔ` **holds** under the
+predicted race window for H3; the integration test in the next PR pins
+it more precisely.
+
+### Pool pressure — `/stress/pool-pressure` ramp 1→100 VUs × 50s (`onFirstUse`, `poolMax: 5`)
+
+```
+iterations:     15,571 over 50s (~311 req/s)
+markerReads Δ:  5          # cold start for this route's own runtime
+acquires Δ:     93,431
+releases Δ:     93,431     # still balanced at 100 VUs on poolMax: 5
+pg timeouts:    0          # with fast queries, queue drains in time
+```
+
+With the PoC's tiny seed dataset, queries return fast enough that a
+5-slot pool sustains 100 VUs without timeouts. Larger payloads, higher
+query latency, or higher RSC per-page concurrency would change the
+picture — this is the sizing observation H4 is about, not a safety bug.
+
+### One counter bug found by running this
+
+An earlier revision counted pool acquires *before* `super.connect()`
+resolved. Under the spike scenario, `pg`'s `connectionTimeoutMillis`
+rejected ~1,100 connects, so acquires outran releases by that delta.
+Fixed by counting only on successful resolve. The `'release'` event
+fires unconditionally from `pg-pool`'s `_release()` regardless of
+what's happening inside `client.release()`, so that path was already
+robust. See the comment block in `src/lib/pool.ts` for the gory details.
 
 ## Stress scripts
 

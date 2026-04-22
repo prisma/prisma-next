@@ -20,11 +20,12 @@ import { getDb } from '../lib/db';
  */
 export interface RecentPostsRawProps {
   readonly verifyMode: VerifyMode;
+  readonly poolMax?: number | undefined;
   readonly limit?: number;
 }
 
-export async function RecentPostsRaw({ verifyMode, limit = 10 }: RecentPostsRawProps) {
-  const db = getDb({ verifyMode });
+export async function RecentPostsRaw({ verifyMode, poolMax, limit = 10 }: RecentPostsRawProps) {
+  const db = getDb({ verifyMode, poolMax });
   const plan = db.sql.post
     .select('id', 'title', 'userId', 'createdAt')
     .orderBy('createdAt', { direction: 'desc' })
