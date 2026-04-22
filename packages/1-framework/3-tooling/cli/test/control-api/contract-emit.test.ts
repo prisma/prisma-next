@@ -265,6 +265,12 @@ describe('executeContractEmit', () => {
 
     await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
       const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      // Wait until the first call has issued its generation (reaching emit())
+      // before starting the second, otherwise parallel test load can swap the
+      // generation order between the two calls.
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(1);
+      });
       const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
 
       await eventually(() => {
@@ -301,16 +307,21 @@ describe('executeContractEmit', () => {
       .mockImplementationOnce(() => firstEmit.promise)
       .mockResolvedValueOnce(createEmitResult('newer'));
 
+    const localFs = await vi.importActual<FsModule>('node:fs/promises');
     mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
       const [path] = args;
       if (String(path).includes('.2.next.tmp')) {
         throw new Error('simulated newer generation write failure');
       }
-      return actualFs.writeFile(...args);
+      return localFs.writeFile(...args);
     });
 
     await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
       const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      // Same generation-order safeguard as in the previous test.
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(1);
+      });
       const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
 
       await eventually(() => {
