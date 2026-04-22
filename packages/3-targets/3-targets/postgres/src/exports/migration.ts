@@ -13,6 +13,11 @@ export {
   addUnique,
   dropConstraint,
 } from '../core/migrations/operations/constraints';
+export {
+  type DataTransformClosure,
+  type DataTransformOptions,
+  dataTransform,
+} from '../core/migrations/operations/data-transform';
 export { createExtension, createSchema } from '../core/migrations/operations/dependencies';
 export {
   addEnumValues,
