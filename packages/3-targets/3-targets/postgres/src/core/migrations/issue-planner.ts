@@ -654,7 +654,7 @@ const DEFAULT_POLICY: MigrationOperationPolicy = {
 };
 
 function emptySchemaIR(): SqlSchemaIR {
-  return { tables: {}, dependencies: [], types: {} } as SqlSchemaIR;
+  return { tables: {}, dependencies: [] };
 }
 
 function conflictKindForCall(call: PostgresOpFactoryCall): SqlPlannerConflict['kind'] {
