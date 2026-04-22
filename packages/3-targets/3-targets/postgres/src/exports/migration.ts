@@ -1,3 +1,8 @@
+// Re-exported so user-edited migration.ts files only need to depend on
+// `@prisma-next/target-postgres/migration` to fill in planner-emitted
+// `placeholder("…")` slots, instead of pulling in `@prisma-next/errors`
+// directly. The planner emits an import from this same module.
+export { placeholder } from '@prisma-next/errors/migration';
 export {
   addColumn,
   alterColumnType,

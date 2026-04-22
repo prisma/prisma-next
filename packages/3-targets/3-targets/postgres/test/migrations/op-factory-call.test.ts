@@ -133,7 +133,7 @@ describe('Postgres call classes', () => {
       );
       expect(call.importRequirements()).toEqual([
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
-        { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
+        { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'placeholder' },
         {
           moduleSpecifier: './contract.json',
           symbol: 'contract',
@@ -399,7 +399,11 @@ describe('renderCallsToTypeScript', () => {
 
     const source = renderCallsToTypeScript(calls, META);
 
-    expect(source).toContain("import { placeholder } from '@prisma-next/errors/migration';");
+    // dataTransform + placeholder are merged into a single import from
+    // the target's migration entrypoint (see DataTransformCall).
+    expect(source).toContain(
+      "import { dataTransform, placeholder } from '@prisma-next/target-postgres/migration';",
+    );
     expect(source).toContain('import contract from \'./contract.json\' with { type: "json" };');
     expect(source).toContain(
       [
