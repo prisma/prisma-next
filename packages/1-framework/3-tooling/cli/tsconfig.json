@@ -3,7 +3,8 @@
   "compilerOptions": {
     "rootDir": ".",
     "outDir": "dist",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "lib": ["ES2024"]
   },
   "include": ["src/**/*.ts", "test/**/*.ts"],
   "exclude": ["dist"]
