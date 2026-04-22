@@ -155,6 +155,16 @@ withTempDir(({ createTempDir }) => {
            WHERE table_schema = 'public' AND table_name = 'user' AND column_name = 'name'`,
         );
         expect(colInfo.rows).toEqual([{ is_nullable: 'NO' }]);
+
+        // Re-apply must be a no-op: the marker advanced past this
+        // migration and the dataTransform op is idempotency-skipped
+        // because its `check` query now returns 0 rows (all NULLs
+        // were backfilled by the first apply). Pins both the
+        // runner's marker-CAS ledger advance and the data-transform
+        // check-driven skip path (spec AC4.2 idempotency half).
+        const reapply = await runMigrationApply(ctx);
+        expect(reapply.exitCode, `reapply: ${reapply.stdout}\n${reapply.stderr}`).toBe(0);
+        expect(reapply.stdout).toContain('Already up to date');
       },
       timeouts.spinUpPpgDev,
     );
