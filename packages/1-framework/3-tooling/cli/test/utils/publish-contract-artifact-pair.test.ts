@@ -1,8 +1,6 @@
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { publishContractArtifactPair } from '../../src/utils/publish-contract-artifact-pair';
 
 vi.mock('node:fs/promises', async () => {
   const actual = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
@@ -13,31 +11,37 @@ vi.mock('node:fs/promises', async () => {
   };
 });
 
-type FsWriteFile = typeof import('node:fs/promises')['writeFile'];
-
-const mockedRename = vi.mocked(rename);
-const mockedWriteFile = vi.mocked(writeFile);
+type FsPromisesModule = typeof import('node:fs/promises');
 
 describe('publishContractArtifactPair', () => {
   let tmpDir = '';
+  let actualFs: FsPromisesModule;
+  let mockedFs: FsPromisesModule;
+  let publishContractArtifactPair: typeof import('../../src/utils/publish-contract-artifact-pair')['publishContractArtifactPair'];
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'publish-contract-artifacts-'));
-    mockedRename.mockReset();
-    mockedWriteFile.mockReset();
+    vi.restoreAllMocks();
+    vi.resetModules();
 
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) =>
-      actualFs.rename(...args),
-    );
-    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) =>
+    actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedFs = await import('node:fs/promises');
+    ({ publishContractArtifactPair } = await import(
+      '../../src/utils/publish-contract-artifact-pair'
+    ));
+
+    vi.mocked(mockedFs.rename).mockReset();
+    vi.mocked(mockedFs.writeFile).mockReset();
+    vi.mocked(mockedFs.rename).mockImplementation(async (...args) => actualFs.rename(...args));
+    vi.mocked(mockedFs.writeFile).mockImplementation(async (...args) =>
       actualFs.writeFile(...args),
     );
+
+    tmpDir = await actualFs.mkdtemp(join(tmpdir(), 'publish-contract-artifacts-'));
   });
 
   afterEach(async () => {
     if (tmpDir.length > 0) {
-      await rm(tmpDir, { recursive: true, force: true });
+      await actualFs.rm(tmpDir, { recursive: true, force: true });
     }
     vi.restoreAllMocks();
   });
@@ -50,18 +54,18 @@ describe('publishContractArtifactPair', () => {
     const nextJson = JSON.stringify({ generation: 'next' });
     const nextDts = "export type Generation = 'next';\n";
 
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
+    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
+    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
 
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    const mockedRename = vi.mocked(mockedFs.rename);
     const snapshots: Array<{
       readonly json: string | undefined;
       readonly dts: string | undefined;
       readonly to: string;
     }> = [];
 
-    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) => {
+    mockedRename.mockImplementation(async (...args) => {
       const [, to] = args;
       await actualFs.rename(...args);
 
@@ -111,12 +115,12 @@ describe('publishContractArtifactPair', () => {
     const previousJson = JSON.stringify({ generation: 'previous' });
     const previousDts = "export type Generation = 'previous';\n";
 
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
+    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
+    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
 
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
-    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
+    const mockedWriteFile = vi.mocked(mockedFs.writeFile);
+    mockedWriteFile.mockImplementation(async (...args) => {
       const [path] = args;
       if (String(path).includes('contract.d.ts') && String(path).includes('.next.tmp')) {
         throw new Error('simulated dts write failure');
@@ -134,7 +138,7 @@ describe('publishContractArtifactPair', () => {
       }),
     ).rejects.toThrow('simulated dts write failure');
 
-    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
   }, 1000);
 });

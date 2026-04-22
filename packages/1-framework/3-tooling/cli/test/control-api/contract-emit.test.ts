@@ -8,6 +8,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as configLoader from '../../src/config-loader';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
 
+interface PromiseResolvers<T> {
+  promise: Promise<T>;
+  resolve: (value: T | PromiseLike<T>) => void;
+  reject: (reason?: unknown) => void;
+}
+
+declare global {
+  interface PromiseConstructor {
+    withResolvers<T>(): PromiseResolvers<T>;
+  }
+}
+
 vi.mock('@prisma-next/emitter', async () => {
   const actual =
     await vi.importActual<typeof import('@prisma-next/emitter')>('@prisma-next/emitter');
