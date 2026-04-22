@@ -18,7 +18,7 @@ interface ProviderFailureLike {
   readonly meta?: unknown;
 }
 
-interface EmitWriteTargetState {
+interface EmitOutputQueueState {
   nextGeneration: number;
   queue: Promise<void>;
 }
@@ -37,33 +37,33 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
   );
 }
 
-const emitWriteTargets = new Map<string, EmitWriteTargetState>();
+const emitOutputQueues = new Map<string, EmitOutputQueueState>();
 
-function getEmitWriteTargetState(outputJsonPath: string): EmitWriteTargetState {
-  const existing = emitWriteTargets.get(outputJsonPath);
+function getEmitOutputQueue(outputJsonPath: string): EmitOutputQueueState {
+  const existing = emitOutputQueues.get(outputJsonPath);
   if (existing) {
     return existing;
   }
 
-  const created: EmitWriteTargetState = {
+  const created: EmitOutputQueueState = {
     nextGeneration: 0,
     queue: Promise.resolve(),
   };
-  emitWriteTargets.set(outputJsonPath, created);
+  emitOutputQueues.set(outputJsonPath, created);
   return created;
 }
 
 function issueEmitGeneration(outputJsonPath: string): number {
-  const state = getEmitWriteTargetState(outputJsonPath);
+  const state = getEmitOutputQueue(outputJsonPath);
   state.nextGeneration += 1;
   return state.nextGeneration;
 }
 
 function queueEmitWrite<T>(
   outputJsonPath: string,
-  action: (state: EmitWriteTargetState) => Promise<T>,
+  action: (state: EmitOutputQueueState) => Promise<T>,
 ): Promise<T> {
-  const state = getEmitWriteTargetState(outputJsonPath);
+  const state = getEmitOutputQueue(outputJsonPath);
   const run = state.queue.then(
     () => action(state),
     () => action(state),
