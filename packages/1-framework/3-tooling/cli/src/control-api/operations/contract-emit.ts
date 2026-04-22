@@ -243,6 +243,30 @@ async function restoreArtifact(
   }
 }
 
+interface PublishEntry {
+  readonly tempPath: string;
+  readonly outputPath: string;
+  readonly previous: string | undefined;
+}
+
+async function publishPairWithRollback(
+  entries: readonly PublishEntry[],
+  generation: number,
+): Promise<void> {
+  const replaced: PublishEntry[] = [];
+  try {
+    for (const entry of entries) {
+      await rename(entry.tempPath, entry.outputPath);
+      replaced.push(entry);
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      replaced.map((entry) => restoreArtifact(entry.outputPath, entry.previous, generation)),
+    );
+    throw error;
+  }
+}
+
 async function writePlainContractArtifacts({
   outputJsonPath,
   outputDtsPath,
@@ -267,8 +291,6 @@ async function writePlainContractArtifacts({
 
     const tempJsonPath = createTempArtifactPath(outputJsonPath, generation, 'next');
     const tempDtsPath = createTempArtifactPath(outputDtsPath, generation, 'next');
-    let cleanupJsonTemp = true;
-    let cleanupDtsTemp = true;
 
     try {
       await writeFile(tempJsonPath, contractJson, 'utf-8');
@@ -282,30 +304,18 @@ async function writePlainContractArtifacts({
 
       const previousJson = await readExistingArtifact(outputJsonPath);
       const previousDts = await readExistingArtifact(outputDtsPath);
-      let replacedJson = false;
-      let replacedDts = false;
 
-      try {
-        await rename(tempDtsPath, outputDtsPath);
-        cleanupDtsTemp = false;
-        replacedDts = true;
-
-        await rename(tempJsonPath, outputJsonPath);
-        cleanupJsonTemp = false;
-        replacedJson = true;
-      } catch (error) {
-        await Promise.allSettled([
-          replacedDts ? restoreArtifact(outputDtsPath, previousDts, generation) : Promise.resolve(),
-          replacedJson
-            ? restoreArtifact(outputJsonPath, previousJson, generation)
-            : Promise.resolve(),
-        ]);
-        throw error;
-      }
+      await publishPairWithRollback(
+        [
+          { tempPath: tempDtsPath, outputPath: outputDtsPath, previous: previousDts },
+          { tempPath: tempJsonPath, outputPath: outputJsonPath, previous: previousJson },
+        ],
+        generation,
+      );
     } finally {
       await Promise.allSettled([
-        cleanupJsonTemp ? rm(tempJsonPath, { force: true }) : Promise.resolve(),
-        cleanupDtsTemp ? rm(tempDtsPath, { force: true }) : Promise.resolve(),
+        rm(tempJsonPath, { force: true }),
+        rm(tempDtsPath, { force: true }),
       ]);
     }
   });
