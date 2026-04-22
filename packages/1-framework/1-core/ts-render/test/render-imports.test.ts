@@ -117,4 +117,65 @@ describe('renderImports', () => {
     ]);
     expect(out).toBe('import c from \'./c.json\' with { type: "json" };');
   });
+
+  it('sorts multi-key attribute entries deterministically in the `with` clause', () => {
+    const out = renderImports([
+      {
+        moduleSpecifier: './c.json',
+        symbol: 'c',
+        kind: 'default',
+        attributes: { type: 'json', integrity: 'sha256-abc' },
+      },
+    ]);
+    expect(out).toBe('import c from \'./c.json\' with { integrity: "sha256-abc", type: "json" };');
+  });
+
+  it('detects attribute conflicts when keys differ at the same length', () => {
+    expect(() =>
+      renderImports([
+        { moduleSpecifier: 'm', symbol: 'a', attributes: { type: 'json' } },
+        { moduleSpecifier: 'm', symbol: 'b', attributes: { kind: 'json' } },
+      ]),
+    ).toThrow(/Conflicting import attributes/);
+  });
+
+  it('detects attribute conflicts when attribute maps have different sizes', () => {
+    expect(() =>
+      renderImports([
+        {
+          moduleSpecifier: 'm',
+          symbol: 'a',
+          attributes: { type: 'json', integrity: 'sha256-abc' },
+        },
+        { moduleSpecifier: 'm', symbol: 'b', attributes: { type: 'json' } },
+      ]),
+    ).toThrow(/Conflicting import attributes/);
+  });
+
+  it('omits the `with` clause when attributes is an empty object', () => {
+    const out = renderImports([{ moduleSpecifier: 'm', symbol: 'a', attributes: {} }]);
+    expect(out).toBe("import { a } from 'm';");
+  });
+
+  it('stringifies multi-key attribute maps in sorted order in the conflict message', () => {
+    try {
+      renderImports([
+        {
+          moduleSpecifier: 'm',
+          symbol: 'a',
+          attributes: { type: 'json', integrity: 'sha256-abc' },
+        },
+        {
+          moduleSpecifier: 'm',
+          symbol: 'b',
+          attributes: { type: 'text', integrity: 'sha256-xyz' },
+        },
+      ]);
+      throw new Error('expected renderImports to throw');
+    } catch (err) {
+      expect((err as Error).message).toContain(
+        '{ integrity: "sha256-abc", type: "json" } vs { integrity: "sha256-xyz", type: "text" }',
+      );
+    }
+  });
 });
