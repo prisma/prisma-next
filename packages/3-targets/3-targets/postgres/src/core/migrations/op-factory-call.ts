@@ -803,7 +803,10 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   override importRequirements(): readonly ImportRequirement[] {
     return [
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
-      { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
+      // `placeholder` is re-exported from `@prisma-next/target-postgres/migration`
+      // so the user's migration.ts only depends on a single migration-authoring
+      // entrypoint.
+      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
       {
         moduleSpecifier: './contract.json',
         symbol: 'contract',
