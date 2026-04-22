@@ -1,5 +1,5 @@
 /**
- * Mongo class-flow IR: one concrete `*Call` class per pure factory under
+ * Mongo migration IR: one concrete `*Call` class per pure factory under
  * `migration-factories.ts`, plus a shared `OpFactoryCallNode` abstract
  * base. Every call class carries the literal arguments its backing
  * factory would receive, computes a human-readable `label` in its

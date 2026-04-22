@@ -1,5 +1,5 @@
 /**
- * Unit coverage for the Postgres class-flow IR:
+ * Unit coverage for the Postgres migration IR:
  *
  * - Every `*Call` class constructs with literal args, is frozen, computes its
  *   label, lowers to the matching runtime op via `toOp()`, and emits the

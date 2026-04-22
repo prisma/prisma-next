@@ -109,9 +109,8 @@ export function errorMigrationInvalidDefaultExport(
 }
 
 /**
- * A class-flow `Migration.operations` getter returned a value that is not an
- * array. Used by class-flow emit capabilities after instantiating the
- * authored migration.
+ * A `Migration.operations` getter returned a value that is not an array. Used
+ * by emit capabilities after instantiating the authored migration.
  */
 export function errorMigrationPlanNotArray(
   dir: string,

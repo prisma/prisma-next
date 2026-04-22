@@ -26,7 +26,7 @@ const MigrationMetaSchema = type({
 });
 
 /**
- * Base class for class-flow migrations.
+ * Base class for migrations.
  *
  * A `Migration` subclass is itself a `MigrationPlan`: CLI commands and the
  * runner can consume it directly via `targetId`, `operations`, `origin`, and

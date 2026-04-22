@@ -46,7 +46,7 @@ function makeFrameworkPlanner(): MigrationPlanner<'sql', 'postgres'> {
 
 describe('PostgresMigrationPlanner authoring surface', () => {
   describe('plan(...).plan.renderTypeScript()', () => {
-    it('emits a class-flow migration scaffold carrying the destination storage hash', () => {
+    it('emits a migration scaffold carrying the destination storage hash', () => {
       const planner = makeFrameworkPlanner();
       const contract = createEmptyContract();
       const fromSchemaIR = contractToSchemaIRImpl(null, {
@@ -92,7 +92,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:to' });
     });
 
-    it('renders a class-flow stub whose describe() carries from/to and whose operations list is empty', () => {
+    it('renders a stub whose describe() carries from/to and whose operations list is empty', () => {
       const planner = makeFrameworkPlanner();
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',

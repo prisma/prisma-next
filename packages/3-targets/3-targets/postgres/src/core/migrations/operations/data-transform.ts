@@ -1,5 +1,5 @@
 /**
- * User-facing `dataTransform` factory for the Postgres class-flow authoring
+ * User-facing `dataTransform` factory for the Postgres migration authoring
  * surface. Invoked directly inside a `migration.ts` file:
  *
  * ```ts
@@ -16,9 +16,7 @@
  * invokes each one, asserts that its `meta.storageHash` matches the
  * `contract` it was handed (→ `PN-MIG-2005` on mismatch), and lowers the
  * plan via the Postgres adapter to a serialized `{sql, params}` payload
- * for `ops.json`. See
- * `projects/postgres-class-flow-migrations/specs/dataTransform-class-flow-design.md`
- * for the full design rationale.
+ * for `ops.json`.
  */
 
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';

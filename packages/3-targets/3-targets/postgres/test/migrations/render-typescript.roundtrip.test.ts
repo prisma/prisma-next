@@ -1,5 +1,5 @@
 /**
- * End-to-end round-trip for the Postgres class-flow authoring surface.
+ * End-to-end round-trip for the Postgres migration authoring surface.
  *
  * Confirms that the TypeScript source produced by
  * `TypeScriptRenderablePostgresMigration#renderTypeScript()` is a

@@ -2,10 +2,9 @@
  * Utilities for reading/writing `migration.ts` files.
  *
  * Rendering migration.ts source is the target's responsibility — the CLI
- * obtains source strings from a class-flow planner's
- * `plan.renderTypeScript()`. The helper here is limited to file I/O:
- * writing the returned source with the right executable bit and probing
- * for existence.
+ * obtains source strings from a planner's `plan.renderTypeScript()`. The
+ * helper here is limited to file I/O: writing the returned source with the
+ * right executable bit and probing for existence.
  */
 
 import { stat, writeFile } from 'node:fs/promises';
@@ -20,10 +19,10 @@ const MIGRATION_TS_FILE = 'migration.ts';
  * executable permissions (0o755) so it can be run directly via
  * `./migration.ts` by the authoring class's `Migration.run(...)` guard.
  *
- * The source is run through prettier before writing so class-flow
- * renderers can produce structurally-correct but loosely-indented source
- * and rely on a single canonical format on disk. Matches what
- * `@prisma-next/emitter` already does for generated `contract.d.ts`.
+ * The source is run through prettier before writing so migration renderers
+ * can produce structurally-correct but loosely-indented source and rely on
+ * a single canonical format on disk. Matches what `@prisma-next/emitter`
+ * already does for generated `contract.d.ts`.
  */
 export async function writeMigrationTs(packageDir: string, content: string): Promise<void> {
   const formatted = await formatMigrationTsSource(content);

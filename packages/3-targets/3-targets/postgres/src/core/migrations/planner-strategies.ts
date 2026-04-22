@@ -1,5 +1,5 @@
 /**
- * Class-flow migration strategies.
+ * Migration strategies.
  *
  * Each strategy examines the issue list, consumes issues it handles, and
  * returns the `PostgresOpFactoryCall[]` to address them. The issue planner
@@ -82,7 +82,7 @@ export interface StrategyContext {
 }
 
 // ============================================================================
-// Class-flow call strategies (for issue planner)
+// Call strategies (for issue planner)
 // ============================================================================
 
 export type CallMigrationStrategy = (
@@ -624,7 +624,7 @@ function sortDependencies(
 }
 
 /**
- * Lift a component install op into class-flow IR. Structured shapes — extension
+ * Lift a component install op into migration IR. Structured shapes — extension
  * and schema installs with predictable SQL — collapse to typed `*Call`
  * subclasses so the scaffolded migration authoring surface stays readable.
  * Everything else (arbitrary SQL) falls through to `RawSqlCall` as an escape

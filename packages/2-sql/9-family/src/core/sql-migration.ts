@@ -2,7 +2,7 @@ import { Migration } from '@prisma-next/migration-tools/migration';
 import type { AnySqlMigrationOperation, SqlPlanTargetDetails } from './migrations/types';
 
 /**
- * Family-owned base class for class-flow SQL migrations.
+ * Family-owned base class for SQL migrations.
  *
  * Parameterized on the target-details shape because SQL-family targets
  * (Postgres, MySQL, SQLite, …) each carry their own `target.details` payload

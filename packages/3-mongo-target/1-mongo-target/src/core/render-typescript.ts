@@ -15,7 +15,7 @@ const BASE_IMPORT: ImportRequirement = {
 };
 
 /**
- * Render a list of Mongo `OpFactoryCall`s as a class-flow `migration.ts`
+ * Render a list of Mongo `OpFactoryCall`s as a `migration.ts`
  * source string. The result is shebanged, extends the user-facing
  * `Migration` (i.e. `MongoMigration`) from `@prisma-next/family-mongo`, and
  * implements the abstract `operations` and `describe` members. `meta` is

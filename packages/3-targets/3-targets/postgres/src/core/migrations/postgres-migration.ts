@@ -2,7 +2,7 @@ import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
- * Target-owned base class for class-flow Postgres migrations.
+ * Target-owned base class for Postgres migrations.
  *
  * Fixes the `SqlMigration` generic to `PostgresPlanTargetDetails` and the
  * abstract `targetId` to the Postgres target-id string literal, so both
