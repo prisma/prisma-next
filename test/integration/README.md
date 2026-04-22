@@ -70,6 +70,9 @@ This package is located at `test/integration/` (not in `packages/`) as it is a t
 ```bash
 # Run all integration tests (from test/integration/)
 cd test/integration && pnpm test
+
+# Run the Vite plugin HMR suite used by the Vite 7/8 support matrix
+cd test/integration && pnpm test:vite-plugin
 ```
 
 Tests automatically depend on builds of target packages via Turborepo.

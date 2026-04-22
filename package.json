@@ -15,6 +15,7 @@
     "test:e2e": "pnpm --filter @prisma-next/e2e-tests test",
     "test:integration": "pnpm --filter @prisma-next/integration-tests test",
     "test:journeys": "pnpm --filter @prisma-next/integration-tests test:journeys",
+    "test:vite-plugin": "pnpm --filter @prisma-next/integration-tests test:vite-plugin",
     "test:coverage": "turbo run test:coverage",
     "coverage:report": "node scripts/coverage-report.mjs",
     "coverage:packages": "turbo run test:coverage --filter='!./examples/**' --filter='!./test/**'",
