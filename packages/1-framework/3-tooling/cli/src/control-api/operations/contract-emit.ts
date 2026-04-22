@@ -46,8 +46,8 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
  * 5. Publishes staged artifacts to the configured output paths
  *
  * Publication is serialized per output JSON path. Each emit stages temp files,
- * renames `contract.d.ts` before `contract.json`, and restores the previous
- * pair if publication fails after either path has been replaced.
+ * renames `contract.d.ts` before `contract.json`, and attempts to restore the
+ * previous pair if publication fails after either path has been replaced.
  *
  * If a newer generation has already claimed the same output path by the time
  * this request reaches publication, the operation returns successfully with
@@ -188,10 +188,12 @@ export async function executeContractEmit(
     contractDts: emitResult.contractDts,
   });
 
-  const { validateContractDeps } = await import('../../utils/validate-contract-deps');
-  const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
-  if (depsValidation.warning) {
-    process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+  if (publication === 'written') {
+    const { validateContractDeps } = await import('../../utils/validate-contract-deps');
+    const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
+    if (depsValidation.warning) {
+      process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+    }
   }
 
   return {

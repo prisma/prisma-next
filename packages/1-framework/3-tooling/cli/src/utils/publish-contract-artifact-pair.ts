@@ -106,17 +106,22 @@ export async function publishContractArtifactPair({
 }): Promise<boolean> {
   const tempJsonPath = createTempArtifactPath(outputJsonPath, publicationToken, 'next');
   const tempDtsPath = createTempArtifactPath(outputDtsPath, publicationToken, 'next');
+  const canPublish = async () => (await beforePublish?.()) !== false;
 
   try {
     await writeFile(tempJsonPath, contractJson, 'utf-8');
     await writeFile(tempDtsPath, contractDts, 'utf-8');
 
-    if ((await beforePublish?.()) === false) {
+    if (!(await canPublish())) {
       return false;
     }
 
     const previousJson = await readExistingArtifact(outputJsonPath);
     const previousDts = await readExistingArtifact(outputDtsPath);
+
+    if (!(await canPublish())) {
+      return false;
+    }
 
     await publishPairWithRollback(
       [

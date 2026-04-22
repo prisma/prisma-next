@@ -1,3 +1,4 @@
+import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
@@ -46,10 +47,12 @@ describe('contract emit command', () => {
   let consoleOutput: string[] = [];
   let cleanupMocks: () => void = () => {};
   let createContractEmitCommand: CreateContractEmitCommand;
+  let tmpDir = '';
 
   beforeEach(async () => {
     vi.resetModules();
     ({ createContractEmitCommand } = await import('../../src/commands/contract-emit'));
+    tmpDir = await mkdtemp(join(tmpdir(), 'prisma-next-contract-emit-'));
 
     const commandMocks = setupCommandMocks({ isTTY: false });
     consoleOutput = commandMocks.consoleOutput;
@@ -64,13 +67,17 @@ describe('contract emit command', () => {
     mocks.closeMock.mockResolvedValue(undefined);
   }, timeouts.typeScriptCompilation);
 
-  afterEach(() => {
+  afterEach(async () => {
     cleanupMocks();
+    if (tmpDir.length > 0) {
+      await rm(tmpDir, { recursive: true, force: true });
+      tmpDir = '';
+    }
     vi.clearAllMocks();
   });
 
   it('returns an error envelope when publication is superseded', async () => {
-    const outputPath = join(tmpdir(), 'prisma-next-contract-emit', 'contract.json');
+    const outputPath = join(tmpDir, 'contract.json');
 
     mocks.loadConfigMock.mockResolvedValue({
       family: { familyId: 'sql' },

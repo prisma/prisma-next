@@ -410,6 +410,7 @@ describe('executeContractEmit', () => {
     const previousJson = JSON.stringify({ generation: 'previous' });
     const previousDts = "export type Generation = 'previous';\n";
     const firstEmit = Promise.withResolvers<EmitResult>();
+    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
     await writeFile(outputJsonPath, previousJson, 'utf-8');
@@ -438,8 +439,17 @@ describe('executeContractEmit', () => {
 
       await expect(second).rejects.toThrow('simulated newer generation write failure');
 
-      firstEmit.resolve(createEmitResult('older'));
-      await first;
+      firstEmit.resolve({
+        ...createEmitResult('older'),
+        contractDts: [
+          "import type { Missing } from '@example/missing-types';",
+          "export type Generation = 'older';",
+          '',
+        ].join('\n'),
+      });
+      const firstResult = await first;
+      expect(firstResult.publication).toBe('superseded');
+      expect(stderrSpy).not.toHaveBeenCalled();
     });
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);

@@ -456,11 +456,7 @@ describe('prismaVitePlugin', () => {
 
     it('falls back to watching the config file and warns when loadConfig fails', async () => {
       mockedLoadConfig.mockRejectedValue(new Error('config load failed'));
-      mockedExecuteContractEmit.mockResolvedValue({
-        storageHash: 'abc123',
-        profileHash: 'def456',
-        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
-      });
+      mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult());
 
       const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });

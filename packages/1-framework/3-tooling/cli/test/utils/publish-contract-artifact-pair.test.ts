@@ -107,7 +107,35 @@ describe('publishContractArtifactPair', () => {
         to: outputJsonPath,
       },
     ]);
-  }, 1000);
+  });
+
+  it('rechecks beforePublish after snapshotting previous artifacts', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+    const beforePublish = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+
+    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
+    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    await expect(
+      publishContractArtifactPair({
+        outputJsonPath,
+        outputDtsPath,
+        contractJson: JSON.stringify({ generation: 'next' }),
+        contractDts: "export type Generation = 'next';\n",
+        publicationToken: 'publish',
+        beforePublish,
+      }),
+    ).resolves.toBe(false);
+
+    expect(beforePublish).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(mockedFs.rename)).not.toHaveBeenCalled();
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+  });
 
   it('preserves the previous artifacts when the next publish write fails', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
@@ -140,7 +168,7 @@ describe('publishContractArtifactPair', () => {
 
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
-  }, 1000);
+  });
 
   it('attaches rollback failures to the publish error cause', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
@@ -189,5 +217,5 @@ describe('publishContractArtifactPair', () => {
 
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(nextDts);
-  }, 1000);
+  });
 });
