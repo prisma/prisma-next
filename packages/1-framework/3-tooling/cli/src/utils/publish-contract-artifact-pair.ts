@@ -45,6 +45,24 @@ interface PublishEntry {
   readonly previous: string | undefined;
 }
 
+function withRollbackFailureCause(error: unknown, rollbackFailures: readonly unknown[]): Error {
+  const rollbackCause = new AggregateError(
+    rollbackFailures,
+    'Failed to restore published artifacts',
+  );
+
+  if (error instanceof Error) {
+    Object.defineProperty(error, 'cause', {
+      value: rollbackCause,
+      configurable: true,
+      writable: true,
+    });
+    return error;
+  }
+
+  return new Error(String(error), { cause: rollbackCause });
+}
+
 async function publishPairWithRollback(
   entries: readonly PublishEntry[],
   publicationToken: string,
@@ -56,9 +74,17 @@ async function publishPairWithRollback(
       replaced.push(entry);
     }
   } catch (error) {
-    await Promise.allSettled(
+    const rollbackResults = await Promise.allSettled(
       replaced.map((entry) => restoreArtifact(entry.outputPath, entry.previous, publicationToken)),
     );
+    const rollbackFailures = rollbackResults.flatMap((result) =>
+      result.status === 'rejected' ? [result.reason] : [],
+    );
+
+    if (rollbackFailures.length > 0) {
+      throw withRollbackFailureCause(error, rollbackFailures);
+    }
+
     throw error;
   }
 }

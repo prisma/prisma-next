@@ -370,6 +370,40 @@ describe('executeContractEmit', () => {
     expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
   });
 
+  it('restores the previous artifacts when contract.json publish fails after replacing contract.d.ts', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+    const publishError = new Error('simulated json rename failure');
+
+    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await writeFile(outputJsonPath, previousJson, 'utf-8');
+    await writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    mockedEmit.mockResolvedValue(createEmitResult('next'));
+
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
+    mockedRename.mockImplementation(async (...args: Parameters<typeof rename>) => {
+      const [, to] = args;
+
+      if (String(to) === outputJsonPath) {
+        throw publishError;
+      }
+
+      return actualFs.rename(...args);
+    });
+
+    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      await expect(
+        executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') }),
+      ).rejects.toBe(publishError);
+    });
+
+    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+  });
+
   it('keeps the last good artifacts when a newer request fails after superseding an older emit', async () => {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');

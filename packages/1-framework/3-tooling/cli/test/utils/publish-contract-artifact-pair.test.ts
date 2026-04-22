@@ -141,4 +141,53 @@ describe('publishContractArtifactPair', () => {
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
   }, 1000);
+
+  it('attaches rollback failures to the publish error cause', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const previousJson = JSON.stringify({ generation: 'previous' });
+    const previousDts = "export type Generation = 'previous';\n";
+    const nextJson = JSON.stringify({ generation: 'next' });
+    const nextDts = "export type Generation = 'next';\n";
+    const publishError = new Error('simulated json rename failure');
+    const rollbackError = new Error('simulated rollback rename failure');
+
+    await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
+    await actualFs.writeFile(outputJsonPath, previousJson, 'utf-8');
+    await actualFs.writeFile(outputDtsPath, previousDts, 'utf-8');
+
+    const mockedRename = vi.mocked(mockedFs.rename);
+    mockedRename.mockImplementation(async (...args) => {
+      const [, to] = args;
+
+      if (String(to) === outputJsonPath) {
+        throw publishError;
+      }
+
+      if (String(to) === outputDtsPath && String(args[0]).includes('.rollback.tmp')) {
+        throw rollbackError;
+      }
+
+      return actualFs.rename(...args);
+    });
+
+    await expect(
+      publishContractArtifactPair({
+        outputJsonPath,
+        outputDtsPath,
+        contractJson: nextJson,
+        contractDts: nextDts,
+        publicationToken: 'publish',
+      }),
+    ).rejects.toSatisfy((error: unknown) => {
+      expect(error).toBe(publishError);
+      expect(error).toBeInstanceOf(Error);
+      expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(AggregateError);
+      expect((error as Error & { cause?: AggregateError }).cause?.errors).toEqual([rollbackError]);
+      return true;
+    });
+
+    expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
+    expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(nextDts);
+  }, 1000);
 });
