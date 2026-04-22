@@ -343,5 +343,119 @@ withTempDir(({ createTempDir }) => {
       },
       timeouts.spinUpPpgDev,
     );
+
+    it(
+      'preserves the last good artifacts after a bad PSL edit and recovers on the next good edit',
+      async () => {
+        const testSetup = setupTestDirectoryFromFixtures(createTempDir, pslFixtureSubdir);
+        const testDir = testSetup.testDir;
+        const outputDir = testSetup.outputDir;
+        const schemaPath = join(testDir, 'contract.prisma');
+        const contractJsonPath = join(outputDir, 'contract.json');
+        const contractDtsPath = join(outputDir, 'contract.d.ts');
+
+        copyFixtureFiles(testDir, pslFixtureSubdir, [
+          'vite.config.ts',
+          'contract.prisma',
+          'contract-alt.prisma',
+        ]);
+
+        server = await createServer({
+          root: testDir,
+          logLevel: 'silent',
+          server: {
+            middlewareMode: true,
+          },
+        });
+
+        const [initialJsonEmitSuccess, initialDtsEmitSuccess] = await Promise.all([
+          waitForFileChange(contractJsonPath, null, timeouts.typeScriptCompilation),
+          waitForFileChange(contractDtsPath, null, timeouts.typeScriptCompilation),
+        ]);
+        expect(initialJsonEmitSuccess).toBe(true);
+        expect(initialDtsEmitSuccess).toBe(true);
+
+        const initialContractJson = await readJsonFileWhenReady(
+          contractJsonPath,
+          timeouts.typeScriptCompilation,
+        );
+        const initialContractDts = readFileSync(contractDtsPath, 'utf-8');
+        const initialContract = JSON.parse(initialContractJson);
+        expect(initialContract.storage.tables.user.columns).not.toHaveProperty('name');
+
+        const { stat } = await import('node:fs/promises');
+        const [initialJsonStats, initialDtsStats] = await Promise.all([
+          stat(contractJsonPath),
+          stat(contractDtsPath),
+        ]);
+
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
+        replaceInFileOrThrow(
+          schemaPath,
+          '  email String\n\n  @@map("user")\n',
+          '  email String\n  @@broken\n\n  @@map("user")\n',
+        );
+
+        server.watcher.emit('change', schemaPath);
+
+        const [jsonChangedAfterBadEdit, dtsChangedAfterBadEdit] = await Promise.all([
+          waitForFileChange(
+            contractJsonPath,
+            initialJsonStats.mtimeMs,
+            timeouts.typeScriptCompilation,
+          ),
+          waitForFileChange(
+            contractDtsPath,
+            initialDtsStats.mtimeMs,
+            timeouts.typeScriptCompilation,
+          ),
+        ]);
+        expect(jsonChangedAfterBadEdit).toBe(false);
+        expect(dtsChangedAfterBadEdit).toBe(false);
+        expect(await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation)).toBe(
+          initialContractJson,
+        );
+        expect(readFileSync(contractDtsPath, 'utf-8')).toBe(initialContractDts);
+
+        replaceInFileOrThrow(
+          schemaPath,
+          '  email String\n  @@broken\n\n  @@map("user")\n',
+          '  email String\n  name  String?\n\n  @@map("user")\n',
+        );
+
+        server.watcher.emit('change', schemaPath);
+
+        const [jsonChangedAfterRecovery, dtsChangedAfterRecovery] = await Promise.all([
+          waitForFileChange(
+            contractJsonPath,
+            initialJsonStats.mtimeMs,
+            timeouts.typeScriptCompilation,
+          ),
+          waitForFileChange(
+            contractDtsPath,
+            initialDtsStats.mtimeMs,
+            timeouts.typeScriptCompilation,
+          ),
+        ]);
+        expect(jsonChangedAfterRecovery).toBe(true);
+        expect(dtsChangedAfterRecovery).toBe(true);
+
+        const recoveredContract = JSON.parse(
+          await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+        );
+        expect(recoveredContract.storage).toMatchObject({
+          tables: {
+            user: {
+              columns: {
+                name: { nullable: true },
+              },
+            },
+          },
+        });
+        expect(readFileSync(contractDtsPath, 'utf-8')).not.toBe(initialContractDts);
+      },
+      timeouts.spinUpPpgDev + timeouts.typeScriptCompilation * 2,
+    );
   });
 });
