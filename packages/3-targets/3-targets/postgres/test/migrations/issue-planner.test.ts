@@ -579,12 +579,12 @@ describe('planIssues', () => {
         to: 'sha256:bbb',
       });
 
-      expect(ts).toContain('class M extends Migration');
+      expect(ts).toContain('export default class M extends Migration');
       expect(ts).toContain('addColumn(');
       expect(ts).toContain('dataTransform(');
       expect(ts).toContain('placeholder(');
       expect(ts).toContain('setNotNull(');
-      expect(ts).toContain("import { Migration } from '@prisma-next/family-sql/migration'");
+      expect(ts).toContain("from '@prisma-next/target-postgres/migration'");
     });
   });
 });

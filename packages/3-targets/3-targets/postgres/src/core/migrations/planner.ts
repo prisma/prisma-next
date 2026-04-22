@@ -275,8 +275,23 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(storageTypePlan.conflicts);
     }
 
+    // `dependency_missing` issues are owned by
+    // `buildDatabaseDependencyOperations`, which consumes
+    // framework-component-declared install operations directly. Filter them
+    // out so `planIssues` doesn't double-handle them and so the planner
+    // doesn't fail on dependency IDs the issue planner can't classify (e.g.
+    // `postgres.extension.vector` declared by the pgvector extension).
+    //
+    // `type_missing` issues are owned by `buildStorageTypeOperations` via
+    // codec hooks — those are the canonical source for storage-type creation
+    // (and match walk-schema's behaviour). Letting `planIssues` additionally
+    // handle them produces duplicate `CREATE TYPE ...` statements.
+    const issuesForPlanIssues = schemaIssues.filter(
+      (issue) => issue.kind !== 'dependency_missing' && issue.kind !== 'type_missing',
+    );
+
     const issuePlanResult = planIssues({
-      issues: schemaIssues,
+      issues: issuesForPlanIssues,
       toContract: options.contract,
       fromContract,
       schemaName,
