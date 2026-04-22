@@ -2,6 +2,7 @@ import {
   normalizeSchemaNativeType,
   parsePostgresDefault,
 } from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -25,6 +26,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type {
+  SqlStorage,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
@@ -32,6 +34,7 @@ import type {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { planIssues } from './issue-planner';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -178,10 +181,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly fromHash?: string;
+    readonly fromContract?: unknown;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
+    return this.planSql(
+      options as SqlMigrationPlannerPlanOptions,
+      options.fromHash ?? '',
+      (options.fromContract ?? null) as Contract<SqlStorage> | null,
+    );
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
@@ -191,7 +199,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): PostgresPlanResult {
+  private planSql(
+    options: SqlMigrationPlannerPlanOptions,
+    fromHash: string,
+    fromContract: Contract<SqlStorage> | null,
+  ): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -206,6 +218,107 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
 
     const storageTypes = options.contract.storage.types ?? {};
+
+    // Dispatch on the `'data'` operation class — `migration plan` includes it
+    // and wants `DataTransformCall(PlaceholderExpression)` stubs the user
+    // hand-fills; `db update` / `db init` do not include it and need the
+    // walk-schema planner's auto-fill behavior (e.g. NOT NULL backfill via
+    // a temporary default). Phase 4 collapses these two paths.
+    if (options.policy.allowedOperationClasses.includes('data')) {
+      return this.planViaIssues({
+        options,
+        fromHash,
+        fromContract,
+        schemaName,
+        schemaIssues,
+        codecHooks,
+        storageTypes,
+      });
+    }
+
+    return this.planViaWalkSchema({
+      options,
+      fromHash,
+      schemaName,
+      schemaIssues,
+      planningMode,
+      codecHooks,
+      storageTypes,
+    });
+  }
+
+  /**
+   * `migration plan` path: feeds schema issues into `planIssues` so the
+   * data-safety strategies (NOT-NULL backfill, type change, nullable
+   * tightening, enum rebuild) run and emit `DataTransformCall` placeholders.
+   *
+   * Database-dependency and storage-type calls are still produced by the
+   * walk-schema helpers because the issue planner only handles
+   * `dependency_missing` for already-introspected gaps and does not own
+   * codec-hook-driven storage-type setup. Those streams are concatenated in
+   * the same dependency-first ordering used by the walk-schema path.
+   */
+  private planViaIssues(args: {
+    readonly options: SqlMigrationPlannerPlanOptions;
+    readonly fromHash: string;
+    readonly fromContract: Contract<SqlStorage> | null;
+    readonly schemaName: string;
+    readonly schemaIssues: readonly SchemaIssue[];
+    readonly codecHooks: Map<string, CodecControlHooks>;
+    readonly storageTypes: Record<string, StorageTypeInstance>;
+  }): PostgresPlanResult {
+    const { options, fromHash, fromContract, schemaName, schemaIssues, codecHooks, storageTypes } =
+      args;
+
+    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
+    if (storageTypePlan.conflicts.length > 0) {
+      return plannerFailure(storageTypePlan.conflicts);
+    }
+
+    const issuePlanResult = planIssues({
+      issues: schemaIssues,
+      toContract: options.contract,
+      fromContract,
+      schemaName,
+      codecHooks,
+      storageTypes,
+    });
+    if (!issuePlanResult.ok) {
+      return plannerFailure(issuePlanResult.failure);
+    }
+
+    const calls: PostgresOpFactoryCall[] = [
+      ...this.buildDatabaseDependencyOperations(options),
+      ...storageTypePlan.operations,
+      ...issuePlanResult.value.calls,
+    ];
+
+    return Object.freeze({
+      kind: 'success' as const,
+      plan: new TypeScriptRenderablePostgresMigration(calls, {
+        from: fromHash,
+        to: options.contract.storage.storageHash,
+      }),
+    });
+  }
+
+  /**
+   * `db update` / `db init` path (legacy walk-schema). Unchanged Phase-1
+   * pipeline that emits `PostgresOpFactoryCall[]` via direct contract walk
+   * + reconciliation. Auto-fills NOT-NULL backfills with a temporary default
+   * so it can be applied without user intervention.
+   */
+  private planViaWalkSchema(args: {
+    readonly options: SqlMigrationPlannerPlanOptions;
+    readonly fromHash: string;
+    readonly schemaName: string;
+    readonly schemaIssues: readonly SchemaIssue[];
+    readonly planningMode: PlanningMode;
+    readonly codecHooks: Map<string, CodecControlHooks>;
+    readonly storageTypes: Record<string, StorageTypeInstance>;
+  }): PostgresPlanResult {
+    const { options, fromHash, schemaName, schemaIssues, planningMode, codecHooks, storageTypes } =
+      args;
 
     const reconciliationPlan = buildReconciliationPlan({
       contract: options.contract,

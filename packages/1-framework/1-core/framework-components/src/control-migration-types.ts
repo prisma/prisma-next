@@ -317,6 +317,14 @@ export interface MigrationPlanner<
      */
     readonly fromHash: string;
     /**
+     * The "from" contract (the state the planner assumes the database starts
+     * at). Class-flow planners pass this to data-safety strategies so they
+     * can compare `from` and `to` column shapes (e.g. to detect unsafe type
+     * changes). `db update` / `db init` reconcile against the live schema and
+     * have no "from" contract; only `migration plan` provides one.
+     */
+    readonly fromContract?: unknown;
+    /**
      * Active framework components participating in this composition.
      * Families/targets can interpret this list to derive family-specific metadata.
      * All components must have matching familyId and targetId.
