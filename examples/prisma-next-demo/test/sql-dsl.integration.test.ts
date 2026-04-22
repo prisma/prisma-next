@@ -225,8 +225,7 @@ describe('SQL DSL standalone query execution (TML-2160)', () => {
           const limited = await crossAuthorSimilarity(1, runtime);
 
           expect(limited).toHaveLength(1);
-          const [row] = limited;
-          if (!row) throw new Error('expected one row');
+          const row = limited[0]!;
           expect(row.postAUserId).not.toBe(row.postBUserId);
           expect(unorderedPairKey(row.postAId, row.postBId)).toBe(
             unorderedPairKey(seededPostIds.aliceFar, seededPostIds.bobClose),
