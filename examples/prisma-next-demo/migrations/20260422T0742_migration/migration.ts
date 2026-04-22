@@ -1,5 +1,5 @@
 #!/usr/bin/env -S node
-import { addColumn, alterColumnType, Migration } from '@prisma-next/target-postgres/migration';
+import { addColumn, Migration } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
   override describe() {
@@ -16,11 +16,6 @@ export default class M extends Migration {
         typeSql: 'text',
         defaultSql: '',
         nullable: true,
-      }),
-      alterColumnType('public', 'post', 'embedding', {
-        qualifiedTargetType: 'vector(1536)',
-        formatTypeExpected: 'vector(1536)',
-        rawTargetTypeForLabel: 'vector(1536)',
       }),
     ];
   }
