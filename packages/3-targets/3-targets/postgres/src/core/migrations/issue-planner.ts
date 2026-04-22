@@ -486,13 +486,13 @@ function mapIssueToCall(
             };
             return ok([new AddForeignKeyCall(schemaName, issue.table, fkSpec)]);
           }
-          return ok([
-            new AddForeignKeyCall(schemaName, issue.table, {
-              name: fkName,
-              columns,
-              references: { table: '', columns: [] },
-            }),
-          ]);
+          return notOk(
+            issueConflict(
+              'foreignKeyConflict',
+              `Foreign key on "${issue.table}" (${columns.join(', ')}) not found in destination contract`,
+              { table: issue.table },
+            ),
+          );
         }
       }
       return notOk(
