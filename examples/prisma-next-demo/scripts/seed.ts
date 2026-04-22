@@ -28,6 +28,7 @@ async function main() {
       db.sql.user
         .insert({
           email: 'alice@example.com',
+          displayName: 'Alice',
           createdAt: new Date(),
           kind: 'admin',
           address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
@@ -39,6 +40,7 @@ async function main() {
       db.sql.user
         .insert({
           email: 'bob@example.com',
+          displayName: 'Bob',
           createdAt: new Date(),
           kind: 'user',
           address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
