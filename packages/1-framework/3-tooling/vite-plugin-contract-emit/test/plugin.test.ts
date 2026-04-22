@@ -76,6 +76,20 @@ function createContractEmitResult(publication: 'written' | 'superseded' = 'writt
   };
 }
 
+async function eventually(assertion: () => void): Promise<void> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 20; attempt++) {
+    try {
+      assertion();
+      return;
+    } catch (error) {
+      lastError = error;
+      await Promise.resolve();
+    }
+  }
+  throw lastError;
+}
+
 function applyModuleGraph(
   server: ReturnType<typeof createMockServer>,
   definitions: Record<string, { file?: string; imports?: readonly string[] }>,
@@ -726,6 +740,65 @@ describe('prismaVitePlugin', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps only the latest overlapping emit result', async () => {
+      mockedLoadConfig.mockResolvedValue(
+        createLoadedConfig({
+          inputs: undefined,
+        }),
+      );
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'silent',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockReset();
+      mockServer.ws.send.mockClear();
+
+      const firstEmit = Promise.withResolvers<ReturnType<typeof createContractEmitResult>>();
+      const secondEmit = Promise.withResolvers<ReturnType<typeof createContractEmitResult>>();
+
+      mockedExecuteContractEmit
+        .mockImplementationOnce(() => firstEmit.promise)
+        .mockImplementationOnce(() => secondEmit.promise);
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      const firstSignal = mockedExecuteContractEmit.mock.calls[0]?.[0].signal;
+      expect(firstSignal).toBeDefined();
+      expect(firstSignal?.aborted).toBe(false);
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+      expect(firstSignal?.aborted).toBe(true);
+
+      firstEmit.resolve(createContractEmitResult());
+      secondEmit.resolve(createContractEmitResult());
+
+      await eventually(() => {
+        expect(mockServer.ws.send).toHaveBeenCalledTimes(1);
+      });
+      expect(mockServer.ws.send).toHaveBeenCalledWith({ type: 'full-reload' });
     });
   });
 
