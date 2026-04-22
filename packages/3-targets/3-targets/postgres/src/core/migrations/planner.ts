@@ -96,6 +96,35 @@ function liftOpToCall(op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>):
   return new RawSqlCall(op);
 }
 
+/**
+ * Detects codec-hook-emitted enum rebuild / add-value operations whose type
+ * name is owned by the issue planner's `enumChangeCallStrategy`.
+ *
+ * The codec hook identifies these ops via stable ids:
+ * - `type.<name>.rebuild` — monolithic rebuild op
+ * - `type.<name>.value.<value>` — add-value op
+ *
+ * The creation path (`type.<name>`) is untouched: type creation remains
+ * owned by `buildStorageTypeOperations` / codec hooks, matching the
+ * walk-schema planner's behaviour.
+ */
+function isEnumMutationCallForType(
+  call: PostgresOpFactoryCall,
+  ownedTypeNames: ReadonlySet<string>,
+): boolean {
+  if (ownedTypeNames.size === 0) return false;
+  if (!(call instanceof RawSqlCall)) return false;
+  const { id } = call.op;
+  for (const typeName of ownedTypeNames) {
+    const rebuildId = `type.${typeName}.rebuild`;
+    const addValuePrefix = `type.${typeName}.value.`;
+    if (id === rebuildId || id.startsWith(addValuePrefix)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function toColumnSpec(
   name: string,
   column: StorageColumn,
@@ -290,6 +319,22 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       (issue) => issue.kind !== 'dependency_missing' && issue.kind !== 'type_missing',
     );
 
+    // Types with `enum_values_changed` issues are owned by the class-flow
+    // `enumChangeCallStrategy` (which decomposes the change into
+    // `DataTransformCall + createEnumType + alterColumnType + dropEnumType +
+    // renameType`). The codec hook's monolithic `type.<name>.rebuild` /
+    // `type.<name>.value.<value>` operations would duplicate that work, so
+    // drop them from the storage-type stream here.
+    const typesOwnedByIssuePlanner = new Set<string>();
+    for (const issue of schemaIssues) {
+      if (issue.kind === 'enum_values_changed') {
+        typesOwnedByIssuePlanner.add(issue.typeName);
+      }
+    }
+    const storageTypeCalls = storageTypePlan.operations.filter(
+      (call) => !isEnumMutationCallForType(call, typesOwnedByIssuePlanner),
+    );
+
     const issuePlanResult = planIssues({
       issues: issuesForPlanIssues,
       toContract: options.contract,
@@ -312,7 +357,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
 
     const calls: PostgresOpFactoryCall[] = [
       ...this.buildDatabaseDependencyOperations(options),
-      ...storageTypePlan.operations,
+      ...storageTypeCalls,
       ...issueCallsPolicy.allowed,
     ];
 

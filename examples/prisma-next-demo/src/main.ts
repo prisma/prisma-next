@@ -73,6 +73,11 @@ import { similaritySearch } from './queries/similarity-search';
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
 const [cmd, ...args] = argv;
 
+function displayNameFromEmail(email: string): string {
+  const local = email.split('@')[0] ?? email;
+  return local.length > 0 ? local.charAt(0).toUpperCase() + local.slice(1) : email;
+}
+
 async function main() {
   const { databaseUrl } = loadAppConfig();
   const runtime = await db.connect({ url: databaseUrl });
@@ -205,7 +210,10 @@ async function main() {
         console.error('repo-upsert-user kind must be "admin" or "user"');
         process.exit(1);
       }
-      const user = await ormClientUpsertUser({ id, email, kind }, runtime);
+      const user = await ormClientUpsertUser(
+        { id, email, displayName: displayNameFromEmail(email), kind },
+        runtime,
+      );
 
       console.log(JSON.stringify(user, null, 2));
     } else if (cmd === 'repo-create-user-address') {
@@ -222,6 +230,7 @@ async function main() {
         {
           id,
           email,
+          displayName: displayNameFromEmail(email),
           kind,
           createdAt: new Date(),
           address: { street: '789 Elm Blvd', city: 'Austin', zip: '73301', country: 'US' },

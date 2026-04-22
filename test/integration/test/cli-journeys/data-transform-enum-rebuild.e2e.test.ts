@@ -88,8 +88,8 @@ withTempDir(({ createTempDir }) => {
         const migrationTsPath = join(migrationDir, 'migration.ts');
 
         const scaffold = readFileSync(migrationTsPath, 'utf-8');
-        expect(scaffold).toContain('placeholder("migrate-status-values:check")');
-        expect(scaffold).toContain('placeholder("migrate-status-values:run")');
+        expect(scaffold).toContain("placeholder('migrate-status-values:check')");
+        expect(scaffold).toContain("placeholder('migrate-status-values:run')");
         // Rebuild recipe: createEnumType, alterColumnType,
         // dropEnumType, renameType must all appear.
         expect(scaffold).toContain('createEnumType');
@@ -124,11 +124,11 @@ withTempDir(({ createTempDir }) => {
         const filled = scaffold
           .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
-            '() => placeholder("migrate-status-values:check")',
+            "() => placeholder('migrate-status-values:check')",
             "() => db.user.select('id').where((f, fns) => fns.notIn(f.status, ['active', 'archived'])).limit(1)",
           )
           .replace(
-            '() => placeholder("migrate-status-values:run")',
+            "() => placeholder('migrate-status-values:run')",
             `() => db.user.update({ status: '${REMAPPED_STATUS}' }).where((f, fns) => fns.notIn(f.status, ['active', 'archived']))`,
           );
         expect(filled).not.toContain('placeholder(');
