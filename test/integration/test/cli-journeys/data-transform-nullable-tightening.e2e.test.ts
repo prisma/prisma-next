@@ -83,8 +83,8 @@ withTempDir(({ createTempDir }) => {
         const migrationTsPath = join(migrationDir, 'migration.ts');
 
         const scaffold = readFileSync(migrationTsPath, 'utf-8');
-        expect(scaffold).toContain('placeholder("handle-nulls-user-name:check")');
-        expect(scaffold).toContain('placeholder("handle-nulls-user-name:run")');
+        expect(scaffold).toContain("placeholder('handle-nulls-user-name:check')");
+        expect(scaffold).toContain("placeholder('handle-nulls-user-name:run')");
         expect(scaffold).toContain('setNotNull');
         // The planner *must not* emit an addColumn for `name` here:
         // this is the tightening case, the column already exists.
@@ -112,11 +112,11 @@ withTempDir(({ createTempDir }) => {
         const filled = scaffold
           .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
-            '() => placeholder("handle-nulls-user-name:check")',
+            "() => placeholder('handle-nulls-user-name:check')",
             "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
           )
           .replace(
-            '() => placeholder("handle-nulls-user-name:run")',
+            "() => placeholder('handle-nulls-user-name:run')",
             `() => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
           );
         expect(filled).not.toContain('placeholder(');
