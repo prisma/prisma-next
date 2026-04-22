@@ -35,9 +35,6 @@ const packageRoot = resolve(import.meta.dirname, '../..');
 const repoRoot = resolve(packageRoot, '../../../..');
 const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 
-const familySqlMigrationExport = pathToFileURL(
-  resolve(repoRoot, 'packages/2-sql/9-family/src/exports/migration.ts'),
-).href;
 const targetPostgresMigrationExport = pathToFileURL(
   resolve(packageRoot, 'src/exports/migration.ts'),
 ).href;
@@ -85,7 +82,6 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
 
     const tsSource = migration
       .renderTypeScript()
-      .replace("'@prisma-next/family-sql/migration'", `'${familySqlMigrationExport}'`)
       .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
@@ -107,7 +103,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
 
     const tsSource = migration
       .renderTypeScript()
-      .replace("'@prisma-next/family-sql/migration'", `'${familySqlMigrationExport}'`);
+      .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
     const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
@@ -135,7 +131,6 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
 
     const tsSource = migration
       .renderTypeScript()
-      .replace("'@prisma-next/family-sql/migration'", `'${familySqlMigrationExport}'`)
       .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 

@@ -33,3 +33,8 @@ export {
 export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
 export { rawSql } from '../core/migrations/operations/raw';
 export { createTable, dropTable } from '../core/migrations/operations/tables';
+// Target-owned base class for class-flow migrations. Aliased to `Migration`
+// so user-edited migration.ts files (and the class-flow renderer's
+// scaffold) read as `class M extends Migration { … }` without having to
+// thread the target-details generic or redeclare `targetId`.
+export { PostgresMigration as Migration } from '../core/migrations/postgres-migration';

@@ -70,8 +70,9 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       const source = success.plan.renderTypeScript();
 
-      expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration'");
-      expect(source).toContain('class M extends Migration');
+      expect(source).toContain("from '@prisma-next/target-postgres/migration'");
+      expect(source).toMatch(/\bMigration\b/);
+      expect(source).toContain('export default class M extends Migration');
       expect(source).toContain(`from: "${coreHash('sha256:from')}"`);
       expect(source).toContain(`to: "${contract.storage.storageHash}"`);
     });
@@ -101,8 +102,8 @@ describe('PostgresMigrationPlanner authoring surface', () => {
 
       const source = empty.renderTypeScript();
 
-      expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration'");
-      expect(source).toContain('class M extends Migration');
+      expect(source).toContain("from '@prisma-next/target-postgres/migration'");
+      expect(source).toContain('export default class M extends Migration');
       expect(source).toContain('from: "sha256:from"');
       expect(source).toContain('to: "sha256:to"');
       expect(source).toContain('override get operations()');

@@ -21,11 +21,15 @@ export interface RenderMigrationMeta {
 }
 
 /**
- * Always-present base import — the rendered scaffold always extends
- * `Migration` from the family-sql migration subpath.
+ * Always-present base import — the rendered scaffold always extends the
+ * target-owned `Migration` (i.e. `PostgresMigration`) re-exported from
+ * `@prisma-next/target-postgres/migration`. That re-export fixes the
+ * `SqlMigration` generic to `PostgresPlanTargetDetails` and the abstract
+ * `targetId` to `'postgres'`, so user-authored migrations don't need to
+ * thread target-details or redeclare `targetId`.
  */
 const BASE_IMPORT: ImportRequirement = {
-  moduleSpecifier: '@prisma-next/family-sql/migration',
+  moduleSpecifier: '@prisma-next/target-postgres/migration',
   symbol: 'Migration',
 };
 
@@ -40,7 +44,7 @@ export function renderCallsToTypeScript(
     shebangLineFor(detectScaffoldRuntime()),
     imports,
     '',
-    'class M extends Migration {',
+    'export default class M extends Migration {',
     buildDescribeMethod(meta),
     '  override get operations() {',
     '    return [',
@@ -49,7 +53,6 @@ export function renderCallsToTypeScript(
     '  }',
     '}',
     '',
-    'export default M;',
     'Migration.run(import.meta.url, M);',
     '',
   ].join('\n');
