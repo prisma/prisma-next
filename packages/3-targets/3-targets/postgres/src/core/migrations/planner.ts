@@ -302,10 +302,18 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(issuePlanResult.failure);
     }
 
+    const issueCallsPolicy = this.filterCallsByOperationPolicy(
+      issuePlanResult.value.calls,
+      options.policy,
+    );
+    if (issueCallsPolicy.conflicts.length > 0) {
+      return plannerFailure(issueCallsPolicy.conflicts);
+    }
+
     const calls: PostgresOpFactoryCall[] = [
       ...this.buildDatabaseDependencyOperations(options),
       ...storageTypePlan.operations,
-      ...issuePlanResult.value.calls,
+      ...issueCallsPolicy.allowed,
     ];
 
     return Object.freeze({
@@ -404,6 +412,33 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ]);
     }
     return null;
+  }
+
+  /**
+   * Enforces {@link MigrationOperationPolicy} on calls from the issue-based
+   * planner, matching the filter applied in {@link buildReconciliationPlan}
+   * for the walk-schema path.
+   */
+  private filterCallsByOperationPolicy(
+    calls: readonly PostgresOpFactoryCall[],
+    policy: MigrationOperationPolicy,
+  ): {
+    readonly allowed: readonly PostgresOpFactoryCall[];
+    readonly conflicts: readonly SqlPlannerConflict[];
+  } {
+    const allowed: PostgresOpFactoryCall[] = [];
+    const conflicts: SqlPlannerConflict[] = [];
+    for (const call of calls) {
+      if (policy.allowedOperationClasses.includes(call.operationClass)) {
+        allowed.push(call);
+      } else {
+        conflicts.push({
+          kind: 'missingButNonAdditive',
+          summary: `Planned operation "${call.label}" requires "${call.operationClass}" operations, which are not allowed by the current policy.`,
+        });
+      }
+    }
+    return { allowed, conflicts };
   }
 
   /**

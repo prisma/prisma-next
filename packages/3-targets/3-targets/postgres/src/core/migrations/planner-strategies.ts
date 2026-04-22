@@ -40,6 +40,13 @@ import {
 import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builders';
 import { buildExpectedFormatType } from './planner-sql-checks';
 
+/** Shared between descriptor `typeChangeStrategy` and call-flow `typeChangeCallStrategy`. */
+const TYPE_SAFE_WIDENINGS = new Set(['int2→int4', 'int2→int8', 'int4→int8', 'float4→float8']);
+
+function isTypeSafeWidening(fromType: string, toType: string): boolean {
+  return TYPE_SAFE_WIDENINGS.has(`${fromType}→${toType}`);
+}
+
 // ============================================================================
 // Strategy types
 // ============================================================================
@@ -162,11 +169,6 @@ export const typeChangeStrategy: MigrationStrategy = (issues, ctx) => {
   const matched: SchemaIssue[] = [];
   const ops: PostgresMigrationOpDescriptor[] = [];
 
-  const SAFE_WIDENINGS = new Set(['int2→int4', 'int2→int8', 'int4→int8', 'float4→float8']);
-  function isSafeWidening(fromType: string, toType: string): boolean {
-    return SAFE_WIDENINGS.has(`${fromType}→${toType}`);
-  }
-
   for (const issue of issues) {
     if (issue.kind !== 'type_mismatch') continue;
     if (!issue.table || !issue.column) continue;
@@ -177,7 +179,7 @@ export const typeChangeStrategy: MigrationStrategy = (issues, ctx) => {
     const toType = toColumn.nativeType;
     if (fromType === toType) continue;
     matched.push(issue);
-    if (isSafeWidening(fromType, toType)) {
+    if (isTypeSafeWidening(fromType, toType)) {
       ops.push(alterColumnType(issue.table, issue.column));
     } else {
       ops.push(
@@ -363,8 +365,6 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
   };
 };
 
-const SAFE_WIDENINGS = new Set(['int2→int4', 'int2→int8', 'int4→int8', 'float4→float8']);
-
 export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const matched: SchemaIssue[] = [];
   const calls: PostgresOpFactoryCall[] = [];
@@ -380,7 +380,7 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     if (fromType === toType) continue;
     matched.push(issue);
     const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
-    if (SAFE_WIDENINGS.has(`${fromType}→${toType}`)) {
+    if (isTypeSafeWidening(fromType, toType)) {
       calls.push(new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts));
     } else {
       calls.push(

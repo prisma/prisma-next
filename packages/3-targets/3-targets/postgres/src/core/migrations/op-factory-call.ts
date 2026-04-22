@@ -793,9 +793,9 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     return [
-      `dataTransform(contract, ${JSON.stringify(this.label)}, {`,
-      `  check: () => placeholder(${JSON.stringify(this.checkSlot)}),`,
-      `  run: () => placeholder(${JSON.stringify(this.runSlot)}),`,
+      `dataTransform(contract, ${jsonToTsSource(this.label)}, {`,
+      `  check: () => placeholder(${jsonToTsSource(this.checkSlot)}),`,
+      `  run: () => placeholder(${jsonToTsSource(this.runSlot)}),`,
       '})',
     ].join('\n');
   }

@@ -22,7 +22,7 @@
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'pathe';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {

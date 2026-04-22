@@ -882,7 +882,7 @@ function mapIssueToCall(
       }
       if (typeInstance.codecId.startsWith('pg/enum')) {
         const values = (typeInstance.typeParams['values'] ?? []) as readonly string[];
-        return ok([new CreateEnumTypeCall(schemaName, issue.typeName, values)]);
+        return ok([new CreateEnumTypeCall(schemaName, typeInstance.nativeType, values)]);
       }
       return notOk(
         issueConflict(
