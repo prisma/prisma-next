@@ -1,6 +1,6 @@
+import { resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import { executeContractEmit } from '@prisma-next/cli/control-api';
-import { resolve } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
@@ -11,6 +11,21 @@ vi.mock('@prisma-next/cli/control-api', () => ({
 vi.mock('@prisma-next/cli/config-loader', () => ({
   loadConfig: vi.fn(),
 }));
+
+vi.mock('@prisma-next/emitter', () => ({
+  getEmittedArtifactPaths: (outputJsonPath: string) => ({
+    jsonPath: outputJsonPath,
+    dtsPath: outputJsonPath.replace(/\.json$/, '.d.ts'),
+  }),
+}));
+
+vi.mock('pathe', async () => {
+  const path = await vi.importActual<typeof import('node:path')>('node:path');
+  return {
+    extname: path.extname,
+    resolve: path.resolve,
+  };
+});
 
 const mockedExecuteContractEmit = vi.mocked(executeContractEmit);
 const mockedLoadConfig = vi.mocked(loadConfig);
@@ -50,6 +65,15 @@ function createLoadedConfig({
       output: toAbsolutePath(output),
     },
   } as LoadedConfig;
+}
+
+function createContractEmitResult(publication: 'written' | 'superseded' = 'written') {
+  return {
+    storageHash: 'abc123',
+    profileHash: 'def456',
+    publication,
+    files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+  };
 }
 
 function applyModuleGraph(
@@ -114,11 +138,7 @@ describe('prismaVitePlugin', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockedExecuteContractEmit.mockReset();
-    mockedExecuteContractEmit.mockResolvedValue({
-      storageHash: 'abc123',
-      profileHash: 'def456',
-      files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
-    });
+    mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult());
     mockedLoadConfig.mockReset();
     mockedLoadConfig.mockResolvedValue(createLoadedConfig());
   });
@@ -710,6 +730,25 @@ describe('prismaVitePlugin', () => {
   });
 
   describe('error handling', () => {
+    it('does not reload or log success when emit publication is superseded', async () => {
+      mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult('superseded'));
+
+      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockServer.ws.send).not.toHaveBeenCalledWith({ type: 'full-reload' });
+      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Emitted contract'));
+    });
+
     it('logs error when emit fails', async () => {
       mockedExecuteContractEmit.mockRejectedValue(new Error('Emit failed'));
 

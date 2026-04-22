@@ -128,6 +128,11 @@ export function prismaVitePlugin(
         return null;
       }
 
+      if (result.publication === 'superseded') {
+        log('Emit publication superseded before artifacts were written', 'debug');
+        return null;
+      }
+
       log(`Emitted contract (storageHash: ${result.storageHash.slice(0, 8)}...)`);
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');

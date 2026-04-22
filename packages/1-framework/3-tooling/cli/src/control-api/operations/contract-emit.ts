@@ -146,12 +146,12 @@ async function writeContractArtifacts({
   readonly signal: AbortSignal;
   readonly contractJson: string;
   readonly contractDts: string;
-}): Promise<void> {
-  await queueEmitWrite(outputJsonPath, async (state) => {
+}): Promise<'written' | 'superseded'> {
+  return await queueEmitWrite(outputJsonPath, async (state) => {
     signal.throwIfAborted();
 
     if (generation < state.nextGeneration) {
-      return;
+      return 'superseded';
     }
 
     const tempJsonPath = createTempArtifactPath(outputJsonPath, generation, 'next');
@@ -164,7 +164,7 @@ async function writeContractArtifacts({
       signal.throwIfAborted();
 
       if (generation < state.nextGeneration) {
-        return;
+        return 'superseded';
       }
 
       const previousJson = await readExistingArtifact(outputJsonPath);
@@ -177,6 +177,7 @@ async function writeContractArtifacts({
         ],
         generation,
       );
+      return 'written';
     } finally {
       await Promise.allSettled([
         rm(tempJsonPath, { force: true }),
@@ -320,7 +321,7 @@ export async function executeContractEmit(
   );
 
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  await writeContractArtifacts({
+  const publication = await writeContractArtifacts({
     outputJsonPath,
     outputDtsPath,
     generation,
@@ -339,6 +340,7 @@ export async function executeContractEmit(
     storageHash: emitResult.storageHash,
     ...ifDefined('executionHash', emitResult.executionHash),
     profileHash: emitResult.profileHash,
+    publication,
     files: {
       json: outputJsonPath,
       dts: outputDtsPath,

@@ -532,6 +532,8 @@ export interface ContractEmitResult {
   readonly executionHash?: string;
   /** Hash of the profile (target+extensions) */
   readonly profileHash: string;
+  /** Whether this emit published artifacts or was superseded before publication */
+  readonly publication: 'written' | 'superseded';
   /** Paths to the emitted files */
   readonly files: {
     /** Path to the emitted contract.json file */

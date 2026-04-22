@@ -324,10 +324,13 @@ describe('executeContractEmit', () => {
       });
 
       secondEmit.resolve(createEmitResult('newer'));
-      await second;
+      const secondResult = await second;
 
       firstEmit.resolve(createEmitResult('older'));
-      await first;
+      const firstResult = await first;
+
+      expect(secondResult.publication).toBe('written');
+      expect(firstResult.publication).toBe('superseded');
     });
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(JSON.stringify({ generation: 'newer' }));
