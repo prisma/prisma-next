@@ -186,14 +186,32 @@ Asserts the H3 invariant (revised):
 > When `verify.mode === 'always'` and K concurrent queries share a runtime,
 > the number of verification marker reads **equals** K.
 
-Implemented against the running app's `/diag` endpoint so the assertion
-runs against the real pool + real runtime + real RSC rendering, not a
-mock. If the invariant holds (expected), the test locks it in as a
-regression guard. If it fails, the findings doc gets a new surprise to
-document and H3 gets revised again.
+**Test level: process, not HTTP.** The plan originally called for
+asserting against the running app's `/diag` endpoint. On reflection,
+the invariant's mechanism lives entirely in
+`RuntimeCoreImpl.verifyPlanIfNeeded()` — the RSC layer is incidental.
+What the test actually needs to exercise is "N parallel `await`ed
+queries sharing one runtime on the Node event loop", which is
+identical on-event-loop to what RSC produces. A process-level test
+gets that with less machinery (no `next start`, no port management, no
+HTTP layer to debug when something fails) and lets us cheaply
+parameterize K.
 
-Observational output remains the primary deliverable per §3.1; this test
-exists specifically to pin the invariant.
+HTTP-level coverage of the invariant isn't lost: the k6 scripts
+already exercise the `/stress/always` path end-to-end and the
+teardown-time `/diag` delta is the HTTP-level observation. The
+integration test is the deterministic pin; k6 is the empirical
+sanity check.
+
+Implementation: construct an `InstrumentedPool` + `postgres()` client
+directly in the test (reusing the app's `src/lib/pool.ts`), fire K
+concurrent `execute()`s against the same runtime, then assert
+`markerReads === K` and `acquires === releases`. A couple of K values
+(e.g. 1, 5, 50) cover both "single query" and "well-past the default
+pool" shapes.
+
+Observational output remains the primary deliverable per §3.1; this
+test exists specifically to pin the invariant.
 
 ### 3.4 Findings doc (final)
 

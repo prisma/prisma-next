@@ -73,11 +73,12 @@ of the page for marker-read and connection-acquire counters.
 
 | Route             | Purpose                                              | Verify mode   |
 |-------------------|------------------------------------------------------|---------------|
-| `/`               | Five parallel Server Components (varied shapes).     | `onFirstUse`  |
-| `/stress/always`  | Same page, pinned to `always` mode to reproduce H3.  | `always`      |
-| `/diag`           | JSON snapshot of in-process counters.                | —             |
+| `/`                      | Five parallel Server Components (varied shapes).        | `onFirstUse`              |
+| `/stress/always`         | Same page, pinned to `always` mode to probe H3.         | `always`                  |
+| `/stress/pool-pressure`  | Same page, pinned to `poolMax: 5` to probe H4.          | `onFirstUse` (poolMax=5)  |
+| `/diag`                  | JSON snapshot of in-process counters.                   | —                         |
 
-`/stress/always` arrives in a later PR; the other two are live.
+All four routes are live.
 
 ## The five Server Components
 
@@ -172,6 +173,46 @@ Fixed by counting only on successful resolve. The `'release'` event
 fires unconditionally from `pg-pool`'s `_release()` regardless of
 what's happening inside `client.release()`, so that path was already
 robust. See the comment block in `src/lib/pool.ts` for the gory details.
+
+## Tests
+
+```sh
+# skips the whole suite — ppg-dev rejects concurrent connections, so the
+# H2/H3 invariant tests need a real Postgres
+pnpm --filter rsc-poc-postgres test
+
+# runs the suite against a pgvector-capable Postgres
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/rsc_poc \
+  pnpm --filter rsc-poc-postgres test
+```
+
+Start a local Postgres (pgvector-enabled) once:
+
+```sh
+docker run --rm -d --name rsc-poc-pg -p 5434:5432 \
+  -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=rsc_poc \
+  pgvector/pgvector:pg17
+```
+
+The test suite (`test/always-mode-invariant.test.ts`) pins:
+
+- **H2** — `onFirstUse` cold-start: K concurrent queries issue **1 to K**
+  marker reads on first burst, then 0 on subsequent bursts.
+- **H3** (revised) — `always` mode: K concurrent queries issue **exactly
+  K** marker reads, regardless of concurrency. Covered for K ∈ {1, 5, 50}
+  and across repeated bursts.
+- **Balance** — `connectionAcquires === connectionReleases` in all
+  scenarios.
+
+Each test drops and recreates `public` + `prisma_contract` schemas before
+running, so order-independence is guaranteed but concurrent `pnpm test`
+runs against the same `DATABASE_URL` will corrupt each other. Vitest is
+configured with `maxWorkers: 1` to serialize naturally.
+
+Without `DATABASE_URL`, the whole `describe` is skipped (CI-friendly —
+no Postgres service needed for `test:examples`). The source-level
+reasoning in `projects/rsc-concurrency-safety/plan.md §2` is the primary
+argument for H3; this test is the pin.
 
 ## Stress scripts
 
