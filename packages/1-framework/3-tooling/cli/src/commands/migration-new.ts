@@ -11,6 +11,7 @@
 
 import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
@@ -116,10 +117,6 @@ async function executeMigrationNewCommand(
 
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
-  // TODO(#356): replace the sibling-`.d.ts` expedient below with the
-  // contract emitter's `files()` API once that PR lands, so we can
-  // declare the source-contract artifacts the same way as the
-  // destination-contract artifacts.
   let fromContractSourceDir: string | null = null;
 
   try {
@@ -217,23 +214,18 @@ async function executeMigrationNewCommand(
     ]);
 
     await writeMigrationPackage(packageDir, manifest, []);
-    // TODO(#356): the emitter should own the list of contract artifacts to
-    // copy — for now we rely on the sibling `.d.ts` convention.
-    const contractDtsAbsolute = `${contractPathAbsolute.slice(0, -'.json'.length)}.d.ts`;
+    const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
-      { sourcePath: contractPathAbsolute, destName: 'end-contract.json' },
-      { sourcePath: contractDtsAbsolute, destName: 'end-contract.d.ts' },
+      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
+      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
     ]);
     if (fromContractSourceDir !== null) {
+      const sourceArtifacts = getEmittedArtifactPaths(
+        join(fromContractSourceDir, 'end-contract.json'),
+      );
       await copyFilesWithRename(packageDir, [
-        {
-          sourcePath: join(fromContractSourceDir, 'end-contract.json'),
-          destName: 'start-contract.json',
-        },
-        {
-          sourcePath: join(fromContractSourceDir, 'end-contract.d.ts'),
-          destName: 'start-contract.d.ts',
-        },
+        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
+        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
       ]);
     }
 
