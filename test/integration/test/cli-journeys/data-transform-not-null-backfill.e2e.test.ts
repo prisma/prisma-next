@@ -2,8 +2,8 @@
  * NOT-NULL backfill — `notNullBackfillCallStrategy` end-to-end.
  *
  * Drives a contract change that adds a non-nullable column with no
- * default. The Postgres class-flow planner's
- * `notNullBackfillCallStrategy` matches this and emits
+ * default. The Postgres planner's `notNullBackfillCallStrategy`
+ * matches this and emits
  * `addColumn(nullable) → DataTransformCall(placeholder slots) →
  * setNotNull`. The planner-emitted `migration.ts` therefore has two
  * `placeholder("…")` stubs the user must fill in. This test simulates

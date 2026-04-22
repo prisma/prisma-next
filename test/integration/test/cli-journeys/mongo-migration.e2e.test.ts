@@ -4,7 +4,7 @@
  * Covers the gap that no Postgres-shaped journey test exercises for MongoDB:
  *
  *  1. `migration plan --target mongo` from the empty contract baseline:
- *     scaffolds a class-flow `migration.ts`, copies `end-contract.json` /
+ *     scaffolds a `migration.ts`, copies `end-contract.json` /
  *     `end-contract.d.ts` next to it, and emits attested `ops.json` with the
  *     expected `createIndex` operation(s). Asserts the rendered
  *     `migration.ts` is round-trip executable: running it via `tsx`
@@ -16,7 +16,7 @@
  *     bookends populated in `describe()`) and copies the contract artifacts
  *     into the migration directory.
  *
- *  3. End-to-end class-flow with a real MongoDB instance via
+ *  3. End-to-end with a real MongoDB instance via
  *     `MongoMemoryReplSet`: plan + apply the initial DDL, seed data,
  *     hand-author a `dataTransform` + additive `createIndex` migration,
  *     self-emit it by running `node migration.ts`, apply it, and verify both
@@ -200,7 +200,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     created.clear();
   });
 
-  it('migration plan --target mongo scaffolds class-flow migration.ts, copies contract files, and emits attested ops.json', async () => {
+  it('migration plan --target mongo scaffolds migration.ts, copies contract files, and emits attested ops.json', async () => {
     const ctx = setupMongoJourney(undefined);
     created.add(ctx.testDir);
 

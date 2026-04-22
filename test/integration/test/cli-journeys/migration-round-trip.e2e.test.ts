@@ -1,7 +1,7 @@
 /**
- * Class-flow round trip — Phase 3 acceptance.
+ * Migration round trip — Phase 3 acceptance.
  *
- * Drives the full class-flow lifecycle end-to-end against a live
+ * Drives the full migration lifecycle end-to-end against a live
  * Postgres:
  *
  *   1. `migration plan` → `migration apply` against an empty
@@ -11,18 +11,18 @@
  *      and the formatted output reports "Already up to date" (per
  *      `plan.md` lines 318-323).
  *   3. Swap to a contract that both adds a nullable column and
- *      requires a data backfill, hand-author a class-flow
- *      `migration.ts` that combines `addColumn` + `dataTransform` +
- *      `setNotNull`, `migration emit` → `migration apply` succeeds
- *      and the data is correct.
+ *      requires a data backfill, hand-author a `migration.ts` that
+ *      combines `addColumn` + `dataTransform` + `setNotNull`, run
+ *      it to emit `ops.json`, then `migration apply` succeeds and
+ *      the data is correct.
  *   4. Re-running `migration apply` after the second migration is
  *      again a no-op.
  *
  * This is the broader companion to the per-strategy planner-assisted
  * e2es (`data-transform-not-null-backfill.e2e.test.ts` and
  * friends): those isolate one strategy each, this one proves the
- * whole class-flow pipeline (createTable → addColumn → dataTransform
- * → setNotNull) round-trips and is idempotent.
+ * whole pipeline (createTable → addColumn → dataTransform →
+ * setNotNull) round-trips and is idempotent.
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -46,7 +46,7 @@ import {
 const BACKFILLED_NAME = 'unknown';
 
 withTempDir(({ createTempDir }) => {
-  describe('Journey: class-flow round trip (createTable + dataTransform + addColumn)', () => {
+  describe('Journey: migration round trip (createTable + dataTransform + addColumn)', () => {
     const db = useDevDatabase();
 
     it(
@@ -90,8 +90,8 @@ withTempDir(({ createTempDir }) => {
 
         // -----------------------------------------------------------
         // Step 3: swap to the contract that adds a NOT NULL `name`
-        // column. Then hand-author a class-flow `migration.ts`
-        // combining `addColumn(nullable)` + `dataTransform` +
+        // column. Then hand-author a `migration.ts` combining
+        // `addColumn(nullable)` + `dataTransform` +
         // `setNotNull` — the same shape `notNullBackfillCallStrategy`
         // would emit, but written manually here so this test stays
         // independent of the planner-assisted strategies (which the
@@ -161,7 +161,7 @@ Migration.run(import.meta.url, M);
 
         const opsAfterEmit = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
         const opIds = opsAfterEmit.map((op: { id: string }) => op.id);
-        // Class-flow shape: addColumn → dataTransform → setNotNull.
+        // Expected shape: addColumn → dataTransform → setNotNull.
         expect(opIds).toContain('column.user.name');
         expect(opIds).toContain('data_migration.backfill-user-name');
         expect(opIds.some((id: string) => id.includes('setNotNull.user.name'))).toBe(true);
