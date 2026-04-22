@@ -189,8 +189,6 @@ jobs:
     name: Vite Support Matrix (Vite ${{ matrix.vite-version }})
     needs: build
     runs-on: ubuntu-latest
-    env:
-      TEST_TIMEOUT_MULTIPLIER: 2
     strategy:
       fail-fast: false
       matrix:
