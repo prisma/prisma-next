@@ -1,3 +1,4 @@
+import type { Stats } from 'node:fs';
 import { lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
@@ -107,16 +108,19 @@ function createManagedGenerationDirName(generation: number): string {
   return `g-${generation}`;
 }
 
-async function pathExists(path: string): Promise<boolean> {
+async function tryLstat(path: string): Promise<Stats | undefined> {
   try {
-    await lstat(path);
-    return true;
+    return await lstat(path);
   } catch (error) {
     if (isRecord(error) && error['code'] === 'ENOENT') {
-      return false;
+      return undefined;
     }
     throw error;
   }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  return (await tryLstat(path)) !== undefined;
 }
 
 async function replacePathWithSymlink(
@@ -133,6 +137,18 @@ async function replacePathWithSymlink(
   }
 }
 
+async function ensureSymlinkIfMissing(
+  publicPath: string,
+  linkTarget: string,
+  generation: number,
+): Promise<void> {
+  const stat = await tryLstat(publicPath);
+  if (stat?.isSymbolicLink()) {
+    return;
+  }
+  await replacePathWithSymlink(publicPath, linkTarget, generation);
+}
+
 async function ensurePublicManagedLinks({
   outputJsonPath,
   outputDtsPath,
@@ -144,35 +160,8 @@ async function ensurePublicManagedLinks({
   readonly managedPaths: ManagedArtifactPaths;
   readonly generation: number;
 }): Promise<void> {
-  const jsonStat = await (async () => {
-    try {
-      return await lstat(outputJsonPath);
-    } catch (error) {
-      if (isRecord(error) && error['code'] === 'ENOENT') {
-        return undefined;
-      }
-      throw error;
-    }
-  })();
-
-  if (!jsonStat?.isSymbolicLink()) {
-    await replacePathWithSymlink(outputJsonPath, managedPaths.publicJsonLinkTarget, generation);
-  }
-
-  const dtsStat = await (async () => {
-    try {
-      return await lstat(outputDtsPath);
-    } catch (error) {
-      if (isRecord(error) && error['code'] === 'ENOENT') {
-        return undefined;
-      }
-      throw error;
-    }
-  })();
-
-  if (!dtsStat?.isSymbolicLink()) {
-    await replacePathWithSymlink(outputDtsPath, managedPaths.publicDtsLinkTarget, generation);
-  }
+  await ensureSymlinkIfMissing(outputJsonPath, managedPaths.publicJsonLinkTarget, generation);
+  await ensureSymlinkIfMissing(outputDtsPath, managedPaths.publicDtsLinkTarget, generation);
 }
 
 async function readExistingArtifact(path: string): Promise<string | undefined> {
