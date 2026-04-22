@@ -1,3 +1,4 @@
+export type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 export type { MongoCollection } from '../collection';
 export { createMongoCollection } from '../collection';
 export { compileMongoQuery } from '../compile';
@@ -27,7 +28,6 @@ export type {
   MongoWhereFilter,
   NoIncludes,
   ResolvedCreateInput,
-  SimplifyDeep,
   VariantCreateInput,
   VariantModelRow,
   VariantNames,

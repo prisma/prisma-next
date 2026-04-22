@@ -8,6 +8,7 @@ import {
   ColumnRef,
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder';
 import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
@@ -84,7 +85,11 @@ export class GroupedCollection<
   async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
   ): Promise<
-    Array<Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>>
+    Array<
+      SimplifyDeep<
+        Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      >
+    >
   > {
     const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const aggregateEntries = Object.entries(aggregateSpec);
@@ -118,7 +123,9 @@ export class GroupedCollection<
       }
       return mapped;
     }) as Array<
-      Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      SimplifyDeep<
+        Pick<DefaultModelRow<TContract, ModelName>, GroupFields[number]> & AggregateResult<Spec>
+      >
     >;
   }
 }

@@ -7,8 +7,8 @@
  */
 
 import { existsSync } from 'node:fs';
+import { join } from 'node:path';
 import { withClient } from '@prisma-next/test-utils';
-import { join } from 'pathe';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';

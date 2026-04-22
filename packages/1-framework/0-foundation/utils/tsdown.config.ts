@@ -8,5 +8,6 @@ export default defineConfig({
     'src/exports/defined.ts',
     'src/exports/result.ts',
     'src/exports/redact-db-url.ts',
+    'src/exports/simplify-deep.ts',
   ],
 });

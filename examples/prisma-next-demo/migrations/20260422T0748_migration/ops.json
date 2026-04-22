@@ -1,0 +1,55 @@
+[
+  {
+    "id": "data_migration.handle-nulls-user-displayName",
+    "label": "Data transform: handle-nulls-user-displayName",
+    "operationClass": "data",
+    "name": "handle-nulls-user-displayName",
+    "source": "migration.ts",
+    "check": {
+      "sql": "SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1",
+      "params": []
+    },
+    "run": [
+      {
+        "sql": "UPDATE \"user\" SET \"displayName\" = $1 WHERE \"displayName\" IS NULL",
+        "params": ["Anonymous"]
+      }
+    ]
+  },
+  {
+    "id": "alterNullability.setNotNull.user.displayName",
+    "label": "Set NOT NULL on \"user\".\"displayName\"",
+    "operationClass": "destructive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "column",
+        "name": "displayName",
+        "table": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure column \"displayName\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n)"
+      },
+      {
+        "description": "ensure no NULL values in \"displayName\"",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM \"public\".\"user\" WHERE \"displayName\" IS NULL)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "set NOT NULL on \"displayName\"",
+        "sql": "ALTER TABLE \"public\".\"user\" ALTER COLUMN \"displayName\" SET NOT NULL"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify column \"displayName\" is NOT NULL",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM information_schema.columns\n  WHERE table_schema = 'public'\n    AND table_name = 'user'\n    AND column_name = 'displayName'\n    AND is_nullable = 'NO'\n)"
+      }
+    ]
+  }
+]

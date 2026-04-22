@@ -39,6 +39,35 @@ export function placeholder(slot: string): never {
 }
 
 /**
+ * A `dataTransform(endContract, …)` factory was handed a `SqlQueryPlan` whose
+ * `meta.storageHash` does not match the `endContract.storage.storageHash` it
+ * was configured with. This almost always means the user's query-builder
+ * (`sql({ context: createExecutionContext({ contract: endContract, … }) })`)
+ * was instantiated from a different contract reference than the one passed
+ * to `dataTransform(endContract, …)`.
+ *
+ * Distinct from `runtimeError('PLAN.HASH_MISMATCH', …)` (`PN-RUN-*`) which
+ * rejects a plan at runtime execution; this is an authoring-time rejection
+ * so it lives in the `MIG` namespace.
+ */
+export function errorDataTransformContractMismatch(options: {
+  readonly dataTransformName: string;
+  readonly expected: string;
+  readonly actual: string;
+}): CliStructuredError {
+  return new CliStructuredError('2005', 'dataTransform query plan built against wrong contract', {
+    domain: 'MIG',
+    why: `Data transform "${options.dataTransformName}" produced a query plan whose storage hash (${options.actual}) does not match the migration's contract (${options.expected}). The query builder was configured with a different contract than the one passed to dataTransform(endContract, ...).`,
+    fix: 'Ensure the `endContract` imported at module scope (used for both `dataTransform(endContract, …)` and `sql({ context: createExecutionContext({ contract: endContract, … }) })`) is the same reference.',
+    meta: {
+      dataTransformName: options.dataTransformName,
+      expected: options.expected,
+      actual: options.actual,
+    },
+  });
+}
+
+/**
  * `migration.ts` was expected at the given package directory but could not be
  * located. Thrown by `emitMigration` (and, as a belt-and-suspenders, by
  * class-flow `emit` capabilities) when the file is missing.

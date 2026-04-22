@@ -11,11 +11,12 @@
 
 import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
+import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
@@ -116,6 +117,7 @@ async function executeMigrationNewCommand(
 
   let fromContract: Contract | null = null;
   let fromHash: string = EMPTY_CONTRACT_HASH;
+  let fromContractSourceDir: string | null = null;
 
   try {
     const packages = await readMigrationsDir(migrationsDir);
@@ -136,6 +138,7 @@ async function executeMigrationNewCommand(
         }
         fromHash = match.manifest.to;
         fromContract = match.manifest.toContract;
+        fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
         if (latestMigration) {
@@ -145,6 +148,7 @@ async function executeMigrationNewCommand(
           );
           if (leafPkg) {
             fromContract = leafPkg.manifest.toContract;
+            fromContractSourceDir = leafPkg.dirPath;
           }
         }
       }
@@ -210,14 +214,27 @@ async function executeMigrationNewCommand(
     ]);
 
     await writeMigrationPackage(packageDir, manifest, []);
-    await copyContractToMigrationDir(packageDir, contractPathAbsolute);
+    const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
+    await copyFilesWithRename(packageDir, [
+      { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
+      { sourcePath: destinationArtifacts.dtsPath, destName: 'end-contract.d.ts' },
+    ]);
+    if (fromContractSourceDir !== null) {
+      const sourceArtifacts = getEmittedArtifactPaths(
+        join(fromContractSourceDir, 'end-contract.json'),
+      );
+      await copyFilesWithRename(packageDir, [
+        { sourcePath: sourceArtifacts.jsonPath, destName: 'start-contract.json' },
+        { sourcePath: sourceArtifacts.dtsPath, destName: 'start-contract.d.ts' },
+      ]);
+    }
 
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration({
       packageDir,
-      contractJsonPath: join(packageDir, 'contract.json'),
+      contractJsonPath: join(packageDir, 'end-contract.json'),
       fromHash,
       toHash: toStorageHash,
     });

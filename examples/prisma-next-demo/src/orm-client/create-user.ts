@@ -8,6 +8,7 @@ type UserRow = DefaultModelRow<Contract, 'User'>;
 export interface OrmClientCreateUserInput {
   readonly id: string;
   readonly email: string;
+  readonly displayName: string;
   readonly kind: 'admin' | 'user';
   readonly createdAt: Date | string;
 }
@@ -17,6 +18,7 @@ export async function ormClientCreateUser(data: OrmClientCreateUserInput, runtim
   return db.User.select('id', 'email', 'kind').create({
     id: toUserId(data.id),
     email: data.email,
+    displayName: data.displayName,
     kind: data.kind,
     createdAt: toUserCreatedAt(data.createdAt),
   });

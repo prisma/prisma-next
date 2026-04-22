@@ -17,12 +17,19 @@ describe('writeMigrationTs', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('writes the rendered content verbatim', async () => {
+  it('writes the rendered content after passing it through prettier', async () => {
+    // Rendered source often comes in with loose spacing from a programmatic
+    // composer (e.g. the class-flow renderer). `writeMigrationTs` runs it
+    // through prettier so the on-disk file is canonically formatted — this
+    // test locks that behaviour by giving it a deliberately under-quoted
+    // statement and asserting the written file uses the house single-quote
+    // style.
     const content = '#!/usr/bin/env -S node\nconsole.log("hi");\n';
     await writeMigrationTs(tmpDir, content);
 
     const written = await readFile(join(tmpDir, 'migration.ts'), 'utf-8');
-    expect(written).toBe(content);
+    expect(written.startsWith('#!/usr/bin/env -S node')).toBe(true);
+    expect(written).toContain("console.log('hi');");
   });
 
   it.skipIf(!isPosix)('sets the executable bit when content starts with a shebang', async () => {
