@@ -13,8 +13,8 @@ The project is carved at the points where behavior change lands: PR 1 is pure fo
 | PR | Phases | Net effect | Risk |
 |---|---|---|---|
 | 1 — Foundation | 0 + 1 | Additive — new IR in place, `db update` runs through it; `migration plan` unchanged | Low |
-| 2 — Flip | 2 + 3 | `migration plan` switches to class-flow; every example migration re-scaffolded | High |
-| 3 — Cleanup | 4 + 5 + 6 | Planner collapse + delete descriptor-flow + delete `migration emit` | Medium |
+| 2 — Flip | 2 + 3 | `migration plan` switches to class-flow; reference class-flow migration committed; wholesale example re-scaffolding deferred to PR 3 | High |
+| 3 — Cleanup | 4 + 5 + 6 | Planner collapse + re-scaffold every example migration through the unified pipeline + delete descriptor-flow + delete `migration emit` | Medium |
 
 ## PR 1 — Foundation (Phases 0 + 1)
 
@@ -64,11 +64,11 @@ Revert the PR. Walk-schema planner returns to its pre-IR shape. No user impact.
 - Add per-strategy apply/verify tests that run each emitted recipe against a fresh Postgres and assert the runner's post-apply `verifySqlSchema` passes, for each of the four data-safety scenarios (Phase 2).
 - Flip Postgres's `migrationStrategy` registration: remove `resolveDescriptors`, register `emit` instead (Phase 3).
 - Remove descriptor-flow entry points from the Postgres `TargetMigrationsCapability` (`planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`). The framework-level interface still has these methods — deletion from the interface happens in PR 3 — but Postgres no longer implements them (Phase 3).
-- Re-scaffold every `examples/**/migrations/*/`: regenerate `migration.ts`, `ops.json`, `migration.json` through the class-flow pipeline. `migrationId` values change (Phase 3).
+- Commit a hand-authored class-flow reference migration under `examples/prisma-next-demo/prisma/migrations/` that demonstrates the canonical authoring surface (`dataTransform(contract, name, { check, run })`, module-scoped `db`, `class M extends Migration`, `Migration.run(import.meta.url, M)`). Its attested artifacts (`contract.{json,d.ts}`, `ops.json`, `migration.json`) are regenerable locally per the sibling `README.md` and are deliberately not checked in. Wholesale re-scaffolding of every pre-existing `examples/**/migrations/*/` is deferred to PR 3, where a single planning pipeline lets one `migration plan` run produce every example's class-flow migration from its committed contract without straddling the walk-schema / class-flow split that still exists during PR 2.
 
 ### Behavior change
 
-This is the "switch the lights" moment. Users who run `migration plan --target postgres` get a class-flow `migration.ts` from this PR forward. Every example migration in the repo is replaced with its class-flow regeneration.
+This is the "switch the lights" moment. Users who run `migration plan --target postgres` get a class-flow `migration.ts` from this PR forward. A reference class-flow migration is committed under `examples/prisma-next-demo/prisma/migrations/` to demonstrate the canonical authoring surface; wholesale re-scaffolding of every pre-existing example migration is deferred to PR 3.
 
 ### Why combine Phases 2 and 3
 
@@ -79,26 +79,28 @@ Phase 2 in isolation would land a dormant parallel code path in `main` — the r
 - `pnpm -r typecheck` + `pnpm -r lint`.
 - Per-strategy apply/verify tests pass for all four data-safety scenarios.
 - All CLI journey e2e pass — their fixtures and assertions get updated as part of this PR.
-- **Per-example apply/verify**: each re-scaffolded `examples/**/migrations/*/` is applied against a fresh Postgres (e.g. `pnpm --filter <example> db:update` against a disposable database) and the runner's post-apply `verifySqlSchema` check passes. The PR description lists the examples that were exercised and the commands that were run. This is the merge gate for schema equivalence — not a standing test.
+- **Per-strategy live-DB e2e**: each of the four planner-emitted recipes (NOT-NULL backfill, unsafe type change, nullable tightening, enum value removal) drives `migration plan` against a contract diff that triggers exactly that strategy and runs `migration apply` against a live Postgres dev DB, asserting both the placeholder-slot shape and the post-apply data + schema state. These are standing tests; the NOT-NULL case also pins `migration apply` idempotency on re-apply (AC4.2 idempotency half).
+- **Per-example apply/verify is deferred to PR 3.** Re-scaffolding every `examples/**/migrations/*/` requires a single planning pipeline to be the source of truth; during PR 2 `migration plan` and `db update` still run through different pipelines (class-flow vs walk-schema), so re-scaffolding + applying against a disposable database here would couple this PR to walk-schema edge cases PR 3 is specifically designed to eliminate. Schema equivalence is instead pinned by the per-strategy live-DB e2es above plus the class-flow round-trip e2e (`createTable → addColumn → dataTransform → setNotNull` + re-apply idempotency).
 
 ### Review strategy
 
-This PR will be large, dominated by re-scaffolded example diffs. Make it navigable by structuring commits:
+This PR is large but dominated by code, not example diffs (wholesale example re-scaffolding is deferred to PR 3). Make it navigable by structuring commits:
 
 1. One commit per retargeted strategy (data-safety scenarios, one by one).
 2. One commit for the issue-planner default-mapping retarget.
 3. One commit for the CLI flip (`migrationStrategy` registration change, Postgres capability cleanup).
-4. One commit per re-scaffolded example (or one per `examples/<project>/`, if per-migration is too noisy).
+4. One commit for the reference class-flow migration under `examples/prisma-next-demo/`.
+5. One commit per per-strategy live-DB e2e, plus one for the class-flow round-trip e2e.
 
-Reviewers can then focus line-by-line on the first three groups and treat the example-diff commits as "accept the regen".
+Reviewers focus line-by-line on groups 1–3; group 4 is the authoring-surface reference; group 5 is the live-DB pins for the Step 2 / Step 4 spec ACs.
 
 ### Size estimate
 
-Largest PR. ~8–10 days of implementation. ~4–6k LOC including re-scaffolded examples.
+Large PR, dominated by code (retargeted strategies, issue-planner retarget, CLI flip, per-strategy live-DB e2es). ~8–10 days of implementation. Wholesale example re-scaffolding — previously estimated at ~4–6k LOC — is deferred to PR 3.
 
 ### Rollback
 
-Revert the PR. `resolveDescriptors` returns to the Postgres capability, descriptor-flow becomes the active branch again, examples revert to their pre-flip committed state. No data loss — the revert restores the exact committed state of the example migrations, and operators who already applied the new migrations are unaffected (the runner tracks `migrationId` on the target DB, independent of what the repo ships).
+Revert the PR. `resolveDescriptors` returns to the Postgres capability, descriptor-flow becomes the active branch again. The reference class-flow migration under `examples/prisma-next-demo/prisma/migrations/` is removed along with the rest of the revert. No data loss — operators who already applied the new migration are unaffected (the runner tracks `migrationId` on the target DB, independent of what the repo ships).
 
 ## PR 3 — Cleanup (Phases 4 + 5 + 6)
 
@@ -112,6 +114,7 @@ Revert the PR. `resolveDescriptors` returns to the Postgres capability, descript
 - Delete `migration emit` CLI command (Phase 6).
 - Delete `postgresEmit` and `mongoEmit` source files (Phase 6).
 - Remove `hints.planningStrategy` from the manifest writer (Phase 6).
+- Re-scaffold every pre-existing `examples/**/migrations/*/` through the now-unified `migration plan` pipeline: regenerate `migration.ts`, `ops.json`, `migration.json` against each example's committed contract. `migrationId` values change. Migrating this here rather than in PR 2 lets a single planning pipeline be the source of truth for every example's class-flow emission (Phase 4 pre-req).
 
 ### Behavior change
 
@@ -127,6 +130,7 @@ Phase 4 is non-trivial absorption work, but every walk-schema branch is guided b
 - Full integration + e2e green, especially `db update` e2e (now running through issue-based pipeline).
 - Grep assertions from [`spec.md` §"Removal (end of project)"](./spec.md) pass — no source file imports any deleted symbol.
 - New strategy ordering tests from Phase 4 pin the chain order.
+- **Per-example apply/verify** (deferred from PR 2): each re-scaffolded `examples/**/migrations/*/` is applied against a fresh Postgres (e.g. `pnpm --filter <example> db:update` against a disposable database) and the runner's post-apply `verifySqlSchema` check passes. The PR description lists the examples that were exercised and the commands that were run. This is the schema-equivalence merge gate — not a standing test.
 
 ### Escape hatch
 
@@ -139,7 +143,7 @@ The decision is gated on audit output and shouldn't be pre-committed here. Defau
 
 ### Size estimate
 
-~3–4 days. Mostly deletions, net-negative LOC.
+~4–6 days. Mostly deletions in code (net-negative LOC there), plus re-scaffolded example diffs carried over from PR 2 (dominant LOC, but "accept the regen" for reviewers).
 
 ### Rollback
 
@@ -155,7 +159,7 @@ Revert the PR. `db update` returns to the walk-schema planner; descriptor-flow s
 - **Don't split foundations.** Phase 0 alone is too small to justify a PR. Combining with Phase 1 keeps the factory extraction reviewable in context.
 - **Don't defer the flip.** Don't merge Phase 2 without Phase 3. Dormant parallel code paths rot in `main`.
 - **Do split PR 3 if forced.** The audit outcome is the trigger; use the escape hatch above if warranted.
-- **Do grow PR 2's commits, not its commit size.** The re-scaffolded examples will dominate LOC. Commits structured around logical boundaries (one per strategy, one per example) make review tractable at any diff size.
+- **Do grow PR 3's commits, not its commit size.** Re-scaffolded examples (now carried in PR 3 rather than PR 2) will dominate LOC there. Commits structured around logical boundaries (one per strategy in PR 2, one per example in PR 3) make review tractable at any diff size.
 
 ## References
 
