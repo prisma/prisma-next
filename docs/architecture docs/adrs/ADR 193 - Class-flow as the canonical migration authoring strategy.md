@@ -1,5 +1,9 @@
 # ADR 193 — Class-flow as the canonical migration authoring strategy
 
+## Status
+
+**Superseded in terminology, preserved in decision.** As of the postgres-class-flow-migrations project (which this ADR authorized for Postgres), descriptor-flow is fully deleted and class-flow is simply how migrations are authored. The phrase "class-flow" no longer carries a contrast and has been scrubbed from code, tests, and current docs; this ADR preserves the original terminology as a historical record of the decision.
+
 ## At a glance
 
 A developer adds a `status` field with a unique index to their Mongo schema, runs `contract emit`, and then plans a migration:
