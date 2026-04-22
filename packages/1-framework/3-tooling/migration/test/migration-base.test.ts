@@ -166,6 +166,43 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
+  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting an older manifest', async () => {
+    const existingManifest = {
+      from: 'sha256:from',
+      to: 'sha256:to',
+      migrationId: null,
+      kind: 'regular',
+      fromContract: { storage: { storageHash: 'sha256:from' } },
+      toContract: { storage: { storageHash: 'sha256:to' } },
+      hints: {
+        used: ['idx_a'],
+        applied: ['additive_only'],
+        plannerVersion: '2.0.0',
+        planningStrategy: 'legacy-strategy',
+      },
+      labels: [],
+      createdAt: '2026-01-15T10:00:00.000Z',
+    };
+    await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
+
+    const script = migrationScript(
+      '[{ id: "op1", label: "Op", operationClass: "additive" }]',
+      '{ from: "sha256:from", to: "sha256:to" }',
+    );
+    await writeFile(join(tmpDir, 'migration.ts'), script);
+
+    const result = await runMigration('migration.ts');
+    expect(result.exitCode).toBe(0);
+
+    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
+    expect(manifest.hints).toEqual({
+      used: ['idx_a'],
+      applied: ['additive_only'],
+      plannerVersion: '2.0.0',
+    });
+    expect(manifest.hints).not.toHaveProperty('planningStrategy');
+  });
+
   it('prints operations with --dry-run and does not write ops.json', async () => {
     const script = migrationScript('[{ id: "op1", label: "Dry run op" }]');
     await writeFile(join(tmpDir, 'migration.ts'), script);

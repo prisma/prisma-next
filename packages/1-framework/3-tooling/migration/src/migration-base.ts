@@ -9,7 +9,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { dirname, join } from 'pathe';
 import { computeMigrationId } from './attestation';
-import type { MigrationManifest, MigrationOps } from './types';
+import type { MigrationHints, MigrationManifest, MigrationOps } from './types';
 
 export interface MigrationMeta {
   readonly from: string;
@@ -165,16 +165,27 @@ function buildAttestedManifest(
     // (everything else is stripped by `computeMigrationId`), and a real
     // contract bookend would only be available after `migration plan`.
     toContract: existing?.toContract ?? ({ storage: { storageHash: meta.to } } as Contract),
-    hints: existing?.hints ?? {
-      used: [],
-      applied: [],
-      plannerVersion: '2.0.0',
-    },
+    hints: normalizeHints(existing?.hints),
     ...ifDefined('authorship', existing?.authorship),
   };
 
   const migrationId = computeMigrationId(baseManifest, ops);
   return { ...baseManifest, migrationId };
+}
+
+/**
+ * Project `existing.hints` down to the known `MigrationHints` shape, dropping
+ * any legacy keys that may linger in manifests scaffolded by older CLI
+ * versions (e.g. `planningStrategy`). Picking fields explicitly instead of
+ * spreading keeps refreshed `migration.json` files schema-clean regardless
+ * of what was on disk before.
+ */
+function normalizeHints(existing: MigrationHints | undefined): MigrationHints {
+  return {
+    used: existing?.used ?? [],
+    applied: existing?.applied ?? [],
+    plannerVersion: existing?.plannerVersion ?? '2.0.0',
+  };
 }
 
 function readExistingManifest(manifestPath: string): Partial<MigrationManifest> | null {
