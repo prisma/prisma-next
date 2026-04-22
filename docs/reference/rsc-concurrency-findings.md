@@ -1,14 +1,21 @@
-# RSC Concurrency Safety PoC — Findings
+# RSC Concurrency Safety — Findings
 
-**Linear:** [TML-2164](https://linear.app/prisma-company/issue/TML-2164/rsc-concurrency-safety-poc)
-**Milestone:** VP3 of WS3 (Runtime pipeline)
-**Source artifacts:**
-- Plan: [`projects/rsc-concurrency-safety/plan.md`](./plan.md)
-- Postgres app: [`examples/rsc-poc-postgres/`](../../examples/rsc-poc-postgres/)
-- Mongo app: [`examples/rsc-poc-mongo/`](../../examples/rsc-poc-mongo/)
+How Prisma Next's runtime and ORM behave under React Server Components'
+concurrent rendering model, observed across two Next.js 16 App Router
+proof-of-concept apps (one per family) under load.
 
-This is the **findings write-up** for the PoC. At close-out it migrates
-(with minor edits) to `docs/reference/rsc-concurrency-findings.md`.
+**Scope:** what the PoC covered is in this doc. Pool sizing guidance,
+edge runtime validation, streaming composition, and transaction
+semantics across Server Components are **out of scope** — see the "Out
+of scope but likely next" section at the end.
+
+**Reference apps:**
+- Postgres: [`examples/rsc-poc-postgres/`](../../examples/rsc-poc-postgres/)
+- Mongo: [`examples/rsc-poc-mongo/`](../../examples/rsc-poc-mongo/)
+
+**Context:** this doc is the permanent record of the VP3 proof-of-concept
+under WS3 (Runtime pipeline). For the framing of the original question,
+see [Framework Integration Analysis §"Hard problem 2"](./framework-integration-analysis.md).
 
 ---
 
@@ -20,10 +27,11 @@ families, for the configurations this PoC exercised.** No correctness
 bugs were found. One **performance bug** (H2) and one **sizing/liveness
 observation** (H4) are documented below with a recommended fix for H2.
 
-The PoC stop condition per the plan — "either works correctly OR we've
-identified the specific concurrency issues and know what to fix" — is
-met. Pool sizing guidance, edge runtime validation, and production-ready
-concurrency guarantees remain out of scope (deferred to May).
+The PoC's stop condition — "either works correctly OR we've identified
+the specific concurrency issues and know what to fix" — is met. Pool
+sizing guidance, edge runtime validation, and production-ready
+concurrency guarantees remain out of scope (see the "Out of scope but
+likely next" section at the end).
 
 ---
 
@@ -136,18 +144,18 @@ below.
 peer's own `if (verified) return` check, causing the peer to skip
 verification.
 
-**Source-level re-read (mid-flight correction):** The claim doesn't
-hold. Lines `verified = false` (in `always` mode) and
-`if (verified) return` are **synchronous neighbors** with no `await`
-between them. Every entry to `verifyPlanIfNeeded()` in `always` mode
-unconditionally sets the flag false, then immediately checks it on the
-same tick — the early-return is unreachable regardless of peer
-behavior. The flag can be flipped by a peer later in the method body,
-but `always` mode doesn't read it again on this path.
+**Source-level re-read:** The claim doesn't hold. Lines
+`verified = false` (in `always` mode) and `if (verified) return` are
+**synchronous neighbors** with no `await` between them. Every entry to
+`verifyPlanIfNeeded()` in `always` mode unconditionally sets the flag
+false, then immediately checks it on the same tick — the early-return
+is unreachable regardless of peer behavior. The flag can be flipped by
+a peer later in the method body, but `always` mode doesn't read it
+again on this path.
 
-Plan §2 updated with the corrected reasoning and the retained value of
-the `/stress/always` route and test (invariant confirmations rather
-than race reproducers).
+The `/stress/always` route in the Postgres PoC and its integration test
+stand as invariant confirmations (`markerReads === queryCount`) rather
+than race reproducers.
 
 **Observed (`/stress/always` under 50 VUs × 30s, `k6 spike`):**
 
@@ -194,7 +202,8 @@ checkOuts Δ = checkIns Δ       # balanced
 With the PoC's fast queries and small payloads, both drivers sustained
 100 VUs × 50s on 5-slot pools without failures. Under slow queries or
 heavier payloads, the picture would change — that's explicitly **out of
-scope** for this PoC (plan §5). What we learned:
+scope** (see the "Out of scope but likely next" section at the end of
+this doc). What we learned:
 
 - **Postgres**: each query exclusively borrows a pool connection for
   its lifetime. Ratio of commands to acquires is 1:1.
@@ -202,8 +211,8 @@ scope** for this PoC (plan §5). What we learned:
   wire connections. 87,515 commands on a 5-slot pool means heavy
   sharing.
 
-**Verdict:** **No safety bug.** Pool sizing guidance is deferred to May
-as explicitly planned.
+**Verdict:** **No safety bug.** Pool sizing guidance is deferred (see
+the "Out of scope but likely next" section at the end).
 
 ---
 
@@ -451,7 +460,7 @@ the configuration users should copy.
 
 ## What's out of scope but likely next
 
-Following the plan's explicit non-goals:
+Explicit non-goals for this PoC, deferred to future work:
 
 - **Pool sizing guidance.** Needs load-testing with realistic query
   latencies and payloads, not the PoC's 1 KB seed. "Expected parallel
@@ -479,45 +488,3 @@ Following the plan's explicit non-goals:
   - `examples/rsc-poc-mongo/scripts/stress.k6.js` (baseline / pool-pressure)
 - **Diagnostic endpoints:**
   - `GET /diag` on each app returns a JSON snapshot of live counters.
-- **Draft PR:** [#370](https://github.com/prisma/prisma-next/pull/370)
-
-## Two mid-flight corrections worth remembering
-
-For anyone reading this later who wonders why the plan doesn't match
-the first version a reviewer might have seen:
-
-1. **H3 was wrong in the original plan.** The predicted "always mode
-   skips verification under concurrency" race doesn't exist — the
-   reset and the check are synchronous neighbors. Caught by re-reading
-   the source before implementing the stress route. Plan §2 documents
-   both the original claim and the correction.
-
-2. **The PoC's pool instrumentation had two bugs of its own**
-   (documented in `examples/rsc-poc-postgres/src/lib/pool.ts`):
-   - Wrapping `client.release` didn't survive pg-pool's per-checkout
-     reassignment of the method. Fixed by listening on the pool's
-     `'release'` event.
-   - Counting acquires before `super.connect()` resolved inflated the
-     counter under connect-timeout rejections. Fixed by counting only
-     on success.
-
-   Both were bugs in the measurement, not in Prisma Next or pg-pool.
-   Flagging them because they're the kind of thing only live load
-   exposes, and future contributors to the PoC should know about them
-   before trying similar instrumentation.
-
----
-
-## Close-out checklist (step 9 of the plan)
-
-- [ ] Migrate this file (lightly edited) to
-      `docs/reference/rsc-concurrency-findings.md`.
-- [ ] Decide whether the H2 fix needs an ADR. Current recommendation:
-      no, just a PR.
-- [ ] Strip repo-wide references to
-      `projects/rsc-concurrency-safety/**`; replace with canonical
-      `docs/reference/rsc-concurrency-findings.md` links or remove.
-- [ ] Delete `projects/rsc-concurrency-safety/` in the close-out PR.
-- [ ] Update Linear TML-2164 to Done; leave a summary comment
-      pointing at the findings doc and the draft PR.
-- [ ] Confirm VP3's stop condition met with the project lead.

@@ -5,8 +5,9 @@ behavior under RSC concurrent rendering**. Paired with `rsc-poc-postgres`;
 together they cover VP3 of the WS3 runtime-pipeline milestone (Linear:
 [TML-2164][t]).
 
-See `projects/rsc-concurrency-safety/plan.md` for the full project plan,
-including hypotheses H1–H5 and acceptance criteria.
+See [`docs/reference/rsc-concurrency-findings.md`](../../docs/reference/rsc-concurrency-findings.md)
+for the full write-up, including the per-hypothesis results and the
+recommended fix for the one performance bug this PoC surfaced (H2).
 
 [t]: https://linear.app/prisma-company/issue/TML-2164/rsc-concurrency-safety-poc
 
@@ -291,7 +292,7 @@ vitest.config.ts
 
 ## Related
 
-- Project plan: `projects/rsc-concurrency-safety/plan.md`
+- Findings write-up: [`docs/reference/rsc-concurrency-findings.md`](../../docs/reference/rsc-concurrency-findings.md)
 - Framework integration analysis §"Hard problem 2":
   `docs/reference/framework-integration-analysis.md`
 - Companion Postgres app: `examples/rsc-poc-postgres/`
