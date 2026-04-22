@@ -168,6 +168,10 @@ export const contractFixtures = {
   'contract-base': join(JOURNEY_FIXTURES_DIR, 'contract-base.ts'),
   'contract-additive': join(JOURNEY_FIXTURES_DIR, 'contract-additive.ts'),
   'contract-additive-required': join(JOURNEY_FIXTURES_DIR, 'contract-additive-required.ts'),
+  'contract-additive-required-name': join(
+    JOURNEY_FIXTURES_DIR,
+    'contract-additive-required-name.ts',
+  ),
   'contract-destructive': join(JOURNEY_FIXTURES_DIR, 'contract-destructive.ts'),
   'contract-add-table': join(JOURNEY_FIXTURES_DIR, 'contract-add-table.ts'),
   'contract-v3': join(JOURNEY_FIXTURES_DIR, 'contract-v3.ts'),
@@ -177,6 +181,15 @@ export const contractFixtures = {
   'contract-avatar': join(JOURNEY_FIXTURES_DIR, 'contract-avatar.ts'),
   'contract-all': join(JOURNEY_FIXTURES_DIR, 'contract-all.ts'),
   'contract-unique-email': join(JOURNEY_FIXTURES_DIR, 'contract-unique-email.ts'),
+  'contract-typechange-text': join(JOURNEY_FIXTURES_DIR, 'contract-typechange-text.ts'),
+  'contract-typechange-int': join(JOURNEY_FIXTURES_DIR, 'contract-typechange-int.ts'),
+  'contract-nullable-name': join(JOURNEY_FIXTURES_DIR, 'contract-nullable-name.ts'),
+  'contract-nullable-name-required': join(
+    JOURNEY_FIXTURES_DIR,
+    'contract-nullable-name-required.ts',
+  ),
+  'contract-status-enum': join(JOURNEY_FIXTURES_DIR, 'contract-status-enum.ts'),
+  'contract-status-enum-shrunk': join(JOURNEY_FIXTURES_DIR, 'contract-status-enum-shrunk.ts'),
 } as const;
 
 export type ContractVariant = keyof typeof contractFixtures;
