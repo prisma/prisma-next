@@ -1,21 +1,19 @@
 /**
- * Data Transform Authoring Surface (Journey: migration new → emit → ops)
+ * Data Transform Authoring Surface (manual) — exercises the
+ * consolidated `dataTransform` factory exported from
+ * `@prisma-next/target-postgres/migration` end-to-end.
  *
- * Tests the authoring pipeline end-to-end against the class-flow `dataTransform`
- * factory exported from `@prisma-next/target-postgres/migration`:
+ * This file covers the from-scratch authoring path:
  *
- * 1. Set up a project with a base contract, plan + apply initial migration
- * 2. Insert test data (rows that need transforming)
- * 3. Swap to additive contract (adds a nullable column)
- * 4. Emit the new contract
- * 5. migration new → scaffolds package with migration.ts + contract.json
- * 6. Fill in migration.ts with class-flow operations: `addColumn(...)`,
- *    `dataTransform(contract, 'backfill-user-name', { run: () => db.user.update(...) })`
- * 7. migration emit → evaluates TS, factory lowers the plan + asserts contract
- *    hashes match, writes ops.json, attests
- * 8. Inspect ops.json — verify the ops are correct
- * 9. migration apply → executes ops including data transform
- * 10. Verify data was transformed
+ * **`migration new` → hand-author the whole `migration.ts`.** The user
+ * starts from an empty scaffold, writes the operations themselves
+ * (`addColumn`, `dataTransform(contract, ...)`), then runs `migration
+ * emit` + `migration apply`.
+ *
+ * The planner-assisted path (where the user fills in
+ * planner-emitted `placeholder()` stubs) lives in dedicated
+ * per-strategy files alongside this one
+ * (`data-transform-not-null-backfill.e2e.test.ts` and friends).
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
@@ -36,14 +34,14 @@ import {
   useDevDatabase,
 } from '../utils/journey-test-helpers';
 
-withTempDir(({ createTempDir }) => {
-  describe('Journey: Data Transform Authoring', () => {
-    const db = useDevDatabase();
+// Sentinel value the migrations' `dataTransform.run` closures backfill
+// into `user.name`. Named so the post-apply assertions read as a
+// deliberate backfill rather than a placeholder/error string.
+const BACKFILLED_NAME = 'unknown';
 
-    // Sentinel value the migration's `dataTransform.run` closure backfills
-    // into `user.name`. Named so the assertion below reads as a deliberate
-    // backfill rather than a placeholder/error string.
-    const BACKFILLED_NAME = 'unknown';
+withTempDir(({ createTempDir }) => {
+  describe('Journey: Data Transform Authoring (manual)', () => {
+    const db = useDevDatabase();
 
     it(
       'migration new → fill migration.ts → emit → apply → data correct',
