@@ -351,6 +351,25 @@ describe('prismaVitePlugin', () => {
       );
     });
 
+    it('loads config once on startup before the initial emit', async () => {
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockedLoadConfig).toHaveBeenCalledTimes(1);
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(mockedLoadConfig.mock.invocationCallOrder[0]!).toBeLessThan(
+        mockedExecuteContractEmit.mock.invocationCallOrder[0]!,
+      );
+    });
+
     it('registers cleanup hooks for server close', async () => {
       const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
       const mockServer = createMockServer();
@@ -387,6 +406,98 @@ describe('prismaVitePlugin', () => {
 
       expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma-next.config.ts');
       expect(consoleWarnSpy).not.toHaveBeenCalled();
+    });
+
+    it('falls back to watching the config file and warns when loadConfig fails', async () => {
+      mockedLoadConfig.mockRejectedValue(new Error('config load failed'));
+      mockedExecuteContractEmit.mockResolvedValue({
+        storageHash: 'abc123',
+        profileHash: 'def456',
+        files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+      });
+
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma-next.config.ts');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Watching only /project/prisma-next.config.ts'),
+      );
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Contract watch coverage is partial'),
+      );
+      expect(mockedExecuteContractEmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configPath: '/project/prisma-next.config.ts',
+        }),
+      );
+    });
+
+    it('keeps existing watched dependencies while config loading falls back', async () => {
+      let shouldFailLoad = false;
+      mockedLoadConfig.mockImplementation(async () => {
+        if (shouldFailLoad) {
+          throw new Error('config load failed');
+        }
+        return createLoadedConfig({ inputs: undefined });
+      });
+
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'info',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {
+          imports: ['/project/config-shared.ts'],
+        },
+        '/project/config-shared.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockClear();
+      mockServer.watcher.add.mockClear();
+      mockServer.watcher.unwatch.mockClear();
+
+      shouldFailLoad = true;
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+      handleHotUpdate({ file: '/project/config-shared.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(mockServer.watcher.unwatch).not.toHaveBeenCalledWith('/project/config-shared.ts');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Watching the previous dependency set plus /project/prisma-next.config.ts',
+        ),
+      );
+
+      mockedExecuteContractEmit.mockClear();
+      shouldFailLoad = false;
+
+      handleHotUpdate({ file: '/project/config-shared.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -520,6 +631,58 @@ describe('prismaVitePlugin', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+    });
+
+    it('updates watched files when config imports and resolved inputs change', async () => {
+      let currentConfig = createLoadedConfig({
+        inputs: ['./prisma/schema.prisma'],
+      });
+      mockedLoadConfig.mockImplementation(async () => currentConfig);
+
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'silent',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {
+          imports: ['/project/config-shared-a.ts'],
+        },
+        '/project/config-shared-a.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockClear();
+      mockServer.watcher.add.mockClear();
+      mockServer.watcher.unwatch.mockClear();
+
+      currentConfig = createLoadedConfig({
+        inputs: ['./prisma/schema-alt.prisma'],
+      });
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {
+          imports: ['/project/config-shared-b.ts'],
+        },
+        '/project/config-shared-b.ts': {},
+      });
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/config-shared-b.ts');
+      expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma/schema-alt.prisma');
+      expect(mockServer.watcher.unwatch).toHaveBeenCalledWith('/project/config-shared-a.ts');
+      expect(mockServer.watcher.unwatch).toHaveBeenCalledWith('/project/prisma/schema.prisma');
     });
 
     it('debounces rapid successive changes', async () => {

@@ -1,4 +1,8 @@
-import type { ContractSourceProvider, PrismaNextConfig } from '@prisma-next/config/config-types';
+import {
+  type ContractSourceProvider,
+  normalizeContractConfig,
+  type PrismaNextConfig,
+} from '@prisma-next/config/config-types';
 import { ConfigValidationError } from '@prisma-next/config/config-validation';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { resolve } from 'pathe';
@@ -54,17 +58,18 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
     return config;
   }
 
-  const source = finalizeContractSource(config.contract.source, configDir);
-  const output =
-    config.contract.output === undefined ? undefined : resolve(configDir, config.contract.output);
+  const contract = normalizeContractConfig(config.contract);
+  const source = finalizeContractSource(contract.source, configDir);
+  const output = resolve(configDir, contract.output);
 
   validateNoOutputsAreInputs(source.inputs, output);
 
-  const contract =
-    output === undefined ? { ...config.contract, source } : { ...config.contract, source, output };
-
   return {
     ...config,
-    contract,
+    contract: {
+      ...contract,
+      source,
+      output,
+    },
   };
 }

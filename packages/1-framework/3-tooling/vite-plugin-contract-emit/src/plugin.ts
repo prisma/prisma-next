@@ -63,6 +63,7 @@ export function prismaVitePlugin(
   let currentAbortController: AbortController | null = null;
   let server: ViteDevServer | null = null;
   let emitRequestId = 0;
+  let didWarnConfigWatchFallback = false;
 
   function log(message: string, level: 'info' | 'debug' = 'info') {
     if (logLevel === 'silent') return;
@@ -79,6 +80,11 @@ export function prismaVitePlugin(
     }
   }
 
+  function logWarning(message: string) {
+    if (logLevel === 'silent') return;
+    console.warn(`[${PLUGIN_NAME}] ${message}`);
+  }
+
   function handleTrackedFileChange(file: string) {
     const normalized = resolve(file);
     if (ignoredOutputFiles.has(normalized)) {
@@ -92,7 +98,11 @@ export function prismaVitePlugin(
     }
   }
 
-  async function emitContract(): Promise<ContractEmitResult | null> {
+  async function emitContract({
+    refreshWatchedFiles = true,
+  }: {
+    refreshWatchedFiles?: boolean;
+  } = {}): Promise<ContractEmitResult | null> {
     const requestId = ++emitRequestId;
 
     // Cancel any in-flight emit
@@ -103,7 +113,7 @@ export function prismaVitePlugin(
     const signal = currentAbortController.signal;
 
     try {
-      if (server) {
+      if (server && refreshWatchedFiles) {
         await updateWatchedFiles(server);
       }
 
@@ -232,10 +242,13 @@ export function prismaVitePlugin(
   }
 
   async function resolveWatchedFiles(viteServer: ViteDevServer): Promise<Set<string>> {
+    const previousWatchedFiles = new Set(watchedFiles);
+    const previousIgnoredOutputFiles = new Set(ignoredOutputFiles);
     ignoredOutputFiles.clear();
 
     try {
       const config = await loadConfig(absoluteConfigPath);
+      didWarnConfigWatchFallback = false;
       const contract = config.contract;
 
       if (!contract) {
@@ -266,7 +279,26 @@ export function prismaVitePlugin(
 
       return files;
     } catch (error) {
-      logError('Failed to resolve watched files:', error);
+      if (previousIgnoredOutputFiles.size > 0) {
+        for (const outputFile of previousIgnoredOutputFiles) {
+          ignoredOutputFiles.add(outputFile);
+        }
+      }
+      if (!didWarnConfigWatchFallback) {
+        didWarnConfigWatchFallback = true;
+        const reason = error instanceof Error ? ` ${error.message}` : '';
+        const watchScope =
+          previousWatchedFiles.size > 0
+            ? `Watching the previous dependency set plus ${absoluteConfigPath}`
+            : `Watching only ${absoluteConfigPath}`;
+        logWarning(
+          `${watchScope} because Prisma Next config inputs could not be resolved.${reason} Contract watch coverage is partial.`,
+        );
+      }
+      if (previousWatchedFiles.size > 0) {
+        previousWatchedFiles.add(absoluteConfigPath);
+        return previousWatchedFiles;
+      }
       return new Set([absoluteConfigPath]);
     }
   }
@@ -338,6 +370,7 @@ export function prismaVitePlugin(
         viteServer.watcher.off?.('add', onTrackedWatcherEvent);
         viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
         ignoredOutputFiles.clear();
+        didWarnConfigWatchFallback = false;
         server = null;
         watchedFiles.clear();
         log('Server closed, cleaned up resources', 'debug');
@@ -386,7 +419,7 @@ export function prismaVitePlugin(
       }
 
       // Initial emit on server start
-      await emitContract();
+      await emitContract({ refreshWatchedFiles: false });
     },
 
     handleHotUpdate(ctx) {

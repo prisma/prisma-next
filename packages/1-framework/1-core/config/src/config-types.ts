@@ -31,6 +31,17 @@ export interface ContractConfig {
   readonly output?: string;
 }
 
+export const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
+
+export function normalizeContractConfig(
+  contract: ContractConfig,
+): ContractConfig & { readonly output: string } {
+  return {
+    source: contract.source,
+    output: contract.output ?? DEFAULT_CONTRACT_OUTPUT,
+  };
+}
+
 /**
  * Configuration for Prisma Next CLI.
  * Uses Control*Descriptor types for type-safe wiring with compile-time compatibility checks.
@@ -86,8 +97,10 @@ export interface PrismaNextConfig<
   };
 }
 
+const ContractSourceInputSchema = type('string');
+
 export const ContractSourceProviderSchema = type({
-  'inputs?': 'string[]',
+  'inputs?': ContractSourceInputSchema.array(),
   load: 'Function',
 });
 
@@ -120,7 +133,7 @@ const PrismaNextConfigSchema = type({
  * Validates and normalizes the config using Arktype, then returns the normalized IR.
  *
  * Normalization:
- * - contract.output defaults to 'src/prisma/contract.json' if missing
+ * - contract.output defaults to DEFAULT_CONTRACT_OUTPUT if missing
  *
  * @param config - Raw config input from user
  * @returns Normalized config IR with defaults applied
@@ -138,18 +151,10 @@ export function defineConfig<TFamilyId extends string = string, TTargetId extend
 
   // Normalize contract config if present
   if (config.contract) {
-    // Apply defaults
-    const output = config.contract.output ?? 'src/prisma/contract.json';
-
-    const normalizedContract: ContractConfig = {
-      source: config.contract.source,
-      output,
-    };
-
     // Return normalized config
     return {
       ...config,
-      contract: normalizedContract,
+      contract: normalizeContractConfig(config.contract),
     };
   }
 

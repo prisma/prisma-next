@@ -332,6 +332,17 @@ describe('validateConfig', () => {
       createValidRawConfig({ contract: inheritedSourceContract }),
       'contract.source',
     );
+    const inheritedLoadSource = Object.create({
+      load: async () => ok({ targetFamily: 'sql' } as Contract),
+    }) as Record<string, unknown>;
+    expectFieldError(
+      createValidRawConfig({
+        contract: {
+          source: inheritedLoadSource,
+        },
+      }),
+      'contract.source.load',
+    );
     expectFieldError(
       createValidRawConfig({
         contract: {
@@ -372,6 +383,26 @@ describe('validateConfig', () => {
       }),
       'contract.source.load',
     );
+    const inheritedInputsSource = Object.create(
+      {
+        inputs: [123],
+      },
+      {
+        load: {
+          value: async () => ok({ targetFamily: 'sql' } as Contract),
+          enumerable: true,
+        },
+      },
+    ) as Record<string, unknown>;
+    expect(() =>
+      validateConfig(
+        createValidRawConfig({
+          contract: {
+            source: inheritedInputsSource,
+          },
+        }),
+      ),
+    ).not.toThrow();
     expectFieldError(
       createValidRawConfig({
         contract: {
@@ -381,6 +412,20 @@ describe('validateConfig', () => {
       }),
       'contract.output',
     );
+    const inheritedOutputContract = Object.create(
+      {
+        output: 123,
+      },
+      {
+        source: {
+          value: createSourceProvider(),
+          enumerable: true,
+        },
+      },
+    ) as Record<string, unknown>;
+    expect(() =>
+      validateConfig(createValidRawConfig({ contract: inheritedOutputContract })),
+    ).not.toThrow();
   });
 
   it('accepts valid optional sections', () => {

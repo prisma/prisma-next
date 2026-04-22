@@ -25,7 +25,12 @@ export function typescriptContractFromPath(contractPath: string, output?: string
           );
         }
         const mod = await import(pathToFileURL(absolutePath).href);
-        const contract: Contract = mod.default ?? mod.contract;
+        const contract: Contract | undefined = mod.default ?? mod.contract;
+        if (contract === undefined) {
+          throw new Error(
+            `typescriptContractFromPath: module at "${absolutePath}" has no "default" or "contract" export.`,
+          );
+        }
         return ok(contract);
       },
     },

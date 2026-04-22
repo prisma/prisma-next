@@ -19,7 +19,7 @@ function validateContractConfig(contract: Record<string, unknown>): void {
   }
 
   const sourceConfig = source as Record<string, unknown>;
-  const inputs = sourceConfig['inputs'];
+  const inputs = Object.hasOwn(sourceConfig, 'inputs') ? sourceConfig['inputs'] : undefined;
 
   if (inputs !== undefined) {
     if (!Array.isArray(inputs)) {
@@ -39,11 +39,11 @@ function validateContractConfig(contract: Record<string, unknown>): void {
     }
   }
 
-  if (typeof sourceConfig['load'] !== 'function') {
+  if (!Object.hasOwn(sourceConfig, 'load') || typeof sourceConfig['load'] !== 'function') {
     throwValidation('contract.source.load', 'Config.contract.source.load must be a function');
   }
 
-  const output = contract['output'];
+  const output = Object.hasOwn(contract, 'output') ? contract['output'] : undefined;
   if (output !== undefined && typeof output !== 'string') {
     throwValidation('contract.output', 'Config.contract.output must be a string when provided');
   }
