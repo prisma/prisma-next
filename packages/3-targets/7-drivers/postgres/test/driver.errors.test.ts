@@ -365,4 +365,128 @@ describe('@prisma-next/driver-postgres', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it('destroy() evicts pool client by passing truthy error to PoolClient.release', async () => {
+    const clientRelease = vi.fn();
+    const poolClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: clientRelease,
+    };
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => poolClient),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const connection = await driver.acquireConnection();
+    const reason = new Error('rollback failed');
+    await connection.destroy(reason);
+
+    expect(clientRelease).toHaveBeenCalledTimes(1);
+    const [firstArg] = clientRelease.mock.calls[0] ?? [];
+    expect(firstArg).toBe(reason);
+  });
+
+  it('destroy() without an Error reason still evicts pool client with a truthy arg', async () => {
+    const clientRelease = vi.fn();
+    const poolClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: clientRelease,
+    };
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => poolClient),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const connection = await driver.acquireConnection();
+    await connection.destroy();
+
+    expect(clientRelease).toHaveBeenCalledTimes(1);
+    const [firstArg] = clientRelease.mock.calls[0] ?? [];
+    expect(firstArg).toBeInstanceOf(Error);
+  });
+
+  it(
+    'destroy() closes the direct-client driver',
+    async () => {
+      const mockClient = {
+        _connection: {},
+        _ending: false,
+        connect: vi.fn(async () => {}),
+        query: vi.fn(async () => ({ rows: [] })),
+        end: vi.fn(async () => {}),
+      };
+      const driver = createBoundDriverFromBinding(
+        { kind: 'pgClient', client: mockClient as unknown as Client },
+        undefined,
+      );
+      cleanups.push(async () => {
+        await driver.close();
+      });
+
+      const connection = await driver.acquireConnection();
+      await connection.destroy(new Error('rollback failed'));
+
+      expect(driver.state).toBe('closed');
+      expect(mockClient.end).toHaveBeenCalledTimes(1);
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it('destroy() propagates errors thrown by PoolClient.release', async () => {
+    const releaseError = new Error('double release');
+    const clientRelease = vi.fn(() => {
+      throw releaseError;
+    });
+    const poolClient = {
+      query: vi.fn(async () => ({ rows: [] })),
+      release: clientRelease,
+    };
+    const pool = {
+      end: vi.fn(async () => {}),
+      connect: vi.fn(async () => poolClient),
+    } as unknown as Pool;
+    const driver = createBoundDriverFromBinding({ kind: 'pgPool', pool }, undefined);
+    cleanups.push(async () => {
+      await driver.close();
+    });
+
+    const connection = await driver.acquireConnection();
+    // The caller decides whether to swallow teardown errors. The driver just
+    // propagates them so context isn't silently lost.
+    await expect(connection.destroy(new Error('boom'))).rejects.toBe(releaseError);
+    expect(clientRelease).toHaveBeenCalledTimes(1);
+  });
+
+  it(
+    'destroy() propagates errors thrown while closing the direct-client driver',
+    async () => {
+      const endError = new Error('end failed');
+      const mockClient = {
+        _connection: {},
+        _ending: false,
+        connect: vi.fn(async () => {}),
+        query: vi.fn(async () => ({ rows: [] })),
+        end: vi.fn(async () => {
+          throw endError;
+        }),
+      };
+      const driver = createBoundDriverFromBinding(
+        { kind: 'pgClient', client: mockClient as unknown as Client },
+        undefined,
+      );
+
+      const connection = await driver.acquireConnection();
+      await expect(connection.destroy(new Error('rollback failed'))).rejects.toBe(endError);
+      expect(mockClient.end).toHaveBeenCalledTimes(1);
+    },
+    timeouts.spinUpPpgDev,
+  );
 });

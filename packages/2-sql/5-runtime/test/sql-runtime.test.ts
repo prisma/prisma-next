@@ -40,8 +40,10 @@ interface DriverMockSpies {
   connectionExecute: ReturnType<typeof vi.fn>;
   transactionExecute: ReturnType<typeof vi.fn>;
   connectionRelease: ReturnType<typeof vi.fn>;
+  connectionDestroy: ReturnType<typeof vi.fn>;
   transactionCommit: ReturnType<typeof vi.fn>;
   transactionRollback: ReturnType<typeof vi.fn>;
+  driverClose: ReturnType<typeof vi.fn>;
 }
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
@@ -115,15 +117,18 @@ function createMockDriver(): MockSqlDriver {
     execute: connectionExecute,
     query,
     release: vi.fn().mockResolvedValue(undefined),
+    destroy: vi.fn().mockResolvedValue(undefined),
     beginTransaction: vi.fn().mockResolvedValue(transaction),
   };
+
+  const driverClose = vi.fn().mockResolvedValue(undefined);
 
   const driver: SqlDriver = {
     execute: rootExecute,
     query,
     connect: vi.fn().mockImplementation(async (_binding?: undefined) => undefined),
     acquireConnection: vi.fn().mockResolvedValue(connection),
-    close: vi.fn().mockResolvedValue(undefined),
+    close: driverClose,
   };
 
   return Object.assign(driver, {
@@ -132,8 +137,10 @@ function createMockDriver(): MockSqlDriver {
       connectionExecute,
       transactionExecute,
       connectionRelease: connection.release,
+      connectionDestroy: connection.destroy,
       transactionCommit: transaction.commit,
       transactionRollback: transaction.rollback,
+      driverClose,
     },
   });
 }
@@ -293,6 +300,24 @@ describe('createRuntime', () => {
     await connection.release();
   });
 
+  it('delegates connection.destroy() to the driver connection', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const connection = await runtime.connection();
+    const reason = new Error('bad state');
+    await connection.destroy(reason);
+
+    expect(driver.__spies.connectionDestroy).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionDestroy).toHaveBeenCalledWith(reason);
+    expect(driver.__spies.connectionRelease).not.toHaveBeenCalled();
+  });
+
   it('uses transaction queryable for transaction.execute', async () => {
     const { stackInstance, context, driver } = createTestSetup();
     const runtime = createRuntime({
@@ -431,14 +456,33 @@ describe('withTransaction', () => {
     expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
   });
 
-  it('propagates commit failure', async () => {
+  it('wraps commit failure and exposes the original error as cause', async () => {
     const { runtime, driver } = createRuntimeForTransaction();
     const commitError = new Error('commit failed');
     driver.__spies.transactionCommit.mockRejectedValueOnce(commitError);
 
     const result = withTransaction(runtime, async () => 'value');
 
-    await expect(result).rejects.toBe(commitError);
+    await expect(result).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_COMMIT_FAILED',
+      cause: commitError,
+    });
+  });
+
+  it('attempts best-effort rollback after commit fails and releases when it succeeds', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const commitError = new Error('commit failed');
+    driver.__spies.transactionCommit.mockRejectedValueOnce(commitError);
+
+    await withTransaction(runtime, async () => 'value').catch(() => {});
+
+    expect(driver.__spies.transactionCommit).toHaveBeenCalledOnce();
+    expect(driver.__spies.transactionRollback).toHaveBeenCalledOnce();
+    // A successful rollback after a failed commit means the server is no
+    // longer in a transaction and the connection round-tripped cleanly, so
+    // it is safe to return to the pool rather than evict it.
+    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionDestroy).not.toHaveBeenCalled();
   });
 
   it('forwards the callback return value', async () => {
@@ -517,7 +561,46 @@ describe('withTransaction', () => {
       cause: callbackError,
       details: { rollbackError },
     });
-    expect(driver.__spies.connectionRelease).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionDestroy).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionRelease).not.toHaveBeenCalled();
+  });
+
+  it('destroys connection when rollback fails even if destroy also fails', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const callbackError = new Error('callback failed');
+    const rollbackError = new Error('rollback failed');
+    const destroyError = new Error('destroy failed');
+    driver.__spies.transactionRollback.mockRejectedValueOnce(rollbackError);
+    driver.__spies.connectionDestroy.mockRejectedValueOnce(destroyError);
+
+    const rejection = withTransaction(runtime, async () => {
+      throw callbackError;
+    });
+
+    await expect(rejection).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+      cause: callbackError,
+      details: { rollbackError },
+    });
+    expect(driver.__spies.connectionDestroy).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionRelease).not.toHaveBeenCalled();
+  });
+
+  it('destroys connection when commit fails and best-effort rollback also fails', async () => {
+    const { runtime, driver } = createRuntimeForTransaction();
+    const commitError = new Error('commit failed');
+    const rollbackError = new Error('rollback also failed');
+    driver.__spies.transactionCommit.mockRejectedValueOnce(commitError);
+    driver.__spies.transactionRollback.mockRejectedValueOnce(rollbackError);
+
+    const rejection = withTransaction(runtime, async () => 'value');
+
+    await expect(rejection).rejects.toMatchObject({
+      code: 'RUNTIME.TRANSACTION_COMMIT_FAILED',
+      cause: commitError,
+    });
+    expect(driver.__spies.connectionDestroy).toHaveBeenCalledOnce();
+    expect(driver.__spies.connectionRelease).not.toHaveBeenCalled();
   });
 
   it('sets invalidated flag after rollback', async () => {

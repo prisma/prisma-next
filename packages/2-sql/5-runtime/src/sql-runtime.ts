@@ -77,7 +77,28 @@ export interface Runtime extends RuntimeQueryable {
 
 export interface RuntimeConnection extends RuntimeQueryable {
   transaction(): Promise<RuntimeTransaction>;
+  /**
+   * Returns the connection to the pool for reuse. Only call this when the
+   * connection is known to be in a clean state. If a transaction
+   * commit/rollback failed or the connection is otherwise suspect, call
+   * `destroy(reason)` instead.
+   */
   release(): Promise<void>;
+  /**
+   * Evicts the connection so it is never reused. Call this when the
+   * connection may be in an indeterminate state (e.g. a failed rollback
+   * leaving an open transaction, or a broken socket).
+   *
+   * If teardown fails the error is propagated and the connection remains
+   * retryable, so the caller can decide whether to swallow the failure or
+   * retry cleanup. Calling destroy() or release() more than once after a
+   * successful teardown is caller error.
+   *
+   * `reason` is advisory context only. It may be surfaced to driver-level
+   * observability hooks (e.g. pg-pool's `'release'` event) but does not
+   * influence eviction behavior and is not rethrown.
+   */
+  destroy(reason?: unknown): Promise<void>;
 }
 
 export interface RuntimeTransaction extends RuntimeQueryable {
@@ -214,6 +235,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         };
       },
       release: coreConn.release.bind(coreConn),
+      destroy: coreConn.destroy.bind(coreConn),
       execute<Row = Record<string, unknown>>(
         plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
       ): AsyncIterableResult<Row> {
@@ -271,27 +293,72 @@ export async function withTransaction<R>(
     },
   };
 
+  let connectionDisposed = false;
+  const destroyConnection = async (reason: unknown): Promise<void> => {
+    if (connectionDisposed) return;
+    connectionDisposed = true;
+    // SqlConnection.destroy() propagates teardown errors so callers can
+    // decide what to do with them. Here, we're already about to throw a
+    // more informative error describing why we're evicting the connection
+    // (rollback/commit failure), so swallowing the teardown error is the
+    // right call — surfacing it would mask the original cause.
+    await connection.destroy(reason).catch(() => undefined);
+  };
+
   try {
-    const result = await fn(txContext);
-    invalidated = true;
-    await transaction.commit();
-    return result;
-  } catch (error) {
-    invalidated = true;
+    let result: R;
     try {
-      await transaction.rollback();
-    } catch (rollbackError) {
+      result = await fn(txContext);
+    } catch (error) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        await destroyConnection(rollbackError);
+        const wrapped = runtimeError(
+          'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+          'Transaction rollback failed after callback error',
+          { rollbackError },
+        );
+        wrapped.cause = error;
+        throw wrapped;
+      }
+      throw error;
+    } finally {
+      invalidated = true;
+    }
+
+    try {
+      await transaction.commit();
+    } catch (commitError) {
+      // After a failed COMMIT the server-side transaction may be: (a) already
+      // committed (error on response path), (b) already rolled back (deferred
+      // constraint / serialization failure), or (c) still open (COMMIT never
+      // reached the server). Attempt a best-effort rollback to cover (c) and
+      // confirm the protocol is healthy.
+      //
+      // If rollback succeeds, the server is definitely no longer in a
+      // transaction (no-op in (a)/(b), real cleanup in (c)) and we've just
+      // proved the connection round-trips correctly — it's safe to return
+      // to the pool. If rollback fails, the connection state is ambiguous
+      // (broken socket, protocol desync, etc.) and we must destroy it.
+      try {
+        await transaction.rollback();
+      } catch {
+        await destroyConnection(commitError);
+      }
       const wrapped = runtimeError(
-        'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
-        'Transaction rollback failed after callback error',
-        { rollbackError },
+        'RUNTIME.TRANSACTION_COMMIT_FAILED',
+        'Transaction commit failed',
+        { commitError },
       );
-      wrapped.cause = error;
+      wrapped.cause = commitError;
       throw wrapped;
     }
-    throw error;
+    return result;
   } finally {
-    await connection.release();
+    if (!connectionDisposed) {
+      await connection.release();
+    }
   }
 }
 

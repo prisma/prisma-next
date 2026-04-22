@@ -42,7 +42,28 @@ export interface RuntimeCore<TContract = unknown, TDriver = unknown>
 
 export interface RuntimeConnection extends RuntimeQueryable {
   transaction(): Promise<RuntimeTransaction>;
+  /**
+   * Returns the connection to the pool for reuse. Only call this when the
+   * connection is known to be in a clean state. If a transaction
+   * commit/rollback failed or the connection is otherwise suspect, call
+   * `destroy(reason)` instead.
+   */
   release(): Promise<void>;
+  /**
+   * Evicts the connection so it is never reused. Call this when the
+   * connection may be in an indeterminate state (e.g. a failed rollback
+   * leaving an open transaction, or a broken socket).
+   *
+   * If teardown fails the error is propagated and the connection remains
+   * retryable, so the caller can decide whether to swallow the failure or
+   * retry cleanup. Calling destroy() or release() more than once after a
+   * successful teardown is caller error.
+   *
+   * `reason` is advisory context only. It may be surfaced to driver-level
+   * observability hooks (e.g. pg-pool's `'release'` event) but does not
+   * influence eviction behavior and is not rethrown.
+   */
+  destroy(reason?: unknown): Promise<void>;
 }
 
 export interface RuntimeTransaction extends RuntimeQueryable {
@@ -76,6 +97,7 @@ interface DriverWithConnection<_TDriver> {
 export interface DriverConnection extends Queryable {
   beginTransaction(): Promise<DriverTransaction>;
   release(): Promise<void>;
+  destroy(reason?: unknown): Promise<void>;
 }
 
 export interface DriverTransaction extends Queryable {
@@ -243,6 +265,9 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
       },
       async release(): Promise<void> {
         await driverConn.release();
+      },
+      async destroy(reason?: unknown): Promise<void> {
+        await driverConn.destroy(reason);
       },
     };
 
