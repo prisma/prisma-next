@@ -12,7 +12,7 @@ import {
   reconstructGraph,
 } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
-import type { AttestedMigrationBundle } from '../src/types';
+import type { AttestedMigrationBundle, MigrationChainEntry } from '../src/types';
 import { createAttestedManifest, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
@@ -107,9 +107,9 @@ describe('reconstructGraph', () => {
 });
 
 describe('findLeaf', () => {
-  it('returns EMPTY_CONTRACT_HASH for empty graph', () => {
+  it('returns null for empty graph', () => {
     const graph = reconstructGraph([]);
-    expect(findLeaf(graph)).toBe(E);
+    expect(findLeaf(graph)).toBeNull();
   });
 
   it('returns H1 for single migration', () => {
@@ -286,6 +286,39 @@ describe('detectCycles', () => {
     const cycles = detectCycles(graph);
     expect(cycles.length).toBeGreaterThan(0);
   });
+
+  it('handles deep linear chain without stack overflow', () => {
+    const length = 20_000;
+    const nodes = new Set<string>();
+    const forwardChain = new Map<string, MigrationChainEntry[]>();
+    const reverseChain = new Map<string, MigrationChainEntry[]>();
+    const migrationById = new Map<string, MigrationChainEntry>();
+    let prev: string = E;
+    for (let i = 0; i < length; i++) {
+      const next = `h:${i}`;
+      nodes.add(prev);
+      nodes.add(next);
+      const entry: MigrationChainEntry = {
+        from: prev,
+        to: next,
+        migrationId: `mid:${i}`,
+        dirName: `m${i}`,
+        createdAt: new Date(i * 1000).toISOString(),
+        labels: [],
+      };
+      const fwd = forwardChain.get(prev);
+      if (fwd) fwd.push(entry);
+      else forwardChain.set(prev, [entry]);
+      const rev = reverseChain.get(next);
+      if (rev) rev.push(entry);
+      else reverseChain.set(next, [entry]);
+      migrationById.set(entry.migrationId, entry);
+      prev = next;
+    }
+    const graph = { nodes, forwardChain, reverseChain, migrationById };
+    expect(() => detectCycles(graph)).not.toThrow();
+    expect(detectCycles(graph)).toEqual([]);
+  });
 });
 
 describe('detectOrphans', () => {
@@ -363,6 +396,21 @@ describe('findPathWithDecision', () => {
     expect(decision).not.toBeNull();
     expect(decision!.selectedPath).toHaveLength(1);
     expect(decision!.alternativeCount).toBeGreaterThan(0);
+  });
+
+  it('does not count dead-end outgoing edges as alternatives', () => {
+    // At H1 there are two outgoing edges: one reaches H3 (shortcut), one
+    // leads to a dead-end (H_dead) that never converges back. The dead-end
+    // edge must not be counted as an alternative.
+    const packages = [
+      pkg(E, 'H1', 'm1'),
+      pkg('H1', 'H3', 'm_shortcut'),
+      pkg('H1', 'H_dead', 'm_deadend'),
+    ];
+    const graph = reconstructGraph(packages);
+    const decision = findPathWithDecision(graph, 'H1', 'H3');
+    expect(decision).not.toBeNull();
+    expect(decision!.alternativeCount).toBe(0);
   });
 
   it('output shape matches expected keys', () => {
