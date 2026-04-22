@@ -286,6 +286,7 @@ async function executeMigrationPlanCommand(
       schema: fromSchema,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
       fromHash,
+      fromContract,
       frameworkComponents,
     });
     if (plannerResult.kind === 'failure') {

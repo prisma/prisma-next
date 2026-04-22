@@ -19,9 +19,11 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
+  getLatestMigrationDir,
   type JourneyContext,
   parseJsonOutput,
   runContractEmit,
+  runMigrationEmit,
   runMigrationPlan,
   runMigrationPlanAndEmit,
   setupJourney,
@@ -139,6 +141,15 @@ withTempDir(({ createTempDir }) => {
         );
         expect(dropOp, 'I.03: has email-related operation').toBeDefined();
         expect(dropOp!.operationClass, 'I.03: email op is destructive').toBe('destructive');
+
+        // Self-emit the drop-email migration so `ops.json` lands on disk for
+        // the I.04 assertion below. `migration plan` no longer auto-emits
+        // (see ADR on placeholder stubs / user self-emit); the test has to
+        // run the scaffolded `migration.ts` explicitly to produce ops.json.
+        const dropDir = getLatestMigrationDir(ctx);
+        expect(dropDir, 'I.03: drop-email migration dir').toBeTruthy();
+        const dropEmitResult = await runMigrationEmit(ctx, ['--dir', `migrations/${dropDir}`]);
+        expect(dropEmitResult.exitCode, `I.03: emit drop-email: ${dropEmitResult.stderr}`).toBe(0);
 
         // I.04: verify destructive operation class on disk
         const migrationsDir = join(ctx.testDir, 'migrations');
