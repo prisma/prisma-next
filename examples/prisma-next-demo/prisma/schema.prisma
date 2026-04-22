@@ -17,7 +17,7 @@ enum user_type {
 model User {
   id          String    @id @default(uuid())
   email       String
-  displayName String?
+  displayName String
   createdAt   DateTime  @default(now())
   kind        user_type
   address     Address?

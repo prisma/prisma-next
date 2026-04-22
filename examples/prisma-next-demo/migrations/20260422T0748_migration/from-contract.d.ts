@@ -31,7 +31,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4'>;
+  StorageHashBase<'sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:516d134296237bb5f427dfe28f42f79077d0b72cbcae281fdd1ba3c974b9568e'>;
 export type ProfileHash =
@@ -84,7 +84,7 @@ export type FieldOutputTypes = {
   readonly User: {
     readonly id: Char<36>;
     readonly email: CodecTypes['pg/text@1']['output'];
-    readonly displayName: CodecTypes['pg/text@1']['output'];
+    readonly displayName: CodecTypes['pg/text@1']['output'] | null;
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
     readonly kind: CodecTypes['pg/enum@1']['output'];
     readonly address: AddressOutput | null;
@@ -118,7 +118,7 @@ export type FieldInputTypes = {
   readonly User: {
     readonly id: CodecTypes['sql/char@1']['input'];
     readonly email: CodecTypes['pg/text@1']['input'];
-    readonly displayName: CodecTypes['pg/text@1']['input'];
+    readonly displayName: CodecTypes['pg/text@1']['input'] | null;
     readonly createdAt: CodecTypes['pg/timestamptz@1']['input'];
     readonly kind: CodecTypes['pg/enum@1']['input'];
     readonly address: AddressInput | null;
@@ -284,7 +284,7 @@ type ContractBase = ContractType<
           readonly displayName: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
-            readonly nullable: false;
+            readonly nullable: true;
           };
           readonly createdAt: {
             readonly nativeType: 'timestamptz';
@@ -493,7 +493,7 @@ type ContractBase = ContractType<
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
         readonly displayName: {
-          readonly nullable: false;
+          readonly nullable: true;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'pg/text@1' };
         };
         readonly createdAt: {
