@@ -40,6 +40,11 @@ withTempDir(({ createTempDir }) => {
   describe('Journey: Data Transform Authoring', () => {
     const db = useDevDatabase();
 
+    // Sentinel value the migration's `dataTransform.run` closure backfills
+    // into `user.name`. Named so the assertion below reads as a deliberate
+    // backfill rather than a placeholder/error string.
+    const BACKFILLED_NAME = 'unknown';
+
     it(
       'migration new → fill migration.ts → emit → apply → data correct',
       async () => {
@@ -131,7 +136,7 @@ class M extends Migration {
     return [
       addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
       dataTransform(contract, 'backfill-user-name', {
-        run: () => db.user.update({ name: 'unknown' }).where((f, fns) => fns.eq(f.name, null)),
+        run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),
     ];
   }
@@ -182,8 +187,8 @@ Migration.run(import.meta.url, M);
           `SELECT id, email, "name" FROM "public"."user" ORDER BY id`,
         );
         expect(result.rows).toEqual([
-          { id: 1, email: 'alice@example.com', name: 'unknown' },
-          { id: 2, email: 'bob@test.org', name: 'unknown' },
+          { id: 1, email: 'alice@example.com', name: BACKFILLED_NAME },
+          { id: 2, email: 'bob@test.org', name: BACKFILLED_NAME },
         ]);
       },
       timeouts.spinUpPpgDev,
