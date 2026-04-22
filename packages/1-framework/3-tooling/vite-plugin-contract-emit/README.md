@@ -12,6 +12,7 @@ This plugin integrates with Vite's dev server to automatically emit contract art
 - **Config graph + resolved inputs**: Re-emits from the config module graph plus loader-finalized `contract.source.inputs`
 - **Debounce**: Configurable debounce prevents rapid re-emission during rapid edits
 - **Last-change-wins**: Overlapping emit requests are cancelled to avoid stale results
+- **Atomic publication**: Signal-driven emits stage artifacts in a managed generation directory so `contract.json` and `contract.d.ts` flip together and failed writes preserve the last good pair
 - **Config-only fallback warning**: Falls back to watching the config path and warns when loader-resolved inputs cannot be determined
 - **Error overlay**: Emission failures are surfaced via Vite's error overlay
 - **Console logging**: Compact success/error messages with optional debug output
@@ -67,8 +68,9 @@ interface PrismaVitePluginOptions {
 4. **Merge declared inputs**: It adds any explicit `contract.source.inputs`, and treats JS/TS inputs as additional module-graph roots
 5. **Filter emitted artifacts**: Output files are removed from the watch set to avoid self-trigger loops
 6. **Fallback on load failure**: If resolved inputs cannot be loaded, it watches only the config path and warns that coverage is partial
-7. **Initial emit**: The contract is emitted immediately on server start
-8. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
+7. **Managed publish**: Signal-driven emits stage the next generation under a hidden `.<stem>.prisma-next-artifacts/` directory and swap the `current` pointer so both public artifacts update as one logical change
+8. **Initial emit**: The contract is emitted immediately on server start
+9. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
 
 ## Architecture
 
@@ -86,8 +88,9 @@ graph TD
     J[File change] --> K[handleHotUpdate hook]
     K --> L[Schedule debounced emit]
     L --> M[executeContractEmit]
-    M --> N[Write artifacts]
-    
+    M --> N[Stage generation]
+    N --> O[Swap current pointer]
+
     P[Error] --> Q[Overlay or console logging]
 ```
 

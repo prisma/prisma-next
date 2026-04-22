@@ -1,10 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, readFile, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { dirname } from 'pathe';
+import { basename, dirname, join, relative } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
@@ -15,6 +15,19 @@ interface ProviderFailureLike {
   readonly summary: string;
   readonly diagnostics: readonly unknown[];
   readonly meta?: unknown;
+}
+
+interface EmitWriteTargetState {
+  nextGeneration: number;
+  queue: Promise<void>;
+}
+
+interface ManagedArtifactPaths {
+  readonly rootDir: string;
+  readonly generationsDir: string;
+  readonly currentLinkPath: string;
+  readonly publicJsonLinkTarget: string;
+  readonly publicDtsLinkTarget: string;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -29,6 +42,403 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
   return (
     isRecord(value) && typeof value['summary'] === 'string' && Array.isArray(value['diagnostics'])
   );
+}
+
+const emitWriteTargets = new Map<string, EmitWriteTargetState>();
+
+function getEmitWriteTargetState(outputJsonPath: string): EmitWriteTargetState {
+  const existing = emitWriteTargets.get(outputJsonPath);
+  if (existing) {
+    return existing;
+  }
+
+  const created: EmitWriteTargetState = {
+    nextGeneration: 0,
+    queue: Promise.resolve(),
+  };
+  emitWriteTargets.set(outputJsonPath, created);
+  return created;
+}
+
+function issueEmitGeneration(outputJsonPath: string): number {
+  const state = getEmitWriteTargetState(outputJsonPath);
+  state.nextGeneration += 1;
+  return state.nextGeneration;
+}
+
+function queueEmitWrite<T>(
+  outputJsonPath: string,
+  action: (state: EmitWriteTargetState) => Promise<T>,
+): Promise<T> {
+  const state = getEmitWriteTargetState(outputJsonPath);
+  const run = state.queue.then(
+    () => action(state),
+    () => action(state),
+  );
+  state.queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+function createTempArtifactPath(path: string, generation: number, phase: string): string {
+  return join(dirname(path), `.${basename(path)}.${process.pid}.${generation}.${phase}.tmp`);
+}
+
+function getManagedArtifactPaths(
+  outputJsonPath: string,
+  outputDtsPath: string,
+): ManagedArtifactPaths {
+  const outputDir = dirname(outputJsonPath);
+  const stem = basename(outputJsonPath, '.json');
+  const rootDir = join(outputDir, `.${stem}.prisma-next-artifacts`);
+
+  return {
+    rootDir,
+    generationsDir: join(rootDir, 'generations'),
+    currentLinkPath: join(rootDir, 'current'),
+    publicJsonLinkTarget: relative(outputDir, join(rootDir, 'current', basename(outputJsonPath))),
+    publicDtsLinkTarget: relative(outputDir, join(rootDir, 'current', basename(outputDtsPath))),
+  };
+}
+
+function createManagedGenerationDirName(generation: number): string {
+  return `g-${generation}`;
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (isRecord(error) && error['code'] === 'ENOENT') {
+      return false;
+    }
+    throw error;
+  }
+}
+
+async function replacePathWithSymlink(
+  path: string,
+  target: string,
+  generation: number,
+): Promise<void> {
+  const tempLinkPath = createTempArtifactPath(path, generation, 'link');
+  await symlink(target, tempLinkPath);
+  try {
+    await rename(tempLinkPath, path);
+  } finally {
+    await rm(tempLinkPath, { force: true });
+  }
+}
+
+async function ensurePublicManagedLinks({
+  outputJsonPath,
+  outputDtsPath,
+  managedPaths,
+  generation,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly managedPaths: ManagedArtifactPaths;
+  readonly generation: number;
+}): Promise<void> {
+  const jsonStat = await (async () => {
+    try {
+      return await lstat(outputJsonPath);
+    } catch (error) {
+      if (isRecord(error) && error['code'] === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  })();
+
+  if (!jsonStat?.isSymbolicLink()) {
+    await replacePathWithSymlink(outputJsonPath, managedPaths.publicJsonLinkTarget, generation);
+  }
+
+  const dtsStat = await (async () => {
+    try {
+      return await lstat(outputDtsPath);
+    } catch (error) {
+      if (isRecord(error) && error['code'] === 'ENOENT') {
+        return undefined;
+      }
+      throw error;
+    }
+  })();
+
+  if (!dtsStat?.isSymbolicLink()) {
+    await replacePathWithSymlink(outputDtsPath, managedPaths.publicDtsLinkTarget, generation);
+  }
+}
+
+async function readExistingArtifact(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, 'utf-8');
+  } catch (error) {
+    if (isRecord(error) && error['code'] === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function bootstrapManagedArtifactsFromExistingOutputs({
+  outputJsonPath,
+  outputDtsPath,
+  managedPaths,
+  generation,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly managedPaths: ManagedArtifactPaths;
+  readonly generation: number;
+}): Promise<void> {
+  if (await pathExists(managedPaths.currentLinkPath)) {
+    return;
+  }
+
+  const previousJson = await readExistingArtifact(outputJsonPath);
+  const previousDts = await readExistingArtifact(outputDtsPath);
+
+  if (previousJson === undefined && previousDts === undefined) {
+    return;
+  }
+
+  const bootstrapDir = join(managedPaths.generationsDir, 'bootstrap');
+  await mkdir(bootstrapDir, { recursive: true });
+
+  if (previousJson !== undefined) {
+    await writeFile(join(bootstrapDir, basename(outputJsonPath)), previousJson, 'utf-8');
+  }
+
+  if (previousDts !== undefined) {
+    await writeFile(join(bootstrapDir, basename(outputDtsPath)), previousDts, 'utf-8');
+  }
+
+  const tempCurrentPath = createTempArtifactPath(
+    managedPaths.currentLinkPath,
+    generation,
+    'current',
+  );
+  await symlink(relative(managedPaths.rootDir, bootstrapDir), tempCurrentPath);
+  try {
+    await rename(tempCurrentPath, managedPaths.currentLinkPath);
+  } finally {
+    await rm(tempCurrentPath, { force: true });
+  }
+
+  await ensurePublicManagedLinks({
+    outputJsonPath,
+    outputDtsPath,
+    managedPaths,
+    generation,
+  });
+}
+
+async function restoreArtifact(
+  path: string,
+  content: string | undefined,
+  generation: number,
+): Promise<void> {
+  if (content === undefined) {
+    await rm(path, { force: true });
+    return;
+  }
+
+  const restorePath = createTempArtifactPath(path, generation, 'rollback');
+  await writeFile(restorePath, content, 'utf-8');
+  try {
+    await rename(restorePath, path);
+  } finally {
+    await rm(restorePath, { force: true });
+  }
+}
+
+async function writePlainContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+}): Promise<void> {
+  await queueEmitWrite(outputJsonPath, async (state) => {
+    signal.throwIfAborted();
+
+    if (generation < state.nextGeneration) {
+      return;
+    }
+
+    const tempJsonPath = createTempArtifactPath(outputJsonPath, generation, 'next');
+    const tempDtsPath = createTempArtifactPath(outputDtsPath, generation, 'next');
+    let cleanupJsonTemp = true;
+    let cleanupDtsTemp = true;
+
+    try {
+      await writeFile(tempJsonPath, contractJson, 'utf-8');
+      await writeFile(tempDtsPath, contractDts, 'utf-8');
+
+      signal.throwIfAborted();
+
+      if (generation < state.nextGeneration) {
+        return;
+      }
+
+      const previousJson = await readExistingArtifact(outputJsonPath);
+      const previousDts = await readExistingArtifact(outputDtsPath);
+      let replacedJson = false;
+      let replacedDts = false;
+
+      try {
+        await rename(tempDtsPath, outputDtsPath);
+        cleanupDtsTemp = false;
+        replacedDts = true;
+
+        await rename(tempJsonPath, outputJsonPath);
+        cleanupJsonTemp = false;
+        replacedJson = true;
+      } catch (error) {
+        await Promise.allSettled([
+          replacedDts ? restoreArtifact(outputDtsPath, previousDts, generation) : Promise.resolve(),
+          replacedJson
+            ? restoreArtifact(outputJsonPath, previousJson, generation)
+            : Promise.resolve(),
+        ]);
+        throw error;
+      }
+    } finally {
+      await Promise.allSettled([
+        cleanupJsonTemp ? rm(tempJsonPath, { force: true }) : Promise.resolve(),
+        cleanupDtsTemp ? rm(tempDtsPath, { force: true }) : Promise.resolve(),
+      ]);
+    }
+  });
+}
+
+async function writeManagedContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+}): Promise<void> {
+  await queueEmitWrite(outputJsonPath, async (state) => {
+    signal.throwIfAborted();
+
+    if (generation < state.nextGeneration) {
+      return;
+    }
+
+    const managedPaths = getManagedArtifactPaths(outputJsonPath, outputDtsPath);
+    await mkdir(managedPaths.generationsDir, { recursive: true });
+    await bootstrapManagedArtifactsFromExistingOutputs({
+      outputJsonPath,
+      outputDtsPath,
+      managedPaths,
+      generation,
+    });
+
+    const generationDirName = createManagedGenerationDirName(generation);
+    const generationDir = join(managedPaths.generationsDir, generationDirName);
+    const tempGenerationDir = createTempArtifactPath(generationDir, generation, 'dir');
+    let cleanupGenerationDir = true;
+
+    try {
+      await mkdir(tempGenerationDir, { recursive: true });
+      await writeFile(join(tempGenerationDir, basename(outputJsonPath)), contractJson, 'utf-8');
+      await writeFile(join(tempGenerationDir, basename(outputDtsPath)), contractDts, 'utf-8');
+
+      signal.throwIfAborted();
+
+      if (generation < state.nextGeneration) {
+        return;
+      }
+
+      await rename(tempGenerationDir, generationDir);
+      cleanupGenerationDir = false;
+
+      const tempCurrentPath = createTempArtifactPath(
+        managedPaths.currentLinkPath,
+        generation,
+        'current',
+      );
+      await symlink(relative(managedPaths.rootDir, generationDir), tempCurrentPath);
+      try {
+        await rename(tempCurrentPath, managedPaths.currentLinkPath);
+      } finally {
+        await rm(tempCurrentPath, { force: true });
+      }
+
+      await ensurePublicManagedLinks({
+        outputJsonPath,
+        outputDtsPath,
+        managedPaths,
+        generation,
+      });
+    } finally {
+      if (cleanupGenerationDir) {
+        await rm(tempGenerationDir, { recursive: true, force: true });
+      }
+    }
+  });
+}
+
+async function writeContractArtifacts({
+  outputJsonPath,
+  outputDtsPath,
+  generation,
+  signal,
+  contractJson,
+  contractDts,
+  managedPublication,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly generation: number;
+  readonly signal: AbortSignal;
+  readonly contractJson: string;
+  readonly contractDts: string;
+  readonly managedPublication: boolean;
+}): Promise<void> {
+  if (managedPublication) {
+    await writeManagedContractArtifacts({
+      outputJsonPath,
+      outputDtsPath,
+      generation,
+      signal,
+      contractJson,
+      contractDts,
+    });
+    return;
+  }
+
+  await writePlainContractArtifacts({
+    outputJsonPath,
+    outputDtsPath,
+    generation,
+    signal,
+    contractJson,
+    contractDts,
+  });
 }
 
 /**
@@ -51,6 +461,7 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
+  const managedPublication = options.signal !== undefined;
   const { configPath, signal = new AbortController().signal } = options;
   const unlessAborted = abortable(signal);
 
@@ -89,6 +500,7 @@ export async function executeContractEmit(
     });
   }
   const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
+  const generation = issueEmitGeneration(outputJsonPath);
 
   const stack = createControlStack(config);
 
@@ -159,16 +571,21 @@ export async function executeContractEmit(
   familyInstance.validateContract(enrichedIR);
   const emitResult = await unlessAborted(
     emit(enrichedIR, stack, config.family.emission, {
-      outputJsonPath: outputJsonPath,
+      outputJsonPath,
     }),
   );
 
-  // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
-  await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
+  await writeContractArtifacts({
+    outputJsonPath,
+    outputDtsPath,
+    generation,
+    signal,
+    contractJson: emitResult.contractJson,
+    contractDts: emitResult.contractDts,
+    managedPublication,
+  });
 
-  // Validate that contract.d.ts type imports are resolvable
   const { validateContractDeps } = await import('../../utils/validate-contract-deps');
   const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
   if (depsValidation.warning) {
