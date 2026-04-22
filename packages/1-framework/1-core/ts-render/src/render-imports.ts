@@ -25,13 +25,10 @@ import type { ImportRequirement } from './ts-expression';
  */
 export function renderImports(requirements: readonly ImportRequirement[]): string {
   const byModule = aggregateByModule(requirements);
-  const lines: string[] = [];
-  for (const moduleSpecifier of [...byModule.keys()].sort()) {
-    const group = byModule.get(moduleSpecifier);
-    if (!group) continue;
-    lines.push(renderModuleImport(moduleSpecifier, group));
-  }
-  return lines.join('\n');
+  const entries = [...byModule.entries()].sort(([a], [b]) => a.localeCompare(b));
+  return entries
+    .map(([moduleSpecifier, group]) => renderModuleImport(moduleSpecifier, group))
+    .join('\n');
 }
 
 interface ModuleImportGroup {
@@ -107,7 +104,7 @@ function attributesEqual(
 function stringifyAttributes(attrs: Readonly<Record<string, string>> | null): string {
   if (attrs === null) return '(none)';
   const entries = Object.entries(attrs)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
   return `{ ${entries.join(', ')} }`;
 }
@@ -134,7 +131,7 @@ function buildImportClause(group: ModuleImportGroup): string {
 function buildAttributesClause(attrs: Readonly<Record<string, string>> | null): string {
   if (attrs === null) return '';
   const entries = Object.entries(attrs)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+    .sort(([a], [b]) => a.localeCompare(b))
     .map(([k, v]) => `${k}: ${JSON.stringify(v)}`);
   if (entries.length === 0) return '';
   return ` with { ${entries.join(', ')} }`;
