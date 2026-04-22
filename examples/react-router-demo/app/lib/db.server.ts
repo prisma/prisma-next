@@ -5,7 +5,7 @@ import contractJson from '../../src/prisma/contract.json' with { type: 'json' };
 
 type Db = PostgresClient<Contract>;
 
-let cached: Db | undefined;
+let cached: { db: Db; pool: Pool } | undefined;
 
 export function getDb(): Db {
   if (!cached) {
@@ -22,10 +22,22 @@ export function getDb(): Db {
     pool.on('error', (err) => {
       console.error('[react-router-demo] pg pool error:', err.message);
     });
-    cached = postgres<Contract>({
-      contractJson,
-      pg: pool,
-    });
+    cached = {
+      db: postgres<Contract>({ contractJson, pg: pool }),
+      pool,
+    };
   }
-  return cached;
+  return cached.db;
+}
+
+// Drop the cached client whenever Vite re-executes this module so HMR after a
+// contract re-emit rebuilds the runtime against the fresh contractJson instead
+// of reusing the stale one. APR-VP3-07 will replace this with hash-keyed caching.
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (cached) {
+      void cached.pool.end();
+      cached = undefined;
+    }
+  });
 }

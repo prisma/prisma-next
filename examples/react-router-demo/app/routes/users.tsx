@@ -2,7 +2,7 @@ import { Form, redirect } from 'react-router';
 import { getDb } from '~/lib/db.server';
 import type { Route } from './+types/users';
 
-export async function loader(_: Route.LoaderArgs) {
+export async function loader() {
   const db = getDb();
   const plan = db.sql.user.select('id', 'email', 'createdAt').limit(20).build();
   const rows = await db.runtime().execute(plan);
