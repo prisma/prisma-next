@@ -1,0 +1,106 @@
+import { readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { basename, dirname, join } from 'pathe';
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function createTempArtifactPath(path: string, publicationToken: string, phase: string): string {
+  return join(dirname(path), `.${basename(path)}.${process.pid}.${publicationToken}.${phase}.tmp`);
+}
+
+async function readExistingArtifact(path: string): Promise<string | undefined> {
+  try {
+    return await readFile(path, 'utf-8');
+  } catch (error) {
+    if (isRecord(error) && error['code'] === 'ENOENT') {
+      return undefined;
+    }
+    throw error;
+  }
+}
+
+async function restoreArtifact(
+  path: string,
+  content: string | undefined,
+  publicationToken: string,
+): Promise<void> {
+  if (content === undefined) {
+    await rm(path, { force: true });
+    return;
+  }
+
+  const restorePath = createTempArtifactPath(path, publicationToken, 'rollback');
+  await writeFile(restorePath, content, 'utf-8');
+  try {
+    await rename(restorePath, path);
+  } finally {
+    await rm(restorePath, { force: true });
+  }
+}
+
+interface PublishEntry {
+  readonly tempPath: string;
+  readonly outputPath: string;
+  readonly previous: string | undefined;
+}
+
+async function publishPairWithRollback(
+  entries: readonly PublishEntry[],
+  publicationToken: string,
+): Promise<void> {
+  const replaced: PublishEntry[] = [];
+  try {
+    for (const entry of entries) {
+      await rename(entry.tempPath, entry.outputPath);
+      replaced.push(entry);
+    }
+  } catch (error) {
+    await Promise.allSettled(
+      replaced.map((entry) => restoreArtifact(entry.outputPath, entry.previous, publicationToken)),
+    );
+    throw error;
+  }
+}
+
+export async function publishContractArtifactPair({
+  outputJsonPath,
+  outputDtsPath,
+  contractJson,
+  contractDts,
+  publicationToken,
+  beforePublish,
+}: {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+  readonly contractJson: string;
+  readonly contractDts: string;
+  readonly publicationToken: string;
+  readonly beforePublish?: () => Promise<boolean> | boolean;
+}): Promise<boolean> {
+  const tempJsonPath = createTempArtifactPath(outputJsonPath, publicationToken, 'next');
+  const tempDtsPath = createTempArtifactPath(outputDtsPath, publicationToken, 'next');
+
+  try {
+    await writeFile(tempJsonPath, contractJson, 'utf-8');
+    await writeFile(tempDtsPath, contractDts, 'utf-8');
+
+    if ((await beforePublish?.()) === false) {
+      return false;
+    }
+
+    const previousJson = await readExistingArtifact(outputJsonPath);
+    const previousDts = await readExistingArtifact(outputDtsPath);
+
+    await publishPairWithRollback(
+      [
+        { tempPath: tempDtsPath, outputPath: outputDtsPath, previous: previousDts },
+        { tempPath: tempJsonPath, outputPath: outputJsonPath, previous: previousJson },
+      ],
+      publicationToken,
+    );
+    return true;
+  } finally {
+    await Promise.allSettled([rm(tempJsonPath, { force: true }), rm(tempDtsPath, { force: true })]);
+  }
+}

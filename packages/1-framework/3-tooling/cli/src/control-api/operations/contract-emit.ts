@@ -1,13 +1,14 @@
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { abortable } from '@prisma-next/utils/abortable';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { basename, dirname, join } from 'pathe';
+import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
+import { publishContractArtifactPair } from '../../utils/publish-contract-artifact-pair';
 import { enrichContract } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
@@ -74,64 +75,6 @@ function queueEmitWrite<T>(
   return run;
 }
 
-function createTempArtifactPath(path: string, generation: number, phase: string): string {
-  return join(dirname(path), `.${basename(path)}.${process.pid}.${generation}.${phase}.tmp`);
-}
-
-async function readExistingArtifact(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, 'utf-8');
-  } catch (error) {
-    if (isRecord(error) && error['code'] === 'ENOENT') {
-      return undefined;
-    }
-    throw error;
-  }
-}
-
-async function restoreArtifact(
-  path: string,
-  content: string | undefined,
-  generation: number,
-): Promise<void> {
-  if (content === undefined) {
-    await rm(path, { force: true });
-    return;
-  }
-
-  const restorePath = createTempArtifactPath(path, generation, 'rollback');
-  await writeFile(restorePath, content, 'utf-8');
-  try {
-    await rename(restorePath, path);
-  } finally {
-    await rm(restorePath, { force: true });
-  }
-}
-
-interface PublishEntry {
-  readonly tempPath: string;
-  readonly outputPath: string;
-  readonly previous: string | undefined;
-}
-
-async function publishPairWithRollback(
-  entries: readonly PublishEntry[],
-  generation: number,
-): Promise<void> {
-  const replaced: PublishEntry[] = [];
-  try {
-    for (const entry of entries) {
-      await rename(entry.tempPath, entry.outputPath);
-      replaced.push(entry);
-    }
-  } catch (error) {
-    await Promise.allSettled(
-      replaced.map((entry) => restoreArtifact(entry.outputPath, entry.previous, generation)),
-    );
-    throw error;
-  }
-}
-
 async function writeContractArtifacts({
   outputJsonPath,
   outputDtsPath,
@@ -154,36 +97,18 @@ async function writeContractArtifacts({
       return 'superseded';
     }
 
-    const tempJsonPath = createTempArtifactPath(outputJsonPath, generation, 'next');
-    const tempDtsPath = createTempArtifactPath(outputDtsPath, generation, 'next');
-
-    try {
-      await writeFile(tempJsonPath, contractJson, 'utf-8');
-      await writeFile(tempDtsPath, contractDts, 'utf-8');
-
-      signal.throwIfAborted();
-
-      if (generation < state.nextGeneration) {
-        return 'superseded';
-      }
-
-      const previousJson = await readExistingArtifact(outputJsonPath);
-      const previousDts = await readExistingArtifact(outputDtsPath);
-
-      await publishPairWithRollback(
-        [
-          { tempPath: tempDtsPath, outputPath: outputDtsPath, previous: previousDts },
-          { tempPath: tempJsonPath, outputPath: outputJsonPath, previous: previousJson },
-        ],
-        generation,
-      );
-      return 'written';
-    } finally {
-      await Promise.allSettled([
-        rm(tempJsonPath, { force: true }),
-        rm(tempDtsPath, { force: true }),
-      ]);
-    }
+    const didPublish = await publishContractArtifactPair({
+      outputJsonPath,
+      outputDtsPath,
+      contractJson,
+      contractDts,
+      publicationToken: String(generation),
+      beforePublish: () => {
+        signal.throwIfAborted();
+        return generation >= state.nextGeneration;
+      },
+    });
+    return didPublish ? 'written' : 'superseded';
   });
 }
 

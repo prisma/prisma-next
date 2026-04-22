@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -27,6 +27,7 @@ import { formatStyledHeader, formatSuccessMessage } from '../utils/formatters/st
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
+import { publishContractArtifactPair } from '../utils/publish-contract-artifact-pair';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
 
@@ -192,13 +193,16 @@ async function executeContractEmitCommand(
       return notOk(mapEmitFailure(result.failure, { configPath }));
     }
 
-    // Create directories if needed
-    mkdirSync(dirname(outputJsonPath), { recursive: true });
-    mkdirSync(dirname(outputDtsPath), { recursive: true });
+    await mkdir(dirname(outputJsonPath), { recursive: true });
+    await mkdir(dirname(outputDtsPath), { recursive: true });
 
-    // Write the results to files
-    writeFileSync(outputJsonPath, result.value.contractJson, 'utf-8');
-    writeFileSync(outputDtsPath, result.value.contractDts, 'utf-8');
+    await publishContractArtifactPair({
+      outputJsonPath,
+      outputDtsPath,
+      contractJson: result.value.contractJson,
+      contractDts: result.value.contractDts,
+      publicationToken: String(startTime),
+    });
 
     // Validate that contract.d.ts type imports are resolvable
     const { validateContractDeps } = await import('../utils/validate-contract-deps');
