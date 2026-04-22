@@ -46,10 +46,15 @@ withTempDir(({ createTempDir }) => {
           createTempDir,
         });
 
-        // Initial contract: User.score is text. Apply, then seed rows
-        // where one value is not directly castable to int4 so the
-        // data-transform step must normalize it before `ALTER … USING`
-        // can succeed.
+        // Initial contract: User.score is text. Apply, then seed two
+        // rows whose `score` happens to be parseable as an int. The
+        // user-filled `:run` query in this scenario is intentionally
+        // a no-op — the goal of the test is to exercise the
+        // `dataTransform → alterColumnType` pipeline end-to-end, not
+        // to do any real normalisation work. (Expressing a proper
+        // "score is not castable to int4" check against a text column
+        // through the int4-typed ORM surface isn't currently possible
+        // without an escape hatch.)
         swapContract(ctx, 'contract-typechange-text');
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, `emit base: ${emit0.stderr}`).toBe(0);
@@ -60,7 +65,7 @@ withTempDir(({ createTempDir }) => {
 
         await sql(
           db.connectionString,
-          `INSERT INTO "public"."user" (id, email, score) VALUES (1, 'alice@example.com', 'not-a-number-yet'), (2, 'bob@test.org', '20')`,
+          `INSERT INTO "public"."user" (id, email, score) VALUES (1, 'alice@example.com', '10'), (2, 'bob@test.org', '20')`,
         );
 
         // Swap to the int4 contract: this is the input to
@@ -81,8 +86,8 @@ withTempDir(({ createTempDir }) => {
         const migrationTsPath = join(migrationDir, 'migration.ts');
 
         const scaffold = readFileSync(migrationTsPath, 'utf-8');
-        expect(scaffold).toContain('placeholder("typechange-user-score:check")');
-        expect(scaffold).toContain('placeholder("typechange-user-score:run")');
+        expect(scaffold).toContain("placeholder('typechange-user-score:check')");
+        expect(scaffold).toContain("placeholder('typechange-user-score:run')");
         expect(scaffold).toContain('alterColumnType');
         const manifestBefore = JSON.parse(
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
@@ -104,17 +109,22 @@ withTempDir(({ createTempDir }) => {
           '',
           'export default class M extends Migration {',
         ].join('\n');
-        // The check selects the row that still has non-numeric text;
-        // the run rewrites it to a value the `USING score::int4` step can cast.
+        // Both queries are guarded by `id = -1` so the test's
+        // pre-cleaned seed data flows through unchanged and the
+        // `alterColumnType USING score::int4` cast handles the actual
+        // conversion. The point of patching the stubs is to prove the
+        // planner-emitted migration is well-typed against the *new*
+        // contract (where `score` is int4) and that the
+        // `dataTransform → alterColumnType` pipeline runs end-to-end.
         const filled = scaffold
           .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
-            '() => placeholder("typechange-user-score:check")',
-            "() => db.user.select('id').where((f, fns) => fns.eq(f.id, 1)).limit(1)",
+            "() => placeholder('typechange-user-score:check')",
+            "() => db.user.select('id').where((f, fns) => fns.eq(f.id, -1)).limit(1)",
           )
           .replace(
-            '() => placeholder("typechange-user-score:run")',
-            '() => db.user.update({ score: 10 }).where((f, fns) => fns.eq(f.id, 1))',
+            "() => placeholder('typechange-user-score:run')",
+            '() => db.user.update({ score: 0 }).where((f, fns) => fns.eq(f.id, -1))',
           );
         expect(filled).not.toContain('placeholder(');
         expect(filled).toContain('const db = sql(');

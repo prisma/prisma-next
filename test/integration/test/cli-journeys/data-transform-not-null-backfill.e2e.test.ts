@@ -77,8 +77,8 @@ withTempDir(({ createTempDir }) => {
         const migrationTsPath = join(migrationDir, 'migration.ts');
 
         const scaffold = readFileSync(migrationTsPath, 'utf-8');
-        expect(scaffold).toContain('placeholder("backfill-user-name:check")');
-        expect(scaffold).toContain('placeholder("backfill-user-name:run")');
+        expect(scaffold).toContain("placeholder('backfill-user-name:check')");
+        expect(scaffold).toContain("placeholder('backfill-user-name:run')");
         const manifestBefore = JSON.parse(
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
@@ -102,11 +102,11 @@ withTempDir(({ createTempDir }) => {
         const filled = scaffold
           .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
-            '() => placeholder("backfill-user-name:check")',
+            "() => placeholder('backfill-user-name:check')",
             "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",
           )
           .replace(
-            '() => placeholder("backfill-user-name:run")',
+            "() => placeholder('backfill-user-name:run')",
             `() => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null))`,
           );
         expect(filled).not.toContain('placeholder(');
