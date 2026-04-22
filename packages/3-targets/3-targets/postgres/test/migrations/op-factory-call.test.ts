@@ -120,15 +120,26 @@ describe('Postgres call classes', () => {
       );
     });
 
-    it('DataTransformCall renders slots as placeholder closures and imports both factory + placeholder', () => {
+    it('DataTransformCall renders slots as placeholder closures and imports factory + placeholder + contract', () => {
       const call = new DataTransformCall('Backfill', 'check', 'run');
 
       expect(call.renderTypeScript()).toBe(
-        'dataTransform("Backfill", () => placeholder("check"), () => placeholder("run"))',
+        [
+          'dataTransform(contract, "Backfill", {',
+          '  check: () => placeholder("check"),',
+          '  run: () => placeholder("run"),',
+          '})',
+        ].join('\n'),
       );
       expect(call.importRequirements()).toEqual([
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
         { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
+        {
+          moduleSpecifier: './contract.json',
+          symbol: 'contract',
+          kind: 'default',
+          attributes: { type: 'json' },
+        },
       ]);
     });
   });
@@ -383,14 +394,20 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain('createIndex(');
   });
 
-  it('emits DataTransformCall slots as placeholder closures and contributes the placeholder import', () => {
+  it('emits DataTransformCall slots as placeholder closures and contributes placeholder + contract imports', () => {
     const calls = [new DataTransformCall('Backfill user emails', 'check-emails', 'run-emails')];
 
     const source = renderCallsToTypeScript(calls, META);
 
     expect(source).toContain("import { placeholder } from '@prisma-next/errors/migration';");
+    expect(source).toContain('import contract from \'./contract.json\' with { type: "json" };');
     expect(source).toContain(
-      'dataTransform("Backfill user emails", () => placeholder("check-emails"), () => placeholder("run-emails"))',
+      [
+        '      dataTransform(contract, "Backfill user emails", {',
+        '        check: () => placeholder("check-emails"),',
+        '        run: () => placeholder("run-emails"),',
+        '      })',
+      ].join('\n'),
     );
   });
 

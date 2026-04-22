@@ -792,13 +792,24 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
   }
 
   renderTypeScript(): string {
-    return `dataTransform(${JSON.stringify(this.label)}, () => placeholder(${JSON.stringify(this.checkSlot)}), () => placeholder(${JSON.stringify(this.runSlot)}))`;
+    return [
+      `dataTransform(contract, ${JSON.stringify(this.label)}, {`,
+      `  check: () => placeholder(${JSON.stringify(this.checkSlot)}),`,
+      `  run: () => placeholder(${JSON.stringify(this.runSlot)}),`,
+      '})',
+    ].join('\n');
   }
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
       { moduleSpecifier: '@prisma-next/errors/migration', symbol: 'placeholder' },
+      {
+        moduleSpecifier: './contract.json',
+        symbol: 'contract',
+        kind: 'default',
+        attributes: { type: 'json' },
+      },
     ];
   }
 }
