@@ -3,7 +3,7 @@
  *
  * Drives a contract change that flips an existing column from
  * nullable to NOT NULL (no `addColumn`, no type change). The Postgres
- * class-flow planner's `nullableTighteningCallStrategy` matches this
+ * planner's `nullableTighteningCallStrategy` matches this
  * case and emits `DataTransformCall(placeholder slots) → setNotNull`,
  * so the planner-emitted `migration.ts` has two `placeholder("…")`
  * stubs the user must fill in to backfill any existing NULL rows

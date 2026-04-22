@@ -3,7 +3,7 @@
  *
  * Drives a contract change that retypes an existing column from
  * `text` to `int4`. That transition is unsafe (not in
- * `SAFE_WIDENINGS`), so the Postgres class-flow planner's
+ * `SAFE_WIDENINGS`), so the Postgres planner's
  * `typeChangeCallStrategy` matches it and emits
  * `DataTransformCall(placeholder slots) → alterColumnType`. The
  * planner-emitted `migration.ts` therefore has two `placeholder("…")`
