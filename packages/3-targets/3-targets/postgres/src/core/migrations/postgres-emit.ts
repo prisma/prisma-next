@@ -46,13 +46,18 @@ export async function postgresEmit(
 ): Promise<readonly MigrationPlanOperation[]> {
   const filePath = join(options.dir, MIGRATION_TS_FILE);
 
+  let fileStat: Awaited<ReturnType<typeof stat>>;
   try {
-    await stat(filePath);
+    fileStat = await stat(filePath);
   } catch {
     throw errorMigrationFileMissing(options.dir);
   }
 
-  const fileUrl = pathToFileURL(filePath).href;
+  // ESM caches dynamic `import()` by URL. Append mtime so edits to
+  // `migration.ts` within the same process (e.g. tests) load a fresh module.
+  // Truncate to integer: fractional ms contains `.`, which some bundlers
+  // (Vitest) mis-parse as a file-extension boundary.
+  const fileUrl = `${pathToFileURL(filePath).href}?mtime=${Math.trunc(fileStat.mtimeMs)}`;
   const mod = (await import(fileUrl)) as { default?: unknown };
 
   const MigrationExport = mod.default;

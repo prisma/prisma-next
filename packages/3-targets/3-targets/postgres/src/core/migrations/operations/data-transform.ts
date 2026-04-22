@@ -49,6 +49,7 @@ export interface DataTransformOptions {
   readonly run: DataTransformClosure | readonly DataTransformClosure[];
 }
 
+/** Single shared adapter for apply/CLI; sufficient for single-threaded migration execution. */
 let adapterSingleton: ReturnType<typeof createPostgresAdapter> | null = null;
 function getAdapter(): ReturnType<typeof createPostgresAdapter> {
   if (adapterSingleton === null) {

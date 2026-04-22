@@ -3,6 +3,7 @@ import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
 import {
   errorDirectoryExists,
+  errorInvalidDestName,
   errorInvalidJson,
   errorInvalidManifest,
   errorInvalidSlug,
@@ -91,6 +92,9 @@ export async function copyFilesWithRename(
 ): Promise<void> {
   await mkdir(destDir, { recursive: true });
   for (const file of files) {
+    if (basename(file.destName) !== file.destName) {
+      throw errorInvalidDestName(file.destName);
+    }
     await copyFile(file.sourcePath, join(destDir, file.destName));
   }
 }

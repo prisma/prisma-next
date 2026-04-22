@@ -420,6 +420,39 @@ describe('copyFilesWithRename', () => {
   });
 });
 
+describe('copyFilesWithRename', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'migration-copy-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('copies into destDir under the given destName', async () => {
+    const src = join(tmpDir, 'source.json');
+    await writeFile(src, '{"x":1}', 'utf-8');
+    const destDir = join(tmpDir, 'dest');
+    await copyFilesWithRename(destDir, [{ sourcePath: src, destName: 'contract.json' }]);
+    expect(await readFile(join(destDir, 'contract.json'), 'utf-8')).toBe('{"x":1}');
+  });
+
+  it('rejects destName with path segments with MIGRATION.INVALID_DEST_NAME', async () => {
+    const src = join(tmpDir, 'source.json');
+    await writeFile(src, '{}', 'utf-8');
+    const destDir = join(tmpDir, 'dest');
+    await expect(
+      copyFilesWithRename(destDir, [{ sourcePath: src, destName: '../outside.json' }]),
+    ).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_DEST_NAME');
+      expect((e as MigrationToolsError).details).toHaveProperty('destName', '../outside.json');
+      return true;
+    });
+  });
+});
+
 describe('formatMigrationDirName', () => {
   it('formats with normal slug', () => {
     const ts = new Date('2026-02-25T14:30:00Z');

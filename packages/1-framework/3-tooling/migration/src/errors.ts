@@ -84,6 +84,14 @@ export function errorInvalidSlug(slug: string): MigrationToolsError {
   });
 }
 
+export function errorInvalidDestName(destName: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_DEST_NAME', 'Invalid copy destination name', {
+    why: `The destination name "${destName}" must be a single path segment (no ".." or directory separators).`,
+    fix: 'Use a simple file name such as "contract.json" for each destination in the copy list.',
+    details: { destName },
+  });
+}
+
 export function errorSameSourceAndTarget(dirName: string, hash: string): MigrationToolsError {
   return new MigrationToolsError(
     'MIGRATION.SAME_SOURCE_AND_TARGET',

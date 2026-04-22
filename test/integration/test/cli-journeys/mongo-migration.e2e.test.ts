@@ -25,6 +25,7 @@
 
 import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
 import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
@@ -33,7 +34,6 @@ import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
-import { join } from 'pathe';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
   executeCommand,
