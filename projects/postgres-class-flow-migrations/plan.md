@@ -56,9 +56,10 @@ packages/3-targets/3-targets/postgres/src/core/migrations/
 ├── planner-sql-checks.ts    # Pure check-SQL builders (unchanged)
 ├── planner-identity-values.ts
 ├── planner-recipes.ts
-├── runner.ts                # Unchanged
-└── scaffolding.ts           # Only non-descriptor scaffolding helpers remain
+└── runner.ts                # Unchanged
 ```
+
+`scaffolding.ts` is gone entirely — it only ever hosted `renderDescriptorTypeScript`, and that deletes with descriptor-flow in Phase 5. No replacement file is added in its place.
 
 No SQL-family base class is added for the IR: `family-sql` ships no `SqlOpFactoryCallBase` and no `PlannerProducedSqlMigration`. The `OpFactoryCall` interface is lifted directly to the framework so any future target (SQL or otherwise) can reuse it without going through a family layer. (What family-SQL *does* ship is a thin `SqlMigration<TDetails extends SqlPlanTargetDetails>` alias that binds `Migration`'s `TOp` to `SqlMigrationPlanOperation<TDetails>` — a convenience for target-side concrete migration classes; see Phase 1.)
 
@@ -66,7 +67,7 @@ TypeScript rendering primitives (`TsExpression`, `ImportRequirement`, `jsonToTsS
 
 `DataTransformCall` accepts `checkSlot` / `runSlot` strings directly. Its `renderTypeScript()` emits `() => placeholder("slot")` at the call site; its `toOp()` always throws `errorUnfilledPlaceholder(label)` (`PN-MIG-2001`) — a plan carrying a `DataTransformCall` is, by construction, an unfilled stub that only has TypeScript. Real (non-placeholder) data-transform execution happens at migration runtime through the pure `dataTransform` factory when the user runs the authored `migration.ts`. There is no standalone `PlaceholderExpression` AST node in the shipped implementation (W07 + user simplification).
 
-**Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, `renderDescriptorTypeScript` from `scaffolding.ts`.
+**Deleted**: `descriptor-planner.ts`, `operation-descriptors.ts`, `operation-resolver.ts`, `planner-reconciliation.ts`, and `scaffolding.ts` in its entirety (the file only hosts `renderDescriptorTypeScript`, which has no remaining production callers after Phase 3).
 
 **The production pipeline becomes**:
 
@@ -382,7 +383,7 @@ Revert the PR; walk-schema planner returns.
 - `operation-descriptors.ts`
 - `operation-resolver.ts` — thin `resolveX` wrappers from Phase 0 die; pure `createX` factories live on as `op-factories.ts`.
 - `descriptor-planner.ts` (if not already renamed/merged into `issue-planner.ts` during Phase 2 or 4).
-- `renderDescriptorTypeScript` function in `scaffolding.ts`.
+- `scaffolding.ts` **in its entirety** (and its sibling `scaffolding.test.ts`). The file only ever hosted `renderDescriptorTypeScript`; as of PR 2 (Phase 3) it has no production callers — only its own test file imports it. Nothing needs to "remain" in the file.
 - `MigrationDescriptorArraySchema` in `exports/migration.ts`.
 
 **Framework deletes**:
@@ -404,7 +405,7 @@ Revert the PR; walk-schema planner returns.
 ### Validation
 
 - `pnpm -r typecheck`, `pnpm -r lint`.
-- Grep sweep: zero matches for `OperationDescriptor`, `PostgresMigrationOpDescriptor`, `DataTransformDescriptor`, `planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`, `MigrationDescriptorArraySchema`, `evaluateMigrationTs`, `emitDescriptorFlow`, `migrationStrategy` under `packages/` and `test/`.
+- Grep sweep: zero matches for `OperationDescriptor`, `PostgresMigrationOpDescriptor`, `DataTransformDescriptor`, `planWithDescriptors`, `resolveDescriptors`, `renderDescriptorTypeScript`, `MigrationDescriptorArraySchema`, `evaluateMigrationTs`, `emitDescriptorFlow`, `migrationStrategy` under `packages/` and `test/`. Also: zero remaining imports of `core/migrations/scaffolding` (file is deleted).
 - Full integration + e2e pass.
 
 ### Rollback
