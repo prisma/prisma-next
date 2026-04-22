@@ -1388,7 +1388,7 @@ describe('MongoMigrationPlanner', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:01' });
     });
 
-    it('renders a class-flow migration.ts stub that imports Migration and calls Migration.run', () => {
+    it('renders a migration.ts stub that imports Migration and calls Migration.run', () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
         fromHash: 'sha256:00',

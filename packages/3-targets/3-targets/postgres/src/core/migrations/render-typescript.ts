@@ -1,5 +1,5 @@
 /**
- * Polymorphic TypeScript emitter for the Postgres class-flow IR.
+ * Polymorphic TypeScript emitter for the Postgres migration IR.
  *
  * Each `PostgresOpFactoryCall` renders itself via `renderTypeScript()` and
  * declares its own `importRequirements()`; this file just composes the module

@@ -38,7 +38,7 @@ function makePlan(storageHash: string = CONTRACT_HASH): SqlQueryPlan {
   };
 }
 
-describe('dataTransform (class-flow factory)', () => {
+describe('dataTransform factory', () => {
   beforeEachTest();
 
   it('returns a DataTransformOperation with a single run entry and no check', () => {

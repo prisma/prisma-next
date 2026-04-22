@@ -55,16 +55,16 @@ export function createPostgresMigrationPlanner(
 /**
  * Result of `PostgresMigrationPlanner.plan()`. A discriminated union whose
  * success variant carries a `TypeScriptRenderablePostgresMigration` — a
- * class-flow migration object that both the CLI (via
- * `renderTypeScript()`) and the SQL-typed callers (via `operations`,
- * `describe()`, etc.) consume uniformly.
+ * migration object that both the CLI (via `renderTypeScript()`) and the
+ * SQL-typed callers (via `operations`, `describe()`, etc.) consume
+ * uniformly.
  */
 export type PostgresPlanResult =
   | { readonly kind: 'success'; readonly plan: TypeScriptRenderablePostgresMigration }
   | SqlPlannerFailureResult;
 
 /**
- * Postgres migration planner — a thin class-flow wrapper over `planIssues`.
+ * Postgres migration planner — a thin wrapper over `planIssues`.
  *
  * `plan()` verifies the live schema against the target contract (producing
  * `SchemaIssue[]`) and delegates to `planIssues` with the full `db update`

@@ -1,7 +1,7 @@
 /**
- * Class-flow migration planner.
+ * Postgres migration planner.
  *
- * Takes schema issues (from verifySqlSchema) and emits class-flow IR
+ * Takes schema issues (from verifySqlSchema) and emits migration IR
  * (`PostgresOpFactoryCall[]`). Strategies consume issues they recognize and
  * produce specialized call sequences (e.g. NOT NULL backfill →
  * addColumn(nullable) + dataTransform + setNotNull); remaining issues flow
@@ -119,7 +119,7 @@ function isMissing(issue: SchemaIssue): boolean {
 }
 
 // ============================================================================
-// Class-flow issue planner
+// Issue planner
 // ============================================================================
 
 export interface IssuePlannerOptions {

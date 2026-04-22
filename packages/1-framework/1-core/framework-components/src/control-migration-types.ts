@@ -112,8 +112,7 @@ export interface MigrationPlanOperation {
 // ============================================================================
 
 /**
- * Framework-level contract for a single factory call in a target's class-flow
- * planner IR.
+ * Framework-level contract for a single factory call in a target's planner IR.
  *
  * @see ADR 195
  */
@@ -162,14 +161,8 @@ export interface MigrationPlan {
  *  - hand the plan to the runner for execution (via `MigrationPlan`), and
  *  - materialize the plan as an editable source file via `renderTypeScript()`.
  *
- * User-authored migrations (class-flow `Migration` subclasses) satisfy
- * `MigrationPlan` but not this interface: they are already the source.
- *
- * Descriptor-flow targets (e.g. Postgres) that do not materialize their
- * planner plans back to TypeScript provide a throwing stub so that
- * `MigrationPlannerSuccessResult.plan` has a uniform type at the framework
- * level. In practice the CLI only calls `renderTypeScript()` in the
- * class-flow branch of `migration plan`.
+ * User-authored migrations (`Migration` subclasses) satisfy `MigrationPlan`
+ * but not this interface: they are already the source.
  */
 export interface MigrationPlanWithAuthoringSurface extends MigrationPlan {
   /**
@@ -298,17 +291,17 @@ export interface MigrationPlanner<
     readonly policy: MigrationOperationPolicy;
     /**
      * Storage hash of the "from" contract (the state the planner assumes the
-     * database starts at). Class-flow planners use this to populate
-     * `describe()` on the produced plan so the rendered `migration.ts` has
-     * correct `from`/`to` metadata.
+     * database starts at). Planners use this to populate `describe()` on the
+     * produced plan so the rendered `migration.ts` has correct `from`/`to`
+     * metadata.
      */
     readonly fromHash: string;
     /**
      * The "from" contract (the state the planner assumes the database starts
-     * at). Class-flow planners pass this to data-safety strategies so they
-     * can compare `from` and `to` column shapes (e.g. to detect unsafe type
-     * changes). `db update` / `db init` reconcile against the live schema and
-     * have no "from" contract; only `migration plan` provides one.
+     * at). Planners pass this to data-safety strategies so they can compare
+     * `from` and `to` column shapes (e.g. to detect unsafe type changes).
+     * `db update` / `db init` reconcile against the live schema and have no
+     * "from" contract; only `migration plan` provides one.
      */
     readonly fromContract?: unknown;
     /**
@@ -421,9 +414,9 @@ export interface MigrationScaffoldContext {
   /** Absolute path to the contract.json file, if one exists. Used by targets that emit typed-contract imports. */
   readonly contractJsonPath?: string;
   /**
-   * Storage hash of the "from" contract. Class-flow targets (e.g. Mongo) use
-   * this to populate `describe()` on the rendered empty migration so that
-   * `migration.json` generated at emit time has correct identity metadata.
+   * Storage hash of the "from" contract. Targets use this to populate
+   * `describe()` on the rendered empty migration so that identity metadata
+   * is correctly populated.
    */
   readonly fromHash: string;
   /**

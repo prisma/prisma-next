@@ -4,7 +4,7 @@
 > and is published only to support its runtime. Its API is unstable and may change
 > without notice. Do not depend on this package directly; install `prisma-next` instead.
 
-TypeScript source-text rendering utilities shared by any Prisma Next component that has to emit hand-editable `.ts` files — today the Postgres and Mongo migration-authoring surfaces, later any new target that ships a class-flow authoring experience.
+TypeScript source-text rendering utilities shared by any Prisma Next component that has to emit hand-editable `.ts` files — today the Postgres and Mongo migration-authoring surfaces, later any new target that ships a migration-authoring experience.
 
 ## Overview
 
