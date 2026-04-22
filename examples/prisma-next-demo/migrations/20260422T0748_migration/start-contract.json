@@ -116,12 +116,8 @@
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
+            "localFields": ["userId"],
+            "targetFields": ["id"]
           },
           "to": "User"
         }
@@ -209,12 +205,8 @@
         "user": {
           "cardinality": "N:1",
           "on": {
-            "localFields": [
-              "userId"
-            ],
-            "targetFields": [
-              "id"
-            ]
+            "localFields": ["userId"],
+            "targetFields": ["id"]
           },
           "to": "User"
         }
@@ -270,6 +262,13 @@
             "kind": "scalar"
           }
         },
+        "displayName": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
         "email": {
           "nullable": false,
           "type": {
@@ -299,24 +298,16 @@
         "posts": {
           "cardinality": "1:N",
           "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
+            "localFields": ["id"],
+            "targetFields": ["userId"]
           },
           "to": "Post"
         },
         "tasks": {
           "cardinality": "1:N",
           "on": {
-            "localFields": [
-              "id"
-            ],
-            "targetFields": [
-              "userId"
-            ]
+            "localFields": ["id"],
+            "targetFields": ["userId"]
           },
           "to": "Task"
         }
@@ -328,6 +319,9 @@
           },
           "createdAt": {
             "column": "createdAt"
+          },
+          "displayName": {
+            "column": "displayName"
           },
           "email": {
             "column": "email"
@@ -378,7 +372,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:76c1bd5f5733774ae1182e83ca882f623cdf12e78a76c2fb06666d60bbdd6452",
+    "storageHash": "sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69",
     "tables": {
       "bug": {
         "columns": {
@@ -452,24 +446,18 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
+            "columns": ["userId"],
             "constraint": true,
             "index": true,
             "references": {
-              "columns": [
-                "id"
-              ],
+              "columns": ["id"],
               "table": "user"
             }
           }
         ],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       },
@@ -524,24 +512,18 @@
         },
         "foreignKeys": [
           {
-            "columns": [
-              "userId"
-            ],
+            "columns": ["userId"],
             "constraint": true,
             "index": true,
             "references": {
-              "columns": [
-                "id"
-              ],
+              "columns": ["id"],
               "table": "user"
             }
           }
         ],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       },
@@ -560,6 +542,11 @@
             },
             "nativeType": "timestamptz",
             "nullable": false
+          },
+          "displayName": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": true
           },
           "email": {
             "codecId": "pg/text@1",
@@ -584,9 +571,7 @@
         "foreignKeys": [],
         "indexes": [],
         "primaryKey": {
-          "columns": [
-            "id"
-          ]
+          "columns": ["id"]
         },
         "uniques": []
       }
@@ -603,10 +588,7 @@
         "codecId": "pg/enum@1",
         "nativeType": "user_type",
         "typeParams": {
-          "values": [
-            "admin",
-            "user"
-          ]
+          "values": ["admin", "user"]
         }
       }
     }

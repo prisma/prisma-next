@@ -2,5 +2,9 @@
 packages/1-framework/3-tooling/cli/recordings/ascii/** linguist-generated
 **/contract.d.ts linguist-generated
 **/contract.json linguist-generated
+**/end-contract.d.ts linguist-generated
+**/end-contract.json linguist-generated
+**/start-contract.d.ts linguist-generated
+**/start-contract.json linguist-generated
 **/ops.json linguist-generated
 **/migration.json linguist-generated

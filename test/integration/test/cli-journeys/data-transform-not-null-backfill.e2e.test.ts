@@ -92,7 +92,7 @@ withTempDir(({ createTempDir }) => {
           '',
           'const db = sql({',
           '  context: createExecutionContext({',
-          '    contract,',
+          '    contract: endContract,',
           '    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),',
           '  }),',
           '});',

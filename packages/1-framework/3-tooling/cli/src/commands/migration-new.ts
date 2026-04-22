@@ -221,18 +221,18 @@ async function executeMigrationNewCommand(
     // copy — for now we rely on the sibling `.d.ts` convention.
     const contractDtsAbsolute = `${contractPathAbsolute.slice(0, -'.json'.length)}.d.ts`;
     await copyFilesWithRename(packageDir, [
-      { sourcePath: contractPathAbsolute, destName: 'contract.json' },
-      { sourcePath: contractDtsAbsolute, destName: 'contract.d.ts' },
+      { sourcePath: contractPathAbsolute, destName: 'end-contract.json' },
+      { sourcePath: contractDtsAbsolute, destName: 'end-contract.d.ts' },
     ]);
     if (fromContractSourceDir !== null) {
       await copyFilesWithRename(packageDir, [
         {
-          sourcePath: join(fromContractSourceDir, 'contract.json'),
-          destName: 'from-contract.json',
+          sourcePath: join(fromContractSourceDir, 'end-contract.json'),
+          destName: 'start-contract.json',
         },
         {
-          sourcePath: join(fromContractSourceDir, 'contract.d.ts'),
-          destName: 'from-contract.d.ts',
+          sourcePath: join(fromContractSourceDir, 'end-contract.d.ts'),
+          destName: 'start-contract.d.ts',
         },
       ]);
     }
@@ -242,7 +242,7 @@ async function executeMigrationNewCommand(
     const planner = migrations.createPlanner(familyInstance);
     const emptyPlan = planner.emptyMigration({
       packageDir,
-      contractJsonPath: join(packageDir, 'contract.json'),
+      contractJsonPath: join(packageDir, 'end-contract.json'),
       fromHash,
       toHash: toStorageHash,
     });

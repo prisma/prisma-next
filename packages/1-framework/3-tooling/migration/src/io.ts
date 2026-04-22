@@ -83,8 +83,8 @@ export async function writeMigrationPackage(
  * `destDir/<destName>`; missing sources throw `ENOENT`. The helper is
  * intentionally generic: callers own the list of files (e.g. a contract
  * emitter's emitted output) and the naming convention (e.g. renaming
- * the destination contract to `contract.*` and the source contract to
- * `from-contract.*`).
+ * the destination contract to `end-contract.*` and the source contract
+ * to `start-contract.*`).
  */
 export async function copyFilesWithRename(
   destDir: string,

@@ -7,7 +7,7 @@
  *
  * **`migration new` → hand-author the whole `migration.ts`.** The user
  * starts from an empty scaffold, writes the operations themselves
- * (`addColumn`, `dataTransform(contract, ...)`), then runs `migration
+ * (`addColumn`, `dataTransform(endContract, ...)`), then runs `migration
  * emit` + `migration apply`.
  *
  * The planner-assisted path (where the user fills in
@@ -102,7 +102,7 @@ withTempDir(({ createTempDir }) => {
         expect(manifestBefore.migrationId).toBeNull();
 
         // Step 5: Fill in migration.ts with the class-flow authoring surface.
-        // Uses `dataTransform(contract, name, { run })` from
+        // Uses `dataTransform(endContract, name, { run })` from
         // `@prisma-next/target-postgres/migration`, wired through a
         // user-managed `sql({ context })` so the closure can build a typed
         // query plan and the factory can assert contract-hash consistency.
@@ -115,11 +115,11 @@ import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import { Migration, addColumn, dataTransform } from '@prisma-next/target-postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
-import contract from './contract.json' with { type: 'json' };
+import endContract from './end-contract.json' with { type: 'json' };
 
 const db = sql({
   context: createExecutionContext({
-    contract,
+    contract: endContract,
     stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
 });
@@ -132,7 +132,7 @@ export default class M extends Migration {
   override get operations() {
     return [
       addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
-      dataTransform(contract, 'backfill-user-name', {
+      dataTransform(endContract, 'backfill-user-name', {
         run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),
     ];

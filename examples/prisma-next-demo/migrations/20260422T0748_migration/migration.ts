@@ -4,11 +4,11 @@ import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import postgres from '@prisma-next/postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
-import type { Contract } from './contract';
-import contractJson from './contract.json' with { type: 'json' };
+import type { Contract } from './end-contract';
+import endContractJson from './end-contract.json' with { type: 'json' };
 
-const contract = validateContract<Contract>(contractJson, emptyCodecLookup);
-const db = postgres<Contract>({ contractJson, extensions: [pgvector] });
+const endContract = validateContract<Contract>(endContractJson, emptyCodecLookup);
+const db = postgres<Contract>({ contractJson: endContractJson, extensions: [pgvector] });
 
 export default class M extends Migration {
   override describe() {
@@ -20,7 +20,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      dataTransform(contract, 'handle-nulls-user-displayName', {
+      dataTransform(endContract, 'handle-nulls-user-displayName', {
         check: () =>
           db.sql.user
             .select('id')
