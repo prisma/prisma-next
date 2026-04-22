@@ -192,10 +192,14 @@ describe('SQL DSL standalone query execution (TML-2160)', () => {
             expect(results[i]!.distance).toBeGreaterThanOrEqual(results[i - 1]!.distance);
           }
 
+          // 2 Alice posts × 3 Bob posts × 2 join orderings = 12 cross-author pairs.
+          expect(results).toHaveLength(12);
+
           // The closest unordered pair is aliceFar × bobClose. It appears in both
           // orderings (p1=alice/p2=bob and p1=bob/p2=alice), so the top-2 rows
           // should be those two permutations of the same unordered pair.
           const topTwo = results.slice(0, 2);
+          expect(topTwo).toHaveLength(2);
           const topPairKeys = new Set(
             topTwo.map((row) => unorderedPairKey(row.postAId, row.postBId)),
           );
