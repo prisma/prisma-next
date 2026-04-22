@@ -23,6 +23,7 @@ import {
   parseJsonOutput,
   runContractEmit,
   runMigrationPlan,
+  runMigrationPlanAndEmit,
   setupJourney,
   swapContract,
   useDevDatabase,
@@ -47,8 +48,13 @@ withTempDir(({ createTempDir }) => {
         const emit = await runContractEmit(ctx);
         expect(emit.exitCode, 'H.01: contract emit').toBe(0);
 
-        // H.02: migration plan --json
-        const plan = await runMigrationPlan(ctx, ['--name', 'initial', '--json']);
+        // H.02: migration plan --json (plan+self-emit so the migration is
+        // attested on disk for H.03's verifyMigration check).
+        //
+        // `migrationId` was removed from `MigrationPlanResult` in PR 3 — it
+        // was tied to the old `migration emit` path — so we no longer assert
+        // on it here.
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'initial', '--json']);
         expect(plan.exitCode, 'H.02: migration plan --json').toBe(0);
 
         const result = parseJsonOutput<{
@@ -56,7 +62,6 @@ withTempDir(({ createTempDir }) => {
           noOp: boolean;
           from: string;
           to: string;
-          migrationId: string;
           dir: string;
           operations: readonly { id: string; label: string; operationClass: string }[];
         }>(plan);
@@ -65,7 +70,6 @@ withTempDir(({ createTempDir }) => {
         expect(result.noOp, 'H.02: not a noop').toBe(false);
         expect(result.from, 'H.02: from is empty hash').toBe(EMPTY_CONTRACT_HASH);
         expect(result.to, 'H.02: to is defined').toBeDefined();
-        expect(result.migrationId, 'H.02: migrationId is defined').toBeDefined();
         expect(result.dir, 'H.02: dir is defined').toBeDefined();
         expect(result.operations.length, 'H.02: has operations').toBeGreaterThan(0);
 
@@ -106,7 +110,10 @@ withTempDir(({ createTempDir }) => {
         // I.01: emit base contract and plan initial migration
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, 'I.01: contract emit').toBe(0);
-        const planInit = await runMigrationPlan(ctx, ['--name', 'initial']);
+        // Self-emit the initial migration so it's attested and becomes a
+        // leaf in the migration graph — otherwise I.03's planner computes
+        // from the empty contract and mis-classifies the change.
+        const planInit = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(planInit.exitCode, 'I.01: plan initial').toBe(0);
 
         // I.02: swap to destructive contract (removes email column)

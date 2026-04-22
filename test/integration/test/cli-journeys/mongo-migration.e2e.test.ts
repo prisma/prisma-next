@@ -25,7 +25,14 @@
  */
 
 import { execFile } from 'node:child_process';
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
@@ -157,12 +164,20 @@ async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Pr
 }
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {
-  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
-    .filter((d) => !d.startsWith('.'))
-    .sort();
-  const latest = dirs[dirs.length - 1];
-  if (!latest) throw new Error('No migration directory found');
-  return join(ctx.testDir, 'migrations', latest);
+  const migrationsDir = join(ctx.testDir, 'migrations');
+  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  if (dirs.length === 0) throw new Error('No migration directory found');
+  let newest = dirs[0]!;
+  let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
+  for (let i = 1; i < dirs.length; i++) {
+    const dir = dirs[i]!;
+    const mtime = statSync(join(migrationsDir, dir)).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newest = dir;
+    }
+  }
+  return join(migrationsDir, newest);
 }
 
 /**
@@ -218,7 +233,8 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     );
     expect(migrationTs).toContain('@prisma-next/target-mongo/migration');
     expect(migrationTs).toContain('createIndex');
-    expect(migrationTs).toContain('"users"');
+    // Prettier rewrites double-quoted literals to single-quoted on disk.
+    expect(migrationTs).toContain("'users'");
     expect(migrationTs).toContain('Migration.run(import.meta.url');
 
     expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
@@ -227,6 +243,11 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
     );
+
+    // Plan leaves a draft migration; self-emit via `tsx migration.ts` to
+    // produce `ops.json` and the attested `migration.json`.
+    const emit = await migrationEmit(ctx, ['--dir', `migrations/${basename(migrationDir)}`]);
+    expect(emit.exitCode, `migration emit: ${emit.stdout}\n${emit.stderr}`).toBe(0);
 
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8')) as ReadonlyArray<{
       id: string;

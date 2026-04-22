@@ -7,7 +7,14 @@
  */
 
 import { execFile } from 'node:child_process';
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
@@ -531,11 +538,30 @@ export function getMigrationDirs(ctx: JourneyContext): string[] {
 }
 
 /**
- * Returns the latest (last sorted) migration directory name.
+ * Returns the most recently created migration directory name (by mtime).
+ *
+ * Mtime-based selection is more robust than alphabetical sorting: two
+ * migrations planned in the same minute share the `YYYYMMDDTHHMM_` prefix,
+ * and alphabetical tie-break falls through to the slug. A newly-planned
+ * migration whose slug sorts earlier than an existing sibling would be
+ * mis-identified as "not the latest" if we just used `sort().at(-1)`. The
+ * on-disk mtime always reflects the actual creation order.
  */
 export function getLatestMigrationDir(ctx: JourneyContext): string | undefined {
   const dirs = getMigrationDirs(ctx);
-  return dirs[dirs.length - 1];
+  if (dirs.length === 0) return undefined;
+  const migrationsDir = join(ctx.testDir, 'migrations');
+  let newest = dirs[0]!;
+  let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
+  for (let i = 1; i < dirs.length; i++) {
+    const dir = dirs[i]!;
+    const mtime = statSync(join(migrationsDir, dir)).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newest = dir;
+    }
+  }
+  return newest;
 }
 
 // ---------------------------------------------------------------------------

@@ -1,4 +1,7 @@
+import { execFile } from 'node:child_process';
+import { readdirSync, statSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import type { MigrationApplyResult } from '@prisma-next/cli/commands/migration-apply';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
@@ -7,6 +10,10 @@ import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { timeouts, withClient, withDevDatabase } from '@prisma-next/test-utils';
 import stripAnsi from 'strip-ansi';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+const execFileAsync = promisify(execFile);
+const TSX_BIN = resolve(__dirname, '../../../node_modules/.bin/tsx');
+
 import {
   executeCommand,
   getExitCode,
@@ -36,7 +43,38 @@ async function emitContract(testDir: string, configPath: string): Promise<void> 
 
 async function runMigrationPlan(testDir: string, args: readonly string[]): Promise<number> {
   const command = createMigrationPlanCommand();
-  return inDir(testDir, () => executeCommand(command, [...args]));
+  const exit = await inDir(testDir, () => executeCommand(command, [...args]));
+  if (exit === 0) {
+    // Self-emit the freshly planned draft migration so `migration apply` will
+    // accept it. Mirrors the prior `migration emit` step that `runMigrationPlan`
+    // used to trigger before self-emit became the contract.
+    await selfEmitLatestMigration(testDir);
+  }
+  return exit;
+}
+
+function getLatestMigrationDir(testDir: string): string | undefined {
+  const migrationsDir = join(testDir, 'migrations');
+  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  if (dirs.length === 0) return undefined;
+  let newest = dirs[0]!;
+  let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
+  for (let i = 1; i < dirs.length; i++) {
+    const dir = dirs[i]!;
+    const mtime = statSync(join(migrationsDir, dir)).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newest = dir;
+    }
+  }
+  return newest;
+}
+
+async function selfEmitLatestMigration(testDir: string): Promise<void> {
+  const latest = getLatestMigrationDir(testDir);
+  if (!latest) return;
+  const migrationTs = join(testDir, 'migrations', latest, 'migration.ts');
+  await execFileAsync(TSX_BIN, [migrationTs], { cwd: testDir });
 }
 
 async function runMigrationApply(testDir: string, args: readonly string[]): Promise<number> {
