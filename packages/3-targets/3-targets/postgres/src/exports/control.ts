@@ -31,22 +31,15 @@ function buildNativeTypeExpander(
     readonly typeParams?: Record<string, unknown>;
   }) => {
     if (!input.typeParams) return input.nativeType;
-
-    if (!input.codecId) {
-      throw new Error(
-        `Column declares typeParams for nativeType "${input.nativeType}" but has no codecId. ` +
-          'Ensure the column is associated with a codec.',
-      );
-    }
-
+    // Mirror `renderExpectedNativeType` in verify-sql-schema: when a codec
+    // has no `expandNativeType` hook (e.g. `pg/enum@1`, whose typeParams
+    // describe the value set rather than a DDL suffix), fall back to the
+    // bare native type rather than throwing. Throwing here would reject
+    // every plan involving an enum-/values-typed column as soon as its
+    // `typeRef` resolved to a `StorageTypeInstance` carrying typeParams.
+    if (!input.codecId) return input.nativeType;
     const hooks = codecHooks.get(input.codecId);
-    if (!hooks?.expandNativeType) {
-      throw new Error(
-        `Column declares typeParams for nativeType "${input.nativeType}" ` +
-          `but no expandNativeType hook is registered for codecId "${input.codecId}". ` +
-          'Ensure the extension providing this codec is included in extensionPacks.',
-      );
-    }
+    if (!hooks?.expandNativeType) return input.nativeType;
     return hooks.expandNativeType(input);
   };
 }
