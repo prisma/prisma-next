@@ -422,6 +422,34 @@ export async function runMigrationEmit(
   }
 }
 
+/**
+ * Runs `migration plan` and then self-emits the resulting draft `migration.ts`
+ * via `tsx`. Mirrors the old `migration plan`-auto-emits behaviour that journey
+ * tests relied on before the `migration emit` command was removed.
+ *
+ * Returns the original plan result (so JSON callers still see the plan's
+ * stdout). If plan fails, emit is skipped. If emit fails, the returned result
+ * carries the emit failure via `exitCode`/`stderr`.
+ */
+export async function runMigrationPlanAndEmit(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  const planResult = await runMigrationPlan(ctx, extraArgs);
+  if (planResult.exitCode !== 0) return planResult;
+  const latest = getLatestMigrationDir(ctx);
+  if (!latest) return planResult;
+  const emitResult = await runMigrationEmit(ctx, ['--dir', `migrations/${latest}`]);
+  if (emitResult.exitCode !== 0) {
+    return {
+      ...planResult,
+      exitCode: emitResult.exitCode,
+      stderr: `${planResult.stderr}\n[runMigrationPlanAndEmit] migration emit failed (exit ${emitResult.exitCode}):\n${emitResult.stderr}`,
+    };
+  }
+  return planResult;
+}
+
 export async function runMigrationRef(
   ctx: JourneyContext,
   subcommandArgs: readonly string[],

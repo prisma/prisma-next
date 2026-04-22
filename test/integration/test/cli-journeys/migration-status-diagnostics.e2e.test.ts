@@ -22,7 +22,7 @@ import {
   runContractEmit,
   runDbUpdate,
   runMigrationApply,
-  runMigrationPlan,
+  runMigrationPlanAndEmit,
   runMigrationRef,
   runMigrationStatus,
   setupJourney,
@@ -78,7 +78,7 @@ withTempDir(({ createTempDir }) => {
         expect(outContract).toContain('migration plan');
 
         // 3. Offline with migrations — reports count on disk
-        const plan = await runMigrationPlan(ctx, ['--name', 'init']);
+        const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
         expect(plan.exitCode, 'plan').toBe(0);
 
         const statusMigrations = await runMigrationStatus(ctx);
@@ -118,7 +118,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit = await runContractEmit(ctx);
           expect(emit.exitCode, 'emit').toBe(0);
-          const plan = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
 
           const status = await runMigrationStatus(ctx);
@@ -151,7 +151,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit = await runContractEmit(ctx);
           expect(emit.exitCode, 'emit').toBe(0);
-          const plan = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
           const apply = await runMigrationApply(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
@@ -188,7 +188,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit base').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const apply0 = await runMigrationApply(ctx);
           expect(apply0.exitCode, 'apply init').toBe(0);
@@ -196,7 +196,7 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-additive');
           const emit1 = await runContractEmit(ctx);
           expect(emit1.exitCode, 'emit v2').toBe(0);
-          const plan1 = await runMigrationPlan(ctx, ['--name', 'add-field']);
+          const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-field']);
           expect(plan1.exitCode, 'plan v2').toBe(0);
 
           const status = await runMigrationStatus(ctx);
@@ -232,7 +232,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
           const apply0 = await runMigrationApply(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
@@ -275,7 +275,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
           const apply0 = await runMigrationApply(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
@@ -323,7 +323,7 @@ withTempDir(({ createTempDir }) => {
           // Base: emit → plan → apply
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan0.exitCode, 'plan').toBe(0);
           const apply0 = await runMigrationApply(ctx);
           expect(apply0.exitCode, 'apply').toBe(0);
@@ -376,7 +376,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit = await runContractEmit(ctx);
           expect(emit.exitCode, 'emit').toBe(0);
-          const plan = await runMigrationPlan(ctx, ['--name', 'init']);
+          const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'init']);
           expect(plan.exitCode, 'plan').toBe(0);
           const apply = await runMigrationApply(ctx);
           expect(apply.exitCode, 'apply').toBe(0);
@@ -430,7 +430,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit base').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
           const apply0 = await runMigrationApply(ctx);
@@ -439,13 +439,23 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-phone');
           const emitA = await runContractEmit(ctx);
           expect(emitA.exitCode, 'emit branch A').toBe(0);
-          const planA = await runMigrationPlan(ctx, ['--name', 'add-phone', '--from', baseHash]);
+          const planA = await runMigrationPlanAndEmit(ctx, [
+            '--name',
+            'add-phone',
+            '--from',
+            baseHash,
+          ]);
           expect(planA.exitCode, 'plan branch A').toBe(0);
 
           swapContract(ctx, 'contract-bio');
           const emitB = await runContractEmit(ctx);
           expect(emitB.exitCode, 'emit branch B').toBe(0);
-          const planB = await runMigrationPlan(ctx, ['--name', 'add-bio', '--from', baseHash]);
+          const planB = await runMigrationPlanAndEmit(ctx, [
+            '--name',
+            'add-bio',
+            '--from',
+            baseHash,
+          ]);
           expect(planB.exitCode, 'plan branch B').toBe(0);
 
           // Swap to a contract that doesn't match either leaf so the
@@ -489,7 +499,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit base').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
           const apply0 = await runMigrationApply(ctx);
@@ -499,7 +509,12 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-phone');
           const emitA = await runContractEmit(ctx);
           expect(emitA.exitCode, 'emit A').toBe(0);
-          const planA = await runMigrationPlan(ctx, ['--name', 'add-phone', '--from', baseHash]);
+          const planA = await runMigrationPlanAndEmit(ctx, [
+            '--name',
+            'add-phone',
+            '--from',
+            baseHash,
+          ]);
           expect(planA.exitCode, 'plan A').toBe(0);
           const applyA = await runMigrationApply(ctx);
           expect(applyA.exitCode, 'apply A').toBe(0);
@@ -508,7 +523,7 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-bio');
           const emitB = await runContractEmit(ctx);
           expect(emitB.exitCode, 'emit B').toBe(0);
-          const planB = await runMigrationPlan(ctx, [
+          const planB = await runMigrationPlanAndEmit(ctx, [
             '--name',
             'add-bio',
             '--from',
@@ -554,7 +569,7 @@ withTempDir(({ createTempDir }) => {
 
           const emit0 = await runContractEmit(ctx);
           expect(emit0.exitCode, 'emit base').toBe(0);
-          const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+          const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
           expect(plan0.exitCode, 'plan init').toBe(0);
           const baseHash = parseJsonOutput<{ to: string }>(plan0).to;
           const apply0 = await runMigrationApply(ctx);
@@ -563,7 +578,7 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-phone');
           const emitA = await runContractEmit(ctx);
           expect(emitA.exitCode, 'emit A').toBe(0);
-          const planA = await runMigrationPlan(ctx, [
+          const planA = await runMigrationPlanAndEmit(ctx, [
             '--name',
             'add-phone',
             '--from',
@@ -576,7 +591,12 @@ withTempDir(({ createTempDir }) => {
           swapContract(ctx, 'contract-bio');
           const emitB = await runContractEmit(ctx);
           expect(emitB.exitCode, 'emit B').toBe(0);
-          const planB = await runMigrationPlan(ctx, ['--name', 'add-bio', '--from', baseHash]);
+          const planB = await runMigrationPlanAndEmit(ctx, [
+            '--name',
+            'add-bio',
+            '--from',
+            baseHash,
+          ]);
           expect(planB.exitCode, 'plan B').toBe(0);
 
           const setRef = await runMigrationRef(ctx, ['set', 'production', hashA]);
