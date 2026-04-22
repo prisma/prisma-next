@@ -951,7 +951,14 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
 3. Determines the starting point: `--from <hash>` if provided, otherwise the latest migration target
 4. Diffs the starting contract against the new contract using the target's migration planner
-5. Writes a new migration package (`migration.json` + `ops.json`) and attests the `migrationId`
+5. Scaffolds a new migration package containing a draft `migration.ts`, `migration.json` (draft, `migrationId: null`), and contract bookends. `ops.json` and the attested `migrationId` are **not** written by `plan` — they are produced when the developer subsequently runs `node migrations/<dir>/migration.ts` (self-emit). See [Emitting `ops.json` and computing `migrationId`](#emitting-opsjson-and-computing-migrationid).
+6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before self-emitting. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
+
+**Outputs:**
+- `migrations/<dir>/migration.ts` — scaffolded draft (editable)
+- `migrations/<dir>/migration.json` — draft manifest (`migrationId: null`)
+- `migrations/<dir>/start-contract.{json,d.ts}` — bookend from the "from" side (when applicable)
+- `migrations/<dir>/end-contract.{json,d.ts}` — bookend from the "to" side
 
 **Branching with `--from`:** Use `--from` to create a migration edge from a specific contract hash instead of the latest migration target. This enables branched migration graphs where multiple environments diverge from a common ancestor.
 
