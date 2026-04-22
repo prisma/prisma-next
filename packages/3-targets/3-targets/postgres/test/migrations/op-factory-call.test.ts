@@ -378,14 +378,15 @@ describe('renderCallsToTypeScript', () => {
 
     const source = renderCallsToTypeScript(calls, META);
 
-    expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration';");
-    // Per-factory imports collapsed under a single target-postgres line, sorted.
-    // Asserted as an exact-length array so a stray duplicate import line fails here.
+    // `Migration` is now re-exported from the target's migration entrypoint, so
+    // it gets merged into the same aggregated import line as the per-factory
+    // imports (see `buildImportClause` in `@prisma-next/ts-render`). Asserted
+    // as an exact-length array so a stray duplicate import line fails here.
     const targetPostgresImports = source
       .split('\n')
       .filter((line) => line.includes("from '@prisma-next/target-postgres/migration';"));
     expect(targetPostgresImports).toEqual([
-      "import { addColumn, createIndex, createTable, dropTable } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, addColumn, createIndex, createTable, dropTable } from '@prisma-next/target-postgres/migration';",
     ]);
     // Each call appears once in the operations body.
     expect(source).toContain('createTable(');
@@ -399,10 +400,11 @@ describe('renderCallsToTypeScript', () => {
 
     const source = renderCallsToTypeScript(calls, META);
 
-    // dataTransform + placeholder are merged into a single import from
-    // the target's migration entrypoint (see DataTransformCall).
+    // dataTransform + placeholder are merged with the base `Migration`
+    // import (also owned by the target's migration entrypoint) into a
+    // single aggregated line.
     expect(source).toContain(
-      "import { dataTransform, placeholder } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, dataTransform, placeholder } from '@prisma-next/target-postgres/migration';",
     );
     expect(source).toContain('import contract from \'./contract.json\' with { type: "json" };');
     expect(source).toContain(
@@ -419,7 +421,7 @@ describe('renderCallsToTypeScript', () => {
     const source = renderCallsToTypeScript([], { from: 'sha256:a', to: 'sha256:b' });
     expect(source).toContain('from: "sha256:a",');
     expect(source).toContain('to: "sha256:b",');
-    expect(source).toContain('class M extends Migration {');
+    expect(source).toContain('export default class M extends Migration {');
     expect(source).toContain('Migration.run(import.meta.url, M);');
   });
 });
@@ -642,8 +644,9 @@ describe('TypeScriptRenderablePostgresMigration', () => {
     const migration = new TypeScriptRenderablePostgresMigration(calls, META);
 
     const source = migration.renderTypeScript();
-    expect(source).toContain("import { Migration } from '@prisma-next/family-sql/migration';");
-    expect(source).toContain("import { dropTable } from '@prisma-next/target-postgres/migration';");
+    expect(source).toContain(
+      "import { Migration, dropTable } from '@prisma-next/target-postgres/migration';",
+    );
     expect(source).toContain('dropTable("public", "stale")');
   });
 });

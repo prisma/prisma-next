@@ -107,10 +107,10 @@ withTempDir(({ createTempDir }) => {
           '  }),',
           '});',
           '',
-          'class M extends Migration {',
+          'export default class M extends Migration {',
         ].join('\n');
         const filled = scaffold
-          .replace('class M extends Migration {', dbSetupBlock)
+          .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
             '() => placeholder("handle-nulls-user-name:check")',
             "() => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1)",

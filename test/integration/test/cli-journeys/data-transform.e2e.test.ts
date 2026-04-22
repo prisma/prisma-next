@@ -110,11 +110,10 @@ withTempDir(({ createTempDir }) => {
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
         const migrationTs = `
-import { Migration } from '@prisma-next/family-sql/migration';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import { addColumn, dataTransform } from '@prisma-next/target-postgres/migration';
+import { Migration, addColumn, dataTransform } from '@prisma-next/target-postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import contract from './contract.json' with { type: 'json' };
 
@@ -125,7 +124,7 @@ const db = sql({
   }),
 });
 
-class M extends Migration {
+export default class M extends Migration {
   override describe() {
     return { from: ${JSON.stringify(manifestInitial.from)}, to: ${JSON.stringify(manifestInitial.to)} };
   }
@@ -140,7 +139,6 @@ class M extends Migration {
   }
 }
 
-export default M;
 Migration.run(import.meta.url, M);
 `;
         writeFileSync(migrationTsPath, migrationTs);

@@ -114,7 +114,7 @@ withTempDir(({ createTempDir }) => {
           '  }),',
           '});',
           '',
-          'class M extends Migration {',
+          'export default class M extends Migration {',
         ].join('\n');
         // The contract `migration.ts` imports is the *new* contract,
         // where `status` only allows ['active', 'archived']. We can't
@@ -122,7 +122,7 @@ withTempDir(({ createTempDir }) => {
         // the user-written queries select-by/update-by exclusion
         // against the surviving values.
         const filled = scaffold
-          .replace('class M extends Migration {', dbSetupBlock)
+          .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
             '() => placeholder("migrate-status-values:check")',
             "() => db.user.select('id').where((f, fns) => fns.notIn(f.status, ['active', 'archived'])).limit(1)",

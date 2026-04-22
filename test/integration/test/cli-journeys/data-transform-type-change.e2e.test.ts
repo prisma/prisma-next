@@ -104,7 +104,7 @@ withTempDir(({ createTempDir }) => {
           '  }),',
           '});',
           '',
-          'class M extends Migration {',
+          'export default class M extends Migration {',
         ].join('\n');
         // The check returns rows that need fixing; the run normalises
         // them. Both queries are guarded by `id = -1` so the test's
@@ -114,7 +114,7 @@ withTempDir(({ createTempDir }) => {
         // planner-emitted migration is well-typed against the *new*
         // contract (where `score` is int4).
         const filled = scaffold
-          .replace('class M extends Migration {', dbSetupBlock)
+          .replace('export default class M extends Migration {', dbSetupBlock)
           .replace(
             '() => placeholder("typechange-user-score:check")',
             "() => db.user.select('id').where((f, fns) => fns.eq(f.id, -1)).limit(1)",
