@@ -127,8 +127,9 @@ async function replacePathWithSymlink(
   path: string,
   target: string,
   generation: number,
+  phase = 'link',
 ): Promise<void> {
-  const tempLinkPath = createTempArtifactPath(path, generation, 'link');
+  const tempLinkPath = createTempArtifactPath(path, generation, phase);
   await symlink(target, tempLinkPath);
   try {
     await rename(tempLinkPath, path);
@@ -208,17 +209,12 @@ async function bootstrapManagedArtifactsFromExistingOutputs({
     await writeFile(join(bootstrapDir, basename(outputDtsPath)), previousDts, 'utf-8');
   }
 
-  const tempCurrentPath = createTempArtifactPath(
+  await replacePathWithSymlink(
     managedPaths.currentLinkPath,
+    relative(managedPaths.rootDir, bootstrapDir),
     generation,
     'current',
   );
-  await symlink(relative(managedPaths.rootDir, bootstrapDir), tempCurrentPath);
-  try {
-    await rename(tempCurrentPath, managedPaths.currentLinkPath);
-  } finally {
-    await rm(tempCurrentPath, { force: true });
-  }
 
   await ensurePublicManagedLinks({
     outputJsonPath,
@@ -365,17 +361,12 @@ async function writeManagedContractArtifacts({
       await rename(tempGenerationDir, generationDir);
       cleanupGenerationDir = false;
 
-      const tempCurrentPath = createTempArtifactPath(
+      await replacePathWithSymlink(
         managedPaths.currentLinkPath,
+        relative(managedPaths.rootDir, generationDir),
         generation,
         'current',
       );
-      await symlink(relative(managedPaths.rootDir, generationDir), tempCurrentPath);
-      try {
-        await rename(tempCurrentPath, managedPaths.currentLinkPath);
-      } finally {
-        await rm(tempCurrentPath, { force: true });
-      }
 
       await ensurePublicManagedLinks({
         outputJsonPath,
