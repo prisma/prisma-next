@@ -2,7 +2,7 @@ import { publishContractArtifactPair } from './publish-contract-artifact-pair';
 
 interface EmitOutputQueueState {
   nextGeneration: number;
-  queue: Promise<void>;
+  queue: Promise<unknown>;
 }
 
 const emitOutputQueues = new Map<string, EmitOutputQueueState>();
@@ -31,13 +31,6 @@ function isSuperseded(state: EmitOutputQueueState, generation: number): boolean 
   return generation < state.nextGeneration;
 }
 
-function toQueueTail<T>(promise: Promise<T>): Promise<void> {
-  return promise.then(
-    () => undefined,
-    () => undefined,
-  );
-}
-
 function queueEmitWrite<T>(
   outputJsonPath: string,
   action: (state: EmitOutputQueueState) => Promise<T>,
@@ -47,7 +40,7 @@ function queueEmitWrite<T>(
     () => action(state),
     () => action(state),
   );
-  state.queue = toQueueTail(run);
+  state.queue = run;
   return run;
 }
 
