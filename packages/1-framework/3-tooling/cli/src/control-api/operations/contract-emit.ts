@@ -12,6 +12,7 @@ import {
   issueContractArtifactGeneration,
   publishContractArtifactPairSerialized,
 } from '../../utils/publish-contract-artifact-pair-serialized';
+import { validateContractDeps } from '../../utils/validate-contract-deps';
 import { enrichContract } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
@@ -189,7 +190,6 @@ export async function executeContractEmit(
   });
 
   if (publication === 'written') {
-    const { validateContractDeps } = await import('../../utils/validate-contract-deps');
     const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
     if (depsValidation.warning) {
       process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
