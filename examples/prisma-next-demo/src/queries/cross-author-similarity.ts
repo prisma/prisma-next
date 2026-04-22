@@ -2,28 +2,34 @@ import type { Runtime } from '@prisma-next/sql-runtime';
 import { db } from '../prisma/db';
 
 /**
- * "Cross-author similarity" — an SQL DSL escape-hatch query that the ORM client cannot express,
- * even after other ORM gaps (e.g. TML-2137) are closed.
+ * "Cross-author similarity" — an SQL DSL escape-hatch query for a shape that the current ORM
+ * collection surface cannot directly express.
  *
  * Finds the closest pairs of posts written by *different* authors, ordered by cosine distance
  * between their embeddings. For each pair, projects both posts' id/title/userId side-by-side
  * along with the distance between their embeddings.
  *
- * Why the ORM client can't express this:
- *   1. **Self-join on a non-relation predicate.** The ORM's join surface is relation-shaped —
- *      it can only follow declared relations (`include('posts', ...)`). Joining `Post` to
- *      itself on `p1.userId != p2.userId` is an arbitrary predicate join, not a relation,
- *      and has no representation in the collection model.
+ * Why this is an escape-hatch shape:
+ *   1. **Self-join on a non-relation predicate.** The ORM collection surface's join is
+ *      relation-shaped — `include('posts', ...)` follows declared relations. Joining `Post` to
+ *      itself on `p1.userId != p2.userId` is an arbitrary predicate join, not a relation, and
+ *      cannot be expressed as a single collection query.
  *   2. **Extension op taking two column references.** `cosineDistance(f.p1.embedding,
  *      f.p2.embedding)` compares two columns from two aliases within one query. The ORM's
  *      extension-op integration (TML-2042) is `column.method(boundValue)` — method-on-receiver
  *      form where the other argument must be a materialized value. `ormClientFindSimilarPosts`
  *      works around this by running a separate query to load the reference embedding first.
- *      There is no ORM surface for "column vs column within a single query".
- *   3. **Projecting two rows of the same model as peers.** The ORM always has a single root
- *      model per query, and the output row is shaped by that root plus its relations. Two
- *      sibling `Post` rows projected flat into one output row is not a shape the collection
- *      model produces.
+ *      The collection surface has no "column vs column within a single query" form.
+ *   3. **Flat peer-row projection.** A single collection query has a single root model and
+ *      shapes its output row from that root plus its relations. Two sibling `Post` rows
+ *      projected flat into one output row is not a shape the single-collection surface
+ *      produces.
+ *
+ * Note: `@prisma-next/sql-orm-client` is a repository layer (ADR 164) and can orchestrate
+ * multiple plans for one logical operation, so a user could *simulate* this with client-side
+ * stitching — at the cost of extra round-trips and losing single-statement ordering/limit
+ * semantics. The point of the SQL DSL escape hatch is that this shape is a single SQL
+ * statement making one pass over the data.
  *
  * Features exercised:
  *   1. Self-join via `.as()` aliasing of the same table (`post` aliased as `p1` and `p2`).

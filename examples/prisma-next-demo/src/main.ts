@@ -40,8 +40,8 @@
  * - cross-author-similarity [limit]
  *                              SQL DSL escape-hatch: closest post pairs across different
  *                              authors via a self-join on a non-relation predicate, with
- *                              cosineDistance over two column references — a shape the ORM
- *                              client cannot express.
+ *                              cosineDistance over two column references — a shape the
+ *                              current ORM collection surface cannot directly express.
  * - budget-violation           Demo budget enforcement error
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
