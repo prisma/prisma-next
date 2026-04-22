@@ -8,7 +8,10 @@ import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
-import { publishContractArtifactPair } from '../../utils/publish-contract-artifact-pair';
+import {
+  issueContractArtifactGeneration,
+  publishContractArtifactPairSerialized,
+} from '../../utils/publish-contract-artifact-pair-serialized';
 import { enrichContract } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
@@ -16,11 +19,6 @@ interface ProviderFailureLike {
   readonly summary: string;
   readonly diagnostics: readonly unknown[];
   readonly meta?: unknown;
-}
-
-interface EmitOutputQueueState {
-  nextGeneration: number;
-  queue: Promise<void>;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -35,90 +33,6 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
   return (
     isRecord(value) && typeof value['summary'] === 'string' && Array.isArray(value['diagnostics'])
   );
-}
-
-const emitOutputQueues = new Map<string, EmitOutputQueueState>();
-
-function getEmitOutputQueue(outputJsonPath: string): EmitOutputQueueState {
-  const existing = emitOutputQueues.get(outputJsonPath);
-  if (existing) {
-    return existing;
-  }
-
-  const created: EmitOutputQueueState = {
-    nextGeneration: 0,
-    queue: Promise.resolve(),
-  };
-  emitOutputQueues.set(outputJsonPath, created);
-  return created;
-}
-
-function issueEmitGeneration(outputJsonPath: string): number {
-  const state = getEmitOutputQueue(outputJsonPath);
-  state.nextGeneration += 1;
-  return state.nextGeneration;
-}
-
-function isSuperseded(state: EmitOutputQueueState, generation: number): boolean {
-  return generation < state.nextGeneration;
-}
-
-function toQueueTail<T>(promise: Promise<T>): Promise<void> {
-  // Keep the per-output queue advancing even after a failed publication.
-  return promise.then(
-    () => undefined,
-    () => undefined,
-  );
-}
-
-function queueEmitWrite<T>(
-  outputJsonPath: string,
-  action: (state: EmitOutputQueueState) => Promise<T>,
-): Promise<T> {
-  const state = getEmitOutputQueue(outputJsonPath);
-  const run = state.queue.then(
-    () => action(state),
-    () => action(state),
-  );
-  state.queue = toQueueTail(run);
-  return run;
-}
-
-async function writeContractArtifacts({
-  outputJsonPath,
-  outputDtsPath,
-  generation,
-  signal,
-  contractJson,
-  contractDts,
-}: {
-  readonly outputJsonPath: string;
-  readonly outputDtsPath: string;
-  readonly generation: number;
-  readonly signal: AbortSignal;
-  readonly contractJson: string;
-  readonly contractDts: string;
-}): Promise<'written' | 'superseded'> {
-  return await queueEmitWrite(outputJsonPath, async (state) => {
-    signal.throwIfAborted();
-
-    if (isSuperseded(state, generation)) {
-      return 'superseded';
-    }
-
-    const didPublish = await publishContractArtifactPair({
-      outputJsonPath,
-      outputDtsPath,
-      contractJson,
-      contractDts,
-      publicationToken: String(generation),
-      beforePublish: () => {
-        signal.throwIfAborted();
-        return !isSuperseded(state, generation);
-      },
-    });
-    return didPublish ? 'written' : 'superseded';
-  });
 }
 
 /**
@@ -189,7 +103,7 @@ export async function executeContractEmit(
     });
   }
   const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
-  const generation = issueEmitGeneration(outputJsonPath);
+  const generation = issueContractArtifactGeneration(outputJsonPath);
 
   const stack = createControlStack(config);
 
@@ -265,7 +179,7 @@ export async function executeContractEmit(
   );
 
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  const publication = await writeContractArtifacts({
+  const publication = await publishContractArtifactPairSerialized({
     outputJsonPath,
     outputDtsPath,
     generation,
