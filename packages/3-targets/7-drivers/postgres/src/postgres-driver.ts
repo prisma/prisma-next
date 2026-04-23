@@ -350,12 +350,19 @@ class PostgresDirectDriverImpl
         this.options,
         releaseLease,
         // A direct driver has a single underlying socket, so a destroyed
-        // connection means the driver itself is no longer usable. Release the
-        // lease first so close() can acquire the mutex, then tear down the
-        // driver.
+        // connection means the driver itself is no longer usable. Tear down
+        // the driver while still holding the lease so that any
+        // acquireConnection() queued on #connectionMutex only observes the
+        // driver after .end() has completed and #closed is set — preventing
+        // a concurrent caller from reusing a socket that is already being
+        // closed. The lease is released in a finally so a failing .end()
+        // cannot leave the mutex permanently held.
         async () => {
-          releaseLease();
-          await this.close();
+          try {
+            await this.#closeWhileHoldingLease();
+          } finally {
+            releaseLease();
+          }
         },
       );
     } catch (error) {
@@ -367,15 +374,19 @@ class PostgresDirectDriverImpl
   async close(): Promise<void> {
     const releaseLease = await this.#connectionMutex.lock();
     try {
-      if (this.#closed) {
-        return;
-      }
-      this.#closed = true;
-      await this.directClient.end();
-      this.#connected = false;
+      await this.#closeWhileHoldingLease();
     } finally {
       releaseLease();
     }
+  }
+
+  async #closeWhileHoldingLease(): Promise<void> {
+    if (this.#closed) {
+      return;
+    }
+    this.#closed = true;
+    await this.directClient.end();
+    this.#connected = false;
   }
 
   async acquireClient(): Promise<Client> {

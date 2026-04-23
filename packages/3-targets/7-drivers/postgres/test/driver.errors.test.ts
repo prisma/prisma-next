@@ -489,4 +489,96 @@ describe('@prisma-next/driver-postgres', () => {
     },
     timeouts.spinUpPpgDev,
   );
+
+  it(
+    'destroy() holds the direct-client lease until .end() completes, blocking concurrent acquireConnection',
+    async () => {
+      const events: string[] = [];
+      let resolveEnd: (() => void) | undefined;
+      const endPromise = new Promise<void>((resolve) => {
+        resolveEnd = resolve;
+      });
+      const mockClient = {
+        _connection: {},
+        _ending: false,
+        connect: vi.fn(async () => {
+          events.push('connect');
+        }),
+        query: vi.fn(async () => ({ rows: [] })),
+        end: vi.fn(async () => {
+          events.push('end:start');
+          await endPromise;
+          events.push('end:finish');
+        }),
+      };
+      const driver = createBoundDriverFromBinding(
+        { kind: 'pgClient', client: mockClient as unknown as Client },
+        undefined,
+      );
+
+      const firstConnection = await driver.acquireConnection();
+
+      // Kick off a concurrent acquire while the first connection's lease is
+      // still held. It must queue behind the destroy's teardown.
+      let concurrentResolved = false;
+      const concurrentAcquire = driver.acquireConnection().then(
+        (connection) => {
+          events.push('concurrent:resolved');
+          concurrentResolved = true;
+          return { ok: true as const, connection };
+        },
+        (error: unknown) => {
+          events.push('concurrent:rejected');
+          concurrentResolved = true;
+          return { ok: false as const, error };
+        },
+      );
+
+      // Yield so acquireConnection() can enter the mutex queue before destroy
+      // releases the lease.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      const destroyPromise = firstConnection.destroy(new Error('rollback failed'));
+
+      // Let the teardown reach the .end() await. A generous number of
+      // microtask yields keeps the test robust across runtimes without
+      // resorting to real timers.
+      for (let i = 0; i < 10; i++) {
+        await Promise.resolve();
+      }
+
+      // .end() is in flight, and the concurrent acquireConnection() must not
+      // have observed the direct client as reusable yet.
+      expect(events).toContain('end:start');
+      expect(concurrentResolved).toBe(false);
+      expect(driver.state).toBe('closed');
+
+      // Unblock .end(); teardown finishes, the concurrent caller proceeds and
+      // observes the driver as closed (either by rejection or by getting a
+      // connection that fails to reconnect the already-ended socket). Either
+      // outcome is acceptable — the invariant is that the client is fully
+      // ended before the caller observes a reusable state.
+      resolveEnd?.();
+      await destroyPromise;
+      const outcome = await concurrentAcquire;
+
+      const endFinishIndex = events.indexOf('end:finish');
+      const concurrentIndex = events.findIndex(
+        (event) => event === 'concurrent:resolved' || event === 'concurrent:rejected',
+      );
+      expect(endFinishIndex).toBeGreaterThanOrEqual(0);
+      expect(concurrentIndex).toBeGreaterThan(endFinishIndex);
+
+      if (outcome.ok) {
+        // If the caller got a connection handle back, release it so cleanup
+        // doesn't leak. The directClient is already ended, so release() just
+        // drops our bookkeeping.
+        await outcome.connection.release().catch(() => undefined);
+      }
+
+      expect(mockClient.end).toHaveBeenCalledTimes(1);
+    },
+    timeouts.spinUpPpgDev,
+  );
 });
