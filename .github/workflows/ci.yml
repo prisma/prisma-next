@@ -186,15 +186,9 @@ jobs:
         run: pnpm test:integration
 
   test-vite-support:
-    name: Vite Support Matrix (Vite ${{ matrix.vite-version }})
+    name: Vite Support Matrix
     needs: build
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        vite-version:
-          - 7.3.1
-          - 8.0.9
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
@@ -203,8 +197,6 @@ jobs:
       - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Switch integration tests to Vite ${{ matrix.vite-version }}
-        run: pnpm --filter @prisma-next/integration-tests add -D vite@${{ matrix.vite-version }} --save-exact --no-save-catalog
       - name: Run Vite plugin support suite
         run: pnpm test:vite-plugin
 

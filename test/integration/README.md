@@ -71,7 +71,7 @@ This package is located at `test/integration/` (not in `packages/`) as it is a t
 # Run all integration tests (from test/integration/)
 cd test/integration && pnpm test
 
-# Run the Vite plugin HMR suite used by the Vite 7/8 support matrix
+# Run the Vite plugin HMR suite against the pinned Vite 7/8 aliases
 cd test/integration && pnpm test:vite-plugin
 ```
 

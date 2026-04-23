@@ -71,6 +71,8 @@
     "strip-ansi": "^7.1.0",
     "typescript": "catalog:",
     "vite": "catalog:",
+    "vite7": "npm:vite@7.3.1",
+    "vite8": "npm:vite@8.0.9",
     "vitest": "catalog:"
   }
 }
