@@ -58,8 +58,8 @@ describe('OperationRegistry', () => {
     expect(() =>
       registry.register({
         method: 'bad',
-        // biome-ignore lint/suspicious/noExplicitAny: negative test
-        self: {} as any,
+        // @ts-expect-error — SelfSpec requires codecId or traits
+        self: {},
         impl: noopImpl,
       }),
     ).toThrow('Operation "bad" self has neither codecId nor traits');
@@ -83,8 +83,8 @@ describe('OperationRegistry', () => {
     expect(() =>
       registry.register({
         method: 'bad',
-        // biome-ignore lint/suspicious/noExplicitAny: negative test — SelfSpec forbids this shape
-        self: { codecId: 'pg/text@1', traits: ['textual'] } as any,
+        // @ts-expect-error — SelfSpec disallows both codecId and traits
+        self: { codecId: 'pg/text@1', traits: ['textual'] },
         impl: noopImpl,
       }),
     ).toThrow('Operation "bad" self has both codecId and traits');
