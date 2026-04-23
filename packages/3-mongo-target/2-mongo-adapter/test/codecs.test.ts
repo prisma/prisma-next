@@ -146,6 +146,12 @@ describe('vector operation descriptors (production-defined)', () => {
     expect(mongoVectorNearOperation.self?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
+  it('mongoVectorNearOperation.impl returns undefined as a placeholder', () => {
+    // Mongo does not yet lower the vector `near` operation; the impl is a
+    // placeholder so the descriptor satisfies the shared shape.
+    expect((mongoVectorNearOperation.impl as () => unknown)()).toBeUndefined();
+  });
+
   it('mongoVectorOperationDescriptors includes near', () => {
     expect(mongoVectorOperationDescriptors).toHaveLength(1);
     expect(mongoVectorOperationDescriptors[0]).toBe(mongoVectorNearOperation);
