@@ -13,10 +13,10 @@ Introduce a Codecs Registry and a deterministic decoding pipeline that composes 
 3. **Adapter codecs** for target-specific wire types
 4. **Driver native mapping** as the final fallback
 
-Decoding is pure, deterministic, and side-effect free. Failures produce RuntimeError envelopes with stable codes and redacted messages per ADR 027
+Codec selection is deterministic. Runtime `encode` / `decode` hooks may be synchronous or asynchronous, but the runtime keeps a synchronous fast path for plans that only reference synchronous codecs. Failures produce RuntimeError envelopes with stable codes and redacted messages per ADR 027.
 
 ## Terminology
-- **Codec**: pure function pair `{ decode: (wire) => value, encode?: (value) => wire }` plus metadata
+- **Codec**: runtime conversion pair `{ decode: (wire) => value | Promise<value>, encode?: (value) => wire | Promise<wire> }` plus metadata
 - **Wire type**: value as returned by the driver before transformation
 - **Contract type**: logical scalar declared in the data contract (e.g., integer, decimal, datetime, json, bytes, enum)
 - **Lane hint**: per-Plan annotation that requests a specific codec for a projected field
@@ -134,14 +134,27 @@ For each row:
 
 - Build a per-column decode plan by resolving precedence once per projection alias
 - Apply null short-circuit
-- Invoke selected codec's decode
+- Invoke the selected codec's decode
+- Keep synchronous fields as plain values
+- If a selected codec decodes asynchronously, surface that field as `Promise<T>` rather than awaiting the whole row
+- Run JSON-schema validation on the resolved decoded value for both synchronous and asynchronous codecs
 - If it throws, wrap in RUNTIME.DECODE_FAILED with `{ alias, codec, wirePreview }` redacted
 - Attach decodingTrace in diagnostics when debug is enabled
+
+Generated SQL contract types expose this split explicitly:
+
+- `FieldInputTypes` describe write-side values consumed by predicates and mutations
+- `FieldOutputTypes` describe read-side values materialized by query results
+- Async-decode codecs therefore keep input-side types plain while read-side field types become `Promise<T>`
+
+Encode follows the same principle: synchronous plans stay on the fast path, and only parameters that reference async encoders are awaited before the driver call.
 
 ### Streaming and cursors
 
 - Decode row-by-row to support large results
-- Codecs must be synchronous and non-blocking
+- Plans that reference only synchronous codecs stay on a synchronous decode path
+- Async codecs may yield promise-valued fields; the runtime does not force a whole-row await step
+- `encodeJson` and `decodeJson` remain synchronous for contract emission and loading
 - Drivers that stream buffers must surface backpressure to runtime
 
 ## Precision and timezone policy
