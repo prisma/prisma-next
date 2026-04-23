@@ -1,0 +1,37 @@
+// db.users.include('posts', p => p.combine({ popular: p.where(...), totalCount: p.count() })).all()
+digraph {
+  label="db.users.include('posts', p => p.combine({\n  popular: p.where(p => p.views.gt(150)),\n  totalCount: p.count()\n})).all()"
+  labelloc=t
+  fontsize=16
+  fontname="Helvetica-Bold"
+  rankdir=BT
+  node [fontname="Helvetica" fontsize=11 style=filled]
+  edge [fontname="Helvetica" fontsize=9]
+
+  // Nodes
+  start [label="Start" shape=circle fillcolor=white]
+  cs_users_0 [label="CollectionState\n(users, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  cs_posts_0 [label="CollectionState\n(posts, 0)" shape=box fillcolor=gray90 color=gray60 fontcolor=gray40]
+  read_users [label="Read\n(users, [*])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  read_popular [label="Read\n(posts:popular, [*]\nwhere=[views > 150])" shape=box fillcolor="#dae8fc" color="#6c8ebf"]
+  agg_count [label="Aggregate\n(posts, fn=count\ngroupBy=[userId])" shape=box fillcolor="#e0f2f1" color="#4db6ac"]
+  combine [label="Combine\nrightKeys=[userId]" shape=box fillcolor="#e1bee7" color="#9c27b0"]
+  nest [label="Nest\nleftKeys=[id]\nrightKeys=[userId]\nfield=posts\narity=scalar" shape=box fillcolor="#d5e8d4" color="#82b366"]
+  ret [label="Return" shape=doublecircle fillcolor=black fontcolor=white]
+
+  // Edges
+  cs_users_0 -> start [color=gray60]
+  cs_posts_0 -> start [color=gray60]
+  read_users -> cs_users_0 [color=gray60]
+  read_popular -> read_users [label="FilterData\n(users.id -> posts.userId)" color="#2196F3" fontcolor="#2196F3"]
+  read_popular -> cs_posts_0 [color=gray60]
+  agg_count -> read_users [label="FilterData\n(users.id -> posts.userId)" color="#2196F3" fontcolor="#2196F3"]
+  agg_count -> cs_posts_0 [color=gray60]
+  combine -> read_popular [label="BranchData\n(popular, rows)" color="#9C27B0" fontcolor="#9C27B0"]
+  combine -> agg_count [label="BranchData\n(totalCount, scalar)" color="#9C27B0" fontcolor="#9C27B0"]
+  nest -> read_users [label="left" color=gray60]
+  nest -> combine [label="right" color=gray60]
+  ret -> nest [color=gray60]
+  ret -> cs_users_0 [color=gray60 style=dashed]
+  ret -> cs_posts_0 [color=gray60 style=dashed]
+}
