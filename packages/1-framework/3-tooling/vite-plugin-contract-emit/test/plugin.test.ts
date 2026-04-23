@@ -364,6 +364,10 @@ describe('prismaVitePlugin', () => {
       await configureServer(mockServer);
 
       expect(mockedLoadConfig).toHaveBeenCalledTimes(1);
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(mockedLoadConfig.mock.invocationCallOrder[0]!).toBeLessThan(
+        mockedExecuteContractEmit.mock.invocationCallOrder[0]!,
+      );
     });
 
     it('registers cleanup hooks for server close', async () => {
@@ -422,10 +426,15 @@ describe('prismaVitePlugin', () => {
 
       expect(mockServer.watcher.add).toHaveBeenCalledWith('/project/prisma-next.config.ts');
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Contract watch coverage is partial'),
+        expect.stringContaining('Watching only /project/prisma-next.config.ts'),
       );
       expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('/project/prisma-next.config.ts'),
+        expect.stringContaining('Contract watch coverage is partial'),
+      );
+      expect(mockedExecuteContractEmit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configPath: '/project/prisma-next.config.ts',
+        }),
       );
       expect(consoleErrorSpy).not.toHaveBeenCalledWith(
         expect.stringContaining('Contract emit failed'),
@@ -441,8 +450,9 @@ describe('prismaVitePlugin', () => {
         return createLoadedConfig({ inputs: undefined });
       });
 
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
       const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
+        logLevel: 'info',
         debounceMs: 100,
       });
       const mockServer = createMockServer();
@@ -474,6 +484,11 @@ describe('prismaVitePlugin', () => {
 
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
       expect(mockServer.watcher.unwatch).not.toHaveBeenCalledWith('/project/config-shared.ts');
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining(
+          'Watching the previous dependency set plus /project/prisma-next.config.ts',
+        ),
+      );
 
       mockedExecuteContractEmit.mockClear();
       shouldFailLoad = false;

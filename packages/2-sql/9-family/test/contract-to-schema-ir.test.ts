@@ -106,20 +106,36 @@ describe('contractToSchemaIR', () => {
               nativeType: 'vector',
               codecId: 'pgvector/vector@1',
               typeParams: { dimensions: 1536 },
+            }),
+            b: col({
+              nativeType: 'vector',
+              codecId: 'pgvector/vector@1',
               typeRef: 'MyVector',
             }),
           },
         }),
       },
+      types: {
+        MyVector: {
+          codecId: 'pgvector/vector@1',
+          nativeType: 'vector',
+          typeParams: { dimensions: 1536 },
+        },
+      },
     };
 
     const result = contractToSchemaIR(wrap(storage), { renderDefault: testRenderer });
-    const column = result.tables['T']!.columns['a']!;
+    const columnA = result.tables['T']!.columns['a']!;
+    const columnB = result.tables['T']!.columns['b']!;
 
-    expect(column).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
-    expect('codecId' in column).toBe(false);
-    expect('typeParams' in column).toBe(false);
-    expect('typeRef' in column).toBe(false);
+    expect(columnA).toEqual({ name: 'a', nativeType: 'vector', nullable: false });
+    expect('codecId' in columnA).toBe(false);
+    expect('typeParams' in columnA).toBe(false);
+    expect('typeRef' in columnA).toBe(false);
+    expect(columnB).toEqual({ name: 'b', nativeType: 'vector', nullable: false });
+    expect('codecId' in columnB).toBe(false);
+    expect('typeParams' in columnB).toBe(false);
+    expect('typeRef' in columnB).toBe(false);
   });
 
   it('expands parameterized native types when expandNativeType is provided', () => {
@@ -156,6 +172,57 @@ describe('contractToSchemaIR', () => {
     });
     expect(result.tables['T']!.columns['id']!.nativeType).toBe('character(36)');
     expect(result.tables['T']!.columns['name']!.nativeType).toBe('text');
+  });
+
+  it('resolves typeRef against storage.types before expanding native type', () => {
+    // Regression: `post.embedding` in prisma-next-demo stores a bare
+    // `{ nativeType: 'vector', typeRef: 'Embedding1536' }`; the parameter
+    // metadata lives on the named `storage.types` entry. If the IR
+    // conversion doesn't resolve `typeRef`, it emits `"vector"` while
+    // `verify-sql-schema` resolves the ref and emits `"vector(1536)"`,
+    // producing a spurious `type_mismatch` (and a spurious
+    // `alterColumnType` op) when planning from one revision of the
+    // contract to itself.
+    const storage: SqlStorage = {
+      storageHash: 'sha256:test' as StorageHashBase<string>,
+      tables: {
+        Post: table({
+          columns: {
+            embedding: col({
+              nativeType: 'vector',
+              codecId: 'pg/vector@1',
+              nullable: true,
+              typeRef: 'Embedding1536',
+            }),
+          },
+        }),
+      },
+      types: {
+        Embedding1536: {
+          codecId: 'pg/vector@1',
+          nativeType: 'vector',
+          typeParams: { length: 1536 },
+        },
+      },
+    };
+
+    const expand = (input: {
+      nativeType: string;
+      codecId?: string;
+      typeParams?: Record<string, unknown>;
+    }) => {
+      if (input.typeParams && 'length' in input.typeParams) {
+        return `${input.nativeType}(${input.typeParams['length']})`;
+      }
+      return input.nativeType;
+    };
+
+    const result = contractToSchemaIR(wrap(storage), {
+      expandNativeType: expand,
+      renderDefault: testRenderer,
+    });
+
+    expect(result.tables['Post']!.columns['embedding']!.nativeType).toBe('vector(1536)');
   });
 
   it('uses base nativeType when no expandNativeType is provided', () => {

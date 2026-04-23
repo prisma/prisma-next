@@ -65,7 +65,6 @@ import {
   addUnique as createAddUnique,
   dropConstraint as createDropConstraint,
 } from './operations/constraints';
-import { createDataTransform } from './operations/data-transform';
 import {
   addEnumValues as createAddEnumValues,
   createEnumType as createCreateEnumType,
@@ -395,12 +394,15 @@ function resolveDataTransform(
   ctx: OperationResolverContext,
 ): DataTransformOperation {
   const { db, toContract } = ctx;
-  return createDataTransform({
+  return {
+    id: `data_migration.${desc.name}`,
+    label: `Data transform: ${desc.name}`,
+    operationClass: 'data',
     name: desc.name,
     source: desc.source,
     check: resolveCheck(desc.check, db, toContract),
     run: desc.run.flatMap((input) => resolvePlanInput(input, db, toContract)),
-  });
+  };
 }
 
 /**

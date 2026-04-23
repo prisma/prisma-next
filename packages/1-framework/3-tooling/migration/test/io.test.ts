@@ -4,7 +4,7 @@ import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,
@@ -336,60 +336,120 @@ describe('readMigrationsDir', () => {
   });
 });
 
-describe('copyContractToMigrationDir', () => {
+describe('copyFilesWithRename', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'migration-copy-contract-'));
+    tmpDir = await mkdtemp(join(tmpdir(), 'migration-copy-files-'));
   });
 
   afterEach(async () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('copies contract.json and the colocated contract.d.ts into the migration dir under canonical names', async () => {
+  it('copies each file byte-for-byte to destDir under the supplied destName', async () => {
     const sourceDir = join(tmpDir, 'src/prisma');
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
     const sourceDts = join(sourceDir, 'contract.d.ts');
-    await writeFile(sourceJson, JSON.stringify({ storage: { storageHash: 'sha256:abc' } }));
-    await writeFile(sourceDts, 'export type StorageHash = string;');
+    const jsonPayload = JSON.stringify({ storage: { storageHash: 'sha256:abc' } });
+    const dtsPayload = 'export type StorageHash = string;';
+    await writeFile(sourceJson, jsonPayload);
+    await writeFile(sourceDts, dtsPayload);
 
-    const packageDir = join(tmpDir, 'migrations/20260225T1430_test');
-    await mkdir(packageDir, { recursive: true });
+    const destDir = join(tmpDir, 'migrations/20260225T1430_test');
 
-    await copyContractToMigrationDir(packageDir, sourceJson);
+    await copyFilesWithRename(destDir, [
+      { sourcePath: sourceJson, destName: 'contract.json' },
+      { sourcePath: sourceDts, destName: 'contract.d.ts' },
+    ]);
 
-    const copiedJson = await readFile(join(packageDir, 'contract.json'), 'utf-8');
-    expect(copiedJson).toBe(JSON.stringify({ storage: { storageHash: 'sha256:abc' } }));
-    const copiedDts = await readFile(join(packageDir, 'contract.d.ts'), 'utf-8');
-    expect(copiedDts).toBe('export type StorageHash = string;');
+    expect(await readFile(join(destDir, 'contract.json'), 'utf-8')).toBe(jsonPayload);
+    expect(await readFile(join(destDir, 'contract.d.ts'), 'utf-8')).toBe(dtsPayload);
   });
 
-  it('does not fail when no .d.ts companion exists', async () => {
+  it('renames destination filenames according to destName (source → start-contract.*)', async () => {
     const sourceDir = join(tmpDir, 'src/prisma');
     await mkdir(sourceDir, { recursive: true });
     const sourceJson = join(sourceDir, 'contract.json');
-    await writeFile(sourceJson, '{}');
+    const sourceDts = join(sourceDir, 'contract.d.ts');
+    await writeFile(sourceJson, '{"renamed":true}');
+    await writeFile(sourceDts, '// dts');
 
-    const packageDir = join(tmpDir, 'migrations/20260225T1430_no_dts');
-    await mkdir(packageDir, { recursive: true });
+    const destDir = join(tmpDir, 'migrations/20260225T1430_renamed');
 
-    await copyContractToMigrationDir(packageDir, sourceJson);
+    await copyFilesWithRename(destDir, [
+      { sourcePath: sourceJson, destName: 'start-contract.json' },
+      { sourcePath: sourceDts, destName: 'start-contract.d.ts' },
+    ]);
 
-    expect(await readFile(join(packageDir, 'contract.json'), 'utf-8')).toBe('{}');
-    await expect(readFile(join(packageDir, 'contract.d.ts'), 'utf-8')).rejects.toMatchObject({
-      code: 'ENOENT',
-    });
+    expect(await readFile(join(destDir, 'start-contract.json'), 'utf-8')).toBe('{"renamed":true}');
+    expect(await readFile(join(destDir, 'start-contract.d.ts'), 'utf-8')).toBe('// dts');
   });
 
-  it('throws when the source contract.json is missing', async () => {
-    const packageDir = join(tmpDir, 'migrations/20260225T1430_missing');
-    await mkdir(packageDir, { recursive: true });
+  it('creates the destination directory if it does not already exist', async () => {
+    const sourceDir = join(tmpDir, 'src');
+    await mkdir(sourceDir, { recursive: true });
+    const source = join(sourceDir, 'a.json');
+    await writeFile(source, '1');
+
+    const destDir = join(tmpDir, 'nested/deeper/dest');
+
+    await copyFilesWithRename(destDir, [{ sourcePath: source, destName: 'a.json' }]);
+
+    expect(await readFile(join(destDir, 'a.json'), 'utf-8')).toBe('1');
+  });
+
+  it('throws ENOENT when a source file is missing', async () => {
+    const destDir = join(tmpDir, 'migrations/20260225T1430_missing');
 
     await expect(
-      copyContractToMigrationDir(packageDir, join(tmpDir, 'does/not/exist/contract.json')),
+      copyFilesWithRename(destDir, [
+        { sourcePath: join(tmpDir, 'does/not/exist.json'), destName: 'x.json' },
+      ]),
     ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('resolves with no side effects when files is empty', async () => {
+    const destDir = join(tmpDir, 'migrations/20260225T1430_empty');
+
+    await copyFilesWithRename(destDir, []);
+
+    const entries = await readMigrationsDir(join(tmpDir, 'migrations'));
+    expect(entries).toHaveLength(0);
+  });
+});
+
+describe('copyFilesWithRename', () => {
+  let tmpDir: string;
+
+  beforeEach(async () => {
+    tmpDir = await mkdtemp(join(tmpdir(), 'migration-copy-'));
+  });
+
+  afterEach(async () => {
+    await rm(tmpDir, { recursive: true, force: true });
+  });
+
+  it('copies into destDir under the given destName', async () => {
+    const src = join(tmpDir, 'source.json');
+    await writeFile(src, '{"x":1}', 'utf-8');
+    const destDir = join(tmpDir, 'dest');
+    await copyFilesWithRename(destDir, [{ sourcePath: src, destName: 'contract.json' }]);
+    expect(await readFile(join(destDir, 'contract.json'), 'utf-8')).toBe('{"x":1}');
+  });
+
+  it('rejects destName with path segments with MIGRATION.INVALID_DEST_NAME', async () => {
+    const src = join(tmpDir, 'source.json');
+    await writeFile(src, '{}', 'utf-8');
+    const destDir = join(tmpDir, 'dest');
+    await expect(
+      copyFilesWithRename(destDir, [{ sourcePath: src, destName: '../outside.json' }]),
+    ).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_DEST_NAME');
+      expect((e as MigrationToolsError).details).toHaveProperty('destName', '../outside.json');
+      return true;
+    });
   });
 });
 

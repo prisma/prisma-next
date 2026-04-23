@@ -1,5 +1,5 @@
 export {
-  copyContractToMigrationDir,
+  copyFilesWithRename,
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,

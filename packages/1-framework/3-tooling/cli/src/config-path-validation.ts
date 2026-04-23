@@ -1,9 +1,11 @@
-import type { ContractSourceProvider, PrismaNextConfig } from '@prisma-next/config/config-types';
+import {
+  type ContractSourceProvider,
+  normalizeContractConfig,
+  type PrismaNextConfig,
+} from '@prisma-next/config/config-types';
 import { ConfigValidationError } from '@prisma-next/config/config-validation';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { resolve } from 'pathe';
-
-const DEFAULT_CONTRACT_OUTPUT = 'src/prisma/contract.json';
 
 function throwValidation(field: string, why: string): never {
   throw new ConfigValidationError(field, why);
@@ -55,16 +57,18 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
   if (!config.contract) {
     return config;
   }
-
-  const source = finalizeContractSource(config.contract.source, configDir);
-  const output = resolve(configDir, config.contract.output ?? DEFAULT_CONTRACT_OUTPUT);
+  const contract = normalizeContractConfig(config.contract);
+  const source = finalizeContractSource(contract.source, configDir);
+  const output = resolve(configDir, contract.output);
 
   validateNoOutputsAreInputs(source.inputs, output);
 
-  const contract = { ...config.contract, source, output };
-
   return {
     ...config,
-    contract,
+    contract: {
+      ...contract,
+      source,
+      output,
+    },
   };
 }

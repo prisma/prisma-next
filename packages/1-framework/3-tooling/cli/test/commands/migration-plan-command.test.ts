@@ -1,3 +1,4 @@
+import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationPlanResult } from '../../src/commands/migration-plan';
@@ -13,10 +14,11 @@ const mocks = vi.hoisted(() => ({
   findLatestMigration: vi.fn(),
   emitMigration: vi.fn(),
   writeMigrationPackage: vi.fn(),
-  copyContractToMigrationDir: vi.fn(),
+  copyFilesWithRename: vi.fn(),
   writeMigrationTs: vi.fn(),
   assertFrameworkComponentsCompatible: vi.fn(),
   extractSqlDdl: vi.fn(),
+  createControlStack: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', async () => {
@@ -52,7 +54,7 @@ vi.mock('@prisma-next/migration-tools/io', async () => {
   return {
     ...actual,
     writeMigrationPackage: mocks.writeMigrationPackage,
-    copyContractToMigrationDir: mocks.copyContractToMigrationDir,
+    copyFilesWithRename: mocks.copyFilesWithRename,
   };
 });
 
@@ -71,6 +73,13 @@ vi.mock('../../src/utils/framework-components', () => ({
 vi.mock('../../src/control-api/operations/extract-sql-ddl', () => ({
   extractSqlDdl: mocks.extractSqlDdl,
 }));
+
+vi.mock('@prisma-next/framework-components/control', async () => {
+  const actual = await vi.importActual<typeof import('@prisma-next/framework-components/control')>(
+    '@prisma-next/framework-components/control',
+  );
+  return { ...actual, createControlStack: mocks.createControlStack };
+});
 
 const SAME_HASH = 'sha256:same-hash';
 
@@ -179,7 +188,7 @@ describe('migration plan command', () => {
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
-      mocks.copyContractToMigrationDir.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
       const callOrder: string[] = [];
@@ -202,6 +211,198 @@ describe('migration plan command', () => {
       expect(exitCode).toBe(0);
       expect(callOrder).toEqual(['writeMigrationTs', 'emitMigration']);
       expect(mocks.emitMigration).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('placeholder handling', () => {
+    function setupClassBasedConfig(planOperationsGetter: () => unknown[]): void {
+      const planMock = vi.fn().mockReturnValue({
+        kind: 'success',
+        plan: {
+          get operations() {
+            return planOperationsGetter();
+          },
+          renderTypeScript: () => '// migration.ts with placeholder',
+        },
+      });
+      const createPlannerMock = vi.fn().mockReturnValue({ plan: planMock });
+      const contractToSchemaMock = vi.fn().mockReturnValue({ tables: {}, dependencies: [] });
+
+      mocks.loadConfig.mockResolvedValue({
+        family: {
+          familyId: 'sql',
+          create: vi.fn().mockReturnValue({}),
+        },
+        target: {
+          id: 'postgres',
+          familyId: 'sql',
+          targetId: 'postgres',
+          kind: 'target',
+          migrations: {
+            createPlanner: createPlannerMock,
+            createRunner: vi.fn(),
+            contractToSchema: contractToSchemaMock,
+            emit: vi.fn(),
+          },
+        },
+        adapter: { kind: 'adapter', familyId: 'sql', targetId: 'postgres' },
+        contract: { output: '/tmp/test/contract.json' },
+        migrations: { dir: '/tmp/test/migrations' },
+      });
+      mocks.createControlStack.mockReturnValue({});
+    }
+
+    it('returns pendingPlaceholders result when plan.operations throws PN-MIG-2001', async () => {
+      setupClassBasedConfig(() => {
+        throw errorUnfilledPlaceholder('backfill-users-status:check');
+      });
+
+      const OLD_HASH = 'sha256:old-hash';
+      const NEW_HASH = 'sha256:new-hash';
+
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadAllBundles.mockResolvedValue({
+        attested: [],
+        drafts: [],
+        graph: new Map(),
+      });
+      mocks.findLatestMigration.mockReturnValue({
+        to: OLD_HASH,
+        migrationId: 'sha256:prev-id',
+      });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+
+      const command = createMigrationPlanCommand();
+      const exitCode = await executeCommand(command, ['--json']);
+
+      expect(exitCode).toBe(0);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result).toMatchObject({
+        ok: true,
+        noOp: false,
+        from: OLD_HASH,
+        to: NEW_HASH,
+        pendingPlaceholders: true,
+      });
+      expect(result.summary).toContain('placeholder');
+      expect(result.dir).toBeDefined();
+      expect(result.migrationId).toBeUndefined();
+    });
+
+    it('writes migration.ts but does not call emitMigration when placeholders are present', async () => {
+      setupClassBasedConfig(() => {
+        throw errorUnfilledPlaceholder('backfill-users-status:run');
+      });
+
+      mocks.readFile.mockResolvedValue(makeContractJson('sha256:new'));
+      mocks.loadAllBundles.mockResolvedValue({
+        attested: [],
+        drafts: [],
+        graph: new Map(),
+      });
+      mocks.findLatestMigration.mockReturnValue({
+        to: 'sha256:old',
+        migrationId: 'sha256:prev',
+      });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+
+      const command = createMigrationPlanCommand();
+      await executeCommand(command, ['--json']);
+
+      expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
+      expect(mocks.emitMigration).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('contract artifact copying', () => {
+    it('copies destination contract only when there is no prior migration', async () => {
+      setupBaseConfig();
+      const NEW_HASH = 'sha256:new-hash';
+
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadAllBundles.mockResolvedValue({
+        attested: [],
+        drafts: [],
+        graph: new Map(),
+      });
+      mocks.findLatestMigration.mockReturnValue(null);
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+      mocks.emitMigration.mockResolvedValue({
+        operations: [],
+        migrationId: 'sha256:new-id',
+      });
+
+      const command = createMigrationPlanCommand();
+      await executeCommand(command, ['--json']);
+
+      expect(mocks.copyFilesWithRename).toHaveBeenCalledTimes(1);
+      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
+      expect(destinationFiles).toEqual([
+        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
+        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
+      ]);
+    });
+
+    it('copies both destination end-contract.* and start-contract.* when there is a prior migration', async () => {
+      setupBaseConfig();
+      const OLD_HASH = 'sha256:old-hash';
+      const NEW_HASH = 'sha256:new-hash';
+
+      mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
+      mocks.loadAllBundles.mockResolvedValue({
+        attested: [
+          {
+            manifest: { migrationId: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
+            dirPath: '/tmp/test/migrations/20260301T0900_prev',
+            dirName: '20260301T0900_prev',
+          },
+        ],
+        drafts: [],
+        graph: new Map(),
+      });
+      mocks.findLatestMigration.mockReturnValue({
+        to: OLD_HASH,
+        migrationId: 'sha256:prev-id',
+      });
+      mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
+      mocks.writeMigrationPackage.mockResolvedValue(undefined);
+      mocks.copyFilesWithRename.mockResolvedValue(undefined);
+      mocks.extractSqlDdl.mockReturnValue([]);
+      mocks.emitMigration.mockResolvedValue({
+        operations: [],
+        migrationId: 'sha256:new-id',
+      });
+
+      const command = createMigrationPlanCommand();
+      await executeCommand(command, ['--json']);
+
+      expect(mocks.copyFilesWithRename).toHaveBeenCalledTimes(2);
+      const [, destinationFiles] = mocks.copyFilesWithRename.mock.calls[0]!;
+      const [, sourceFiles] = mocks.copyFilesWithRename.mock.calls[1]!;
+      expect(destinationFiles).toEqual([
+        { sourcePath: '/tmp/test/contract.json', destName: 'end-contract.json' },
+        { sourcePath: '/tmp/test/contract.d.ts', destName: 'end-contract.d.ts' },
+      ]);
+      expect(sourceFiles).toEqual([
+        {
+          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.json',
+          destName: 'start-contract.json',
+        },
+        {
+          sourcePath: '/tmp/test/migrations/20260301T0900_prev/end-contract.d.ts',
+          destName: 'start-contract.d.ts',
+        },
+      ]);
     });
   });
 });

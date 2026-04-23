@@ -8,6 +8,7 @@ type UserRow = DefaultModelRow<Contract, 'User'>;
 export interface OrmClientCreateUserWithAddressInput {
   readonly id: string;
   readonly email: string;
+  readonly displayName: string;
   readonly kind: 'admin' | 'user';
   readonly createdAt: Date | string;
   readonly address: AddressInput;
@@ -21,6 +22,7 @@ export async function ormClientCreateUserWithAddress(
   return db.User.select('id', 'email', 'kind', 'address').create({
     id: toUserId(data.id),
     email: data.email,
+    displayName: data.displayName,
     kind: data.kind,
     createdAt: toUserCreatedAt(data.createdAt),
     address: data.address,

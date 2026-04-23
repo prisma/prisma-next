@@ -1,20 +1,23 @@
 /**
- * Data Transform Authoring Surface (Journey: migration new → emit → ops)
+ * Data Transform Authoring Surface (manual) — exercises the
+ * consolidated `dataTransform` factory exported from
+ * `@prisma-next/target-postgres/migration` end-to-end.
  *
- * Tests the authoring pipeline end-to-end:
- * 1. Set up a project with a base contract, plan + apply initial migration
- * 2. Swap to additive contract (adds a nullable column)
- * 3. Emit the new contract
- * 4. migration new → scaffolds package with migration.ts
- * 5. Fill in migration.ts with descriptors + dataTransform (raw_sql)
- * 6. migration emit → evaluates TS, resolves descriptors, writes ops.json, attests
- * 7. Inspect ops.json — verify the ops are correct
- * 8. migration apply → executes ops including data transform
- * 9. Verify data was transformed
+ * This file covers the from-scratch authoring path:
+ *
+ * **`migration new` → hand-author the whole `migration.ts`.** The user
+ * starts from an empty scaffold, writes the operations themselves
+ * (`addColumn`, `dataTransform(endContract, ...)`), then runs `migration
+ * emit` + `migration apply`.
+ *
+ * The planner-assisted path (where the user fills in
+ * planner-emitted `placeholder()` stubs) lives in dedicated
+ * per-strategy files alongside this one
+ * (`data-transform-not-null-backfill.e2e.test.ts` and friends).
  */
 
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'pathe';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
 import {
@@ -31,8 +34,13 @@ import {
   useDevDatabase,
 } from '../utils/journey-test-helpers';
 
+// Sentinel value the migrations' `dataTransform.run` closures backfill
+// into `user.name`. Named so the post-apply assertions read as a
+// deliberate backfill rather than a placeholder/error string.
+const BACKFILLED_NAME = 'unknown';
+
 withTempDir(({ createTempDir }) => {
-  describe('Journey: Data Transform Authoring', () => {
+  describe('Journey: Data Transform Authoring (manual)', () => {
     const db = useDevDatabase();
 
     it(
@@ -93,19 +101,45 @@ withTempDir(({ createTempDir }) => {
         );
         expect(manifestBefore.migrationId).toBeNull();
 
-        // Step 5: Fill in migration.ts with descriptors using typed query builder
+        // Step 5: Fill in migration.ts with the class-flow authoring surface.
+        // Uses `dataTransform(endContract, name, { run })` from
+        // `@prisma-next/target-postgres/migration`, wired through a
+        // user-managed `sql({ context })` so the closure can build a typed
+        // query plan and the factory can assert contract-hash consistency.
+        const manifestInitial = JSON.parse(
+          readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+        );
         const migrationTs = `
-import { createBuilders } from "@prisma-next/target-postgres/migration-builders"
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import { Migration, addColumn, dataTransform } from '@prisma-next/target-postgres/migration';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import endContract from './end-contract.json' with { type: 'json' };
 
-const { addColumn, dataTransform } = createBuilders()
-
-export default () => [
-  addColumn("user", "name"),
-  dataTransform("backfill-user-name", {
-    check: false,
-    run: (db) => db.user.update({ name: "unknown" }).where((f, fns) => fns.eq(f.name, null)),
+const db = sql({
+  context: createExecutionContext({
+    contract: endContract,
+    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
   }),
-]
+});
+
+export default class M extends Migration {
+  override describe() {
+    return { from: ${JSON.stringify(manifestInitial.from)}, to: ${JSON.stringify(manifestInitial.to)} };
+  }
+
+  override get operations() {
+    return [
+      addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
+      dataTransform(endContract, 'backfill-user-name', {
+        run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
+      }),
+    ];
+  }
+}
+
+Migration.run(import.meta.url, M);
 `;
         writeFileSync(migrationTsPath, migrationTs);
 
@@ -149,8 +183,8 @@ export default () => [
           `SELECT id, email, "name" FROM "public"."user" ORDER BY id`,
         );
         expect(result.rows).toEqual([
-          { id: 1, email: 'alice@example.com', name: 'unknown' },
-          { id: 2, email: 'bob@test.org', name: 'unknown' },
+          { id: 1, email: 'alice@example.com', name: BACKFILLED_NAME },
+          { id: 2, email: 'bob@test.org', name: BACKFILLED_NAME },
         ]);
       },
       timeouts.spinUpPpgDev,

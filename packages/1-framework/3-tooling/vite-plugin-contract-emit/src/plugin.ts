@@ -287,8 +287,12 @@ export function prismaVitePlugin(
       if (!didWarnConfigWatchFallback) {
         didWarnConfigWatchFallback = true;
         const reason = error instanceof Error ? ` ${error.message}` : '';
+        const watchScope =
+          previousWatchedFiles.size > 0
+            ? `Watching the previous dependency set plus ${absoluteConfigPath}`
+            : `Watching only ${absoluteConfigPath}`;
         logWarning(
-          `Watching only ${absoluteConfigPath} because Prisma Next config inputs could not be resolved.${reason} Contract watch coverage is partial.`,
+          `${watchScope} because Prisma Next config inputs could not be resolved.${reason} Contract watch coverage is partial.`,
         );
       }
       if (previousWatchedFiles.size > 0) {

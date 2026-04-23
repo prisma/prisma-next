@@ -1,0 +1,349 @@
+[
+  {
+    "id": "extension.vector",
+    "label": "Enable extension \"vector\"",
+    "summary": "Ensures the vector extension is available for pgvector operations",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres"
+    },
+    "precheck": [
+      {
+        "description": "verify extension \"vector\" is not already enabled",
+        "sql": "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create extension \"vector\"",
+        "sql": "CREATE EXTENSION IF NOT EXISTS vector"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "confirm extension \"vector\" is enabled",
+        "sql": "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')"
+      }
+    ]
+  },
+  {
+    "id": "type.user_type",
+    "label": "Create type user_type",
+    "summary": "Creates enum type user_type",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "type",
+        "name": "user_type"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure type \"user_type\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create type \"user_type\"",
+        "sql": "CREATE TYPE \"public\".\"user_type\" AS ENUM ('admin', 'user')"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify type \"user_type\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1\n  FROM pg_type t\n  JOIN pg_namespace n ON t.typnamespace = n.oid\n  WHERE n.nspname = 'public'\n    AND t.typname = 'user_type'\n)"
+      }
+    ]
+  },
+  {
+    "id": "table.bug",
+    "label": "Create table \"bug\"",
+    "summary": "Creates table \"bug\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "bug"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"bug\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"bug\"",
+        "sql": "CREATE TABLE \"public\".\"bug\" (\n  \"severity\" text NOT NULL,\n  \"stepsToRepro\" text\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"bug\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"bug\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "table.feature",
+    "label": "Create table \"feature\"",
+    "summary": "Creates table \"feature\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "feature"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"feature\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"feature\"",
+        "sql": "CREATE TABLE \"public\".\"feature\" (\n  \"priority\" text NOT NULL,\n  \"targetRelease\" text\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"feature\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"feature\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "table.post",
+    "label": "Create table \"post\"",
+    "summary": "Creates table \"post\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"post\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"post\"",
+        "sql": "CREATE TABLE \"public\".\"post\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"embedding\" vector(1536),\n  \"id\" character(36) NOT NULL,\n  \"title\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"post\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "table.task",
+    "label": "Create table \"task\"",
+    "summary": "Creates table \"task\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "task"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"task\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"task\"",
+        "sql": "CREATE TABLE \"public\".\"task\" (\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"description\" text,\n  \"id\" character(36) NOT NULL,\n  \"status\" text DEFAULT 'open' NOT NULL,\n  \"title\" text NOT NULL,\n  \"type\" text NOT NULL,\n  \"userId\" text NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"task\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"task\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "table.user",
+    "label": "Create table \"user\"",
+    "summary": "Creates table \"user\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "table",
+        "name": "user"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure table \"user\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create table \"user\"",
+        "sql": "CREATE TABLE \"public\".\"user\" (\n  \"address\" jsonb,\n  \"createdAt\" timestamptz DEFAULT (now()) NOT NULL,\n  \"email\" text NOT NULL,\n  \"id\" character(36) NOT NULL,\n  \"kind\" \"user_type\" NOT NULL,\n  PRIMARY KEY (\"id\")\n)"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify table \"user\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"user\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.post.post_userId_fkey",
+    "label": "Add foreign key \"post_userId_fkey\" on \"post\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "post_userId_fkey",
+        "table": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"post_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"post_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"post\"\nADD CONSTRAINT \"post_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"post_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'post_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"post\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "index.post.post_userId_idx",
+    "label": "Create index \"post_userId_idx\" on \"post\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "post_userId_idx",
+        "table": "post"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"post_userId_idx\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"post_userId_idx\"",
+        "sql": "CREATE INDEX \"post_userId_idx\" ON \"public\".\"post\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"post_userId_idx\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"post_userId_idx\"') IS NOT NULL"
+      }
+    ]
+  },
+  {
+    "id": "foreignKey.task.task_userId_fkey",
+    "label": "Add foreign key \"task_userId_fkey\" on \"task\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "foreignKey",
+        "name": "task_userId_fkey",
+        "table": "task"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure FK \"task_userId_fkey\" does not exist",
+        "sql": "SELECT NOT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'task_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"task\"')\n)"
+      }
+    ],
+    "execute": [
+      {
+        "description": "add FK \"task_userId_fkey\"",
+        "sql": "ALTER TABLE \"public\".\"task\"\nADD CONSTRAINT \"task_userId_fkey\"\nFOREIGN KEY (\"userId\")\nREFERENCES \"public\".\"user\" (\"id\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify FK \"task_userId_fkey\" exists",
+        "sql": "SELECT EXISTS (\n  SELECT 1 FROM pg_constraint c\n  JOIN pg_namespace n ON c.connamespace = n.oid\n  WHERE c.conname = 'task_userId_fkey'\n  AND n.nspname = 'public'\n  AND c.conrelid = to_regclass('\"public\".\"task\"')\n)"
+      }
+    ]
+  },
+  {
+    "id": "index.task.task_userId_idx",
+    "label": "Create index \"task_userId_idx\" on \"task\"",
+    "operationClass": "additive",
+    "target": {
+      "id": "postgres",
+      "details": {
+        "schema": "public",
+        "objectType": "index",
+        "name": "task_userId_idx",
+        "table": "task"
+      }
+    },
+    "precheck": [
+      {
+        "description": "ensure index \"task_userId_idx\" does not exist",
+        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NULL"
+      }
+    ],
+    "execute": [
+      {
+        "description": "create index \"task_userId_idx\"",
+        "sql": "CREATE INDEX \"task_userId_idx\" ON \"public\".\"task\" (\"userId\")"
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "verify index \"task_userId_idx\" exists",
+        "sql": "SELECT to_regclass('\"public\".\"task_userId_idx\"') IS NOT NULL"
+      }
+    ]
+  }
+]

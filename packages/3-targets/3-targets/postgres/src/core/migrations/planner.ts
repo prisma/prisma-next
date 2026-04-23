@@ -2,6 +2,7 @@ import {
   normalizeSchemaNativeType,
   parsePostgresDefault,
 } from '@prisma-next/adapter-postgres/control';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
   ComponentDatabaseDependency,
@@ -25,6 +26,7 @@ import type {
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
 import type {
+  SqlStorage,
   StorageColumn,
   StorageTable,
   StorageTypeInstance,
@@ -32,6 +34,7 @@ import type {
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { planIssues } from './issue-planner';
 import {
   AddColumnCall,
   AddForeignKeyCall,
@@ -91,6 +94,35 @@ import {
  */
 function liftOpToCall(op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>): RawSqlCall {
   return new RawSqlCall(op);
+}
+
+/**
+ * Detects codec-hook-emitted enum rebuild / add-value operations whose type
+ * name is owned by the issue planner's `enumChangeCallStrategy`.
+ *
+ * The codec hook identifies these ops via stable ids:
+ * - `type.<name>.rebuild` — monolithic rebuild op
+ * - `type.<name>.value.<value>` — add-value op
+ *
+ * The creation path (`type.<name>`) is untouched: type creation remains
+ * owned by `buildStorageTypeOperations` / codec hooks, matching the
+ * walk-schema planner's behaviour.
+ */
+function isEnumMutationCallForType(
+  call: PostgresOpFactoryCall,
+  ownedTypeNames: ReadonlySet<string>,
+): boolean {
+  if (ownedTypeNames.size === 0) return false;
+  if (!(call instanceof RawSqlCall)) return false;
+  const { id } = call.op;
+  for (const typeName of ownedTypeNames) {
+    const rebuildId = `type.${typeName}.rebuild`;
+    const addValuePrefix = `type.${typeName}.value.`;
+    if (id === rebuildId || id.startsWith(addValuePrefix)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function toColumnSpec(
@@ -178,10 +210,15 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
     readonly fromHash?: string;
+    readonly fromContract?: unknown;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
+    return this.planSql(
+      options as SqlMigrationPlannerPlanOptions,
+      options.fromHash ?? '',
+      (options.fromContract ?? null) as Contract<SqlStorage> | null,
+    );
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
@@ -191,7 +228,11 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): PostgresPlanResult {
+  private planSql(
+    options: SqlMigrationPlannerPlanOptions,
+    fromHash: string,
+    fromContract: Contract<SqlStorage> | null,
+  ): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -206,6 +247,146 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
 
     const storageTypes = options.contract.storage.types ?? {};
+
+    // Dispatch on the `'data'` operation class — `migration plan` includes it
+    // and wants `DataTransformCall(PlaceholderExpression)` stubs the user
+    // hand-fills; `db update` / `db init` do not include it and need the
+    // walk-schema planner's auto-fill behavior (e.g. NOT NULL backfill via
+    // a temporary default). Phase 4 collapses these two paths.
+    if (options.policy.allowedOperationClasses.includes('data')) {
+      return this.planViaIssues({
+        options,
+        fromHash,
+        fromContract,
+        schemaName,
+        schemaIssues,
+        codecHooks,
+        storageTypes,
+      });
+    }
+
+    return this.planViaWalkSchema({
+      options,
+      fromHash,
+      schemaName,
+      schemaIssues,
+      planningMode,
+      codecHooks,
+      storageTypes,
+    });
+  }
+
+  /**
+   * `migration plan` path: feeds schema issues into `planIssues` so the
+   * data-safety strategies (NOT-NULL backfill, type change, nullable
+   * tightening, enum rebuild) run and emit `DataTransformCall` placeholders.
+   *
+   * Database-dependency and storage-type calls are still produced by the
+   * walk-schema helpers because the issue planner only handles
+   * `dependency_missing` for already-introspected gaps and does not own
+   * codec-hook-driven storage-type setup. Those streams are concatenated in
+   * the same dependency-first ordering used by the walk-schema path.
+   */
+  private planViaIssues(args: {
+    readonly options: SqlMigrationPlannerPlanOptions;
+    readonly fromHash: string;
+    readonly fromContract: Contract<SqlStorage> | null;
+    readonly schemaName: string;
+    readonly schemaIssues: readonly SchemaIssue[];
+    readonly codecHooks: Map<string, CodecControlHooks>;
+    readonly storageTypes: Record<string, StorageTypeInstance>;
+  }): PostgresPlanResult {
+    const { options, fromHash, fromContract, schemaName, schemaIssues, codecHooks, storageTypes } =
+      args;
+
+    const storageTypePlan = this.buildStorageTypeOperations(options, schemaName, codecHooks);
+    if (storageTypePlan.conflicts.length > 0) {
+      return plannerFailure(storageTypePlan.conflicts);
+    }
+
+    // `dependency_missing` issues are owned by
+    // `buildDatabaseDependencyOperations`, which consumes
+    // framework-component-declared install operations directly. Filter them
+    // out so `planIssues` doesn't double-handle them and so the planner
+    // doesn't fail on dependency IDs the issue planner can't classify (e.g.
+    // `postgres.extension.vector` declared by the pgvector extension).
+    //
+    // `type_missing` issues are owned by `buildStorageTypeOperations` via
+    // codec hooks — those are the canonical source for storage-type creation
+    // (and match walk-schema's behaviour). Letting `planIssues` additionally
+    // handle them produces duplicate `CREATE TYPE ...` statements.
+    const issuesForPlanIssues = schemaIssues.filter(
+      (issue) => issue.kind !== 'dependency_missing' && issue.kind !== 'type_missing',
+    );
+
+    // Types with `enum_values_changed` issues are owned by the class-flow
+    // `enumChangeCallStrategy` (which decomposes the change into
+    // `DataTransformCall + createEnumType + alterColumnType + dropEnumType +
+    // renameType`). The codec hook's monolithic `type.<name>.rebuild` /
+    // `type.<name>.value.<value>` operations would duplicate that work, so
+    // drop them from the storage-type stream here.
+    const typesOwnedByIssuePlanner = new Set<string>();
+    for (const issue of schemaIssues) {
+      if (issue.kind === 'enum_values_changed') {
+        typesOwnedByIssuePlanner.add(issue.typeName);
+      }
+    }
+    const storageTypeCalls = storageTypePlan.operations.filter(
+      (call) => !isEnumMutationCallForType(call, typesOwnedByIssuePlanner),
+    );
+
+    const issuePlanResult = planIssues({
+      issues: issuesForPlanIssues,
+      toContract: options.contract,
+      fromContract,
+      schemaName,
+      codecHooks,
+      storageTypes,
+    });
+    if (!issuePlanResult.ok) {
+      return plannerFailure(issuePlanResult.failure);
+    }
+
+    const issueCallsPolicy = this.filterCallsByOperationPolicy(
+      issuePlanResult.value.calls,
+      options.policy,
+    );
+    if (issueCallsPolicy.conflicts.length > 0) {
+      return plannerFailure(issueCallsPolicy.conflicts);
+    }
+
+    const calls: PostgresOpFactoryCall[] = [
+      ...this.buildDatabaseDependencyOperations(options),
+      ...storageTypeCalls,
+      ...issueCallsPolicy.allowed,
+    ];
+
+    return Object.freeze({
+      kind: 'success' as const,
+      plan: new TypeScriptRenderablePostgresMigration(calls, {
+        from: fromHash,
+        to: options.contract.storage.storageHash,
+      }),
+    });
+  }
+
+  /**
+   * `db update` / `db init` path (legacy walk-schema). Unchanged Phase-1
+   * pipeline that emits `PostgresOpFactoryCall[]` via direct contract walk
+   * + reconciliation. Auto-fills NOT-NULL backfills with a temporary default
+   * so it can be applied without user intervention.
+   */
+  private planViaWalkSchema(args: {
+    readonly options: SqlMigrationPlannerPlanOptions;
+    readonly fromHash: string;
+    readonly schemaName: string;
+    readonly schemaIssues: readonly SchemaIssue[];
+    readonly planningMode: PlanningMode;
+    readonly codecHooks: Map<string, CodecControlHooks>;
+    readonly storageTypes: Record<string, StorageTypeInstance>;
+  }): PostgresPlanResult {
+    const { options, fromHash, schemaName, schemaIssues, planningMode, codecHooks, storageTypes } =
+      args;
 
     const reconciliationPlan = buildReconciliationPlan({
       contract: options.contract,
@@ -276,6 +457,33 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       ]);
     }
     return null;
+  }
+
+  /**
+   * Enforces {@link MigrationOperationPolicy} on calls from the issue-based
+   * planner, matching the filter applied in {@link buildReconciliationPlan}
+   * for the walk-schema path.
+   */
+  private filterCallsByOperationPolicy(
+    calls: readonly PostgresOpFactoryCall[],
+    policy: MigrationOperationPolicy,
+  ): {
+    readonly allowed: readonly PostgresOpFactoryCall[];
+    readonly conflicts: readonly SqlPlannerConflict[];
+  } {
+    const allowed: PostgresOpFactoryCall[] = [];
+    const conflicts: SqlPlannerConflict[] = [];
+    for (const call of calls) {
+      if (policy.allowedOperationClasses.includes(call.operationClass)) {
+        allowed.push(call);
+      } else {
+        conflicts.push({
+          kind: 'missingButNonAdditive',
+          summary: `Planned operation "${call.label}" requires "${call.operationClass}" operations, which are not allowed by the current policy.`,
+        });
+      }
+    }
+    return { allowed, conflicts };
   }
 
   /**

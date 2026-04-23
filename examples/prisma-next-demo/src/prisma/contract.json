@@ -270,6 +270,13 @@
             "kind": "scalar"
           }
         },
+        "displayName": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
         "email": {
           "nullable": false,
           "type": {
@@ -329,6 +336,9 @@
           "createdAt": {
             "column": "createdAt"
           },
+          "displayName": {
+            "column": "displayName"
+          },
           "email": {
             "column": "email"
           },
@@ -378,7 +388,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:76c1bd5f5733774ae1182e83ca882f623cdf12e78a76c2fb06666d60bbdd6452",
+    "storageHash": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
     "tables": {
       "bug": {
         "columns": {
@@ -559,6 +569,11 @@
               "kind": "function"
             },
             "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "displayName": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
             "nullable": false
           },
           "email": {
