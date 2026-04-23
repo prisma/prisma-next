@@ -208,7 +208,10 @@ describe('createAggregateFunctions', () => {
     expect(ast).toBeInstanceOf(AggregateExpr);
     expect(ast.fn).toBe('count');
     expect(ast.expr).toBeUndefined();
-    expect((result as ExpressionImpl).field).toEqual({ codecId: 'pg/int8@1', nullable: false });
+    expect((result as ExpressionImpl).returnType).toEqual({
+      codecId: 'pg/int8@1',
+      nullable: false,
+    });
   });
 
   it('count(expr) produces AggregateExpr with fn count and the given expr', () => {
@@ -226,13 +229,13 @@ describe('createAggregateFunctions', () => {
     expect(ast).toBeInstanceOf(AggregateExpr);
     expect(ast.fn).toBe('sum');
     expect(ast.expr).toBeInstanceOf(IdentifierRef);
-    expect((result as ExpressionImpl).field).toEqual({ codecId: 'pg/int4@1', nullable: true });
+    expect((result as ExpressionImpl).returnType).toEqual({ codecId: 'pg/int4@1', nullable: true });
   });
 
   it('avg produces AggregateExpr with fn avg', () => {
     const result = fns.avg(f().id);
     expect((result.buildAst() as AggregateExpr).fn).toBe('avg');
-    expect((result as ExpressionImpl).field.nullable).toBe(true);
+    expect((result as ExpressionImpl).returnType.nullable).toBe(true);
   });
 
   it('min produces AggregateExpr with fn min', () => {
@@ -256,45 +259,62 @@ describe('createAggregateFunctions', () => {
 
 describe('extension functions', () => {
   it('produces OperationExpr from queryOperationTypes', () => {
-    const opTypes = {
+    const vectorField: ScopeField = { codecId: 'pgvector/vector@1', nullable: false };
+    const lowering = {
+      targetFamily: 'sql' as const,
+      strategy: 'function' as const,
+      template: '{{self}} <=> {{arg0}}',
+    };
+    const resultField: ScopeField = { codecId: 'pg/float8@1', nullable: false };
+
+    const cosineDistanceImpl = (a: unknown, b: unknown) => {
+      const selfAst = (a as ExpressionImpl).buildAst();
+      const otherAst = (b as ExpressionImpl).buildAst();
+      return new ExpressionImpl(
+        new OperationExpr({
+          method: 'cosineDistance',
+          self: selfAst,
+          args: [otherAst],
+          returns: resultField,
+          lowering,
+        }),
+        resultField,
+      );
+    };
+
+    const operations = {
       cosineDistance: {
-        args: [
-          { codecId: 'pgvector/vector@1', nullable: false },
-          { codecId: 'pgvector/vector@1', nullable: false },
-        ],
-        returns: { codecId: 'pg/float8@1', nullable: false },
-        lowering: {
-          targetFamily: 'sql' as const,
-          strategy: 'function' as const,
-          template: '{{self}} <=> {{arg0}}',
-        },
+        self: { codecId: 'pgvector/vector@1' } as const,
+        impl: cosineDistanceImpl,
       },
     };
 
-    const fns = createFunctions(opTypes);
+    const fns = createFunctions(operations);
 
-    const vectorField: ScopeField = { codecId: 'pgvector/vector@1', nullable: false };
     const expr1 = new ExpressionImpl(ColumnRef.of('posts', 'embedding'), vectorField);
     const expr2 = new ExpressionImpl(ColumnRef.of('other', 'embedding'), vectorField);
 
     type TestQC = {
       readonly codecTypes: Record<string, { readonly input: unknown; readonly output: unknown }>;
       readonly capabilities: Record<string, Record<string, boolean>>;
-      readonly queryOperationTypes: typeof opTypes;
+      readonly queryOperationTypes: typeof operations;
       readonly resolvedColumnOutputTypes: Record<string, never>;
     };
     const typedFns = fns as unknown as Functions<TestQC>;
-    const result = typedFns.cosineDistance(expr1, expr2);
+    const result = (typedFns.cosineDistance as typeof cosineDistanceImpl)(expr1, expr2);
 
     expect(result).toBeInstanceOf(ExpressionImpl);
-    const ast = result.buildAst() as OperationExpr;
+    const ast = (result as ExpressionImpl).buildAst() as OperationExpr;
     expect(ast).toBeInstanceOf(OperationExpr);
     expect(ast.method).toBe('cosineDistance');
     expect(ast.self).toBeInstanceOf(ColumnRef);
     expect((ast.self as ColumnRef).table).toBe('posts');
     expect(ast.args).toHaveLength(1);
     expect(ast.args[0]).toBeInstanceOf(ColumnRef);
-    expect((result as ExpressionImpl).field).toEqual({ codecId: 'pg/float8@1', nullable: false });
+    expect((result as ExpressionImpl).returnType).toEqual({
+      codecId: 'pg/float8@1',
+      nullable: false,
+    });
   });
 });
 

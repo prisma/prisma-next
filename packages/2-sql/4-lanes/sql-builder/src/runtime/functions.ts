@@ -9,35 +9,56 @@ import {
   ListExpression,
   LiteralExpr,
   NullCheckExpr,
-  OperationExpr,
   OrExpr,
-  ParamRef,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
+import { toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
   AggregateOnlyFunctions,
   BooleanCodecType,
   BuiltinFunctions,
+  CodecExpression,
   Expression,
-  ExpressionOrValue,
   Functions,
 } from '../expression';
 import type { QueryContext, ScopeField, Subquery } from '../scope';
 import { ExpressionImpl } from './expression-impl';
 
 type CodecTypes = Record<string, { readonly input: unknown }>;
-type ExprOrVal<T extends ScopeField = ScopeField> = ExpressionOrValue<T, CodecTypes>;
+// Runtime-level ExprOrVal — accepts any codec, any nullability. Concrete codec
+// typing lives on the public BuiltinFunctions surface in `../expression`.
+type ExprOrVal<CodecId extends string = string, N extends boolean = boolean> = CodecExpression<
+  CodecId,
+  N,
+  CodecTypes
+>;
 
 const BOOL_FIELD: BooleanCodecType = { codecId: 'pg/bool@1', nullable: false };
 
-function resolve(value: ExprOrVal): AstExpression {
-  if (value instanceof ExpressionImpl) return value.buildAst();
-  return ParamRef.of(value);
-}
+const resolve = toExpr;
 
-function resolveToAst(value: ExprOrVal): AstExpression {
-  if (value instanceof ExpressionImpl) return value.buildAst();
+/**
+ * Resolves an Expression via `buildAst()`, or wraps a raw value as a
+ * `LiteralExpr` — an SQL literal inlined into the query text, not a bound
+ * parameter.
+ *
+ * Used for `and` / `or` operands. The usual operand is an `Expression<bool>`
+ * (e.g. the result of `fns.eq`), which this function passes through by calling
+ * `buildAst()`. The only time the raw-value branch fires is when the caller
+ * writes `fns.and(true, x)` or similar — inlining `TRUE`/`FALSE` literals
+ * lets the SQL planner statically simplify `TRUE AND x` to `x`, which it
+ * cannot do for an opaque `ParamRef`.
+ */
+function toLiteralExpr(value: unknown): AstExpression {
+  if (
+    typeof value === 'object' &&
+    value !== null &&
+    'buildAst' in value &&
+    typeof (value as { buildAst: unknown }).buildAst === 'function'
+  ) {
+    return (value as { buildAst(): AstExpression }).buildAst();
+  }
   return new LiteralExpr(value);
 }
 
@@ -81,7 +102,7 @@ function numericAgg(
   expr: Expression<ScopeField>,
 ): ExpressionImpl<{ codecId: string; nullable: true }> {
   return new ExpressionImpl(AggregateExpr[fn](expr.buildAst()), {
-    codecId: (expr as ExpressionImpl).field.codecId,
+    codecId: expr.returnType.codecId,
     nullable: true as const,
   });
 }
@@ -94,8 +115,10 @@ function createBuiltinFunctions() {
     gte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'gte'),
     lt: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lt'),
     lte: (a: ExprOrVal, b: ExprOrVal) => comparison(a, b, 'lte'),
-    and: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(AndExpr.of(exprs.map(resolveToAst))),
-    or: (...exprs: ExprOrVal<BooleanCodecType>[]) => boolExpr(OrExpr.of(exprs.map(resolveToAst))),
+    and: (...exprs: ExprOrVal<'pg/bool@1', boolean>[]) =>
+      boolExpr(AndExpr.of(exprs.map(toLiteralExpr))),
+    or: (...exprs: ExprOrVal<'pg/bool@1', boolean>[]) =>
+      boolExpr(OrExpr.of(exprs.map(toLiteralExpr))),
     exists: (subquery: Subquery<Record<string, ScopeField>>) =>
       boolExpr(ExistsExpr.exists(subquery.buildAst())),
     notExists: (subquery: Subquery<Record<string, ScopeField>>) =>
@@ -127,34 +150,8 @@ function createAggregateOnlyFunctions() {
   } satisfies AggregateOnlyFunctions;
 }
 
-function createExtensionFunction(
-  name: string,
-  entry: SqlOperationEntry,
-): (...args: ExprOrVal[]) => ExpressionImpl {
-  return (...args: ExprOrVal[]) => {
-    const resolvedArgs = args.map((arg, i) => {
-      if (arg instanceof ExpressionImpl) return arg.buildAst();
-      const codecId = entry.args[i]?.codecId;
-      return ParamRef.of(arg, codecId ? { codecId } : undefined);
-    });
-    const self = resolvedArgs[0] as AstExpression;
-    const restArgs = resolvedArgs.slice(1);
-
-    return new ExpressionImpl(
-      new OperationExpr({
-        method: name,
-        self,
-        args: restArgs.length > 0 ? restArgs : undefined,
-        returns: entry.returns,
-        lowering: entry.lowering,
-      }),
-      entry.returns,
-    );
-  };
-}
-
 export function createFunctions<QC extends QueryContext>(
-  queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>,
+  operations: Readonly<Record<string, SqlOperationEntry>>,
 ): Functions<QC> {
   const builtins = createBuiltinFunctions();
 
@@ -163,19 +160,17 @@ export function createFunctions<QC extends QueryContext>(
       const builtin = (builtins as Record<string, unknown>)[prop];
       if (builtin) return builtin;
 
-      const extOp = queryOperationTypes[prop];
-      if (extOp) {
-        return createExtensionFunction(prop, extOp);
-      }
+      const op = operations[prop];
+      if (op) return op.impl;
       return undefined;
     },
   });
 }
 
 export function createAggregateFunctions<QC extends QueryContext>(
-  queryOperationTypes: Readonly<Record<string, SqlOperationEntry>>,
+  operations: Readonly<Record<string, SqlOperationEntry>>,
 ): AggregateFunctions<QC> {
-  const baseFns = createFunctions<QC>(queryOperationTypes);
+  const baseFns = createFunctions<QC>(operations);
   const aggregates = createAggregateOnlyFunctions();
 
   return new Proxy({} as AggregateFunctions<QC>, {

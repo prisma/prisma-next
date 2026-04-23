@@ -75,7 +75,7 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
       },
     },
   },
-  queryOperations: () => pgvectorQueryOperations,
+  queryOperations: () => pgvectorQueryOperations(),
   databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,

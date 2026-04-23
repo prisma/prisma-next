@@ -1,9 +1,6 @@
-import type {
-  OperationDescriptor,
-  OperationEntry,
-  OperationRegistry,
-} from '@prisma-next/operations';
+import type { OperationDescriptor, OperationRegistry } from '@prisma-next/operations';
 import { createOperationRegistry } from '@prisma-next/operations';
+import type { QueryOperationTypeEntry } from '@prisma-next/sql-contract/types';
 
 export interface SqlLoweringSpec {
   readonly targetFamily: 'sql';
@@ -11,9 +8,14 @@ export interface SqlLoweringSpec {
   readonly template: string;
 }
 
-export interface SqlOperationEntry extends OperationEntry {
-  readonly lowering: SqlLoweringSpec;
-}
+/**
+ * Runtime shape of a SQL operation entry — tightened beyond the framework's
+ * target-agnostic `OperationEntry` so `impl` returns a codec-exact
+ * `QueryOperationReturn` instead of `unknown`. Consumers (ORM column helper,
+ * sql-builder `fns` dispatch) can read `result.returnType.codecId` without a
+ * cast.
+ */
+export type SqlOperationEntry = QueryOperationTypeEntry;
 
 export type SqlOperationDescriptor = OperationDescriptor<SqlOperationEntry>;
 

@@ -2,47 +2,36 @@ import { describe, expect, it } from 'vitest';
 import { createSqlOperationRegistry, type SqlOperationDescriptor } from '../src/index';
 
 describe('SqlOperationRegistry', () => {
+  const noopImpl = () => ({ returnType: { codecId: 'pg/bool@1', nullable: false } });
+
   const descriptor = (
     method: string,
     overrides?: Partial<SqlOperationDescriptor>,
   ): SqlOperationDescriptor => ({
     method,
-    args: [{ codecId: 'pg/vector@1', nullable: false }],
-    returns: { codecId: 'core/float8', nullable: false },
-    lowering: {
-      targetFamily: 'sql',
-      strategy: 'infix',
-      template: '{{self}} <=> {{arg0}}',
-    },
+    self: { codecId: 'pg/vector@1' },
+    impl: noopImpl,
     ...overrides,
   });
 
-  it('registers and retrieves with lowering spec', () => {
+  it('registers and retrieves an operation', () => {
     const registry = createSqlOperationRegistry();
     registry.register(descriptor('cosineDistance'));
 
     const entry = registry.entries()['cosineDistance'];
-    expect(entry?.lowering).toEqual({
-      targetFamily: 'sql',
-      strategy: 'infix',
-      template: '{{self}} <=> {{arg0}}',
+    expect(entry).toEqual({
+      self: { codecId: 'pg/vector@1' },
+      impl: noopImpl,
     });
   });
 
-  it('supports function strategy', () => {
+  it('registers multiple operations', () => {
     const registry = createSqlOperationRegistry();
-    registry.register(
-      descriptor('normalize', {
-        lowering: {
-          targetFamily: 'sql',
-          strategy: 'function',
-          template: 'normalize({{self}})',
-        },
-      }),
-    );
+    registry.register(descriptor('cosineDistance'));
+    registry.register(descriptor('l2Distance', { self: { traits: ['order'] } }));
 
-    const entry = registry.entries()['normalize'];
-    expect(entry?.lowering.strategy).toBe('function');
+    const entries = registry.entries();
+    expect(Object.keys(entries)).toEqual(['cosineDistance', 'l2Distance']);
   });
 
   it('throws on duplicate method', () => {

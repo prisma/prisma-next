@@ -11,7 +11,7 @@ describe('ExpressionImpl', () => {
 
     expect(expr).toBeInstanceOf(ExpressionImpl);
     expect(expr.buildAst()).toBe(col);
-    expect(expr.field).toEqual(scopeField);
+    expect(expr.returnType).toEqual(scopeField);
   });
 
   it('wraps a predicate Expression node', () => {

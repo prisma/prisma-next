@@ -1,9 +1,5 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
-import {
-  generateCodecTypeIntersection,
-  serializeObjectKey,
-  serializeValue,
-} from '@prisma-next/emitter/domain-type-generation';
+import { serializeObjectKey, serializeValue } from '@prisma-next/emitter/domain-type-generation';
 import type {
   GenerateContractTypesOptions,
   ValidationContext,
@@ -309,10 +305,13 @@ export const sqlEmission = {
 
   getFamilyTypeAliases(options?: GenerateContractTypesOptions): string {
     const queryOperationTypeImports = options?.queryOperationTypeImports ?? [];
-    const queryOperationTypes = generateCodecTypeIntersection(
-      queryOperationTypeImports,
-      'QueryOperationTypes',
-    );
+    const queryOperationAliases = queryOperationTypeImports
+      .filter((imp) => imp.named === 'QueryOperationTypes')
+      .map((imp) => `${imp.alias}<CodecTypes>`);
+    const queryOperationTypes =
+      queryOperationAliases.length > 0
+        ? queryOperationAliases.join(' & ')
+        : 'Record<string, never>';
 
     return [
       'export type LaneCodecTypes = CodecTypes;',

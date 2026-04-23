@@ -40,7 +40,8 @@ export type ProfileHash =
 export type CodecTypes = PgTypes & PgVectorTypes;
 export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
-export type QueryOperationTypes = PgAdapterQueryOps & PgVectorQueryOperationTypes;
+export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
+  PgVectorQueryOperationTypes<CodecTypes>;
 type DefaultLiteralValue<CodecId extends string, _Encoded> = CodecId extends keyof CodecTypes
   ? CodecTypes[CodecId]['output']
   : _Encoded;
