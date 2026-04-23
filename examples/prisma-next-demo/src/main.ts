@@ -37,6 +37,11 @@
  *                              Vector similarity search via ORM client
  * - users-paginate [cursor]    Cursor-based pagination
  * - similarity-search <vec>    Vector similarity search (pgvector)
+ * - cross-author-similarity [limit]
+ *                              SQL DSL escape-hatch: closest post pairs across different
+ *                              authors via a self-join on a non-relation predicate, with
+ *                              cosineDistance over two column references — a shape the
+ *                              current ORM collection surface cannot directly express.
  * - budget-violation           Demo budget enforcement error
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
@@ -63,6 +68,7 @@ import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor
 import { ormClientSearchPostsByEmbedding } from './orm-client/search-posts-by-embedding';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
+import { crossAuthorSimilarity } from './queries/cross-author-similarity';
 import { deleteWithoutWhere } from './queries/delete-without-where';
 import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
@@ -325,6 +331,12 @@ async function main() {
       const results = await similaritySearch(queryVector, limit);
 
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'cross-author-similarity') {
+      const [limitStr] = args;
+      const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
+      const results = await crossAuthorSimilarity(limit);
+
+      console.log(JSON.stringify(results, null, 2));
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
 
@@ -377,7 +389,8 @@ async function main() {
           'repo-upsert-user <id> <email> <kind> | repo-create-user-address <id> <email> <kind> | ' +
           'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +
           'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
-          'similarity-search <vec> [limit] | budget-violation | guardrail-delete]',
+          'similarity-search <vec> [limit] | cross-author-similarity [limit] | ' +
+          'budget-violation | guardrail-delete]',
       );
       process.exit(1);
     }
