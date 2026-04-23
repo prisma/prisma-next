@@ -72,6 +72,18 @@ export interface Codec<
   readonly init?: (params: TParams) => THelper;
 }
 
+type AnyCodec = Codec<
+  string,
+  readonly CodecTrait[],
+  unknown,
+  unknown,
+  Record<string, unknown>,
+  unknown,
+  unknown,
+  boolean,
+  boolean
+>;
+
 /**
  * Registry interface for codecs organized by ID and by contract scalar type.
  *
@@ -81,31 +93,31 @@ export interface Codec<
  * then packs, then app overrides).
  */
 export interface CodecRegistry {
-  get(id: string): Codec<string> | undefined;
+  get(id: string): AnyCodec | undefined;
   has(id: string): boolean;
-  getByScalar(scalar: string): readonly Codec<string>[];
-  getDefaultCodec(scalar: string): Codec<string> | undefined;
-  register(codec: Codec<string>): void;
+  getByScalar(scalar: string): readonly AnyCodec[];
+  getDefaultCodec(scalar: string): AnyCodec | undefined;
+  register(codec: AnyCodec): void;
   /** Returns true if the codec with this ID has the given trait. */
   hasTrait(codecId: string, trait: CodecTrait): boolean;
   /** Returns all traits for a codec, or an empty array if not found. */
   traitsOf(codecId: string): readonly CodecTrait[];
-  [Symbol.iterator](): Iterator<Codec<string>>;
-  values(): IterableIterator<Codec<string>>;
+  [Symbol.iterator](): Iterator<AnyCodec>;
+  values(): IterableIterator<AnyCodec>;
 }
 
 /**
  * Implementation of CodecRegistry.
  */
 class CodecRegistryImpl implements CodecRegistry {
-  private readonly _byId = new Map<string, Codec<string>>();
-  private readonly _byScalar = new Map<string, Codec<string>[]>();
+  private readonly _byId = new Map<string, AnyCodec>();
+  private readonly _byScalar = new Map<string, AnyCodec[]>();
 
   /**
    * Map-like interface for codec lookup by ID.
    * Example: registry.get('pg/text@1')
    */
-  get(id: string): Codec<string> | undefined {
+  get(id: string): AnyCodec | undefined {
     return this._byId.get(id);
   }
 
@@ -121,7 +133,7 @@ class CodecRegistryImpl implements CodecRegistry {
    * Returns an empty frozen array if no codecs are found.
    * Example: registry.getByScalar('text') → [codec1, codec2, ...]
    */
-  getByScalar(scalar: string): readonly Codec<string>[] {
+  getByScalar(scalar: string): readonly AnyCodec[] {
     return this._byScalar.get(scalar) ?? Object.freeze([]);
   }
 
@@ -129,7 +141,7 @@ class CodecRegistryImpl implements CodecRegistry {
    * Get the default codec for a scalar type (first registered codec).
    * Returns undefined if no codec handles this scalar type.
    */
-  getDefaultCodec(scalar: string): Codec<string> | undefined {
+  getDefaultCodec(scalar: string): AnyCodec | undefined {
     const _codecs = this._byScalar.get(scalar);
     return _codecs?.[0];
   }
@@ -141,7 +153,7 @@ class CodecRegistryImpl implements CodecRegistry {
    * @param codec - The codec to register
    * @throws Error if a codec with the same ID already exists
    */
-  register(codec: Codec<string>): void {
+  register(codec: AnyCodec): void {
     if (this._byId.has(codec.id)) {
       throw new Error(`Codec with ID '${codec.id}' is already registered`);
     }
@@ -172,7 +184,7 @@ class CodecRegistryImpl implements CodecRegistry {
    * Returns an iterator over all registered codecs.
    * Useful for iterating through codecs from another registry.
    */
-  *[Symbol.iterator](): Iterator<Codec<string>> {
+  *[Symbol.iterator](): Iterator<AnyCodec> {
     for (const codec of this._byId.values()) {
       yield codec;
     }
@@ -181,7 +193,7 @@ class CodecRegistryImpl implements CodecRegistry {
   /**
    * Returns an iterable of all registered codecs.
    */
-  values(): IterableIterator<Codec<string>> {
+  values(): IterableIterator<AnyCodec> {
     return this._byId.values();
   }
 }
