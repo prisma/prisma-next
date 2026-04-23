@@ -2,7 +2,11 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import {
+  type ExecutionStackInstance,
+  instantiateExecutionStack,
+  type RuntimeDriverInstance,
+} from '@prisma-next/framework-components/execution';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -17,8 +21,12 @@ import {
   createExecutionContext,
   createRuntime,
   createSqlExecutionStack,
+  type Log,
   type Runtime,
   type SqlMiddleware,
+  type SqlRuntimeAdapterInstance,
+  type SqlRuntimeDriverInstance,
+  type SqlRuntimeExtensionInstance,
 } from '@prisma-next/sql-runtime';
 import { setupTestDatabase } from '@prisma-next/sql-runtime/test/utils';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -30,23 +38,35 @@ import type { Contract } from './sql-builder/fixtures/generated/contract';
 
 const sqlContract = validateContract<Contract>(contract, emptyCodecLookup);
 
-function rewriteUserSelects(predicate: (ast: SelectAst) => SelectAst): SqlMiddleware {
+function rewriteUserSelects(name: string, rewrite: (ast: SelectAst) => SelectAst): SqlMiddleware {
   return {
-    name: 'rewriteUserSelects',
+    name,
     familyId: 'sql',
     async beforeCompile(draft) {
       if (draft.ast.kind !== 'select') return undefined;
       if (draft.ast.from.kind !== 'table-source') return undefined;
       if (draft.ast.from.name !== 'users') return undefined;
-      return { ...draft, ast: predicate(draft.ast) };
+      return { ...draft, ast: rewrite(draft.ast) };
     },
   };
 }
 
+function withPredicate(ast: SelectAst, pred: BinaryExpr): SelectAst {
+  return ast.withWhere(ast.where ? AndExpr.of([ast.where, pred]) : pred);
+}
+
+type TestStackInstance = ExecutionStackInstance<
+  'sql',
+  'postgres',
+  SqlRuntimeAdapterInstance<'postgres'>,
+  RuntimeDriverInstance<'sql', 'postgres'>,
+  SqlRuntimeExtensionInstance<'postgres'>
+>;
+
 describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOperation }, () => {
-  let runtime: Runtime;
   let context: ExecutionContext<typeof sqlContract>;
-  let debug: ReturnType<typeof vi.fn<(event: unknown) => void>>;
+  let driver: SqlRuntimeDriverInstance<'postgres'>;
+  let stackInstance: TestStackInstance;
   const closeFns: Array<() => Promise<void>> = [];
 
   beforeAll(async () => {
@@ -96,27 +116,12 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
 
       await c.query(`
         INSERT INTO users (id, name, email, invited_by_id) VALUES
-          (1, 'Alice', 'alice@example.com', NULL),
-          (2, 'Bob',   'bob@example.com',   1),
-          (3, 'Charlie','charlie@example.com', 1),
-          (4, 'Diana', 'diana@example.com',  2)
+          (1, 'Alice',   'alice@example.com',   NULL),
+          (2, 'Bob',     'bob@example.com',     1),
+          (3, 'Charlie', 'charlie@example.com', 1),
+          (4, 'Diana',   'diana@example.com',   2)
       `);
     });
-
-    // Middleware filters SELECT * FROM users to just id=1 (Alice). Demonstrates
-    // that a rewrite composes with any user-supplied WHERE, and that parameterized
-    // predicates flow through the adapter's lowering path.
-    const idEqOne = BinaryExpr.eq(
-      ColumnRef.of('users', 'id'),
-      ParamRef.of(1, { name: 'middleware_user_id', codecId: 'pg/int4@1' }),
-    );
-
-    const onlyAlice = rewriteUserSelects((ast) => {
-      const combined = ast.where ? AndExpr.of([ast.where, idEqOne]) : idEqOne;
-      return ast.withWhere(combined);
-    });
-
-    debug = vi.fn<(event: unknown) => void>();
 
     const stack = createSqlExecutionStack({
       target: postgresTarget,
@@ -130,23 +135,15 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
       extensionPacks: [pgvector],
     });
 
-    const stackInstance = instantiateExecutionStack(stack);
+    stackInstance = instantiateExecutionStack(stack) as TestStackInstance;
     context = createExecutionContext({ contract: sqlContract, stack });
-    const driver = stackInstance.driver;
-    if (!driver) throw new Error('Driver missing');
+    const resolvedDriver = stackInstance.driver;
+    if (!resolvedDriver) throw new Error('Driver missing');
+    driver = resolvedDriver as SqlRuntimeDriverInstance<'postgres'>;
     await driver.connect({ kind: 'pgClient', client });
 
-    runtime = createRuntime({
-      stackInstance,
-      context,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      middleware: [onlyAlice],
-      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug },
-    });
-
     closeFns.push(
-      () => runtime.close(),
+      () => driver.close(),
       () => client.end(),
       () => database.close(),
     );
@@ -162,31 +159,70 @@ describe('integration: SQL middleware rewriting', { timeout: timeouts.databaseOp
     }
   });
 
-  it('rewrites a SELECT to filter by the middleware-added predicate', async () => {
-    const db = sql({ context });
-    const rows = await runtime.execute(db.users.select('id', 'name').build()).toArray();
-    const ids = rows.map((r) => r.id).sort();
+  function buildRuntime(middleware: SqlMiddleware[], log?: Log): Runtime {
+    return createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      middleware,
+      ...(log ? { log } : {}),
+    });
+  }
 
-    expect(ids).toEqual([1]);
+  it('single middleware rewrite shapes the result set', async () => {
+    const debug = vi.fn<(event: unknown) => void>();
+    const idEqOne = BinaryExpr.eq(
+      ColumnRef.of('users', 'id'),
+      ParamRef.of(1, { name: 'middleware_user_id', codecId: 'pg/int4@1' }),
+    );
+    const onlyAlice = rewriteUserSelects('onlyAlice', (ast) => withPredicate(ast, idEqOne));
+    const runtime = buildRuntime([onlyAlice], {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug,
+    });
+
+    const db = sql({ context });
+    const rows = await runtime.execute(db.users.select('id').build()).toArray();
+
+    expect(rows.map((r) => r.id)).toEqual([1]);
     expect(debug).toHaveBeenCalledWith({
       event: 'middleware.rewrite',
-      middleware: 'rewriteUserSelects',
+      middleware: 'onlyAlice',
       lane: 'dsl',
     });
   });
 
-  it('composes with a user-supplied WHERE clause', async () => {
-    const db = sql({ context });
-    // User filters gt(id, 2); middleware adds id == 1; AND of both is empty.
-    const rows = await runtime
-      .execute(
-        db.users
-          .select('id')
-          .where((f, fns) => fns.gt(f.id, 2))
-          .build(),
-      )
-      .toArray();
+  it('chains multiple middlewares, combining their predicates', async () => {
+    const debug = vi.fn<(event: unknown) => void>();
+    const idGte = (v: number, suffix: string) =>
+      BinaryExpr.gte(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(v, { name: `mw_${suffix}`, codecId: 'pg/int4@1' }),
+      );
+    const idLte = (v: number, suffix: string) =>
+      BinaryExpr.lte(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(v, { name: `mw_${suffix}`, codecId: 'pg/int4@1' }),
+      );
+    const lowerBound = rewriteUserSelects('idGte2', (ast) => withPredicate(ast, idGte(2, 'gte2')));
+    const upperBound = rewriteUserSelects('idLte3', (ast) => withPredicate(ast, idLte(3, 'lte3')));
 
-    expect(rows).toEqual([]);
+    const runtime = buildRuntime([lowerBound, upperBound], {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug,
+    });
+
+    const db = sql({ context });
+    const rows = await runtime.execute(db.users.select('id', 'name').build()).toArray();
+
+    expect(rows.map((r) => r.id).sort()).toEqual([2, 3]);
+    expect(debug).toHaveBeenCalledTimes(2);
+    expect(debug.mock.calls[0]?.[0]).toMatchObject({ middleware: 'idGte2' });
+    expect(debug.mock.calls[1]?.[0]).toMatchObject({ middleware: 'idLte3' });
   });
 });
