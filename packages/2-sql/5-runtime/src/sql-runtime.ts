@@ -6,7 +6,6 @@ import type {
 import { checkMiddlewareCompatibility } from '@prisma-next/framework-components/runtime';
 import type {
   Log,
-  Middleware,
   RuntimeCore,
   RuntimeCoreOptions,
   RuntimeTelemetryEvent,
@@ -33,6 +32,8 @@ import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
+import { runBeforeCompileChain } from './middleware/before-compile-chain';
+import type { SqlMiddleware } from './middleware/sql-middleware';
 import type {
   ExecutionContext,
   SqlRuntimeAdapterInstance,
@@ -45,7 +46,7 @@ export interface RuntimeOptions<TContract extends Contract<SqlStorage> = Contrac
   readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middleware?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -64,7 +65,7 @@ export interface CreateRuntimeOptions<
   readonly context: ExecutionContext<TContract>;
   readonly driver: SqlDriver<unknown>;
   readonly verify: RuntimeVerifyOptions;
-  readonly middleware?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
@@ -125,7 +126,7 @@ export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
 class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorage>>
   implements Runtime
 {
-  private readonly core: RuntimeCore<TContract, SqlDriver<unknown>>;
+  private readonly core: RuntimeCore<TContract, SqlDriver<unknown>, SqlMiddleware>;
   private readonly contract: TContract;
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
@@ -148,7 +149,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
     const familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
 
-    const coreOptions: RuntimeCoreOptions<TContract, SqlDriver<unknown>> = {
+    const coreOptions: RuntimeCoreOptions<TContract, SqlDriver<unknown>, SqlMiddleware> = {
       familyAdapter,
       driver,
       verify,
@@ -172,12 +173,27 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     }
   }
 
-  private toExecutionPlan<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): ExecutionPlan<Row> {
+  private async toExecutionPlan<Row>(
+    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): Promise<ExecutionPlan<Row>> {
     const isSqlQueryPlan = (p: ExecutionPlan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
       return 'ast' in p && !('sql' in p);
     };
 
-    return isSqlQueryPlan(plan) ? lowerSqlPlan(this.adapter, this.contract, plan) : plan;
+    if (!isSqlQueryPlan(plan)) {
+      return plan;
+    }
+
+    const rewrittenDraft = await runBeforeCompileChain(
+      this.core.middleware,
+      { ast: plan.ast, meta: plan.meta },
+      this.core.middlewareContext,
+    );
+
+    const planToLower: SqlQueryPlan<Row> =
+      rewrittenDraft.ast === plan.ast ? plan : { ...plan, ast: rewrittenDraft.ast };
+
+    return lowerSqlPlan(this.adapter, this.contract, planToLower);
   }
 
   private executeAgainstQueryable<Row = Record<string, unknown>>(
@@ -185,11 +201,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     queryable: CoreQueryable,
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated(this.contract);
-    const executablePlan = this.toExecutionPlan(plan);
 
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
+      const executablePlan = await self.toExecutionPlan(plan);
       const encodedParams = encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,

@@ -11,10 +11,10 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type {
   ExecutionContext,
-  Middleware,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
+  SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
 import {
@@ -37,22 +37,23 @@ export interface SqliteClient<TContract extends Contract<SqlStorage>> {
   runtime(): Runtime;
 }
 
-export interface SqliteOptionsBase<TContract extends Contract<SqlStorage>> {
+export interface SqliteOptionsBase {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<SqliteTargetId>[];
-  readonly middleware?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly SqlMiddleware[];
   readonly verify?: RuntimeVerifyOptions;
 }
 
 export type SqliteOptionsWithContract<TContract extends Contract<SqlStorage>> = {
   readonly path?: string;
-} & SqliteOptionsBase<TContract> & {
+} & SqliteOptionsBase & {
     readonly contract: TContract;
     readonly contractJson?: never;
   };
 
 export type SqliteOptionsWithContractJson<TContract extends Contract<SqlStorage>> = {
   readonly path?: string;
-} & SqliteOptionsBase<TContract> & {
+  readonly _contract?: TContract;
+} & SqliteOptionsBase & {
     readonly contractJson: unknown;
     readonly contract?: never;
   };

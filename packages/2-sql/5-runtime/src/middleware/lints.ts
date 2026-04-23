@@ -1,6 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { Middleware, MiddlewareContext } from '@prisma-next/runtime-executor';
 import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
@@ -8,6 +7,7 @@ import {
   isQueryAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { SqlMiddleware, SqlMiddlewareContext } from './sql-middleware';
 
 export interface LintsOptions {
   readonly severities?: {
@@ -138,14 +138,14 @@ function getConfiguredSeverity(code: string, options?: LintsOptions): 'warn' | '
  * Fallback: When ast is missing, `fallbackWhenAstMissing: 'raw'` uses heuristic
  * SQL parsing; `'skip'` skips all lints. Default is `'raw'`.
  */
-export function lints<TContract = unknown>(options?: LintsOptions): Middleware<TContract> {
+export function lints(options?: LintsOptions): SqlMiddleware {
   const fallback = options?.fallbackWhenAstMissing ?? 'raw';
 
   return Object.freeze({
     name: 'lints',
     familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: MiddlewareContext<TContract>) {
+    async beforeExecute(plan: ExecutionPlan, ctx: SqlMiddlewareContext) {
       if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 
