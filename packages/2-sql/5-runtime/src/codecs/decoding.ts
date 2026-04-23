@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
@@ -76,6 +77,56 @@ function resolveColumnRefForAlias(
   }
 
   return fallbackColumnRefIndex?.get(alias);
+}
+
+function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+  return value instanceof Promise;
+}
+
+function isJsonSchemaValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
+  );
+}
+
+function wirePreview(value: unknown): string {
+  return typeof value === 'string' && value.length > 100
+    ? `${value.substring(0, 100)}...`
+    : String(value).substring(0, 100);
+}
+
+function decodeFailure(alias: string, codec: Codec, wireValue: unknown, error: unknown): Error {
+  return runtimeError(
+    'RUNTIME.DECODE_FAILED',
+    `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
+    {
+      alias,
+      codec: codec.id,
+      wirePreview: wirePreview(wireValue),
+    },
+  );
+}
+
+function validateDecodedValue(
+  alias: string,
+  decodedValue: unknown,
+  codec: Codec,
+  jsonValidators: JsonSchemaValidatorRegistry | undefined,
+  projection: ExecutionPlan['meta']['projection'],
+  fallbackColumnRefIndex: ColumnRefIndex | null,
+): unknown {
+  if (!jsonValidators) {
+    return decodedValue;
+  }
+
+  const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
+  if (ref) {
+    validateJsonValue(jsonValidators, ref.table, ref.column, decodedValue, 'decode', codec.id);
+  }
+
+  return decodedValue;
 }
 
 export function decodeRow(
@@ -167,53 +218,41 @@ export function decodeRow(
 
     try {
       const decodedValue = codec.decode(wireValue);
-
-      // Validate decoded JSON value against schema
-      if (jsonValidators) {
-        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
-        if (ref) {
-          validateJsonValue(
-            jsonValidators,
-            ref.table,
-            ref.column,
-            decodedValue,
-            'decode',
-            codec.id,
-          );
-        }
+      if (isPromiseLike(decodedValue)) {
+        decoded[alias] = decodedValue
+          .then((resolvedValue) =>
+            validateDecodedValue(
+              alias,
+              resolvedValue,
+              codec,
+              jsonValidators,
+              projection,
+              fallbackColumnRefIndex,
+            ),
+          )
+          .catch((error) => {
+            if (isJsonSchemaValidationError(error)) {
+              throw error;
+            }
+            throw decodeFailure(alias, codec, wireValue, error);
+          });
+        continue;
       }
 
-      decoded[alias] = decodedValue;
+      decoded[alias] = validateDecodedValue(
+        alias,
+        decodedValue,
+        codec,
+        jsonValidators,
+        projection,
+        fallbackColumnRefIndex,
+      );
     } catch (error) {
-      // Re-throw JSON schema validation errors as-is
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
-      ) {
+      if (isJsonSchemaValidationError(error)) {
         throw error;
       }
 
-      const decodeError = new Error(
-        `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
-      ) as Error & {
-        code: string;
-        category: string;
-        severity: string;
-        details?: Record<string, unknown>;
-      };
-      decodeError.code = 'RUNTIME.DECODE_FAILED';
-      decodeError.category = 'RUNTIME';
-      decodeError.severity = 'error';
-      decodeError.details = {
-        alias,
-        codec: codec.id,
-        wirePreview:
-          typeof wireValue === 'string' && wireValue.length > 100
-            ? `${wireValue.substring(0, 100)}...`
-            : String(wireValue).substring(0, 100),
-      };
-      throw decodeError;
+      throw decodeFailure(alias, codec, wireValue, error);
     }
   }
 

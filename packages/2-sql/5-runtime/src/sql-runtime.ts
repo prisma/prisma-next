@@ -30,7 +30,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
-import { encodeParams } from './codecs/encoding';
+import { encodeParams, encodeParamsAsync, hasAsyncParamEncoding } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
 import type {
@@ -190,7 +190,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
+      const encodedParams = hasAsyncParamEncoding(executablePlan, self.codecRegistry)
+        ? await encodeParamsAsync(executablePlan, self.codecRegistry)
+        : encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
