@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto';
 import { canonicalizeJson } from './canonicalize-json';
-import { readMigrationPackage, writeMigrationManifest } from './io';
-import type { MigrationManifest, MigrationOps } from './types';
+import { readMigrationPackage } from './io';
+import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
 
 export interface VerifyResult {
   readonly ok: boolean;
-  readonly reason?: 'draft' | 'mismatch';
+  readonly reason?: 'mismatch';
   readonly storedMigrationId?: string;
   readonly computedMigrationId?: string;
 }
@@ -20,8 +20,15 @@ function sha256Hex(input: string): string {
  * for the rationale: contracts are anchored separately by the
  * storage-hash bookends inside the envelope; planner hints are advisory
  * and must not affect identity.
+ *
+ * The `migrationId` field on the manifest is stripped before hashing so
+ * the function can be used both at write time (when no id exists yet)
+ * and at verify time (rehashing an already-attested manifest).
  */
-export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOps): string {
+export function computeMigrationId(
+  manifest: Omit<MigrationManifest, 'migrationId'> & { readonly migrationId?: string },
+  ops: MigrationOps,
+): string {
   const {
     migrationId: _migrationId,
     signature: _signature,
@@ -40,34 +47,35 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
   return `sha256:${hash}`;
 }
 
-/** Compute and persist `migrationId` to `manifest.json`. */
-export async function attestMigration(dir: string): Promise<string> {
-  const pkg = await readMigrationPackage(dir);
-  const migrationId = computeMigrationId(pkg.manifest, pkg.ops);
+/**
+ * Re-hash an on-disk migration bundle and compare against the stored
+ * `migrationId`. Returns `{ ok: true }` when the package is internally
+ * consistent (manifest + ops still produce the recorded id), or
+ * `{ ok: false, reason: 'mismatch', stored, computed }` when they do
+ * not — typically a sign of FS corruption, partial writes, or a
+ * post-emit hand edit.
+ */
+export function verifyMigrationBundle(bundle: MigrationBundle): VerifyResult {
+  const computed = computeMigrationId(bundle.manifest, bundle.ops);
 
-  const updated = { ...pkg.manifest, migrationId };
-  await writeMigrationManifest(dir, updated);
-
-  return migrationId;
-}
-
-export async function verifyMigration(dir: string): Promise<VerifyResult> {
-  const pkg = await readMigrationPackage(dir);
-
-  if (pkg.manifest.migrationId === null) {
-    return { ok: false, reason: 'draft' };
-  }
-
-  const computed = computeMigrationId(pkg.manifest, pkg.ops);
-
-  if (pkg.manifest.migrationId === computed) {
-    return { ok: true, storedMigrationId: pkg.manifest.migrationId, computedMigrationId: computed };
+  if (bundle.manifest.migrationId === computed) {
+    return {
+      ok: true,
+      storedMigrationId: bundle.manifest.migrationId,
+      computedMigrationId: computed,
+    };
   }
 
   return {
     ok: false,
     reason: 'mismatch',
-    storedMigrationId: pkg.manifest.migrationId,
+    storedMigrationId: bundle.manifest.migrationId,
     computedMigrationId: computed,
   };
+}
+
+/** Convenience wrapper: read the package from disk then verify it. */
+export async function verifyMigration(dir: string): Promise<VerifyResult> {
+  const pkg = await readMigrationPackage(dir);
+  return verifyMigrationBundle(pkg);
 }

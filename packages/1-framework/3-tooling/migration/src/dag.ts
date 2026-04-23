@@ -8,7 +8,7 @@ import {
   errorSameSourceAndTarget,
 } from './errors';
 import { bfs } from './graph-ops';
-import type { AttestedMigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
+import type { MigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
 
 /** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
@@ -30,7 +30,7 @@ function appendEdge(
   else map.set(key, [entry]);
 }
 
-export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): MigrationGraph {
+export function reconstructGraph(packages: readonly MigrationBundle[]): MigrationGraph {
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
@@ -55,12 +55,10 @@ export function reconstructGraph(packages: readonly AttestedMigrationBundle[]): 
       labels: pkg.manifest.labels,
     };
 
-    if (migration.migrationId !== null) {
-      if (migrationById.has(migration.migrationId)) {
-        throw errorDuplicateMigrationId(migration.migrationId);
-      }
-      migrationById.set(migration.migrationId, migration);
+    if (migrationById.has(migration.migrationId)) {
+      throw errorDuplicateMigrationId(migration.migrationId);
     }
+    migrationById.set(migration.migrationId, migration);
 
     appendEdge(forwardChain, from, migration);
     appendEdge(reverseChain, to, migration);
@@ -93,7 +91,7 @@ function compareTieBreak(a: MigrationChainEntry, b: MigrationChainEntry): number
   if (ca !== 0) return ca;
   const tc = a.to.localeCompare(b.to);
   if (tc !== 0) return tc;
-  return (a.migrationId ?? '').localeCompare(b.migrationId ?? '');
+  return a.migrationId.localeCompare(b.migrationId);
 }
 
 function sortedNeighbors(edges: readonly MigrationChainEntry[]): readonly MigrationChainEntry[] {
