@@ -8,8 +8,7 @@ import {
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
-  AttestedMigrationBundle,
-  DraftMigrationBundle,
+  MigrationBundle,
   MigrationChainEntry,
   MigrationGraph,
 } from '@prisma-next/migration-tools/types';
@@ -62,7 +61,7 @@ export interface MigrationStatusEntry {
   readonly dirName: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string | null;
+  readonly migrationId: string;
   readonly operationCount: number;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
@@ -87,7 +86,7 @@ export interface MigrationStatusResult {
     readonly refName?: string;
     readonly selectedPath: readonly {
       readonly dirName: string;
-      readonly migrationId: string | null;
+      readonly migrationId: string;
       readonly from: string;
       readonly to: string;
     }[];
@@ -95,8 +94,7 @@ export interface MigrationStatusResult {
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
   readonly graph?: MigrationGraph;
-  readonly bundles?: readonly AttestedMigrationBundle[];
-  readonly drafts?: readonly DraftMigrationBundle[];
+  readonly bundles?: readonly MigrationBundle[];
   readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
@@ -227,7 +225,7 @@ export function deriveEdgeStatuses(
  */
 function buildMigrationEntries(
   chain: readonly MigrationChainEntry[],
-  packages: readonly AttestedMigrationBundle[],
+  packages: readonly MigrationBundle[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
   edgeStatuses?: readonly EdgeStatus[],
@@ -436,11 +434,10 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let attested: readonly AttestedMigrationBundle[];
-  let drafts: readonly DraftMigrationBundle[];
+  let bundles: readonly MigrationBundle[];
   let graph: MigrationGraph;
   try {
-    ({ attested, drafts, graph } = await loadAllBundles(migrationsDir));
+    ({ bundles, graph } = await loadAllBundles(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -454,18 +451,7 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  if (drafts.length > 0) {
-    diagnostics.push({
-      code: 'MIGRATION.DRAFTS',
-      severity: 'warn',
-      message: `${drafts.length} draft migration(s) found: ${drafts.map((d) => d.dirName).join(', ')}`,
-      hints: [
-        "Run 'node <migration-dir>/migration.ts' to self-emit and attest each draft before applying",
-      ],
-    });
-  }
-
-  if (attested.length === 0) {
+  if (bundles.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
       diagnostics.push({
         code: 'CONTRACT.AHEAD',
@@ -576,7 +562,7 @@ async function executeMigrationStatusCommand(
       migrations: [],
       targetHash: EMPTY_CONTRACT_HASH,
       contractHash,
-      summary: `${attested.length} migration(s) on disk`,
+      summary: `${bundles.length} migration(s) on disk`,
       diagnostics,
       markerHash,
       ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
@@ -616,12 +602,12 @@ async function executeMigrationStatusCommand(
       migrations: [],
       targetHash: EMPTY_CONTRACT_HASH,
       contractHash,
-      summary: `${attested.length} migration(s) on disk`,
+      summary: `${bundles.length} migration(s) on disk`,
       diagnostics,
       ...ifDefined('markerHash', markerHash),
       ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
       graph,
-      bundles: attested,
+      bundles,
       diverged: true,
     });
   }
@@ -638,7 +624,7 @@ async function executeMigrationStatusCommand(
   }
 
   const edgeStatuses = deriveEdgeStatuses(graph, targetHash, contractHash, markerHash, mode);
-  const entries = buildMigrationEntries(chain, attested, mode, markerHash, edgeStatuses);
+  const entries = buildMigrationEntries(chain, bundles, mode, markerHash, edgeStatuses);
 
   const pendingCount = edgeStatuses.filter((e) => e.status === 'pending').length;
   const appliedCount = edgeStatuses.filter((e) => e.status === 'applied').length;
@@ -646,7 +632,7 @@ async function executeMigrationStatusCommand(
   let summary: string;
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
-      summary = `${attested.length} migration(s) on disk`;
+      summary = `${bundles.length} migration(s) on disk`;
     } else if (activeRefHash && markerHash !== undefined) {
       summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
     } else if (pendingCount === 0) {
@@ -706,8 +692,7 @@ async function executeMigrationStatusCommand(
     ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
     ...ifDefined('pathDecision', pathDecision),
     graph,
-    bundles: attested,
-    ...(drafts.length > 0 ? { drafts } : {}),
+    bundles,
     edgeStatuses,
     ...ifDefined('activeRefHash', activeRefHash),
     ...ifDefined('activeRefName', activeRefName),
@@ -768,11 +753,6 @@ export function createMigrationStatusCommand(): Command {
               activeRefHash: statusResult.activeRefHash,
               activeRefName: statusResult.activeRefName,
               edgeStatuses: statusResult.edgeStatuses,
-              draftEdges: statusResult.drafts?.map((d) => ({
-                from: d.manifest.from,
-                to: d.manifest.to,
-                dirName: d.dirName,
-              })),
             });
 
             const graphToRender =

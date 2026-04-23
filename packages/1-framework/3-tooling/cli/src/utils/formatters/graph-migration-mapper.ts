@@ -39,12 +39,6 @@ export interface EdgeStatus {
   readonly status: EdgeStatusKind;
 }
 
-export interface DraftEdge {
-  readonly from: string;
-  readonly to: string;
-  readonly dirName: string;
-}
-
 export interface MigrationGraphInput {
   readonly graph: MigrationGraph;
   readonly mode: 'online' | 'offline';
@@ -58,8 +52,6 @@ export interface MigrationGraphInput {
    * icons (✓/⧗) are baked into edge labels. Undefined in offline mode.
    */
   readonly edgeStatuses?: readonly EdgeStatus[] | undefined;
-  /** Draft migrations to render as dashed edges. */
-  readonly draftEdges?: readonly DraftEdge[] | undefined;
 }
 
 export interface MigrationRenderInput {
@@ -204,7 +196,9 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
     spineTargetHash = lastEdge?.to ?? EMPTY_CONTRACT_HASH;
   }
 
-  // Contract not in attested graph — connect from spine target with a dashed edge
+  // Contract not in the migration graph — connect from spine target with a
+  // dashed edge so the user can see the gap (contract has changed but no
+  // migration has been planned yet).
   if (contractHash !== EMPTY_CONTRACT_HASH && !graph.nodes.has(contractHash)) {
     const contractMarkers: NodeMarker[] = [];
     if (mode === 'online' && markerHash === contractHash) {
@@ -216,13 +210,10 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
       markers: contractMarkers,
     });
 
-    const matchingDraft = input.draftEdges?.find((d) => d.to === contractHash);
-    const fromHash = matchingDraft?.from ?? spineTargetHash;
-    if (graph.nodes.has(fromHash) || fromHash === spineTargetHash) {
+    if (graph.nodes.has(spineTargetHash) || spineTargetHash === EMPTY_CONTRACT_HASH) {
       edgeList.push({
-        from: toShortId(fromHash),
+        from: toShortId(spineTargetHash),
         to: shortHash(contractHash),
-        ...ifDefined('label', matchingDraft ? `${matchingDraft.dirName} [draft]` : undefined),
         style: 'dashed',
       });
     }

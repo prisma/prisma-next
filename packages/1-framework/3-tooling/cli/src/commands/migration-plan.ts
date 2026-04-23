@@ -1,7 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import {
@@ -173,18 +177,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { attested: bundles, drafts, graph } = await loadAllBundles(migrationsDir);
-
-    // Check if a draft migration already targets this contract
-    const existingDraft = drafts.find((d) => d.manifest.to === toStorageHash);
-    if (existingDraft) {
-      return notOk(
-        errorRuntime('A draft migration to this contract already exists', {
-          why: `Draft migration at "${existingDraft.dirName}" already targets ${toStorageHash}`,
-          fix: `Run 'node ${migrationsRelative}/${existingDraft.dirName}/migration.ts' to self-emit and attest it, or delete it and re-plan.`,
-        }),
-      );
-    }
+    const { bundles, graph } = await loadAllBundles(migrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -258,10 +251,9 @@ async function executeMigrationPlanCommand(
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const manifest: MigrationManifest = {
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: fromHash,
     to: toStorageHash,
-    migrationId: null,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,
@@ -275,8 +267,6 @@ async function executeMigrationPlanCommand(
   };
 
   try {
-    let hasPlaceholders = false;
-
     const stack = createControlStack(config);
     const familyInstance = config.family.create(stack);
     const planner = migrations.createPlanner(familyInstance);
@@ -296,12 +286,17 @@ async function executeMigrationPlanCommand(
         }),
       );
     }
+
     // Accessing .operations triggers toOp() on each call. If any call
     // is a DataTransformCall with an unfilled placeholder stub, toOp()
-    // throws PN-MIG-2001. That means there ARE operations — they just
-    // need the user to fill in the placeholder before emit can succeed.
+    // throws PN-MIG-2001. We catch that here so the migration can still
+    // be scaffolded with `ops: []`; the user fills the placeholder, then
+    // re-runs `node migration.ts` to attest with the real ops.
+    let plannedOps: readonly MigrationPlanOperation[] = [];
+    let hasPlaceholders = false;
     try {
-      if (plannerResult.plan.operations.length === 0) {
+      plannedOps = plannerResult.plan.operations;
+      if (plannedOps.length === 0) {
         return notOk(
           errorMigrationPlanningFailed({
             conflicts: [
@@ -322,9 +317,21 @@ async function executeMigrationPlanCommand(
         throw e;
       }
     }
+
     const migrationTsContent = plannerResult.plan.renderTypeScript();
 
-    await writeMigrationPackage(packageDir, manifest, []);
+    // Always-attest: compute migrationId over (manifest, ops). When
+    // placeholders blocked lowering, ops is `[]` and the id hashes over
+    // the empty list — re-emitting after the user fills the placeholder
+    // produces a different id (over the real ops). This is intentional;
+    // there is no on-disk "draft" state.
+    const opsForWrite = hasPlaceholders ? [] : plannedOps;
+    const manifest: MigrationManifest = {
+      ...baseManifest,
+      migrationId: computeMigrationId(baseManifest, opsForWrite),
+    };
+
+    await writeMigrationPackage(packageDir, manifest, opsForWrite);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
@@ -357,27 +364,20 @@ async function executeMigrationPlanCommand(
       return ok(result);
     }
 
-    // The planner's operations list is the source of truth for the CLI
-    // display. Users attest the migration (`ops.json` + `migrationId`)
-    // by running `node migration.ts` from the package directory; that
-    // self-emit path also surfaces any `errorUnfilledPlaceholder`
-    // (PN-MIG-2001) when a hand-authored slot is still empty.
-    const operations = plannerResult.plan.operations;
-
-    const sql = extractSqlDdl(operations);
+    const sql = extractSqlDdl(plannedOps);
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,
       from: fromHash,
       to: toStorageHash,
       dir: relative(process.cwd(), packageDir),
-      operations: operations.map((op) => ({
+      operations: plannedOps.map((op) => ({
         id: op.id,
         label: op.label,
         operationClass: op.operationClass,
       })),
       sql,
-      summary: `Planned ${operations.length} operation(s)`,
+      summary: `Planned ${plannedOps.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
     return ok(result);
