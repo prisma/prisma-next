@@ -140,9 +140,8 @@ function printHelp(): void {
  * schema-conformant manifest so the resulting package can still be read,
  * verified, and applied.
  *
- * In both cases the `migrationId` is recomputed against the current
- * manifest + ops so the on-disk artifacts are always fully attested — no
- * draft (`migrationId: null`) ever leaves this function.
+ * The `migrationId` is recomputed against the current manifest + ops so
+ * the on-disk artifacts are always fully attested.
  */
 function buildAttestedManifest(
   migrationDir: string,
@@ -151,8 +150,7 @@ function buildAttestedManifest(
 ): MigrationManifest {
   const existing = readExistingManifest(join(migrationDir, 'migration.json'));
 
-  const baseManifest: MigrationManifest = {
-    migrationId: null,
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: meta.from,
     to: meta.to,
     kind: meta.kind ?? 'regular',
