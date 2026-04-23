@@ -1,4 +1,8 @@
 import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type {
+  ExtractFieldInputTypes,
+  ExtractFieldOutputTypes,
+} from '@prisma-next/sql-contract/types';
 import { describe, expectTypeOf, it } from 'vitest';
 import { defineContract, field, model } from '../src/contract-builder';
 
@@ -19,7 +23,25 @@ const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
   version: '0.0.1',
 };
 
+type AsyncCodecTypes = {
+  readonly 'test/encrypted@1': {
+    readonly input: string;
+    readonly output: Promise<string>;
+  };
+};
+
+const asyncTargetPack = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+} as const satisfies TargetPackRef<'sql', 'postgres'> & {
+  readonly __codecTypes?: AsyncCodecTypes;
+};
+
 const int4Column = columnDescriptor('pg/int4@1');
+const encryptedColumn = columnDescriptor('test/encrypted@1', 'text');
 
 describe('contract DSL type surface', () => {
   it('preserves the typed contract result at the defineContract boundary', () => {
@@ -38,5 +60,26 @@ describe('contract DSL type surface', () => {
     expectTypeOf(contract.target).toEqualTypeOf<'postgres'>();
     expectTypeOf(contract.targetFamily).toEqualTypeOf<'sql'>();
     expectTypeOf(contract.models.User.storage.table).toEqualTypeOf<'user'>();
+  });
+
+  it('emits distinct input and output type maps for async codecs in no-emit contracts', () => {
+    const contract = defineContract({
+      family: bareFamilyPack,
+      target: asyncTargetPack,
+      models: {
+        Secret: model('Secret', {
+          fields: {
+            value: field.column(encryptedColumn),
+          },
+        }).sql({ table: 'secret' }),
+      },
+    });
+
+    expectTypeOf<ExtractFieldOutputTypes<typeof contract>['Secret']['value']>().toEqualTypeOf<
+      Promise<string>
+    >();
+    expectTypeOf<
+      ExtractFieldInputTypes<typeof contract>['Secret']['value']
+    >().toEqualTypeOf<string>();
   });
 });

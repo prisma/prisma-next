@@ -1,5 +1,9 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
+import type {
+  Codec as BaseCodec,
+  CodecRuntimeBehavior,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
@@ -48,18 +52,21 @@ export interface CodecMeta {
 /**
  * SQL codec interface — extends the framework base with SQL-specific fields.
  *
- * Codecs are pure, synchronous functions with no side effects or IO.
- * They provide deterministic conversion between database wire types and JS values,
- * and between JS values and contract JSON.
+ * Runtime encode/decode hooks may be asynchronous, but contract JSON conversion
+ * remains synchronous. SQL runtime paths branch only when a codec opts into
+ * async runtime work via `runtime.encode` and/or `runtime.decode`.
  */
 export interface Codec<
   Id extends string = string,
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
-  TJs = unknown,
+  TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TJs> {
+  TOutput = TInput,
+  TEncodeAsync extends boolean = false,
+  TDecodeAsync extends boolean = false,
+> extends BaseCodec<Id, TTraits, TWire, TInput, TOutput, TEncodeAsync, TDecodeAsync> {
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -183,26 +190,50 @@ class CodecRegistryImpl implements CodecRegistry {
  * Codec factory - creates a codec with typeId and encode/decode functions.
  * Provides identity defaults for encodeJson/decodeJson when not supplied.
  */
+type RuntimeEncodeIsAsync<TRuntime extends CodecRuntimeBehavior | undefined> = TRuntime extends {
+  readonly encode: 'async';
+}
+  ? true
+  : false;
+type RuntimeDecodeIsAsync<TRuntime extends CodecRuntimeBehavior | undefined> = TRuntime extends {
+  readonly decode: 'async';
+}
+  ? true
+  : false;
+
 export function codec<
   Id extends string,
   const TTraits extends readonly CodecTrait[],
   TWire,
-  TJs,
+  TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
+  TOutput = TInput,
+  TRuntime extends CodecRuntimeBehavior | undefined = undefined,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
-  encode: (value: TJs) => TWire;
-  decode: (wire: TWire) => TJs;
-  encodeJson?: (value: TJs) => JsonValue;
-  decodeJson?: (json: JsonValue) => TJs;
+  encode: (value: TInput) => RuntimeEncodeIsAsync<TRuntime> extends true ? Promise<TWire> : TWire;
+  decode: (wire: TWire) => RuntimeDecodeIsAsync<TRuntime> extends true ? Promise<TOutput> : TOutput;
+  encodeJson?: (value: TInput) => JsonValue;
+  decodeJson?: (json: JsonValue) => TInput;
   meta?: CodecMeta;
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
   traits?: TTraits;
+  runtime?: TRuntime;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+}): Codec<
+  Id,
+  TTraits,
+  TWire,
+  TInput,
+  TParams,
+  THelper,
+  TOutput,
+  RuntimeEncodeIsAsync<TRuntime>,
+  RuntimeDecodeIsAsync<TRuntime>
+> {
   const identity = (v: unknown) => v;
   return {
     id: config.typeId,
@@ -210,6 +241,7 @@ export function codec<
     ...ifDefined('meta', config.meta),
     ...ifDefined('paramsSchema', config.paramsSchema),
     ...ifDefined('init', config.init),
+    ...ifDefined('runtime', config.runtime),
     ...ifDefined(
       'traits',
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
@@ -217,8 +249,8 @@ export function codec<
     ...ifDefined('renderOutputType', config.renderOutputType),
     encode: config.encode,
     decode: config.decode,
-    encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
+    encodeJson: (config.encodeJson ?? identity) as (value: TInput) => JsonValue,
+    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
 }
 
@@ -228,9 +260,35 @@ export function codec<
 export type CodecId<T> =
   T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
 export type CodecInput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+  T extends Codec<
+    string,
+    readonly CodecTrait[],
+    unknown,
+    infer TInput,
+    infer _TParams,
+    infer _THelper,
+    infer _TOutput,
+    infer _TEncodeAsync,
+    infer _TDecodeAsync
+  >
+    ? TInput
+    : never;
 export type CodecOutput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+  T extends Codec<
+    string,
+    readonly CodecTrait[],
+    unknown,
+    infer _TInput,
+    infer _TParams,
+    infer _THelper,
+    infer TOutput,
+    infer _TEncodeAsync,
+    infer TDecodeAsync
+  >
+    ? TDecodeAsync extends true
+      ? Promise<TOutput>
+      : TOutput
+    : never;
 export type CodecTraits<T> =
   T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
 

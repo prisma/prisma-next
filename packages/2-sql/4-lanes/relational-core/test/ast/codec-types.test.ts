@@ -1,6 +1,12 @@
 import type { Type } from 'arktype';
-import { describe, expect, it } from 'vitest';
-import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types';
+import { describe, expect, expectTypeOf, it } from 'vitest';
+import {
+  type CodecInput,
+  type CodecOutput,
+  codec,
+  createCodecRegistry,
+  defineCodecs,
+} from '../../src/ast/codec-types';
 
 describe('codec factory', () => {
   it('creates codec with id, targetTypes, encode, and decode', () => {
@@ -105,6 +111,20 @@ describe('codec factory', () => {
     });
 
     check(testCodec);
+  });
+
+  it('creates codecs with async runtime metadata and split input/output types', () => {
+    const testCodec = codec({
+      typeId: 'test/async@1',
+      targetTypes: ['text'],
+      runtime: { encode: 'async', decode: 'async' } as const,
+      encode: async (value: string) => value.toUpperCase(),
+      decode: async (wire: string) => wire.toLowerCase(),
+    });
+
+    expect(testCodec.runtime).toEqual({ encode: 'async', decode: 'async' });
+    expectTypeOf<CodecInput<typeof testCodec>>().toEqualTypeOf<string>();
+    expectTypeOf<CodecOutput<typeof testCodec>>().toEqualTypeOf<Promise<string>>();
   });
 });
 
@@ -473,6 +493,28 @@ describe('CodecDefBuilder', () => {
     const builder = defineCodecs().add('text', codec1);
     expect(builder.CodecTypes).toBeDefined();
     expect('test/type1@1' in builder.CodecTypes).toBe(true);
+  });
+
+  it('keeps write input types plain when async decode widens read outputs', () => {
+    const asyncCodec = codec({
+      typeId: 'test/encrypted@1',
+      targetTypes: ['text'],
+      runtime: { decode: 'async' } as const,
+      encode: (value: string) => value.toUpperCase(),
+      decode: async (wire: string) => wire.toLowerCase(),
+    });
+
+    const builder = defineCodecs().add('text', asyncCodec);
+
+    expectTypeOf<
+      (typeof builder.CodecTypes)['test/encrypted@1']['input']
+    >().toEqualTypeOf<string>();
+    expectTypeOf<(typeof builder.CodecTypes)['test/encrypted@1']['output']>().toEqualTypeOf<
+      Promise<string>
+    >();
+    expectTypeOf<typeof builder.codecDefinitions.text.input>().toEqualTypeOf<string>();
+    expectTypeOf<typeof builder.codecDefinitions.text.output>().toEqualTypeOf<Promise<string>>();
+    expectTypeOf<typeof builder.codecDefinitions.text.jsType>().toEqualTypeOf<Promise<string>>();
   });
 });
 

@@ -50,3 +50,13 @@ const traitlessCodec = mongoCodec({
 test('MongoCodecTraits is never for codec without traits', () => {
   expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
 });
+
+test('Mongo codecs remain sync-only', () => {
+  mongoCodec({
+    typeId: 'test/async@1',
+    targetTypes: ['string'],
+    // @ts-expect-error Mongo async codec runtime support is deferred to a follow-up
+    decode: async (wire: string) => wire,
+    encode: (value: string) => value,
+  });
+});
