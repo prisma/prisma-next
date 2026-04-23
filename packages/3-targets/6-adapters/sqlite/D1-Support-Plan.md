@@ -41,7 +41,7 @@ Migrations are driven from the Node-based CLI, which has no Workers runtime. The
 
 **`POST /accounts/:id/d1/database/:db/query`** — single-statement queries with request/response semantics. Used for schema introspection, marker reads, and all non-migration control-plane work. Simple, one round-trip per query.
 
-**`POST /accounts/:id/d1/database/:db/import`** — asynchronous SQL-file ingestion. The CLI uploads the migration SQL to a pre-signed R2 URL (returned by the D1 `init` call), tells D1 to ingest, and polls for completion. This path executes statements sequentially server-side with a different transaction-framing model than `/query`: in particular, `PRAGMA foreign_keys = OFF` takes effect and applies to subsequent statements in the same import. The import pipeline is atomic-on-failure — per wrangler's own comment, *"if the execution fails to complete, your DB will return to its original state and you can safely retry"* — which preserves marker/ledger integrity.
+**`POST /accounts/:id/d1/database/:db/import`** — asynchronous SQL-file ingestion. The CLI uploads the migration SQL to a pre-signed R2 URL (returned by the D1 `init` call), tells D1 to ingest, and polls for completion. This path executes statements sequentially server-side with a different transaction-framing model than `/query`: in particular, `PRAGMA foreign_keys = OFF` takes effect and applies to subsequent statements in the same import. The import pipeline is atomic-on-failure — per wrangler's own comment, *"if the execution fails to complete, your DB will return to its original state and you can safely retry"* — so the DDL either applies cleanly or not at all.
 
 Wrangler exposes the same split without naming it. `wrangler d1 migrations apply` uses `/query` and silently loses data on recreate-table with CASCADE children. `wrangler d1 execute --file=migration.sql` uses the import API and does not. Prisma Next uses the import API from the start for migration application and avoids the trap.
 
@@ -56,7 +56,7 @@ The current `ControlDriverInstance` interface (`packages/1-framework/1-core/fram
 The interface grows one method:
 
 - `query(sql, params?)` — existing. Contract: execute a single statement, return rows. Used for introspection, marker reads, any other control-plane reads.
-- `applyScript(sql)` — new. Contract: execute the entire SQL blob atomically; either every statement succeeds and the changes commit, or nothing changes. No rows returned. The caller is responsible for encoding any assertions inside the script (e.g., `RAISE(ABORT)` on marker CAS failure or FK integrity violation).
+- `applyScript(sql)` — new. Contract: execute the entire SQL blob atomically; either every statement succeeds and the changes commit, or nothing changes. No rows returned. The caller is responsible for encoding any assertions inside the script (e.g., `RAISE(ABORT)` on an post-check violation).
 - `close()` — existing.
 
 How each target's control driver implements `applyScript`:
@@ -65,29 +65,30 @@ How each target's control driver implements `applyScript`:
 - **Native SQLite**: wraps `db.exec(script)` in `BEGIN IMMEDIATE … COMMIT`, rolls back on error.
 - **Postgres**: `BEGIN` then a single multi-statement `query(script)` then `COMMIT`, rolled back on error.
 
-The D1-specific migration runner reads linearly: pre-phase calls `driver.query(...)` for each introspection and marker read; then it composes a single SQL string containing PRAGMA, DDL, marker CAS, marker upsert, and ledger insert; then `driver.applyScript(script)`. No conditional routing inside the runner, and no way for the runner to accidentally ship a migration through the wrong endpoint.
+The D1-specific migration runner reads linearly: pre-phase calls `driver.query(...)` for each introspection and marker read; it composes a single SQL script containing PRAGMA toggles, DDL, and the post-checks hands that script to `driver.applyScript(...)`; then post-apply calls `driver.query(...)` again for re-introspection, verification, and — if verification passes — the marker CAS, marker upsert, and ledger insert. No conditional routing inside the runner, and no way for the runner to accidentally ship a migration through the wrong endpoint.
 
 Considered and rejected: having the driver inspect the SQL string and auto-route (e.g., "multi-statement → import") from inside `query`. Fragile (what counts as multi-statement with PRAGMAs, comments, etc.) and implicit. `query` and `applyScript` differ in *intent* — read-with-results vs atomic side effect with no expected rows — and the interface surfaces the intent explicitly.
 
 PR #341's existing runner continues to use `query` throughout (it opens `BEGIN EXCLUSIVE` via `query('BEGIN EXCLUSIVE')` and does interactive reads inside). `applyScript` is additive; it doesn't require any change to that runner. If we later want to port PR #341's runner to the `applyScript` shape, the primitive is already available on native SQLite and Postgres control drivers.
 
-### Runner shape: pre-import reads → import submission → done
+### Runner shape: pre-phase reads → apply script → verify → sign
 
-PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with interactive reads inside. D1's import API is not interactive — you submit a SQL file and poll for outcome. The lifecycle restructures into:
+PR #341's runner wraps the entire migration in `BEGIN EXCLUSIVE … COMMIT` with interactive reads inside. D1's import API is not interactive — you submit a SQL file and poll for outcome. The lifecycle restructures into four phases:
 
-1. **Pre-import reads** (via `driver.query`): introspect current schema, read the marker, compute which operations to skip based on their postchecks, verify origin-hash compatibility. Non-atomic reads. If any check aborts the migration, no state has changed.
-2. **Script composition and submission** (via `driver.applyScript`): construct a single SQL script containing, in order —
+1. **Pre-phase reads** (via `driver.query`): introspect current schema, read the marker, compute which operations to skip based on their postchecks, verify origin-hash compatibility. Non-atomic reads. If any check aborts the migration, no state has changed.
+2. **Apply script** (via `driver.applyScript`): construct a single SQL script containing, in order —
    - `PRAGMA foreign_keys = OFF;`
    - Control-table creation (idempotent): `CREATE TABLE IF NOT EXISTS _prisma_marker` / `_prisma_ledger`
    - Each non-skipped operation's DDL, including recreate-table operations for tables with incoming CASCADE FKs
    - `PRAGMA foreign_keys = ON;` followed by an inline assertion over `pragma_foreign_key_check` that raises on violations
-   - Marker-version CAS: conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin`, guarded by a `changes()`-based assertion that raises on zero-row updates
-   - Marker upsert via `INSERT … ON CONFLICT DO UPDATE`
-   - Ledger insert
-  
-   Hand the script to `driver.applyScript`. On D1 that routes through the import API; on native SQLite and Postgres it wraps in `BEGIN`/`COMMIT`. Atomicity: any failed statement triggers a full rollback to the pre-apply state, so DDL and marker/ledger updates are atomic with each other.
 
-3. **Post-import**: nothing. Schema verification is dropped (see below).
+   Hand the script to `driver.applyScript`. On D1 that routes through the import API; on native SQLite and Postgres it wraps in `BEGIN`/`COMMIT`. Atomicity: any failed statement triggers a full rollback to the pre-apply state. Note: the script contains DDL only — no marker or ledger writes.
+
+3. **Verify** (via `driver.query`): re-introspect the live schema and compare against the destination contract using `verifySqlSchema`. If the live schema does not satisfy the contract, the migration is reported as failed and the next phase does not run. The DDL is already live — it cannot be rolled back — but the marker remains unchanged, so downstream callers (the runtime, subsequent migrations) see the database as still being at the origin contract and refuse to treat it as signed.
+
+4. **Sign** (via `driver.query`): if verification passed, issue the marker update and ledger insert as individual statements. The marker update is a conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin` — the marker-version CAS guard — followed by an upsert `INSERT … ON CONFLICT DO UPDATE` for the first-migration case. If the CAS reports zero rows changed (another migrator advanced the marker between our pre-phase read and now), the signing phase reports failure without updating. The DDL we applied is still live; again, downstream consumers see the pre-migration marker and the situation is equivalent to "DDL applied but not signed."
+
+The signing phase trades atomicity with the DDL for the ability to gate the marker on verification — a property the import API cannot provide inside the atomic apply.
 
 ### Foreign-key handling via the import API
 
@@ -103,17 +104,21 @@ Consequence: the planner's full range of operations, including recreate-table of
 
 The native SQLite runner uses `BEGIN EXCLUSIVE` to prevent two concurrent migrators from racing. D1 offers no equivalent lock primitive — REST is stateless, binding batches are short-lived, and the import API has no session affinity.
 
-The D1 runner replaces exclusive locking with optimistic concurrency on the marker row. The pre-import phase reads the marker's current storage-hash. The imported SQL file includes a conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin` — if the hash has moved since we read it, zero rows are affected and a follow-up assertion `SELECT CASE WHEN changes() = 0 THEN RAISE(ABORT, 'marker CAS failure') END` aborts the import. The import pipeline's atomic rollback then reverts everything. Two concurrent migrators cannot both succeed; the loser sees a CAS failure and can re-plan against the new state.
+The D1 runner replaces exclusive locking with optimistic concurrency on the marker row. The pre-phase reads the marker's current storage-hash. The signing phase, which runs after the applied DDL has been verified, issues a conditional `UPDATE _prisma_marker SET … WHERE storage_hash = :expected_origin`. If the hash has moved since we read it, zero rows are affected and the runner reports CAS failure without touching the marker. Two concurrent migrators cannot both sign; the loser sees a CAS failure and can re-plan against the new state.
 
-This is weaker than exclusive locking in one respect: two migrators might both enter the pre-import phase, both do full introspection, and one of them does throwaway work before the CAS fails. In practice that's fine — migrations are human-triggered from a CLI, and "both migrators independently try to apply the same plan" is a rare operational event, not a hot contention path.
+This is weaker than exclusive locking in two respects. First, two migrators might both enter the pre-phase, both do full introspection, and one of them does throwaway work before the CAS fails. Second, two migrators might both *apply* the same DDL (the import is atomic per-migrator but nothing prevents the two imports from both running) before one of them loses the CAS. In practice both are fine — migrations are human-triggered from a CLI, and idempotent DDL (our planner already emits `CREATE TABLE IF NOT EXISTS`, `INDEX IF NOT EXISTS`) absorbs the concurrent-apply case. "Two operators independently try to apply the same plan" is a rare operational event, not a hot contention path.
 
-### Schema verification: dropped
+### Schema verification: done between apply and sign
 
-PR #341's runner verifies the post-DDL schema against the contract inside the transaction: introspect the live database, compare it against the contract, fail the migration if they diverge. This defends against planner bugs — a missing `NOT NULL`, a wrong type affinity, an index on the wrong column set — before marking the migration successful.
+PR #341's runner verifies the post-DDL schema against the contract inside the transaction: introspect the live database, compare it against the contract, fail the migration if they diverge. This defends against planner bugs — a missing `NOT NULL`, a wrong type affinity, an index on the wrong column set — and, for user-authored migrations, against the authored SQL producing a different schema than the declared target. It's a safety property worth preserving.
 
-On D1, verification cannot happen atomically with the DDL — the import API is fire-and-poll, not interactive, so re-introspecting the live schema and comparing against the contract can only happen after the import has committed. **D1 migrations do not perform schema verification.** A migration is considered successful if the imported SQL file executes without errors and the foreign-key integrity assertion passes. Planner bugs may leak to runtime and surface there instead of at migration time.
+On D1, verification cannot happen *atomically* with the DDL — the import API is fire-and-poll, so re-introspecting the live schema can only happen after the import has committed. That rules out the "verify and rollback together" model. It does not rule out verification itself.
 
-This is the same model wrangler has used for D1 migrations since launch, and matches how most SQLite migration tooling operates. The loss relative to PR #341 is real but localized: the planner is already well-covered by unit tests, and the ORM's type-level contract checks catch many schema mismatches before a query even runs. Both alternatives for restoring verification (post-commit with a status column; pre-batch simulation) were considered and rejected — see the alternatives section.
+The D1 runner runs verification as an explicit phase between apply and sign. If verification fails, the marker is not updated. The live DDL is already applied and cannot be rolled back; the database is in a state where its schema does not match any signed contract. Downstream callers see the marker unchanged from its pre-migration value — the same signal they would see if the migration had never run — and refuse to treat the database as being at the target contract. The operator is told verification failed and must reconcile manually (edit the migration SQL or the contract, then re-run; on re-run the planner re-diffs live schema against contract and either produces an empty plan if the previous DDL happened to work, or produces a corrective plan).
+
+This design is strictly binary at the marker: either the contract is signed (applied + verified) or it isn't. There is no "applied but not verified" status column, so no tri-state for downstream callers to handle. The cost is that a failed-verification migration leaves the live DDL applied without being signed — unrecoverable automatically, recoverable manually. That cost is accepted in exchange for keeping the verification property.
+
+User-authored migrations receive the same treatment: whatever SQL the user wrote, we apply it via the import API, then check that the resulting schema matches the declared target contract. If it doesn't, we do not sign it.
 
 ## Runtime Strategy
 
@@ -191,19 +196,25 @@ Problems: D1's binding also does not provide interactive transactions — `db.ba
 
 Rejected after reading the runner code. The interactive reads in `applyPlan` — postcheck-before-execute idempotency, precheck verification, post-execute postcheck, mid-transaction introspection — are baked into the control flow, not confined to the `BEGIN`/`COMMIT` envelope. A strategy pattern that abstracts only the transaction boundary leaves the interactive reads unresolved. Factoring them out too would essentially rewrite the runner. A parallel D1-specific runner with a reshaped lifecycle is cleaner than a half-factored abstract runner.
 
-### Post-commit schema verification with a marker status column
+### Dropping schema verification entirely on D1
 
-Rejected. After the atomic batch commits, re-introspect the live database and verify it matches the contract; on verification failure, write a `verification_failed` status into the marker as a separate follow-up statement, and require the runtime to interpret this status.
+Rejected. The argument for dropping it is that the import API's non-interactive nature prevents atomic apply+verify, so a post-apply verification with no consequence isn't worth the introspection cost.
 
-Problems: the whole point of verification in PR #341 is that its result is atomic with the DDL apply — either the schema matches and the migration is marked successful, or neither happens. A post-commit verification step with a compensating status write destroys that invariant: the DDL is already live when we discover the mismatch, and the runtime now has a tri-state marker (applied-and-verified, applied-but-failed-verification, no-marker) that every downstream caller must handle. The operational ergonomics are worse than no verification — users get a successfully-applied migration that's somehow also a failure, and have to manually recover.
+The flaw: for user-authored migrations, verification is the only check that the authored SQL actually produces the declared target schema. Dropping it means the system would sign an arbitrary contract hash onto whatever state the SQL left the database in. That's a real correctness regression, not a small one. The plan keeps verification and separates it from the atomic apply, gating the marker update on verification passing.
 
-### Pre-batch schema simulation
+### Post-apply schema verification written into a tri-state marker
 
-Rejected. Apply the planned DDL to the introspected `SqlSchemaIR` in memory, verify the simulated IR matches the contract, then ship the batch. Would preserve the atomic guarantee: if simulation says the plan produces a matching schema and the batch executes cleanly, the live schema would match.
+Rejected. A variant of keeping verification would encode the verification outcome as a status column on the marker: `applied-and-verified`, `applied-but-failed-verification`, `no-marker`. The live database's state is reported faithfully, and downstream callers can branch on the status.
 
-Problems: the simulator verifies the planner against a twin of itself. PR #341's post-DDL verification catches two classes of bug — planner bugs (planner's intent doesn't match the contract) *and* execution-path bugs (DDL renders or SQLite applies it differently than the planner expects). Simulation can only catch the first class, and does so by duplicating the planner's logic in another form. If the planner and the simulator are written from the same mental model (which they inevitably are, by the same authors), they tend to reproduce the same bugs. The addition does not meaningfully raise confidence beyond what the planner's own unit tests provide.
+Problems: every downstream consumer — the runtime, subsequent migration planners, any tooling that reads the marker — must now understand three states. The `applied-but-failed-verification` branch has no clear correct behavior: refuse to start the application? Log a warning and proceed? Attempt auto-reconciliation? Each choice is wrong for some scenarios. The current plan avoids this by keeping the marker binary (signed or not): if verification fails, the marker simply isn't updated, and downstream callers see the same thing they would see if the migration had never run. The operator reconciles manually, which is the right boundary for a case that requires human judgement anyway.
 
-On top of that, the simulator carries a permanent maintenance tax: every new planner feature requires a matching simulator change, and the two must be kept in sync over the lifetime of the project. For a guarantee that provides little additional signal, the cost is not justified. Planner correctness is instead defended through unit tests on the planner directly, and through ORM-level runtime checks that catch schema mismatches at query time.
+### Pre-apply schema simulation
+
+Rejected. Apply the planned DDL to the introspected `SqlSchemaIR` in memory, verify the simulated IR matches the contract, then ship the script. Would preserve the atomic guarantee: if simulation says the plan produces a matching schema and the script executes cleanly, the live schema would match.
+
+Problems: the simulator verifies the planner against a twin of itself. PR #341's post-DDL verification catches two classes of bug — planner bugs (planner's intent doesn't match the contract) *and* execution-path bugs (DDL renders or SQLite applies it differently than the planner expects). Simulation can only catch the first class, and does so by duplicating the planner's logic in another form. If the planner and the simulator are written from the same mental model (which they inevitably are, by the same authors), they tend to reproduce the same bugs.
+
+Running the real verification against the live schema is both simpler and more robust than maintaining a simulator that has to be kept in sync with every planner change.
 
 ### Support nested writes on D1 via client-generated primary keys
 
@@ -223,7 +234,7 @@ Rejected for this release, might revisit. The idea: before submitting the import
 
 ## Open Questions
 
-- **Import API atomicity under mid-file failures.** Wrangler's comment states that failed imports return the database to its original state. Verify empirically that this covers *every* failure class we care about: syntax errors, `RAISE(ABORT)` raised by our assertions (FK check, marker CAS), and FK-integrity violations surfaced by `PRAGMA foreign_key_check`. If any of these are treated as "partial success," the marker/ledger integrity invariant fails.
+- **Import API atomicity under mid-file failures.** Wrangler's comment states that failed imports return the database to its original state. Verify empirically that this covers *every* failure class we care about: syntax errors, `RAISE(ABORT)` raised by our inline FK-integrity assertion, and FK-integrity violations surfaced by `PRAGMA foreign_key_check`. If any of these are treated as "partial success," the DDL atomicity invariant fails.
 - **Import API error granularity.** When the import fails, does the response tell us *which* statement failed and what the SQL error was, or only that the import failed? The CLI's error messages depend on this — we want to surface "operation X's DDL failed with message Y," not "the import failed."
 - **Import API size limits.** Migrations are generally small, but the R2 upload step has per-object limits. Confirm no migration shape we reasonably expect hits them.
 - **Per-table introspection parallelism on `/query`.** PR #341's control adapter comments that synchronous `node:sqlite` reads don't benefit from `Promise.all`. On D1 `/query` the opposite is true — parallelizing per-table PRAGMA reads can meaningfully cut pre-import time for large schemas. The control adapter may need either a configuration flag or a driver-hint mechanism to choose strategy.
