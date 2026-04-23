@@ -183,7 +183,7 @@ interface MigrationShowResult {
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string | null;
+  readonly migrationId: string;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -211,11 +211,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   lines.push(`${formatDimText(`  kind: ${result.kind}`)}`);
   lines.push(`${formatDimText(`  from: ${result.from}`)}`);
   lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
-  if (result.migrationId) {
-    lines.push(`${formatDimText(`  migrationId: ${result.migrationId}`)}`);
-  } else {
-    lines.push(`${formatYellow('  migrationId: (draft — not yet attested)')}`);
-  }
+  lines.push(`${formatDimText(`  migrationId: ${result.migrationId}`)}`);
   lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);
 
   lines.push('');
