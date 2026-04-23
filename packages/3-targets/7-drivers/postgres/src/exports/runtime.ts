@@ -104,7 +104,48 @@ class PostgresUnboundDriverImpl implements PostgresRuntimeDriver {
 
   async acquireConnection(): Promise<SqlConnection> {
     const delegate = this.#requireDelegate();
-    return delegate.acquireConnection();
+    const connection = await delegate.acquireConnection();
+    return this.#wrapConnection(connection, delegate);
+  }
+
+  /**
+   * Wraps an acquired connection so that teardown paths which close the
+   * underlying delegate (notably `destroy()` on a pgClient binding, where
+   * the single socket means a destroyed connection invalidates the driver)
+   * also reset our own `#delegate` reference. Without this, a failed
+   * transaction rollback would leave the outer unbound wrapper reporting
+   * `connected` while routing subsequent work to an already-ended delegate.
+   */
+  #wrapConnection(connection: SqlConnection, delegate: SqlDriver<PostgresBinding>): SqlConnection {
+    const syncDelegateState = (): void => {
+      if (this.#delegate === delegate && delegate.state === 'closed') {
+        this.#delegate = null;
+        this.#closed = true;
+      }
+    };
+    const wrapped: SqlConnection = {
+      beginTransaction: connection.beginTransaction.bind(connection),
+      execute: connection.execute.bind(connection),
+      query: connection.query.bind(connection),
+      release: async () => {
+        try {
+          await connection.release();
+        } finally {
+          syncDelegateState();
+        }
+      },
+      destroy: async (reason?: unknown) => {
+        try {
+          await connection.destroy(reason);
+        } finally {
+          syncDelegateState();
+        }
+      },
+    };
+    if (connection.explain) {
+      wrapped.explain = connection.explain.bind(connection);
+    }
+    return wrapped;
   }
 
   async close(): Promise<void> {

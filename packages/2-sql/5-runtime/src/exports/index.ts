@@ -44,8 +44,12 @@ export {
 export type {
   CreateRuntimeOptions,
   Runtime,
+  RuntimeConnection,
+  RuntimeQueryable,
   RuntimeTelemetryEvent,
+  RuntimeTransaction,
   RuntimeVerifyOptions,
   TelemetryOutcome,
+  TransactionContext,
 } from '../sql-runtime';
-export { createRuntime } from '../sql-runtime';
+export { createRuntime, withTransaction } from '../sql-runtime';

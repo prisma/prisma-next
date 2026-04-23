@@ -180,11 +180,18 @@ abstract class PostgresQueryable<C extends PoolClient | Client = PoolClient | Cl
 class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection {
   #connection: PoolClient | Client;
   #onRelease: (() => void) | undefined;
+  #onDestroy: ((reason: unknown) => Promise<void> | void) | undefined;
 
-  constructor(connection: PoolClient | Client, options: ConnectionOptions, onRelease?: () => void) {
+  constructor(
+    connection: PoolClient | Client,
+    options: ConnectionOptions,
+    onRelease?: () => void,
+    onDestroy?: (reason: unknown) => Promise<void> | void,
+  ) {
     super(options);
     this.#connection = connection;
     this.#onRelease = onRelease;
+    this.#onDestroy = onDestroy;
   }
 
   override acquireClient(): Promise<PoolClient | Client> {
@@ -201,11 +208,40 @@ class PostgresConnectionImpl extends PostgresQueryable implements SqlConnection 
   }
 
   async release(): Promise<void> {
-    if ('release' in this.#connection) {
-      this.#connection.release();
+    const conn = this.#connection;
+    if ('release' in conn) {
+      conn.release();
     }
-    this.#onRelease?.();
+    const onRelease = this.#onRelease;
     this.#onRelease = undefined;
+    this.#onDestroy = undefined;
+    onRelease?.();
+  }
+
+  async destroy(reason?: unknown): Promise<void> {
+    const onDestroy = this.#onDestroy;
+    const onRelease = this.#onRelease;
+    this.#onDestroy = undefined;
+    this.#onRelease = undefined;
+
+    const conn = this.#connection;
+    if ('release' in conn) {
+      // Pass a truthy Error to pg's PoolClient.release so the pool evicts the
+      // client instead of returning it for reuse. A connection that reaches
+      // destroy() is in an indeterminate state (failed rollback/commit, etc.)
+      // and must not be handed back to another caller. The Error value is
+      // surfaced on pg-pool's 'release' event as advisory context; pg-pool
+      // itself only uses its truthiness for the eviction decision.
+      const releaseArg: Error =
+        reason instanceof Error ? reason : new Error('Connection destroyed');
+      conn.release(releaseArg);
+    }
+
+    if (onDestroy) {
+      await onDestroy(reason);
+    } else {
+      onRelease?.();
+    }
   }
 }
 
@@ -309,7 +345,26 @@ class PostgresDirectDriverImpl
     const releaseLease = await this.#connectionMutex.lock();
     try {
       const client = await this.acquireClient();
-      return new PostgresConnectionImpl(client, this.options, releaseLease);
+      return new PostgresConnectionImpl(
+        client,
+        this.options,
+        releaseLease,
+        // A direct driver has a single underlying socket, so a destroyed
+        // connection means the driver itself is no longer usable. Tear down
+        // the driver while still holding the lease so that any
+        // acquireConnection() queued on #connectionMutex only observes the
+        // driver after .end() has completed and #closed is set — preventing
+        // a concurrent caller from reusing a socket that is already being
+        // closed. The lease is released in a finally so a failing .end()
+        // cannot leave the mutex permanently held.
+        async () => {
+          try {
+            await this.#closeWhileHoldingLease();
+          } finally {
+            releaseLease();
+          }
+        },
+      );
     } catch (error) {
       releaseLease();
       throw error;
@@ -319,15 +374,19 @@ class PostgresDirectDriverImpl
   async close(): Promise<void> {
     const releaseLease = await this.#connectionMutex.lock();
     try {
-      if (this.#closed) {
-        return;
-      }
-      this.#closed = true;
-      await this.directClient.end();
-      this.#connected = false;
+      await this.#closeWhileHoldingLease();
     } finally {
       releaseLease();
     }
+  }
+
+  async #closeWhileHoldingLease(): Promise<void> {
+    if (this.#closed) {
+      return;
+    }
+    this.#closed = true;
+    await this.directClient.end();
+    this.#connected = false;
   }
 
   async acquireClient(): Promise<Client> {

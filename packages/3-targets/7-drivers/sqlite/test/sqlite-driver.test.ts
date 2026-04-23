@@ -1,9 +1,14 @@
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { DatabaseSync } from 'node:sqlite';
 import { SqlQueryError } from '@prisma-next/sql-errors';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { createBoundDriverFromBinding, type SqliteBinding } from '../src/sqlite-driver';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  createBoundDriverFromBinding,
+  type SqliteBinding,
+  SqliteConnectionImpl,
+} from '../src/sqlite-driver';
 
 let testDir: string;
 let testPath: string;
@@ -209,5 +214,62 @@ describe('SqliteTransaction', () => {
     await tx.commit();
     await conn.release();
     await driver.close();
+  });
+});
+
+describe('SqliteConnectionImpl cleanup retries', () => {
+  it('release() leaves the connection retryable when close() throws', async () => {
+    const db = new DatabaseSync(':memory:');
+    const closeSpy = vi.spyOn(db, 'close').mockImplementationOnce(() => {
+      throw new Error('busy: statement in progress');
+    });
+
+    const connection = new SqliteConnectionImpl(db);
+
+    // First release surfaces the close error (release must not swallow).
+    await expect(connection.release()).rejects.toThrow('busy');
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+
+    // The handle is still open; a retry must actually attempt close again
+    // instead of short-circuiting on an internal "disposed" flag.
+    closeSpy.mockRestore();
+    await expect(connection.release()).resolves.toBeUndefined();
+    expect(db.isOpen).toBe(false);
+  });
+
+  it('destroy() propagates close() errors and leaves the connection retryable', async () => {
+    const db = new DatabaseSync(':memory:');
+    const closeSpy = vi.spyOn(db, 'close').mockImplementationOnce(() => {
+      throw new Error('busy: statement in progress');
+    });
+
+    const connection = new SqliteConnectionImpl(db);
+
+    // destroy() propagates teardown errors; the call site decides whether to
+    // swallow. The connection is left retryable so a follow-up cleanup can
+    // actually close the handle once the underlying condition clears.
+    await expect(connection.destroy(new Error('rollback failed'))).rejects.toThrow('busy');
+    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(db.isOpen).toBe(true);
+
+    closeSpy.mockRestore();
+    await expect(connection.destroy()).resolves.toBeUndefined();
+    expect(db.isOpen).toBe(false);
+  });
+
+  it('release() after a failed destroy() finally closes the handle', async () => {
+    const db = new DatabaseSync(':memory:');
+    const closeSpy = vi.spyOn(db, 'close').mockImplementationOnce(() => {
+      throw new Error('busy: statement in progress');
+    });
+
+    const connection = new SqliteConnectionImpl(db);
+
+    await expect(connection.destroy(new Error('rollback failed'))).rejects.toThrow('busy');
+    expect(db.isOpen).toBe(true);
+
+    closeSpy.mockRestore();
+    await expect(connection.release()).resolves.toBeUndefined();
+    expect(db.isOpen).toBe(false);
   });
 });

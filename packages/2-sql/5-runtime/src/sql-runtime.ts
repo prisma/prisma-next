@@ -13,7 +13,11 @@ import type {
   RuntimeVerifyOptions,
   TelemetryOutcome,
 } from '@prisma-next/runtime-executor';
-import { AsyncIterableResult, createRuntimeCore } from '@prisma-next/runtime-executor';
+import {
+  AsyncIterableResult,
+  createRuntimeCore,
+  runtimeError,
+} from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
@@ -73,7 +77,28 @@ export interface Runtime extends RuntimeQueryable {
 
 export interface RuntimeConnection extends RuntimeQueryable {
   transaction(): Promise<RuntimeTransaction>;
+  /**
+   * Returns the connection to the pool for reuse. Only call this when the
+   * connection is known to be in a clean state. If a transaction
+   * commit/rollback failed or the connection is otherwise suspect, call
+   * `destroy(reason)` instead.
+   */
   release(): Promise<void>;
+  /**
+   * Evicts the connection so it is never reused. Call this when the
+   * connection may be in an indeterminate state (e.g. a failed rollback
+   * leaving an open transaction, or a broken socket).
+   *
+   * If teardown fails the error is propagated and the connection remains
+   * retryable, so the caller can decide whether to swallow the failure or
+   * retry cleanup. Calling destroy() or release() more than once after a
+   * successful teardown is caller error.
+   *
+   * `reason` is advisory context only. It may be surfaced to driver-level
+   * observability hooks (e.g. pg-pool's `'release'` event) but does not
+   * influence eviction behavior and is not rethrown.
+   */
+  destroy(reason?: unknown): Promise<void>;
 }
 
 export interface RuntimeTransaction extends RuntimeQueryable {
@@ -85,6 +110,10 @@ export interface RuntimeQueryable {
   execute<Row = Record<string, unknown>>(
     plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
   ): AsyncIterableResult<Row>;
+}
+
+export interface TransactionContext extends RuntimeQueryable {
+  readonly invalidated: boolean;
 }
 
 interface CoreQueryable {
@@ -206,6 +235,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         };
       },
       release: coreConn.release.bind(coreConn),
+      destroy: coreConn.destroy.bind(coreConn),
       execute<Row = Record<string, unknown>>(
         plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
       ): AsyncIterableResult<Row> {
@@ -221,6 +251,114 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
   close(): Promise<void> {
     return this.core.close();
+  }
+}
+
+function transactionClosedError(): Error {
+  return runtimeError(
+    'RUNTIME.TRANSACTION_CLOSED',
+    'Cannot read from a query result after the transaction has ended. Await the result or call .toArray() inside the transaction callback.',
+    {},
+  );
+}
+
+export async function withTransaction<R>(
+  runtime: Runtime,
+  fn: (tx: TransactionContext) => PromiseLike<R>,
+): Promise<R> {
+  const connection = await runtime.connection();
+  const transaction = await connection.transaction();
+
+  let invalidated = false;
+  const txContext: TransactionContext = {
+    get invalidated() {
+      return invalidated;
+    },
+    execute<Row = Record<string, unknown>>(
+      plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    ): AsyncIterableResult<Row> {
+      if (invalidated) {
+        throw transactionClosedError();
+      }
+      const inner = transaction.execute(plan);
+      const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
+        for await (const row of inner) {
+          if (invalidated) {
+            throw transactionClosedError();
+          }
+          yield row;
+        }
+      };
+      return new AsyncIterableResult(guarded());
+    },
+  };
+
+  let connectionDisposed = false;
+  const destroyConnection = async (reason: unknown): Promise<void> => {
+    if (connectionDisposed) return;
+    connectionDisposed = true;
+    // SqlConnection.destroy() propagates teardown errors so callers can
+    // decide what to do with them. Here, we're already about to throw a
+    // more informative error describing why we're evicting the connection
+    // (rollback/commit failure), so swallowing the teardown error is the
+    // right call — surfacing it would mask the original cause.
+    await connection.destroy(reason).catch(() => undefined);
+  };
+
+  try {
+    let result: R;
+    try {
+      result = await fn(txContext);
+    } catch (error) {
+      try {
+        await transaction.rollback();
+      } catch (rollbackError) {
+        await destroyConnection(rollbackError);
+        const wrapped = runtimeError(
+          'RUNTIME.TRANSACTION_ROLLBACK_FAILED',
+          'Transaction rollback failed after callback error',
+          { rollbackError },
+        );
+        wrapped.cause = error;
+        throw wrapped;
+      }
+      throw error;
+    } finally {
+      invalidated = true;
+    }
+
+    try {
+      await transaction.commit();
+    } catch (commitError) {
+      // After a failed COMMIT the server-side transaction may be: (a) already
+      // committed (error on response path), (b) already rolled back (deferred
+      // constraint / serialization failure), or (c) still open (COMMIT never
+      // reached the server). Attempt a best-effort rollback to cover (c) and
+      // confirm the protocol is healthy.
+      //
+      // If rollback succeeds, the server is definitely no longer in a
+      // transaction (no-op in (a)/(b), real cleanup in (c)) and we've just
+      // proved the connection round-trips correctly — it's safe to return
+      // to the pool. If rollback fails, the connection state is ambiguous
+      // (broken socket, protocol desync, etc.) and we must destroy it.
+      try {
+        await transaction.rollback();
+      } catch {
+        await destroyConnection(commitError);
+      }
+      const wrapped = runtimeError(
+        'RUNTIME.TRANSACTION_COMMIT_FAILED',
+        'Transaction commit failed',
+        { commitError },
+      );
+      wrapped.cause = commitError;
+      throw wrapped;
+    }
+    return result;
+  } finally {
+    if (!connectionDisposed) {
+      await connection.release();
+    }
   }
 }
 
