@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  withTransaction: vi.fn(),
   sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
   createRuntime: mocks.createRuntime,
+  withTransaction: mocks.withTransaction,
 }));
 
 vi.mock('@prisma-next/sql-contract/validate', () => ({
@@ -71,6 +73,7 @@ describe('postgres', () => {
     mocks.createRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
+    mocks.withTransaction.mockReset();
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
@@ -95,6 +98,15 @@ describe('postgres', () => {
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
+    mocks.withTransaction.mockImplementation(
+      async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
+        const mockTxCtx = {
+          invalidated: false,
+          execute: vi.fn(),
+        };
+        return fn(mockTxCtx);
+      },
+    );
   });
 
   it('sql is constructed eagerly without runtime; runtime and pool are deferred until runtime() is accessed', () => {
@@ -387,5 +399,60 @@ describe('postgres', () => {
         pg: { query: () => {} } as unknown as Client,
       }),
     ).toThrow('Unable to determine pg binding type from pg input');
+  });
+
+  it('transaction() delegates to withTransaction with the lazy runtime', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const result = await db.transaction(async () => 'tx-value');
+
+    expect(mocks.withTransaction).toHaveBeenCalledOnce();
+    expect(mocks.withTransaction).toHaveBeenCalledWith(
+      mocks.createRuntime.mock.results[0]?.value,
+      expect.any(Function),
+    );
+    expect(result).toBe('tx-value');
+  });
+
+  it('transaction() provides sql on the transaction context', async () => {
+    const txSqlProxy = { lane: 'tx-sql' };
+    let callCount = 0;
+    mocks.sqlBuilder.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return { lane: 'sql' };
+      return txSqlProxy;
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    let receivedTx: { sql?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.sql).toBe(txSqlProxy);
+    expect(mocks.sqlBuilder).toHaveBeenCalledTimes(2);
+  });
+
+  it('transaction() lazily creates runtime before connect()', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
+    expect(mocks.createRuntime).not.toHaveBeenCalled();
+
+    await db.transaction(async () => 'value');
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
 });

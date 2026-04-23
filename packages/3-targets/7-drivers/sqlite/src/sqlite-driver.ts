@@ -65,7 +65,7 @@ function openConnection(path: string): DatabaseSync {
   }
 }
 
-class SqliteConnectionImpl implements SqlConnection {
+export class SqliteConnectionImpl implements SqlConnection {
   readonly #db: DatabaseSync;
 
   constructor(db: DatabaseSync) {
@@ -118,6 +118,12 @@ class SqliteConnectionImpl implements SqlConnection {
   }
 
   async release(): Promise<void> {
+    // SQLite connections are not pooled — release is equivalent to destroy
+    // (close the underlying DatabaseSync handle).
+    return this.destroy();
+  }
+
+  async destroy(_reason?: unknown): Promise<void> {
     try {
       this.#db.close();
     } catch (error) {

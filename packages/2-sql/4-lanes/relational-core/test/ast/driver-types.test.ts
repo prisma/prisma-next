@@ -18,6 +18,7 @@ function createMockDriverWithVoidBinding(): SqlDriver {
   const connection = {
     ...queryable,
     release: async () => {},
+    destroy: async (_reason?: unknown) => {},
     beginTransaction: async () => transaction,
   } as unknown as SqlConnection;
 
