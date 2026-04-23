@@ -143,7 +143,7 @@ describe('mongoVectorCodec.renderOutputType', () => {
 describe('vector operation descriptors (production-defined)', () => {
   it('mongoVectorNearOperation has method near', () => {
     expect(mongoVectorNearOperation.method).toBe('near');
-    expect(mongoVectorNearOperation.args[0]?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
+    expect(mongoVectorNearOperation.self?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
   it('mongoVectorOperationDescriptors includes near', () => {
@@ -159,7 +159,7 @@ describe('vector operation descriptors (production-defined)', () => {
 
     const entries = registry.entries();
     expect(entries['near']).toBeDefined();
-    expect(entries['near']?.args[0]?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
+    expect(entries['near']?.self?.codecId).toBe(MONGO_VECTOR_CODEC_ID);
   });
 
   it('returns empty entries for fresh registry', () => {

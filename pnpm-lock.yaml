@@ -1626,6 +1626,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/operations
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../contract
       arktype:
         specifier: ^2.1.26
         version: 2.1.29

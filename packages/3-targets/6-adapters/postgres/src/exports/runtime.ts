@@ -79,7 +79,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     ...postgresAdapterDescriptorMeta,
     codecs: createPostgresCodecRegistry,
     parameterizedCodecs: () => parameterizedCodecDescriptors,
-    queryOperations: () => postgresQueryOperations,
+    queryOperations: () => postgresQueryOperations(),
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(): SqlRuntimeAdapter {
       return createPostgresAdapter();

@@ -17,6 +17,7 @@ import {
   OrderByItem,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
+import type { Expression } from '@prisma-next/sql-relational-core/expression';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
@@ -203,26 +204,6 @@ type QueryOperationReturnJsType<
     : unknown
   : unknown;
 
-type CodecArgJsType<Arg, TCodecTypes extends Record<string, unknown>> = Arg extends {
-  readonly codecId: infer CId extends string;
-  readonly nullable: infer N;
-}
-  ? CId extends keyof TCodecTypes
-    ? TCodecTypes[CId] extends { readonly output: infer O }
-      ? N extends true
-        ? O | null
-        : O
-      : unknown
-    : unknown
-  : unknown;
-
-type MapArgsToJsTypes<
-  Args extends readonly unknown[],
-  TCodecTypes extends Record<string, unknown>,
-> = Args extends readonly [infer Head, ...infer Tail]
-  ? [CodecArgJsType<Head, TCodecTypes>, ...MapArgsToJsTypes<Tail, TCodecTypes>]
-  : [];
-
 type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Returns extends {
   readonly codecId: infer Id extends string;
 }
@@ -235,22 +216,51 @@ type IsBooleanReturn<Returns, TCodecTypes extends Record<string, unknown>> = Ret
     : false
   : false;
 
+/**
+ * Extract the `{codecId, nullable}` spec carried inside an `Expression<T>`.
+ * Used to recover the op's return spec from its impl signature so the
+ * pre-existing `QueryOperationReturn*` helpers can consume it unchanged.
+ */
+type SpecOf<E> = E extends Expression<infer T> ? T : never;
+
+type ImplReturnSpec<Impl> = Impl extends (...args: never[]) => infer Ret ? SpecOf<Ret> : never;
+
+/**
+ * Builds the ORM column-method signature for an operation.
+ *
+ * - User args: drops the impl's first parameter (the column is bound at access
+ *   time) and forwards the rest unchanged. Each remaining arg keeps its
+ *   authored `CodecExpression` / `TraitExpression` shape — so callers can pass
+ *   a raw JS value, another column handle (which itself implements
+ *   `Expression`), or `null` when nullable.
+ * - Return: predicate ops (boolean-traited return) yield `AnyExpression`;
+ *   non-predicate ops yield `ComparisonMethods<JsType, Traits>` of the return
+ *   codec.
+ */
 type QueryOperationMethod<Op, TCodecTypes extends Record<string, unknown>> = Op extends {
-  readonly args: readonly [unknown, ...infer UserArgs];
-  readonly returns: infer Returns;
+  readonly impl: (...args: never[]) => unknown;
 }
-  ? IsBooleanReturn<Returns, TCodecTypes> extends true
-    ? (...args: MapArgsToJsTypes<UserArgs, TCodecTypes>) => AnyExpression
-    : (
-        ...args: MapArgsToJsTypes<UserArgs, TCodecTypes>
-      ) => ComparisonMethods<
-        QueryOperationReturnJsType<Returns, TCodecTypes>,
-        QueryOperationReturnTraits<Returns, TCodecTypes>
-      >
+  ? Op['impl'] extends (first: never, ...rest: infer UserArgs extends readonly unknown[]) => unknown
+    ? ImplReturnSpec<Op['impl']> extends infer Returns
+      ? IsBooleanReturn<Returns, TCodecTypes> extends true
+        ? (...args: UserArgs) => AnyExpression
+        : (
+            ...args: UserArgs
+          ) => ComparisonMethods<
+            QueryOperationReturnJsType<Returns, TCodecTypes>,
+            QueryOperationReturnTraits<Returns, TCodecTypes>
+          >
+      : never
+    : never
   : never;
 
+/**
+ * Tests whether an operation's `self` dispatch hint reaches a field with the
+ * given codec identity. Codec hints match by identity; trait hints match when
+ * every required trait is present in the field codec's trait set.
+ */
 type OpMatchesField<Op, CodecId extends string, CT extends Record<string, unknown>> = Op extends {
-  readonly args: readonly [infer Self, ...(readonly unknown[])];
+  readonly self: infer Self;
 }
   ? Self extends { readonly codecId: CodecId }
     ? true
@@ -400,10 +410,11 @@ export type RelationFilterAccessor<
 };
 
 type ScalarModelAccessor<TContract extends Contract<SqlStorage>, ModelName extends string> = {
-  [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
-    FieldJsType<TContract, ModelName, K>,
-    FieldTraits<TContract, ModelName, K>
-  > &
+  [K in keyof FieldsOf<TContract, ModelName> & string]: Expression<{
+    codecId: FieldCodecId<TContract, ModelName, K>;
+    nullable: FieldNullable<TContract, ModelName, K>;
+  }> &
+    ComparisonMethods<FieldJsType<TContract, ModelName, K>, FieldTraits<TContract, ModelName, K>> &
     FieldOperations<TContract, ModelName, K>;
 };
 
@@ -681,6 +692,16 @@ type FieldCodecId<
 }
   ? Id
   : never;
+
+type FieldNullable<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = FieldStorageColumn<TContract, ModelName, FieldName> extends {
+  readonly nullable: infer N extends boolean;
+}
+  ? N
+  : false;
 
 type FieldTraits<
   TContract extends Contract<SqlStorage>,

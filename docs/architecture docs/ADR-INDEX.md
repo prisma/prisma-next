@@ -66,6 +66,8 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
 | 164 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 164 - Repository Layer.md](adrs/ADR%20164%20-%20Repository%20Layer.md) |
 | 202 | Codec trait system | Semantic capability traits (`equality`, `order`, `numeric`, `textual`, `boolean`) declared on codecs and consumed by query surfaces to gate operator availability by data type | [ADR 202 - Codec trait system.md](adrs/ADR%20202%20-%20Codec%20trait%20system.md) |
+| 203 | Trait-targeted operation arguments | Extends operation argument specs with `traits` to accept any codec carrying the required capability, alongside exact `codecId` targeting | [ADR 203 - Trait-targeted operation arguments.md](adrs/ADR%20203%20-%20Trait-targeted%20operation%20arguments.md) |
+| 204 | Operations as TypeScript functions | Operations are authored as real TS functions — signature is the type surface, body builds the AST — with a minimal `self` dispatch hint for ORM column-helper reachability | [ADR 204 - Operations as TypeScript functions.md](adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md) |
 
 ## Migration System
 

@@ -45,7 +45,7 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
   codecs: createPgvectorCodecRegistry,
-  queryOperations: () => pgvectorQueryOperations,
+  queryOperations: () => pgvectorQueryOperations(),
   parameterizedCodecs: () => parameterizedCodecDescriptors,
   create() {
     return {

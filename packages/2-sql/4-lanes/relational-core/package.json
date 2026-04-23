@@ -41,6 +41,7 @@
     ".": "./dist/index.mjs",
     "./ast": "./dist/exports/ast.mjs",
     "./errors": "./dist/exports/errors.mjs",
+    "./expression": "./dist/exports/expression.mjs",
     "./plan": "./dist/exports/plan.mjs",
     "./query-lane-context": "./dist/exports/query-lane-context.mjs",
     "./types": "./dist/exports/types.mjs",
