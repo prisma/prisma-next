@@ -2,6 +2,7 @@ import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  ControlStack,
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
@@ -34,10 +35,28 @@ const MigrationMetaSchema = type({
  * every migration must implement — `migration.json` is required for a
  * migration to be valid.
  */
-export abstract class Migration<TOperation extends MigrationPlanOperation = MigrationPlanOperation>
-  implements MigrationPlan
+export abstract class Migration<
+  TOperation extends MigrationPlanOperation = MigrationPlanOperation,
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> implements MigrationPlan
 {
   abstract readonly targetId: string;
+
+  /**
+   * Assembled `ControlStack` injected by the orchestrator (`runMigration`).
+   *
+   * Subclasses (e.g. `PostgresMigration`) read the stack to materialize their
+   * adapter once per instance. Optional at the abstract level so unit tests can
+   * construct `Migration` instances purely for `operations` / `describe`
+   * assertions without needing a real stack; concrete subclasses that need the
+   * stack at runtime should narrow the parameter to required.
+   */
+  protected readonly stack: ControlStack<TFamilyId, TTargetId> | undefined;
+
+  constructor(stack?: ControlStack<TFamilyId, TTargetId>) {
+    this.stack = stack;
+  }
 
   /**
    * Ordered list of operations this migration performs.

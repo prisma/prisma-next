@@ -3,7 +3,7 @@ import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import postgres from '@prisma-next/postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, setNotNull } from '@prisma-next/target-postgres/migration';
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
@@ -20,7 +20,7 @@ export default class M extends Migration {
 
   override get operations() {
     return [
-      dataTransform(endContract, 'handle-nulls-user-displayName', {
+      this.dataTransform(endContract, 'handle-nulls-user-displayName', {
         check: () =>
           db.sql.user
             .select('id')

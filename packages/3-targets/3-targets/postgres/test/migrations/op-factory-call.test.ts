@@ -120,19 +120,18 @@ describe('Postgres call classes', () => {
       );
     });
 
-    it('DataTransformCall renders slots as placeholder closures and imports factory + placeholder + endContract', () => {
+    it('DataTransformCall renders slots as placeholder closures and imports placeholder + endContract', () => {
       const call = new DataTransformCall('Backfill', 'check', 'run');
 
       expect(call.renderTypeScript()).toBe(
         [
-          'dataTransform(endContract, "Backfill", {',
+          'this.dataTransform(endContract, "Backfill", {',
           '  check: () => placeholder("check"),',
           '  run: () => placeholder("run"),',
           '})',
         ].join('\n'),
       );
       expect(call.importRequirements()).toEqual([
-        { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'dataTransform' },
         { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'placeholder' },
         {
           moduleSpecifier: './end-contract.json',
@@ -400,18 +399,20 @@ describe('renderCallsToTypeScript', () => {
 
     const source = renderCallsToTypeScript(calls, META);
 
-    // dataTransform + placeholder are merged with the base `Migration`
-    // import (also owned by the target's migration entrypoint) into a
-    // single aggregated line.
+    // `placeholder` is merged with the base `Migration` import (also owned
+    // by the target's migration entrypoint) into a single aggregated line.
+    // `dataTransform` is no longer imported as a free factory: it is called
+    // as `this.dataTransform(...)` so `PostgresMigration` can inject the
+    // control adapter.
     expect(source).toContain(
-      "import { Migration, dataTransform, placeholder } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, placeholder } from '@prisma-next/target-postgres/migration';",
     );
     expect(source).toContain(
       'import endContract from \'./end-contract.json\' with { type: "json" };',
     );
     expect(source).toContain(
       [
-        '      dataTransform(endContract, "Backfill user emails", {',
+        '      this.dataTransform(endContract, "Backfill user emails", {',
         '        check: () => placeholder("check-emails"),',
         '        run: () => placeholder("run-emails"),',
         '      })',

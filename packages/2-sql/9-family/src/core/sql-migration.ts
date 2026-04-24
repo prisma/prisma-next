@@ -28,6 +28,7 @@ import type { AnySqlMigrationOperation, SqlPlanTargetDetails } from './migration
  * `addColumn`) and data-transform operations (e.g. `dataTransform`). Mirrors
  * `MongoMigration`'s parameterization on `AnyMongoMigrationOperation`.
  */
-export abstract class SqlMigration<TDetails extends SqlPlanTargetDetails> extends Migration<
-  AnySqlMigrationOperation<TDetails>
-> {}
+export abstract class SqlMigration<
+  TDetails extends SqlPlanTargetDetails,
+  TTargetId extends string = string,
+> extends Migration<AnySqlMigrationOperation<TDetails>, 'sql', TTargetId> {}
