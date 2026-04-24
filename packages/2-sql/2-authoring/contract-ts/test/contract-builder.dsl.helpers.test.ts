@@ -1,9 +1,5 @@
 import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/authoring';
-import type {
-  ExtensionPackRef,
-  FamilyPackRef,
-  TargetPackRef,
-} from '@prisma-next/framework-components/components';
+import type { ExtensionPackRef, FamilyPackRef } from '@prisma-next/framework-components/components';
 import { describe, expect, expectTypeOf, it, vi } from 'vitest';
 import { defineContract, rel } from '../src/contract-builder';
 
@@ -111,7 +107,7 @@ const sqlFamilyPack = {
   },
 } as const satisfies FamilyPackRef<'sql'>;
 
-const postgresTargetPack = {
+const postgresTargetPackBase = {
   kind: 'target',
   id: 'postgres',
   familyId: 'sql',
@@ -132,9 +128,11 @@ const postgresTargetPack = {
       },
     },
   },
-} as const satisfies TargetPackRef<'sql', 'postgres'> & {
+} as const;
+
+const postgresTargetPack: typeof postgresTargetPackBase & {
   readonly __codecTypes?: PortableSqlCodecTypes;
-};
+} = postgresTargetPackBase;
 
 const pgvectorExtensionPack = {
   kind: 'extension',

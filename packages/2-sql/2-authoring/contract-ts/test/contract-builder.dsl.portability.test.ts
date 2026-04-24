@@ -21,21 +21,25 @@ const bareFamilyPack: FamilyPackRef<'sql'> = {
   version: '0.0.1',
 };
 
-const postgresTargetPack = {
+const postgresTargetPackBase = {
   kind: 'target',
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
-} as const satisfies PortableTargetPack<'postgres'>;
+} as const;
 
-const sqliteTargetPack = {
+const sqliteTargetPackBase = {
   kind: 'target',
   id: 'sqlite',
   familyId: 'sql',
   targetId: 'sqlite',
   version: '0.0.1',
-} as const satisfies PortableTargetPack<'sqlite'>;
+} as const;
+
+const postgresTargetPack: PortableTargetPack<'postgres'> = postgresTargetPackBase;
+
+const sqliteTargetPack: PortableTargetPack<'sqlite'> = sqliteTargetPackBase;
 
 const uuidColumn = columnDescriptor('sql/char@1', 'character', { length: 36 });
 const textColumn = columnDescriptor('sql/text@1');

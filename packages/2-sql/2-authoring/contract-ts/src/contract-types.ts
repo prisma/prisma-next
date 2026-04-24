@@ -16,8 +16,8 @@ import type { UnionToIntersection } from './authoring-type-utils';
 import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
-  ? C extends Record<string, { output: unknown }>
-    ? C
+  ? Exclude<C, undefined> extends Record<string, { readonly output: unknown }>
+    ? Exclude<C, undefined>
     : Record<string, never>
   : Record<string, never>;
 

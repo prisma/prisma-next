@@ -30,15 +30,17 @@ type AsyncCodecTypes = {
   };
 };
 
-const asyncTargetPack = {
+const asyncTargetPackBase = {
   kind: 'target',
   id: 'postgres',
   familyId: 'sql',
   targetId: 'postgres',
   version: '0.0.1',
-} as const satisfies TargetPackRef<'sql', 'postgres'> & {
+} as const;
+
+const asyncTargetPack: typeof asyncTargetPackBase & {
   readonly __codecTypes?: AsyncCodecTypes;
-};
+} = asyncTargetPackBase;
 
 const int4Column = columnDescriptor('pg/int4@1');
 const encryptedColumn = columnDescriptor('test/encrypted@1', 'text');
