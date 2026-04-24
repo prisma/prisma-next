@@ -1,10 +1,9 @@
 /**
  * Entrypoint orchestrator for class-flow `migration.ts` files.
  *
- * `runMigration(import.meta.url, MigrationClass)` replaces the legacy
- * `Migration.run(import.meta.url, MigrationClass)` static. The user
- * authors a migration class, then calls `runMigration` at module scope
- * after the class definition; when the file is invoked as a node entrypoint
+ * The user authors a migration class, then calls
+ * `runMigration(import.meta.url, MigrationClass)` at module scope after
+ * the class definition. When the file is invoked as a node entrypoint
  * (`node migration.ts`), the runner:
  *
  * 1. Detects whether the file is the direct entrypoint (no-op when imported).
