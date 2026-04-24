@@ -62,8 +62,8 @@ if (MigrationExport.prototype instanceof Migration) {
 }
 const operations = migration.plan();
 
-await writeMigrationOps(dir, operations);
-const migrationId = await attestMigration(dir);
+const migrationId = computeMigrationId(manifest, operations);
+await writeMigrationPackage(dir, { ...manifest, migrationId }, operations);
 ```
 
 Both shapes funnel through `plan()` — the class path instantiates and calls `plan()`, the factory path calls the function, validates the result has `plan()`, then calls it. The guards in this pipeline throw structured errors: `PN-MIG-2002` if `migration.ts` is missing, `PN-MIG-2003` if the default export is not a valid migration shape, and `PN-MIG-2004` if `plan()` returns a non-array (see [ADR 027](ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md)).
