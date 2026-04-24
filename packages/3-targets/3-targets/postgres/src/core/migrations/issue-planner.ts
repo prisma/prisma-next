@@ -719,9 +719,9 @@ export function planIssues(
   options: IssuePlannerOptions,
 ): Result<IssuePlannerValue, readonly SqlPlannerConflict[]> {
   // When no policy is supplied, `planIssues` treats the call as trusted (the
-  // caller — typically a test or the `planDescriptors` adapter — has already
-  // vetted the issues). Only explicit policies gate operation classes into
-  // conflicts. `PostgresMigrationPlanner` always passes an explicit policy.
+  // caller — typically a test — has already vetted the issues). Only explicit
+  // policies gate operation classes into conflicts.
+  // `PostgresMigrationPlanner` always passes an explicit policy.
   const policyProvided = options.policy !== undefined;
   const policy = options.policy ?? DEFAULT_POLICY;
   const schema = options.schema ?? emptySchemaIR();
