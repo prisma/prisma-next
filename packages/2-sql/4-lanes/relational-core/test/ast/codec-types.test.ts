@@ -590,7 +590,9 @@ describe('CodecDefBuilder', () => {
     >();
     expectTypeOf<typeof builder.codecDefinitions.text.input>().toEqualTypeOf<string>();
     expectTypeOf<typeof builder.codecDefinitions.text.output>().toEqualTypeOf<Promise<string>>();
-    expectTypeOf<typeof builder.codecDefinitions.text.jsType>().toEqualTypeOf<Promise<string>>();
+    expectTypeOf<typeof builder.codecDefinitions.text.outputType>().toEqualTypeOf<
+      Promise<string>
+    >();
 
     const wire = await builder.codecDefinitions.text.codec.encode!('cleartext');
     expect(wire).not.toBe('cleartext');

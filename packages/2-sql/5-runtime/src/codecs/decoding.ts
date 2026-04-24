@@ -79,10 +79,6 @@ function resolveColumnRefForAlias(
   return fallbackColumnRefIndex?.get(alias);
 }
 
-export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  return value instanceof Promise;
-}
-
 export function isJsonSchemaValidationError(error: unknown): boolean {
   return (
     error instanceof Error &&
@@ -159,7 +155,7 @@ export function decodeField(options: DecodeFieldOptions): unknown {
 
   try {
     const decoded = codec.decode(wireValue);
-    if (isPromiseLike(decoded)) {
+    if (decoded instanceof Promise) {
       const promise = (async () => {
         try {
           const resolved = await decoded;

@@ -9,7 +9,6 @@ export {
   decodeFailure,
   decodeField,
   isJsonSchemaValidationError,
-  isPromiseLike,
   wirePreview,
 } from '../codecs/decoding';
 export {

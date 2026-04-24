@@ -430,6 +430,36 @@ describe('collection-dispatch', () => {
     });
   });
 
+  it('dispatchCollectionRows() multi-query path preserves promise-valued async codec fields on child rows', async () => {
+    const contract = withAsyncPostContract(getTestContract());
+    const { collection, runtime } = createAsyncPostCollection(contract);
+    const scoped = collection.select('name').include('posts', (posts) => posts.select('title'));
+
+    // Multi-query path hands child rows back from executeQueryPlan unchanged.
+    // In production that runtime applies decodeRow, which yields Promise<T>
+    // for async-decode columns; here we simulate the same shape directly so
+    // the unit test asserts the ORM stitching does not unwrap or drop the
+    // promise fields.
+    const secretPromise = Promise.resolve('alpha');
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice' }],
+      [{ user_id: 1, title: 'Post A', secret: secretPromise }],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    const posts = rows[0]?.['posts'] as Record<string, unknown>[] | undefined;
+    expect(posts?.[0]?.['title']).toBe('Post A');
+    expect(posts?.[0]?.['secret']).toBeInstanceOf(Promise);
+    await expect(posts?.[0]?.['secret']).resolves.toBe('alpha');
+  });
+
   it('dispatchCollectionRows() multi-query path stitches includes, strips hidden fields, and releases scope', async () => {
     const contract = getTestContract();
     const { collection, runtime } = createCollectionFor('User', contract);

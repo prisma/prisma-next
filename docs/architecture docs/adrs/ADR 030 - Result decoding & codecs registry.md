@@ -159,6 +159,10 @@ Generated SQL contract types expose this split explicitly:
 
 Encode follows the same principle: synchronous plans stay on the fast path, and only parameters that reference async encoders are awaited before the driver call.
 
+### Codec-author contract for `runtime.encode`
+
+If a codec does not declare `runtime.encode: 'async'` but its `encode` hook returns a `Promise`, the runtime throws `RUNTIME.ENCODE_FAILED` before any driver call. This is a deliberate defensive check: the sync encode path never awaits, so a codec that silently returns a promise would otherwise deliver a `Promise<string>` to the driver instead of the encoded scalar. Codec authors must either return a plain wire value or opt into async by setting `runtime.encode: 'async'`.
+
 ### Streaming and cursors
 
 - Decode row-by-row to support large results

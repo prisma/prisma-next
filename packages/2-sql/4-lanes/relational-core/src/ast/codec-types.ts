@@ -302,9 +302,12 @@ export type CodecOutput<T> =
     infer TOutput,
     infer TRuntime
   >
-    ? TRuntime extends { readonly decode: 'async' }
-      ? Promise<TOutput>
-      : TOutput
+    ? // Await the codec-declared TOutput before re-wrapping so authors who
+      // type their async `decode` return explicitly as `Promise<User>` do not
+      // produce a `Promise<Promise<User>>` from the factory.
+      TRuntime extends { readonly decode: 'async' }
+      ? Promise<Awaited<TOutput>>
+      : Awaited<TOutput>
     : never;
 export type CodecTraits<T> =
   T extends Codec<
@@ -369,7 +372,7 @@ export interface CodecDefBuilder<
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
       readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly outputType: CodecOutput<ScalarNames[K]>;
     };
   };
 
@@ -414,11 +417,10 @@ class CodecDefBuilderImpl<
     }
     this.CodecTypes = codecTypes as ExtractCodecTypes<ScalarNames>;
 
-    // Populate dataTypes from codecs - extract id property from each codec
-    // Build object preserving keys from ScalarNames
-    // Type assertion is safe because we know ScalarNames structure matches the return type
-    // biome-ignore lint/suspicious/noExplicitAny: dynamic codec mapping requires any
-    const dataTypes = {} as any;
+    // Populate dataTypes from codecs - extract id property from each codec.
+    // Narrowed to `Record<string, string>` during construction; the final
+    // assignment uses a structural cast to preserve the literal-keyed shape.
+    const dataTypes: Record<string, string> = {};
     for (const key in this._codecs) {
       if (Object.hasOwn(this._codecs, key)) {
         const codec = this._codecs[key] as AnyCodec;
@@ -454,7 +456,7 @@ class CodecDefBuilderImpl<
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
       readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly outputType: CodecOutput<ScalarNames[K]>;
     };
   } {
     const result: Record<
@@ -465,7 +467,7 @@ class CodecDefBuilderImpl<
         codec: AnyCodec;
         input: unknown;
         output: unknown;
-        jsType: unknown;
+        outputType: unknown;
       }
     > = {};
 
@@ -477,7 +479,7 @@ class CodecDefBuilderImpl<
         codec: codec,
         input: undefined as unknown as CodecInput<typeof codec>,
         output: undefined as unknown as CodecOutput<typeof codec>,
-        jsType: undefined as unknown as CodecOutput<typeof codec>,
+        outputType: undefined as unknown as CodecOutput<typeof codec>,
       };
     }
 
@@ -488,7 +490,7 @@ class CodecDefBuilderImpl<
         readonly codec: ScalarNames[K];
         readonly input: CodecInput<ScalarNames[K]>;
         readonly output: CodecOutput<ScalarNames[K]>;
-        readonly jsType: CodecOutput<ScalarNames[K]>;
+        readonly outputType: CodecOutput<ScalarNames[K]>;
       };
     };
   }

@@ -16,10 +16,6 @@ function resolveParamCodec(
   return null;
 }
 
-function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  return value instanceof Promise;
-}
-
 function paramLabel(paramDescriptor: ParamDescriptor, paramIndex: number): string {
   return paramDescriptor.name ?? `param[${paramIndex}]`;
 }
@@ -75,7 +71,7 @@ export function encodeParam(
   if (codec.encode) {
     try {
       const encoded = codec.encode(value);
-      if (isPromiseLike(encoded)) {
+      if (encoded instanceof Promise) {
         throw unexpectedAsyncEncodeFailure(codec, paramDescriptor, paramIndex);
       }
       return encoded;
@@ -108,7 +104,7 @@ export async function encodeParamAsync(
 
   try {
     const encoded = codec.encode(value);
-    return isPromiseLike(encoded) ? await encoded : encoded;
+    return encoded instanceof Promise ? await encoded : encoded;
   } catch (error) {
     throw encodeFailure(codec, paramDescriptor, paramIndex, error);
   }
