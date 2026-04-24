@@ -53,6 +53,16 @@ For each projected field in a result row:
 
 If decoding fails at any stage, emit RUNTIME.DECODE_FAILED with `cause.origin = 'adapter' | 'lane'` depending on where the selected codec came from
 
+### Include-aggregate decoding (current divergence)
+
+Top-level projected rows apply the full precedence chain above. Rows materialized through the SQL ORM's single-query include strategies (`lateral`, `correlated`) arrive as nested JSON aggregates inside the parent row and are decoded by the ORM extension using a narrower rule:
+
+- Only **contract-declared codecs** (rule 2) are consulted: each included column is matched to `contract.storage.tables[<relatedTable>].columns[<column>].codecId`.
+- **Lane hints** (rule 1) attached to the include branch are not honored today. A follow-up will unify include decoding with the top-level precedence by threading include-aware projection annotations into the runtime decoder.
+- Adapter and driver-native fallbacks (rules 3 and 4) still apply transitively through the contract's `codecId` resolution, matching top-level behavior.
+
+The semantics of decoding (null short-circuit, sync vs promise-valued fields, JSON-schema validation, error redaction for async-decode codecs) are identical to the top-level path — only the codec *selection* is narrower.
+
 ## Registry model
 - Global, versioned registry keyed by name = `'namespace/codec@version'`
 - Namespaces required to avoid collisions, e.g., `sql/char@1`, `pg/numeric@1`, `vendorX/uuid@2`
