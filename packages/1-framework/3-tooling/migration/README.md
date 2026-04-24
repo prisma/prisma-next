@@ -66,7 +66,7 @@ graph TD
 
 | Subpath | Contents |
 |---|---|
-| `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationChainEntry`, `MigrationHints` |
+| `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationEdge`, `MigrationHints` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
 | `./attestation` | `computeMigrationId`, `verifyMigration`, `verifyMigrationBundle` |
 | `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |

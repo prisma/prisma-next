@@ -46,10 +46,10 @@ export interface MigrationBundle {
 }
 
 /**
- * An entry in the migration graph. All on-disk migrations are attested,
- * so `migrationId` is always a string.
+ * A directed edge in the migration graph. All on-disk migrations are
+ * attested, so `migrationId` is always a string.
  */
-export interface MigrationChainEntry {
+export interface MigrationEdge {
   readonly from: string;
   readonly to: string;
   readonly migrationId: string;
@@ -60,7 +60,7 @@ export interface MigrationChainEntry {
 
 export interface MigrationGraph {
   readonly nodes: ReadonlySet<string>;
-  readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
-  readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
-  readonly migrationById: ReadonlyMap<string, MigrationChainEntry>;
+  readonly forwardChain: ReadonlyMap<string, readonly MigrationEdge[]>;
+  readonly reverseChain: ReadonlyMap<string, readonly MigrationEdge[]>;
+  readonly migrationById: ReadonlyMap<string, MigrationEdge>;
 }

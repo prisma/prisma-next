@@ -9,7 +9,7 @@ import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {
   MigrationBundle,
-  MigrationChainEntry,
+  MigrationEdge,
   MigrationGraph,
 } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
@@ -154,7 +154,7 @@ export function deriveEdgeStatuses(
 ): EdgeStatus[] {
   if (mode === 'offline') return [];
 
-  const edgeKey = (e: MigrationChainEntry) => `${e.from}\0${e.to}`;
+  const edgeKey = (e: MigrationEdge) => `${e.from}\0${e.to}`;
 
   // No marker = empty DB — treat root as the marker (nothing applied, everything pending)
   const effectiveMarker = markerHash ?? EMPTY_CONTRACT_HASH;
@@ -224,7 +224,7 @@ export function deriveEdgeStatuses(
  * @param markerHash — the marker hash from the database, or undefined if no marker row / offline
  */
 function buildMigrationEntries(
-  chain: readonly MigrationChainEntry[],
+  chain: readonly MigrationEdge[],
   packages: readonly MigrationBundle[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
@@ -294,7 +294,7 @@ function resolveDisplayChain(
   graph: MigrationGraph,
   targetHash: string,
   markerHash: string | undefined,
-): readonly MigrationChainEntry[] | null {
+): readonly MigrationEdge[] | null {
   if (markerHash === undefined) {
     return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
   }
