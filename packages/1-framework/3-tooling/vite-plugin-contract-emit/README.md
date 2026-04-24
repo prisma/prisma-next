@@ -105,14 +105,10 @@ graph TD
 - **@prisma-next/cli**: Uses the control-api `executeContractEmit` operation
 - **vite**: Peer dependency (`^7.0.0 || ^8.0.0`)
 
-## Example
+## Examples
 
-See `examples/prisma-next-demo` for a working example with:
-- `vite.config.ts` configured with the plugin
-- `pnpm dev` script to start Vite
-- `prisma/contract.ts` as the contract authoring source
-
-Run `pnpm dev` in the demo, edit `prisma/contract.ts`, and watch the artifacts regenerate.
+- `examples/prisma-next-demo` — plain Vite + React SPA, covers TS-first and PSL-first contracts. Run `pnpm dev`, edit `prisma/contract.ts`, watch the artifacts regenerate.
+- `examples/react-router-demo` — React Router v7 Framework Mode (SSR). The plugin runs alongside `@react-router/dev/vite`; a `loader` and an `action` exercise the Prisma Next runtime on the server, and a smoke test proves a PSL edit re-emits the contract without a manual command. This is the validation target for April VP3 — see [`projects/vite-vp3-auto-emit/`](../../../../../projects/vite-vp3-auto-emit/).
 
 ## Related
 
