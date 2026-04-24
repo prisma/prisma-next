@@ -255,6 +255,7 @@ function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
 
 function expectPromise(value: unknown): Promise<unknown> {
   expect(value).toBeInstanceOf(Promise);
+  // Vitest's matcher checks runtime shape but does not narrow `unknown` for TypeScript.
   if (!(value instanceof Promise)) {
     throw new Error('Expected promise-valued decode result');
   }
