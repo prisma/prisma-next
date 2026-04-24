@@ -25,7 +25,7 @@ const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
   codecs: createSqliteCodecRegistry,
   parameterizedCodecs: () => [],
   mutationDefaultGenerators: () => [],
-  create(): SqliteRuntimeAdapterInstance {
+  create(_stack): SqliteRuntimeAdapterInstance {
     return createSqliteAdapter();
   },
 };
