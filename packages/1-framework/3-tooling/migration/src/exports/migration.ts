@@ -1,1 +1,7 @@
-export { Migration, type MigrationMeta } from '../migration-base';
+export {
+  isDirectEntrypoint,
+  Migration,
+  type MigrationMeta,
+  printMigrationHelp,
+  serializeMigration,
+} from '../migration-base';
