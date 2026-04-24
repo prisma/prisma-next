@@ -1,3 +1,4 @@
+import type { ExecutionStack } from '@prisma-next/framework-components/execution';
 import { describe, expect, it } from 'vitest';
 import postgresRuntimeAdapterDescriptor from '../src/exports/runtime';
 
@@ -7,7 +8,9 @@ describe('adapter descriptor / instance codec parity', () => {
       [...postgresRuntimeAdapterDescriptor.codecs().values()].map((c) => c.id),
     );
 
-    const adapterInstance = postgresRuntimeAdapterDescriptor.create();
+    // The adapter doesn't read the stack today; pass an empty stub.
+    const stack = {} as ExecutionStack<'sql', 'postgres'>;
+    const adapterInstance = postgresRuntimeAdapterDescriptor.create(stack);
     const instanceCodecIds = new Set(
       [...adapterInstance.profile.codecs().values()].map((c) => c.id),
     );

@@ -132,7 +132,7 @@ export function createTestAdapterDescriptor(
     codecs: () => codecRegistry,
     parameterizedCodecs: () => [],
     mutationDefaultGenerators: createTestMutationDefaultGenerators,
-    create(): SqlRuntimeAdapterInstance<'postgres'> {
+    create(_stack): SqlRuntimeAdapterInstance<'postgres'> {
       return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },
   };

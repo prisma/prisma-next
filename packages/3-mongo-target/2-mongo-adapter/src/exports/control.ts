@@ -57,7 +57,7 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
       ],
     },
   },
-  create() {
+  create(_stack) {
     return { familyId: 'mongo' as const, targetId: 'mongo' as const };
   },
 };

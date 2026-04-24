@@ -1,6 +1,7 @@
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
+  ControlStack,
 } from '@prisma-next/framework-components/control';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
@@ -55,6 +56,9 @@ export interface SqlControlAdapter<TTarget extends string = string>
 export interface SqlControlAdapterDescriptor<TTarget extends string = string> {
   /**
    * Creates a SQL control adapter instance for control-plane operations.
+   *
+   * Receives the assembled `ControlStack` so adapters can read aggregated
+   * metadata (codec lookup, extension contributions) when materializing.
    */
-  create(): SqlControlAdapter<TTarget>;
+  create(stack: ControlStack<'sql', TTarget>): SqlControlAdapter<TTarget>;
 }
