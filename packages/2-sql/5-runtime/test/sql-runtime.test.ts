@@ -10,6 +10,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   CodecRegistry,
+  CodecRuntimeBehavior,
   CodecTrait,
   SelectAst,
   SqlDriver,
@@ -61,8 +62,7 @@ type AnyCodec = Codec<
   Record<string, unknown>,
   unknown,
   unknown,
-  boolean,
-  boolean
+  CodecRuntimeBehavior | undefined
 >;
 
 function createStubCodecs(extraCodecs: readonly AnyCodec[] = []): CodecRegistry {

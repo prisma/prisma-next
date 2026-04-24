@@ -1,6 +1,8 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type {
   Codec as BaseCodec,
+  CodecDecodeResult,
+  CodecEncodeResult,
   CodecRuntimeBehavior,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
@@ -8,7 +10,12 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
-export type { CodecTrait } from '@prisma-next/framework-components/codec';
+export type {
+  CodecDecodeResult,
+  CodecEncodeResult,
+  CodecRuntimeBehavior,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 
 /**
  * Descriptor for parameterized codecs that require type parameter validation.
@@ -64,9 +71,8 @@ export interface Codec<
   TParams = Record<string, unknown>,
   THelper = unknown,
   TOutput = TInput,
-  TEncodeAsync extends boolean = false,
-  TDecodeAsync extends boolean = false,
-> extends BaseCodec<Id, TTraits, TWire, TInput, TOutput, TEncodeAsync, TDecodeAsync> {
+  TRuntime extends CodecRuntimeBehavior | undefined = undefined,
+> extends BaseCodec<Id, TTraits, TWire, TInput, TOutput, TRuntime> {
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -80,8 +86,7 @@ type AnyCodec = Codec<
   Record<string, unknown>,
   unknown,
   unknown,
-  boolean,
-  boolean
+  CodecRuntimeBehavior | undefined
 >;
 
 /**
@@ -202,17 +207,6 @@ class CodecRegistryImpl implements CodecRegistry {
  * Codec factory - creates a codec with typeId and encode/decode functions.
  * Provides identity defaults for encodeJson/decodeJson when not supplied.
  */
-type RuntimeEncodeIsAsync<TRuntime extends CodecRuntimeBehavior | undefined> = TRuntime extends {
-  readonly encode: 'async';
-}
-  ? true
-  : false;
-type RuntimeDecodeIsAsync<TRuntime extends CodecRuntimeBehavior | undefined> = TRuntime extends {
-  readonly decode: 'async';
-}
-  ? true
-  : false;
-
 export function codec<
   Id extends string,
   const TTraits extends readonly CodecTrait[],
@@ -225,8 +219,8 @@ export function codec<
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
-  encode: (value: TInput) => RuntimeEncodeIsAsync<TRuntime> extends true ? Promise<TWire> : TWire;
-  decode: (wire: TWire) => RuntimeDecodeIsAsync<TRuntime> extends true ? Promise<TOutput> : TOutput;
+  encode: (value: TInput) => CodecEncodeResult<TWire, TRuntime>;
+  decode: (wire: TWire) => CodecDecodeResult<TOutput, TRuntime>;
   encodeJson?: (value: TInput) => JsonValue;
   decodeJson?: (json: JsonValue) => TInput;
   meta?: CodecMeta;
@@ -235,29 +229,9 @@ export function codec<
   traits?: TTraits;
   runtime?: TRuntime;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<
-  Id,
-  TTraits,
-  TWire,
-  TInput,
-  TParams,
-  THelper,
-  TOutput,
-  RuntimeEncodeIsAsync<TRuntime>,
-  RuntimeDecodeIsAsync<TRuntime>
-> {
+}): Codec<Id, TTraits, TWire, TInput, TParams, THelper, TOutput, TRuntime> {
   const identity = (v: unknown) => v;
-  type CodecResult = Codec<
-    Id,
-    TTraits,
-    TWire,
-    TInput,
-    TParams,
-    THelper,
-    TOutput,
-    RuntimeEncodeIsAsync<TRuntime>,
-    RuntimeDecodeIsAsync<TRuntime>
-  >;
+  type CodecResult = Codec<Id, TTraits, TWire, TInput, TParams, THelper, TOutput, TRuntime>;
 
   const baseCodec: Omit<CodecResult, 'runtime'> = {
     id: config.typeId,
@@ -298,8 +272,7 @@ export type CodecId<T> =
     infer _TParams,
     infer _THelper,
     infer _TOutput,
-    infer _TEncodeAsync,
-    infer _TDecodeAsync
+    infer _TRuntime
   >
     ? Id
     : T extends { readonly id: infer Id }
@@ -314,8 +287,7 @@ export type CodecInput<T> =
     infer _TParams,
     infer _THelper,
     infer _TOutput,
-    infer _TEncodeAsync,
-    infer _TDecodeAsync
+    infer _TRuntime
   >
     ? TInput
     : never;
@@ -328,10 +300,9 @@ export type CodecOutput<T> =
     infer _TParams,
     infer _THelper,
     infer TOutput,
-    infer _TEncodeAsync,
-    infer TDecodeAsync
+    infer TRuntime
   >
-    ? TDecodeAsync extends true
+    ? TRuntime extends { readonly decode: 'async' }
       ? Promise<TOutput>
       : TOutput
     : never;
@@ -344,8 +315,7 @@ export type CodecTraits<T> =
     infer _TParams,
     infer _THelper,
     infer _TOutput,
-    infer _TEncodeAsync,
-    infer _TDecodeAsync
+    infer _TRuntime
   >
     ? TTraits[number] & CodecTrait
     : never;

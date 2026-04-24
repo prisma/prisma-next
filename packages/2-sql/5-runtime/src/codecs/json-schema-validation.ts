@@ -15,7 +15,7 @@ import type {
  * array. This is required for async/encryption codecs whose decoded value may
  * be sensitive: third-party validators (ajv, @cfworker/json-schema, etc.) often
  * embed the offending value in `err.message`, which would otherwise flow into
- * telemetry. See spec `projects/async-codecs/spec.md` NFR-4.
+ * telemetry.
  */
 export function validateJsonValue(
   registry: JsonSchemaValidatorRegistry,

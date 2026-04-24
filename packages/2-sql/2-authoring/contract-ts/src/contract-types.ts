@@ -512,9 +512,11 @@ type FieldInputType<
           ? I | null
           : I
         : CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-          ? Col extends { readonly nullable: true }
-            ? O | null
-            : O
+          ? // Fallback: codec exposed only `output`. Strip Promise wrapping so
+            // async-decode codecs still accept plain input values on writes.
+            Col extends { readonly nullable: true }
+            ? Awaited<O> | null
+            : Awaited<O>
           : unknown
       : unknown
     : unknown

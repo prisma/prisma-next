@@ -685,7 +685,10 @@ type FieldInputJsType<
   ModelName extends string,
   FieldName extends string,
 > = [FieldInputFromTypeMaps<TContract, ModelName, FieldName>] extends [never]
-  ? FieldJsType<TContract, ModelName, FieldName>
+  ? // Fallback resolves through the storage JS (output-side) type; strip
+    // Promise wrapping so async codec fields stay plain on write/filter/cursor
+    // surfaces even when the contract's input type map is missing an entry.
+    Awaited<FieldJsType<TContract, ModelName, FieldName>>
   : FieldInputFromTypeMaps<TContract, ModelName, FieldName>;
 
 type FieldStorageColumn<

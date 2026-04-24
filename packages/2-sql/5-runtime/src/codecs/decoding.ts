@@ -133,7 +133,7 @@ export interface DecodeFieldOptions {
  *
  * Schema-validation errors for async-decode codecs are redacted (validator
  * `message` strings are dropped) so decrypted plaintext cannot flow into
- * telemetry. See spec NFR-4 and ADR 030.
+ * telemetry. See ADR 030.
  */
 export function decodeField(options: DecodeFieldOptions): unknown {
   const { alias, wireValue, codec, jsonValidators, tableName, columnName } = options;

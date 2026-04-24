@@ -8,7 +8,7 @@ export interface MongoCodec<
   TTraits extends readonly MongoCodecTrait[] = readonly MongoCodecTrait[],
   TWire = unknown,
   TJs = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TJs, TJs, false, false> {
+> extends BaseCodec<Id, TTraits, TWire, TJs, TJs, undefined> {
   readonly traits: TTraits;
 }
 

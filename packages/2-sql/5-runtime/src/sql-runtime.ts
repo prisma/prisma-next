@@ -133,7 +133,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private codecRegistryValidated: boolean;
   // Plans are re-executed often; async-encode is a pure function of
   // (paramDescriptors, registry). Caching by plan identity keeps the sync
-  // hot path free of per-execute registry walks (spec NFR-1).
+  // hot path free of per-execute registry walks.
   private readonly asyncEncodingCache = new WeakMap<object, boolean>();
 
   constructor(options: RuntimeOptions<TContract>) {
