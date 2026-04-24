@@ -21,7 +21,7 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
-import { createAsyncSecretCodec, encryptSecret } from './seeded-secret-codec';
+import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
 // =============================================================================
@@ -447,7 +447,11 @@ describe('JSON Schema encoding validation', () => {
     });
 
     const result = await encodeParamsAsync(plan, codecRegistry);
-    expect(result[0]).toBe(await encryptSecret('Alice', asyncSecretSeed));
+    // IV is random per encryption, so assert on the decrypted round-trip
+    // instead of matching exact ciphertext bytes.
+    expect(typeof result[0]).toBe('string');
+    expect(result[0]).not.toBe('Alice');
+    await expect(decryptSecret(result[0] as string, asyncSecretSeed)).resolves.toBe('Alice');
   });
 });
 

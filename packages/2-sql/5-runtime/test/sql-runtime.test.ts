@@ -25,7 +25,7 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
-import { createAsyncSecretCodec, encryptSecret } from './seeded-secret-codec';
+import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -415,9 +415,15 @@ describe('createRuntime', () => {
     await runtime.execute(plan).toArray();
 
     expect(driver.__spies.rootExecute).toHaveBeenCalledOnce();
-    expect(driver.__spies.rootExecute.mock.calls[0]?.[0]).toMatchObject({
-      params: [await encryptSecret('Alice', runtimeSecretSeed)],
-    });
+    // IV is random per encryption, so verify the driver received ciphertext
+    // (not plaintext) and that it round-trips to the original value.
+    const sentRequest = driver.__spies.rootExecute.mock.calls[0]?.[0] as
+      | { params?: readonly unknown[] }
+      | undefined;
+    const sentSecret = sentRequest?.params?.[0];
+    expect(typeof sentSecret).toBe('string');
+    expect(sentSecret).not.toBe('Alice');
+    await expect(decryptSecret(sentSecret as string, runtimeSecretSeed)).resolves.toBe('Alice');
   });
 
   it('wraps async parameter encoding failures before the driver runs', async () => {

@@ -26,10 +26,8 @@ async function digestBytes(value: string): Promise<Uint8Array> {
 }
 
 async function encryptWithSeed(seed: string, value: string): Promise<string> {
-  const [keyBytes, iv] = await Promise.all([
-    digestBytes(`${seed}:key`),
-    digestBytes(`${seed}:iv:${value}`).then((bytes) => bytes.slice(0, 12)),
-  ]);
+  const keyBytes = await digestBytes(`${seed}:key`);
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const key = await globalThis.crypto.subtle.importKey(
     'raw',
     keyBytes,
@@ -596,8 +594,12 @@ describe('CodecDefBuilder', () => {
 
     const wire = await builder.codecDefinitions.text.codec.encode!('cleartext');
     expect(wire).not.toBe('cleartext');
-    expect(wire).toBe(await builder.codecDefinitions.text.codec.encode!('cleartext'));
+    // Two encrypt calls produce distinct ciphertext (random IV) but both
+    // decrypt to the same plaintext.
+    const wireAgain = await builder.codecDefinitions.text.codec.encode!('cleartext');
+    expect(wireAgain).not.toBe(wire);
     await expect(builder.codecDefinitions.text.codec.decode(wire)).resolves.toBe('cleartext');
+    await expect(builder.codecDefinitions.text.codec.decode(wireAgain)).resolves.toBe('cleartext');
   });
 });
 

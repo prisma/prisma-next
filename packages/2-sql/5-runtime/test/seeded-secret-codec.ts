@@ -1,4 +1,24 @@
+// ============================================================================
+// TEST-ONLY FIXTURE — do not copy into production code.
+//
+// This helper exists so the async-codec tests exercise the crypto shape of
+// a real encrypted column. It uses AES-GCM with a random 12-byte IV per
+// encryption, stored as `iv:ciphertext`, which is adequate for a test
+// fixture but is not a production-grade codec:
+//   * the AES key is deterministically derived from a short string seed;
+//   * there is no key rotation, key identifier, associated-data binding,
+//     or authenticated envelope versioning.
+// A production codec must source keys from a KMS, bind AAD, and carry
+// version/rotation metadata. Treat this file strictly as test plumbing.
+//
+// Guard against accidental production use.
+// ============================================================================
+
 import { codec } from '@prisma-next/sql-relational-core/ast';
+
+if (typeof process !== 'undefined' && process.env?.['NODE_ENV'] === 'production') {
+  throw new Error('seeded-secret-codec is a test fixture and must not be loaded in production');
+}
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -26,10 +46,8 @@ async function importSeedKey(seed: string) {
 }
 
 export async function encryptSecret(value: string, seed: string): Promise<string> {
-  const [key, iv] = await Promise.all([
-    importSeedKey(seed),
-    digestBytes(`${seed}:iv:${value}`).then((bytes) => bytes.slice(0, 12)),
-  ]);
+  const key = await importSeedKey(seed);
+  const iv = globalThis.crypto.getRandomValues(new Uint8Array(12));
   const ciphertext = await globalThis.crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     key,
