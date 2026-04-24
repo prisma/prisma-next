@@ -12,7 +12,7 @@ import {
   reconstructGraph,
 } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
-import type { AttestedMigrationBundle, MigrationChainEntry } from '../src/types';
+import type { MigrationBundle, MigrationChainEntry } from '../src/types';
 import { createAttestedManifest, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
@@ -23,7 +23,7 @@ function pkg(
   dirName: string,
   createdAt = '2026-02-25T14:00:00.000Z',
   labels: readonly string[] = [],
-): AttestedMigrationBundle {
+): MigrationBundle {
   const manifest = createAttestedManifest({ from, to, createdAt, labels });
   const ops = createTestOps();
   const migrationId = computeMigrationId(
@@ -38,7 +38,7 @@ function pkg(
   };
 }
 
-function chain(...specs: Array<[string, string, string]>): AttestedMigrationBundle[] {
+function chain(...specs: Array<[string, string, string]>): MigrationBundle[] {
   return specs.map(([from, to, dirName]) => pkg(from!, to!, dirName!));
 }
 
@@ -277,7 +277,7 @@ describe('detectCycles', () => {
   });
 
   it('detects cycle in node graph', () => {
-    const packages: AttestedMigrationBundle[] = [
+    const packages: MigrationBundle[] = [
       pkg('A', 'B', 'm1'),
       pkg('B', 'C', 'm2'),
       pkg('C', 'A', 'm3'),

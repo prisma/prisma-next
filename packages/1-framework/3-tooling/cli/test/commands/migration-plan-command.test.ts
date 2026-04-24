@@ -1,6 +1,6 @@
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationPlanResult } from '../../src/commands/migration-plan';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
@@ -135,13 +135,30 @@ describe('migration plan command', () => {
     vi.clearAllMocks();
   });
 
+  // The repo-wide vitest config uses `isolate: false`, so every `vi.mock(...)`
+  // registered above leaks into the next test file in the same worker (which
+  // breaks anything that does real fs I/O against `node:fs/promises.readFile`,
+  // `command-helpers.loadAllBundles`, or `migration-tools/io.writeMigrationPackage`).
+  // Use `doUnmock` (non-hoisted) here so subsequent files see the real modules.
+  afterAll(() => {
+    vi.doUnmock('node:fs/promises');
+    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('../../src/utils/command-helpers');
+    vi.doUnmock('@prisma-next/migration-tools/dag');
+    vi.doUnmock('@prisma-next/migration-tools/io');
+    vi.doUnmock('@prisma-next/migration-tools/migration-ts');
+    vi.doUnmock('../../src/utils/framework-components');
+    vi.doUnmock('../../src/control-api/operations/extract-sql-ddl');
+    vi.doUnmock('@prisma-next/framework-components/control');
+    vi.resetModules();
+  });
+
   describe('no-op short-circuit', () => {
     it('returns noOp envelope without dir when hashes match', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
@@ -178,8 +195,7 @@ describe('migration plan command', () => {
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
@@ -261,8 +277,7 @@ describe('migration plan command', () => {
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
@@ -299,8 +314,7 @@ describe('migration plan command', () => {
 
       mocks.readFile.mockResolvedValue(makeContractJson('sha256:new'));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
@@ -325,8 +339,7 @@ describe('migration plan command', () => {
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue(null);
@@ -353,14 +366,13 @@ describe('migration plan command', () => {
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
       mocks.loadAllBundles.mockResolvedValue({
-        attested: [
+        bundles: [
           {
             manifest: { migrationId: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
             dirPath: '/tmp/test/migrations/20260301T0900_prev',
             dirName: '20260301T0900_prev',
           },
         ],
-        drafts: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
