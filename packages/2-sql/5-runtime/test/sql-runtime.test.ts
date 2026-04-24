@@ -10,6 +10,7 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   CodecRegistry,
+  CodecTrait,
   SelectAst,
   SqlDriver,
   SqlExecuteRequest,
@@ -23,6 +24,7 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
+import { createAsyncSecretCodec, encryptSecret } from './seeded-secret-codec';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -35,6 +37,8 @@ const testContract: Contract<SqlStorage> = {
   capabilities: {},
   meta: {},
 };
+
+const runtimeSecretSeed = 'sql-runtime-secret';
 
 interface DriverMockSpies {
   rootExecute: ReturnType<typeof vi.fn>;
@@ -49,7 +53,19 @@ interface DriverMockSpies {
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
-function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
+type AnyCodec = Codec<
+  string,
+  readonly CodecTrait[],
+  unknown,
+  unknown,
+  Record<string, unknown>,
+  unknown,
+  unknown,
+  boolean,
+  boolean
+>;
+
+function createStubCodecs(extraCodecs: readonly AnyCodec[] = []): CodecRegistry {
   const registry = createCodecRegistry();
   registry.register(
     codec({
@@ -65,7 +81,7 @@ function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegi
   return registry;
 }
 
-function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
+function createStubAdapter(extraCodecs: readonly AnyCodec[] = []) {
   const codecs = createStubCodecs(extraCodecs);
   return {
     familyId: 'sql' as const,
@@ -185,7 +201,7 @@ function createTestAdapterDescriptor(
   };
 }
 
-function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
+function createTestSetup(options?: { extraCodecs?: readonly AnyCodec[] }) {
   const adapter = createStubAdapter(options?.extraCodecs);
   const driver = createMockDriver();
 
@@ -365,12 +381,9 @@ describe('createRuntime', () => {
   });
 
   it('awaits async parameter encoding before driver execution', async () => {
-    const asyncSecretCodec = codec({
+    const asyncSecretCodec = createAsyncSecretCodec({
       typeId: 'test/async-secret@1',
-      targetTypes: ['text'],
-      runtime: { encode: 'async' } as const,
-      encode: async (value: string) => `enc:${value}`,
-      decode: (wire: string) => wire,
+      seed: runtimeSecretSeed,
     });
     const { stackInstance, context, driver } = createTestSetup({
       extraCodecs: [asyncSecretCodec],
@@ -403,7 +416,7 @@ describe('createRuntime', () => {
 
     expect(driver.__spies.rootExecute).toHaveBeenCalledOnce();
     expect(driver.__spies.rootExecute.mock.calls[0]?.[0]).toMatchObject({
-      params: ['enc:Alice'],
+      params: [await encryptSecret('Alice', runtimeSecretSeed)],
     });
   });
 

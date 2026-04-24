@@ -21,6 +21,7 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
+import { createAsyncSecretCodec, encryptSecret } from './seeded-secret-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
 // =============================================================================
@@ -76,6 +77,8 @@ const postMetadataSchema: Record<string, unknown> = {
   required: ['postTitle'],
 };
 
+const asyncSecretSeed = 'json-schema-validation-secret';
+
 function createMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
   const validators = new Map<string, JsonSchemaValidateFn>();
   validators.set('user.metadata', createStubValidator(metadataSchema));
@@ -120,20 +123,7 @@ function createTestCodecRegistry(): CodecRegistry {
 
 function createAsyncCodecRegistry(): CodecRegistry {
   const registry = createTestCodecRegistry();
-  registry.register(
-    codec({
-      typeId: 'pg/secret@1',
-      targetTypes: ['text'],
-      runtime: { encode: 'async', decode: 'async' } as const,
-      encode: async (value: string) => `enc:${value}`,
-      decode: async (wire: string) => {
-        if (!wire.startsWith('enc:')) {
-          throw new Error('invalid secret payload');
-        }
-        return wire.slice(4);
-      },
-    }),
-  );
+  registry.register(createAsyncSecretCodec({ seed: asyncSecretSeed }));
   registry.register(
     codec({
       typeId: 'pg/async-jsonb@1',
@@ -448,7 +438,7 @@ describe('JSON Schema encoding validation', () => {
     });
 
     const result = await encodeParamsAsync(plan, codecRegistry);
-    expect(result[0]).toBe('enc:Alice');
+    expect(result[0]).toBe(await encryptSecret('Alice', asyncSecretSeed));
   });
 });
 
@@ -666,7 +656,7 @@ describe('JSON Schema decoding validation', () => {
       },
     });
 
-    const row = { id: 7, secret: 'enc:Alice' };
+    const row = { id: 7, secret: await encryptSecret('Alice', asyncSecretSeed) };
     const result = decodeRow(row, plan, codecRegistry);
 
     expect(result['id']).toBe(7);
