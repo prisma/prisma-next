@@ -44,6 +44,18 @@ describe('readMarker', () => {
     expect(marker).not.toBeNull();
     expect(marker?.meta).toEqual({});
   });
+
+  it('defaults invariants to empty array when the field is absent (natural schemaless behaviour)', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual([]);
+  });
 });
 
 describe('initMarker', () => {
@@ -62,6 +74,18 @@ describe('initMarker', () => {
     expect(marker?.contractJson).toBeNull();
     expect(marker?.canonicalVersion).toBeNull();
     expect(marker?.appTag).toBeNull();
+    expect(marker?.invariants).toEqual([]);
+  });
+
+  it('writes invariants to the marker document', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      invariants: ['alpha', 'beta'],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 });
 
@@ -99,6 +123,40 @@ describe('updateMarker', () => {
 
     const marker = await readMarker(db);
     expect(marker?.storageHash).toBe('sha256:v1');
+  });
+
+  it('writes the caller-supplied invariants (already-unioned) to the doc', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha'],
+    });
+
+    const updated = await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: ['alpha', 'beta'],
+    });
+
+    expect(updated).toBe(true);
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
+  });
+
+  it('leaves existing invariants untouched when the caller omits the field', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha']);
   });
 });
 

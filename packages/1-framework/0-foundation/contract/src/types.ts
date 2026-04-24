@@ -220,4 +220,5 @@ export interface ContractMarkerRecord {
   readonly updatedAt: Date;
   readonly appTag: string | null;
   readonly meta: Record<string, unknown>;
+  readonly invariants: readonly string[];
 }

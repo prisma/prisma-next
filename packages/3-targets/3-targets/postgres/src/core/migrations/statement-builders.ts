@@ -17,7 +17,8 @@ export const ensureMarkerTableStatement: SqlStatement = {
     canonical_version int,
     updated_at timestamptz not null default now(),
     app_tag text,
-    meta jsonb not null default '{}'
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
   )`,
   params: [],
 };
@@ -44,6 +45,7 @@ export interface WriteMarkerInput {
   readonly canonicalVersion?: number | null;
   readonly appTag?: string | null;
   readonly meta?: Record<string, unknown>;
+  readonly invariants: readonly string[];
 }
 
 export function buildWriteMarkerStatements(input: WriteMarkerInput): {
@@ -58,6 +60,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
     input.canonicalVersion ?? null,
     input.appTag ?? null,
     jsonParam(input.meta ?? {}),
+    input.invariants,
   ];
 
   return {
@@ -70,7 +73,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version,
         updated_at,
         app_tag,
-        meta
+        meta,
+        invariants
       ) values (
         $1,
         $2,
@@ -79,7 +83,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         $5,
         now(),
         $6,
-        $7::jsonb
+        $7::jsonb,
+        $8::text[]
       )`,
       params,
     },
@@ -91,7 +96,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version = $5,
         updated_at = now(),
         app_tag = $6,
-        meta = $7::jsonb
+        meta = $7::jsonb,
+        invariants = $8::text[]
       where id = $1`,
       params,
     },

@@ -296,6 +296,12 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
    * All components must have matching familyId ('sql') and targetId.
    */
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
+  /**
+   * Invariant ids contributed by this apply (the migration's `providedInvariants`).
+   * The runner unions these into `marker.invariants` atomically with the marker write.
+   * Defaults to `[]` for marker-only flows (`db update`, `db init`).
+   */
+  readonly invariants?: readonly string[];
 }
 
 export type SqlMigrationRunnerErrorCode =

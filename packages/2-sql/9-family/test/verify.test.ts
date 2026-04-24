@@ -11,6 +11,7 @@ describe('marker parser', () => {
       updated_at: new Date('2024-01-01T00:00:00Z'),
       app_tag: 'my-app',
       meta: { key: 'value' },
+      invariants: ['alpha', 'beta'],
     };
 
     const result = parseContractMarkerRow(row);
@@ -23,6 +24,7 @@ describe('marker parser', () => {
       updatedAt: new Date('2024-01-01T00:00:00Z'),
       appTag: 'my-app',
       meta: { key: 'value' },
+      invariants: ['alpha', 'beta'],
     });
   });
 
@@ -42,7 +44,30 @@ describe('marker parser', () => {
       updatedAt: expect.any(Date),
       appTag: null,
       meta: {},
+      invariants: [],
     });
+  });
+
+  it('defaults invariants to empty array when the field is absent', () => {
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+      meta: { k: 'v' },
+    };
+
+    const result = parseContractMarkerRow(row);
+    expect(result.invariants).toEqual([]);
+  });
+
+  it('defaults invariants to empty array when the field is null', () => {
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+      invariants: null,
+    };
+
+    const result = parseContractMarkerRow(row);
+    expect(result.invariants).toEqual([]);
   });
 
   it('parses updated_at as string', () => {

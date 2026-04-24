@@ -843,6 +843,7 @@ describe('ControlClient progress emission', () => {
         updatedAt: new Date(),
         appTag: null,
         meta: {},
+        invariants: [],
       };
       mockFamilyInstance.readMarker = async () => expectedMarker;
 

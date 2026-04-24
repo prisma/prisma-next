@@ -159,4 +159,86 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
       },
     );
   });
+
+  describe('when applying with invariants', () => {
+    it(
+      'unions invariants into the marker monotonically across repeated applies',
+      { timeout: testTimeout },
+      async () => {
+        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+        const initialPlan = planner.plan({
+          contract,
+          schema: emptySchema,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        if (initialPlan.kind !== 'success') {
+          throw new Error('expected initial planner success');
+        }
+
+        const emptyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [],
+        });
+
+        const readInvariants = async (): Promise<string[]> => {
+          const row = await driver!.query<{ invariants: string[] }>(
+            'select invariants from prisma_contract.marker where id = $1',
+            [1],
+          );
+          return row.rows[0]?.invariants ?? [];
+        };
+
+        // Initial apply writes the schema and seeds the invariant set.
+        const firstResult = await runner.execute({
+          plan: initialPlan.plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['alpha'],
+        });
+        expect(firstResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha']);
+
+        // Subsequent applies run empty plans (schema already matches) but still union invariants.
+        const secondResult = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['beta'],
+        });
+        expect(secondResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta']);
+
+        // Re-declaring an already-stored invariant stays deduped; adding a new one extends.
+        const thirdResult = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['alpha', 'gamma'],
+        });
+        expect(thirdResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'gamma']);
+
+        // Marker-only apply (no invariants option) preserves the existing set.
+        const fourthResult = await runner.execute({
+          plan: emptyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        expect(fourthResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'gamma']);
+      },
+    );
+  });
 });

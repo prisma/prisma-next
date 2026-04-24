@@ -36,6 +36,7 @@ const ContractMarkerRowSchema = type({
   'updated_at?': 'Date | string',
   'app_tag?': 'string | null',
   'meta?': 'unknown | null',
+  'invariants?': type('string').array().or('null'),
 });
 
 /**
@@ -57,6 +58,7 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     updated_at?: Date | string;
     app_tag?: string | null;
     meta?: unknown | null;
+    invariants?: readonly string[] | null;
   };
 
   const updatedAt = validatedRow.updated_at
@@ -73,6 +75,7 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     updatedAt,
     appTag: validatedRow.app_tag ?? null,
     meta: parseMeta(validatedRow.meta),
+    invariants: validatedRow.invariants ?? [],
   };
 }
 
@@ -90,7 +93,8 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
       canonical_version,
       updated_at,
       app_tag,
-      meta
+      meta,
+      invariants
     from prisma_contract.marker
     where id = $1`,
     params: [1],
@@ -149,6 +153,7 @@ export async function readMarker(
     updated_at: Date | string;
     app_tag: string | null;
     meta: unknown | null;
+    invariants: readonly string[] | null;
   }>(markerStatement.sql, markerStatement.params);
 
   if (queryResult.rows.length === 0) {
