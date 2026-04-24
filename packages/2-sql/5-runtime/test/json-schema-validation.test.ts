@@ -253,6 +253,14 @@ function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
   };
 }
 
+function expectPromise(value: unknown): Promise<unknown> {
+  expect(value).toBeInstanceOf(Promise);
+  if (!(value instanceof Promise)) {
+    throw new Error('Expected promise-valued decode result');
+  }
+  return value;
+}
+
 // =============================================================================
 // Tests: Validator Registry via createExecutionContext
 // =============================================================================
@@ -660,8 +668,7 @@ describe('JSON Schema decoding validation', () => {
     const result = decodeRow(row, plan, codecRegistry);
 
     expect(result['id']).toBe(7);
-    expect(result['secret']).toBeInstanceOf(Promise);
-    await expect(result['secret'] as Promise<unknown>).resolves.toBe('Alice');
+    await expect(expectPromise(result['secret'])).resolves.toBe('Alice');
   });
 
   it('wraps async decode failures with runtime context', async () => {
@@ -680,7 +687,7 @@ describe('JSON Schema decoding validation', () => {
     const row = { secret: 'bad-payload' };
     const result = decodeRow(row, plan, codecRegistry);
 
-    await expect(result['secret'] as Promise<unknown>).rejects.toMatchObject({
+    await expect(expectPromise(result['secret'])).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       details: expect.objectContaining({
         alias: 'secret',
@@ -705,7 +712,7 @@ describe('JSON Schema decoding validation', () => {
     const row = { metadata: '{"age":30}' };
     const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
 
-    await expect(result['metadata'] as Promise<unknown>).rejects.toMatchObject({
+    await expect(expectPromise(result['metadata'])).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       details: expect.objectContaining({
         table: 'user',
