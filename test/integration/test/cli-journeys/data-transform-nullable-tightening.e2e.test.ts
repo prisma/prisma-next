@@ -13,7 +13,7 @@
  * `migration apply` and asserts the post-apply NULL row has been
  * backfilled and the column is NOT NULL.
  *
- * Phase 2 acceptance: covers `migrationPlanCallStrategies` end-to-end
+ * Phase 2 acceptance: covers `postgresPlannerStrategies` (data-safe path) end-to-end
  * for the nullable-tightening case (plan.md AC R2.2 #3).
  */
 

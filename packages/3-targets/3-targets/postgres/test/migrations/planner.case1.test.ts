@@ -147,6 +147,38 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
     expect(uniqueOp!.execute[0]!.sql).toContain('"user_email_key"');
   });
 
+  it('emits extension install for migration plan policy (data class allowed)', () => {
+    // Regression: the planner used to dispatch on the `'data'` operation
+    // class to a strategy chain that did NOT include
+    // `dependencyInstallCallStrategy`, causing `migration plan` to fail with
+    // `Unknown dependency type: postgres.extension.vector` for any contract
+    // using extension packs. The unified `postgresPlannerStrategies` chain
+    // must produce the install op for both `db init` and `migration plan`
+    // policies.
+    const planner = createPostgresMigrationPlanner();
+    const frameworkComponents = [pgvectorDescriptor];
+
+    const result = planner.plan({
+      contract,
+      schema: emptySchema,
+      policy: {
+        allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
+      },
+      frameworkComponents,
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') {
+      throw new Error(`Expected success but got ${JSON.stringify(result)}`);
+    }
+    const operationIds = result.plan.operations.map((op) => op.id);
+    expect(operationIds).toContain('extension.vector');
+    expect(result.plan.operations.find((op) => op.id === 'extension.vector')).toMatchObject({
+      label: 'Enable extension "vector"',
+      execute: [{ sql: 'CREATE EXTENSION IF NOT EXISTS vector' }],
+    });
+  });
+
   it('ignores non-postgres dependency install operations', () => {
     const planner = createPostgresMigrationPlanner();
     const mysqlDependency: ComponentDatabaseDependency<unknown> = {

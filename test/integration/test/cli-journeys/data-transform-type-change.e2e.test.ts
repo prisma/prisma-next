@@ -13,7 +13,7 @@
  * `migration apply` and asserts the post-apply column has switched
  * to `int4` with the expected integer values.
  *
- * Phase 2 acceptance: covers `migrationPlanCallStrategies` end-to-end
+ * Phase 2 acceptance: covers `postgresPlannerStrategies` (data-safe path) end-to-end
  * for the unsafe type-change case (plan.md AC R2.2 #2).
  */
 
