@@ -8,6 +8,81 @@ import {
   defineCodecs,
 } from '../../src/ast/codec-types';
 
+const textEncoder = new TextEncoder();
+const textDecoder = new TextDecoder();
+
+function toBase64(bytes: Uint8Array): string {
+  return Buffer.from(bytes).toString('base64');
+}
+
+function fromBase64(value: string): Uint8Array {
+  return Uint8Array.from(Buffer.from(value, 'base64'));
+}
+
+async function digestBytes(value: string): Promise<Uint8Array> {
+  return new Uint8Array(
+    await globalThis.crypto.subtle.digest('SHA-256', textEncoder.encode(value)),
+  );
+}
+
+async function encryptWithSeed(seed: string, value: string): Promise<string> {
+  const [keyBytes, iv] = await Promise.all([
+    digestBytes(`${seed}:key`),
+    digestBytes(`${seed}:iv:${value}`).then((bytes) => bytes.slice(0, 12)),
+  ]);
+  const key = await globalThis.crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM' },
+    false,
+    ['encrypt'],
+  );
+  const ciphertext = await globalThis.crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    textEncoder.encode(value),
+  );
+  return `${toBase64(iv)}:${toBase64(new Uint8Array(ciphertext))}`;
+}
+
+async function decryptWithSeed(seed: string, wire: string): Promise<string> {
+  const [ivEncoded, ciphertextEncoded, extra] = wire.split(':');
+  if (
+    ivEncoded === undefined ||
+    ciphertextEncoded === undefined ||
+    extra !== undefined ||
+    ivEncoded.length === 0 ||
+    ciphertextEncoded.length === 0
+  ) {
+    throw new Error('invalid encrypted payload');
+  }
+
+  const keyBytes = await digestBytes(`${seed}:key`);
+  const key = await globalThis.crypto.subtle.importKey(
+    'raw',
+    keyBytes,
+    { name: 'AES-GCM' },
+    false,
+    ['decrypt'],
+  );
+  const plaintext = await globalThis.crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: fromBase64(ivEncoded) },
+    key,
+    fromBase64(ciphertextEncoded),
+  );
+  return textDecoder.decode(plaintext);
+}
+
+function createAsyncSecretCodec(seed: string) {
+  return codec({
+    typeId: 'test/encrypted@1',
+    targetTypes: ['text'],
+    runtime: { encode: 'async', decode: 'async' } as const,
+    encode: (value: string) => encryptWithSeed(seed, value),
+    decode: (wire: string) => decryptWithSeed(seed, wire),
+  });
+}
+
 describe('codec factory', () => {
   it('creates codec with id, targetTypes, encode, and decode', () => {
     const testCodec = codec({
@@ -69,6 +144,17 @@ describe('codec factory', () => {
     expect(testCodec.decodeJson('world')).toBe('world');
   });
 
+  it('omits runtime when not provided', () => {
+    const testCodec = codec({
+      typeId: 'test/without-runtime@1',
+      targetTypes: ['text'],
+      encode: (value: string) => value,
+      decode: (wire: string) => wire,
+    });
+
+    expect('runtime' in testCodec).toBe(false);
+  });
+
   it.each([
     {
       label: 'without meta',
@@ -113,18 +199,16 @@ describe('codec factory', () => {
     check(testCodec);
   });
 
-  it('creates codecs with async runtime metadata and split input/output types', () => {
-    const testCodec = codec({
-      typeId: 'test/async@1',
-      targetTypes: ['text'],
-      runtime: { encode: 'async', decode: 'async' } as const,
-      encode: async (value: string) => value.toUpperCase(),
-      decode: async (wire: string) => wire.toLowerCase(),
-    });
+  it('creates codecs with async runtime metadata and split input/output types', async () => {
+    const testCodec = createAsyncSecretCodec('codec-factory-seed');
 
     expect(testCodec.runtime).toEqual({ encode: 'async', decode: 'async' });
     expectTypeOf<CodecInput<typeof testCodec>>().toEqualTypeOf<string>();
     expectTypeOf<CodecOutput<typeof testCodec>>().toEqualTypeOf<Promise<string>>();
+
+    const wire = await testCodec.encode!('cleartext');
+    expect(wire).not.toBe('cleartext');
+    await expect(testCodec.decode(wire)).resolves.toBe('cleartext');
   });
 });
 
@@ -495,14 +579,8 @@ describe('CodecDefBuilder', () => {
     expect('test/type1@1' in builder.CodecTypes).toBe(true);
   });
 
-  it('keeps write input types plain when async decode widens read outputs', () => {
-    const asyncCodec = codec({
-      typeId: 'test/encrypted@1',
-      targetTypes: ['text'],
-      runtime: { decode: 'async' } as const,
-      encode: (value: string) => value.toUpperCase(),
-      decode: async (wire: string) => wire.toLowerCase(),
-    });
+  it('keeps write input types plain when async codecs round-trip through defineCodecs()', async () => {
+    const asyncCodec = createAsyncSecretCodec('builder-seed');
 
     const builder = defineCodecs().add('text', asyncCodec);
 
@@ -515,6 +593,11 @@ describe('CodecDefBuilder', () => {
     expectTypeOf<typeof builder.codecDefinitions.text.input>().toEqualTypeOf<string>();
     expectTypeOf<typeof builder.codecDefinitions.text.output>().toEqualTypeOf<Promise<string>>();
     expectTypeOf<typeof builder.codecDefinitions.text.jsType>().toEqualTypeOf<Promise<string>>();
+
+    const wire = await builder.codecDefinitions.text.codec.encode!('cleartext');
+    expect(wire).not.toBe('cleartext');
+    expect(wire).toBe(await builder.codecDefinitions.text.codec.encode!('cleartext'));
+    await expect(builder.codecDefinitions.text.codec.decode(wire)).resolves.toBe('cleartext');
   });
 });
 

@@ -247,13 +247,24 @@ export function codec<
   RuntimeDecodeIsAsync<TRuntime>
 > {
   const identity = (v: unknown) => v;
-  return {
+  type CodecResult = Codec<
+    Id,
+    TTraits,
+    TWire,
+    TInput,
+    TParams,
+    THelper,
+    TOutput,
+    RuntimeEncodeIsAsync<TRuntime>,
+    RuntimeDecodeIsAsync<TRuntime>
+  >;
+
+  const baseCodec: Omit<CodecResult, 'runtime'> = {
     id: config.typeId,
     targetTypes: config.targetTypes,
     ...ifDefined('meta', config.meta),
     ...ifDefined('paramsSchema', config.paramsSchema),
     ...ifDefined('init', config.init),
-    ...ifDefined('runtime', config.runtime),
     ...ifDefined(
       'traits',
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
@@ -264,13 +275,36 @@ export function codec<
     encodeJson: (config.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
+
+  if (config.runtime === undefined) {
+    return baseCodec;
+  }
+
+  return {
+    ...baseCodec,
+    runtime: config.runtime,
+  };
 }
 
 /**
  * Type helpers to extract codec types.
  */
 export type CodecId<T> =
-  T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
+  T extends Codec<
+    infer Id,
+    infer _TTraits,
+    infer _TWire,
+    infer _TInput,
+    infer _TParams,
+    infer _THelper,
+    infer _TOutput,
+    infer _TEncodeAsync,
+    infer _TDecodeAsync
+  >
+    ? Id
+    : T extends { readonly id: infer Id }
+      ? Id
+      : never;
 export type CodecInput<T> =
   T extends Codec<
     string,
@@ -302,15 +336,27 @@ export type CodecOutput<T> =
       : TOutput
     : never;
 export type CodecTraits<T> =
-  T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
+  T extends Codec<
+    string,
+    infer TTraits,
+    infer _TWire,
+    infer _TInput,
+    infer _TParams,
+    infer _THelper,
+    infer _TOutput,
+    infer _TEncodeAsync,
+    infer _TDecodeAsync
+  >
+    ? TTraits[number] & CodecTrait
+    : never;
 
 /**
  * Type helper to extract codec types from builder instance.
  */
 export type ExtractCodecTypes<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
+  ScalarNames extends { readonly [K in keyof ScalarNames]: AnyCodec } = Record<never, never>,
 > = {
-  readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id> ? Id : never]: {
+  readonly [K in keyof ScalarNames as CodecId<ScalarNames[K]> & string]: {
     readonly input: CodecInput<ScalarNames[K]>;
     readonly output: CodecOutput<ScalarNames[K]>;
     readonly traits: CodecTraits<ScalarNames[K]>;
@@ -324,23 +370,22 @@ export type ExtractCodecTypes<
  * we extract it by creating a mapped type that uses the Id as both key and value,
  * then extract the value type. This preserves literal types.
  */
-export type ExtractDataTypes<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> },
-> = {
-  readonly [K in keyof ScalarNames]: {
-    readonly [Id in keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>]: Id;
-  }[keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>];
-};
+export type ExtractDataTypes<ScalarNames extends { readonly [K in keyof ScalarNames]: AnyCodec }> =
+  {
+    readonly [K in keyof ScalarNames]: {
+      readonly [Id in keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>]: Id;
+    }[keyof ExtractCodecTypes<Record<K, ScalarNames[K]>>];
+  };
 
 /**
  * Builder interface for declaring codecs.
  */
 export interface CodecDefBuilder<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
+  ScalarNames extends { readonly [K in keyof ScalarNames]: AnyCodec } = Record<never, never>,
 > {
   readonly CodecTypes: ExtractCodecTypes<ScalarNames>;
 
-  add<ScalarName extends string, CodecImpl extends Codec<string>>(
+  add<ScalarName extends string, CodecImpl extends AnyCodec>(
     scalarName: ScalarName,
     codecImpl: CodecImpl,
   ): CodecDefBuilder<
@@ -349,7 +394,7 @@ export interface CodecDefBuilder<
 
   readonly codecDefinitions: {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id extends string> ? Id : never;
+      readonly typeId: CodecId<ScalarNames[K]> & string;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -369,7 +414,7 @@ export interface CodecDefBuilder<
  * Implementation of CodecDefBuilder.
  */
 class CodecDefBuilderImpl<
-  ScalarNames extends { readonly [K in keyof ScalarNames]: Codec<string> } = Record<never, never>,
+  ScalarNames extends { readonly [K in keyof ScalarNames]: AnyCodec } = Record<never, never>,
 > implements CodecDefBuilder<ScalarNames>
 {
   private readonly _codecs: ScalarNames;
@@ -390,7 +435,7 @@ class CodecDefBuilderImpl<
       { readonly input: unknown; readonly output: unknown; readonly traits: unknown }
     > = {};
     for (const [, codecImpl] of Object.entries(this._codecs)) {
-      const codecImplTyped = codecImpl as Codec<string>;
+      const codecImplTyped = codecImpl as AnyCodec;
       codecTypes[codecImplTyped.id] = {
         input: undefined as unknown as CodecInput<typeof codecImplTyped>,
         output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
@@ -406,7 +451,7 @@ class CodecDefBuilderImpl<
     const dataTypes = {} as any;
     for (const key in this._codecs) {
       if (Object.hasOwn(this._codecs, key)) {
-        const codec = this._codecs[key] as Codec<string>;
+        const codec = this._codecs[key] as AnyCodec;
         dataTypes[key] = codec.id;
       }
     }
@@ -417,7 +462,7 @@ class CodecDefBuilderImpl<
     };
   }
 
-  add<ScalarName extends string, CodecImpl extends Codec<string>>(
+  add<ScalarName extends string, CodecImpl extends AnyCodec>(
     scalarName: ScalarName,
     codecImpl: CodecImpl,
   ): CodecDefBuilder<
@@ -434,7 +479,7 @@ class CodecDefBuilderImpl<
    */
   get codecDefinitions(): {
     readonly [K in keyof ScalarNames]: {
-      readonly typeId: ScalarNames[K] extends Codec<infer Id> ? Id : never;
+      readonly typeId: CodecId<ScalarNames[K]> & string;
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
@@ -447,7 +492,7 @@ class CodecDefBuilderImpl<
       {
         typeId: string;
         scalar: string;
-        codec: Codec;
+        codec: AnyCodec;
         input: unknown;
         output: unknown;
         jsType: unknown;
@@ -455,7 +500,7 @@ class CodecDefBuilderImpl<
     > = {};
 
     for (const [scalarName, codecImpl] of Object.entries(this._codecs)) {
-      const codec = codecImpl as Codec<string>;
+      const codec = codecImpl as AnyCodec;
       result[scalarName] = {
         typeId: codec.id,
         scalar: scalarName,
@@ -468,7 +513,7 @@ class CodecDefBuilderImpl<
 
     return result as {
       readonly [K in keyof ScalarNames]: {
-        readonly typeId: ScalarNames[K] extends Codec<infer Id extends string> ? Id : never;
+        readonly typeId: CodecId<ScalarNames[K]> & string;
         readonly scalar: K;
         readonly codec: ScalarNames[K];
         readonly input: CodecInput<ScalarNames[K]>;
