@@ -1,6 +1,11 @@
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
+  AnyQueryAst,
+  LoweredStatement,
+  LowererContext,
+} from '@prisma-next/sql-relational-core/ast';
+import type {
   DependencyIR,
   PrimaryKey,
   SqlColumnIR,
@@ -14,6 +19,8 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { parsePostgresDefault } from './default-normalizer';
 import { pgEnumControlHooks } from './enum-control-hooks';
+import { renderLoweredSql } from './sql-renderer';
+import type { PostgresContract } from './types';
 
 /**
  * Postgres control plane adapter for control-plane operations like introspection.
@@ -35,6 +42,18 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * before comparison with contract native types.
    */
   readonly normalizeNativeType = normalizeSchemaNativeType;
+
+  /**
+   * Lower a SQL query AST into a Postgres-flavored `{ sql, params }` payload.
+   *
+   * Delegates to the shared `renderLoweredSql` renderer so the control adapter
+   * emits byte-identical SQL to `PostgresAdapterImpl.lower()` for the same AST
+   * and contract. Used at migration plan/emit time (e.g. by `dataTransform`)
+   * without instantiating the runtime adapter.
+   */
+  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+    return renderLoweredSql(ast, context.contract as PostgresContract);
+  }
 
   /**
    * Introspects a Postgres database schema and returns a raw SqlSchemaIR.
