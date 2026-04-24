@@ -122,6 +122,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           contractJson: { storageHash: 'sha256:other-contract' },
           canonicalVersion: null,
           meta: {},
+          invariants: [],
         });
         await executeStatement(driver!, mismatchedMarker.insert);
 

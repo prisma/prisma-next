@@ -34,10 +34,15 @@ export interface MarkerOperations {
   initMarker(destination: {
     readonly storageHash: string;
     readonly profileHash: string;
+    readonly invariants?: readonly string[];
   }): Promise<void>;
   updateMarker(
     expectedFrom: string,
-    destination: { readonly storageHash: string; readonly profileHash: string },
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
   ): Promise<boolean>;
   writeLedgerEntry(entry: {
     readonly edgeId: string;
@@ -67,6 +72,12 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   readonly strictVerification?: boolean;
   readonly context?: OperationContext;
+  /**
+   * Invariant ids contributed by this apply (the migration's `providedInvariants`).
+   * The runner unions these into `marker.invariants` atomically with the marker write.
+   * Defaults to `[]` for marker-only flows.
+   */
+  readonly invariants?: readonly string[];
 }
 
 function runnerFailure(
@@ -79,6 +90,13 @@ function runnerFailure(
     summary,
     ...opts,
   });
+}
+
+function unionInvariants(
+  existing: readonly string[],
+  incoming: readonly string[],
+): readonly string[] {
+  return Array.from(new Set([...existing, ...incoming])).sort();
 }
 
 export class MongoMigrationRunner {
@@ -200,10 +218,16 @@ export class MongoMigrationRunner {
       });
     }
 
+    const unionedInvariants = unionInvariants(
+      existingMarker?.invariants ?? [],
+      options.invariants ?? [],
+    );
+
     if (existingMarker) {
       const updated = await markerOps.updateMarker(existingMarker.storageHash, {
         storageHash: destination.storageHash,
         profileHash,
+        invariants: unionedInvariants,
       });
       if (!updated) {
         return runnerFailure(
@@ -221,6 +245,7 @@ export class MongoMigrationRunner {
       await markerOps.initMarker({
         storageHash: destination.storageHash,
         profileHash,
+        invariants: unionedInvariants,
       });
     }
 

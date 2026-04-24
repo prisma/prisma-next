@@ -57,6 +57,13 @@ function isDataTransformOperation(op: unknown): op is DataTransformOperation {
   );
 }
 
+function unionInvariants(
+  existing: readonly string[],
+  incoming: readonly string[],
+): readonly string[] {
+  return Array.from(new Set([...existing, ...incoming])).sort();
+}
+
 /**
  * Deep clones and freezes a record object to prevent mutation.
  * Recursively clones nested objects and arrays to ensure complete isolation.
@@ -617,6 +624,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
+    const unionedInvariants = unionInvariants(
+      existingMarker?.invariants ?? [],
+      options.invariants ?? [],
+    );
     const writeStatements = buildWriteMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:
@@ -626,6 +637,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       contractJson: options.destinationContract,
       canonicalVersion: null,
       meta: {},
+      invariants: unionedInvariants,
     });
     const statement = existingMarker ? writeStatements.update : writeStatements.insert;
     await this.executeStatement(driver, statement);

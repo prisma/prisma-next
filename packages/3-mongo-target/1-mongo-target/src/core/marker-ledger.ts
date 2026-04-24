@@ -42,12 +42,17 @@ export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
     updatedAt: doc['updatedAt'] as Date,
     appTag: (doc['appTag'] as string) ?? null,
     meta: (doc['meta'] as Record<string, unknown>) ?? {},
+    invariants: (doc['invariants'] as readonly string[]) ?? [],
   };
 }
 
 export async function initMarker(
   db: Db,
-  destination: { readonly storageHash: string; readonly profileHash: string },
+  destination: {
+    readonly storageHash: string;
+    readonly profileHash: string;
+    readonly invariants?: readonly string[];
+  },
 ): Promise<void> {
   const cmd = new RawInsertOneCommand(COLLECTION, {
     _id: MARKER_ID,
@@ -58,6 +63,7 @@ export async function initMarker(
     updatedAt: new Date(),
     appTag: null,
     meta: {},
+    invariants: destination.invariants ?? [],
   });
   await executeInsertOne(db, cmd);
 }
@@ -65,18 +71,24 @@ export async function initMarker(
 export async function updateMarker(
   db: Db,
   expectedFrom: string,
-  destination: { readonly storageHash: string; readonly profileHash: string },
+  destination: {
+    readonly storageHash: string;
+    readonly profileHash: string;
+    readonly invariants?: readonly string[];
+  },
 ): Promise<boolean> {
+  const set: Record<string, unknown> = {
+    storageHash: destination.storageHash,
+    profileHash: destination.profileHash,
+    updatedAt: new Date(),
+  };
+  if (destination.invariants !== undefined) {
+    set['invariants'] = destination.invariants;
+  }
   const cmd = new RawFindOneAndUpdateCommand(
     COLLECTION,
     { _id: MARKER_ID, storageHash: expectedFrom },
-    {
-      $set: {
-        storageHash: destination.storageHash,
-        profileHash: destination.profileHash,
-        updatedAt: new Date(),
-      },
-    },
+    { $set: set },
     false,
   );
   const result = await executeFindOneAndUpdate(db, cmd);

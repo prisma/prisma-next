@@ -464,6 +464,7 @@ describe('MongoMigrationRunner schema verification', () => {
         updatedAt: new Date(),
         appTag: null,
         meta: {},
+        invariants: [],
       }),
     };
     let introspectCalls = 0;
