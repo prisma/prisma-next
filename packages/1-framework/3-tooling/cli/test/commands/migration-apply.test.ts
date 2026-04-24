@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { attestMigration } from '@prisma-next/migration-tools/attestation';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -13,7 +13,6 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { isAttested } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -48,10 +47,9 @@ async function writeAttestedMigration(
 ): Promise<{ dirName: string; migrationId: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
   const packageDir = join(migrationsDir, dirName);
-  const manifest: MigrationManifest = {
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: opts.from,
     to: opts.to,
-    migrationId: null,
     kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
@@ -63,8 +61,9 @@ async function writeAttestedMigration(
     labels: [],
     createdAt: opts.timestamp.toISOString(),
   };
+  const migrationId = computeMigrationId(baseManifest, opts.ops);
+  const manifest: MigrationManifest = { ...baseManifest, migrationId };
   await writeMigrationPackage(packageDir, manifest, opts.ops);
-  const migrationId = await attestMigration(packageDir);
   return { dirName, migrationId };
 }
 
@@ -102,7 +101,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -163,7 +162,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -226,7 +225,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
 
       const pathToContractA = findPath(graph, EMPTY_CONTRACT_HASH, 'sha256:hash-a');
@@ -250,7 +249,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -274,7 +273,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -282,8 +281,12 @@ describe(
       expect(path).toBeNull();
     });
 
-    it('skips draft migrations when resolving pending path', async () => {
-      const tempDir = await createTempDir('skip-drafts');
+    it('rejects legacy draft packages (`migrationId: null`) at read time', async () => {
+      // After the draft state was collapsed, the schema rejects any
+      // on-disk manifest with `migrationId: null`. We construct one
+      // directly to confirm the read path surfaces a schema error
+      // pointing at the offending file rather than silently skipping it.
+      const tempDir = await createTempDir('reject-legacy-draft');
       const migrationsDir = join(tempDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
 
@@ -297,32 +300,29 @@ describe(
         slug: 'initial',
       });
 
-      const draftManifest: MigrationManifest = {
+      const legacyDraftDir = join(
+        migrationsDir,
+        formatMigrationDirName(new Date(2026, 0, 2), 'legacy-draft'),
+      );
+      const baseManifest = {
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
-        migrationId: null,
-        kind: 'regular',
+        kind: 'regular' as const,
         fromContract: createContract(),
         toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
         createdAt: new Date().toISOString(),
       };
-      const draftDir = join(migrationsDir, formatMigrationDirName(new Date(2026, 0, 2), 'draft'));
-      await writeMigrationPackage(draftDir, draftManifest, []);
+      const legacyJson = JSON.stringify({ ...baseManifest, migrationId: null });
+      await mkdir(legacyDraftDir, { recursive: true });
+      const { writeFile } = await import('node:fs/promises');
+      await writeFile(join(legacyDraftDir, 'migration.json'), legacyJson);
+      await writeFile(join(legacyDraftDir, 'ops.json'), '[]');
 
-      const allPackages = await readMigrationsDir(migrationsDir);
-      expect(allPackages).toHaveLength(2);
-
-      const attested = allPackages.filter(isAttested);
-      expect(attested).toHaveLength(1);
-
-      const graph = reconstructGraph(attested);
-      const leaf = findLeaf(graph);
-      expect(leaf).toBe('sha256:hash-a');
-
-      const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf!);
-      expect(path).toHaveLength(1);
+      await expect(readMigrationsDir(migrationsDir)).rejects.toMatchObject({
+        code: 'MIGRATION.INVALID_MANIFEST',
+      });
     });
 
     it('distinguishes corrupted empty-sentinel marker from absent marker', async () => {
@@ -373,7 +373,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
 
@@ -411,7 +411,7 @@ describe(
       });
 
       const packages = await readMigrationsDir(migrationsDir);
-      const attested = packages.filter(isAttested);
+      const attested = packages;
       const graph = reconstructGraph(attested);
       const leaf = findLeaf(graph);
       const path = findPath(graph, EMPTY_CONTRACT_HASH, leaf!)!;

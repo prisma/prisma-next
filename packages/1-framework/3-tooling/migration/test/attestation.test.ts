@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import type { Contract } from '@prisma-next/contract/types';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { attestMigration, computeMigrationId, verifyMigration } from '../src/attestation';
+import { computeMigrationId, verifyMigration, verifyMigrationBundle } from '../src/attestation';
 import { canonicalizeJson } from '../src/canonicalize-json';
 import { writeMigrationPackage } from '../src/io';
 import { createTestContract, createTestManifest, createTestOps } from './fixtures';
@@ -162,7 +162,7 @@ describe('computeMigrationId', () => {
   });
 });
 
-describe('attestMigration + verifyMigration', () => {
+describe('verifyMigration', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
@@ -173,32 +173,21 @@ describe('attestMigration + verifyMigration', () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  it('attests a draft and subsequent verify passes', async () => {
+  it('passes for a freshly written attested package', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
-    await writeMigrationPackage(dir, createTestManifest(), createTestOps());
-
-    const migrationId = await attestMigration(dir);
-    expect(migrationId).toMatch(/^sha256:/);
+    const ops = createTestOps();
+    const manifest = createTestManifest({}, ops);
+    await writeMigrationPackage(dir, manifest, ops);
 
     const result = await verifyMigration(dir);
     expect(result.ok).toBe(true);
   });
 
-  it('verify returns draft status for unattested migration', async () => {
-    const dir = join(tmpDir, '20260225T1430_draft');
-    await writeMigrationPackage(dir, createTestManifest({ migrationId: null }), createTestOps());
-
-    const result = await verifyMigration(dir);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('draft');
-  });
-
-  it('verify detects tampered ops', async () => {
+  it('detects tampered ops', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered');
-    const manifest = createTestManifest();
     const ops = createTestOps();
+    const manifest = createTestManifest({}, ops);
     await writeMigrationPackage(dir, manifest, ops);
-    await attestMigration(dir);
 
     await writeFile(join(dir, 'ops.json'), JSON.stringify([], null, 2));
 
@@ -207,15 +196,52 @@ describe('attestMigration + verifyMigration', () => {
     expect(result.reason).toBe('mismatch');
   });
 
-  it('verify detects tampered manifest field', async () => {
+  it('verifyMigrationBundle reports mismatch for an in-memory tampered bundle', () => {
+    // Mirrors the apply-time defense-in-depth check: every loaded bundle
+    // is rehashed and a tampered ops list (post-load corruption) must
+    // surface a mismatch with both the stored and recomputed ids so the
+    // CLI can point users at the offending directory.
+    const ops = createTestOps();
+    const baseManifest = {
+      from: 'sha256:empty',
+      to: 'sha256:abc123',
+      kind: 'regular' as const,
+      fromContract: null,
+      toContract: createTestContract(),
+      hints: { used: [], applied: [], plannerVersion: '0.0.1' },
+      labels: [],
+      createdAt: '2026-02-25T14:30:00.000Z',
+    };
+    const storedMigrationId = computeMigrationId(baseManifest, ops);
+    const tamperedOps = [
+      ...ops,
+      { id: 'extra', label: 'Extra', operationClass: 'additive' as const },
+    ];
+
+    const result = verifyMigrationBundle({
+      dirName: '20260225T1430_tampered',
+      dirPath: '/tmp/tampered',
+      manifest: { ...baseManifest, migrationId: storedMigrationId },
+      ops: tamperedOps,
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe('mismatch');
+    expect(result.storedMigrationId).toBe(storedMigrationId);
+    expect(result.computedMigrationId).not.toBe(storedMigrationId);
+  });
+
+  it('detects tampered manifest field', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered_manifest');
-    await writeMigrationPackage(dir, createTestManifest(), createTestOps());
-    const migrationId = await attestMigration(dir);
+    const ops = createTestOps();
+    const manifest = createTestManifest({}, ops);
+    await writeMigrationPackage(dir, manifest, ops);
 
     const manifestPath = join(dir, 'migration.json');
     const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
     content.labels = ['tampered'];
-    content.migrationId = migrationId;
+    // Keep the original migrationId so the only thing that changed is the
+    // hashed input; verify must surface this as a mismatch.
     await writeFile(manifestPath, JSON.stringify(content, null, 2));
 
     const result = await verifyMigration(dir);
