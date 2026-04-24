@@ -8,7 +8,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import { dirname, join } from 'pathe';
+import { join } from 'pathe';
 import { computeMigrationId } from './attestation';
 import type { MigrationHints, MigrationManifest, MigrationOps } from './types';
 
@@ -85,54 +85,14 @@ export abstract class Migration<
   get destination(): { readonly storageHash: string } {
     return { storageHash: this.describe().to };
   }
-
-  /**
-   * Entrypoint guard for migration files. When called at module scope,
-   * detects whether the file is being run directly (e.g. `node migration.ts`)
-   * and if so, serializes the migration plan to `ops.json` and
-   * `migration.json` in the same directory. When the file is imported by
-   * another module, this is a no-op.
-   *
-   * Usage (at module scope, after the class definition):
-   *
-   *     class MyMigration extends Migration { ... }
-   *     export default MyMigration;
-   *     Migration.run(import.meta.url, MyMigration);
-   *
-   * Deprecated in favour of `runMigration` from `@prisma-next/cli/migration-runner`,
-   * which assembles a `ControlStack` from `prisma-next.config.ts` and passes
-   * it to the migration constructor. Retained transiently so callers that
-   * have not migrated yet keep working; removed in a follow-up commit.
-   */
-  static run(importMetaUrl: string, MigrationClass: new () => Migration): void {
-    if (!importMetaUrl) return;
-    if (!isDirectEntrypoint(importMetaUrl)) return;
-
-    const args = process.argv.slice(2);
-
-    if (args.includes('--help')) {
-      printMigrationHelp();
-      return;
-    }
-
-    const dryRun = args.includes('--dry-run');
-    const migrationDir = dirname(fileURLToPath(importMetaUrl));
-
-    try {
-      const instance = new MigrationClass();
-      serializeMigration(instance, migrationDir, dryRun);
-    } catch (err) {
-      process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-      process.exitCode = 1;
-    }
-  }
 }
 
 /**
  * Returns true when `import.meta.url` resolves to the same file that was
- * invoked as the node entrypoint (`process.argv[1]`). Used by both
- * `Migration.run` and `runMigration` to no-op when the migration module is
- * being imported (e.g. by another script) rather than executed directly.
+ * invoked as the node entrypoint (`process.argv[1]`). Used by `runMigration`
+ * (in `@prisma-next/cli/migration-runner`) to no-op when the migration
+ * module is being imported (e.g. by another script) rather than executed
+ * directly.
  */
 export function isDirectEntrypoint(importMetaUrl: string): boolean {
   const metaFilename = fileURLToPath(importMetaUrl);
@@ -163,7 +123,7 @@ function printHelp(): void {
 }
 
 /**
- * Build the attested manifest written by `Migration.run()`.
+ * Build the attested manifest written alongside `ops.json`.
  *
  * When a `migration.json` already exists in the directory (the common case:
  * the package was scaffolded by `migration plan`), preserve the contract
@@ -238,10 +198,10 @@ function readExistingManifest(manifestPath: string): Partial<MigrationManifest> 
 /**
  * Serialize a migration instance to `ops.json` + `migration.json` in
  * `migrationDir`. When `dryRun` is true, prints both artifacts to stdout
- * and skips the writes. Shared between the legacy `Migration.run` path
- * and `runMigration` from `@prisma-next/cli/migration-runner`; the
- * orchestrator owns config loading and stack assembly, this owns the
- * "lower the instance to disk artifacts" step.
+ * and skips the writes. Called by `runMigration` from
+ * `@prisma-next/cli/migration-runner`; the orchestrator owns config loading
+ * and stack assembly, this owns the "lower the instance to disk artifacts"
+ * step.
  */
 export function serializeMigration(
   instance: Migration,

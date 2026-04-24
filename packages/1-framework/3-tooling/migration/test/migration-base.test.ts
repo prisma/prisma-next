@@ -1,14 +1,8 @@
-import { execFile } from 'node:child_process';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { promisify } from 'node:util';
-import { join, resolve } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Migration } from '../src/migration-base';
-
-const execFileAsync = promisify(execFile);
-const packageRoot = resolve(import.meta.dirname, '..');
-const repoRoot = resolve(packageRoot, '../../../..');
+import { join } from 'pathe';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { Migration, serializeMigration } from '../src/migration-base';
 
 describe('Migration', () => {
   describe('operations + describe() contract', () => {
@@ -53,66 +47,68 @@ describe('Migration', () => {
       expect(m.origin).toEqual({ storageHash: 'hashFrom' });
       expect(m.destination).toEqual({ storageHash: 'hashTo' });
     });
+
+    it('returns a null origin when from is empty (origin-less plan)', () => {
+      class InitialMigration extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: '', to: 'sha256:to' };
+        }
+      }
+
+      expect(new InitialMigration().origin).toBeNull();
+    });
   });
 });
 
-describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
+/**
+ * Direct unit tests for `serializeMigration` — the file-I/O step that was
+ * previously only exercised through the now-removed `Migration.run` static
+ * via subprocess. Running it in-process keeps the behavior coverage
+ * (manifest synthesis, manifest preservation, hint normalization,
+ * dry-run output, error surfaces) while dropping the subprocess + tsx
+ * round-trip overhead.
+ */
+describe('serializeMigration', () => {
   let tmpDir: string;
+  let stdoutSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'migration-run-'));
+    tmpDir = await mkdtemp(join(tmpdir(), 'serialize-migration-'));
+    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   });
 
   afterEach(async () => {
+    stdoutSpy.mockRestore();
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  const migrationBasePath = join(packageRoot, 'src/migration-base.ts').replace(/\\/g, '/');
-
-  function migrationScript(opsReturn: string, meta = '{ from: "abc", to: "def" }'): string {
-    return [
-      `import { Migration } from '${migrationBasePath}';`,
-      '',
-      'class M extends Migration {',
-      "  readonly targetId = 'test';",
-      '  get operations() {',
-      `    return ${opsReturn};`,
-      '  }',
-      '  describe() {',
-      `    return ${meta};`,
-      '  }',
-      '}',
-      'export default M;',
-      '',
-      'Migration.run(import.meta.url, M);',
-    ].join('\n');
-  }
-
-  async function runMigration(
-    filename: string,
-    args: string[] = [],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const filePath = join(tmpDir, filename);
-    const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
-    try {
-      const result = await execFileAsync(tsxPath, [filePath, ...args], { cwd: tmpDir });
-      return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
-    } catch (error) {
-      const e = error as { stdout: string; stderr: string; code: number };
-      return { stdout: e.stdout || '', stderr: e.stderr || '', exitCode: e.code || 1 };
+  function makeMigration(
+    operations: unknown,
+    meta: { readonly from: string; readonly to: string; readonly labels?: readonly string[] } = {
+      from: 'abc',
+      to: 'def',
+    },
+  ): Migration {
+    class M extends Migration {
+      readonly targetId = 'test';
+      override get operations() {
+        return operations as never;
+      }
+      override describe() {
+        return meta;
+      }
     }
+    return new M();
   }
 
-  it('writes ops.json and migration.json when run as entrypoint', async () => {
-    const script = migrationScript('[{ id: "op1", label: "Test op" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
+  it('writes ops.json and migration.json with synthesized manifest fields', async () => {
+    serializeMigration(makeMigration([{ id: 'op1', label: 'Test op' }]), tmpDir, false);
 
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('ops.json + migration.json');
-
-    const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
-    const ops = JSON.parse(opsJson);
+    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([{ id: 'op1', label: 'Test op' }]);
 
     const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
@@ -124,13 +120,10 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(manifest.fromContract).toBeNull();
     expect(manifest.toContract).toEqual({ storage: { storageHash: 'def' } });
-    expect(manifest.hints).toMatchObject({
-      used: [],
-      applied: [],
-    });
+    expect(manifest.hints).toMatchObject({ used: [], applied: [] });
   });
 
-  it('preserves contract bookends and hints from an existing manifest when re-emitting', async () => {
+  it('preserves contract bookends, hints, labels, and createdAt from an existing manifest', async () => {
     const existingManifest = {
       from: 'sha256:from',
       to: 'sha256:to',
@@ -148,14 +141,14 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     };
     await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
 
-    const script = migrationScript(
-      '[{ id: "op1", label: "Edited op", operationClass: "additive" }]',
-      '{ from: "sha256:from", to: "sha256:to" }',
+    serializeMigration(
+      makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
+        from: 'sha256:from',
+        to: 'sha256:to',
+      }),
+      tmpDir,
+      false,
     );
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).toBe(0);
 
     const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.fromContract).toEqual(existingManifest.fromContract);
@@ -185,14 +178,14 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     };
     await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
 
-    const script = migrationScript(
-      '[{ id: "op1", label: "Op", operationClass: "additive" }]',
-      '{ from: "sha256:from", to: "sha256:to" }',
+    serializeMigration(
+      makeMigration([{ id: 'op1', label: 'Op', operationClass: 'additive' }], {
+        from: 'sha256:from',
+        to: 'sha256:to',
+      }),
+      tmpDir,
+      false,
     );
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).toBe(0);
 
     const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.hints).toEqual({
@@ -203,88 +196,41 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.hints).not.toHaveProperty('planningStrategy');
   });
 
-  it('prints operations with --dry-run and does not write ops.json', async () => {
-    const script = migrationScript('[{ id: "op1", label: "Dry run op" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts', ['--dry-run']);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('op1');
-    expect(result.stdout).toContain('Dry run op');
-
-    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
-    expect(opsExists).toBeNull();
-  });
-
-  it('prints usage with --help', async () => {
-    const script = migrationScript('[]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts', ['--help']);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('--dry-run');
-    expect(result.stdout).toContain('--help');
-  });
-
-  it('is a no-op when the file is imported', async () => {
-    const migrationFile = migrationScript('[{ id: "op1" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), migrationFile);
-
-    const importerScript = [
-      `import M from '${join(tmpDir, 'migration.ts').replace(/\\/g, '/')}';`,
-      'const m = new M();',
-      'const ops = m.operations;',
-      'console.log(JSON.stringify(ops));',
-    ].join('\n');
-    await writeFile(join(tmpDir, 'importer.ts'), importerScript);
-
-    const result = await runMigration('importer.ts');
-    expect(result.exitCode).toBe(0);
-
-    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
-    expect(opsExists).toBeNull();
-
-    const importedOps = JSON.parse(result.stdout.trim());
-    expect(importedOps).toEqual([{ id: 'op1' }]);
-  });
-
-  it('exits with error when operations is not an array', async () => {
-    const script = migrationScript('"not an array"');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stderr).toContain('operations');
-  });
-
-  it('rejects invalid describe() return with clear error', async () => {
-    const script = migrationScript('[{ id: "op1" }]', '{ bad: true }');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stderr).toContain('describe()');
-    expect(result.stderr).toContain('invalid');
-  });
-
-  it('includes migration.json content in --dry-run output', async () => {
-    const script = migrationScript(
-      '[{ id: "op1" }]',
-      '{ from: "abc", to: "def", labels: ["test"] }',
+  it('prints both ops.json and migration.json sections in dry-run mode without writing files', async () => {
+    serializeMigration(
+      makeMigration([{ id: 'op1', label: 'Dry run op' }], {
+        from: 'abc',
+        to: 'def',
+        labels: ['test'],
+      }),
+      tmpDir,
+      true,
     );
-    await writeFile(join(tmpDir, 'migration.ts'), script);
 
-    const result = await runMigration('migration.ts', ['--dry-run']);
-    expect(result.exitCode).toBe(0);
+    const stdoutText = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
+    expect(stdoutText).toContain('--- migration.json ---');
+    expect(stdoutText).toContain('--- ops.json ---');
+    expect(stdoutText).toContain('"op1"');
+    expect(stdoutText).toContain('"from"');
+    expect(stdoutText).toContain('"to"');
 
-    const output = result.stdout;
-    expect(output).toContain('"from"');
-    expect(output).toContain('"to"');
-    expect(output).toContain('"op1"');
-
+    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
     const manifestExists = await readFile(join(tmpDir, 'migration.json'), 'utf-8').catch(
       () => null,
     );
+    expect(opsExists).toBeNull();
     expect(manifestExists).toBeNull();
+  });
+
+  it('throws when operations is not an array', () => {
+    expect(() => serializeMigration(makeMigration('not an array'), tmpDir, false)).toThrow(
+      /operations/,
+    );
+  });
+
+  it('throws a clear error when describe() returns invalid metadata', () => {
+    expect(() =>
+      serializeMigration(makeMigration([{ id: 'op1' }], { bad: true } as never), tmpDir, false),
+    ).toThrow(/describe\(\).*invalid/);
   });
 });
