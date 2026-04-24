@@ -46,7 +46,7 @@ import { buildColumnDefaultSql, buildColumnTypeSql } from './planner-ddl-builder
 import { buildExpectedFormatType } from './planner-sql-checks';
 import {
   type CallMigrationStrategy,
-  migrationPlanCallStrategies,
+  postgresPlannerStrategies,
   type StrategyContext,
 } from './planner-strategies';
 
@@ -649,8 +649,13 @@ function issueKey(issue: SchemaIssue): string {
   return `${table}\u0000${column}\u0000${name}`;
 }
 
+// When no policy is explicitly supplied (test-only path; production callers
+// always pass one), allow every class so strategies that gate on
+// `'data'` (data-safe placeholders) still fire — the test is treated as
+// trusted. Filtering of actual emitted calls only runs when a policy was
+// explicitly provided (see `policyProvided` below).
 const DEFAULT_POLICY: MigrationOperationPolicy = {
-  allowedOperationClasses: ['additive'],
+  allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
 };
 
 function emptySchemaIR(): SqlSchemaIR {
@@ -738,7 +743,7 @@ export function planIssues(
     frameworkComponents,
   };
 
-  const strategies = options.strategies ?? migrationPlanCallStrategies;
+  const strategies = options.strategies ?? postgresPlannerStrategies;
 
   let remaining = options.issues;
   const recipeCalls: PostgresOpFactoryCall[] = [];

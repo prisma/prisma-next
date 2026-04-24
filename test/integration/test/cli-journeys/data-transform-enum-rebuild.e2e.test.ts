@@ -17,7 +17,7 @@
  * the post-apply enum has only the surviving values and the doomed
  * row was remapped.
  *
- * Phase 2 acceptance: covers `migrationPlanCallStrategies` end-to-end
+ * Phase 2 acceptance: covers `postgresPlannerStrategies` (data-safe path) end-to-end
  * for the enum-rebuild case (plan.md AC R2.2 #4).
  */
 

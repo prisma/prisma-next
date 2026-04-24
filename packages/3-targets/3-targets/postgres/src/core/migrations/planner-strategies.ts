@@ -3,12 +3,20 @@
  *
  * Each strategy examines the issue list, consumes issues it handles, and
  * returns the `PostgresOpFactoryCall[]` to address them. The issue planner
- * chains strategies and routes whatever's left through `mapIssueToCall`.
+ * runs each strategy in order and routes whatever's left through
+ * `mapIssueToCall`.
  *
- * - `migrationPlanCallStrategies` — data-safe strategies (dataTransform for
- *   NOT NULL, type changes, etc.) for `migration plan`.
- * - `dbUpdateCallStrategies` — dev-push strategies (temp defaults,
- *   component install ops, codec-hook type ops) for `db update`.
+ * The full ordered list is exported as `postgresPlannerStrategies` and is
+ * used unchanged by both `migration plan` and `db update` / `db init`. The
+ * two journeys differ only in `policy.allowedOperationClasses`:
+ *
+ * - When `'data'` is in the policy, data-safe strategies (NOT NULL backfill,
+ *   nullability tightening, unsafe type changes, enum shrink/rebuild) emit
+ *   `DataTransformCall` placeholders that the user fills in.
+ * - When `'data'` is excluded, those strategies short-circuit so the
+ *   downstream walk-schema strategies (codec-hook type ops, dependency
+ *   installs, temp-default backfill) and `mapIssueToCall` defaults emit
+ *   direct DDL instead.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -144,6 +152,11 @@ function buildAlterTypeOptions(
 }
 
 export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  // `DataTransformCall` is operation class `'data'`. When the policy excludes
+  // it (`db update` / `db init`), skip so `notNullAddColumnCallStrategy`
+  // (temp-default backfill) or `mapIssueToCall` can take the issue.
+  if (!ctx.policy.allowedOperationClasses.includes('data')) return { kind: 'no_match' };
+
   const matched: SchemaIssue[] = [];
   const calls: PostgresOpFactoryCall[] = [];
 
@@ -179,6 +192,13 @@ export const notNullBackfillCallStrategy: CallMigrationStrategy = (issues, ctx) 
 const SAFE_WIDENINGS = new Set(['int2→int4', 'int2→int8', 'int4→int8', 'float4→float8']);
 
 export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  // For unsafe widenings this strategy emits a `DataTransformCall` placeholder
+  // (operation class `'data'`); when the policy excludes `'data'`
+  // (`db update` / `db init`), skip those issues so `mapIssueToCall` can
+  // emit a direct `ALTER COLUMN TYPE`. Safe widenings still flow through
+  // here because the resulting `AlterColumnTypeCall` is `widening`-class.
+  const dataAllowed = ctx.policy.allowedOperationClasses.includes('data');
+
   const matched: SchemaIssue[] = [];
   const calls: PostgresOpFactoryCall[] = [];
 
@@ -191,9 +211,11 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
     const fromType = fromColumn.nativeType;
     const toType = toColumn.nativeType;
     if (fromType === toType) continue;
+    const isSafeWidening = SAFE_WIDENINGS.has(`${fromType}→${toType}`);
+    if (!isSafeWidening && !dataAllowed) continue;
     matched.push(issue);
     const alterOpts = buildAlterTypeOptions(issue.table, issue.column, ctx);
-    if (SAFE_WIDENINGS.has(`${fromType}→${toType}`)) {
+    if (isSafeWidening) {
       calls.push(new AlterColumnTypeCall(ctx.schemaName, issue.table, issue.column, alterOpts));
     } else {
       calls.push(
@@ -216,6 +238,11 @@ export const typeChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
 };
 
 export const nullableTighteningCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  // `DataTransformCall` is operation class `'data'`. When the policy excludes
+  // it (`db update` / `db init`), skip so `mapIssueToCall` emits a direct
+  // `SET NOT NULL` instead.
+  if (!ctx.policy.allowedOperationClasses.includes('data')) return { kind: 'no_match' };
+
   const matched: SchemaIssue[] = [];
   const calls: PostgresOpFactoryCall[] = [];
 
@@ -282,6 +309,13 @@ function enumRebuildCallRecipe(
 }
 
 export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
+  // The shrink/rebuild branches emit a `DataTransformCall` placeholder or a
+  // destructive rebuild that should be authored explicitly. When the policy
+  // excludes `'data'` (`db update` / `db init`), skip the entire strategy so
+  // `storageTypePlanCallStrategy` (codec-hook driven) takes over with the
+  // dev-push enum behavior.
+  if (!ctx.policy.allowedOperationClasses.includes('data')) return { kind: 'no_match' };
+
   const matched: SchemaIssue[] = [];
   const calls: PostgresOpFactoryCall[] = [];
 
@@ -324,15 +358,8 @@ export const enumChangeCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   };
 };
 
-export const migrationPlanCallStrategies: readonly CallMigrationStrategy[] = [
-  enumChangeCallStrategy,
-  notNullBackfillCallStrategy,
-  typeChangeCallStrategy,
-  nullableTighteningCallStrategy,
-];
-
 // ============================================================================
-// db-update strategies (absorbed from the walk-schema planner)
+// Walk-schema strategies (absorbed from the legacy planner)
 // ============================================================================
 
 /**
@@ -341,11 +368,10 @@ export const migrationPlanCallStrategies: readonly CallMigrationStrategy[] = [
  * the authoritative source for codec-driven DDL (enum create/rebuild/add-
  * value, custom type creation, etc.).
  *
- * Runs AFTER `enumChangeCallStrategy` in the `db update` chain so the
- * structured enum path (value add, rebuild recipe) gets first pick at
- * `enum_values_changed` issues; this strategy then handles remaining
- * `type_missing` / `enum_values_changed` issues for types whose hook
- * produced at least one op.
+ * Runs after `enumChangeCallStrategy` so the structured enum path (value
+ * add, rebuild recipe) gets first pick at `enum_values_changed` issues;
+ * this strategy then handles remaining `type_missing` / `enum_values_changed`
+ * issues for types whose hook produced at least one op.
  */
 export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) => {
   const storageTypes = ctx.toContract.storage.types ?? {};
@@ -644,7 +670,33 @@ function liftInstallOpToCall(
   return new RawSqlCall(op);
 }
 
-export const dbUpdateCallStrategies: readonly CallMigrationStrategy[] = [
+/**
+ * Ordered list of Postgres planner strategies, shared by `migration plan`
+ * and `db update` / `db init`. The issue planner runs each strategy in
+ * order, letting it consume any issues it handles, and routes whatever's
+ * left through `mapIssueToCall`. Behavior diverges purely on
+ * `policy.allowedOperationClasses`:
+ *
+ * - When `'data'` is allowed (`migration plan`), the data-safe strategies
+ *   (`enumChangeCallStrategy`, `notNullBackfillCallStrategy`,
+ *   `typeChangeCallStrategy`, `nullableTighteningCallStrategy`) consume their
+ *   matching issues and emit `DataTransformCall` placeholders or recipe ops.
+ *
+ * - When `'data'` is not allowed (`db update` / `db init`), each data-safe
+ *   strategy short-circuits to `no_match`, leaving the issue for the
+ *   downstream walk-schema strategies (`storageTypePlanCallStrategy`,
+ *   `dependencyInstallCallStrategy`, `notNullAddColumnCallStrategy`) or the
+ *   `mapIssueToCall` default to handle with direct DDL.
+ *
+ * Order matters: data-safe strategies must run before the walk-schema
+ * strategies on overlapping issue kinds (e.g. `enum_values_changed`,
+ * `missing_column` for NOT NULL) so they take priority when active.
+ */
+export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
+  enumChangeCallStrategy,
+  notNullBackfillCallStrategy,
+  typeChangeCallStrategy,
+  nullableTighteningCallStrategy,
   storageTypePlanCallStrategy,
   dependencyInstallCallStrategy,
   notNullAddColumnCallStrategy,

@@ -18,7 +18,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
-import { dbUpdateCallStrategies, migrationPlanCallStrategies } from './planner-strategies';
+import { postgresPlannerStrategies } from './planner-strategies';
 import type { PlanningMode } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
@@ -67,13 +67,17 @@ export type PostgresPlanResult =
  * Postgres migration planner — a thin wrapper over `planIssues`.
  *
  * `plan()` verifies the live schema against the target contract (producing
- * `SchemaIssue[]`) and delegates to `planIssues` with the full `db update`
- * strategy chain: enum-change, codec-hook storage types, component-declared
- * dependency installs, shared-temp-default / empty-table-guarded NOT-NULL
- * add-column, not-null-backfill, type-change, and nullable-tightening. The
- * issue planner applies operation-class policy gates and emits a single
- * `PostgresOpFactoryCall[]` that drives both the runtime-ops view (via
- * `renderOps`) and the `renderTypeScript()` authoring surface.
+ * `SchemaIssue[]`) and delegates to `planIssues` with the unified
+ * `postgresPlannerStrategies` list: enum-change, NOT-NULL backfill,
+ * type-change, nullable-tightening, codec-hook storage types,
+ * component-declared dependency installs, and shared-temp-default /
+ * empty-table-guarded NOT-NULL add-column. The same strategy list runs for
+ * `migration plan`, `db update`, and `db init`; behavior diverges purely on
+ * `policy.allowedOperationClasses` (the data-safe strategies short-circuit
+ * when `'data'` is excluded). The issue planner applies operation-class
+ * policy gates and emits a single `PostgresOpFactoryCall[]` that drives both
+ * the runtime-ops view (via `renderOps`) and the `renderTypeScript()`
+ * authoring surface.
  */
 export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgres'> {
   constructor(private readonly config: PlannerConfig) {}
@@ -117,15 +121,6 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
 
-    // Dispatch on the `'data'` operation class: `migration plan` includes it
-    // and wants `DataTransformCall` placeholder stubs the user hand-fills;
-    // `db update` / `db init` do not include it and need direct destructive
-    // DDL so reconciliation completes without user intervention. The two
-    // strategy chains share the same issue planner but differ in how they
-    // resolve data-losing schema changes.
-    const allowsDataTransforms = options.policy.allowedOperationClasses.includes('data');
-    const strategies = allowsDataTransforms ? migrationPlanCallStrategies : dbUpdateCallStrategies;
-
     const result = planIssues({
       issues: schemaIssues,
       toContract: options.contract,
@@ -141,7 +136,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       schema: options.schema,
       policy: options.policy,
       frameworkComponents: options.frameworkComponents,
-      strategies,
+      strategies: postgresPlannerStrategies,
     });
 
     if (!result.ok) {
