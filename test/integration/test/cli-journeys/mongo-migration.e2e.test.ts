@@ -308,9 +308,14 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationId: string | null;
+      migrationId: string;
     };
-    expect(manifest.migrationId).toBeNull();
+    // `migration new` always writes a fully attested package; the
+    // `migrationId` is the content-address over `(manifest, [])` since
+    // the scaffolded `migration.ts` carries no operations yet. The
+    // developer fills in operations and re-runs `node migration.ts` to
+    // rewrite both `ops.json` and `migrationId`.
+    expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 });
 
