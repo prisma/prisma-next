@@ -15,11 +15,13 @@ import type {
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
   SqlRuntimeExtensionDescriptor,
+  TransactionContext,
 } from '@prisma-next/sql-runtime';
 import {
   createExecutionContext,
   createRuntime,
   createSqlExecutionStack,
+  withTransaction,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { type Client, Pool } from 'pg';
@@ -33,6 +35,11 @@ import {
 export type PostgresTargetId = 'postgres';
 type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
 
+export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>>
+  extends TransactionContext {
+  readonly sql: Db<TContract>;
+}
+
 export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
@@ -40,6 +47,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
+  transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
 }
 
 export interface PostgresOptionsBase<TContract extends Contract<SqlStorage>> {
@@ -239,6 +247,20 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
     },
     runtime() {
       return getRuntime();
+    },
+    transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
+      return withTransaction(getRuntime(), (txCtx) => {
+        const txSql: Db<TContract> = sqlBuilder<TContract>({ context });
+        // Use `txCtx` as the prototype instead of spreading it so that live
+        // accessors (notably the `invalidated` getter, which reads a closure
+        // variable in `withTransaction`) remain wired to the original object.
+        // Spreading would evaluate the getter once and freeze its value.
+        const tx: PostgresTransactionContext<TContract> = Object.assign(
+          Object.create(txCtx) as TransactionContext,
+          { sql: txSql },
+        );
+        return fn(tx);
+      });
     },
   };
 }
