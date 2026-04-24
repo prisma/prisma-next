@@ -134,8 +134,27 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
         return { raw: row, mapped } as RowEnvelope;
       });
 
+      // Precompute one decode plan per included table. Each plan resolves
+      // column→codec once and is reused across every parent row and every
+      // child of that include, eliminating O(parents × children × columns)
+      // registry lookups.
+      const includePlans = state.includes.map((include) => {
+        if (include.scalar || include.combine) {
+          return { include, plan: null };
+        }
+        const plan = context
+          ? buildIncludeDecodePlan(
+              contract,
+              context,
+              include.relatedModelName,
+              include.relatedTableName,
+            )
+          : null;
+        return { include, plan };
+      });
+
       for (const parent of parentRows) {
-        for (const include of state.includes) {
+        for (const { include, plan } of includePlans) {
           if (include.scalar || include.combine) {
             throw new Error(
               'single-query include strategy does not support scalar include selectors or combine()',
@@ -143,14 +162,8 @@ function dispatchWithSingleQueryIncludes<Row>(options: {
           }
           const rawChildren = parseIncludedRows(parent.raw[include.relationName]);
           const mappedChildren = rawChildren.map((childRow) =>
-            context
-              ? decodeIncludedRow(
-                  contract,
-                  context,
-                  include.relatedModelName,
-                  include.relatedTableName,
-                  childRow,
-                )
+            context && plan
+              ? decodeIncludedRow(contract, context, plan, childRow)
               : mapStorageRowToModelFields(contract, include.relatedModelName, childRow),
           );
           parent.mapped[include.relationName] = coerceSingleQueryIncludeResult(
@@ -528,31 +541,66 @@ function parseIncludedRows(value: unknown): Record<string, unknown>[] {
   return rows;
 }
 
-function decodeIncludedRow(
+interface IncludeDecodeColumn {
+  readonly columnName: string;
+  readonly fieldName: string;
+  readonly codec: ReturnType<CollectionContext<Contract<SqlStorage>>['context']['codecs']['get']>;
+}
+
+interface IncludeDecodePlan {
+  readonly tableName: string;
+  readonly modelName: string;
+  readonly columns: readonly IncludeDecodeColumn[];
+}
+
+/**
+ * Precomputes the `{ columnName, fieldName, codec }` triples for every column
+ * of an included table. Each included table resolves to a single plan reused
+ * across all parent rows, so the per-column `context.codecs.get(codecId)`
+ * lookup runs once per query instead of once per (parent, child, column).
+ */
+function buildIncludeDecodePlan(
   contract: Contract<SqlStorage>,
   context: CollectionContext<Contract<SqlStorage>>['context'],
   modelName: string,
   tableName: string,
-  row: Record<string, unknown>,
-): Record<string, unknown> {
+): IncludeDecodePlan | null {
   const table = contract.storage.tables[tableName];
-  if (!table) {
-    return mapStorageRowToModelFields(contract, modelName, row);
-  }
+  if (!table) return null;
 
   const columnToField = getColumnToFieldMap(contract, modelName);
-  const mapped: Record<string, unknown> = {};
+  const columns: IncludeDecodeColumn[] = [];
+  for (const [columnName, column] of Object.entries(table.columns)) {
+    const codecId = column?.codecId;
+    const codec = codecId ? context.codecs.get(codecId) : undefined;
+    columns.push({
+      columnName,
+      fieldName: columnToField[columnName] ?? columnName,
+      codec,
+    });
+  }
+  return { tableName, modelName, columns };
+}
 
-  for (const [columnName, wireValue] of Object.entries(row)) {
-    const fieldName = columnToField[columnName] ?? columnName;
+function decodeIncludedRow(
+  _contract: Contract<SqlStorage>,
+  context: CollectionContext<Contract<SqlStorage>>['context'],
+  plan: IncludeDecodePlan,
+  row: Record<string, unknown>,
+): Record<string, unknown> {
+  const mapped: Record<string, unknown> = {};
+  const seen = new Set<string>();
+
+  for (const { columnName, fieldName, codec } of plan.columns) {
+    if (!(columnName in row)) continue;
+    seen.add(columnName);
+    const wireValue = row[columnName];
 
     if (wireValue === null || wireValue === undefined) {
       mapped[fieldName] = wireValue;
       continue;
     }
 
-    const codecId = table.columns[columnName]?.codecId;
-    const codec = codecId ? context.codecs.get(codecId) : undefined;
     if (!codec) {
       mapped[fieldName] = wireValue;
       continue;
@@ -563,9 +611,17 @@ function decodeIncludedRow(
       wireValue,
       codec,
       jsonValidators: context.jsonSchemaValidators,
-      tableName,
+      tableName: plan.tableName,
       columnName,
     });
+  }
+
+  // Preserve any columns absent from the decode plan (forward-compat with
+  // extension packs that ship extra wire-only aggregate fields).
+  for (const [columnName, wireValue] of Object.entries(row)) {
+    if (!seen.has(columnName) && !Object.hasOwn(mapped, columnName)) {
+      mapped[columnName] = wireValue;
+    }
   }
 
   return mapped;

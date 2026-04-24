@@ -701,6 +701,47 @@ describe('JSON Schema decoding validation', () => {
     });
   });
 
+  it('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
+    const leakyPlaintext = 'super-secret-plaintext-value';
+    const leakyCodec = codec({
+      typeId: 'pg/leaky@1',
+      targetTypes: ['text'],
+      runtime: { decode: 'async' } as const,
+      encode: (v: string) => v,
+      decode: async (_w: string) => {
+        throw new Error(`decrypt failed for value=${leakyPlaintext}`);
+      },
+    });
+    const registry = createCodecRegistry();
+    registry.register(leakyCodec);
+
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { secret: 'pg/leaky@1' },
+        refs: { columns: [{ table: 'user', column: 'secret' }] },
+      },
+    });
+
+    const row = { secret: 'wire-bytes' };
+    const result = decodeRow(row, plan, registry);
+
+    const rejection = await expectPromise(result['secret']).catch((e: unknown) => e);
+    const err = rejection as Error & { code?: string; details?: Record<string, unknown> };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe('RUNTIME.DECODE_FAILED');
+    // Plaintext must not appear anywhere in the serializable envelope.
+    expect(err.message).not.toContain(leakyPlaintext);
+    expect(JSON.stringify(err.details ?? {})).not.toContain(leakyPlaintext);
+    // The original error is reachable via `cause` for developer diagnostics.
+    expect(((err as Error & { cause?: unknown }).cause as Error)?.message).toContain(
+      leakyPlaintext,
+    );
+  });
+
   it('preserves JSON schema validation for async decoded values', async () => {
     const codecRegistry = createAsyncCodecRegistry();
     const plan = createTestPlan({

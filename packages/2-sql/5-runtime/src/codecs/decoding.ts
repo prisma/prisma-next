@@ -103,15 +103,21 @@ export function decodeFailure(
   wireValue: unknown,
   error: unknown,
 ): Error {
-  return runtimeError(
+  // Codec-authored error messages may embed the decrypted value (e.g.
+  // `Error("bad tag for <plaintext>")`). Keep the human message bounded to
+  // the alias + codec ID and surface the original error through `cause` so
+  // diagnostics stay available to debuggers but never flow into telemetry.
+  const envelope = runtimeError(
     'RUNTIME.DECODE_FAILED',
-    `Failed to decode row alias '${alias}' with codec '${codecId}': ${error instanceof Error ? error.message : String(error)}`,
+    `Failed to decode row alias '${alias}' with codec '${codecId}'`,
     {
       alias,
       codec: codecId,
       wirePreview: wirePreview(wireValue),
     },
   );
+  (envelope as Error).cause = error;
+  return envelope;
 }
 
 export interface DecodeFieldOptions {
