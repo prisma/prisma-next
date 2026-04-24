@@ -2,130 +2,202 @@
 
 ## Summary
 
-Fix the cross-plane coupling in Postgres class-flow authoring (`dataTransform`) and descriptor-flow resolution (`operation-resolver.ts`), both of which hard-code `createPostgresAdapter()` inside `src/core/**` of `@prisma-next/target-postgres` — bypassing the user's config-declared stack and dragging runtime-plane code into shared-plane files. Introduce `lower()` as a first-class method on the control adapter; extract the abstract `Migration` base class into a shared-plane home and leave the `run()` orchestrator in migration-plane tooling; have the orchestrator discover `prisma-next.config.ts` from the migration file's directory, build the control adapter from `config.adapter` + `config.extensionPacks`, and constructor-inject it into the migration instance. Provide an escape hatch for users to construct the migration themselves and bypass auto-discovery entirely.
+Inject the control adapter into Postgres class-flow migrations instead of constructing it as a module-level singleton inside `@prisma-next/target-postgres`'s `dataTransform` factory. Split the migration entrypoint orchestrator (`Migration.run`) out of the abstract `Migration` base class and into `@prisma-next/cli` so the base class becomes pure authoring data with no I/O dependency. Give the SQL control adapter a `lower()` method so emit-time SQL is rendered through the same adapter the runtime uses, removing the `@prisma-next/sql-runtime` cross-plane dependency from `@prisma-next/target-postgres`. Adapter descriptor `create()` signatures evolve to take the assembled stack, mirroring the existing `ControlFamilyDescriptor.create(stack)` pattern.
 
 ## Description
 
 ### What's broken today
 
-Two files in `packages/3-targets/3-targets/postgres/src/core/` each import `createPostgresAdapter` and `lowerSqlPlan`, hold an adapter singleton at module scope, and lower `SqlQueryPlan → {sql, params}` at `migration.ts`-execution time:
+`packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts` constructs a runtime adapter at module scope and uses it to lower `SqlQueryPlan → {sql, params}` at `migration.ts`-execution time:
 
-- `migrations/operations/data-transform.ts` — the class-flow `dataTransform()` factory.
-- `migrations/operation-resolver.ts` — the descriptor-flow resolver.
+```ts
+import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
+import { lowerSqlPlan } from '@prisma-next/sql-runtime';
 
-Both live in what is intended to be shared-plane code (mirrors sqlite's `src/core/**` shared registration in `architecture.config.json`). Both violate three things simultaneously:
+let adapterSingleton: ReturnType<typeof createPostgresAdapter> | null = null;
+function getAdapter() {
+  if (adapterSingleton === null) {
+    adapterSingleton = createPostgresAdapter();
+  }
+  return adapterSingleton;
+}
 
-1. **Plane**: `@prisma-next/sql-runtime` is registered as runtime plane (`architecture.config.json:117-122`). Shared → runtime is forbidden. The dep-cruiser rule isn't currently firing on these imports because target-postgres's `src/core/**` isn't explicitly registered — only its `exports/{control,runtime}.ts` are — but the intent is clearly shared.
+export function dataTransform(contract, name, options) {
+  const adapter = getAdapter();
+  // ... lowerSqlPlan(adapter, contract, plan) ...
+}
+```
 
-2. **Abstraction**: they reach for a *runtime* adapter to do *control*-plane lowering. The control adapter (`SqlControlAdapter<TTarget>` in `@prisma-next/family-sql`) is the right abstraction for producing control-plane SQL statements; it just doesn't have `lower()` on it today. The fix is not to invent a separate "lowerer" abstraction — it's to put `lower()` on the adapter interface where it belongs.
+This violates three things at once:
 
-3. **Configuration**: the singleton is constructed with default options, ignoring the `extensionPacks`, codec registrations, and adapter options the user declared in `prisma-next.config.ts`. Emit-time SQL can silently diverge from runtime-time SQL for the same query — especially for codec-typed parameters (pgvector `$1::vector`, JSON/JSONB casts, any user-registered codec). This is a correctness hazard, not just a style issue.
+1. **Plane**: `@prisma-next/sql-runtime` is registered as runtime plane (see `architecture.config.json`). A target package's shared-plane code reaching into runtime is a layer-crossing import. The dep-cruiser rule isn't currently firing because target-postgres's `src/core/**` isn't explicitly registered, but the intent of the layout is shared.
 
-There's also a packaging bug: `@prisma-next/adapter-postgres` is a **devDependency** of `@prisma-next/target-postgres` (`package.json:36`) even though `src/core/.../data-transform.ts` imports from it at runtime. Fixes to the plane problem remove the import entirely, closing this in passing.
+2. **Abstraction**: the factory uses a *runtime* adapter to do *control*-plane lowering. The right abstraction is the `SqlControlAdapter`, which today doesn't have `lower()` on it. The fix is to add `lower()` to the control adapter, not to invent a separate "lowerer".
 
-### What the adapter is and isn't
+3. **Configuration**: the singleton constructs `createPostgresAdapter()` with no options, ignoring whatever the user declared in `prisma-next.config.ts`. Today this happens to be benign because `lower()` reads codec metadata only off the AST's `ParamRef.codecId` and a hardcoded cast switch (`getCodecParamCast` in `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:39`). But it's a latent correctness hazard the moment any extension-aware codec metadata is needed at lower-time.
 
-The adapter is *not* contract-coupled. `lowerSqlPlan(adapter, contract, plan)` passes the contract through to `adapter.lower(ast, { contract, params })` as per-call `LowererContext`. One adapter instance services any number of contracts; `data-transform.ts` currently takes a `contract` argument for two reasons — the storage-hash mismatch assertion (`PN-MIG-2005`) and forwarding into the lowerer — neither of which implies the adapter must be contract-scoped. The apparent coupling is an artefact of the factory's signature, not a structural requirement.
+There's also a packaging artefact: `@prisma-next/adapter-postgres` is a `devDependency` of `@prisma-next/target-postgres` (`packages/3-targets/3-targets/postgres/package.json:36`) even though `data-transform.ts` imports from it at runtime. Removing the import closes this in passing.
 
-For migrations that visit multiple intermediate contracts in one file, a single stack-configured control adapter services all of them.
+### What the adapter actually depends on (post-DI)
+
+I traced what `lower()` reads at render time. The runtime adapter's `lower()` method uses only:
+
+- The input AST (which already carries codec IDs on each `ParamRef`).
+- A hardcoded codec→cast switch for three known codec IDs (`pg/vector@1`, `pg/json@1`, `pg/jsonb@1`) — see `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:37-50`.
+
+The adapter's own `codecRegistry` field is exposed via `profile.codecs()` for runtime value encoding/decoding, but is never consulted during `lower()`. So today, lowering is stateless w.r.t. extensions: control and runtime adapters render identically given the same input AST.
+
+The takeaway is that DI of the adapter is currently a **plumbing fix**, not a behavior change. The pgvector hardcoding is a separate sin (out of scope; tracked in a follow-up ticket — see [References](#references)) and the cleanup will remove the hardcoded switch entirely once the cast metadata moves onto codec descriptors.
 
 ### What needs to change
 
-- **Control adapter gains `lower()`**: `SqlControlAdapter<TTarget>` grows a `lower(ast, ctx)` method matching the existing `Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>` shape. The rendering implementation is shared with the runtime adapter via a common module in postgres-adapter's `src/core/**` (already shared plane), so both `exports/control.ts` and `exports/runtime.ts` construct adapters that lower identically for the same input.
-- **`Migration` abstract class splits from `Migration.run()`**: the authoring contract (`targetId`, `operations`, `describe`, `origin`, `destination`, constructor taking injected stack) moves to a shared-plane home. The orchestrator (`run()`, c12-based config discovery, target-mismatch validation, ops serialization, file I/O) stays in migration-plane tooling. This incidentally resolves a pre-existing plane violation: `packages/2-sql/9-family/src/core/sql-migration.ts:1` currently imports `Migration` from migration-plane `@prisma-next/migration-tools`, a shared→migration edge that only works today because dep-cruiser isn't catching it.
-- **Config-aware orchestrator**: the relocated `run()` walks up from the migration file's directory via c12 to find `prisma-next.config.ts`, validates it, calls `config.adapter.create(…)` with options resolved from `config.extensionPacks`, verifies `config.target.targetId === instance.targetId`, and constructor-injects a minimal stack object into the migration instance.
-- **Constructor injection, no module-level DI**: `PostgresMigration` (and its parents) take `{ controlAdapter, … }` in the constructor. `dataTransform` becomes a method on the migration instance (`this.dataTransform(contract, name, options)`), or receives the adapter through another in-instance channel. `operation-resolver.ts` receives the adapter through its `OperationResolverContext`. Neither file imports `createPostgresAdapter` any longer.
-- **Escape hatch for stack drift**: `Migration.run(importMetaUrl, ClassOrInstance)` accepts either a class constructor (default: auto-discover + inject) or a pre-instantiated migration (user did their own DI; skip discovery). This is the release valve for old migrations whose authoring-time stack has drifted from current `prisma-next.config.ts` — common scenario: extensions installed since the migration was written, or an adapter bump that rendered SQL differently.
+**1. Control adapter gains `lower()` and a stack-aware constructor.**
+
+`SqlControlAdapter<TTarget>` grows a `lower(ast, ctx)` method matching the existing `Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>` shape. The Postgres control adapter implements it by delegating to the same SQL renderer the runtime adapter uses (extracting the renderer to a shared module in `packages/3-targets/6-adapters/postgres/src/core/**` if needed, since both `exports/control.ts` and `exports/runtime.ts` already share that directory).
+
+`SqlControlAdapterDescriptor.create()` and `RuntimeAdapterDescriptor.create()` evolve from no-args to taking the assembled stack, mirroring the existing `ControlFamilyDescriptor.create(stack: ControlStack<F, T>)` (`packages/1-framework/1-core/framework-components/src/control-descriptors.ts:26`). This keeps the framework's "create takes the stack" pattern consistent across descriptor kinds and gives adapters access to whatever they need from the stack (today: nothing; tomorrow: codec lookup for cast resolution, profile id from config, etc.).
+
+**2. Drop `Migration.run` from the base class.**
+
+The static `Migration.run(importMetaUrl, MigrationClass)` in `packages/1-framework/3-tooling/migration/src/migration-base.ts:83-114` is removed. It's replaced by a free-standing `runMigration(importMetaUrl, MigrationClass)` function that lives in `@prisma-next/cli`.
+
+The base `Migration` class stays in `@prisma-next/migration-tools` (no new package). Once `Migration.run` is removed, the base class no longer drives I/O; the package's mix of "abstract class + manifest/attestation tooling" becomes acceptable. A future refactor might still relocate the base class to a more clearly layered home, but that's out of scope here.
+
+**3. `runMigration` lives in `@prisma-next/cli`.**
+
+`@prisma-next/cli` already depends on `@prisma-next/migration-tools` and already owns `loadConfig` (`packages/1-framework/3-tooling/cli/src/config-loader.ts`). Putting the orchestrator there means it can call `loadConfig`, build the control stack via `createControlStack`, instantiate the migration with the stack, and serialize to disk — all without introducing a new dependency edge or duplicating the c12 wrapper.
+
+A new subpath export, e.g. `@prisma-next/cli/migration-runner`, provides `runMigration` to user migration files. Migration scaffolds switch from `Migration.run(import.meta.url, M)` to `runMigration(import.meta.url, M)`.
+
+**4. Migration constructor takes the full `ControlStack`.**
+
+The `Migration` base class gains a constructor that accepts a `ControlStack<F, T>` and stores it. Subclasses (`SqlMigration`, `PostgresMigration`) inherit this. The stack is the same shape `ControlFamilyDescriptor.create` already takes, keeping the framework consistent. Storing the full stack rather than just the adapter leaves room for future migration-time needs (target-specific helpers, extension-pack-contributed metadata) without re-plumbing the constructor.
+
+The Postgres path materializes the adapter once via `this.controlAdapter = stack.adapter.create(stack)` and stores both. `runMigration` does not pre-create the adapter; the migration class owns adapter materialization, which keeps the orchestrator generic.
+
+**5. `dataTransform` becomes a flat factory taking the adapter as a parameter.**
+
+The free `dataTransform(contract, name, options)` factory becomes `dataTransform(contract, name, options, adapter)`. The factory stays a flat function: it lowers immediately via `adapter.lower(...)` and returns the same JSON-shaped op `{ kind, sql, params, check, run }` as today. The module-level `adapterSingleton` and `getAdapter()` helper are deleted, along with imports of `createPostgresAdapter` and `lowerSqlPlan`.
+
+A convenience instance method on `PostgresMigration` provides the adapter from the stored stack:
+
+```ts
+abstract class PostgresMigration extends SqlMigration<PostgresPlanTargetDetails> {
+  readonly targetId = 'postgres' as const;
+
+  protected dataTransform(contract, name, options) {
+    return dataTransform(contract, name, options, this.controlAdapter);
+  }
+}
+```
+
+User migration files write `this.dataTransform(contract, name, opts)` from inside `get operations()`. The free factory remains usable standalone (tests, ad-hoc tooling, non-class contexts).
+
+**6. Drop the runtime-plane dependency from `@prisma-next/target-postgres`.**
+
+Once `data-transform.ts` calls `adapter.lower()` on an injected adapter rather than `lowerSqlPlan(createPostgresAdapter(), ...)`, the package no longer needs `@prisma-next/sql-runtime` or `@prisma-next/adapter-postgres`. Both come out of `package.json` (one from `dependencies`, the other from `devDependencies`).
+
+### What changes for users
+
+Each existing `migration.ts` file gets two small edits:
+
+```diff
+-import { dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
++import { Migration, setNotNull } from '@prisma-next/target-postgres/migration';
++import { runMigration } from '@prisma-next/cli/migration-runner';
+
+ export default class M extends Migration {
+   override get operations() {
+     return [
+-      dataTransform(endContract, 'name', { check, run }),
++      this.dataTransform(endContract, 'name', { check, run }),
+       setNotNull('public', 'user', 'displayName'),
+     ];
+   }
+ }
+
+-Migration.run(import.meta.url, M);
++runMigration(import.meta.url, M);
+```
+
+Three example migrations exist under `examples/prisma-next-demo/migrations/`; they all flip in the same way. The CLI's planner/scaffold templates emit the new shapes going forward.
 
 ### Why this shape
 
-Constructor injection (not a module-scoped setter, not AsyncLocalStorage) gives us:
+- **Constructor injection over module-scoped state.** The instance has its stack from birth; no "before reading operations, someone must call X". Test isolation is trivial (pass a fake stack). Concurrent migrations in one process work without coordination — not a current need, but nothing breaks if it arrives.
+- **Stack-shaped descriptor `create()` is the existing framework pattern.** `ControlFamilyDescriptor.create(stack)` already does this; descriptors-take-stack is the consistent shape, not a new convention.
+- **Runner in `@prisma-next/cli` keeps layering clean.** The CLI is the only place that legitimately needs config loading + stack assembly + ops serialization in one function. Migration-tools stays focused on on-disk persistence; the base class stays a pure abstraction.
+- **Flat factory + instance-method wrapper preserves both worlds.** The factory has no DI magic; tests and standalone tools use it directly. The class hides the adapter parameter as ergonomics; user migration files don't carry it.
 
-- **No ordering contracts**: the instance has its stack from birth; no "before reading operations, someone must call X".
-- **Test isolation**: unit tests inject a fake adapter trivially.
-- **Concurrent migrations in one process**: not a current use case, but nothing breaks if it arrives.
-- **Target-level DI as a byproduct**: the same AST could be lowered by any target's control adapter if you injected it — incidental benefit for cross-target testing and future multi-target scenarios.
+### Not in scope
 
-Loading config via c12 walk-up from `dirname(import.meta.url)` gives the 99% case "it just works" ergonomics (same pattern the CLI already uses). The escape hatch gives the 1% case a clean DI path without adding a new config-override concept — users just construct the instance themselves.
-
-### Scope non-extension: the `db` typed-builder problem
-
-User-authored `migration.ts` files currently re-import the full target + extension stack at *type* level to get a typed `db = postgres<Contract>({ … })` query-builder handle:
-
-```ts
-import pgvector from '@prisma-next/extension-pgvector/runtime';
-import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import postgres from '@prisma-next/postgres/runtime';
-import { validateContract } from '@prisma-next/sql-contract/validate';
-import { dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
-import type { Contract } from './end-contract';
-import endContractJson from './end-contract.json' with { type: 'json' };
-
-const endContract = validateContract<Contract>(endContractJson, emptyCodecLookup);
-const db = postgres<Contract>({ contractJson: endContractJson, extensions: [pgvector] });
-```
-
-This is the same type-level stack-redeclaration problem the TS-contract-authoring surface has. It is **not** in scope for this spec. The `dataTransform` / lowerer / adapter machinery itself needs no type-level stack info; it consumes structural `SqlQueryPlan`s. The only type-level dependency is on the file-relative generated `./end-contract`. The `db` handle's typing is a separate conversation with a different solution shape.
+- **Fix for the pgvector codec-cast hardcoding** (`getCodecParamCast` in `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:39-50`). Tracked separately — see [References](#references). The DI work is independent of it; the lowered SQL is byte-identical before and after this PR for the same input AST + contract.
+- **The `db` typed-builder type-level redeclaration in `migration.ts`.** Same flavour as the TS-contract-authoring surface's stack-redeclaration problem; orthogonal to control-adapter DI. The `dataTransform` / lowerer / adapter machinery itself needs no type-level stack info.
+- **Applying the same DI pattern to MySQL / SQLite / Mongo targets.** Mongo doesn't have the hard-coded-runtime-adapter sin; SQLite's equivalent (if present) can follow the same shape later.
+- **Promoting the `Migration` base class to a different layer / new package.** Considered (`framework-components` was on the table); the current location is acceptable once `run` is removed. Revisit later if the package boundary becomes painful.
+- **Config-digest stamping on `migration.json`** for detecting authored-vs-current stack drift. Plausible follow-up; not needed for this refactor.
+- **CLI apply / self-execution paths for migration files.** The CLI loads migration classes by import; it does not execute migration files as scripts. `runMigration` is the entrypoint guard for the script-execution path only.
 
 ## Requirements
 
 ### Functional Requirements
 
+**Control adapter**
+
+- `SqlControlAdapter<TTarget>` declares a `lower(ast, ctx)` method matching the existing `Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>` shape.
+- `SqlControlAdapterDescriptor<TTarget>.create()` accepts a `ControlStack<'sql', TTarget>` argument, matching the existing `ControlFamilyDescriptor.create(stack)` pattern. Same change applies to the runtime adapter descriptor (see Plane hygiene below for the runtime side).
+- `PostgresControlAdapter` implements `lower()` by delegating to the same SQL renderer used by the runtime adapter. There is one source of truth for SQL rendering shared between control and runtime; no duplication.
+- For the same input AST + contract, `PostgresControlAdapter.lower()` and the runtime `PostgresAdapterImpl.lower()` produce byte-identical `{ sql, params }`.
+
+**Migration base + runner split**
+
+- `Migration.run` static method is removed from `packages/1-framework/3-tooling/migration/src/migration-base.ts`.
+- The `Migration` abstract class remains in `@prisma-next/migration-tools/migration`. It gains a constructor that accepts and stores a `ControlStack<F, T>`.
+- `SqlMigration` and `PostgresMigration` subclasses inherit the stack-accepting constructor. `PostgresMigration` materializes the control adapter once (`this.controlAdapter = stack.adapter.create(stack)`) and stores it.
+- `runMigration(importMetaUrl, MigrationClass)` is exported from a new subpath of `@prisma-next/cli` (e.g. `@prisma-next/cli/migration-runner`).
+- `runMigration` is responsible for: entrypoint detection (same `realpathSync` guard as today), arg parsing (`--dry-run`, `--help`), config discovery via the existing `loadConfig`, control-stack assembly via `createControlStack`, target-mismatch validation, instantiation `new MigrationClass(stack)`, and delegating to the existing serialization path (`ops.json` + `migration.json` writers in `migration-base.ts`).
+
+**Config-aware orchestration**
+
+- `runMigration` walks up from `dirname(fileURLToPath(importMetaUrl))` via `loadConfig` (the existing CLI loader, same `name: 'prisma-next'` semantics).
+- When no config is found, `runMigration` emits a diagnostic explaining the resolution failure and points users at the config file requirement.
+- When `config.target.targetId !== instance.targetId`, `runMigration` emits a target-mismatch diagnostic with both ids.
+
+**`dataTransform` / call sites**
+
+- `dataTransform(contract, name, options, adapter)` is a flat free function. It calls `adapter.lower()` inline and returns the existing `DataTransformOperation` shape unchanged. No module-scoped state.
+- `PostgresMigration` exposes a `protected dataTransform(contract, name, options)` instance method that calls the free factory with `this.controlAdapter`.
+- All existing `migration.ts` files in the repo (examples + integration tests) are migrated to use `this.dataTransform` and `runMigration`.
+- The CLI's migration-scaffold/template emits the new shape (`this.dataTransform`, `runMigration(import.meta.url, M)`).
+
 **Plane hygiene**
-- `target-postgres`'s `src/core/**` must not import from `@prisma-next/sql-runtime` or `@prisma-next/adapter-postgres/adapter`. No shared → runtime edges.
-- `@prisma-next/adapter-postgres` and `@prisma-next/sql-runtime` are removed from `@prisma-next/target-postgres`'s `dependencies` and `devDependencies`.
-- Registering target-postgres `src/core/**` explicitly as shared plane in `architecture.config.json` (matching sqlite's registration) so dep-cruiser actually enforces this.
 
-**Control adapter lowering**
-- `SqlControlAdapter<TTarget>` in `@prisma-next/family-sql` grows a `lower(ast, ctx)` method structurally compatible with `Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>`.
-- `PostgresControlAdapter` accepts the same options shape as the runtime adapter (`PostgresAdapterOptions`: extensions, codec registrations, profile id) and lowers identically for the same input.
-- The rendering implementation is shared between control and runtime adapters via a common module in postgres-adapter's `src/core/**`. No duplication of SQL rendering logic.
-
-**Migration base split**
-- Abstract `Migration<TOperation>` class (authoring surface only: `targetId`, `operations`, `describe`, `origin`, `destination`), `MigrationMeta`, and `MigrationMetaSchema` live in a shared-plane package. That package imports nothing from `node:fs`, `node:url`, `pathe`, `c12`, or `prettier`.
-- The abstract class exposes a constructor taking a minimal stack interface (at minimum: `{ controlAdapter: SqlControlAdapter<TTarget> }`; extensible).
-- `SqlMigration<TDetails>` (`packages/2-sql/9-family/src/core/sql-migration.ts`) and `PostgresMigration` (`packages/3-targets/3-targets/postgres/src/core/migrations/postgres-migration.ts`) compile in their current shared-plane locations without plane exceptions, importing the abstract class from its new shared-plane home.
-- The `run()` orchestrator (c12 config discovery, argv parsing, target-mismatch validation, ops/manifest serialization, file I/O) lives in a migration-plane package. Users' `migration.ts` files continue to import `Migration` (now a re-export) from `@prisma-next/target-postgres/migration`; the migration-plane re-export wraps the shared-plane abstract class plus the orchestrator's `run()` static method.
-
-**Config discovery + DI**
-- When `run()` is invoked with a class constructor and the migration file is the direct node entrypoint, it walks up from `dirname(fileURLToPath(importMetaUrl))` using c12 (same `name: 'prisma-next'` as the CLI) to locate `prisma-next.config.ts`.
-- Config is validated via `@prisma-next/config`'s validator (the same one `@prisma-next/cli`'s loader uses).
-- Control adapter is constructed via `config.adapter.create(resolveOptions(config.extensionPacks))`.
-- `instance = new Class({ controlAdapter, … })` is then passed to the existing ops-serialization path.
-- `config.target.targetId` is compared against `instance.targetId`; a mismatch is a loud error with both ids in the diagnostic.
-
-**Escape hatch**
-- `Migration.run(importMetaUrl, MigrationClassOrInstance)` accepts either:
-  - A class constructor → auto-discover config, construct with the resolved stack.
-  - A pre-constructed `Migration` instance → skip discovery entirely, use the instance as-is.
-- The class-vs-instance discriminator is simple (`typeof arg === 'function'` vs `arg instanceof Migration`).
-- The instance path performs no validation against any config — the user has opted into full DI.
-
-**DataTransform / operation-resolver consume injected adapter**
-- `dataTransform` no longer imports `createPostgresAdapter` or `lowerSqlPlan`. Access pattern: method on the migration instance (`this.dataTransform(contract, name, options)`) or equivalent in-instance channel; the user-facing call site inside `get operations()` reads naturally under the chosen shape.
-- The `contract` argument is retained: it's used for the `PN-MIG-2005` storage-hash assertion and for `LowererContext` forwarding. It is not re-interpreted as adapter coupling.
-- `operation-resolver.ts` receives the adapter through `OperationResolverContext`. The module-scoped `const postgresAdapter = createPostgresAdapter();` at the top of the file is deleted.
+- `@prisma-next/target-postgres`'s `package.json` lists neither `@prisma-next/adapter-postgres` nor `@prisma-next/sql-runtime` in `dependencies` or `devDependencies` after the refactor. (Both go away — adapter is no longer constructed in shared-plane code; sql-runtime is no longer imported.)
+- No file under `packages/3-targets/3-targets/postgres/src/core/**` imports from `@prisma-next/sql-runtime` or `@prisma-next/adapter-postgres/adapter`.
+- `pnpm lint:deps` passes repo-wide with no new plane-rule exceptions.
 
 **Diagnostics**
-- New error code for target mismatch between config and migration (e.g. `PN-MIG-3NNN`; allocate from the migration-plane range). Message format: "migration is for target `<instance.targetId>` but config declares target `<config.target.targetId>`".
-- New error code (or extension of existing `errorConfigFileNotFound`) for the "no config found and no pre-instantiated migration provided" case; the message points the user at the escape hatch.
-- Existing `PN-MIG-2005` contract-mismatch is unchanged.
+
+- A new error code (allocated from the migration-plane range, e.g. `PN-MIG-3NNN`) covers the target-mismatch case. Message format: "migration is for target `<instance.targetId>` but config declares target `<config.target.targetId>`".
+- The existing config-not-found error from `@prisma-next/cli`'s loader is reused. If its message wording assumes "you ran the CLI" rather than "you ran a migration script", add a brief contextual prefix; otherwise unchanged.
+- The existing `PN-MIG-2005` storage-hash mismatch in `data-transform.ts` is unchanged.
 
 ### Non-Functional Requirements
 
-- **Backwards compatibility**: existing `migration.ts` files continue to run. On-disk `ops.json` / `migration.json` formats are unchanged. Given the same input closures and the same effective adapter options, bytes in the lowered `{sql, params}` payloads must be identical before and after this refactor (the sample migrations under `examples/prisma-next-demo/migrations/**` are the regression anchor).
-- **`pnpm lint:deps` passes**: no new plane-rule exceptions introduced.
-- **Package footprint**: the shared-plane `Migration`-base package has no Node built-ins and no tooling deps.
-- **Test isolation**: unit tests for `dataTransform` and `operation-resolver` can exercise closures with a fake/spy control adapter; no real Postgres lowering needed.
-- **c12 configuration**: the orchestrator uses the same `name: 'prisma-next'` and discovery semantics as the CLI's loader. No new search-path rules.
+- **Backwards compatibility (artifact format).** `ops.json` and `migration.json` shapes are unchanged. For the same input closures and the same effective adapter behavior, the lowered `{ sql, params }` payloads must be byte-identical before and after the refactor. (The example migrations under `examples/prisma-next-demo/migrations/**` are an existing regression anchor; existing e2e tests cover the round-trip.)
+- **Test isolation.** Unit tests for `dataTransform` exercise a fake control adapter. No real Postgres lowering needed.
+- **No new plane exceptions.** `architecture.config.json` and `dep-cruiser` config are not relaxed.
+- **Migration source files own their dependencies.** The user migration script imports `runMigration` from `@prisma-next/cli/migration-runner`; pulling in CLI machinery at script run time is acceptable since the script's role is exactly "run a migration."
 
 ### Non-goals
 
-- **The `db` typed-builder re-import problem in `migration.ts`**. Same flavour of problem as the TS-contract-authoring surface; out of scope here.
-- **Config-digest stamping on `migration.json`** for detecting authored-vs-current stack drift. Plausible follow-up; the escape hatch is sufficient for Phase 1.
-- **Applying the same DI pattern to sqlite / mysql / mongo targets**. Mongo is already class-flow and doesn't have the hard-coded-runtime-adapter sin; sqlite's equivalent (if any) can follow the same shape later.
-- **Consolidating descriptor-flow and class-flow into a single pipeline**. That's PR 3 of `postgres-class-flow-migrations`; this spec only fixes the shared adapter-injection plumbing both pipelines need.
-- **Removing the TypeScript contract authoring surface's type-level stack redeclaration.** Separate problem, separate spec.
+- pgvector codec-cast hardcoding (separate ticket).
+- Regression-anchor `.ops.json` snapshots per example migration; existing integration tests are sufficient.
+- Singleton-vs-per-run adapter lifetime concerns. Migration scripts run in isolation.
+- CLI self-execution / apply flow for migration files (CLI loads classes, doesn't exec scripts).
+- Promoting the `Migration` base class out of `@prisma-next/migration-tools`.
+- Same-pattern DI for MySQL / SQLite / Mongo targets.
+- Migrating off `c12` or changing config search semantics.
 
 ## Acceptance Criteria
 
@@ -135,50 +207,51 @@ Grouped by theme; each item is independently verifiable.
 
 - [ ] `rg "from '@prisma-next/sql-runtime'" packages/3-targets/3-targets/postgres/src/core/` returns no matches.
 - [ ] `rg "from '@prisma-next/adapter-postgres" packages/3-targets/3-targets/postgres/src/core/` returns no matches.
-- [ ] `rg "createPostgresAdapter\\(" packages/3-targets/3-targets/postgres/src/` returns no matches (construction is owned by the orchestrator / adapter descriptor, not by target-postgres).
+- [ ] `rg "createPostgresAdapter\\(" packages/3-targets/3-targets/postgres/src/` returns no matches.
 - [ ] `@prisma-next/target-postgres`'s `package.json` lists neither `@prisma-next/adapter-postgres` nor `@prisma-next/sql-runtime` in `dependencies` or `devDependencies`.
-- [ ] `architecture.config.json` explicitly registers `packages/3-targets/3-targets/postgres/src/core/**` as shared plane.
 - [ ] `pnpm lint:deps` passes repo-wide with no new plane-rule exceptions.
 
 ### Control adapter
 
 - [ ] `SqlControlAdapter<TTarget>` declares `lower(ast, ctx)` and is structurally assignable to `Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>` for lowering calls.
-- [ ] `PostgresControlAdapter` accepts `PostgresAdapterOptions` in its constructor; configured identically to the runtime adapter, it produces byte-identical SQL + params for the same input AST + contract. Covered by a new shared unit test that runs both paths over a representative matrix (select / insert / update / delete, with at least one pgvector-typed column and one JSONB-typed column to exercise codec casts).
-- [ ] A single rendering module under postgres-adapter's `src/core/**` is the sole source of truth for SQL rendering; both control and runtime adapter classes delegate to it.
+- [ ] `SqlControlAdapterDescriptor.create(stack)` and `RuntimeAdapterDescriptor.create(stack)` (or its SQL specialization) take the assembled stack, mirroring `ControlFamilyDescriptor.create(stack)`.
+- [ ] `PostgresControlAdapter` and the runtime Postgres adapter delegate to a single shared SQL renderer (a single source of truth in `packages/3-targets/6-adapters/postgres/src/core/**`).
+- [ ] A unit test confirms that `PostgresControlAdapter.lower(ast, { contract })` and `PostgresAdapterImpl.lower(ast, { contract })` produce byte-identical `{ sql, params }` for a representative AST matrix (select / insert / update / delete, including JSON / JSONB / vector-cast `ParamRef`s).
 
-### Migration base split
+### Migration base + runner split
 
-- [ ] The abstract `Migration` class (and `MigrationMeta` / `MigrationMetaSchema`) live in a shared-plane package with zero imports from `node:fs`, `node:url`, `pathe`, `c12`, or `prettier`.
-- [ ] `@prisma-next/migration-tools`'s `migration-base.ts` re-exports the abstract class from the shared-plane package; the `run()` static method lives in the migration-plane entrypoint.
-- [ ] `packages/2-sql/9-family/src/core/sql-migration.ts` compiles with its shared-plane registration, importing the abstract class from its new shared-plane home.
-- [ ] `packages/3-targets/3-targets/postgres/src/core/migrations/postgres-migration.ts` compiles likewise.
-- [ ] No shared→migration or shared→runtime imports exist in any of the above files after the move.
+- [ ] `Migration.run` is removed from `packages/1-framework/3-tooling/migration/src/migration-base.ts`.
+- [ ] `Migration` (and `SqlMigration`, `PostgresMigration`) accept a `ControlStack` in their constructor and store it.
+- [ ] `PostgresMigration` exposes `controlAdapter` (or equivalent accessor) materialized via `stack.adapter.create(stack)`.
+- [ ] `runMigration(importMetaUrl, MigrationClass)` is exported from `@prisma-next/cli/migration-runner` (or chosen subpath) and produces the same on-disk artifacts (`ops.json`, `migration.json`) that `Migration.run` produced.
+- [ ] `runMigration` reuses the existing `loadConfig` from `@prisma-next/cli` for config discovery — no duplication of the c12 wrapper.
 
-### Config discovery + DI
+### `dataTransform` and call sites
 
-- [ ] When a `migration.ts` is run directly as a node entrypoint and a valid `prisma-next.config.ts` exists up-tree, `run()` locates the config via c12 and invokes `new MigrationClass({ controlAdapter, … })`.
-- [ ] When no config is found (walk-up hits the filesystem root), `run()` emits a diagnostic naming the escape hatch.
-- [ ] When `config.target.targetId !== instance.targetId`, `run()` emits a target-mismatch diagnostic with both ids.
-- [ ] When invoked with a pre-instantiated migration (`Migration.run(importMetaUrl, new M(customStack))`), `run()` does not attempt config discovery and uses the instance as-is.
-- [ ] Target-mismatch and config-missing diagnostics each have a new error code and a dedicated unit test.
+- [ ] `dataTransform(contract, name, options, adapter)` accepts the adapter as its fourth parameter.
+- [ ] `PostgresMigration` exposes `protected dataTransform(contract, name, options)` that defers to the free factory with `this.controlAdapter`.
+- [ ] `data-transform.ts` no longer imports `createPostgresAdapter` or `lowerSqlPlan`; the module-level `adapterSingleton` and `getAdapter()` are deleted.
+- [ ] All existing `migration.ts` files in `examples/**` and `**/integration-tests/**` use `this.dataTransform` (where applicable) and `runMigration`.
+- [ ] The CLI scaffold/template that emits new `migration.ts` files emits the new shapes.
 
-### DataTransform / operation-resolver
+### Config-aware orchestration
 
-- [ ] `dataTransform` (class-flow) uses the migration instance's injected control adapter. No `createPostgresAdapter` call anywhere in the file.
-- [ ] `operation-resolver.ts` (descriptor-flow) receives the adapter through `OperationResolverContext`. No module-scoped `postgresAdapter` constant.
-- [ ] The `PN-MIG-2005` storage-hash-mismatch assertion is unchanged; its existing test still passes.
+- [ ] When a `migration.ts` is invoked as a node entrypoint and a valid `prisma-next.config.ts` exists up-tree, `runMigration` resolves the config and instantiates the migration with a stack assembled from it.
+- [ ] When `config.target.targetId !== instance.targetId`, `runMigration` exits with a target-mismatch diagnostic carrying both ids and a non-zero exit code.
+- [ ] When no config is found, `runMigration` emits a diagnostic and exits non-zero.
+- [ ] Each new diagnostic has a dedicated unit test.
 
 ### End-to-end behaviour
 
-- [ ] Running `node examples/prisma-next-demo/migrations/20260422T0748_migration/migration.ts` regenerates `ops.json` byte-identically to the committed version. Same check for the other two example migrations in that example.
-- [ ] `data-transform-*.e2e.test.ts` and `class-flow-round-trip.e2e.test.ts` pass unchanged.
-- [ ] Unit tests for `dataTransform` exercise a fake control adapter (demonstrating injection works).
+- [ ] Re-running the existing example migrations under `examples/prisma-next-demo/migrations/**` regenerates `ops.json` byte-identically to the committed version. (Each example migration file is updated to the new call shape; the generated artifact bytes do not change.)
+- [ ] Existing data-transform e2e tests (`data-transform-*.e2e.test.ts`, `class-flow-round-trip.e2e.test.ts`) pass unchanged in semantics.
+- [ ] A new unit test for `dataTransform` exercises a fake control adapter, demonstrating injection works without spinning up real Postgres.
 
 ## Other Considerations
 
 ### Security
 
-No new surface. Config loading reuses the CLI's c12-based pattern and the same validator; no additional filesystem traversal beyond standard walk-up-to-root.
+No new surface. Config loading reuses the existing CLI loader and validator. No additional filesystem traversal.
 
 ### Cost
 
@@ -186,7 +259,7 @@ No operational cost impact; code-organisation refactor.
 
 ### Observability
 
-Orchestrator should log at verbose level (stderr) the resolved config file path and the effective adapter options when constructing the stack, to aid debugging of "my migration's `ops.json` changed after a config edit" issues. Low priority; implementation discretion.
+`runMigration` should log the resolved config file path and the effective target id at verbose level (stderr) when constructing the stack. Aids debugging "my migration's `ops.json` changed after a config edit." Low priority; implementation discretion.
 
 ### Data Protection
 
@@ -198,26 +271,35 @@ N/A.
 
 ## References
 
-- `packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts` — primary target of the fix.
-- `packages/3-targets/3-targets/postgres/src/core/migrations/operation-resolver.ts` — sibling occurrence of the same pattern.
-- `packages/1-framework/3-tooling/migration/src/migration-base.ts` — current home of `Migration` + `Migration.run()`; splits into two halves.
-- `packages/2-sql/9-family/src/core/sql-migration.ts`, `packages/3-targets/3-targets/postgres/src/core/migrations/postgres-migration.ts` — subclasses that need the relocated abstract class.
-- `packages/2-sql/9-family/src/core/control-adapter.ts` — `SqlControlAdapter` interface that grows `lower()`.
-- `packages/3-targets/6-adapters/postgres/src/core/adapter.ts` — runtime adapter today; rendering core factored out for shared use.
-- `packages/3-targets/6-adapters/postgres/src/exports/control.ts` — control adapter descriptor updated to construct a lowering-capable control adapter.
-- `packages/1-framework/3-tooling/cli/src/config-loader.ts` — existing c12-based loader to reuse/extract.
-- `packages/1-framework/1-core/config/src/config-types.ts` — `PrismaNextConfig` (`adapter`, `extensionPacks`) shape the orchestrator reads.
-- `architecture.config.json` + `dependency-cruiser.config.mjs` — plane rules; confirm no new exceptions.
-- `projects/postgres-class-flow-migrations/reviews/pr-2-flip/code-review.md` — PR round-trip context that surfaced the concern.
-- `.cursor/rules/multi-plane-entrypoints.mdc` — pattern for the migration-tools package gaining shared- and migration-plane entrypoints.
-- CodeRabbit review comment: "Keep runtime lowering out of src/core." Cited in the kickoff discussion.
+**Files central to the refactor**
+
+- `packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts` — primary target of the fix. Drops singleton + sql-runtime import; gains adapter parameter.
+- `packages/1-framework/3-tooling/migration/src/migration-base.ts` — `Migration.run` is removed; constructor gains stack parameter.
+- `packages/2-sql/9-family/src/core/sql-migration.ts` and `packages/3-targets/3-targets/postgres/src/core/migrations/postgres-migration.ts` — subclasses inherit constructor; `PostgresMigration` adds `dataTransform` instance method and exposes `controlAdapter`.
+- `packages/2-sql/9-family/src/core/control-adapter.ts` — `SqlControlAdapter` interface gains `lower()`; `SqlControlAdapterDescriptor.create(stack)` signature change.
+- `packages/3-targets/6-adapters/postgres/src/exports/control.ts`, `packages/3-targets/6-adapters/postgres/src/exports/runtime.ts` — descriptors updated for new `create(stack)` signature.
+- `packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts`, `packages/3-targets/6-adapters/postgres/src/core/adapter.ts` — control adapter implements `lower()` by delegating to a shared renderer; rendering extracted to a shared module.
+- `packages/1-framework/1-core/framework-components/src/control-descriptors.ts` — `ControlAdapterDescriptor.create(stack)` interface change.
+- `packages/1-framework/1-core/framework-components/src/execution-descriptors.ts` — `RuntimeAdapterDescriptor.create(stack)` interface change.
+- `packages/1-framework/3-tooling/cli/src/config-loader.ts` — reused as-is by `runMigration`.
+- `packages/1-framework/3-tooling/cli/` — gains `runMigration` exported from a new subpath (e.g. `migration-runner`).
+- `packages/3-targets/3-targets/postgres/package.json` — drops `@prisma-next/sql-runtime` and `@prisma-next/adapter-postgres`.
+
+**Examples & tests touched**
+
+- `examples/prisma-next-demo/migrations/**/migration.ts` — three files; each gets the two-line `dataTransform → this.dataTransform` and `Migration.run → runMigration` swap.
+- Any `migration.ts` under `**/integration-tests/**` — same swap.
+
+**Architecture / repo configs**
+
+- `architecture.config.json` and `dependency-cruiser.config.mjs` — confirm no new plane-rule exceptions are introduced.
+
+**Follow-up tickets**
+
+- "Move SQL param-cast metadata onto codec descriptors" — separately tracked. Wipes out `getCodecParamCast` switch in `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:37-58`. Out of scope here; this PR leaves the switch untouched.
 
 ## Open Questions
 
-1. **Home for the shared abstract `Migration`**: new standalone package (e.g. `@prisma-next/migration-base` under `packages/1-framework/1-core/`) or slot into an existing shared-plane package (`framework-components` is the closest fit)? Default assumption: new package — the abstract class has a narrow, semver-critical surface and benefits from standalone versioning. Confirm or override.
-2. **Stack-argument shape on the constructor**: `{ controlAdapter }`, `{ stack: { controlAdapter, … } }`, or `{ adapter }`? Default assumption: `{ controlAdapter }` at the top level, named explicitly — leaves room to add siblings (`driver`, future hooks) without overloading a generic name.
-3. **`dataTransform` access shape**: method on `PostgresMigration` (`this.dataTransform(…)`) vs bound factory exposed via an instance property (`this.factories.dataTransform(…)`) vs free factory that's given the adapter through a constructor-bound closure in the base class. Default assumption: method on the class, most legible in `get operations()`. Happy to revisit if there's a DX preference for the free-factory form.
-4. **Loader placement**: extract the c12-based loader from `@prisma-next/cli` into a shared-plane `@prisma-next/config-loader` (or extend the existing shared `@prisma-next/config` package) so both CLI and migration-orchestrator consume the same code, or let the orchestrator ship a minimal private copy? Default assumption: extract-and-share — two copies drift.
-5. **Target-mismatch enforcement for the instance escape hatch**: when a user passes `new M(customStack)`, should `run()` still attempt any sanity-check (e.g. comparing against an available config if one is discoverable, warn only)? Default assumption: no — the user has opted into full DI and we trust them. A loud diagnostic in the auto-discovery path plus silence in the instance path is the cleanest contract.
-6. **Regression anchoring for `ops.json`**: snapshot each currently-committed example migration's `ops.json` and re-run through the refactored pipeline as an explicit regression test, or lean on the existing e2e suite to catch divergence? Default assumption: add snapshots — cheap, precise, and they'd have caught any silent codec-rendering drift.
-7. **Ordering vs existing Phase 3**: this work overlaps conceptually with the `postgres-class-flow-migrations` PR 3 cleanup (descriptor-flow collapse). Should it land before PR 3 (so PR 3 inherits a clean adapter-injection foundation), be folded into PR 3, or land independently on main? Default assumption: land before PR 3 as a narrow independent PR — reviewable in isolation and PR 3 benefits from not having to maintain the broken descriptor-flow adapter constant.
+1. **Subpath name for `runMigration` in `@prisma-next/cli`.** Default: `@prisma-next/cli/migration-runner`. Alternatives considered: `@prisma-next/cli/runtime`, `@prisma-next/cli/run-migration`. The verbose form is the clearest. Confirm or override.
+2. **Where the shared SQL renderer lives.** Current `lower()` body is inline in `PostgresAdapterImpl` (`packages/3-targets/6-adapters/postgres/src/core/adapter.ts:124-163`). Extracting it as a free function (e.g. `renderLoweredSql(ast, ctx) → { sql, params }`) in a new module under `packages/3-targets/6-adapters/postgres/src/core/` is the obvious shape; both adapter classes call it. No real alternatives, just confirming the shape during execution.
+3. **Should `runMigration` accept a `--config <path>` override?** The current `Migration.run` doesn't. The existing CLI's `loadConfig` accepts an optional path. Suggest: yes, accept it via `--config` arg, since the CLI already supports it and migration-script runs benefit from the same flexibility (e.g. switching configs per environment in CI).
