@@ -19,7 +19,6 @@ import type {
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
-import type { PlanningMode } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -116,8 +115,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return policyResult;
     }
 
-    const planningMode = this.resolvePlanningMode(options.policy);
-    const schemaIssues = this.collectSchemaIssues(options, planningMode.includeExtraObjects);
+    const schemaIssues = this.collectSchemaIssues(options);
     const codecHooks = extractCodecControlHooks(options.frameworkComponents);
     const storageTypes = options.contract.storage.types ?? {};
 
@@ -165,19 +163,12 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     return null;
   }
 
-  private resolvePlanningMode(policy: MigrationOperationPolicy): PlanningMode {
-    const allowWidening = policy.allowedOperationClasses.includes('widening');
-    const allowDestructive = policy.allowedOperationClasses.includes('destructive');
-    // `db init` uses additive-only policy and intentionally ignores extras.
-    // Any reconciliation-capable policy should inspect extras to reconcile strict equality.
-    const includeExtraObjects = allowWidening || allowDestructive;
-    return { includeExtraObjects, allowWidening, allowDestructive };
-  }
-
-  private collectSchemaIssues(
-    options: PlannerOptionsWithComponents,
-    strict: boolean,
-  ): readonly SchemaIssue[] {
+  private collectSchemaIssues(options: PlannerOptionsWithComponents): readonly SchemaIssue[] {
+    // `db init` uses additive-only policy and intentionally ignores extra
+    // schema objects. Any reconciliation-capable policy (widening or
+    // destructive) must inspect extras to reconcile strict equality.
+    const allowed = options.policy.allowedOperationClasses;
+    const strict = allowed.includes('widening') || allowed.includes('destructive');
     const verifyOptions: VerifySqlSchemaOptionsWithComponents = {
       contract: options.contract,
       schema: options.schema,
