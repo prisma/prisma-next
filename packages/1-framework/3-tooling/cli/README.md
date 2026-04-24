@@ -951,12 +951,13 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
 3. Determines the starting point: `--from <hash>` if provided, otherwise the latest migration target
 4. Diffs the starting contract against the new contract using the target's migration planner
-5. Scaffolds a new migration package containing a draft `migration.ts`, `migration.json` (draft, `migrationId: null`), and contract bookends. `ops.json` and the attested `migrationId` are **not** written by `plan` — they are produced when the developer subsequently runs `node migrations/<dir>/migration.ts` (self-emit). See [Emitting `ops.json` and computing `migrationId`](#emitting-opsjson-and-computing-migrationid).
-6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before self-emitting. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
+5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationId` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), `ops.json` (the planned ops, or `[]` in the placeholder-blocked case), and contract bookends. The package is **always** fully attested — there is no draft state on disk.
+6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before re-emitting. The on-disk `ops.json` is `[]` and `migrationId` is the hash of `(manifest, [])`, so applying the migration as-written will not advance the storage hash to the intended destination — the runner's destination-hash post-check surfaces this as a state mismatch. After filling in the placeholders, run `node migrations/<dir>/migration.ts` to re-emit `ops.json` and the corresponding `migrationId`. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
 
 **Outputs:**
-- `migrations/<dir>/migration.ts` — scaffolded draft (editable)
-- `migrations/<dir>/migration.json` — draft manifest (`migrationId: null`)
+- `migrations/<dir>/migration.ts` — editable migration source (with `placeholder(...)` slots when the planner inserted them)
+- `migrations/<dir>/migration.json` — fully attested manifest (`migrationId: string`, never null)
+- `migrations/<dir>/ops.json` — planned operations (empty list `[]` if placeholders blocked the planner)
 - `migrations/<dir>/start-contract.{json,d.ts}` — bookend from the "from" side (when applicable)
 - `migrations/<dir>/end-contract.{json,d.ts}` — bookend from the "to" side
 
@@ -1033,14 +1034,15 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 - `-v, --verbose`: Verbose output (debug info, timings)
 
 **What it does:**
-1. Reads attested migration packages from `config.migrations.dir`
-2. Reconstructs the migration graph (skips drafts with `migrationId: null`)
-3. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
-4. Connects to the database and reads the current marker hash
-5. Finds the shortest path from the marker hash to the destination using graph pathfinding
-6. Executes each pending migration in order using the target's `MigrationRunner`
-7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
-8. After each migration, the runner verifies the schema and updates the marker/ledger
+1. Reads migration packages from `config.migrations.dir` (every package is attested — there is no on-disk draft state)
+2. **Defense in depth:** rehashes `(manifest, ops)` for each loaded bundle and confirms it matches the stored `migrationId`. If a bundle has been hand-edited or partially written since emit, apply aborts with a structured runtime error pointing at the offending directory and asks the developer to re-run `node migrations/<dir>/migration.ts` (or restore from version control).
+3. Reconstructs the migration graph from all loaded bundles
+4. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
+5. Connects to the database and reads the current marker hash
+6. Finds the shortest path from the marker hash to the destination using graph pathfinding
+7. Executes each pending migration in order using the target's `MigrationRunner`
+8. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
+9. After each migration, the runner verifies the schema and updates the marker/ledger
 
 **Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
 
