@@ -9,10 +9,23 @@ export interface RenderMigrationMeta {
   readonly labels?: readonly string[];
 }
 
-const BASE_IMPORT: ImportRequirement = {
-  moduleSpecifier: '@prisma-next/family-mongo/migration',
-  symbol: 'Migration',
-};
+/**
+ * Always-present base imports for the rendered scaffold:
+ *
+ * - `Migration` from `@prisma-next/family-mongo/migration` — the
+ *   user-facing Mongo `Migration` base; subclasses don't need to
+ *   redeclare `targetId` or thread family/target generics.
+ * - `runMigration` from `@prisma-next/cli/migration-runner` — the
+ *   entrypoint orchestrator that loads `prisma-next.config.ts`, assembles
+ *   a `ControlStack`, and instantiates the migration class. The migration
+ *   file owns this dependency directly: pulling CLI machinery in at
+ *   script run time is acceptable because the script's whole purpose is
+ *   to be invoked from the project that owns the config.
+ */
+const BASE_IMPORTS: readonly ImportRequirement[] = [
+  { moduleSpecifier: '@prisma-next/family-mongo/migration', symbol: 'Migration' },
+  { moduleSpecifier: '@prisma-next/cli/migration-runner', symbol: 'runMigration' },
+];
 
 /**
  * Render a list of Mongo `OpFactoryCall`s as a `migration.ts`
@@ -27,9 +40,9 @@ const BASE_IMPORT: ImportRequirement = {
  * `renderTypeScript()` expression and declares its own
  * `importRequirements()`. The top-level renderer aggregates imports
  * across all nodes and emits one `import { … } from "…"` line per module.
- * The `Migration` import from `@prisma-next/family-mongo/migration` is
- * always emitted — it's driven by `meta` (the rendered scaffold always
- * extends `Migration`), not by any node.
+ * The `Migration` and `runMigration` imports are always emitted — they're
+ * structural to the rendered scaffold (extends `Migration`, calls
+ * `runMigration`), not driven by any node.
  */
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
@@ -52,13 +65,13 @@ export function renderCallsToTypeScript(
     '}',
     '',
     'export default M;',
-    'Migration.run(import.meta.url, M);',
+    'runMigration(import.meta.url, M);',
     '',
   ].join('\n');
 }
 
 function buildImports(calls: ReadonlyArray<OpFactoryCall>): string {
-  const requirements: ImportRequirement[] = [BASE_IMPORT];
+  const requirements: ImportRequirement[] = [...BASE_IMPORTS];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
       requirements.push(req);

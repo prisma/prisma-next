@@ -1,4 +1,5 @@
 #!/usr/bin/env -S node
+import { runMigration } from '@prisma-next/cli/migration-runner';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import postgres from '@prisma-next/postgres/runtime';
@@ -36,4 +37,4 @@ export default class M extends Migration {
   }
 }
 
-Migration.run(import.meta.url, M);
+runMigration(import.meta.url, M);

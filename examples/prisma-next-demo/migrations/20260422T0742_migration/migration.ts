@@ -1,4 +1,5 @@
 #!/usr/bin/env -S node
+import { runMigration } from '@prisma-next/cli/migration-runner';
 import { addColumn, Migration } from '@prisma-next/target-postgres/migration';
 
 export default class M extends Migration {
@@ -21,4 +22,4 @@ export default class M extends Migration {
   }
 }
 
-Migration.run(import.meta.url, M);
+runMigration(import.meta.url, M);

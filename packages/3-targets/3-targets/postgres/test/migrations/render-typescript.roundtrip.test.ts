@@ -38,6 +38,56 @@ const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 const targetPostgresMigrationExport = pathToFileURL(
   resolve(packageRoot, 'src/exports/migration.ts'),
 ).href;
+const cliMigrationRunnerExport = pathToFileURL(
+  resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/migration-runner.ts'),
+).href;
+const cliConfigTypesExport = pathToFileURL(
+  resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/exports/config-types.ts'),
+).href;
+const familySqlControlExport = pathToFileURL(
+  resolve(repoRoot, 'packages/2-sql/9-family/src/exports/control.ts'),
+).href;
+const targetPostgresControlExport = pathToFileURL(
+  resolve(packageRoot, 'src/exports/control.ts'),
+).href;
+const adapterPostgresControlExport = pathToFileURL(
+  resolve(repoRoot, 'packages/3-targets/6-adapters/postgres/src/exports/control.ts'),
+).href;
+
+/**
+ * `runMigration` requires a `prisma-next.config.ts` to assemble a
+ * `ControlStack`. Tests have no workspace `node_modules` resolution from
+ * `tmpDir`, so we write a bespoke config alongside `migration.ts` whose
+ * imports all use absolute `file://` URLs into the live workspace
+ * sources. The driver is omitted — the round-trip exercises the
+ * serialization path only and never opens a database connection.
+ */
+const fixtureConfigSource = [
+  `import postgresAdapter from '${adapterPostgresControlExport}';`,
+  `import { defineConfig } from '${cliConfigTypesExport}';`,
+  `import sql from '${familySqlControlExport}';`,
+  `import postgres from '${targetPostgresControlExport}';`,
+  '',
+  'export default defineConfig({',
+  '  family: sql,',
+  '  target: postgres,',
+  '  adapter: postgresAdapter,',
+  '});',
+  '',
+].join('\n');
+
+/**
+ * Rewrite the two bare imports the renderer always emits so that running
+ * the rendered scaffold from a temp directory (which has no workspace
+ * `node_modules` resolution) still reaches the live in-source modules.
+ * Both rewrites are required — the migration class needs the workspace
+ * `Migration` base, and the entrypoint needs the workspace `runMigration`.
+ */
+function rewriteImports(tsSource: string): string {
+  return tsSource
+    .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`)
+    .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerExport}'`);
+}
 
 const META = {
   from: 'sha256:0000000000000000000000000000000000000000000000000000000000000000',
@@ -50,6 +100,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'postgres-render-roundtrip-'));
     await writeFile(join(tmpDir, 'package.json'), '{"type":"module"}');
+    await writeFile(join(tmpDir, 'prisma-next.config.ts'), fixtureConfigSource);
   });
 
   afterEach(async () => {
@@ -80,9 +131,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     ];
     const migration = new TypeScriptRenderablePostgresMigration(calls, META);
 
-    const tsSource = migration
-      .renderTypeScript()
-      .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
+    const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
     const { stdout, stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
@@ -101,9 +150,7 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
   it('renders an empty calls list whose executed scaffold emits []', async () => {
     const migration = new TypeScriptRenderablePostgresMigration([], META);
 
-    const tsSource = migration
-      .renderTypeScript()
-      .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
+    const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
     const { stderr } = await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
@@ -129,12 +176,12 @@ describe('TypeScriptRenderablePostgresMigration round-trip', () => {
     const calls = [new RawSqlCall(op)];
     const migration = new TypeScriptRenderablePostgresMigration(calls, META);
 
-    const tsSource = migration
-      .renderTypeScript()
-      .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`);
+    const tsSource = rewriteImports(migration.renderTypeScript());
     await writeFile(join(tmpDir, 'migration.ts'), tsSource);
 
-    await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], { cwd: tmpDir });
+    await execFileAsync(tsxPath, [join(tmpDir, 'migration.ts')], {
+      cwd: tmpDir,
+    });
 
     const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
 
