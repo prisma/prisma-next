@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeMigrationId } from '../src/attestation';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
+import { MigrationToolsError } from '../src/errors';
 import {
   detectCycles,
   detectOrphans,
@@ -10,8 +11,7 @@ import {
   findPathWithDecision,
   findReachableLeaves,
   reconstructGraph,
-} from '../src/dag';
-import { MigrationToolsError } from '../src/errors';
+} from '../src/graph';
 import type { MigrationBundle, MigrationChainEntry } from '../src/types';
 import { createAttestedManifest, createTestOps } from './fixtures';
 

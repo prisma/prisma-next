@@ -38,7 +38,7 @@ Full semantic validation happens in target/family migration planners and runners
 graph TD
     CLI["CLI commands<br/>(migration plan, apply, verify, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> ATT["attestation.ts<br/>Migration attestation"]
-    CLI --> GRAPH["dag.ts<br/>Graph operations"]
+    CLI --> GRAPH["graph.ts<br/>Graph operations"]
     IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
     ATT --> IO
     ATT --> CAN["canonicalize-json.ts"]
