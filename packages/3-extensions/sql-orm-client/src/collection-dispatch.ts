@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { decodeField } from '@prisma-next/sql-runtime';
 import {
   getColumnToFieldMap,
   isToOneCardinality,
@@ -528,80 +528,6 @@ function parseIncludedRows(value: unknown): Record<string, unknown>[] {
   return rows;
 }
 
-function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
-  return value instanceof Promise;
-}
-
-function isJsonSchemaValidationError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
-  );
-}
-
-function wirePreview(value: unknown): string {
-  return typeof value === 'string' && value.length > 100
-    ? `${value.substring(0, 100)}...`
-    : String(value).substring(0, 100);
-}
-
-function decodeFailure(alias: string, codecId: string, wireValue: unknown, error: unknown): Error {
-  return runtimeError(
-    'RUNTIME.DECODE_FAILED',
-    `Failed to decode row alias '${alias}' with codec '${codecId}': ${error instanceof Error ? error.message : String(error)}`,
-    {
-      alias,
-      codec: codecId,
-      wirePreview: wirePreview(wireValue),
-    },
-  );
-}
-
-function validateIncludedJsonValue(
-  context: CollectionContext<Contract<SqlStorage>>['context'],
-  tableName: string,
-  columnName: string,
-  value: unknown,
-  codecId: string,
-): unknown {
-  const registry = context.jsonSchemaValidators;
-  if (!registry) {
-    return value;
-  }
-
-  const validate = registry.get(`${tableName}.${columnName}`);
-  if (!validate) {
-    return value;
-  }
-
-  const result = validate(value);
-  if (result.valid) {
-    return value;
-  }
-
-  const summary =
-    result.errors.length === 1
-      ? (result.errors[0]?.path ?? '/') === '/'
-        ? (result.errors[0]?.message ?? 'unknown validation error')
-        : `${result.errors[0]?.path}: ${result.errors[0]?.message}`
-      : result.errors
-          .map((error) => (error.path === '/' ? error.message : `${error.path}: ${error.message}`))
-          .join('; ');
-
-  throw runtimeError(
-    'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-    `JSON schema validation failed for column '${tableName}.${columnName}' (decode): ${summary}`,
-    {
-      table: tableName,
-      column: columnName,
-      codecId,
-      direction: 'decode',
-      errors: [...result.errors],
-    },
-  );
-}
-
 function decodeIncludedRow(
   contract: Contract<SqlStorage>,
   context: CollectionContext<Contract<SqlStorage>>['context'],
@@ -632,35 +558,14 @@ function decodeIncludedRow(
       continue;
     }
 
-    try {
-      const decodedValue = codec.decode(wireValue);
-      if (isPromiseLike(decodedValue)) {
-        mapped[fieldName] = decodedValue
-          .then((resolvedValue) =>
-            validateIncludedJsonValue(context, tableName, columnName, resolvedValue, codec.id),
-          )
-          .catch((error) => {
-            if (isJsonSchemaValidationError(error)) {
-              throw error;
-            }
-            throw decodeFailure(fieldName, codec.id, wireValue, error);
-          });
-        continue;
-      }
-
-      mapped[fieldName] = validateIncludedJsonValue(
-        context,
-        tableName,
-        columnName,
-        decodedValue,
-        codec.id,
-      );
-    } catch (error) {
-      if (isJsonSchemaValidationError(error)) {
-        throw error;
-      }
-      throw decodeFailure(fieldName, codec.id, wireValue, error);
-    }
+    mapped[fieldName] = decodeField({
+      alias: fieldName,
+      wireValue,
+      codec,
+      jsonValidators: context.jsonSchemaValidators,
+      tableName,
+      columnName,
+    });
   }
 
   return mapped;

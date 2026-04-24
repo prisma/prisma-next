@@ -4,6 +4,14 @@ export type {
   Middleware,
   MiddlewareContext,
 } from '@prisma-next/runtime-executor';
+export type { DecodeFieldOptions } from '../codecs/decoding';
+export {
+  decodeFailure,
+  decodeField,
+  isJsonSchemaValidationError,
+  isPromiseLike,
+  wirePreview,
+} from '../codecs/decoding';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,

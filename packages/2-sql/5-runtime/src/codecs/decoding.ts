@@ -79,11 +79,11 @@ function resolveColumnRefForAlias(
   return fallbackColumnRefIndex?.get(alias);
 }
 
-function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
+export function isPromiseLike<T>(value: T | Promise<T>): value is Promise<T> {
   return value instanceof Promise;
 }
 
-function isJsonSchemaValidationError(error: unknown): boolean {
+export function isJsonSchemaValidationError(error: unknown): boolean {
   return (
     error instanceof Error &&
     'code' in error &&
@@ -91,42 +91,90 @@ function isJsonSchemaValidationError(error: unknown): boolean {
   );
 }
 
-function wirePreview(value: unknown): string {
+export function wirePreview(value: unknown): string {
   return typeof value === 'string' && value.length > 100
     ? `${value.substring(0, 100)}...`
     : String(value).substring(0, 100);
 }
 
-function decodeFailure(alias: string, codec: Codec, wireValue: unknown, error: unknown): Error {
+export function decodeFailure(
+  alias: string,
+  codecId: string,
+  wireValue: unknown,
+  error: unknown,
+): Error {
   return runtimeError(
     'RUNTIME.DECODE_FAILED',
-    `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
+    `Failed to decode row alias '${alias}' with codec '${codecId}': ${error instanceof Error ? error.message : String(error)}`,
     {
       alias,
-      codec: codec.id,
+      codec: codecId,
       wirePreview: wirePreview(wireValue),
     },
   );
 }
 
-function validateDecodedValue(
-  alias: string,
-  decodedValue: unknown,
-  codec: Codec,
-  jsonValidators: JsonSchemaValidatorRegistry | undefined,
-  projection: ExecutionPlan['meta']['projection'],
-  fallbackColumnRefIndex: ColumnRefIndex | null,
-): unknown {
-  if (!jsonValidators) {
-    return decodedValue;
-  }
+export interface DecodeFieldOptions {
+  readonly alias: string;
+  readonly wireValue: unknown;
+  readonly codec: Codec;
+  readonly jsonValidators?: JsonSchemaValidatorRegistry | undefined;
+  readonly tableName?: string | undefined;
+  readonly columnName?: string | undefined;
+}
 
-  const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
-  if (ref) {
-    validateJsonValue(jsonValidators, ref.table, ref.column, decodedValue, 'decode', codec.id);
-  }
+/**
+ * Runs codec.decode on a single wire value, threading JSON-schema validation
+ * and error redaction through a single place. Sync codecs return the decoded
+ * value directly; async codecs return a `Promise<unknown>` with unread
+ * rejections silenced so floating promise fields don't trigger Node's
+ * `unhandledRejection` for rows whose async field is never awaited. Consumers
+ * that do await the promise still receive the rejection.
+ *
+ * Schema-validation errors for async-decode codecs are redacted (validator
+ * `message` strings are dropped) so decrypted plaintext cannot flow into
+ * telemetry. See spec NFR-4 and ADR 030.
+ */
+export function decodeField(options: DecodeFieldOptions): unknown {
+  const { alias, wireValue, codec, jsonValidators, tableName, columnName } = options;
+  const redactValues = codec.runtime?.decode === 'async';
+  const runValidation = (value: unknown): void => {
+    if (!jsonValidators || !tableName || !columnName) return;
+    validateJsonValue(
+      jsonValidators,
+      tableName,
+      columnName,
+      value,
+      'decode',
+      codec.id,
+      redactValues,
+    );
+  };
 
-  return decodedValue;
+  try {
+    const decoded = codec.decode(wireValue);
+    if (isPromiseLike(decoded)) {
+      const promise = (async () => {
+        try {
+          const resolved = await decoded;
+          runValidation(resolved);
+          return resolved;
+        } catch (error) {
+          if (isJsonSchemaValidationError(error)) throw error;
+          throw decodeFailure(alias, codec.id, wireValue, error);
+        }
+      })();
+      // Silence unread async fields; consumers that await still see the rejection.
+      promise.catch(() => {});
+      return promise;
+    }
+
+    runValidation(decoded);
+    return decoded;
+  } catch (error) {
+    if (isJsonSchemaValidationError(error)) throw error;
+    throw decodeFailure(alias, codec.id, wireValue, error);
+  }
 }
 
 export function decodeRow(
@@ -216,44 +264,17 @@ export function decodeRow(
       continue;
     }
 
-    try {
-      const decodedValue = codec.decode(wireValue);
-      if (isPromiseLike(decodedValue)) {
-        decoded[alias] = decodedValue
-          .then((resolvedValue) =>
-            validateDecodedValue(
-              alias,
-              resolvedValue,
-              codec,
-              jsonValidators,
-              projection,
-              fallbackColumnRefIndex,
-            ),
-          )
-          .catch((error) => {
-            if (isJsonSchemaValidationError(error)) {
-              throw error;
-            }
-            throw decodeFailure(alias, codec, wireValue, error);
-          });
-        continue;
-      }
-
-      decoded[alias] = validateDecodedValue(
-        alias,
-        decodedValue,
-        codec,
-        jsonValidators,
-        projection,
-        fallbackColumnRefIndex,
-      );
-    } catch (error) {
-      if (isJsonSchemaValidationError(error)) {
-        throw error;
-      }
-
-      throw decodeFailure(alias, codec, wireValue, error);
-    }
+    const ref = jsonValidators
+      ? resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex)
+      : undefined;
+    decoded[alias] = decodeField({
+      alias,
+      wireValue,
+      codec,
+      jsonValidators,
+      tableName: ref?.table,
+      columnName: ref?.column,
+    });
   }
 
   return decoded;
