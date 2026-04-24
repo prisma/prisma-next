@@ -10,13 +10,18 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  CodecControlHooks,
   MigrationOperationPolicy,
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  SqlStorage,
+  StorageColumn,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import { notOk, ok } from '@prisma-next/utils/result';
@@ -127,13 +132,8 @@ export interface IssuePlannerOptions {
   readonly toContract: Contract<SqlStorage>;
   readonly fromContract: Contract<SqlStorage> | null;
   readonly schemaName: string;
-  readonly codecHooks: ReadonlyMap<
-    string,
-    import('@prisma-next/family-sql/control').CodecControlHooks
-  >;
-  readonly storageTypes: Readonly<
-    Record<string, import('@prisma-next/sql-contract/types').StorageTypeInstance>
-  >;
+  readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
+  readonly storageTypes: Readonly<Record<string, StorageTypeInstance>>;
   /**
    * Current database schema IR. Strategies read this to detect whether a
    * structure already exists (e.g. `buildSchemaLookupMap` for shared-temp-
@@ -163,18 +163,16 @@ export interface IssuePlannerValue {
 
 function toColumnSpec(
   name: string,
-  column: import('@prisma-next/sql-contract/types').StorageColumn,
-  codecHooks: ReadonlyMap<string, import('@prisma-next/family-sql/control').CodecControlHooks>,
-  storageTypes: Readonly<
-    Record<string, import('@prisma-next/sql-contract/types').StorageTypeInstance>
-  >,
+  column: StorageColumn,
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
 ): ColumnSpec {
   return {
     name,
     typeSql: buildColumnTypeSql(
       column,
-      codecHooks as Map<string, import('@prisma-next/family-sql/control').CodecControlHooks>,
-      storageTypes as Record<string, import('@prisma-next/sql-contract/types').StorageTypeInstance>,
+      codecHooks as Map<string, CodecControlHooks>,
+      storageTypes as Record<string, StorageTypeInstance>,
     ),
     defaultSql: buildColumnDefaultSql(column.default, column),
     nullable: column.nullable,
@@ -377,14 +375,8 @@ function mapIssueToCall(
               `Column "${issue.table}"."${issue.column}" not in destination contract`,
             ),
           );
-        const hooksMap = codecHooks as Map<
-          string,
-          import('@prisma-next/family-sql/control').CodecControlHooks
-        >;
-        const typesMap = storageTypes as Record<
-          string,
-          import('@prisma-next/sql-contract/types').StorageTypeInstance
-        >;
+        const hooksMap = codecHooks as Map<string, CodecControlHooks>;
+        const typesMap = storageTypes as Record<string, StorageTypeInstance>;
         const qualifiedTargetType = buildColumnTypeSql(column, hooksMap, typesMap, false);
         const formatTypeExpected = buildExpectedFormatType(column, hooksMap, typesMap);
         return ok([

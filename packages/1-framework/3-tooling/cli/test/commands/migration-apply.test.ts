@@ -1,4 +1,4 @@
-import { mkdir } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
@@ -316,7 +316,6 @@ describe(
       };
       const legacyJson = JSON.stringify({ ...baseManifest, migrationId: null });
       await mkdir(legacyDraftDir, { recursive: true });
-      const { writeFile } = await import('node:fs/promises');
       await writeFile(join(legacyDraftDir, 'migration.json'), legacyJson);
       await writeFile(join(legacyDraftDir, 'ops.json'), '[]');
 
