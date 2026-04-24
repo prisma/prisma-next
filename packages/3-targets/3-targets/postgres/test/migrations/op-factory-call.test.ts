@@ -425,7 +425,8 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain('from: "sha256:a",');
     expect(source).toContain('to: "sha256:b",');
     expect(source).toContain('export default class M extends Migration {');
-    expect(source).toContain('Migration.run(import.meta.url, M);');
+    expect(source).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
+    expect(source).toContain('runMigration(import.meta.url, M);');
   });
 });
 

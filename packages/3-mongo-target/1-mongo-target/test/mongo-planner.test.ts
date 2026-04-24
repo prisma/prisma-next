@@ -1388,7 +1388,7 @@ describe('MongoMigrationPlanner', () => {
       expect(empty.destination).toEqual({ storageHash: 'sha256:01' });
     });
 
-    it('renders a migration.ts stub that imports Migration and calls Migration.run', () => {
+    it('renders a migration.ts stub that imports Migration and calls runMigration', () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
         fromHash: 'sha256:00',
@@ -1398,8 +1398,9 @@ describe('MongoMigrationPlanner', () => {
       const source = empty.renderTypeScript();
 
       expect(source).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
+      expect(source).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
       expect(source).toContain('class M extends Migration');
-      expect(source).toContain('Migration.run(import.meta.url, M);');
+      expect(source).toContain('runMigration(import.meta.url, M);');
       expect(source).toContain('sha256:00');
       expect(source).toContain('sha256:01');
     });
