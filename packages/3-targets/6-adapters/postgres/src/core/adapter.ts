@@ -6,8 +6,8 @@ import {
   createCodecRegistry,
   type LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { codecDefinitions } from './codecs';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 

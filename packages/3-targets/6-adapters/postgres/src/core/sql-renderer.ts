@@ -23,8 +23,8 @@ import {
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import type { PostgresContract } from './types';
 
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;

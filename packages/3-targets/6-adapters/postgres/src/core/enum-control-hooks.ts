@@ -3,13 +3,13 @@ import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/
 import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { PG_ENUM_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 import {
   escapeLiteral,
   qualifyName,
   quoteIdentifier,
   validateEnumValueLength,
 } from '@prisma-next/target-postgres/sql-utils';
-import { PG_ENUM_CODEC_ID } from './codec-ids';
 
 /**
  * Postgres enum control hooks.
