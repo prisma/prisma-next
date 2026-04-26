@@ -285,4 +285,63 @@ describe('Postgres adapter', () => {
 
     expect(sql).toContain('WHERE FALSE');
   });
+
+  it('exposes profile metadata: codecs registry, capabilities, and readMarkerStatement', () => {
+    expect(adapter.profile.target).toBe('postgres');
+    expect(adapter.profile.id).toBe('postgres/default@1');
+    expect(adapter.profile.capabilities['postgres']).toMatchObject({ lateral: true });
+    expect(adapter.profile.capabilities['sql']).toMatchObject({ returning: true });
+
+    const codecs = adapter.profile.codecs();
+    expect(codecs.get('pg/text@1')).toBeDefined();
+    expect(codecs.has('pg/jsonb@1')).toBe(true);
+
+    const marker = adapter.profile.readMarkerStatement();
+    expect(marker.sql).toContain('from prisma_contract.marker');
+    expect(marker.params).toEqual([1]);
+  });
+
+  it('honours an overridden profile id from PostgresAdapterOptions', () => {
+    const customAdapter = createPostgresAdapter({ profileId: 'postgres/custom@9' });
+    expect(customAdapter.profile.id).toBe('postgres/custom@9');
+  });
+
+  it('reports parameterized codec descriptors with paramsSchema for every entry', () => {
+    const descriptors = adapter.parameterizedCodecs();
+    expect(descriptors.length).toBeGreaterThan(0);
+    const ids = descriptors.map((d) => d.codecId);
+    expect(ids).toEqual(expect.arrayContaining(['pg/numeric@1', 'pg/timestamptz@1']));
+    for (const descriptor of descriptors) {
+      expect(descriptor.paramsSchema).toBeDefined();
+    }
+  });
+
+  it('renders DO UPDATE SET with param-ref values and UPDATE SET with column-ref values', () => {
+    const insertWithParamUpdate = InsertAst.into(TableSource.named('user'))
+      .withRows([
+        {
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+        },
+      ])
+      .withOnConflict(
+        InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({
+          email: ParamRef.of('b@example.com', { name: 'replacement', codecId: 'pg/text@1' }),
+        }),
+      );
+
+    const insertSql = adapter.lower(insertWithParamUpdate, { contract, params: [] }).sql;
+    expect(insertSql).toMatch(/ON CONFLICT \("email"\) DO UPDATE SET "email" = \$\d+/);
+
+    const updateWithColumnRef = UpdateAst.table(TableSource.named('user'))
+      .withSet({ email: ColumnRef.of('user', 'email') })
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('user', 'id'),
+          ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+        ),
+      );
+    const updateSql = adapter.lower(updateWithColumnRef, { contract, params: [] }).sql;
+    expect(updateSql).toContain(`SET "email" = "user"."email"`);
+  });
 });
