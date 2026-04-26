@@ -9,7 +9,7 @@ describe('adapter descriptor / instance codec parity', () => {
     );
 
     // The adapter doesn't read the stack today; pass an empty stub.
-    const stack = {} as ExecutionStack<'sql', 'postgres'>;
+    const stack = {} as unknown as ExecutionStack<'sql', 'postgres'>;
     const adapterInstance = postgresRuntimeAdapterDescriptor.create(stack);
     const instanceCodecIds = new Set(
       [...adapterInstance.profile.codecs().values()].map((c) => c.id),
