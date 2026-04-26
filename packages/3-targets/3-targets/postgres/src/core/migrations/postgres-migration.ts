@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import { errorPostgresMigrationStackMissing } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
@@ -65,11 +66,7 @@ export abstract class PostgresMigration extends SqlMigration<
     options: DataTransformOptions,
   ): PostgresDataTransformOperation {
     if (!this.controlAdapter) {
-      throw new Error(
-        'PostgresMigration.dataTransform requires a control adapter. ' +
-          'Construct the migration with a ControlStack that includes a Postgres adapter ' +
-          '(this is what `runMigration` does).',
-      );
+      throw errorPostgresMigrationStackMissing();
     }
     return dataTransform(contract, name, options, this.controlAdapter);
   }
