@@ -8,15 +8,7 @@ This project is set up for MongoDB. Prisma Next also supports other databases.
 
 Your data contract is the heart of your application. It lives at [`{{schemaPath}}`]({{schemaPath}}) and describes your models:
 
-```prisma
-model User {
-  id    ObjectId @id @map("_id")
-  email String   @unique
-  name  String?
-  posts Post[]
-  @@map("users")
-}
-```
+{{schemaSample}}
 
 Every model you define in your contract can be queried from your app. Your editor will autocomplete the query methods and show you what type each field is:
 

@@ -123,11 +123,11 @@ export async function runInit(
     { path: join(schemaDir, 'db.ts'), content: dbFile(inputs.target) },
     {
       path: 'prisma-next.md',
-      content: quickReferenceMd(inputs.target, inputs.schemaPath, pkgRun),
+      content: quickReferenceMd(inputs.target, inputs.authoring, inputs.schemaPath, pkgRun),
     },
     {
       path: '.agents/skills/prisma-next/SKILL.md',
-      content: agentSkillMd(inputs.target, inputs.schemaPath, pkgRun),
+      content: agentSkillMd(inputs.target, inputs.authoring, inputs.schemaPath, pkgRun),
     },
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
