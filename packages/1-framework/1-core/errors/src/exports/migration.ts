@@ -4,7 +4,6 @@ export {
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
   errorMigrationTargetMismatch,
-  errorPostgresMigrationStackMissing,
   errorUnfilledPlaceholder,
   placeholder,
 } from '../migration';

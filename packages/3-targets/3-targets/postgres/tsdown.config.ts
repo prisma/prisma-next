@@ -8,6 +8,7 @@ export default defineConfig({
     'src/exports/control.ts',
     'src/exports/data-transform.ts',
     'src/exports/default-normalizer.ts',
+    'src/exports/errors.ts',
     'src/exports/issue-planner.ts',
     'src/exports/migration.ts',
     'src/exports/native-type-normalizer.ts',

@@ -1,9 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { errorPostgresMigrationStackMissing } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { errorPostgresMigrationStackMissing } from '../errors';
 import {
   type DataTransformOptions,
   dataTransform,
