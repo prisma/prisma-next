@@ -17,6 +17,7 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -71,19 +72,6 @@ export interface MigrationApplyResult {
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredErrorType {
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {

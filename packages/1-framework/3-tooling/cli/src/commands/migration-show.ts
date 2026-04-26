@@ -8,7 +8,12 @@ import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractOperationStatements } from '../control-api/operations/extract-operation-statements';
-import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  type CliStructuredError,
+  errorRuntime,
+  errorUnexpected,
+  mapMigrationToolsError,
+} from '../utils/cli-errors';
 import {
   addGlobalOptions,
   setCommandDescriptions,
@@ -157,13 +162,7 @@ async function executeMigrationShowCommand(
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code, ...(error.details ?? {}) },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

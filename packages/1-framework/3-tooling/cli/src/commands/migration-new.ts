@@ -26,17 +26,19 @@ import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join, relative, resolve } from 'pathe';
+import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   getTargetMigrations,
+  resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
@@ -68,11 +70,7 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
 
-  const contractPath = config.contract?.output ?? 'contract.json';
-  const contractPathAbsolute = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    contractPath,
-  );
+  const contractPathAbsolute = resolveContractPath(config);
 
   let contractJsonContent: string;
   try {
@@ -154,13 +152,7 @@ async function executeMigrationNewCommand(
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     throw error;
   }
