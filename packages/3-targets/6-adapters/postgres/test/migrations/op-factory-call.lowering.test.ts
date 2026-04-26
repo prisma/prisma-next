@@ -256,7 +256,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
     const operations = migration.operations;
     expect(operations).toHaveLength(1);
-    expect(operations[0]?.id).toBe('dropTable.stale');
+    expect(operations[0]).toMatchObject({ id: 'dropTable.stale' });
   });
 
   it('renders TypeScript source mirroring renderCallsToTypeScript output', () => {
