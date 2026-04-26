@@ -236,9 +236,42 @@ function renderNullCheck(
   pim: ParamIndexMap,
 ): string {
   const rendered = renderExpr(expr.expr, contract, pim);
-  const renderedExpr =
-    expr.expr.kind === 'operation' || expr.expr.kind === 'subquery' ? `(${rendered})` : rendered;
+  const renderedExpr = isAtomicExpressionKind(expr.expr.kind) ? rendered : `(${rendered})`;
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
+}
+
+/**
+ * Atomic expression kinds whose rendered SQL is already self-delimited
+ * (a column reference, parameter, literal, function call, aggregate, etc.)
+ * and therefore does not need surrounding parentheses when used as the
+ * left operand of a postfix predicate like `IS NULL` or `IS NOT NULL`,
+ * or as either operand of a binary infix operator.
+ *
+ * Anything not in this set is treated as composite (binary, AND/OR/NOT,
+ * EXISTS, nested IS NULL, subqueries, operation templates) and gets
+ * wrapped to preserve grouping.
+ */
+function isAtomicExpressionKind(kind: AnyExpression['kind']): boolean {
+  switch (kind) {
+    case 'column-ref':
+    case 'identifier-ref':
+    case 'param-ref':
+    case 'literal':
+    case 'aggregate':
+    case 'json-object':
+    case 'json-array-agg':
+    case 'list':
+      return true;
+    case 'subquery':
+    case 'operation':
+    case 'binary':
+    case 'and':
+    case 'or':
+    case 'exists':
+    case 'null-check':
+    case 'not':
+      return false;
+  }
 }
 
 function renderBinary(expr: BinaryExpr, contract: PostgresContract, pim: ParamIndexMap): string {
@@ -482,7 +515,13 @@ function renderOperation(
       if (token === '{{self}}') {
         return self;
       }
-      return args[Number(argIndex)] ?? '';
+      const arg = args[Number(argIndex)];
+      if (arg === undefined) {
+        throw new Error(
+          `Operation lowering template for "${expr.method}" referenced missing argument {{arg${argIndex}}}; template has ${args.length} arg(s)`,
+        );
+      }
+      return arg;
     },
   );
 }

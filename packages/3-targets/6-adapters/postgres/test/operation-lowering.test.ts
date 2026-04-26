@@ -159,4 +159,25 @@ describe('Operation lowering', () => {
     const lowered = adapter.lower(ast, { contract, params: [] });
     expect(lowered.sql).toContain(`echo('{{arg1}}', 'replacement')`);
   });
+
+  it('throws when the lowering template references an argument that the descriptor does not provide', () => {
+    const operationExpr = new OperationExpr({
+      method: 'partial',
+      self: ColumnRef.of('user', 'email'),
+      args: [LiteralExpr.of('only-arg-0')],
+      returns: { codecId: 'core/bool', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'partial({{self}}, {{arg0}}, {{arg1}})',
+      },
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('result', operationExpr),
+    ]);
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      /Operation lowering template for "partial" referenced missing argument \{\{arg1\}\}; template has 1 arg\(s\)/,
+    );
+  });
 });
