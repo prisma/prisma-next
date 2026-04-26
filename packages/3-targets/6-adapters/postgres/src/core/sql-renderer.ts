@@ -470,13 +470,21 @@ function renderOperation(
     return renderExpr(arg, contract, pim);
   });
 
-  let result = expr.lowering.template;
-  result = result.replace(/\{\{self\}\}/g, self);
-  for (let i = 0; i < args.length; i++) {
-    result = result.replace(new RegExp(`\\{\\{arg${i}\\}\\}`, 'g'), args[i] ?? '');
-  }
-
-  return result;
+  // Resolve `{{self}}` and `{{argN}}` from the original template in a single
+  // pass. Doing this with sequential `String.prototype.replace` calls is
+  // unsafe: a substituted fragment can itself contain text that matches a
+  // later token (e.g. an arg literal containing the substring `{{arg1}}`),
+  // and the next iteration would corrupt it. A single regex callback never
+  // re-scans already-substituted output.
+  return expr.lowering.template.replace(
+    /\{\{self\}\}|\{\{arg(\d+)\}\}/g,
+    (token, argIndex: string | undefined) => {
+      if (token === '{{self}}') {
+        return self;
+      }
+      return args[Number(argIndex)] ?? '';
+    },
+  );
 }
 
 function renderJoin(join: JoinAst, contract: PostgresContract, pim: ParamIndexMap): string {
