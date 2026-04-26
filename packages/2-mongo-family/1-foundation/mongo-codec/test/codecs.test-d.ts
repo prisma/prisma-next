@@ -48,11 +48,5 @@ const traitlessCodec = mongoCodec({
 });
 
 test('MongoCodecTraits is never for codec without traits', () => {
-  // Without `traits`, the unified factory leaves `traits?` as undefined, so the
-  // resulting type parameter is `readonly CodecTrait[]` and the extracted
-  // trait union is `CodecTrait`. We assert the extraction is the wide trait
-  // type rather than `never` post-m4.
-  expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<
-    'equality' | 'order' | 'boolean' | 'numeric' | 'textual'
-  >();
+  expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
 });

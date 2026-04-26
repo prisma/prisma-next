@@ -1057,6 +1057,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
