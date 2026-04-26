@@ -76,15 +76,19 @@ export function createTestOps(): readonly MigrationPlanOperation[] {
 }
 
 /**
- * Build and write a fully-attested test package to disk. The `migrationId`
- * is computed over the same `ops` passed to the writer, so the resulting
- * package round-trips through `readMigrationPackage`'s integrity check.
+ * Canonical helper for writing a test migration package to disk. Always
+ * produces a *consistent* (attested) package: the `migrationId` is computed
+ * over the exact `ops` passed to the writer, so the resulting package
+ * round-trips through `readMigrationPackage`'s integrity check.
  *
- * Use this for happy-path tests. Tests that deliberately produce a corrupt
- * bundle (tampering tests) should call `createTestManifest` and
- * `writeMigrationPackage` directly so the corruption step is explicit.
+ * Tampering tests use this same helper and then surgically overwrite the
+ * offending file post-hoc (e.g. `fs.writeFile(join(dir, 'ops.json'), ...)`).
+ * That keeps the corruption visible (the test names exactly which file is
+ * being corrupted) and makes the package's initial state incontrovertibly
+ * consistent — there is no path that produces an inconsistent fixture by
+ * accident.
  */
-export async function writeAttestedTestPackage(
+export async function writeTestPackage(
   dir: string,
   manifestOverrides: Partial<MigrationManifest> = {},
   ops: MigrationOps = createTestOps(),
