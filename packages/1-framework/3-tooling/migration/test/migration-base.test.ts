@@ -1,5 +1,6 @@
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import type { ControlStack } from '@prisma-next/framework-components/control';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Migration, serializeMigration } from '../src/migration-base';
@@ -60,6 +61,52 @@ describe('Migration', () => {
       }
 
       expect(new InitialMigration().origin).toBeNull();
+    });
+  });
+
+  describe('constructor accepts and stores a ControlStack', () => {
+    /**
+     * The constructor injection contract is that a subclass (e.g.
+     * `PostgresMigration`) can read `this.stack` to materialize whatever it
+     * needs (typically a control adapter). The base class itself stores the
+     * argument verbatim; this test exercises that storage directly via a
+     * subclass that exposes the protected field, independent of any concrete
+     * target's stack-consumption logic.
+     */
+    it('stores the injected stack on the protected `stack` field', () => {
+      const stub = { sentinel: true } as unknown as ControlStack<'sql', 'test'>;
+
+      class StackProbe extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: 'a', to: 'b' };
+        }
+        public readStack(): unknown {
+          return this.stack;
+        }
+      }
+
+      expect(new StackProbe(stub).readStack()).toBe(stub);
+    });
+
+    it('leaves `stack` undefined when constructed without an argument', () => {
+      class StackProbe extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: 'a', to: 'b' };
+        }
+        public readStack(): unknown {
+          return this.stack;
+        }
+      }
+
+      expect(new StackProbe().readStack()).toBeUndefined();
     });
   });
 });
