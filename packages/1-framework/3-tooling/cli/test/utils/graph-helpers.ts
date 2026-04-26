@@ -8,7 +8,7 @@ export function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
-  const migrationById = new Map<string, MigrationChainEntry>();
+  const migrationByHash = new Map<string, MigrationChainEntry>();
 
   for (const e of entries) {
     nodes.add(e.from);
@@ -17,8 +17,8 @@ export function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
     forwardChain.get(e.from)!.push(e);
     if (!reverseChain.has(e.to)) reverseChain.set(e.to, []);
     reverseChain.get(e.to)!.push(e);
-    migrationById.set(e.migrationHash, e);
+    migrationByHash.set(e.migrationHash, e);
   }
 
-  return { nodes, forwardChain, reverseChain, migrationById };
+  return { nodes, forwardChain, reverseChain, migrationByHash };
 }

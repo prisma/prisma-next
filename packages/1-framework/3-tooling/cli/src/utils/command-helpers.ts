@@ -152,7 +152,7 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
  * Every on-disk package is content-addressed (`migrationHash` is always a
  * string); there is no draft state to filter out.
  */
-export async function loadMigrationBundles(migrationsDir: string): Promise<{
+export async function loadMigrationPackages(migrationsDir: string): Promise<{
   bundles: readonly MigrationPackage[];
   graph: MigrationGraph;
 }> {
@@ -161,18 +161,20 @@ export async function loadMigrationBundles(migrationsDir: string): Promise<{
   return { bundles, graph };
 }
 
-export interface MigrationBundleSet {
+export interface MigrationPackageSet {
   readonly bundles: readonly MigrationPackage[];
   readonly graph: MigrationGraph;
 }
 
 /**
- * Alias of `loadMigrationBundles` retained for naming-clarity in commands
+ * Alias of `loadMigrationPackages` retained for naming-clarity in commands
  * that previously needed both attested and draft splits. With the
  * collapse of the draft state, both helpers do the same thing.
  */
-export async function loadAllBundles(migrationsDir: string): Promise<MigrationBundleSet> {
-  return loadMigrationBundles(migrationsDir);
+export async function loadAllMigrationPackages(
+  migrationsDir: string,
+): Promise<MigrationPackageSet> {
+  return loadMigrationPackages(migrationsDir);
 }
 
 /**

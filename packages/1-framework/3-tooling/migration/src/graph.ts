@@ -15,5 +15,5 @@ export interface MigrationGraph {
   readonly nodes: ReadonlySet<string>;
   readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
   readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
-  readonly migrationById: ReadonlyMap<string, MigrationChainEntry>;
+  readonly migrationByHash: ReadonlyMap<string, MigrationChainEntry>;
 }

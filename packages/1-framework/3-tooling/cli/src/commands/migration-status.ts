@@ -20,7 +20,7 @@ import { createControlClient } from '../control-api/client';
 import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllBundles,
+  loadAllMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -429,7 +429,7 @@ async function executeMigrationStatusCommand(
   let bundles: readonly MigrationPackage[];
   let graph: MigrationGraph;
   try {
-    ({ bundles, graph } = await loadAllBundles(migrationsDir));
+    ({ bundles, graph } = await loadAllMigrationPackages(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
