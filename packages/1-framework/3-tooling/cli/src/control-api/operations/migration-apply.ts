@@ -30,6 +30,21 @@ export interface ExecuteMigrationApplyOptions<TFamilyId extends string, TTargetI
   readonly onProgress?: OnControlProgress;
 }
 
+/**
+ * Apply a sequence of migration packages against the configured driver.
+ *
+ * Validates the path's continuity (origin → ... → destination, no gaps),
+ * then drives the family/target's migration runner over each package's
+ * operations in order, surfacing per-migration progress through `onProgress`.
+ *
+ * The `pendingMigrations` parameter is trusted input. Callers are responsible
+ * for upstream verification of the originating migration packages — typically
+ * by loading them via `readMigrationPackage` from
+ * `@prisma-next/migration-tools/io`, which performs hash-integrity checks at
+ * the load boundary. This operation does not re-verify the packages and
+ * assumes the `(metadata, ops)` pairs on disk have not been tampered with
+ * since emit.
+ */
 export async function executeMigrationApply<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteMigrationApplyOptions<TFamilyId, TTargetId>,
 ): Promise<MigrationApplyResult> {

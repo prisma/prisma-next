@@ -1,4 +1,3 @@
-import { verifyMigrationBundle } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
@@ -204,27 +203,6 @@ async function executeMigrationApplyCommand(
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
-  }
-
-  // Defense in depth: re-hash every bundle and confirm the recorded
-  // `migrationId` matches the on-disk `(manifest, ops)`. Catches FS
-  // corruption, partial writes, and post-emit hand edits before we
-  // start touching the database.
-  for (const bundle of migrations.bundles) {
-    const verified = verifyMigrationBundle(bundle);
-    if (!verified.ok) {
-      return notOk(
-        errorRuntime(`Migration package is corrupt: ${bundle.dirName}`, {
-          why: `Stored migrationId "${verified.storedMigrationId}" does not match the recomputed hash "${verified.computedMigrationId}" for ${migrationsRelative}/${bundle.dirName}. The migration.json or ops.json has been edited or partially written since emit.`,
-          fix: `Re-emit the package by running \`node "${migrationsRelative}/${bundle.dirName}/migration.ts"\`, or restore the directory from version control.`,
-          meta: {
-            dirName: bundle.dirName,
-            storedMigrationId: verified.storedMigrationId,
-            computedMigrationId: verified.computedMigrationId,
-          },
-        }),
-      );
-    }
   }
 
   const client = createControlClient({
