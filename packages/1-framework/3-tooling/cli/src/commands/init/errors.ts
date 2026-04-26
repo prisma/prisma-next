@@ -174,6 +174,33 @@ export function errorInitInvalidManifest(options: {
 }
 
 /**
+ * The user's existing `tsconfig.json` could not be parsed even with JSONC
+ * tolerance (comments + trailing commas) enabled. Init merges the
+ * minimum compiler options the scaffolded files need (FR2.2), so an
+ * unparseable tsconfig is a hard precondition failure: we cannot
+ * faithfully edit a file we cannot read.
+ *
+ * Init must surface this **before** writing any scaffold file so the
+ * user's working tree stays byte-identical (FR6.2 / NFR3) — see
+ * `runInit` for the precondition gate.
+ *
+ * Maps to exit code `2 = PRECONDITION` — the user can fix the file and
+ * re-run.
+ */
+export function errorInitInvalidTsconfig(options: {
+  readonly path: string;
+  readonly cause: string;
+}): CliStructuredError {
+  return new CliStructuredError('5011', `Failed to parse ${options.path}`, {
+    domain: 'CLI',
+    why: `\`${options.path}\` is not valid JSON or JSONC: ${options.cause}`,
+    fix: `Fix the syntax in \`${options.path}\` and re-run \`prisma-next init\`. \`init\` accepts JSONC (comments and trailing commas) but cannot recover from unbalanced braces or missing commas.`,
+    docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    meta: { path: options.path, cause: options.cause },
+  });
+}
+
+/**
  * `prisma-next contract emit` failed after a successful install. Surface
  * the underlying error so the user can fix it and re-run; files and
  * dependencies remain on disk untouched. Maps to exit code

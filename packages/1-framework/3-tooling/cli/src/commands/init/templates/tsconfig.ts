@@ -1,3 +1,11 @@
+import {
+  applyEdits,
+  modify,
+  type ParseError,
+  parse as parseJsonc,
+  printParseErrorCode,
+} from 'jsonc-parser';
+
 /**
  * Compiler options the scaffolded `prisma-next.config.ts` and `db.ts` need
  * to typecheck:
@@ -47,18 +55,120 @@ export function defaultTsConfig(): string {
   );
 }
 
-export function mergeTsConfig(existing: string): string {
-  const config = JSON.parse(existing) as Record<string, unknown>;
-  const compilerOptions = (config['compilerOptions'] ?? {}) as Record<string, unknown>;
+/**
+ * Thrown by `mergeTsConfig` when the user's existing `tsconfig.json` is
+ * not parseable as JSONC (TypeScript's actual configured dialect — see
+ * FR6.1). Carries the raw parse errors so the caller can render an
+ * actionable, location-aware message.
+ *
+ * `runInit` catches this exception during the precondition phase and
+ * maps it to a `CliStructuredError(5011)` so the user's working tree
+ * stays byte-identical when init bails (FR6.2 / NFR3).
+ */
+export class TsConfigParseError extends Error {
+  readonly errors: readonly ParseError[];
 
+  constructor(errors: readonly ParseError[]) {
+    super(formatTsConfigParseErrors(errors));
+    this.errors = errors;
+    this.name = 'TsConfigParseError';
+  }
+}
+
+function formatTsConfigParseErrors(errors: readonly ParseError[]): string {
+  if (errors.length === 0) {
+    return 'tsconfig.json is empty or not an object';
+  }
+  return errors.map((e) => `${printParseErrorCode(e.error)} at offset ${e.offset}`).join('; ');
+}
+
+/**
+ * Merges the required compiler options into an existing `tsconfig.json`.
+ *
+ * Parsing is delegated to `jsonc-parser` so JSONC inputs (comments,
+ * trailing commas) — TypeScript's real configuration dialect — survive
+ * unchanged: edits are applied as text patches via `modify` /
+ * `applyEdits`, preserving the user's formatting, key ordering, and
+ * comments wherever the touched paths permit (FR6.1, AC "Hostile
+ * inputs").
+ *
+ * Throws `TsConfigParseError` when the input is not parseable as JSONC.
+ * The caller must catch this and surface a structured error before
+ * writing any scaffold files (FR6.2 atomicity).
+ */
+export function mergeTsConfig(existing: string): string {
+  const { config } = parseTsConfigText(existing);
+
+  // Match the indentation / line-ending style of the existing file so
+  // the merged output diffs cleanly against it. `jsonc-parser` uses
+  // these only when it has to insert a brand-new object node;
+  // existing-key edits replace the value in place.
+  const formattingOptions = {
+    tabSize: detectIndent(existing),
+    insertSpaces: true,
+    eol: existing.includes('\r\n') ? '\r\n' : '\n',
+  };
+
+  let result = existing;
   for (const [key, value] of Object.entries(REQUIRED_COMPILER_OPTIONS)) {
-    compilerOptions[key] = value;
+    const edits = modify(result, ['compilerOptions', key], value, { formattingOptions });
+    result = applyEdits(result, edits);
   }
 
-  compilerOptions['types'] = mergeTypesArray(compilerOptions['types']);
+  const existingTypes = (config['compilerOptions'] as Record<string, unknown> | undefined)?.[
+    'types'
+  ];
+  const mergedTypes = mergeTypesArray(existingTypes);
+  const typesEdits = modify(result, ['compilerOptions', 'types'], mergedTypes, {
+    formattingOptions,
+  });
+  result = applyEdits(result, typesEdits);
 
-  config['compilerOptions'] = compilerOptions;
-  return JSON.stringify(config, null, 2);
+  return result;
+}
+
+/**
+ * Parses an existing `tsconfig.json` (JSONC) and returns the structured
+ * config alongside any non-fatal parse warnings. Throws
+ * `TsConfigParseError` if the input cannot be parsed at all or does
+ * not resolve to a JSON object — both cases mean we cannot safely
+ * apply edits.
+ *
+ * Exposed independently so callers (notably `runInit`'s precondition
+ * gate) can validate the file *before* any scaffold file is written.
+ */
+export function parseTsConfigText(text: string): {
+  readonly config: Record<string, unknown>;
+} {
+  const errors: ParseError[] = [];
+  const value = parseJsonc(text, errors, {
+    allowTrailingComma: true,
+    disallowComments: false,
+    allowEmptyContent: false,
+  });
+
+  if (value === undefined || value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new TsConfigParseError(errors);
+  }
+  if (errors.length > 0) {
+    throw new TsConfigParseError(errors);
+  }
+  return { config: value as Record<string, unknown> };
+}
+
+function detectIndent(text: string): number {
+  // Look at the first indented line. A 2-space indent (the TS default)
+  // is by far the most common; we fall back to 2 when nothing useful
+  // is detectable (e.g. a single-line tsconfig).
+  const match = text.match(/^([ \t]+)\S/m);
+  if (match === null) {
+    return 2;
+  }
+  const indent = match[1] ?? '';
+  if (indent.startsWith('\t')) {
+    return 1;
+  }
+  return indent.length || 2;
 }
 
 /**

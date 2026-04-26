@@ -3,8 +3,10 @@ import { envExampleContent, envFileContent } from '../../../../src/commands/init
 import {
   defaultTsConfig,
   mergeTsConfig,
+  parseTsConfigText,
   REQUIRED_COMPILER_OPTIONS,
   REQUIRED_COMPILER_OPTIONS_TYPES,
+  TsConfigParseError,
 } from '../../../../src/commands/init/templates/tsconfig';
 
 // ---------------------------------------------------------------------------
@@ -78,6 +80,60 @@ describe('mergeTsConfig (FR2.2 / FR9.3)', () => {
     const first = mergeTsConfig(JSON.stringify({ compilerOptions: { strict: true } }));
     const second = mergeTsConfig(first);
     expect(JSON.parse(second)).toEqual(JSON.parse(first));
+  });
+});
+
+describe('mergeTsConfig JSONC support (FR6.1)', () => {
+  it('parses comments and trailing commas', () => {
+    const jsonc = [
+      '{',
+      '  // top comment',
+      '  "compilerOptions": {',
+      '    "strict": true, // trailing comma + comment below',
+      '  },',
+      '}',
+    ].join('\n');
+    const merged = mergeTsConfig(jsonc);
+    // Merged file is itself valid JSONC and re-parses cleanly.
+    const reparsed = parseTsConfigText(merged).config as {
+      compilerOptions: Record<string, unknown>;
+    };
+    expect(reparsed.compilerOptions['strict']).toBe(true);
+    expect(reparsed.compilerOptions['moduleResolution']).toBe('bundler');
+    expect(reparsed.compilerOptions['types']).toEqual(['node']);
+  });
+
+  it('preserves user comments through the merge where possible', () => {
+    const jsonc = [
+      '{',
+      '  // important: do not delete this comment',
+      '  "compilerOptions": {',
+      '    "strict": true',
+      '  }',
+      '}',
+    ].join('\n');
+    const merged = mergeTsConfig(jsonc);
+    expect(merged).toContain('// important: do not delete this comment');
+  });
+
+  it('throws TsConfigParseError on bare unparseable input (FR6.1 error case)', () => {
+    expect(() => mergeTsConfig('{ "compilerOptions": ')).toThrow(TsConfigParseError);
+  });
+
+  it('throws TsConfigParseError when the input does not parse to an object', () => {
+    expect(() => mergeTsConfig('"a string at the root"')).toThrow(TsConfigParseError);
+    expect(() => mergeTsConfig('[1, 2, 3]')).toThrow(TsConfigParseError);
+  });
+});
+
+describe('parseTsConfigText (FR6.1)', () => {
+  it('returns the parsed object for a valid JSONC tsconfig', () => {
+    const { config } = parseTsConfigText('{ "compilerOptions": { "strict": true /* ok */ } }');
+    expect(config).toEqual({ compilerOptions: { strict: true } });
+  });
+
+  it('throws TsConfigParseError on malformed input', () => {
+    expect(() => parseTsConfigText('{ broken')).toThrow(TsConfigParseError);
   });
 });
 
