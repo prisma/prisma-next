@@ -1,5 +1,7 @@
 # ADR 030 — Result decoding & codecs registry
 
+> **Partial supersession:** the runtime-shape and codec-invocation parts of this ADR — specifically the codec method signatures (synchronous `encode` / `decode` / `encodeJson` / `decodeJson`), the **Decoding pipeline** section's row-by-row synchronous loop, and the **Streaming and cursors** statement that "codecs must be synchronous and non-blocking" — have been superseded by [ADR 204 — Single-Path Async Codec Runtime](ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Codec query-time methods are now uniformly `Promise`-returning at the public interface; the runtime always awaits them and dispatches per-row codec calls concurrently via `Promise.all`. The **registry model**, **precedence rules**, **lane hints**, **error-mapping codes**, and **PPg/preflight policy** in this ADR remain unchanged.
+
 ## Context
 
 Plans execute against heterogeneous targets and drivers that surface wire types not directly usable in JS/TS. Users expect stable, predictable JS values that respect the data contract's types and nullability. Lanes may request explicit casts or richer shapes (JSON aggregates, arrays), and PPg preflight must decode consistently for diagnostics. We need a single composition model for where decoding logic lives, how it is selected, and what happens on conflicts or failures.
