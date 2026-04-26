@@ -526,7 +526,11 @@ function getInsertColumnOrder(
     return orderedColumns;
   }
 
-  return Object.keys(contract.storage.tables[tableName]?.columns ?? {});
+  const table = contract.storage.tables[tableName];
+  if (!table) {
+    throw new Error(`INSERT target table not found in contract storage: ${tableName}`);
+  }
+  return Object.keys(table.columns);
 }
 
 function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): string {
@@ -595,7 +599,11 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
           case 'do-nothing':
             return ` ON CONFLICT (${conflictColumns.join(', ')}) DO NOTHING`;
           case 'do-update-set': {
-            const updates = Object.entries(action.set).map(([colName, value]) => {
+            const updateEntries = Object.entries(action.set);
+            if (updateEntries.length === 0) {
+              throw new Error('INSERT onConflict do-update-set requires at least one assignment');
+            }
+            const updates = updateEntries.map(([colName, value]) => {
               const target = quoteIdentifier(colName);
               if (value.kind === 'param-ref') {
                 return `${target} = ${renderParamRef(value, pim)}`;
@@ -621,7 +629,11 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamInde
 
 function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const table = quoteIdentifier(ast.table.name);
-  const setClauses = Object.entries(ast.set).map(([col, val]) => {
+  const setEntries = Object.entries(ast.set);
+  if (setEntries.length === 0) {
+    throw new Error('UPDATE requires at least one SET assignment');
+  }
+  const setClauses = setEntries.map(([col, val]) => {
     const column = quoteIdentifier(col);
     let value: string;
     switch (val.kind) {

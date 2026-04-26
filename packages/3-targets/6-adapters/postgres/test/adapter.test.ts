@@ -344,4 +344,35 @@ describe('Postgres adapter', () => {
     const updateSql = adapter.lower(updateWithColumnRef, { contract, params: [] }).sql;
     expect(updateSql).toContain(`SET "email" = "user"."email"`);
   });
+
+  it('throws when a default-values INSERT targets a table missing from contract storage', () => {
+    const ast = InsertAst.into(TableSource.named('missing_table')).withRows([{}, {}]);
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      /INSERT target table not found in contract storage: missing_table/,
+    );
+  });
+
+  it('throws when ON CONFLICT DO UPDATE SET has no assignments', () => {
+    const ast = InsertAst.into(TableSource.named('user'))
+      .withRows([
+        {
+          id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
+          email: ParamRef.of('a@example.com', { name: 'email', codecId: 'pg/text@1' }),
+        },
+      ])
+      .withOnConflict(InsertOnConflict.on([ColumnRef.of('user', 'email')]).doUpdateSet({}));
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      /INSERT onConflict do-update-set requires at least one assignment/,
+    );
+  });
+
+  it('throws when UPDATE has no SET assignments', () => {
+    const ast = UpdateAst.table(TableSource.named('user')).withSet({});
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      /UPDATE requires at least one SET assignment/,
+    );
+  });
 });
