@@ -38,7 +38,8 @@ const mongoCodecLookup: CodecLookup = {
     return {
       id,
       targetTypes: [bsonType],
-      decode: (v: unknown) => v,
+      encode: async (v: unknown) => v,
+      decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v as JsonValue,
       decodeJson: (v: JsonValue) => v,
     };
