@@ -12,9 +12,8 @@
  */
 
 import { join } from 'node:path';
-import { verifyMigration } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { readMigrationsDir } from '@prisma-next/migration-tools/io';
+import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { withTempDir } from '../utils/cli-test-helpers';
@@ -83,9 +82,14 @@ withTempDir(({ createTempDir }) => {
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'H.03: one migration package').toHaveLength(1);
 
+        // Phase 1 of TML-2264 (commit 6aad313ff) folded `verifyMigration`
+        // into `readMigrationPackage`'s load boundary: a successful read is
+        // proof of attestation, and any tamper throws MIGRATION.BUNDLE_CORRUPT.
         const pkgDir = join(migrationsDir, packages[0]!.dirName);
-        const verifyResult = await verifyMigration(pkgDir);
-        expect(verifyResult.ok, 'H.03: attestation passes').toBe(true);
+        await expect(
+          readMigrationPackage(pkgDir),
+          'H.03: attestation passes',
+        ).resolves.toBeDefined();
 
         // H.04: chain linkage
         expect(packages[0]!.manifest.from, 'H.04: from empty').toBe(EMPTY_CONTRACT_HASH);
