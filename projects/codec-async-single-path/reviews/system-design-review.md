@@ -1,6 +1,6 @@
 # System design review — `codec-async-single-path` (project-spanning, m1 → m5)
 
-> **Scope.** This review now reflects the full project lifecycle on `feat/codec-async-single-path`. Initial sections preserve the as-built snapshot at HEAD `47ce86a6f` (m1..m4 SATISFIED); the § M2 R1 / § M3 R1 / § M3 R2 / § M4 R1 / § M4 R2 deltas and the final § M5 R1 section reflect the project end-state at HEAD `5ac4a3de6`. Round verdicts: **m1 → SATISFIED**, **m2 → SATISFIED**, **m3 → SATISFIED**, **m4 → SATISFIED**, **m5 R1 → ANOTHER ROUND NEEDED** (four doc / test-comment-quality findings F5/F6/F7/F8; AC substance complete; m5 R2 expected to close on a single doc-only commit and an optional second commit on the T5.4 deferred-test artifact).
+> **Scope.** This review now reflects the full project lifecycle on `feat/codec-async-single-path`. Initial sections preserve the as-built snapshot at HEAD `47ce86a6f` (m1..m4 SATISFIED); the § M2 R1 / § M3 R1 / § M3 R2 / § M4 R1 / § M4 R2 deltas and the § M5 R1 section reflect the snapshot at HEAD `5ac4a3de6`; § M5 R2 captures the doc-quality closure of F5/F6/F7 at HEAD `a4aeba917`; § M5 R3 captures the closure of F8 at HEAD `a8ea4dbd1`. Round verdicts: **m1 → SATISFIED**, **m2 → SATISFIED**, **m3 → SATISFIED**, **m4 → SATISFIED**, **m5 → SATISFIED at R3** (R1 ANOTHER ROUND NEEDED on F5/F6/F7/F8 doc-quality findings; R2 closed F5/F6/F7; R3 closed F8 — the project is ready for the create-pr handoff, gated only by the orchestrator's close-out PR sequencing).
 
 ## Sources
 
@@ -675,3 +675,58 @@ Workspace-wide light gates re-run after the doc fixes:
 - All other ACs unchanged from m5 R1.
 
 **Totals at end of m5 R2: 26 PASS / 0 FAIL / 0 NOT VERIFIED** (with three PASS-with-scope-note entries on AC-SE2, AC-SE4, AC-DW3 — all unchanged from m5 R1).
+
+## M5 R3 — F8 closure
+
+> Final round of m5. F8 (T5.4 deferred-test header comment overpromising) closed by commit `a8ea4dbd1`. Phase verdict: **SATISFIED**. Project is ready for the create-pr handoff, gated only by the orchestrator's existing T5.11 / T5.12 close-out PR.
+
+### M5 R3.1 What changed since m5 R2
+
+A single doc-only commit (`a8ea4dbd1`) closes F8 with a localized edit to one file:
+
+- [`packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts) — header comment at L395–L426 rewritten (Option B per the F8 recommendation) to honestly describe the three `it.skip` blocks as placeholders. The new header explicitly states "the titles describe what each case would assert, but the bodies are stubbed (`expect(true).toBe(true)`) — assertions are not carried over verbatim", points future implementers at "PR #375 § collection-dispatch.test.ts (tests 5–7)" for re-derivation when child-row codec dispatch lands, and preserves the structural-deferral rationale (dispatcher does not invoke codecs on `jsonb_agg` child cells; verified by `rg 'codec\.(encode|decode)' packages/3-extensions/sql-orm-client/src` returning zero matches) and the rationale for dropping PR #375 test 8 (it asserts the inverse of AC-RT2's plain-`T` guarantee). No test bodies changed; suite count unchanged at 463 passed | 3 skipped. **F8 closed.**
+
+### M5 R3.2 Architectural snapshot at HEAD `a8ea4dbd1`
+
+No change from m5 R1 / R2 architectural snapshot. The architectural shape — single-path always-await, build-time vs query-time seam, cross-family parity at the `BaseCodec` seam, walk-back framing — is unchanged across R2 → R3; the only delta is the deferred-test artifact's documentation now matching what's on disk. The deferred-test discipline at T5.2 ([`json-schema-validation.test.ts (L613–L685)`](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:613-685)) and T5.4 ([`collection-dispatch.test.ts (L395–L440)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:395-440)) is now consistent across the project: T5.2 preserves the assertion shape verbatim because the activation gate is a one-line spelling change (orthogonal redaction policy); T5.4 honestly describes its bodies as stubs because the activation gate is a separate ORM feature project (include-aggregate child-codec dispatch) and the assertions will be re-derived from PR #375 alongside that activation. The two patterns are spec-legitimate and now correctly self-described.
+
+### M5 R3.3 Implementer's surfaced consistency follow-up — accepted as honestly-resolved within scope
+
+The implementer flagged that an inline comment at [`collection-dispatch.test.ts (L428–L430)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:428-430) inside the first `it.skip` block still reads "Translated from PR #375. Activates when child-row codec decoding is added to the single-query include path; assertions express the single-path always-await contract …", which by the same standard the rewritten header now establishes is slightly misleading (the body is `expect(true).toBe(true)`, not a translated assertion). Reviewer's disposition: **accepted; not refiled as a finding**. Two reasons:
+
+1. **The rewritten header at L395–L426 governs.** The 31-line header establishes the truth for all three `it.skip` blocks: bodies are stubs, assertions are not preserved verbatim. A future implementer encounters the header first and is therefore not misled.
+2. **One-line edit-only doc nit; round-cost not justified.** Filing as a new finding would mean an R4 with the exact same shape as R3 (single-line edit, same suite count, no validation-gate re-run beyond a sanity test). Below the findings-discipline threshold.
+
+Surfaced for the orchestrator to fold into the close-out PR alongside T5.11 / T5.12.
+
+### M5 R3.4 Validation gates
+
+Workspace-wide gates plus the targeted sql-orm-client gate re-run after the doc fix:
+
+| Gate | Command | Result | Notes |
+|---|---|---|---|
+| Targeted tests | `pnpm --filter @prisma-next/sql-orm-client test` | PASS — 463 passed \| 3 skipped (54 test files, no type errors) | Confirms the implementer-reported suite count exactly. The three `it.skip` at L427–L440 still report `it.skip`. |
+| Layering / imports | `pnpm lint:deps` | PASS (0 violations across 606 modules / 1198 deps) | Workspace-wide; sanity check after doc-only edit. |
+| Type-check | `pnpm typecheck` | PASS (120/120 tasks) | Workspace-wide; sanity check. |
+
+`pnpm test:packages` / `pnpm test:integration` / `pnpm test:all` skipped per the round prompt — R3 is a doc-only edit inside one test file, and the m5 R2 results carry forward unchanged for everything except `sql-orm-client` (re-run targeted above).
+
+### M5 R3.5 AC scoreboard delta
+
+- All ACs unchanged from m5 R2. F8 closure does not change any AC scoring (AC-SE4 was already PASS-with-scope-note based on substance, not on the header comment); the AC-SE4 evidence link in [code-review.md](code-review.md) was refreshed to point at the rewritten header at L395–L426 and the unchanged `it.skip` blocks at L427–L440.
+
+**Totals at end of m5 R3: 26 PASS / 0 FAIL / 0 NOT VERIFIED** (with three PASS-with-scope-note entries on AC-SE2, AC-SE4, AC-DW3 — unchanged from m5 R1 / R2; all spec-legitimate or orchestrator-deferred sub-pieces).
+
+### M5 R3.6 Pre-PR readiness check
+
+| Requirement | Status |
+|---|---|
+| All ACs PASS or scope-noted PASS | PASS — 26 PASS / 0 FAIL / 0 NOT VERIFIED. |
+| Findings log has zero open findings | PASS — F1, F2, F3, F4, F5, F6, F7, F8 all closed. |
+| Walkthrough is project-spanning (m1 → m5) | PASS — narrates m1 → m5 in five steps; project-spanning behavior table; § M5 R3 appended. |
+| System-design-review is up to date through m5 R3 | PASS — this section. |
+| No pending spec changes | PASS — `spec.md` untouched since project start. |
+| Worktree clean | PASS at HEAD `a8ea4dbd1`. After this artifact commit lands, will again be clean. |
+| Branch state allows `git push -u origin HEAD` | PASS — branch ahead of `origin/main` by 37 commits; not yet pushed; clean fast-forward. |
+
+**Phase verdict: SATISFIED.** The codec-async-single-path project is ready for the create-pr handoff. The remaining work is the orchestrator's existing close-out PR (T5.11 / T5.12 — strip `projects/` references and delete `projects/codec-async-single-path/**`), sequenced after the user reviews `user-attention.md`.
