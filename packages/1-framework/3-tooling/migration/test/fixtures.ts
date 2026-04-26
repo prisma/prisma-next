@@ -3,11 +3,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '../src/hash';
 import { writeMigrationPackage } from '../src/io';
-import {
-  type MigrationMetadata,
-  type MigrationMetadataWire,
-  metadataToWire,
-} from '../src/metadata';
+import type { MigrationMetadata } from '../src/metadata';
 import type { MigrationOps, MigrationPackage } from '../src/package';
 
 export function createTestContract(overrides: Partial<Contract> = {}): Contract {
@@ -44,20 +40,6 @@ export function createTestMetadata(
     ...baseMetadata,
     migrationHash: overrides.migrationHash ?? computeMigrationHash(baseMetadata, ops),
   };
-}
-
-/**
- * Build an attested test record in its on-disk wire shape — useful for tests
- * that bypass `writeMigrationPackage` and write `migration.json` directly,
- * but still need a structurally-valid file. The wire shape uses the legacy
- * field name `migrationId`; Phase 5 of TML-2264 collapses this back to a
- * single shape.
- */
-export function createTestWireMetadata(
-  overrides: Partial<MigrationMetadata> = {},
-  ops: MigrationOps = [],
-): MigrationMetadataWire {
-  return metadataToWire(createTestMetadata(overrides, ops));
 }
 
 /**

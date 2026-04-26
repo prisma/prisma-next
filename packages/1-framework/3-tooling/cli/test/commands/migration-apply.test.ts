@@ -281,14 +281,12 @@ describe(
       expect(path).toBeNull();
     });
 
-    it('rejects legacy draft packages (`migrationId: null`) at read time', async () => {
-      // After the draft state was collapsed, the schema rejects any
-      // on-disk migration.json with `migrationId: null`. We construct one
-      // directly to confirm the read path surfaces a schema error
-      // pointing at the offending file rather than silently skipping it.
-      // (The on-disk wire shape still uses `migrationId`; Phase 5 of
-      // TML-2264 collapses it back to a single in-memory shape.)
-      const tempDir = await createTempDir('reject-legacy-draft');
+    it('rejects migration.json with `migrationHash: null` at read time', async () => {
+      // The arktype schema in `io.ts` requires `migrationHash` to be a
+      // string; a null value (or any non-string) must surface as
+      // `MIGRATION.INVALID_MANIFEST` from `readMigrationsDir` rather than
+      // being silently skipped, so users know which directory to re-emit.
+      const tempDir = await createTempDir('reject-invalid-hash');
       const migrationsDir = join(tempDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
 
@@ -302,11 +300,11 @@ describe(
         slug: 'initial',
       });
 
-      const legacyDraftDir = join(
+      const invalidDir = join(
         migrationsDir,
-        formatMigrationDirName(new Date(2026, 0, 2), 'legacy-draft'),
+        formatMigrationDirName(new Date(2026, 0, 2), 'invalid-hash'),
       );
-      const baseWireMetadata = {
+      const baseMetadata = {
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
         kind: 'regular' as const,
@@ -316,10 +314,10 @@ describe(
         labels: [],
         createdAt: new Date().toISOString(),
       };
-      const legacyJson = JSON.stringify({ ...baseWireMetadata, migrationId: null });
-      await mkdir(legacyDraftDir, { recursive: true });
-      await writeFile(join(legacyDraftDir, 'migration.json'), legacyJson);
-      await writeFile(join(legacyDraftDir, 'ops.json'), '[]');
+      const invalidJson = JSON.stringify({ ...baseMetadata, migrationHash: null });
+      await mkdir(invalidDir, { recursive: true });
+      await writeFile(join(invalidDir, 'migration.json'), invalidJson);
+      await writeFile(join(invalidDir, 'ops.json'), '[]');
 
       await expect(readMigrationsDir(migrationsDir)).rejects.toMatchObject({
         code: 'MIGRATION.INVALID_MANIFEST',

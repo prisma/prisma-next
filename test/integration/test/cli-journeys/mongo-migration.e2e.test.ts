@@ -263,9 +263,9 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     }
 
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationId: string | null;
+      migrationHash: string | null;
     };
-    expect(manifest.migrationId).toMatch(/^sha256:/);
+    expect(manifest.migrationHash).toMatch(/^sha256:/);
   });
 
   it('migration new --target mongo scaffolds an empty Migration stub with contract files copied', async () => {
@@ -308,14 +308,14 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationId: string;
+      migrationHash: string;
     };
     // `migration new` always writes a fully attested package; the
-    // `migrationId` is the content-address over `(manifest, [])` since
+    // `migrationHash` is the content-address over `(manifest, [])` since
     // the scaffolded `migration.ts` carries no operations yet. The
     // developer fills in operations and re-runs `node migration.ts` to
-    // rewrite both `ops.json` and `migrationId`.
-    expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
+    // rewrite both `ops.json` and `migrationHash`.
+    expect(manifest.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 });
 
@@ -481,9 +481,9 @@ MigrationCLI.run(import.meta.url, M);
       expect(ops.some((o) => o.id.startsWith('index.users.'))).toBe(true);
 
       const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-        migrationId: string | null;
+        migrationHash: string | null;
       };
-      expect(manifest.migrationId).toMatch(/^sha256:/);
+      expect(manifest.migrationHash).toMatch(/^sha256:/);
 
       const apply1 = await migrationApply(ctx);
       expect(apply1.exitCode, `migration apply additive: ${apply1.stdout}\n${apply1.stderr}`).toBe(
