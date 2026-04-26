@@ -74,10 +74,10 @@ Out of scope (phase 2): framework auto-detection, telemetry, a dedicated `prisma
 
 ### FR4 — Mongo facade is at parity with Postgres (closes R2)
 
-- **FR4.1** `@prisma-next/mongo` exposes `db.orm` directly off `MongoClient<Contract>`. The user can write `db.orm.User.where(...).first()` without an explicit `connect()` call, exactly as for Postgres.
+- **FR4.1** `@prisma-next/mongo` exposes `db.orm` directly off `MongoClient<Contract>`. The user can write `db.orm.users.where(...).first()` without an explicit `connect()` call, exactly as for Postgres. Root accessors are emitter-driven (lowercased plurals from `@@map`-style collection names); templates and AC use those names rather than the PascalCase model.
 - **FR4.2** Connection is lazy: `const db = mongo({...})` returns a fully-typed client; the first query triggers `connect`. Mirrors Postgres semantics.
-- **FR4.3** A query of the form `db.orm.User.where({...}).first()` typechecks (no `Property 'where' does not exist on type 'never'`) and runs against a real `mongod`.
-- **FR4.4** Multi-document transactions remain available via an explicit transaction API (e.g. `db.transaction(async (tx) => ...)`); replica-set requirement is documented in `prisma-next.md`. Dev-environment replica-set provisioning (docker-compose, `mongodb-memory-server`, Atlas) is **out of scope** for this project and is tracked separately in [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams).
+- **FR4.3** A query of the form `db.orm.users.where({...}).first()` typechecks (no `Property 'where' does not exist on type 'never'`) and runs against a real `mongod`.
+- **FR4.4** The replica-set requirement for transactions and change streams is documented in `prisma-next.md` (and the Mongo agent skill) with a pointer to the dev-environment options. The `db.transaction(...)` runtime API is **deferred from this project** and is owned end-to-end by [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams), which also owns dev-environment replica-set provisioning (docker-compose, `mongodb-memory-server`, Atlas).
 - **FR4.5** `quick-reference-mongo.md` and `agent-skill-mongo.md` are rewritten so the primary code samples match FR4.1; references to `db.sql` are removed from the Mongo skill.
 
 ### FR5 — Templates differentiate by (target × authoring) (closes R3)
@@ -169,10 +169,10 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Mongo facade parity (FR4)
 
-- [ ] In a TS file `import { db } from './prisma/db'; const u = await db.orm.User.where({}).first()`, `tsc --noEmit` exits 0 against the published `@prisma-next/mongo`.
+- [ ] In a TS file `import { db } from './prisma/db'; const u = await db.orm.users.where({}).first()`, `tsc --noEmit` exits 0 against the published `@prisma-next/mongo`.
 - [ ] The same code, run against a live `mongod`, returns a typed result.
 - [ ] `quick-reference-mongo.md` and `agent-skill-mongo.md` use `db.orm.…` as the primary example. Neither file references `db.sql`.
-- [ ] Multi-document transactions are demonstrated via `db.transaction(async (tx) => …)` in `prisma-next.md` and noted as requiring a replica set.
+- [ ] `prisma-next.md` (Mongo quick reference) documents the replica-set requirement for transactions and change streams and links to [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams). The Mongo facade does **not** ship a `db.transaction(...)` runtime API in this project — that ticket owns it.
 
 ## Templates × authoring (FR5)
 
@@ -258,7 +258,7 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 Decisions resolved with the project sponsor on 2026-04-26. Each is wired to the FR / NG / NFR it changes (or confirms). No questions remain open before planning.
 
-1. **Mongo facade fix (FR4).** Fix `MongoClient<Contract>` so `db.orm.User` works directly off the runtime, mirroring Postgres. The explicit-`connect()` model is deprecated. (Confirms FR4.1, FR4.2.)
+1. **Mongo facade fix (FR4).** Fix `MongoClient<Contract>` so `db.orm.<collection>` works directly off the runtime, mirroring Postgres. The explicit-`connect()` model is deprecated. Root accessors are emitter-driven (lowercased plurals from `@@map`-style collection names — e.g. `db.orm.users`, `db.orm.posts`) rather than the PascalCase model name. Templates, agent skill, and acceptance criteria all standardise on those keys. (Confirms FR4.1, FR4.2.)
 2. **Always add `@types/node` (FR2).** Always add `@types/node` to `devDependencies` if it is not already declared anywhere; always set `"types": ["node"]` in the scaffolded `tsconfig.json` when `moduleResolution` is `bundler` and Node types would otherwise be hidden. (Confirms FR2.1, FR2.2.)
 3. **`init` is offline-by-default (FR8, NFR9).** DB-version probe is opt-in. **`init` never requires a live DB connection** — explicitly added as NFR9 and reinforced in FR8.3: `--strict-probe` only escalates probe **failures** to fatal, it never causes a probe to be attempted on its own. Without `--probe-db` and without interactive consent, `init` opens no network connection to the user's database.
 4. **Mongo replica-set: doc-only in this project; gap tracked separately.** FR4.4 / FR8.4 document the requirement and link to [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams), which owns the dev-environment provisioning story (docker-compose / mongodb-memory-server / Atlas + runtime warning). `init` advises, never auto-provisions.
@@ -267,3 +267,4 @@ Decisions resolved with the project sponsor on 2026-04-26. Each is wired to the 
 7. **Bootstrap mode deferred (NG1).** `init` in a bare directory keeps its existing actionable error ("Run `npm init` first"). `--bootstrap` and a dedicated `create-prisma-next` package remain phase 2.
 8. **pnpm catalog: honour-and-warn (FR7.3).** Inside a pnpm workspace whose catalog overrides `latest`, `init` uses the catalog version and emits a structured warning naming the override so the user can pin the published `latest` if they want.
 9. **No watch-mode script (FR3.5).** The `package.json` scripts written by `init` do **not** include a `contract:emit:watch`. File-watching during dev belongs to the build tool (Vite plugins, etc.) — adding a half-working watch script in `init` would just compete with whatever the user's framework already provides.
+10. **Mongo `db.transaction(...)` deferred from M3 (FR4.4).** This project ships only the documentation: `prisma-next.md` and the agent skill state the replica-set requirement and link to [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams), which now owns both the runtime API (sessions / `withTransaction` plumbing through `mongo-wire` / `mongo-lowering` / `mongo-driver` / `mongo-runtime`) and the dev-environment story end-to-end. The Mongo facade does not expose `db.transaction(...)` until that ticket lands.

@@ -44,11 +44,11 @@ Closes FR4. Highest user-impact gap surfaced by the research; without this, the 
 
 **Tasks (sketch):**
 
-- [ ] Add `db.orm` directly to `MongoClient<Contract>` with lazy connection semantics (FR4.1, FR4.2).
-- [ ] Trace and fix the type chain that resolves `client.orm.User.where` to `never` against the published facade.
-- [ ] Add `db.transaction(async tx => …)` API; document the replica-set requirement (links to FR8.4).
-- [ ] Rewrite `quick-reference-mongo.md` and `agent-skill-mongo.md` so the primary code samples use `db.orm.…`; remove `db.sql` references from the Mongo skill.
-- [ ] Add E2E coverage: `tsc --noEmit` + a real `db.orm.User.where(...).first()` query against `mongodb-memory-server` (replica set).
+- [ ] Add `db.orm` directly to `MongoClient<Contract>` with lazy connection semantics (FR4.1, FR4.2). Accept binding-style connection inputs (`{ url } | { uri, dbName } | { mongoClient, dbName }`) mirroring Postgres.
+- [ ] Pin the type chain that resolves `db.orm.<collection>.where(...)` against an emitter-style Contract with a `.test-d.ts` regression test. Standardise on lowercased plural root accessors (e.g. `db.orm.users`) — the PascalCase names are not emitted.
+- [ ] Document the replica-set requirement for transactions and change streams in `prisma-next.md` and the Mongo agent skill; defer the `db.transaction()` API and runtime end-to-end to [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams).
+- [ ] Rewrite `quick-reference-mongo.md` and `agent-skill-mongo.md` so the primary code samples use `db.orm.<collection>` lazily (no manual `connect()` step); remove `db.sql` references from the Mongo skill.
+- [ ] Add E2E coverage: `tsc --noEmit` + a real `db.orm.users.where(...).first()` query against `mongodb-memory-server` (`MongoMemoryReplSet`).
 
 ### Milestone 4 — Project hygiene + scaffold typechecks (R5, R6)
 
@@ -110,7 +110,7 @@ Closes FR9.
 All 9 spec-phase open questions are resolved — see [`spec.md` § Decisions](./spec.md#decisions). Notable consequences for this plan:
 
 - **M1** picks up the offline-friendly guarantee (NFR9): probe is opt-in, `--strict-probe` is a no-op without `--probe-db`, no network connection to the user's DB without explicit consent.
-- **M3** (Mongo facade parity) explicitly **excludes** dev-environment replica-set provisioning — that gap is owned by [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams). M3 only delivers the runtime API + docs.
+- **M3** (Mongo facade parity) explicitly **excludes** both dev-environment replica-set provisioning and the `db.transaction(...)` runtime API — both are owned by [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams). M3 ships only the lazy facade, type chain, templates, and the replica-set documentation.
 - **M4** writes `package.json#scripts.contract:emit` (not `prisma-next:emit`) and adds the forward-looking `.gitattributes` subset (including future `prisma/end-contract.*`, `prisma/ops.json`, `prisma/migration.json`).
 
 ## Close-out (required)
