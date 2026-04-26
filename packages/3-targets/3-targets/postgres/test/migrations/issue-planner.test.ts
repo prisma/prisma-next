@@ -1,9 +1,9 @@
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { planIssues } from '@prisma-next/target-postgres/issue-planner';
-import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
 import { describe, expect, it } from 'vitest';
+import { planIssues } from '../../src/core/migrations/issue-planner';
+import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
 
 function makeContract(
   overrides: Partial<Contract<SqlStorage>['storage']> = {},
