@@ -1,6 +1,6 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';
 import { createRuntime, createSqlExecutionStack } from '../src/exports';
@@ -91,7 +91,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     ]);
     const runtime = createTestRuntime(driver);
 
-    const plan: ExecutionPlan<{ id: number; email: string }> = {
+    const plan: SqlExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" ORDER BY id',
       params: [],
       meta: {
@@ -117,7 +117,7 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
     driver.setRows([{ id: 1, email: 'test@example.com' }]);
     const runtime = createTestRuntime(driver);
 
-    const plan: ExecutionPlan<{ id: number; email: string }> = {
+    const plan: SqlExecutionPlan<{ id: number; email: string }> = {
       sql: 'SELECT id, email FROM "user" LIMIT 1',
       params: [],
       meta: {

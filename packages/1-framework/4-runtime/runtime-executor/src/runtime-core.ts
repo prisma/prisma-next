@@ -1,5 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
+import type { ExecutionPlan, RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import { AsyncIterableResult, runtimeError } from '@prisma-next/framework-components/runtime';
 import { computeSqlFingerprint } from './fingerprint';
 import { parseContractMarkerRow } from './marker';
@@ -125,6 +124,19 @@ interface DriverWithClose<_TDriver> {
   close(): Promise<void>;
 }
 
+/**
+ * Internal SQL wire-plan view. `RuntimeCoreImpl` is currently SQL-flavored
+ * and assumes the plans it executes carry a SQL string and parameters. The
+ * public `RuntimeCore`/`RuntimeQueryable` SPIs use the framework
+ * `ExecutionPlan` marker (`meta + _row`); generalizing the executor to
+ * family-abstract plans is M3 work. Until then, `WirePlanView` makes the
+ * SQL assumption explicit at narrow access sites.
+ */
+interface WirePlanView {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
+
 class RuntimeCoreImpl<
   TContract = unknown,
   TDriver = unknown,
@@ -236,10 +248,12 @@ class RuntimeCoreImpl<
     durationMs?: number,
   ): void {
     const contract = this.contract as { target: string };
+    // RuntimeCoreImpl is SQL-flavored; see WirePlanView.
+    const wirePlan = plan as unknown as WirePlanView;
     this._telemetry = Object.freeze({
       lane: plan.meta.lane,
       target: contract.target,
-      fingerprint: computeSqlFingerprint(plan.sql),
+      fingerprint: computeSqlFingerprint(wirePlan.sql),
       outcome,
       ...(durationMs !== undefined ? { durationMs } : {}),
     });
@@ -331,10 +345,12 @@ class RuntimeCoreImpl<
           }
         }
 
-        const encodedParams = plan.params;
+        // RuntimeCoreImpl is SQL-flavored; see WirePlanView.
+        const wirePlan = plan as unknown as WirePlanView;
+        const encodedParams = wirePlan.params;
 
         for await (const row of queryable.execute<Record<string, unknown>>({
-          sql: plan.sql,
+          sql: wirePlan.sql,
           params: encodedParams,
         })) {
           for (const mw of self.middleware) {

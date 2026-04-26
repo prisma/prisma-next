@@ -1,13 +1,9 @@
-import type {
-  Contract,
-  ExecutionPlan,
-  JsonValue,
-  ParamDescriptor,
-} from '@prisma-next/contract/types';
+import type { Contract, JsonValue, ParamDescriptor } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   JsonSchemaValidateFn,
   JsonSchemaValidatorRegistry,
@@ -202,7 +198,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
   };
 }
 
-function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
+function createTestPlan(overrides?: Partial<SqlExecutionPlan>): SqlExecutionPlan {
   return {
     sql: 'SELECT 1',
     params: [],
