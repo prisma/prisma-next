@@ -8,9 +8,9 @@ import type {
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlStorage, StorageColumn } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import type { PostgresColumnDefault } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import type { PostgresColumnDefault } from '../../src/core/types';
 
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;

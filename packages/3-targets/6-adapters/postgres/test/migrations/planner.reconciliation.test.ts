@@ -2,8 +2,8 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import type { MigrationOperationPolicy } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
 const RECONCILIATION_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'],

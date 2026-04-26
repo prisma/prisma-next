@@ -2221,9 +2221,6 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../3-targets/6-adapters/postgres
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
@@ -2659,9 +2656,6 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../../1-framework/3-tooling/migration
-      '@prisma-next/sql-builder':
-        specifier: workspace:*
-        version: link:../../../2-sql/4-lanes/sql-builder
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/contract
@@ -2690,15 +2684,6 @@ importers:
         specifier: ^2.0.3
         version: 2.0.3
     devDependencies:
-      '@prisma-next/adapter-postgres':
-        specifier: workspace:*
-        version: link:../../6-adapters/postgres
-      '@prisma-next/driver-postgres':
-        specifier: workspace:*
-        version: link:../../7-drivers/postgres
-      '@prisma-next/extension-pgvector':
-        specifier: workspace:*
-        version: link:../../../3-extensions/pgvector
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -2809,6 +2794,18 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/cli
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../7-drivers/postgres
+      '@prisma-next/errors':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/errors
+      '@prisma-next/extension-pgvector':
+        specifier: workspace:*
+        version: link:../../../3-extensions/pgvector
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -2818,6 +2815,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)

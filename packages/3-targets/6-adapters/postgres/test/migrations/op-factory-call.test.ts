@@ -14,8 +14,6 @@
  *   `renderOps` and `renderTypeScript()` through `renderCallsToTypeScript`.
  */
 
-import { ifDefined } from '@prisma-next/utils/defined';
-import { describe, expect, it } from 'vitest';
 import {
   AddColumnCall,
   AddEnumValuesCall,
@@ -40,10 +38,12 @@ import {
   RenameTypeCall,
   SetDefaultCall,
   SetNotNullCall,
-} from '../../src/core/migrations/op-factory-call';
-import { TypeScriptRenderablePostgresMigration } from '../../src/core/migrations/planner-produced-postgres-migration';
-import { renderOps } from '../../src/core/migrations/render-ops';
-import { renderCallsToTypeScript } from '../../src/core/migrations/render-typescript';
+} from '@prisma-next/target-postgres/op-factory-call';
+import { TypeScriptRenderablePostgresMigration } from '@prisma-next/target-postgres/planner-produced-postgres-migration';
+import { renderOps } from '@prisma-next/target-postgres/render-ops';
+import { renderCallsToTypeScript } from '@prisma-next/target-postgres/render-typescript';
+import { ifDefined } from '@prisma-next/utils/defined';
+import { describe, expect, it } from 'vitest';
 
 const META = { from: 'sha256:from', to: 'sha256:to' } as const;
 
