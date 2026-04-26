@@ -6,14 +6,14 @@ import {
 
 describe('extractPackageSpecifiers', () => {
   it('extracts scoped package names from import type statements', () => {
-    const dts = `import type { Foo } from '@prisma-next/adapter-postgres/codec-types';
+    const dts = `import type { Foo } from '@prisma-next/target-postgres/codec-types';
 import type { Bar } from '@prisma-next/sql-contract/types';
 import type { Contract } from '@prisma-next/contract/types';`;
 
     const result = extractPackageSpecifiers(dts);
 
     expect(result).toEqual([
-      '@prisma-next/adapter-postgres',
+      '@prisma-next/target-postgres',
       '@prisma-next/sql-contract',
       '@prisma-next/contract',
     ]);
@@ -33,12 +33,12 @@ import type { B } from '@prisma-next/contract/hashing';`;
   });
 
   it('extracts from double-quoted import specifiers', () => {
-    const dts = `import type { Foo } from "@prisma-next/adapter-postgres/codec-types";
+    const dts = `import type { Foo } from "@prisma-next/target-postgres/codec-types";
 import type { Bar } from "@prisma-next/sql-contract/types";`;
 
     const result = extractPackageSpecifiers(dts);
 
-    expect(result).toEqual(['@prisma-next/adapter-postgres', '@prisma-next/sql-contract']);
+    expect(result).toEqual(['@prisma-next/target-postgres', '@prisma-next/sql-contract']);
   });
 });
 
