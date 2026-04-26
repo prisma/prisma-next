@@ -334,7 +334,7 @@ describe('JSON Schema validator registry', () => {
 describe('JSON Schema encoding validation', () => {
   const codecRegistry = createTestCodecRegistry();
 
-  it('encodes JSON values via codec', () => {
+  it('encodes JSON values via codec', async () => {
     const plan = createTestPlan({
       params: [{ name: 'Alice' }],
       meta: {
@@ -350,28 +350,28 @@ describe('JSON Schema encoding validation', () => {
       },
     });
 
-    const result = encodeParams(plan, codecRegistry);
+    const result = await encodeParams(plan, codecRegistry);
     expect(result[0]).toBe('{"name":"Alice"}');
   });
 
-  it('returns null for null values', () => {
+  it('returns null for null values', async () => {
     const descriptor: ParamDescriptor = {
       codecId: 'pg/jsonb@1',
       source: 'dsl',
     };
 
-    const result = encodeParam(null, descriptor, 0, codecRegistry);
+    const result = await encodeParam(null, descriptor, 0, codecRegistry);
     expect(result).toBeNull();
   });
 
-  it('encodes when descriptor has name', () => {
+  it('encodes when descriptor has name', async () => {
     const descriptor: ParamDescriptor = {
       name: 'metadata',
       codecId: 'pg/jsonb@1',
       source: 'dsl',
     };
 
-    const result = encodeParam({ age: 30 }, descriptor, 0, codecRegistry);
+    const result = await encodeParam({ age: 30 }, descriptor, 0, codecRegistry);
     expect(result).toBe('{"age":30}');
   });
 });
@@ -383,7 +383,7 @@ describe('JSON Schema encoding validation', () => {
 describe('JSON Schema decoding validation', () => {
   const codecRegistry = createTestCodecRegistry();
 
-  it('passes valid decoded JSON values', () => {
+  it('passes valid decoded JSON values', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -396,11 +396,11 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: '{"name":"Alice"}' };
-    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });
 
-  it('throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED for invalid decoded values', () => {
+  it('throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED for invalid decoded values', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -413,22 +413,22 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: '{"age":30}' };
-    expect(() => decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry())).toThrow(
-      expect.objectContaining({
-        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-        category: 'RUNTIME',
-        severity: 'error',
-        details: expect.objectContaining({
-          table: 'user',
-          column: 'metadata',
-          direction: 'decode',
-          codecId: 'pg/jsonb@1',
-        }),
-      }),
-    );
+    await expect(
+      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry()),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      category: 'RUNTIME',
+      severity: 'error',
+      details: {
+        table: 'user',
+        column: 'metadata',
+        direction: 'decode',
+        codecId: 'pg/jsonb@1',
+      },
+    });
   });
 
-  it('validates aliased projection columns using projection mapping', () => {
+  it('validates aliased projection columns using projection mapping', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -442,19 +442,19 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { userMeta: '{"age":30}' };
-    expect(() => decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry())).toThrow(
-      expect.objectContaining({
-        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-        details: expect.objectContaining({
-          table: 'user',
-          column: 'metadata',
-          direction: 'decode',
-        }),
-      }),
-    );
+    await expect(
+      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry()),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      details: {
+        table: 'user',
+        column: 'metadata',
+        direction: 'decode',
+      },
+    });
   });
 
-  it('resolves join aliases with duplicate column names using projection mapping', () => {
+  it('resolves join aliases with duplicate column names using projection mapping', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -482,21 +482,19 @@ describe('JSON Schema decoding validation', () => {
       userMeta: '{"userName":"Alice"}',
       postMeta: '{"userName":"Alice"}',
     };
-    expect(() =>
+    await expect(
       decodeRow(row, plan, codecRegistry, createJoinMetadataValidatorRegistry()),
-    ).toThrow(
-      expect.objectContaining({
-        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-        details: expect.objectContaining({
-          table: 'post',
-          column: 'metadata',
-          direction: 'decode',
-        }),
-      }),
-    );
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      details: {
+        table: 'post',
+        column: 'metadata',
+        direction: 'decode',
+      },
+    });
   });
 
-  it('skips validation when column ref cannot be resolved', () => {
+  it('skips validation when column ref cannot be resolved', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -508,11 +506,11 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { data: '{"bad":"data"}' };
-    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['data']).toEqual({ bad: 'data' });
   });
 
-  it('skips validation for null wire values', () => {
+  it('skips validation for null wire values', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -525,11 +523,11 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: null };
-    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['metadata']).toBeNull();
   });
 
-  it('skips validation when no registry is provided', () => {
+  it('skips validation when no registry is provided', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -542,11 +540,11 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: '{"bad":"data"}' };
-    const result = decodeRow(row, plan, codecRegistry);
+    const result = await decodeRow(row, plan, codecRegistry);
     expect(result['metadata']).toEqual({ bad: 'data' });
   });
 
-  it('decodes non-JSON columns without validation', () => {
+  it('decodes non-JSON columns without validation', async () => {
     const plan = createTestPlan({
       meta: {
         target: 'postgres',
@@ -564,7 +562,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { id: 42, metadata: '{"name":"Alice"}' };
-    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['id']).toBe(42);
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });

@@ -852,4 +852,31 @@ describe('validateContract', () => {
       expect(() => validateContract(contract, emptyCodecLookup)).not.toThrow();
     });
   });
+
+  // T2.7 — regression: validateContract must remain synchronous (consumes only
+  // build-time codec methods). If this signature ever drifts to a Promise,
+  // the type-level assertion below fails and `await` becomes required at every
+  // call site (including `postgres({...})`).
+  describe('synchronous return (regression)', () => {
+    it('returns a non-Promise value at runtime', () => {
+      const result = validateContract<Contract<SqlStorage>>(
+        structuredClone(baseContract),
+        emptyCodecLookup,
+      );
+      expect(result).toBeDefined();
+      const thenable = result as unknown as { then?: unknown };
+      expect(typeof thenable.then).toBe('undefined');
+    });
+
+    it('binds to a synchronous type at the call site', () => {
+      // Type-level regression: this must compile without `await`. The let
+      // binding has the synchronous Contract<SqlStorage> type; if
+      // validateContract becomes Promise-returning, this assignment fails.
+      const result: Contract<SqlStorage> = validateContract<Contract<SqlStorage>>(
+        structuredClone(baseContract),
+        emptyCodecLookup,
+      );
+      expect(result.target).toBe('postgres');
+    });
+  });
 });

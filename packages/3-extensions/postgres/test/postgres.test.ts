@@ -109,6 +109,21 @@ describe('postgres', () => {
     );
   });
 
+  // T2.8 — regression: postgres({...}) must remain synchronous (it only consumes
+  // build-time codec methods via validateContract / type maps). If construction
+  // becomes Promise-returning, this assignment loses its synchronous type and
+  // every call site needs `await postgres(...)`.
+  it('returns a synchronous client (sync regression)', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const thenable = db as unknown as { then?: unknown };
+    expect(typeof thenable.then).toBe('undefined');
+    expect(db.sql).toBeDefined();
+  });
+
   it('sql is constructed eagerly without runtime; runtime and pool are deferred until runtime() is accessed', () => {
     const db = postgres({
       contract,
