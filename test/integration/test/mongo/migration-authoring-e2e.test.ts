@@ -1,6 +1,8 @@
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   deserializeMongoOps,
@@ -23,6 +25,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
 };
+
+function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  // ControlStack arg is unused by the mongo factory; an empty object suffices for these integration tests.
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
 
 describe(
   'Migration authoring round-trip (factory → serialize → deserialize → runner → DB)',
@@ -64,7 +73,11 @@ describe(
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         const result = await runner.execute({
           plan: {
@@ -73,9 +86,10 @@ describe(
             operations: serialized,
           },
 
-          destinationContract: {},
+          destinationContract: {} as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
+          strictVerification: false,
         });
         if (!result.ok) throw new Error(`Runner failed: ${result.failure.summary}`);
         return result.value;
@@ -305,6 +319,7 @@ describe(
             createMongoRunnerDeps(
               controlDriver2,
               MongoDriverImpl.fromDb(extractDb(controlDriver2)),
+              makeFamily(),
             ),
           );
           const result2 = await runner.execute({
@@ -315,9 +330,10 @@ describe(
               operations: serialized2,
             },
 
-            destinationContract: {},
+            destinationContract: {} as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
+            strictVerification: false,
           });
           expect(result2.ok).toBe(true);
         } finally {
@@ -342,6 +358,7 @@ describe(
             createMongoRunnerDeps(
               controlDriver3,
               MongoDriverImpl.fromDb(extractDb(controlDriver3)),
+              makeFamily(),
             ),
           );
           const result3 = await runner.execute({
@@ -352,9 +369,10 @@ describe(
               operations: serialized3,
             },
 
-            destinationContract: {},
+            destinationContract: {} as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
+            strictVerification: false,
           });
           expect(result3.ok).toBe(true);
         } finally {

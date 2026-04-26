@@ -2,6 +2,7 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -76,6 +77,13 @@ const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
 
+function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  // ControlStack arg is unused by the mongo factory; an empty object suffices for these integration tests.
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
+
 describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer }, () => {
   let replSet: MongoMemoryReplSet;
   let client: MongoClient;
@@ -147,7 +155,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         const runResult = await runner.execute({
           plan: {
@@ -193,7 +205,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         await runner.execute({
           plan: {
@@ -233,7 +249,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         await runner.execute({
           plan: {
@@ -265,7 +285,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       try {
         const planner = new MongoMigrationPlanner();
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
 
         // Step 1: Apply create index
@@ -360,7 +384,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
       try {
         const planner = new MongoMigrationPlanner();
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
 
         // First apply
@@ -424,7 +452,11 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
 
         const planner = new MongoMigrationPlanner();
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         const schema = contractToMongoSchemaIR(null);
         const result = planner.plan({

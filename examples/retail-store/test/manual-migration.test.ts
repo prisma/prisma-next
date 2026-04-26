@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import { deserializeMongoOps, MongoMigrationRunner } from '@prisma-next/target-mongo/control';
 import { timeouts } from '@prisma-next/test-utils';
 import { type Db, MongoClient } from 'mongodb';
@@ -13,6 +15,13 @@ import AddProductValidation from '../migrations/20260415_add-product-validation/
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
+
+function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  // ControlStack arg is unused by the mongo factory; an empty object suffices for these examples.
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
 
 const migrationDir = resolve(import.meta.dirname, '../migrations/20260415_add-product-validation');
 
@@ -79,7 +88,11 @@ describe(
       const controlDriver = await mongoControlDriver.create(replSet.getUri(dbName));
       try {
         const runner = new MongoMigrationRunner(
-          createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+          createMongoRunnerDeps(
+            controlDriver,
+            MongoDriverImpl.fromDb(extractDb(controlDriver)),
+            makeFamily(),
+          ),
         );
         const result = await runner.execute({
           plan: {
@@ -91,9 +104,10 @@ describe(
             operations: JSON.parse(opsJson),
           },
 
-          destinationContract: {},
+          destinationContract: {} as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
+          strictVerification: false,
         });
 
         expect(result.ok).toBe(true);
