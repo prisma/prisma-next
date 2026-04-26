@@ -23,6 +23,22 @@ function attestedManifest(
   return { ...base, migrationId: computeMigrationId(base, ops) };
 }
 
+/**
+ * Build an attested manifest and write the package in one step. The
+ * `migrationId` is computed over the same `ops` passed to the writer,
+ * so the resulting package round-trips through `readMigrationPackage`'s
+ * integrity check.
+ */
+async function writeAttestedPackage(
+  dir: string,
+  base: Omit<MigrationManifest, 'migrationId'>,
+  ops: readonly MigrationPlanOperation[],
+): Promise<MigrationManifest> {
+  const manifest = attestedManifest(base, ops);
+  await writeMigrationPackage(dir, manifest, ops);
+  return manifest;
+}
+
 function createTableOp(table: string): MigrationPlanOperation {
   return {
     id: `table.${table}`,
@@ -70,7 +86,10 @@ describe('migration plan → emit end-to-end', () => {
 
       const ops: MigrationPlanOperation[] = [createTableOp('user')];
 
-      const manifest = attestedManifest(
+      const dirName = formatMigrationDirName(new Date(), 'initial');
+      const packageDir = join(migrationsDir, dirName);
+      const manifest = await writeAttestedPackage(
+        packageDir,
         {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:initial-hash',
@@ -87,10 +106,6 @@ describe('migration plan → emit end-to-end', () => {
         },
         ops,
       );
-
-      const dirName = formatMigrationDirName(new Date(), 'initial');
-      const packageDir = join(migrationsDir, dirName);
-      await writeMigrationPackage(packageDir, manifest, ops);
 
       const pkg = await readMigrationPackage(packageDir);
       expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
@@ -135,25 +150,22 @@ describe('migration plan → emit end-to-end', () => {
         const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
         const path1 = join(migrationsDir, dir1);
         const ops1 = [createTableOp('user')];
-        await writeMigrationPackage(
+        await writeAttestedPackage(
           path1,
-          attestedManifest(
-            {
-              from: EMPTY_CONTRACT_HASH,
-              to: 'sha256:hash-a',
-              kind: 'regular',
-              fromContract: null,
-              toContract: contractA,
-              hints: {
-                used: [],
-                applied: ['additive_only'],
-                plannerVersion: '1.0.0',
-              },
-              labels: [],
-              createdAt: new Date().toISOString(),
+          {
+            from: EMPTY_CONTRACT_HASH,
+            to: 'sha256:hash-a',
+            kind: 'regular',
+            fromContract: null,
+            toContract: contractA,
+            hints: {
+              used: [],
+              applied: ['additive_only'],
+              plannerVersion: '1.0.0',
             },
-            ops1,
-          ),
+            labels: [],
+            createdAt: new Date().toISOString(),
+          },
           ops1,
         );
 
@@ -161,25 +173,22 @@ describe('migration plan → emit end-to-end', () => {
         const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
         const path2 = join(migrationsDir, dir2);
         const ops2 = [createTableOp('post')];
-        await writeMigrationPackage(
+        await writeAttestedPackage(
           path2,
-          attestedManifest(
-            {
-              from: 'sha256:hash-a',
-              to: 'sha256:hash-b',
-              kind: 'regular',
-              fromContract: contractA,
-              toContract: contractB,
-              hints: {
-                used: [],
-                applied: ['additive_only'],
-                plannerVersion: '1.0.0',
-              },
-              labels: [],
-              createdAt: new Date().toISOString(),
+          {
+            from: 'sha256:hash-a',
+            to: 'sha256:hash-b',
+            kind: 'regular',
+            fromContract: contractA,
+            toContract: contractB,
+            hints: {
+              used: [],
+              applied: ['additive_only'],
+              plannerVersion: '1.0.0',
             },
-            ops2,
-          ),
+            labels: [],
+            createdAt: new Date().toISOString(),
+          },
           ops2,
         );
 
@@ -217,25 +226,22 @@ describe('migration plan → emit end-to-end', () => {
       // First migration
       const dir1 = formatMigrationDirName(new Date(), 'initial');
       const path1 = join(migrationsDir, dir1);
-      await writeMigrationPackage(
+      await writeAttestedPackage(
         path1,
-        attestedManifest(
-          {
-            from: EMPTY_CONTRACT_HASH,
-            to: 'sha256:target-hash',
-            kind: 'regular',
-            fromContract: null,
-            toContract: contract,
-            hints: {
-              used: [],
-              applied: ['additive_only'],
-              plannerVersion: '1.0.0',
-            },
-            labels: [],
-            createdAt: new Date().toISOString(),
+        {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:target-hash',
+          kind: 'regular',
+          fromContract: null,
+          toContract: contract,
+          hints: {
+            used: [],
+            applied: ['additive_only'],
+            plannerVersion: '1.0.0',
           },
-          [],
-        ),
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
         [],
       );
 
