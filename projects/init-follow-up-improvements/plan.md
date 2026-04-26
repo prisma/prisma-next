@@ -73,6 +73,7 @@ Closes FR5. Eliminates the "TS-authoring users get PSL docs" mismatch and the fo
 - [ ] Reconcile the Postgres and Mongo TS schema templates to a single shape (FR5.3).
 - [ ] Parametrise `prisma-next.md` and `agent-skill-{postgres,mongo}.md` by `(target, authoring)`.
 - [ ] Add snapshot tests covering all four cells (FR5.4); each scaffolded project typechecks against the published facade.
+- [ ] **Carried from M4:** automated `tsc --noEmit` E2E in all four (target × authoring) cells (FR2.3). M4 ships the constituent pieces (FR2.1/FR2.2 — devDep + tsconfig); the four-cell composition piggy-backs on FR5.4's tarball-build-and-typecheck infrastructure.
 
 ### Milestone 6 — Hostile-input survival + atomic init (R7, R10)
 

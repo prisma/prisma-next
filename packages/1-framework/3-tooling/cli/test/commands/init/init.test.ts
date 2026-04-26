@@ -58,6 +58,7 @@ import {
 } from '../../../src/commands/init/exit-codes';
 import {
   buildCatalogWarnings,
+  hasDirectDep,
   isRecognisedPnpmResolutionError,
   redactSecrets,
   runInit,
@@ -601,6 +602,98 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', () => {
     expect(readFileSync(join(tmpDir, '.gitattributes'), 'utf-8')).toBe(snapshot.gitattributes);
     expect(readFileSync(join(tmpDir, 'package.json'), 'utf-8')).toBe(snapshot.packageJson);
     expect(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')).toBe(snapshot.tsconfig);
+  });
+
+  it('skips adding @types/node when already in devDependencies (FR2.1)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'test-app', devDependencies: { '@types/node': '^18.19.0' } }),
+    );
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: true },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(execFile).toHaveBeenCalledWith(
+      'pnpm',
+      ['add', '-D', 'prisma-next'],
+      expect.anything(),
+      expect.any(Function),
+    );
+    for (const call of vi.mocked(execFile).mock.calls) {
+      const args = call[1];
+      expect(args).not.toContain('@types/node');
+    }
+  });
+
+  it('skips adding @types/node when already in dependencies (FR2.1)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'test-app', dependencies: { '@types/node': '^18.19.0' } }),
+    );
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: true },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(execFile).toHaveBeenCalledWith(
+      'pnpm',
+      ['add', '-D', 'prisma-next'],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
+  it('still adds @types/node when only an unrelated dep is declared (FR2.1)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'test-app', devDependencies: { typescript: '^5.0.0' } }),
+    );
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: true },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(execFile).toHaveBeenCalledWith(
+      'pnpm',
+      ['add', '-D', 'prisma-next', '@types/node'],
+      expect.anything(),
+      expect.any(Function),
+    );
+  });
+
+  it('exits PRECONDITION with structured error on a malformed package.json (F01)', async () => {
+    writeFileSync(join(tmpDir, 'package.json'), '{ "name": "broken", '); // truncated JSON
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+      const envelope = JSON.parse(writes.join('').trim()) as {
+        ok: false;
+        code: string;
+        meta?: { path?: string };
+      };
+      expect(envelope.ok).toBe(false);
+      expect(envelope.code).toBe('PN-CLI-5010');
+      expect(envelope.meta?.path).toBe('package.json');
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('reports hygiene files in filesWritten via --json (FR1.5)', async () => {
@@ -1438,5 +1531,27 @@ describe('runInit catalog warning surface (F03 / FR7.3)', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+describe('hasDirectDep (FR2.1)', () => {
+  it('detects a direct devDependency', () => {
+    expect(hasDirectDep({ devDependencies: { '@types/node': '^18' } }, '@types/node')).toBe(true);
+  });
+
+  it('detects a direct (runtime) dependency', () => {
+    expect(hasDirectDep({ dependencies: { '@types/node': '^18' } }, '@types/node')).toBe(true);
+  });
+
+  it('returns false when the field is absent', () => {
+    expect(hasDirectDep({ name: 'pkg' }, '@types/node')).toBe(false);
+  });
+
+  it('returns false when the field is null', () => {
+    expect(hasDirectDep({ devDependencies: null }, '@types/node')).toBe(false);
+  });
+
+  it('does not inspect peerDependencies (irrelevant for the clobber-risk path)', () => {
+    expect(hasDirectDep({ peerDependencies: { '@types/node': '*' } }, '@types/node')).toBe(false);
   });
 });
