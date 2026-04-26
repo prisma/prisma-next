@@ -6,9 +6,11 @@ import type {
   JsonSchemaValidateFn,
   JsonSchemaValidatorRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { decodeRow } from '../src/codecs/decoding';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
+import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 
 // =============================================================================
 // Shared helpers
@@ -520,5 +522,98 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
     const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry);
     expect(result).toEqual({ syncCol: 'sync:a', asyncCol: 'async:b' });
+  });
+});
+
+// =============================================================================
+// T5.1 + T5.5 — seeded-secret-codec realistic crypto roundtrip + envelopes
+// =============================================================================
+
+describe('seeded-secret-codec — realistic crypto path against the runtime', () => {
+  const seed = 'codec-async-test-seed';
+
+  it(
+    'encodeParams encrypts plaintext via async codec.encode (no Promise leaks)',
+    { timeout: timeouts.databaseOperation },
+    async () => {
+      const registry = createCodecRegistry();
+      registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
+
+      const plan = createTestPlan({
+        params: ['Alice'],
+        meta: {
+          target: 'postgres',
+          storageHash: coreHash('sha256:test'),
+          lane: 'dsl',
+          paramDescriptors: [{ name: 'secret', codecId: 'pg/secret@1', source: 'dsl' }],
+        },
+      });
+
+      const result = await encodeParams(plan, registry);
+      const wire = result[0];
+      expect(typeof wire).toBe('string');
+      expect(typeof (wire as { then?: unknown } | null | undefined)?.then).toBe('undefined');
+      expect(wire).not.toBe('Alice');
+      await expect(decryptSecret(wire as string, seed)).resolves.toBe('Alice');
+    },
+  );
+
+  it(
+    'decodeRow decrypts ciphertext via async codec.decode and yields plain values',
+    { timeout: timeouts.databaseOperation },
+    async () => {
+      const registry = createCodecRegistry();
+      registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
+
+      const wire = await encryptSecret('top-secret', seed);
+      const plan = createTestPlan({
+        meta: {
+          target: 'postgres',
+          storageHash: coreHash('sha256:test'),
+          lane: 'dsl',
+          paramDescriptors: [],
+          projectionTypes: { secret: 'pg/secret@1' },
+          refs: { columns: [{ table: 'user', column: 'secret' }] },
+        },
+      });
+
+      const result = await decodeRow({ secret: wire }, plan, registry);
+      expect(typeof (result['secret'] as { then?: unknown } | null)?.then).toBe('undefined');
+      expect(result['secret']).toBe('top-secret');
+    },
+  );
+
+  it('decode failures from async crypto are wrapped in RUNTIME.DECODE_FAILED with cause', async () => {
+    const registry = createCodecRegistry();
+    registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
+
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: coreHash('sha256:test'),
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { secret: 'pg/secret@1' },
+        refs: { columns: [{ table: 'user', column: 'secret' }] },
+      },
+    });
+
+    const rejection = await decodeRow({ secret: 'bad-payload' }, plan, registry).catch(
+      (e: unknown) => e,
+    );
+    expect(rejection).toBeInstanceOf(Error);
+    const err = rejection as Error & {
+      code?: string;
+      details?: { table?: string; column?: string; codec?: string; wirePreview?: string };
+      cause?: unknown;
+    };
+    expect(err.code).toBe('RUNTIME.DECODE_FAILED');
+    expect(err.details).toMatchObject({
+      table: 'user',
+      column: 'secret',
+      codec: 'pg/secret@1',
+      wirePreview: 'bad-payload',
+    });
+    expect((err.cause as Error | undefined)?.message).toBe('invalid secret payload');
   });
 });

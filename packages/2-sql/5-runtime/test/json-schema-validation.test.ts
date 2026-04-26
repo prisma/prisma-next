@@ -566,4 +566,42 @@ describe('JSON Schema decoding validation', () => {
     expect(result['id']).toBe(42);
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });
+
+  it('runs JSON schema validation against the resolved value of an async decoder', async () => {
+    const asyncRegistry = createCodecRegistry();
+    asyncRegistry.register(
+      codec({
+        typeId: 'pg/async-jsonb@1',
+        targetTypes: ['jsonb'],
+        encode: async (v: unknown) => JSON.stringify(v),
+        decode: async (w: unknown) => (typeof w === 'string' ? JSON.parse(w) : w),
+      }),
+    );
+
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { metadata: 'pg/async-jsonb@1' },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
+      },
+    });
+
+    const row = { metadata: '{"age":30}' };
+    await expect(
+      decodeRow(row, plan, asyncRegistry, createMetadataValidatorRegistry()),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      category: 'RUNTIME',
+      severity: 'error',
+      details: {
+        table: 'user',
+        column: 'metadata',
+        direction: 'decode',
+        codecId: 'pg/async-jsonb@1',
+      },
+    });
+  });
 });
