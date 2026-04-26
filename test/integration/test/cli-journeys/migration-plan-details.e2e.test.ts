@@ -82,9 +82,9 @@ withTempDir(({ createTempDir }) => {
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'H.03: one migration package').toHaveLength(1);
 
-        // Phase 1 of TML-2264 (commit 6aad313ff) folded `verifyMigration`
-        // into `readMigrationPackage`'s load boundary: a successful read is
-        // proof of attestation, and any tamper throws MIGRATION.HASH_MISMATCH.
+        // `readMigrationPackage`'s load boundary integrates verification:
+        // a successful read is proof of attestation, and any tamper throws
+        // MIGRATION.HASH_MISMATCH.
         const pkgDir = join(migrationsDir, packages[0]!.dirName);
         await expect(
           readMigrationPackage(pkgDir),
