@@ -375,4 +375,24 @@ describe('Postgres adapter', () => {
       /UPDATE requires at least one SET assignment/,
     );
   });
+
+  it('parenthesizes composite expressions before appending IS NULL / IS NOT NULL', () => {
+    const ast = SelectAst.from(TableSource.named('user'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+      .withWhere(
+        AndExpr.of([
+          NullCheckExpr.isNull(BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1))),
+          NullCheckExpr.isNotNull(
+            OrExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1))]),
+          ),
+          NullCheckExpr.isNull(ColumnRef.of('user', 'email')),
+        ]),
+      );
+
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
+
+    expect(sql).toContain('("user"."id" = 1) IS NULL');
+    expect(sql).toContain('(("user"."id" = 1)) IS NOT NULL');
+    expect(sql).toContain('"user"."email" IS NULL');
+  });
 });
