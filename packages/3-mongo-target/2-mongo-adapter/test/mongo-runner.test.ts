@@ -1,8 +1,10 @@
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import type {
+  ControlFamilyInstance,
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 import {
   MongoSchemaCollection,
@@ -19,6 +21,7 @@ import {
 import { type Db, MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { introspectSchema } from '../src/core/introspect-schema';
 import { createMongoControlDriver } from '../src/core/mongo-control-driver';
 import { createMongoRunnerDeps } from '../src/core/runner-deps';
 
@@ -60,17 +63,29 @@ function makeContract(
     }
   >,
   storageHash = 'sha256:dest',
-) {
+): MongoContract {
   const storageCollections: Record<string, Record<string, unknown>> = {};
   for (const [name, def] of Object.entries(collections)) {
     storageCollections[name] = { indexes: def.indexes ?? [] };
   }
+  // These tests exercise the runner's marker/ledger/policy paths against a
+  // real Mongo, not contract canonicalization. Only `storage` is read by the
+  // planner here, so the partial structure is shaped to satisfy the runtime
+  // path while the cast keeps callers from having to construct a full
+  // MongoContract (target/models/capabilities/etc.) that is unused by these
+  // tests.
   return {
     storage: {
       storageHash,
       collections: storageCollections,
     },
-  };
+  } as unknown as MongoContract;
+}
+
+function bareContract(storageHash: string): MongoContract {
+  // Same rationale as `makeContract` above: data-transform tests only need
+  // a destination storage hash on the contract; everything else is unused.
+  return { storage: { storageHash } } as unknown as MongoContract;
 }
 
 function planForContract(
@@ -103,9 +118,24 @@ function serializePlan(plan: MigrationPlan): MigrationPlan {
   };
 }
 
+function fakeFamily(): ControlFamilyInstance<'mongo', MongoSchemaIR> {
+  // The runner only invokes `family.introspect`; the rest of the
+  // `ControlFamilyInstance` surface is unused at runtime in these tests, so
+  // the cast keeps the test free of family-mongo (which would create a
+  // package-layering loop into family-mongo from the adapter tests).
+  return {
+    familyId: 'mongo' as const,
+    introspect: async () => introspectSchema(db),
+  } as unknown as ControlFamilyInstance<'mongo', MongoSchemaIR>;
+}
+
 function makeRunner() {
   return new MongoMigrationRunner(
-    createMongoRunnerDeps(createMongoControlDriver(db, client), MongoDriverImpl.fromDb(db)),
+    createMongoRunnerDeps(
+      createMongoControlDriver(db, client),
+      MongoDriverImpl.fromDb(db),
+      fakeFamily(),
+    ),
   );
 }
 
@@ -481,7 +511,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
-      destinationContract: { storageHash: 'sha256:dest-dt' },
+      destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -527,7 +557,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
-      destinationContract: { storageHash: 'sha256:dest-dt' },
+      destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -574,7 +604,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
-      destinationContract: { storageHash: 'sha256:dest-dt' },
+      destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -618,7 +648,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
-      destinationContract: { storageHash: 'sha256:dest-dt' },
+      destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -643,7 +673,7 @@ describe('MongoMigrationRunner - data transforms', () => {
     const runner = makeRunner();
     const result = await runner.execute({
       plan: makeDataTransformPlan([op]),
-      destinationContract: { storageHash: 'sha256:dest-dt' },
+      destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['additive'] },
       frameworkComponents: [],
     });
@@ -806,7 +836,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
 
     const result1 = await runner.execute({
       plan,
-      destinationContract: { storageHash: 'sha256:retry' },
+      destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
@@ -819,7 +849,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
 
     const result2 = await runner.execute({
       plan,
-      destinationContract: { storageHash: 'sha256:retry' },
+      destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
       frameworkComponents: [],
     });
