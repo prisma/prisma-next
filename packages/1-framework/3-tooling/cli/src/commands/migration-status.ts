@@ -17,7 +17,12 @@ import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  type CliStructuredError,
+  errorRuntime,
+  errorUnexpected,
+  mapMigrationToolsError,
+} from '../utils/cli-errors';
 import {
   addGlobalOptions,
   loadAllMigrationPackages,
@@ -357,13 +362,7 @@ async function executeMigrationStatusCommand(
     allRefs = await readRefs(refsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     throw error;
   }
@@ -374,13 +373,7 @@ async function executeMigrationStatusCommand(
       activeRefHash = resolveRef(allRefs, activeRefName).hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
-        return notOk(
-          errorRuntime(error.message, {
-            why: error.why,
-            fix: error.fix,
-            meta: { code: error.code },
-          }),
-        );
+        return notOk(mapMigrationToolsError(error));
       }
       throw error;
     }
@@ -432,9 +425,7 @@ async function executeMigrationStatusCommand(
     ({ bundles, graph } = await loadAllMigrationPackages(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, { why: error.why, fix: error.fix, meta: { code: error.code } }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

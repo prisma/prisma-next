@@ -95,14 +95,6 @@ function setupConfigMock(): void {
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
     driver: { kind: 'driver' },
     db: { connection: 'postgres://localhost/tamper-test' },
-    // `migration new` resolves the contract path off `config.contract.output`
-    // with a different default ('contract.json' next to the config) than
-    // the other commands' `resolveContractPath` helper ('src/prisma/contract.json').
-    // Setting `contract.output` explicitly aligns all five tests on the
-    // same on-disk path the fixture writes to. For apply/plan/status/show
-    // this is a no-op (they already resolve to `src/prisma/contract.json`
-    // by default).
-    contract: { output: join('src', 'prisma', 'contract.json') },
   });
 }
 
@@ -425,5 +417,24 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
     // must also be uniform — this is the property the spec asserts directly.
     const renderedTexts = diagnostics.map((d) => d.humanText);
     expect(new Set(renderedTexts).size).toBe(1);
+
+    // Machine-readable envelope shape: every command must carry the full
+    // `details` payload from `errorMigrationHashMismatch` in `meta`. This
+    // pins the F12 fix — `migration status` / `migration new` previously
+    // dropped `dir` / `storedHash` / `computedHash`, surfacing only `code`.
+    // After the shared `mapMigrationToolsError` helper landed, the envelope
+    // shape is identical across all five commands.
+    const metaKeys = diagnostics.map((d) =>
+      Object.keys(d.envelope.meta ?? {})
+        .sort()
+        .join(','),
+    );
+    expect(new Set(metaKeys).size, JSON.stringify(metaKeys, null, 2)).toBe(1);
+    for (const d of diagnostics) {
+      expect(d.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
+      expect(typeof d.envelope.meta?.['dir']).toBe('string');
+      expect(typeof d.envelope.meta?.['storedHash']).toBe('string');
+      expect(typeof d.envelope.meta?.['computedHash']).toBe('string');
+    }
   });
 });

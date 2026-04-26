@@ -30,6 +30,7 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -75,22 +76,6 @@ export interface MigrationPlanResult {
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredError {
-  if (CliStructuredError.is(error)) {
-    return error;
-  }
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration plan: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 async function executeMigrationPlanCommand(
@@ -385,7 +370,18 @@ async function executeMigrationPlanCommand(
     };
     return ok(result);
   } catch (error) {
-    return notOk(mapMigrationToolsError(error));
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return notOk(
+      errorUnexpected(message, {
+        why: `Unexpected error during migration plan: ${message}`,
+      }),
+    );
   }
 }
 
