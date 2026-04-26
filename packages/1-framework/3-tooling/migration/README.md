@@ -17,11 +17,19 @@ On-disk migration persistence, hash verification, and history reconstruction for
 
 `computeMigrationHash` in `hash.ts` uses explicit framing:
 
-1. Canonicalize migration metadata, ops, and embedded contracts.
-2. Hash each canonical part independently with SHA-256.
-3. Hash the canonical JSON tuple of those part hashes.
+1. Strip identity-affecting fields (`migrationHash`, `signature`, `fromContract`,
+   `toContract`, `hints`) from the metadata envelope, then canonicalize the
+   stripped envelope and the ops array.
+2. SHA-256 each canonical part independently.
+3. SHA-256 the canonical JSON tuple `[hash(metadata), hash(ops)]`.
 
-This avoids delimiter-ambiguity and ensures `migrationHash` commits to the exact 4-part tuple.
+This avoids delimiter-ambiguity and pins `migrationHash` to a 2-tuple over
+the on-disk storage shape. Per [ADR 199 — Storage-only migration identity],
+contracts are anchored separately via storage-hash bookends inside the
+metadata envelope, and planner hints are advisory and must not affect
+identity.
+
+[ADR 199 — Storage-only migration identity]: ../../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md
 
 ## Ops validation boundary
 
@@ -36,7 +44,7 @@ Full semantic validation happens in target/family migration planners and runners
 
 ```mermaid
 graph TD
-    CLI["CLI commands<br/>(migration plan, apply, verify, show, status)"] --> IO["io.ts<br/>File I/O"]
+    CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> HASH["hash.ts<br/>Migration hashing"]
     CLI --> GRAPH["dag.ts<br/>Graph operations"]
     IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
@@ -83,7 +91,7 @@ Each migration is a directory containing two files:
 ```
 migrations/
   20260225T1430_add_users/
-    migration.json    # MigrationMetadata (wire format)
+    migration.json    # MigrationMetadata
     ops.json          # MigrationPlanOperation[]
 ```
 
