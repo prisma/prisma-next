@@ -107,11 +107,15 @@ export default function mongo<
   const contract = resolveContract(options);
   let binding = resolveOptionalMongoBinding(options);
 
+  // `mongoQuery` calls its parameter `contractJson`, but accepts the validated
+  // contract value here (it normalises both internally).
   const query = mongoQuery<TContract>({ contractJson: contract });
 
+  // Single source of truth for the lifecycle. `runtimePromise` is the in-flight
+  // or settled build; `closed` is the terminal state set by `close()`. A failed
+  // build resets `runtimePromise` so a retry is possible (see test).
   let runtimePromise: Promise<MongoRuntime> | undefined;
-  let runtimeForClose: MongoRuntime | undefined;
-  let connected = false;
+  let closed = false;
 
   const buildRuntime = async (resolvedBinding: MongoBinding): Promise<MongoRuntime> => {
     const adapter = createMongoAdapter();
@@ -119,19 +123,19 @@ export default function mongo<
       resolvedBinding.kind === 'url'
         ? await MongoDriverImpl.fromConnection(resolvedBinding.url, resolvedBinding.dbName)
         : MongoDriverImpl.fromDb(resolvedBinding.client.db(resolvedBinding.dbName));
-    const runtime = createMongoRuntime({
+    return createMongoRuntime({
       adapter,
       driver,
       contract,
       targetId: 'mongo',
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
     });
-    runtimeForClose = runtime;
-    connected = true;
-    return runtime;
   };
 
   const getRuntime = (): Promise<MongoRuntime> => {
+    if (closed) {
+      return Promise.reject(new Error('Mongo client is closed'));
+    }
     if (runtimePromise !== undefined) {
       return runtimePromise;
     }
@@ -170,7 +174,10 @@ export default function mongo<
     contract,
 
     async connect(bindingInput?: MongoBindingInput): Promise<MongoRuntime> {
-      if (connected || runtimePromise !== undefined) {
+      if (closed) {
+        throw new Error('Mongo client is closed');
+      }
+      if (runtimePromise !== undefined) {
         throw new Error('Mongo client already connected');
       }
       if (bindingInput !== undefined) {
@@ -189,8 +196,17 @@ export default function mongo<
     },
 
     async close(): Promise<void> {
-      if (runtimeForClose !== undefined) {
-        await runtimeForClose.close();
+      if (closed) return;
+      closed = true;
+      if (runtimePromise === undefined) return;
+      // Await whatever the build resolved to. Swallow build failures because
+      // the user's intent is "release any resources we acquired" — there is
+      // nothing to close if the build never produced a runtime.
+      try {
+        const runtime = await runtimePromise;
+        await runtime.close();
+      } catch {
+        // build failed; nothing to close.
       }
     },
   };
