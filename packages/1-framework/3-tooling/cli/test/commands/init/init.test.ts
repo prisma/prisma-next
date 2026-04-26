@@ -262,6 +262,56 @@ describe('runInit (interactive)', () => {
     expect(clack.confirm).not.toHaveBeenCalled();
   });
 
+  it('on target switch, prompts to confirm removing the previous facade dep (FR9.2)', async () => {
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'app', dependencies: { '@prisma-next/postgres': '^1.0.0' } }),
+    );
+    vi.mocked(clack.select).mockReset().mockResolvedValueOnce('mongo').mockResolvedValueOnce('psl');
+    // reinit confirm → true, write-env → false, facade removal → true
+    vi.mocked(clack.confirm)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(true);
+
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+
+    expect(clack.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringMatching(
+          /Switching from PostgreSQL to MongoDB.*remove @prisma-next\/postgres/,
+        ),
+        initialValue: true,
+      }),
+    );
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
+  });
+
+  it('keeps the previous facade dep when the target-switch confirm is declined (FR9.2)', async () => {
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify({ name: 'app', dependencies: { '@prisma-next/postgres': '^1.0.0' } }),
+    );
+    vi.mocked(clack.select).mockReset().mockResolvedValueOnce('mongo').mockResolvedValueOnce('psl');
+    // reinit confirm → true, write-env → false, facade removal → false
+    vi.mocked(clack.confirm)
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockResolvedValueOnce(false);
+
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('^1.0.0');
+  });
+
   it('prompts for the .env opt-in interactively (FR3.2) and writes .env when accepted', async () => {
     vi.mocked(clack.confirm).mockResolvedValue(true);
     await runInitTest(tmpDir, {
@@ -725,6 +775,266 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', () => {
     } finally {
       spy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR9 — Re-init cleanup
+// ---------------------------------------------------------------------------
+
+describe('runInit re-init cleanup (FR9)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-reinit-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('deletes previously-emitted contract artefacts on re-init (FR9.1)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{"stale":true}');
+    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export type Contract = never;');
+    writeFileSync(join(tmpDir, 'prisma', 'end-contract.json'), '{"stale":true}');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/end-contract.json'))).toBe(false);
+  });
+
+  it('does not delete unrelated files in the schema dir (FR9.1 boundary)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    writeFileSync(join(tmpDir, 'prisma', 'seed.ts'), 'export {}');
+    writeFileSync(join(tmpDir, 'prisma', 'README.md'), '# notes');
+    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(existsSync(join(tmpDir, 'prisma/seed.ts'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'prisma/README.md'))).toBe(true);
+    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
+  });
+
+  it('does not delete anything on a green-field init (FR9.1)', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_OK);
+      const parsed = JSON.parse(writes.join('').trim()) as { filesDeleted: string[] };
+      expect(parsed.filesDeleted).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports deleted files in --json filesDeleted on re-init (FR9.1)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
+    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export {}');
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', force: true, install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      const parsed = JSON.parse(writes.join('').trim()) as { filesDeleted: string[] };
+      expect(parsed.filesDeleted).toEqual(
+        expect.arrayContaining(['prisma/contract.json', 'prisma/contract.d.ts']),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('drops the previous facade dep on target switch with --force (FR9.2)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          dependencies: { '@prisma-next/postgres': '^1.0.0', dotenv: '^16.0.0' },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'mongodb', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
+    expect(pkg.dependencies['dotenv']).toBe('^16.0.0');
+  });
+
+  it('keeps the facade dep when re-init does not switch targets (FR9.2)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          dependencies: { '@prisma-next/postgres': '^1.0.0' },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'old config');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBe('^1.0.0');
+  });
+
+  it('does not touch deps on a green-field init (FR9.2 boundary)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          dependencies: { '@prisma-next/mongo': '^1.0.0', someUnrelated: '^2.0.0' },
+        },
+        null,
+        2,
+      ),
+    );
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/mongo']).toBe('^1.0.0');
+    expect(pkg.dependencies['someUnrelated']).toBe('^2.0.0');
+  });
+
+  it('after target switch, project contains no Postgres-target artefacts (FR9 acceptance)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          dependencies: { '@prisma-next/postgres': '^1.0.0' },
+          scripts: { 'contract:emit': 'prisma-next contract emit' },
+        },
+        null,
+        2,
+      ),
+    );
+    writeFileSync(join(tmpDir, 'prisma', 'contract.d.ts'), 'export type Contract = unknown;');
+    writeFileSync(join(tmpDir, 'prisma', 'contract.json'), '{}');
+
+    await runInitTest(tmpDir, {
+      options: { target: 'mongodb', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      dependencies: Record<string, string>;
+    };
+    expect(pkg.dependencies['@prisma-next/postgres']).toBeUndefined();
+    expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/contract.d.ts'))).toBe(false);
+  });
+
+  it('idempotent .gitignore: partial entries are not duplicated on re-init (FR9.3)', async () => {
+    writeFileSync(join(tmpDir, '.gitignore'), 'node_modules/\n');
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const after = readFileSync(join(tmpDir, '.gitignore'), 'utf-8');
+    expect(after.split('\n').filter((l) => l === 'node_modules/')).toHaveLength(1);
+    expect(after.split('\n').filter((l) => l === 'dist/')).toHaveLength(1);
+    expect(after.split('\n').filter((l) => l === '.env')).toHaveLength(1);
+  });
+
+  it('idempotent .gitattributes: existing entries are not duplicated on re-init (FR9.3)', async () => {
+    writeFileSync(join(tmpDir, '.gitattributes'), 'prisma/contract.json linguist-generated\n');
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const after = readFileSync(join(tmpDir, '.gitattributes'), 'utf-8');
+    expect(
+      after.split('\n').filter((l) => l === 'prisma/contract.json linguist-generated'),
+    ).toHaveLength(1);
+  });
+
+  it('idempotent package.json#scripts: existing identical entry is not duplicated (FR9.3)', async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          scripts: { 'contract:emit': 'prisma-next contract emit' },
+        },
+        null,
+        2,
+      ),
+    );
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      scripts: Record<string, string>;
+    };
+    expect(pkg.scripts['contract:emit']).toBe('prisma-next contract emit');
+    expect(Object.keys(pkg.scripts)).toEqual(['contract:emit']);
   });
 });
 

@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 import * as clack from '@clack/prompts';
 import { dirname, isAbsolute, join } from 'pathe';
@@ -43,6 +43,7 @@ import {
   renderInitOutro,
 } from './output';
 import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
+import { findStaleArtefacts, removeDependency } from './reinit-cleanup';
 import { agentSkillMd } from './templates/agent-skill';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
 import { envExampleContent, envFileContent, MIN_SERVER_VERSION } from './templates/env';
@@ -107,6 +108,7 @@ export async function runInit(
   const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
   const warnings: string[] = [];
   const filesWritten: string[] = [];
+  const filesDeleted: string[] = [];
 
   if (!flags.json && !flags.quiet) {
     clack.intro('prisma-next init', { output: process.stderr });
@@ -160,6 +162,15 @@ export async function runInit(
     },
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
+
+  // FR9.1 — on re-init, queue the previously-emitted contract artefacts
+  // for deletion so a target switch (or schema-shape change) does not
+  // leave a stale `contract.json` / `contract.d.ts` next to the new
+  // schema source. Detection is filesystem-only (no parsing of the
+  // previous config) so the cleanup is safe to run before the write
+  // phase: each path is checked for existence in the precondition,
+  // and missing-on-disk-at-write-time is tolerated.
+  const filesToDelete: string[] = inputs.reinit ? [...findStaleArtefacts(baseDir, schemaDir)] : [];
 
   // FR3.2: a real `.env` is only written when the user opted in. Never
   // overwrite an existing `.env` — secrets live there and clobbering
@@ -249,15 +260,29 @@ export async function runInit(
       throw err;
     }
 
-    // FR3.5: idempotent package.json#scripts updater. Collisions with a
-    // user-written script of the same name produce a structured warning
-    // and the user's script is preserved.
+    // package.json edits are chained: FR9.2 facade-dep removal first
+    // (so the script merge sees the cleaned `dependencies` and rounds
+    // out a single re-stringification), then FR3.5 / FR9.3 idempotent
+    // scripts merge with collision detection.
+    let workingPkg = pkgRaw;
+    let pkgChanged = false;
+    if (inputs.removePreviousFacade !== null) {
+      const next = removeDependency(workingPkg, inputs.removePreviousFacade);
+      if (next !== null) {
+        workingPkg = next;
+        pkgChanged = true;
+      }
+    }
     const { content: nextPkg, warnings: scriptWarnings } = mergePackageScripts(
-      pkgRaw,
+      workingPkg,
       REQUIRED_SCRIPTS,
     );
     if (nextPkg !== null) {
-      filesToWrite.push({ path: 'package.json', content: nextPkg });
+      workingPkg = nextPkg;
+      pkgChanged = true;
+    }
+    if (pkgChanged) {
+      filesToWrite.push({ path: 'package.json', content: workingPkg });
     }
     warnings.push(...scriptWarnings);
   }
@@ -276,6 +301,29 @@ export async function runInit(
     filesWritten.push(file.path);
     if (file.logMessage !== undefined && !flags.json && !flags.quiet) {
       ui.log(file.logMessage);
+    }
+  }
+
+  // FR9.1 — delete stale artefacts after the new templates are written.
+  // Order is intentional: the names do not collide with `filesToWrite`
+  // (we never write `contract.json` from this command — that's `contract
+  // emit`'s job), so deletion *after* the writes guarantees we never
+  // remove a file we just produced. `existsSync` was checked in the
+  // precondition phase, but a concurrent `git checkout` could have
+  // already removed the file — `unlinkSync` would then throw ENOENT,
+  // which we tolerate as the user-visible end state we wanted anyway.
+  for (const rel of filesToDelete) {
+    const fullPath = join(baseDir, rel);
+    if (!existsSync(fullPath)) {
+      continue;
+    }
+    try {
+      unlinkSync(fullPath);
+      filesDeleted.push(rel);
+    } catch (err) {
+      if (!(err instanceof Error && 'code' in err && (err as { code: string }).code === 'ENOENT')) {
+        throw err;
+      }
     }
   }
 
@@ -345,6 +393,7 @@ export async function runInit(
     authoring: inputs.authoring,
     schemaPath: inputs.schemaPath,
     filesWritten,
+    filesDeleted,
     packagesInstalled: {
       skipped: install.skipped,
       deps: [...install.deps],

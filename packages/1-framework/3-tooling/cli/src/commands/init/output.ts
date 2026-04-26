@@ -22,6 +22,14 @@ export const InitOutputSchema = type({
   authoring: "'psl'|'typescript'",
   schemaPath: 'string',
   filesWritten: 'string[]',
+  /**
+   * FR9.1 — files removed from disk during this run. Populated only on
+   * re-init when previously-emitted contract artefacts (`contract.json`,
+   * `contract.d.ts`, `start-/end-contract.*`, `ops.json`,
+   * `migration.json`) were left behind by an earlier run. Empty on a
+   * green-field init.
+   */
+  filesDeleted: 'string[]',
   packagesInstalled: {
     skipped: 'boolean',
     deps: 'string[]',
@@ -68,6 +76,14 @@ export function renderInitOutro(ui: TerminalUI, output: InitOutput, flags: Globa
   lines.push('Files written:');
   for (const file of output.filesWritten) {
     lines.push(`  • ${file}`);
+  }
+
+  if (output.filesDeleted.length > 0) {
+    lines.push('');
+    lines.push('Files deleted (stale contract artefacts):');
+    for (const file of output.filesDeleted) {
+      lines.push(`  • ${file}`);
+    }
   }
 
   if (!output.packagesInstalled.skipped) {
