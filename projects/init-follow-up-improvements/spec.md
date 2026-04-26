@@ -169,7 +169,7 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Mongo facade parity (FR4)
 
-- [ ] In a TS file `import { db } from './prisma/db'; const u = await db.orm.users.where({}).first()`, `tsc --noEmit` exits 0 against the published `@prisma-next/mongo`.
+- [ ] In a TS file `import { db } from './prisma/db'; const u = await db.orm.users.where({}).first()`, `tsc --noEmit` exits 0 against the published `@prisma-next/mongo`. The end-to-end check (scaffold → install → typecheck against a built tarball) is owned by FR5 (templates × authoring); within FR4 this AC is satisfied by the type-test against the emitted-Contract fixture and the package-level `tsc --noEmit`.
 - [ ] The same code, run against a live `mongod`, returns a typed result.
 - [ ] `quick-reference-mongo.md` and `agent-skill-mongo.md` use `db.orm.…` as the primary example. Neither file references `db.sql`.
 - [ ] `prisma-next.md` (Mongo quick reference) documents the replica-set requirement for transactions and change streams and links to [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams). The Mongo facade does **not** ship a `db.transaction(...)` runtime API in this project — that ticket owns it.

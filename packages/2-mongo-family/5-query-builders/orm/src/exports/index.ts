@@ -1,3 +1,5 @@
+// Re-exported so facade packages (e.g. `@prisma-next/mongo`) can plumb the
+// executor signature without a direct dep on `@prisma-next/mongo-query-ast`.
 export type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 export type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 export type { MongoCollection } from '../collection';
