@@ -325,6 +325,9 @@ Prisma Next has no declared minimum supported Postgres or MongoDB server version
 
 ## Open Questions for the spec phase
 
+> **All resolved 2026-04-26.** See [`../spec.md` § Decisions](../spec.md#decisions). The list below is preserved as a research-phase snapshot — it captures the questions the user-journey raised, not the final answers.
+
+
 1. **Bootstrap mode (P5).** Should `init` in a bare directory `npm init -y` for the user? Or print the command and offer to run it? Or stay strict and just improve the error message?
 2. **Mongo facade fix vs. work-around.** Fix `MongoClient` so `db.orm.User` works directly (Postgres parity) — or update docs to reflect the explicit-`connect()` model and accept the asymmetry. Recommend the former.
 3. **Framework detection scope.** Do we ship Next.js auto-detection (and reference the not-yet-existing plugin) in this iteration, or save it for a follow-up?
