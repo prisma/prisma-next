@@ -1455,6 +1455,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../4-query/query-ast
+      '@prisma-next/mongo-wire':
+        specifier: workspace:*
+        version: link:../6-transport/mongo-wire
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
