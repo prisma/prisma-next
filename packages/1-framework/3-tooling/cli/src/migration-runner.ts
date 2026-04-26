@@ -46,6 +46,11 @@ import { loadConfig } from './config-loader';
  * compatibility in TS is contravariant in the parameter, and a wider
  * `unknown` parameter on the alias side would reject any narrower
  * subclass signature.
+ *
+ * The runner only ever passes one argument (`new MigrationClass(stack)`);
+ * the rest-arity is purely a type-compatibility concession for subclass
+ * constructors that declare narrower parameter types, not an extension
+ * point for additional construction arguments.
  */
 // biome-ignore lint/suspicious/noExplicitAny: see JSDoc - rest args with any are the idiomatic TS pattern for accepting arbitrary subclass constructor signatures
 export type MigrationConstructor = new (...args: any[]) => Migration;
@@ -93,6 +98,11 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
  * loading, but the typical usage pattern (top-level call after the class
  * definition) does not require awaiting because node's module evaluation
  * keeps the promise alive until completion.
+ *
+ * Any throwable inside this function must surface through the internal
+ * try/catch — script callers do not await, so an unhandled rejection
+ * would silently exit 0. Treat the try/catch as load-bearing for the
+ * no-await usage pattern.
  */
 export async function runMigration(
   importMetaUrl: string,
@@ -116,6 +126,12 @@ export async function runMigration(
 
     const stack = createControlStack(config);
 
+    // Construct first so we can read `instance.targetId`. The target-mismatch
+    // check below is what rescues concrete subclasses that cast inside their
+    // constructor (e.g. `PostgresMigration` casts `stack.adapter.create(stack)`
+    // to `SqlControlAdapter<'postgres'>`); a wrong-target stack would produce a
+    // misshapen adapter, but the instance never reaches `serializeMigration`
+    // because we throw `errorMigrationTargetMismatch` before that.
     const instance = new MigrationClass(stack);
 
     if (instance.targetId !== config.target.targetId) {
