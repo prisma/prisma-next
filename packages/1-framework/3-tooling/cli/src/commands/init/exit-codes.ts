@@ -4,12 +4,12 @@
  * These are part of the command's public contract. AI agents and CI scripts
  * branch on them (FR1.6), so the values must remain stable across versions.
  *
- * The CLI-domain convention used elsewhere in the project assigns 2 to
- * "preconditions not met" / "bad input" and 1 to "internal/runtime error";
- * `init` follows that convention and adds finer-grained codes for the two
- * fallible side effects it owns (install + emit) and one for "user aborted
- * an interactive prompt" so callers can distinguish "the user said no" from
- * "we never got to ask".
+ * Codes 0–3 are the CLI-wide reserved values per the [CLI Style Guide
+ * Exit Codes section](../../../../../../../docs/CLI%20Style%20Guide.md#exit-codes):
+ * `OK = 0`, `INTERNAL_ERROR = 1`, `PRECONDITION = 2`, `USER_ABORTED = 3`.
+ * Codes 4 and 5 are command-specific outcomes for `init`'s two fallible
+ * side effects (install + emit). Documented in `--help` via
+ * `setCommandDescriptions` in `./index.ts`.
  */
 
 export const INIT_EXIT_OK = 0;
@@ -36,16 +36,22 @@ export const INIT_EXIT_PRECONDITION = 2;
 export const INIT_EXIT_USER_ABORTED = 3;
 
 /**
- * Dependency installation step failed and was not recoverable. `init` does
- * not currently fail-fast on install errors (it falls back to printing
- * manual install instructions), so this code is reserved for future use
- * when the install path is hardened (R4 / FR7).
+ * Dependency installation step failed without a recoverable fallback.
+ * `init` automatically falls back from `pnpm` to `npm` on a recognised
+ * workspace/catalog leak (FR7.2); this code is returned only when the
+ * fallback also fails, or when the package manager is not pnpm and the
+ * single attempt failed. Files written before the install step (config,
+ * schema, db client, etc.) remain on disk so the user can fix the
+ * environment and re-run; the error envelope's `meta.filesWritten` lists
+ * them.
  */
 export const INIT_EXIT_INSTALL_FAILED = 4;
 
 /**
- * Contract emit step failed. Reserved for the same reason as
- * `INIT_EXIT_INSTALL_FAILED` — emit failures currently degrade gracefully
- * with a manual-step note.
+ * Contract emit step failed after a successful install. Files written
+ * before emit (including any installed dependencies) are still on disk;
+ * the user can fix the underlying issue (typically a contract syntax
+ * error or a missing extension pack) and re-run `prisma-next contract
+ * emit` manually.
  */
 export const INIT_EXIT_EMIT_FAILED = 5;

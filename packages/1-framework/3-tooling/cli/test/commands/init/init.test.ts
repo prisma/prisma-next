@@ -49,12 +49,42 @@ vi.mock('../../../src/control-api/operations/contract-emit', () => ({
 import { execFile } from 'node:child_process';
 import * as clack from '@clack/prompts';
 import {
+  INIT_EXIT_EMIT_FAILED,
+  INIT_EXIT_INSTALL_FAILED,
   INIT_EXIT_OK,
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
 } from '../../../src/commands/init/exit-codes';
-import { isRecognisedPnpmResolutionError, runInit } from '../../../src/commands/init/init';
+import {
+  isRecognisedPnpmResolutionError,
+  redactSecrets,
+  runInit,
+} from '../../../src/commands/init/init';
+import type { InitFlagOptions } from '../../../src/commands/init/inputs';
 import type { GlobalFlags } from '../../../src/utils/global-flags';
+
+/**
+ * Test wrapper that defaults `canPrompt` from `flags.interactive` so the
+ * test cases below remain readable. The real action handler in
+ * `commands/init/index.ts` derives `canPrompt` from a stdin-TTY check
+ * merged with `--interactive`; tests that want to exercise the
+ * "decoration on, prompts off" combination (stdout TTY, stdin closed)
+ * pass `canPrompt: false` explicitly.
+ */
+async function runInitTest(
+  tmpDir: string,
+  args: {
+    readonly options: InitFlagOptions;
+    readonly flags: GlobalFlags;
+    readonly canPrompt?: boolean;
+  },
+): Promise<number> {
+  return runInit(tmpDir, {
+    options: args.options,
+    flags: args.flags,
+    canPrompt: args.canPrompt ?? args.flags.interactive !== false,
+  });
+}
 
 /**
  * GlobalFlags shape for an interactive run with stdout to a TTY. Tests
@@ -103,7 +133,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('scaffolds five files for postgres target', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
     });
@@ -116,7 +146,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('generates config with single facade import and contract as string path', async () => {
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).toContain("from '@prisma-next/postgres/config'");
@@ -126,7 +156,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('generates db.ts with single @prisma-next runtime import', async () => {
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const db = readFileSync(join(tmpDir, 'prisma/db.ts'), 'utf-8');
     const prismaNextImports = db.split('\n').filter((l) => l.includes("from '@prisma-next/"));
@@ -135,7 +165,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('generates PSL starter schema with User and Post models', async () => {
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const schema = readFileSync(join(tmpDir, 'prisma/contract.prisma'), 'utf-8');
     expect(schema).toContain('model User');
@@ -149,7 +179,7 @@ describe('runInit (interactive)', () => {
       .mockResolvedValueOnce('typescript');
     vi.mocked(clack.text).mockResolvedValue('prisma/contract.ts');
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const schema = readFileSync(join(tmpDir, 'prisma/contract.ts'), 'utf-8');
     expect(schema).toContain('defineContract');
@@ -162,11 +192,18 @@ describe('runInit (interactive)', () => {
   it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(clack.confirm).toHaveBeenCalledTimes(1);
+    // Style Guide § Destructive operation confirmation requires the prompt
+    // to name the destructive consequence (overwriting generated files)
+    // and disclose that it is the project being re-initialised, so the
+    // user can decline knowing what's at stake. Lock that contract in.
     expect(clack.confirm).toHaveBeenCalledWith(
-      expect.objectContaining({ message: expect.stringContaining('Re-initialize') }),
+      expect.objectContaining({
+        message: expect.stringMatching(/already initialized.*Re-initialize.*overwrite/i),
+        initialValue: false,
+      }),
     );
   });
 
@@ -177,7 +214,7 @@ describe('runInit (interactive)', () => {
 
     vi.mocked(clack.confirm).mockResolvedValue(true);
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).not.toBe('old config');
@@ -192,7 +229,7 @@ describe('runInit (interactive)', () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
     vi.mocked(clack.confirm).mockResolvedValue(false);
 
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
     });
@@ -203,7 +240,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('does not prompt when prisma-next.config.ts does not exist', async () => {
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(clack.confirm).not.toHaveBeenCalled();
   });
@@ -211,7 +248,7 @@ describe('runInit (interactive)', () => {
   it('normalizes configPath when schema path starts with ./', async () => {
     vi.mocked(clack.text).mockResolvedValue('./prisma/contract.prisma');
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     const config = readFileSync(join(tmpDir, 'prisma-next.config.ts'), 'utf-8');
     expect(config).toContain('contract: "./prisma/contract.prisma"');
@@ -219,7 +256,7 @@ describe('runInit (interactive)', () => {
   });
 
   it('with --no-install skips dependency installation and emit', async () => {
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(execFile).not.toHaveBeenCalled();
     expect(existsSync(join(tmpDir, 'prisma/contract.json'))).toBe(false);
@@ -229,7 +266,7 @@ describe('runInit (interactive)', () => {
   it('detects pnpm and installs dependencies', async () => {
     writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
 
-    await runInit(tmpDir, { options: { install: true }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: true }, flags: interactiveFlags() });
 
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
@@ -250,7 +287,7 @@ describe('runInit (interactive)', () => {
     writeFileSync(join(tmpDir, 'deno.json'), '{}');
     writeFileSync(join(tmpDir, 'deno.lock'), '{}');
 
-    await runInit(tmpDir, { options: { install: true }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: true }, flags: interactiveFlags() });
 
     expect(execFile).toHaveBeenCalledWith(
       'deno',
@@ -269,7 +306,7 @@ describe('runInit (interactive)', () => {
   it('shows prisma-next.md in outro', async () => {
     writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
 
-    await runInit(tmpDir, { options: { install: true }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: true }, flags: interactiveFlags() });
 
     const outroCall = vi.mocked(clack.outro).mock.calls[0]?.[0] as string | undefined;
     expect(outroCall).toContain('prisma-next.md');
@@ -278,7 +315,7 @@ describe('runInit (interactive)', () => {
   it('exits with PRECONDITION when no package.json exists', async () => {
     rmSync(join(tmpDir, 'package.json'));
 
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: interactiveFlags(),
     });
@@ -290,7 +327,7 @@ describe('runInit (interactive)', () => {
   it('does not write any files when no package.json exists', async () => {
     rmSync(join(tmpDir, 'package.json'));
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
     expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
@@ -301,7 +338,7 @@ describe('runInit (interactive)', () => {
     writeFileSync(join(tmpDir, 'deno.json'), '{}');
     writeFileSync(join(tmpDir, 'deno.lock'), '{}');
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
@@ -310,7 +347,7 @@ describe('runInit (interactive)', () => {
     rmSync(join(tmpDir, 'package.json'));
     writeFileSync(join(tmpDir, 'deno.jsonc'), '{}');
 
-    await runInit(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
   });
@@ -334,7 +371,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('runs without prompts when --target and --authoring are supplied (FR1.3)', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: {
         target: 'postgres',
         authoring: 'psl',
@@ -352,7 +389,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('accepts --target mongodb (the user-facing alias for the internal mongo target)', async () => {
-    await runInit(tmpDir, {
+    await runInitTest(tmpDir, {
       options: { target: 'mongodb', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
@@ -362,7 +399,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('accepts --authoring typescript (FR1.1)', async () => {
-    await runInit(tmpDir, {
+    await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'typescript', install: false },
       flags: noninteractiveFlags(),
     });
@@ -371,7 +408,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('honours --schema-path (FR1.1)', async () => {
-    await runInit(tmpDir, {
+    await runInitTest(tmpDir, {
       options: {
         target: 'postgres',
         authoring: 'psl',
@@ -386,7 +423,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('exits PRECONDITION when --target is missing in non-interactive mode (FR1.4)', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
@@ -397,7 +434,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('exits PRECONDITION when --authoring is missing in non-interactive mode (FR1.4)', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', install: false },
       flags: noninteractiveFlags(),
     });
@@ -407,7 +444,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('exits PRECONDITION when no flags are supplied in non-interactive mode (FR1.4)', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: noninteractiveFlags(),
     });
@@ -416,7 +453,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('exits PRECONDITION on invalid --target value', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'sqlite', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
@@ -425,7 +462,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('exits PRECONDITION on invalid --authoring value', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'graphql', install: false },
       flags: noninteractiveFlags(),
     });
@@ -434,7 +471,7 @@ describe('runInit (non-interactive, FR1)', () => {
   });
 
   it('refuses --strict-probe without --probe-db (FR8.3 / NFR9 offline-by-default)', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: {
         target: 'postgres',
         authoring: 'psl',
@@ -452,7 +489,7 @@ describe('runInit (non-interactive, FR1)', () => {
   it('exits PRECONDITION when re-init is needed but --force is not supplied', async () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing');
 
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
     });
@@ -464,7 +501,7 @@ describe('runInit (non-interactive, FR1)', () => {
   it('overwrites with --force in non-interactive mode', async () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing');
 
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', force: true, install: false },
       flags: noninteractiveFlags(),
     });
@@ -506,7 +543,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', () => {
   });
 
   it('writes a single JSON document to stdout with all required fields', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags({ json: true }),
     });
@@ -522,12 +559,22 @@ describe('runInit (--json output, FR1.5 / FR10.2)', () => {
     expect(Array.isArray(parsed['filesWritten'])).toBe(true);
     expect((parsed['filesWritten'] as string[]).length).toBeGreaterThan(0);
     expect(parsed['packagesInstalled']).toMatchObject({ skipped: true });
-    expect(Array.isArray(parsed['nextSteps'])).toBe(true);
-    expect((parsed['nextSteps'] as string[]).length).toBeGreaterThan(0);
+    // The `nextSteps` array is part of the documented `--json` contract
+    // (FR1.5 / FR10.2). Agents and CI are expected to surface these
+    // strings to the user verbatim, so we lock the canonical anchor
+    // tokens (DATABASE_URL, the contract-emit command, the agent skill
+    // file) rather than just asserting "non-empty". A rewording is fine;
+    // dropping any of these anchors needs to be a conscious change.
+    const nextSteps = parsed['nextSteps'] as string[];
+    expect(Array.isArray(nextSteps)).toBe(true);
+    const nextStepsText = nextSteps.join('\n');
+    expect(nextStepsText).toContain('DATABASE_URL');
+    expect(nextStepsText).toMatch(/(prisma-next|npx prisma-next) contract emit/);
+    expect(nextStepsText).toContain('.agents/skills/prisma-next/SKILL.md');
   });
 
   it('writes a structured error to stdout in JSON mode when preconditions fail', async () => {
-    const exit = await runInit(tmpDir, {
+    const exit = await runInitTest(tmpDir, {
       options: { install: false },
       flags: noninteractiveFlags({ json: true }),
     });
@@ -544,7 +591,7 @@ describe('runInit (--json output, FR1.5 / FR10.2)', () => {
   });
 
   it('reports the mongodb alias (not the internal "mongo") in --json output', async () => {
-    await runInit(tmpDir, {
+    await runInitTest(tmpDir, {
       options: { target: 'mongodb', authoring: 'psl', install: false },
       flags: noninteractiveFlags({ json: true }),
     });
@@ -640,7 +687,7 @@ describe('runInit pnpm → npm install fallback (FR7.2)', () => {
     );
     const { writes, restore } = captureStdout();
     try {
-      const exit = await runInit(tmpDir, {
+      const exit = await runInitTest(tmpDir, {
         options: { target: 'postgres', authoring: 'psl', install: true },
         flags: noninteractiveFlags({ json: true }),
       });
@@ -660,28 +707,188 @@ describe('runInit pnpm → npm install fallback (FR7.2)', () => {
     }
   });
 
-  it('does not fall back when pnpm fails for an unrelated reason', async () => {
+  it('does not fall back when pnpm fails for an unrelated reason — exits INSTALL_FAILED with structured error', async () => {
     mockExecFile((cmd) => (cmd === 'pnpm' ? { stderr: 'ENOTFOUND registry.npmjs.org' } : null));
     const { writes, restore } = captureStdout();
     try {
-      const exit = await runInit(tmpDir, {
+      const exit = await runInitTest(tmpDir, {
         options: { target: 'postgres', authoring: 'psl', install: true },
         flags: noninteractiveFlags({ json: true }),
       });
-      expect(exit).toBe(INIT_EXIT_OK);
+      expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
 
       const npmCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
       expect(npmCalls.length).toBe(0);
 
       const parsed = JSON.parse(writes.join('').trim()) as {
-        warnings: string[];
-        packagesInstalled: { skipped: boolean };
+        ok: boolean;
+        code: string;
+        meta: { filesWritten: string[]; stderr: string[] };
       };
-      expect(parsed.packagesInstalled.skipped).toBe(false);
-      expect(parsed.warnings.join('\n')).toMatch(/Could not install dependencies automatically/);
-      expect(parsed.warnings.join('\n')).not.toMatch(/Falling back to/);
+      expect(parsed.ok).toBe(false);
+      expect(parsed.code).toBe('PN-CLI-5007');
+      expect(parsed.meta.filesWritten).toEqual(
+        expect.arrayContaining(['prisma-next.config.ts', 'prisma/contract.prisma']),
+      );
+      expect(parsed.meta.stderr.join('\n')).toMatch(/ENOTFOUND/);
     } finally {
       restore();
     }
+  });
+
+  it('escalates to INSTALL_FAILED when both pnpm AND the npm fallback fail', async () => {
+    mockExecFile(() => ({
+      stderr: 'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND followed by npm ETARGET',
+    }));
+    const { writes, restore } = captureStdout();
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: true },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
+
+      const parsed = JSON.parse(writes.join('').trim()) as {
+        ok: boolean;
+        code: string;
+      };
+      expect(parsed.ok).toBe(false);
+      expect(parsed.code).toBe('PN-CLI-5007');
+    } finally {
+      restore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F02 / F07 / F09 — emit failure + secret redaction
+// ---------------------------------------------------------------------------
+
+describe('runInit emit failure (F02 / F07)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-emit-test-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    vi.clearAllMocks();
+    vi.mocked(execFile).mockImplementation(
+      (_cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+        const callback = cb as (err: null) => void;
+        callback(null);
+        return undefined as never;
+      },
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('exits EMIT_FAILED with PN-CLI-5008 and surfaces the underlying cause', async () => {
+    const { executeContractEmit } = await import(
+      '../../../src/control-api/operations/contract-emit'
+    );
+    vi.mocked(executeContractEmit).mockRejectedValueOnce(new Error('contract.prisma is invalid'));
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: true },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_EMIT_FAILED);
+
+      const parsed = JSON.parse(writes.join('').trim()) as {
+        ok: boolean;
+        code: string;
+        meta: { cause: string; filesWritten: string[] };
+      };
+      expect(parsed.ok).toBe(false);
+      expect(parsed.code).toBe('PN-CLI-5008');
+      expect(parsed.meta.cause).toContain('contract.prisma is invalid');
+      expect(parsed.meta.filesWritten).toEqual(expect.arrayContaining(['prisma-next.config.ts']));
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
+
+describe('redactSecrets (F09)', () => {
+  it('redacts userinfo from URLs in stderr', () => {
+    expect(redactSecrets('failed: https://user:pass@registry.example.com/foo')).toBe(
+      'failed: https://***@registry.example.com/foo',
+    );
+  });
+
+  it('redacts a bare token URL', () => {
+    expect(redactSecrets('npm error: https://npm-token-123@registry.npmjs.org/')).toBe(
+      'npm error: https://***@registry.npmjs.org/',
+    );
+  });
+
+  it('leaves URLs without userinfo untouched', () => {
+    expect(redactSecrets('ENOTFOUND https://registry.npmjs.org/')).toBe(
+      'ENOTFOUND https://registry.npmjs.org/',
+    );
+  });
+
+  it('handles empty input', () => {
+    expect(redactSecrets('')).toBe('');
+  });
+
+  it('redacts even when the URL is in the middle of a longer line', () => {
+    expect(
+      redactSecrets('GET https://alice:secret@registry.example.com/foo failed: 401 Unauthorized'),
+    ).toBe('GET https://***@registry.example.com/foo failed: 401 Unauthorized');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F14 — deriveCanPrompt action-handler bridge
+// ---------------------------------------------------------------------------
+
+describe('deriveCanPrompt (F14, action-handler bridge)', () => {
+  // Lazy import to avoid the static side-effect of pulling Commander into
+  // every test file.
+  // biome-ignore lint/suspicious/noExplicitAny: dynamic import shape is widened by vitest's compiler
+  let deriveCanPrompt: (opts: any) => boolean;
+
+  beforeEach(async () => {
+    ({ deriveCanPrompt } = await import('../../../src/commands/init/index'));
+  });
+
+  it('returns false when stdin is closed even though stdout is a TTY (the canonical CI/agent shape)', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: false }),
+    ).toBe(false);
+  });
+
+  it('returns true when both streams are TTYs and no override is set', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: undefined, stdinIsTTY: true }),
+    ).toBe(true);
+  });
+
+  it('honours an explicit --interactive override even when stdin is closed', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: true, optionInteractive: true, stdinIsTTY: false }),
+    ).toBe(true);
+  });
+
+  it('returns false when --no-interactive is set, regardless of stdin', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: true }),
+    ).toBe(false);
+  });
+
+  it('returns false in a fully piped environment (decoration off, stdin closed)', () => {
+    expect(
+      deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: false }),
+    ).toBe(false);
   });
 });

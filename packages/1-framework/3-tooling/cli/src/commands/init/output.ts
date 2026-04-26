@@ -3,16 +3,21 @@ import type { GlobalFlags } from '../../utils/global-flags';
 import type { TerminalUI } from '../../utils/terminal-ui';
 
 /**
- * arktype schema for the structured output document `init --json` writes to
- * stdout (FR1.5). The same shape backs the human-readable outro renderer
- * (FR10), so the two output modes carry identical information.
+ * arktype schema for the structured success document `init --json` writes
+ * to stdout (FR1.5). The same shape backs the human-readable outro
+ * renderer (FR10), so the two output modes carry identical information.
  *
  * `target` is normalised to the user-facing flag value (`mongodb` rather
  * than the internal `mongo`) so consumers can round-trip the document
  * straight into a follow-up `--target` invocation.
+ *
+ * The `ok: true` literal is the documented success/error discriminator —
+ * see [Style Guide § JSON Semantics](../../../../../../../docs/CLI%20Style%20Guide.md#json-semantics).
+ * Error envelopes (`CliErrorEnvelope`) carry `ok: false` so consumers can
+ * branch with `if (doc.ok)` without inspecting the rest of the structure.
  */
 export const InitOutputSchema = type({
-  ok: 'boolean',
+  ok: 'true',
   target: "'postgres'|'mongodb'",
   authoring: "'psl'|'typescript'",
   schemaPath: 'string',
@@ -101,9 +106,7 @@ export function buildNextSteps(options: {
   readonly schemaPath: string;
 }): string[] {
   const steps: string[] = [];
-  steps.push(
-    '1. Set DATABASE_URL in your environment (a .env.example will be added in a follow-up release).',
-  );
+  steps.push('1. Set DATABASE_URL in your environment (export it or add it to .env).');
   if (!options.contractEmitted) {
     steps.push(`2. Emit the contract: \`${options.emitCommand}\``);
     steps.push(`3. Edit your schema at ${options.schemaPath}, then re-run the emit command.`);
