@@ -88,6 +88,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
   - Where: `file:line` when applicable
   - More: hint to rerun with `-v`/`--trace`; docs link by code
 - JSON schema (single object): `{ code, domain, severity, summary, why, fix, where: { path, line }, meta, docsUrl }`.
+- **Missing-input failures**: when a command fails because required flags are missing in non-interactive mode, the envelope MUST set `meta.missingFlags: string[]` listing each missing flag's long form (e.g. `["--target", "--authoring"]`) so callers can react programmatically. The `fix:` text SHOULD list the same flags in canonical CLI form, copy-pasteable.
 
 ## Plans & Preflights (Rendering)
 - Summary header: target, storageHash/profileHash, op count, affected tables, estimated rows.
@@ -102,16 +103,31 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 ## Interactivity
 - Interactive by default: `init`, `migration apply`, `doctor` (future).
 - Non‑interactive by default: `contract emit`, `migration plan`, `migration preflight`, `db verify`, `db sign`, `status`.
-- Non‑TTY/CI: never prompt; fail if input is required unless `--yes` provided.
+- Non‑TTY/CI: never prompt; fail with a structured precondition error if input is required.
 - `--interactive`/`--no-interactive` override the TTY detection.
+- **Every interactive prompt MUST have a flag-driven equivalent.** A command that requires user input without a corresponding flag is broken in non-interactive mode. Adding a new prompt requires adding the matching flag in the same change.
+- **Interactivity requires both stdin and stdout to be TTYs.** Commands that prompt MUST check `process.stdin.isTTY && process.stdout.isTTY`. A closed stdin (`< /dev/null`, common in CI and AI agents) is non-interactive even when stdout is a TTY. `--interactive` overrides this only when both streams are actually capable of carrying input/output.
+- **`-y`/`--yes` auto-accepts non-destructive prompts only.** It does NOT consent to data loss, overwriting generated files, or any other destructive action. Destructive operations require an explicit `--force` flag (see [Destructive operation confirmation](#destructive-operation-confirmation)).
 
 ### Destructive operation confirmation
-- `db update` prompts for confirmation when the plan includes destructive operations (drops, type changes).
-- The prompt lists the destructive operations and asks the user to confirm before applying.
-- `-y`/`--yes` auto-accepts the prompt (the single bypass mechanism, per clig.dev §Arguments §Confirmation).
-- In non-interactive mode (piped, CI, `--no-interactive`): no prompt is shown; the command fails with a structured error and suggests `-y`.
-- In `--json` mode: no prompt; same non-interactive behavior.
-- No separate `--accept-data-loss` flag — `-y` is the standard CLI convention for auto-accepting prompts, keeping the flag surface minimal. The internal control API retains `acceptDataLoss` for programmatic consumers.
+
+Destructive operations (drops, type changes, overwriting generated files, overwriting an existing signature marker, …) require **explicit consent via `--force`**, separate from the `-y` "skip non-destructive prompts" mechanism.
+
+This is a deliberate divergence from clig.dev §Arguments §Confirmation. AI agents and CI scripts routinely pass `-y` to suppress prompts on long-running pipelines; conflating "skip prompts" with "consent to destruction" is a footgun the project has decided to avoid.
+
+#### Rules
+
+- A command that performs a destructive action MUST prompt for confirmation in interactive mode AND require `--force` to skip the prompt or to run the action non-interactively.
+- The prompt MUST list the destructive operations (or describe them concretely, e.g. "this will overwrite all generated files") so the user can decline knowing what's at stake.
+- In non-interactive mode (piped stdout, closed stdin, `--no-interactive`, `--json`) without `--force`: no prompt is shown; the command fails with a structured precondition error (exit code `2`) whose `fix:` names `--force`.
+- `-y`/`--yes` MUST NOT be a substitute for `--force`. A non-interactive invocation with `-y` but without `--force` against a destructive operation MUST still fail.
+- The internal control API retains a programmatic equivalent (e.g. `acceptDataLoss: boolean`) for consumers that drive the planner directly; `--force` is the user-facing CLI flag.
+
+#### Examples
+
+- `migration apply` / `db update`: when the plan includes destructive ops, prompts in interactive mode; requires `--force` to apply without a prompt or in non-interactive mode.
+- `db sign`: requires `--force` to overwrite an existing marker with a different hash (already documented in [Database Commands](#database-commands)).
+- `prisma-next init`: re-running `init` in a directory with a generated `prisma-next.config.ts` requires `--force`; `-y` alone is not sufficient to authorise overwriting generated files.
 
 ## Config & Environment
 - Config file names: `prisma-next.config.ts|.mjs|.js` (ESM); optional CJS fallback.
@@ -121,14 +137,52 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
 - Contract source/output and migration directory: defined in config; flags should not override (for now).
 - DB Connection: `--db=<URL>` or `config.db.connection`.
 
-## Exit Codes & Streams
-- Exit codes: `0` success, `1` runtime/error, `2` usage/config error.
-- stdout for data only; stderr for decoration, warnings, errors, and help text.
-- All errors include PN codes; CI should match on PN codes rather than exit code granularity.
+## Exit Codes
+
+Exit codes are a **coarse classification** of command outcomes, intended for shell-level branching (`if ! prisma-next ...; then`) and CI gates. Fine-grained discrimination uses **PN error codes** — every structured error carries one, and scripts that need to react to a specific failure mode (e.g. "retry on `PN-CLI-5004` but fail on `PN-CLI-5003`") MUST match on the PN code.
+
+Streams are covered in [Output Conventions](#output-conventions-composable-cli-output): stdout is data-only; stderr carries decoration, warnings, errors, and help.
+
+### Reserved (CLI-wide)
+
+These codes have a fixed meaning across every Prisma Next CLI command. Specific commands MUST NOT redefine them.
+
+| Code | Name | Meaning |
+|---|---|---|
+| `0` | `OK` | Command succeeded. |
+| `1` | `INTERNAL_ERROR` | Unexpected internal failure, crash, or bug. The command did not reach a documented outcome. Reserved for "this should not have happened". |
+| `2` | `PRECONDITION` | Usage / configuration / precondition error: bad flags, missing required input, conflicting flags, missing prerequisite file. "Your invocation was wrong, fix it and try again." Matches commander.js and Linux convention (`misuse of shell builtin`). |
+| `3` | `USER_ABORTED` | The user explicitly declined an interactive prompt (e.g. did not consent to a destructive overwrite). Distinct from signal-based interruption. |
+| `130` | — | Interrupted by SIGINT (Ctrl+C). POSIX convention (`128 + 2`). |
+| `143` | — | Terminated by SIGTERM. POSIX convention (`128 + 15`). |
+
+### Command-specific (open-ended)
+
+Codes `4`–`99` are available for command-specific outcome codes. Each command:
+
+- MUST define its codes in a co-located, exported module (e.g. `src/commands/<command>/exit-codes.ts`) so consumers can import them by name rather than literal.
+- MUST document each code in its `--help`, package `README.md`, or both.
+- SHOULD pick names that describe an **outcome shape** (`INSTALL_FAILED`, `VERIFY_DRIFT`, `PLAN_HAS_DESTRUCTIVE_OPS`), not a specific cause.
+
+The same numeric value MAY mean different things in different commands (e.g. `init`'s `4 = INSTALL_FAILED` is unrelated to a hypothetical `migration apply 4`). Exit codes are always interpreted in the context of the command that produced them; the PN code disambiguates within the class.
+
+Codes `100` and above are reserved for runtime-environment signals (POSIX `128 + N`) and MUST NOT be claimed by a command.
+
+### Promoting a command-specific code to CLI-wide
+
+If a category of failure recurs across multiple commands and would benefit from a stable cross-command meaning, it MAY be promoted into the reserved range. Promotion is a breaking change to any command that already used that numeric code in the open range, MUST renumber every prior use, and MUST be flagged in release notes. Treat command-specific codes as conventionally stable, like any other public API.
+
+### Why both exit codes and PN codes?
+
+Exit codes are the right tool for shell pipelines: they're a single integer, every shell understands them, and matching on them is one line of bash. They MUST stay coarse — pipelines built on exit-code matching are surprisingly common, and a small reserved core is enough for almost every shell-level decision.
+
+PN error codes (`PN-CLI-5003`, `PN-MIG-2001`, etc.) are the precise channel — every structured error carries one. Scripts that need to discriminate between two specific failure modes that share an exit code MUST match on the PN code, not the exit code.
 
 ## JSON Semantics
 - `--json` outputs a single JSON object for the command result to stdout regardless of TTY mode.
 - When piped (`!isTTY`), no decoration is visible — only JSON data on stdout.
+- **Each command's `--json` success shape MUST be defined as a schema** (arktype or equivalent) co-located with the command (e.g. `src/commands/<command>/output.ts`) and exported on the package's public surface, so downstream consumers can validate the output. The error envelope schema is shared (see [Errors](#errors)). Hand-writing JSON without a co-located schema is not allowed.
+- Success and error documents on the same command SHOULD share a discriminator field (typically `ok: boolean`) so consumers can branch without inspecting the structure.
 
 > **Future**: When streaming commands are implemented, NDJSON event streams (`--json=ndjson`) will be supported for commands like `migration preflight` and `migration apply`.
 
