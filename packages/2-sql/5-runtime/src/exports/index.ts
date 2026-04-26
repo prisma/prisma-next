@@ -34,6 +34,7 @@ export {
   createExecutionContext,
   createSqlExecutionStack,
 } from '../sql-context';
+export type { SqlExecutionPlan } from '../sql-execution-plan';
 export type { SqlStatement } from '../sql-marker';
 export {
   ensureSchemaStatement,
