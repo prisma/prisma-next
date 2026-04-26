@@ -1,169 +1,116 @@
-import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
+import type { PlanMeta } from '@prisma-next/contract/types';
+import type {
+  ExecutionPlan,
+  QueryPlan,
+  RuntimeMiddleware,
+  RuntimeMiddlewareContext,
+} from '@prisma-next/framework-components/runtime';
+import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
-import type { Middleware } from '../src/middleware/types';
-import { createRuntimeCore } from '../src/runtime-core';
-import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
 
 /**
- * Local SQL wire-plan shape used to drive RuntimeCoreImpl in tests. The
- * cross-family `ExecutionPlan` marker only requires `meta + _row`, but
- * `RuntimeCoreImpl` is currently SQL-flavored and reads `sql`/`params`
- * from the plan it receives. See `runtime-core.ts:WirePlanView` and the
- * cross-family runtime unification project for the M3 generalization.
+ * Cross-family demonstration: a fictional "mock" family extends the
+ * canonical `RuntimeCore` base and inherits the middleware lifecycle
+ * (`runBeforeCompile → lower → beforeExecute → runDriver → onRow →
+ * afterExecute`) from `runWithMiddleware`. Confirms that the abstract
+ * base is family-agnostic — i.e. SQL and Mongo are not the only families
+ * that can plug in.
+ *
+ * This file evolved from a `RuntimeCoreImpl`-shaped mock-family test
+ * landed by the cross-family middleware SPI project. Adapted in this
+ * project's M2 to point at the new abstract base instead. See
+ * `projects/cross-family-runtime-unification/plan.md` § Milestone 2.
  */
-interface MockWirePlan extends ExecutionPlan {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-}
 
 interface MockContract {
   readonly target: string;
-  readonly targetFamily: string;
   readonly storageHash: string;
-  readonly profileHash?: string;
 }
 
-class MockMarkerReader implements MarkerReader {
-  private marker: { storageHash: string; profileHash: string } | null = null;
+interface MockPlan extends QueryPlan {
+  readonly draftId: string;
+}
 
-  readMarkerStatement(): MarkerStatement {
+interface MockExec extends ExecutionPlan {
+  readonly compiledId: string;
+}
+
+class MockRuntime extends RuntimeCore<MockPlan, MockExec, RuntimeMiddleware<MockExec>> {
+  readonly events: string[] = [];
+  closeCalls = 0;
+
+  constructor(
+    middleware: ReadonlyArray<RuntimeMiddleware<MockExec>>,
+    ctx: RuntimeMiddlewareContext,
+    private readonly contract: MockContract,
+    private readonly rows: ReadonlyArray<Record<string, unknown>>,
+  ) {
+    super({ middleware, ctx });
+  }
+
+  protected lower(plan: MockPlan): MockExec {
+    if (plan.meta.target !== this.contract.target) {
+      throw new Error(
+        `Plan target ${plan.meta.target} does not match contract target ${this.contract.target}`,
+      );
+    }
+    if (plan.meta.storageHash !== this.contract.storageHash) {
+      throw new Error(
+        `Plan storageHash ${plan.meta.storageHash} does not match contract storageHash ${this.contract.storageHash}`,
+      );
+    }
+    return { compiledId: plan.draftId, meta: plan.meta };
+  }
+
+  protected runDriver(_exec: MockExec): AsyncIterable<Record<string, unknown>> {
+    const rows = this.rows;
     return {
-      sql: 'SELECT core_hash, profile_hash FROM mock_marker WHERE id = 1',
-      params: [1],
+      async *[Symbol.asyncIterator](): AsyncIterator<Record<string, unknown>> {
+        for (const row of rows) {
+          yield row;
+        }
+      },
     };
-  }
-
-  setMarker(storageHash: string, profileHash: string): void {
-    this.marker = { storageHash, profileHash };
-  }
-
-  getMarker(): { storageHash: string; profileHash: string } | null {
-    return this.marker;
-  }
-}
-
-class MockDriver {
-  private rows: ReadonlyArray<Record<string, unknown>> = [];
-  private markerRows: ReadonlyArray<Record<string, unknown>> = [];
-
-  setRows(rows: ReadonlyArray<Record<string, unknown>>): void {
-    this.rows = rows;
-  }
-
-  setMarkerRows(rows: ReadonlyArray<Record<string, unknown>>): void {
-    this.markerRows = rows;
-  }
-
-  async query(
-    sql: string,
-    _params: readonly unknown[],
-  ): Promise<{
-    rows: ReadonlyArray<unknown>;
-  }> {
-    // If the query looks like a marker query, return marker rows
-    if (sql.includes('mock_marker') || sql.includes('core_hash') || sql.includes('profile_hash')) {
-      return { rows: this.markerRows };
-    }
-    return { rows: this.rows };
-  }
-
-  async *execute<Row = Record<string, unknown>>(options: {
-    sql: string;
-    params: readonly unknown[];
-  }): AsyncIterable<Row> {
-    void options;
-    for (const row of this.rows) {
-      yield row as Row;
-    }
   }
 
   async close(): Promise<void> {
-    // No-op
+    this.closeCalls++;
   }
 }
 
-class MockFamilyAdapter implements RuntimeFamilyAdapter<MockContract> {
-  readonly contract: MockContract;
-  readonly markerReader: MarkerReader;
+const ctx: RuntimeMiddlewareContext = {
+  contract: {},
+  mode: 'strict',
+  now: () => Date.now(),
+  log: { info: () => {}, warn: () => {}, error: () => {} },
+};
 
-  constructor(contract: MockContract, markerReader: MarkerReader) {
-    this.contract = contract;
-    this.markerReader = markerReader;
-  }
+const meta: PlanMeta = {
+  target: 'mock',
+  storageHash: 'sha256:test-core',
+  lane: 'raw-sql',
+  paramDescriptors: [],
+};
 
-  validatePlan(plan: ExecutionPlan, contract: MockContract): void {
-    if (plan.meta.target !== contract.target) {
-      throw new Error(
-        `Plan target ${plan.meta.target} does not match contract target ${contract.target}`,
-      );
-    }
-    if (plan.meta.storageHash !== contract.storageHash) {
-      throw new Error(
-        `Plan storageHash ${plan.meta.storageHash} does not match contract storageHash ${contract.storageHash}`,
-      );
-    }
-  }
-}
-
-describe('runtime-core with mock family', () => {
+describe('RuntimeCore with mock family', () => {
   it('executes plans without SQL dependencies', async () => {
-    const contract: MockContract = {
-      target: 'mock',
-      targetFamily: 'mock',
-      storageHash: 'sha256:test-core',
-      profileHash: 'sha256:test-profile',
-    };
+    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const runtime = new MockRuntime([], ctx, contract, [{ id: 1, name: 'test' }]);
 
-    const markerReader = new MockMarkerReader();
-    const familyAdapter = new MockFamilyAdapter(contract, markerReader);
-    const driver = new MockDriver();
-    const runtime = createRuntimeCore({
-      familyAdapter,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+    const plan: MockPlan = { draftId: 'd-1', meta };
 
-    const plan: MockWirePlan = {
-      sql: 'SELECT * FROM mock_table',
-      params: [],
-      meta: {
-        target: 'mock',
-        storageHash: 'sha256:test-core',
-        lane: 'raw-sql',
-        paramDescriptors: [],
-      },
-    };
-
-    driver.setRows([{ id: 1, name: 'test' }]);
-
-    const results: unknown[] = [];
-    for await (const row of runtime.execute(plan)) {
-      results.push(row);
-    }
+    const results = await runtime.execute(plan).toArray();
 
     expect(results).toHaveLength(1);
     expect(results[0]).toEqual({ id: 1, name: 'test' });
   });
 
-  it('validates plans against contract', async () => {
-    const contract: MockContract = {
-      target: 'mock',
-      targetFamily: 'mock',
-      storageHash: 'sha256:test-core',
-    };
+  it('rejects plans whose `lower` raises (cross-family pre-execution validation)', async () => {
+    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const runtime = new MockRuntime([], ctx, contract, []);
 
-    const markerReader = new MockMarkerReader();
-    const familyAdapter = new MockFamilyAdapter(contract, markerReader);
-    const driver = new MockDriver();
-    const runtime = createRuntimeCore({
-      familyAdapter,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
-
-    const invalidPlan: MockWirePlan = {
-      sql: 'SELECT * FROM mock_table',
-      params: [],
+    const invalidPlan: MockPlan = {
+      draftId: 'd-2',
       meta: {
         target: 'other',
         storageHash: 'sha256:other-core',
@@ -172,95 +119,44 @@ describe('runtime-core with mock family', () => {
       },
     };
 
-    driver.setRows([]);
-
-    await expect(async () => {
-      for await (const _row of runtime.execute(invalidPlan)) {
-        void _row;
-      }
-    }).rejects.toThrow('Plan target other does not match contract target mock');
+    await expect(runtime.execute(invalidPlan).toArray()).rejects.toThrow(
+      'Plan target other does not match contract target mock',
+    );
   });
 
-  it('supports middleware', async () => {
-    const contract: MockContract = {
-      target: 'mock',
-      targetFamily: 'mock',
-      storageHash: 'sha256:test-core',
-    };
-
-    const markerReader = new MockMarkerReader();
-    const familyAdapter = new MockFamilyAdapter(contract, markerReader);
-    const driver = new MockDriver();
+  it('drives middleware hooks for any family', async () => {
     let beforeExecuteCalled = false;
     let onRowCalled = false;
     let afterExecuteCalled = false;
 
-    const middleware: Middleware<MockContract> = {
+    const middleware: RuntimeMiddleware<MockExec> = {
       name: 'test-middleware',
-      async beforeExecute(plan, ctx) {
-        void plan;
-        void ctx;
+      async beforeExecute() {
         beforeExecuteCalled = true;
       },
-      async onRow(row, plan, ctx) {
-        void row;
-        void plan;
-        void ctx;
+      async onRow() {
         onRowCalled = true;
       },
-      async afterExecute(plan, result, ctx) {
-        void plan;
-        void result;
-        void ctx;
+      async afterExecute() {
         afterExecuteCalled = true;
       },
     };
 
-    const runtime = createRuntimeCore({
-      familyAdapter,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      middleware: [middleware],
-    });
+    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const runtime = new MockRuntime([middleware], ctx, contract, [{ id: 1 }]);
 
-    const plan: MockWirePlan = {
-      sql: 'SELECT * FROM mock_table',
-      params: [],
-      meta: {
-        target: 'mock',
-        storageHash: 'sha256:test-core',
-        lane: 'raw-sql',
-        paramDescriptors: [],
-      },
-    };
-
-    driver.setRows([{ id: 1 }]);
-
-    for await (const _row of runtime.execute(plan)) {
-      void _row;
-    }
+    await runtime.execute({ draftId: 'd-3', meta }).toArray();
 
     expect(beforeExecuteCalled).toBe(true);
     expect(onRowCalled).toBe(true);
     expect(afterExecuteCalled).toBe(true);
   });
 
-  it('closes driver', async () => {
-    const contract: MockContract = {
-      target: 'mock',
-      targetFamily: 'mock',
-      storageHash: 'sha256:test-core',
-    };
-
-    const markerReader = new MockMarkerReader();
-    const familyAdapter = new MockFamilyAdapter(contract, markerReader);
-    const driver = new MockDriver();
-    const runtime = createRuntimeCore({
-      familyAdapter,
-      driver,
-      verify: { mode: 'onFirstUse', requireMarker: false },
-    });
+  it('exposes `close()` for resource teardown', async () => {
+    const contract: MockContract = { target: 'mock', storageHash: 'sha256:test-core' };
+    const runtime = new MockRuntime([], ctx, contract, []);
 
     await expect(runtime.close()).resolves.toBeUndefined();
+    expect(runtime.closeCalls).toBe(1);
   });
 });
