@@ -20,10 +20,10 @@ import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { initMarker, readMarker, updateMarker } from '@prisma-next/target-mongo/control';
+import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
 import { mongoSchemaToView } from './schema-to-view';
-import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
 
 export interface MongoControlFamilyInstance
   extends ControlFamilyInstance<'mongo', MongoSchemaIR>,

@@ -6,8 +6,8 @@ import type {
 import { VERIFY_CODE_SCHEMA_FAILURE } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { contractToMongoSchemaIR } from '@prisma-next/target-mongo/control';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { contractToMongoSchemaIR } from '../contract-to-schema';
 import { diffMongoSchemas } from '../schema-diff';
 
 export interface VerifyMongoSchemaOptions {

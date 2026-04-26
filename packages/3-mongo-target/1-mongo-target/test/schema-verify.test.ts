@@ -13,6 +13,8 @@ function buildContract(
   collections: Record<string, MongoStorageCollection>,
   overrides?: Partial<MongoContract>,
 ): MongoContract {
+  // String → branded hash casts: MongoContract uses branded `StorageHashBase` and
+  // `ProfileHashBase` types that this fixture supplies as plain strings.
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -27,7 +29,7 @@ function buildContract(
     profileHash: 'sha256:profile',
     meta: {},
     ...overrides,
-  };
+  } as unknown as MongoContract;
 }
 
 function ir(collections: MongoSchemaCollection[]): MongoSchemaIR {
@@ -308,7 +310,11 @@ describe('verifyMongoSchema', () => {
     });
 
     it('omits profileHash when the contract has no profileHash', () => {
-      const contract = buildContract({}, { profileHash: '' });
+      // ProfileHashBase is a branded string; the cast scopes the override to the field.
+      const contract = buildContract(
+        {},
+        { profileHash: '' as unknown as MongoContract['profileHash'] },
+      );
       const result = verifyMongoSchema({
         contract,
         schema: ir([]),
