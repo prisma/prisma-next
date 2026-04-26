@@ -3,7 +3,7 @@ import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
   createExecutionContext,

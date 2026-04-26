@@ -82,8 +82,7 @@ export abstract class RuntimeCore<
    *
    * The `Row` type parameter on `execute()` is satisfied by the caller via
    * the plan's phantom `_row`; the runtime treats rows as opaque records
-   * here and trusts the caller's row typing — the same convention used by
-   * today's `RuntimeCoreImpl.#executeWith` (`yield row as Row`).
+   * here and trusts the caller's row typing.
    */
   protected abstract runDriver(exec: TExec): AsyncIterable<Record<string, unknown>>;
 
@@ -95,8 +94,7 @@ export abstract class RuntimeCore<
     async function* generator(): AsyncGenerator<Row, void, unknown> {
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled);
-      // The driver yields raw `Record<string, unknown>`; we cast to `Row` here
-      // for parity with `RuntimeCoreImpl.#executeWith` (`yield row as Row`).
+      // The driver yields raw `Record<string, unknown>`; we cast to `Row` here.
       // The Row contract is enforced by the caller via `plan._row`.
       yield* runWithMiddleware<TExec, Row>(
         exec,

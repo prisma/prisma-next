@@ -1,9 +1,8 @@
 export type {
   AfterExecuteResult,
-  Log,
-  Middleware,
-  MiddlewareContext,
-} from '@prisma-next/runtime-executor';
+  RuntimeLog as Log,
+} from '@prisma-next/framework-components/runtime';
+export type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,
@@ -15,6 +14,13 @@ export { budgets } from '../middleware/budgets';
 export type { LintsOptions } from '../middleware/lints';
 export { lints } from '../middleware/lints';
 export type { SqlMiddleware, SqlMiddlewareContext } from '../middleware/sql-middleware';
+export type {
+  MarkerReader,
+  RuntimeFamilyAdapter,
+  RuntimeTelemetryEvent,
+  RuntimeVerifyOptions,
+  TelemetryOutcome,
+} from '../runtime-spi';
 export type {
   ExecutionContext,
   RuntimeMutationDefaultGenerator,
@@ -46,10 +52,7 @@ export type {
   Runtime,
   RuntimeConnection,
   RuntimeQueryable,
-  RuntimeTelemetryEvent,
   RuntimeTransaction,
-  RuntimeVerifyOptions,
-  TelemetryOutcome,
   TransactionContext,
 } from '../sql-runtime';
 export { createRuntime, withTransaction } from '../sql-runtime';

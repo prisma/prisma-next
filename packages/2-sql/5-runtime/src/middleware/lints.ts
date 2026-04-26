@@ -1,5 +1,4 @@
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
   type AnyQueryAst,
@@ -7,6 +6,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { evaluateRawGuardrails } from '../guardrails/raw';
 import type { SqlMiddleware, SqlMiddlewareContext } from './sql-middleware';
 
 export interface LintsOptions {
