@@ -4,7 +4,7 @@
 
 ## Summary
 
-Hoist the apply-time `migrationHash` integrity check out of the CLI's `migration apply` command and into the on-disk loader (`readMigrationPackage` in `@prisma-next/migration-tools/io`). Every code path that materializes a `MigrationPackage` from disk — CLI commands, the control client, and the in-process `Migration.run()` orchestrator — then gets package-integrity verification for free, in one place, with one error shape, applied uniformly across every target family. The currently-explicit verification loop in `migration apply` becomes redundant and is deleted.
+Hoist the apply-time `migrationHash` integrity check out of the CLI's `migration apply` command and into the on-disk loader (`readMigrationPackage` in `@prisma-next/migration-tools/io`). Every code path that materializes a `MigrationPackage` from disk — CLI commands and the control client — then gets package-integrity verification for free, in one place, with one error shape, applied uniformly across every target family. The currently-explicit verification loop in `migration apply` becomes redundant and is deleted. The author-time write path (`MigrationCLI.run`, landed by [TML-2301](https://linear.app/prisma-company/issue/TML-2301)) is intentionally outside this scope — it regenerates packages rather than consuming them; see [Decision 6 — two-loader architectural split](#6-tml-2301-coordination--resolved-two-loader-architectural-split).
 
 The same PR also cleans up the vocabulary and file layout in `@prisma-next/migration-tools` (the package we're touching): rename `migrationId` → `migrationHash` to be explicit that the value is a hash, not an opaque id; rename `MigrationBundle` → `MigrationPackage` to match the existing `read/writeMigrationPackage` I/O verbs; rename `MigrationManifest` → `MigrationMetadata` so "manifest" stays exclusively the on-disk-file term; and split the dumping-ground `types.ts` into one file per concept. See [Naming and structure refactor](#naming-and-structure-refactor) for the full set of changes and rationale.
 
@@ -30,7 +30,7 @@ Verification exists, but it lives in exactly one consumer instead of in the load
 
 - `packages/1-framework/3-tooling/cli/src/commands/migration-apply.ts:213-233` runs an explicit `for (const bundle of migrations.bundles) { verifyMigrationBundle(bundle); … }` loop after loading. This was added in commit `4ac692609` (2026-04-23), after this ticket was filed.
 - Every other CLI command that loads packages — `migration plan`, `migration status`, `migration show`, `migration new` — does **not** verify. `db update` and `db init` don't load `MigrationPackage`s and aren't affected.
-- The future in-process apply path being added in [TML-2301](https://linear.app/prisma-company/issue/TML-2301) (the `Migration.run()` orchestrator's apply branch, plus the control client) will need the same check, and is at risk of forgetting it for the same reason: there is no enforcement at the load boundary.
+- Future in-process apply paths — for example the control client exposing programmatic apply, or other consumers of `readMigrationPackage` we have not anticipated — would need the same check and would be at risk of forgetting it for the same reason: there is no enforcement at the load boundary. (The original spec cited [TML-2301](https://linear.app/prisma-company/issue/TML-2301)'s `Migration.run()` orchestrator as a future load-path consumer; TML-2301 ultimately landed as `MigrationCLI.run`, which is a *write* path that regenerates packages rather than consuming them — see [Decision 6](#6-tml-2301-coordination--resolved-two-loader-architectural-split). The broader load-boundary concern still stands for whatever does load packages programmatically.)
 
 This is a defense-in-depth gap. Hash mismatch indicates corruption (FS partial-write, manual edit, cherry-pick of a half-applied directory) and must hard-fail consistently regardless of which command happens to consume the package.
 
@@ -90,7 +90,7 @@ Adding integrity verification to `readMigrationPackage` therefore covers every e
 | `loadMigrationBundles` (CLI helper) | `loadMigrationPackages` | `cli/src/utils/command-helpers.ts` | Match the new package vocabulary. |
 | `loadAllBundles` (CLI helper alias) | `loadAllMigrationPackages` | same | Same. |
 
-The sibling `MigrationMeta` interface in `migration-base.ts` (the small structure returned by `Migration.describe()`) is **kept as-is** to avoid expanding scope into TML-2301's territory; we accept the temporary near-collision with `MigrationMetadata` and let TML-2301's split decide whether to rename it (likely to `MigrationDescription` to match `describe()`). Open question 3 below.
+The sibling `MigrationMeta` interface in `migration-base.ts` (the small structure returned by `Migration.describe()`) is **kept as-is**. TML-2301 (the migration-base split) merged without renaming `MigrationMeta` — it remains the user-authored `describe()` return type, semantically distinct from `MigrationMetadata` (the on-disk-attested record produced by `buildAttestedMetadata`). The two names coexist by design; the near-collision is judged acceptable given the distinct concepts they represent. Open question 3 (now resolved) below.
 
 ### File layout
 
@@ -167,7 +167,7 @@ The following are dumping-ground / vocabulary issues we noticed while auditing b
 
 - **`framework-components/src/control-migration-types.ts`.** A 11-interface dumping ground (`MigrationOperationClass`, `SerializedQueryPlan`, `DataTransformOperation`, `MigrationOperationPolicy`, `MigrationPlanOperation`, `OpFactoryCall`, `MigrationPlan`, `MigrationPlanWithAuthoringSurface`, `MigrationPlannerConflict`, `MigrationPlannerSuccessResult`, `MigrationRunner`, `TargetMigrationsCapability`). Worth splitting per concept — but this PR only adds JSDoc to one of those interfaces, and a structural change to `framework-components` belongs in its own PR scoped to that package's responsibilities.
 - **`migration-tools/src/errors.ts`.** 24 error factories in one file. Cohesive (all `MigrationToolsError`, all `MIGRATION.*` codes), so not a dumping ground in the same sense as `types.ts`. We add one new factory and rename two; we don't split the file. If the file grows further, splitting by concern (`errors-io.ts`, `errors-graph.ts`, `errors-refs.ts`, `errors-integrity.ts`) is a clean follow-up.
-- **`MigrationMeta` (in `migration-base.ts`).** Confusingly close to `MigrationMetadata` after this PR's rename. TML-2301 is splitting `migration-base.ts` (extracting the abstract class to a shared-plane home and the orchestrator to migration-plane); the right time to rename `MigrationMeta` → `MigrationDescription` is during that split, not before. We accept the transient confusion.
+- **`MigrationMeta` (in `migration-base.ts`).** Near-collision with `MigrationMetadata` after this PR's rename. TML-2301 (now merged) chose to keep `MigrationMeta` as the durable name for the user-authored `describe()` return type; the two names coexist by design and describe distinct concepts (`MigrationMeta` = user's `describe()` output; `MigrationMetadata` = on-disk-attested record from `buildAttestedMetadata`). No follow-up rename planned.
 - **README "Attestation framing" section drift.** The README says `computeMigrationId` hashes a "4-part tuple" but the code (post-ADR 199) hashes a 2-part tuple (stripped metadata + ops). Pre-existing drift; we update the section as part of the README refresh anyway, since we're already touching the file for the rename.
 
 ## Changes
@@ -220,11 +220,29 @@ In `packages/1-framework/3-tooling/cli/src/commands/migration-apply.ts`:
 - `MigrationRunner.execute` in `packages/1-framework/1-core/framework-components/src/control-migration-types.ts`: add a paragraph noting that `plan` is treated as trusted input (already-verified package origin) and that callers obtain packages through `readMigrationPackage` to satisfy this invariant.
 - `executeMigrationApply` in `packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts`: same note on the operation function's docstring, applied to its `pendingMigrations` parameter.
 
-### 6. TML-2301 coordination
+### 6. TML-2301 coordination — resolved (two-loader architectural split)
 
-The `Migration.run()` orchestrator's apply branch (added in TML-2301) loads on-disk migration packages to build the apply plan. It must use `readMigrationPackage` / `readMigrationsDir`, not raw `fs.readFile` + `JSON.parse`. This is a coordination requirement on TML-2301, not a code change in this spec — but the spec for TML-2301 is updated to reference this contract, and the implementation PR for TML-2301 lands after (or alongside) this one so the verifying loader exists when the orchestrator is wired.
+**Status: resolved post-merge.** TML-2301 merged into `main` during this PR's development, with a different shape than the original spec anticipated. This section records the final architectural picture.
 
-The control client path (the `db update` apply flow that does not load on-disk packages, and any future `migration apply` invocation through the control client surface) is unchanged because it does not load `MigrationPackage`s today; if it ever does, it goes through the same primitive.
+The original spec assumed `Migration.run()` would be an in-process apply orchestrator that loads `MigrationPackage`s from disk, and would therefore need to route through `readMigrationPackage` to inherit hash verification. **That assumption was wrong.** TML-2301 ultimately landed as `MigrationCLI.run` (in `packages/1-framework/3-tooling/cli/src/migration-cli.ts`), which is a different kind of code path:
+
+- `MigrationCLI.run` is a **write path**, not a read path. It runs when a developer types `node migrations/<dir>/migration.ts` to *regenerate* `migration.json` and `ops.json` from their authored `Migration` subclass.
+- It reads the existing `migration.json` only for **scaffolding-context preservation** (`createdAt`, `fromContract`, `toContract`, `hints`, `labels` carried forward into the regenerated record), via a small private helper `readExistingMetadata`. It never reads `ops.json`.
+- It therefore **cannot** verify the migration hash even if we wanted it to: hash verification is a property of the `(metadata, ops)` tuple, and `MigrationCLI.run` only ever has `metadata` in hand. Verification at this site is structurally impossible, not just unwanted.
+- It also **should not** verify, even hypothetically, because a hash mismatch is the *expected* outcome of regeneration: the developer's source changes invalidate the prior hash by definition.
+
+This results in a clean **two-loader architectural split**, sharper than what the original spec sketched:
+
+| Path | Loader | Verifies hash? | Why |
+|---|---|---|---|
+| Apply-time read (CLI `apply` / `plan` / `status` / `show` / `new`; future control client) | `readMigrationPackage` / `readMigrationsDir` (`migration-tools/src/io.ts`) | Yes — every load | Consumer must trust the on-disk bytes match what was emitted. |
+| Author-time write (`MigrationCLI.run`; one site) | `readExistingMetadata` (`cli/src/migration-cli.ts`, private) | No — structurally cannot | Producer is regenerating the package; mismatch is the expected outcome of a re-author. |
+
+The verifying loader owns the read path; the non-verifying read of `migration.json` for scaffolding preservation is partitioned to its single author-time site. The two loaders cannot be unified because their *intent* differs: one is a consumer that demands integrity, the other a producer that demands flexibility.
+
+A subtle integrity edge worth noting: `MigrationCLI.run`'s scaffolding-context preservation could silently inherit hand-edited `createdAt` / `fromContract` / `toContract` / `hints` / `labels` values from a tampered `migration.json` into the regenerated package. Bounded — only those four/five scaffolding fields, not the hash itself (which is recomputed from new authored content); not exploitable as a load-time integrity bypass (read-path consumers still see the new hash). Below the threshold for this PR. If we later care, the right primitive is a separate "verify scaffolding-only metadata" check in `MigrationCLI.run` that does not require ops; out of scope here.
+
+The control client path (the `db update` apply flow that does not load on-disk packages, and any future `migration apply` invocation through the control client surface) is unchanged because it does not load `MigrationPackage`s today; if it ever does, it goes through the same verifying primitive.
 
 ### 7. Type renames + file split
 
@@ -332,19 +350,19 @@ In `packages/1-framework/3-tooling/migration/README.md`:
 - **`db update` / `db init`.** These do not load on-disk migration packages, so they are not affected.
 - **Splitting `framework-components/src/control-migration-types.ts`.** Noted as an opportunity in [Out-of-scope opportunities](#out-of-scope-opportunities-noted-not-addressed); a separate PR scoped to that package.
 - **Splitting `errors.ts` further.** Same; noted as an opportunity, not done here.
-- **Renaming `MigrationMeta` (in `migration-base.ts`).** Coordinated with TML-2301's `migration-base.ts` split.
+- **Renaming `MigrationMeta` (in `migration-base.ts`).** TML-2301 (now merged) chose to keep `MigrationMeta` as the durable name for the user-authored `describe()` return type. No follow-up rename planned; this PR retains the convention.
 
 ## Open questions
 
 1. **`./types` export subpath.** Once `types.ts` is split into `metadata.ts` / `package.ts` / `graph.ts`, do we (a) replace the single `./types` subpath in `package.json` with three subpaths (`./metadata`, `./package`, `./graph`), or (b) keep `./types` as a barrel that re-exports from all three? **Default:** (a). It enforces narrower imports at consumers (a rule the repo already favors — see `.cursor/rules/no-barrel-files.mdc`) and surfaces accidental cross-concept coupling. Cost: ~10 import-statement updates across consumers.
-2. **`errorMigrationHashMismatch` export visibility.** Export from `@prisma-next/migration-tools/errors` (mirrors the other `errorXxx` factories) or keep private to the loader? **Default:** export it — easier for `Migration.run()` (TML-2301) to surface the same error shape if it ever wants to trigger one before the loader has run, and consistent with the rest of the file.
-3. **Rename `MigrationMeta` → `MigrationDescription` in `migration-base.ts`?** Currently confusingly close to `MigrationMetadata` after this PR. **Default:** no — coordinate with TML-2301's `migration-base.ts` split. If TML-2301 lands first, this PR can pick up the rename trivially; if this PR lands first, TML-2301 picks it up.
+2. **`errorMigrationHashMismatch` export visibility.** Export from `@prisma-next/migration-tools/errors` (mirrors the other `errorXxx` factories) or keep private to the loader? **Default:** export it — easier for future programmatic consumers (e.g., the control client mentioned in [§ Why we want this](#why-we-want-this)) to surface the same error shape if they ever construct packages without going through the loader, and consistent with the rest of the file.
+3. **Rename `MigrationMeta` → `MigrationDescription` in `migration-base.ts`?** **Resolved (post-TML-2301 merge): no.** TML-2301's migration-base split chose to keep `MigrationMeta` as the durable name for the user-authored `describe()` return type. The two names (`MigrationMeta`, `MigrationMetadata`) coexist by design and describe distinct concepts. No rename planned.
 4. **Wire-format codemod commit organization.** Single commit for the field rename across all 113 files, or split into `examples/<app>/`-scoped commits? **Default:** single commit — they're a mechanical batch and reviewing them individually adds no signal.
 
 ## References
 
 - [TML-2264 (this ticket)](https://linear.app/prisma-company/issue/TML-2264/migration-runner-should-verify-migration-matches-its-hash)
-- [TML-2301 — Migration control-adapter DI + `Migration` base split](https://linear.app/prisma-company/issue/TML-2301) (sibling; coordinate)
+- [TML-2301 — Migration control-adapter DI + `Migration` base split](https://linear.app/prisma-company/issue/TML-2301) (sibling; **merged**, integrated into this branch via merge commit `39157ef76`)
 - [TML-2316 — Implement ADR 192 step 2: emit-drift detection for `migration.ts`](https://linear.app/prisma-company/issue/TML-2316/implement-adr-192-step-2-emit-drift-detection-for-migrationts) (follow-up; out of scope here)
 - [ADR 192 — `ops.json` is the migration contract](../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) (apply-time verification, two-step model)
 - [ADR 199 — Storage-only migration identity](../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md) (`migrationHash` definition; written using the old `migrationId` term — not retroactively edited)
