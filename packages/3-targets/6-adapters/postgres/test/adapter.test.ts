@@ -94,11 +94,11 @@ describe('Postgres adapter', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 
-    expect(lowered.body.sql).toContain('json_build_object');
-    expect(lowered.body.sql).toContain(
+    expect(lowered.sql).toContain('json_build_object');
+    expect(lowered.sql).toContain(
       '(SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id") AS "firstPostId"',
     );
-    expect(lowered.body.sql).toContain(`WHERE "user"."email" = 'a@example.com'`);
+    expect(lowered.sql).toContain(`WHERE "user"."email" = 'a@example.com'`);
   });
 
   it('lowers insert, update, and delete statements with returning clauses', () => {
@@ -137,13 +137,13 @@ describe('Postgres adapter', () => {
       )
       .withReturning([ColumnRef.of('user', 'id')]);
 
-    expect(adapter.lower(insertAst, { contract }).body.sql).toContain(
+    expect(adapter.lower(insertAst, { contract }).sql).toContain(
       'ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"',
     );
-    expect(adapter.lower(updateAst, { contract }).body.sql).toBe(
+    expect(adapter.lower(updateAst, { contract }).sql).toBe(
       'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."email"',
     );
-    expect(adapter.lower(deleteAst, { contract }).body.sql).toBe(
+    expect(adapter.lower(deleteAst, { contract }).sql).toBe(
       'DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"',
     );
   });
@@ -206,7 +206,7 @@ describe('Postgres adapter', () => {
 
     const lowered = adapter.lower(ast, { contract });
 
-    expect(lowered.body.sql).toBe(
+    expect(lowered.sql).toBe(
       [
         'SELECT DISTINCT ON ("user"."email") "user"."id" AS "id"',
         'FROM "user"',
@@ -226,7 +226,7 @@ describe('Postgres adapter', () => {
       .withRows([{}])
       .withOnConflict(InsertOnConflict.on([ColumnRef.of('user', 'email')]).doNothing());
 
-    expect(adapter.lower(ast, { contract, params: [] }).body.sql).toBe(
+    expect(adapter.lower(ast, { contract, params: [] }).sql).toBe(
       'INSERT INTO "user" DEFAULT VALUES ON CONFLICT ("email") DO NOTHING',
     );
   });
@@ -240,7 +240,7 @@ describe('Postgres adapter', () => {
       ProjectionItem.of('missingValue', LiteralExpr.of(undefined)),
     ]);
 
-    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
 
     expect(sql).toBe(
       `SELECT 12 AS "bigintValue", '2024-01-01T00:00:00.000Z' AS "createdAtLiteral", ARRAY[1, 'two'] AS "arrayValue", '{"ok":true}' AS "jsonValue", NULL AS "missingValue" FROM "user"`,
@@ -258,7 +258,7 @@ describe('Postgres adapter', () => {
       .withHaving(BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)))
       .withWhere(OrExpr.of([BinaryExpr.eq(ColumnRef.of('user', 'id'), LiteralExpr.of(1))]));
 
-    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
 
     expect(sql).toContain('SELECT DISTINCT');
     expect(sql).toContain('GROUP BY "user"."email"');
@@ -271,7 +271,7 @@ describe('Postgres adapter', () => {
       ProjectionItem.of('id', ColumnRef.of('u', 'id')),
     ]);
 
-    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
 
     expect(sql).toContain('FROM "user" AS "u"');
   });
@@ -281,7 +281,7 @@ describe('Postgres adapter', () => {
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
       .withWhere(OrExpr.false());
 
-    const sql = adapter.lower(ast, { contract, params: [] }).body.sql;
+    const sql = adapter.lower(ast, { contract, params: [] }).sql;
 
     expect(sql).toContain('WHERE FALSE');
   });

@@ -57,8 +57,7 @@ const controlAdapter = new PostgresControlAdapter();
 function expectParity(ast: AnyQueryAst): void {
   const runtime = runtimeAdapter.lower(ast, { contract });
   const control = controlAdapter.lower(ast, { contract });
-  expect(control.sql).toBe(runtime.body.sql);
-  expect(control.params).toEqual(runtime.body.params);
+  expect(control).toEqual(runtime);
 }
 
 describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () => {
@@ -144,8 +143,8 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
     expectParity(jsonAst);
     expectParity(vectorAst);
 
-    expect(runtimeAdapter.lower(jsonbAst, { contract }).body.sql).toContain('::jsonb');
-    expect(runtimeAdapter.lower(jsonAst, { contract }).body.sql).toContain('::json');
-    expect(runtimeAdapter.lower(vectorAst, { contract }).body.sql).toContain('::vector');
+    expect(runtimeAdapter.lower(jsonbAst, { contract }).sql).toContain('::jsonb');
+    expect(runtimeAdapter.lower(jsonAst, { contract }).sql).toContain('::json');
+    expect(runtimeAdapter.lower(vectorAst, { contract }).sql).toContain('::vector');
   });
 });

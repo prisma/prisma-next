@@ -80,7 +80,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('email', ColumnRef.of('user', 'email')),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe('SELECT "user"."id" AS "id", "user"."email" AS "email" FROM "user"');
     });
 
@@ -90,10 +90,8 @@ describe('SQLite adapter', () => {
         .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ParamRef.of('test@example.com')));
 
       const lowered = adapter.lower(ast, { contract });
-      expect(lowered.body.sql).toBe(
-        'SELECT "user"."id" AS "id" FROM "user" WHERE "user"."email" = ?',
-      );
-      expect(lowered.body.params).toEqual(['test@example.com']);
+      expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."email" = ?');
+      expect(lowered.params).toEqual(['test@example.com']);
     });
 
     it('renders ORDER BY, LIMIT, OFFSET', () => {
@@ -103,7 +101,7 @@ describe('SQLite adapter', () => {
         .withLimit(10)
         .withOffset(5);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe(
         'SELECT "user"."id" AS "id" FROM "user" ORDER BY "user"."id" ASC LIMIT 10 OFFSET 5',
       );
@@ -114,7 +112,7 @@ describe('SQLite adapter', () => {
         .withProjection([ProjectionItem.of('email', ColumnRef.of('user', 'email'))])
         .withDistinct();
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('SELECT DISTINCT');
     });
 
@@ -127,7 +125,7 @@ describe('SQLite adapter', () => {
         .withGroupBy([ColumnRef.of('user', 'email')])
         .withHaving(BinaryExpr.gt(AggregateExpr.count(), LiteralExpr.of(1)));
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('GROUP BY "user"."email"');
       expect(sql).toContain('HAVING COUNT(*) > 1');
     });
@@ -137,7 +135,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('id', ColumnRef.of('u', 'id')),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('FROM "user" AS "u"');
     });
 
@@ -151,7 +149,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('firstPostId', SubqueryExpr.of(subquery)),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain(
         '(SELECT "post"."id" AS "id" FROM "post" WHERE "post"."userId" = "user"."id") AS "firstPostId"',
       );
@@ -166,7 +164,7 @@ describe('SQLite adapter', () => {
         .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
         .withWhere(ExistsExpr.notExists(subquery));
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('NOT EXISTS (SELECT');
     });
 
@@ -180,7 +178,7 @@ describe('SQLite adapter', () => {
           ]),
         );
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('"user"."metadata" IS NULL');
       expect(sql).toContain('"user"."email" IS NOT NULL');
     });
@@ -195,7 +193,7 @@ describe('SQLite adapter', () => {
           ]),
         );
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('FALSE');
       expect(sql).toContain('TRUE');
     });
@@ -205,7 +203,7 @@ describe('SQLite adapter', () => {
         .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
         .withWhere(OrExpr.false());
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('WHERE FALSE');
     });
   });
@@ -220,8 +218,8 @@ describe('SQLite adapter', () => {
       ]);
 
       const lowered = adapter.lower(ast, { contract });
-      expect(lowered.body.sql).toBe('INSERT INTO "user" ("id", "email") VALUES (?, ?)');
-      expect(lowered.body.params).toEqual([1, 'a@example.com']);
+      expect(lowered.sql).toBe('INSERT INTO "user" ("id", "email") VALUES (?, ?)');
+      expect(lowered.params).toEqual([1, 'a@example.com']);
     });
 
     it('renders multi-row insert', () => {
@@ -230,14 +228,14 @@ describe('SQLite adapter', () => {
         { id: ParamRef.of(2), email: ParamRef.of('b@example.com') },
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe('INSERT INTO "user" ("id", "email") VALUES (?, ?), (?, ?)');
     });
 
     it('renders DEFAULT VALUES', () => {
       const ast = InsertAst.into(TableSource.named('user')).withRows([{}]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe('INSERT INTO "user" DEFAULT VALUES');
     });
 
@@ -246,7 +244,7 @@ describe('SQLite adapter', () => {
         .withRows([{ id: ParamRef.of(1), email: ParamRef.of('a@example.com') }])
         .withOnConflict(InsertOnConflict.on([ColumnRef.of('user', 'email')]).doNothing());
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('ON CONFLICT ("email") DO NOTHING');
     });
 
@@ -259,7 +257,7 @@ describe('SQLite adapter', () => {
           }),
         );
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"');
     });
 
@@ -268,7 +266,7 @@ describe('SQLite adapter', () => {
         .withRows([{ id: ParamRef.of(1), email: ParamRef.of('a@example.com') }])
         .withReturning([ColumnRef.of('user', 'id')]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('RETURNING "user"."id"');
     });
 
@@ -290,8 +288,8 @@ describe('SQLite adapter', () => {
         .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)));
 
       const lowered = adapter.lower(ast, { contract });
-      expect(lowered.body.sql).toBe('UPDATE "user" SET "email" = ? WHERE "user"."id" = ?');
-      expect(lowered.body.params).toEqual(['b@example.com', 1]);
+      expect(lowered.sql).toBe('UPDATE "user" SET "email" = ? WHERE "user"."id" = ?');
+      expect(lowered.params).toEqual(['b@example.com', 1]);
     });
 
     it('renders update with RETURNING', () => {
@@ -300,7 +298,7 @@ describe('SQLite adapter', () => {
         .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)))
         .withReturning([ColumnRef.of('user', 'email')]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe(
         'UPDATE "user" SET "email" = ? WHERE "user"."id" = ? RETURNING "user"."email"',
       );
@@ -314,8 +312,8 @@ describe('SQLite adapter', () => {
       );
 
       const lowered = adapter.lower(ast, { contract });
-      expect(lowered.body.sql).toBe('DELETE FROM "user" WHERE "user"."id" = ?');
-      expect(lowered.body.params).toEqual([1]);
+      expect(lowered.sql).toBe('DELETE FROM "user" WHERE "user"."id" = ?');
+      expect(lowered.params).toEqual([1]);
     });
 
     it('renders delete with RETURNING', () => {
@@ -323,7 +321,7 @@ describe('SQLite adapter', () => {
         .withWhere(BinaryExpr.eq(ColumnRef.of('user', 'id'), ParamRef.of(1)))
         .withReturning([ColumnRef.of('user', 'id')]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe('DELETE FROM "user" WHERE "user"."id" = ? RETURNING "user"."id"');
     });
   });
@@ -340,7 +338,7 @@ describe('SQLite adapter', () => {
         ),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('json_object(\'email\', "user"."email", \'count\', COUNT(*))');
     });
 
@@ -349,7 +347,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('posts', JsonArrayAggExpr.of(ColumnRef.of('post', 'title'))),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('json_group_array("post"."title")');
     });
 
@@ -361,7 +359,7 @@ describe('SQLite adapter', () => {
         ),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('coalesce(json_group_array("post"."title"), \'[]\')');
     });
   });
@@ -375,7 +373,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('missingValue', LiteralExpr.of(undefined)),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toBe(
         `SELECT 12 AS "bigintValue", '2024-01-01T00:00:00.000Z' AS "dateValue", '{"ok":true}' AS "jsonValue", NULL AS "missingValue" FROM "user"`,
       );
@@ -388,7 +386,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).not.toContain('DISTINCT ON');
     });
 
@@ -397,7 +395,7 @@ describe('SQLite adapter', () => {
         ProjectionItem.of('id', ColumnRef.of('user', 'id')),
       ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).not.toContain('LATERAL');
     });
 
@@ -411,7 +409,7 @@ describe('SQLite adapter', () => {
           ),
         );
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).not.toContain('::');
       expect(sql).toContain('= ?');
     });
@@ -449,7 +447,7 @@ describe('SQLite adapter', () => {
           ),
         ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('INNER JOIN "post" ON "post"."userId" = "user"."id"');
     });
 
@@ -464,7 +462,7 @@ describe('SQLite adapter', () => {
           ),
         ]);
 
-      const { sql } = adapter.lower(ast, { contract }).body;
+      const { sql } = adapter.lower(ast, { contract });
       expect(sql).toContain('LEFT JOIN "post" ON');
     });
   });
