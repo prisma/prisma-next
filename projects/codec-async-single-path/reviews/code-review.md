@@ -4,11 +4,11 @@
 
 ## Summary
 
-- **Current verdict (latest round):** m4 / R2 → SATISFIED
-- **Phases SATISFIED:** m1 (codec interface and factory); m2 (SQL runtime — always-await, concurrent dispatch); m3 (ORM client types and dispatch); m4 (Mongo cross-family parity — codec interface, encode-side runtime, sync build-time regression)
-- **AC scoreboard totals:** 19 PASS / 0 FAIL / 7 NOT VERIFIED
-- **Open findings:** 0
-- **Open escalations:** 0 (1 historical item for user's attention from m4 R1; resolved by R2 widening — see § Items for the user's attention in m4 R2 round notes)
+- **Current verdict (latest round):** m5 / R1 → ANOTHER ROUND NEEDED (four should-fix / low-process doc-quality findings against ADR 204, ADR 030, two affected READMEs, and one deferred-test header comment; AC substance otherwise complete).
+- **Phases SATISFIED:** m1 (codec interface and factory); m2 (SQL runtime — always-await, concurrent dispatch); m3 (ORM client types and dispatch); m4 (Mongo cross-family parity — codec interface, encode-side runtime, sync build-time regression). m5 awaiting R2 to clear F5/F6/F7/F8.
+- **AC scoreboard totals:** 26 PASS / 0 FAIL / 0 NOT VERIFIED (with three PASS-with-scope-note entries on AC-SE2, AC-SE4, AC-DW3 documenting spec-legitimate or orchestrator-deferred sub-pieces).
+- **Open findings:** 4 (F5 should-fix, F6 should-fix, F7 low / process, F8 should-fix — all on doc/test-comment artifacts; no production source code touched).
+- **Open escalations:** 0.
 
 ## Acceptance criteria scoreboard
 
@@ -57,18 +57,19 @@
 
 | AC ID  | Description (short) | Phase | Status                          | Evidence |
 |--------|---------------------|-------|---------------------------------|----------|
-| AC-SE1 | Async codec failure → standard envelope; original on `cause`, not in `message` | m5 | NOT VERIFIED — m5 pending | — |
-| AC-SE2 | Validator-message redaction fires when triggered (translated from PR #375) | m5 | NOT VERIFIED — m5 pending | — |
-| AC-SE3 | `seeded-secret-codec` fixture exists, exercises async crypto E2E | m5 | NOT VERIFIED — m5 pending | — |
-| AC-SE4 | JSON-Schema failure shape and include-aggregate test patterns translated and pass | m5 | NOT VERIFIED — m5 pending | — |
+| AC-SE1 | Async codec failure → standard envelope; original on `cause`, not in `message` | m5 | PASS | m2 envelope coverage at [`codec-async.test.ts (L143–L207)`](../../../packages/2-sql/5-runtime/test/codec-async.test.ts:143-207) and [(L406–L477)](../../../packages/2-sql/5-runtime/test/codec-async.test.ts:406-477); m5 T5.1 runtime-level wrapping in [`sql-runtime.test.ts (L460–L500)`](../../../packages/2-sql/5-runtime/test/sql-runtime.test.ts:460-500) (commit `6ba8769a3`); m5 T5.5 seeded-secret end-to-end DECODE_FAILED at [`codec-async.test.ts (L586–L620)`](../../../packages/2-sql/5-runtime/test/codec-async.test.ts:586-620) (commit `52c69e899`). |
+| AC-SE2 | Validator-message redaction fires when triggered (translated from PR #375) | m5 | PASS — scope-noted | PR #375's codec-message redaction test translated to `it.skip` at [`json-schema-validation.test.ts (L613–L685)`](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:613-685) (commit `50028a91b`). Spec-legitimate deferral — [`spec.md` § Non-goals (L92)](../spec.md) explicitly out-of-scopes "Changes to the redaction-trigger spelling itself ... tracked separately". The test preserves the assertion verbatim (commented `it.skip` retains the structural failure-case shape) so it can be activated by a future redaction-spelling project without re-derivation. The async-shape side of the redaction policy (validator running against the **resolved** decoded value) is exercised by AC-SE4's JSON-Schema piece. |
+| AC-SE3 | `seeded-secret-codec` fixture exists, exercises async crypto E2E | m5 | PASS | Fixture at [`packages/2-sql/5-runtime/test/seeded-secret-codec.ts`](../../../packages/2-sql/5-runtime/test/seeded-secret-codec.ts) (commit `52c69e899`); JSDoc explicitly notes the async-marker artifact from PR #375 was stripped. Exercised end-to-end by [`codec-async.test.ts (L529–L620)`](../../../packages/2-sql/5-runtime/test/codec-async.test.ts:529-620) (encode encrypts, decode decrypts, no Promise-typed cells reach user code, decode failures wrap in `RUNTIME.DECODE_FAILED` with `cause`) and [`sql-runtime.test.ts (L413–L500)`](../../../packages/2-sql/5-runtime/test/sql-runtime.test.ts:413-500) (runtime awaits async parameter encoding before driver execution, wraps encode failures before driver runs). |
+| AC-SE4 | JSON-Schema failure shape and include-aggregate test patterns translated and pass | m5 | PASS — scope-noted | JSON-Schema piece **fully passes**: T5.3 test `runs JSON schema validation against the resolved value of an async decoder` at [`json-schema-validation.test.ts (L570–L600)`](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:570-600) (commit `6ba8769a3`) exercises async-decoder validation; failure shape is `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`. **Include-aggregate piece**: PR #375's three child-row-codec-decoding tests translated as `it.skip` placeholders at [`collection-dispatch.test.ts (L422–L436)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:422-436) (commit `29613b1c7`) with header comment recording that the current dispatcher does not invoke codecs on `jsonb_agg` child cells (verified: `rg 'codec\.(encode\|decode)' packages/3-extensions/sql-orm-client/src` returns zero matches). Adding child-codec dispatch is a new ORM feature outside this project's async-shape scope; it is a "concrete blocker requiring a spec amendment to address" per the orchestrator's deferral criteria. PR #375's promise-valued child-cell test is intentionally **dropped**, not skipped: it asserts the inverse of this project's single-path "runtime always awaits, yields plain values" guarantee (AC-RT2) and would be incorrect to land. |
+
 
 ### Documentation and walk-back preservation
 
 | AC ID  | Description (short) | Phase | Status                          | Evidence |
 |--------|---------------------|-------|---------------------------------|----------|
-| AC-DW1 | New ADR documents single-path design / seam / cross-family / walk-back; ADR 030 has "Superseded by" pointer | m5 | NOT VERIFIED — m5 pending | — |
-| AC-DW2 | None of the seven walk-back constraints (NFR #5) introduced | m1-m5 | NOT VERIFIED — m5 pending; m1..m4 portions clean (see round notes) | — |
-| AC-DW3 | `wip/review-code/pr-375/` referenced from ADR; `projects/codec-async-single-path/**` removed at close-out | m5 | NOT VERIFIED — m5 pending | — |
+| AC-DW1 | New ADR documents single-path design / seam / cross-family / walk-back; ADR 030 has "Superseded by" pointer | m5 | PASS | [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md`](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) (commit `ddf698c72`) is born in canonical location and substantively covers Context (rejected per-codec marker design), Decision (single-path always-await + uniform Promise-returning interface + single factory), Architecture (interface shape, factory lift mechanic, runtime always-await + `Promise.all`, cross-family parity at the `BaseCodec` seam), Walk-back framing with the seven NFR #5 constraints transcribed verbatim from `spec.md`, Trade-offs, Cross-family scope notes (Mongo decode out of project scope), and References. ADR 030 carries a partial-supersession pointer at [`ADR 030 (L3)`](../../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md:3) (commit `e855c9beb`) naming the runtime-shape sections (codec method signatures, Decoding pipeline, Streaming and cursors) and preserving the registry-model parts unchanged. F5/F6/F7 (filed below) target documentation-quality defects in ADR 204 and two READMEs but do not undermine the AC's "ADR documents the design" substance. |
+| AC-DW2 | None of the seven walk-back constraints (NFR #5) introduced | m1-m5 | PASS | All seven walk-back constraints verified absent across m1..m5: (1) no `runtime`/`kind`/equivalent field on the public `Codec` interface — `keyof Codec` set assertion in `framework-components/test/codec-types.types.test-d.ts`; (2) no `codecSync` / `codecAsync` factory variants — `rg 'export.*codecSync\|export.*codecAsync' packages/` returns zero matches; (3) no exported sync-vs-async predicates — `rg 'isSyncEncoder\|isSyncDecoder' packages/` returns zero matches; (4) no conditional return types tied to async-ness — `encode`/`decode` are `Promise<...>` unconditionally on both `Codec` and `MongoCodec`; (5) no `TRuntime` generic — both interfaces have exactly five generics (`Id, TTraits, TWire, TInput, TOutput`); (6) docs frame the **author** surface as "you may write sync or async; the factory accepts both" — see ADR 204 § Decision item 2 and the m5 T5.8 README updates; (7) no public guarantees that depend on async-ness — error envelope shape (AC-SE1) is identical regardless of authoring style. ADR 204 § Walk-back framing transcribes the seven constraints verbatim. |
+| AC-DW3 | `wip/review-code/pr-375/` referenced from ADR; `projects/codec-async-single-path/**` removed at close-out | m5 | PASS — scope-noted | The ADR migrates the relevant PR #375 review content into its Context section (the rejected per-codec marker design + the four critiques: cost-in-the-wrong-place, no-walk-back, wrong-seam, cross-family-portability) — satisfying the "or migrated content where relevant" branch of the AC. The `wip/review-code/pr-375/` review artifacts are intentionally **not linked from canonical ADR text** per the always-applied [`.cursor/rules/doc-maintenance.mdc`](../../../.cursor/rules/doc-maintenance.mdc) rule that "Docs must not link to transient project artifacts". The remaining piece — removing `projects/codec-async-single-path/**` and stripping repo-wide references (T5.11 / T5.12) — is **explicitly orchestrator-deferred** to a separate close-out PR after the user reviews `user-attention.md`, per the m5 R1 delegation prompt. |
 
 Status values: `PASS` / `FAIL` / `NOT VERIFIED — <reason>` / `ACCEPTED DEFERRAL — <link>` / `OUT OF SCOPE`.
 
@@ -154,6 +155,156 @@ After updating, confirm `pnpm --filter @prisma-next/sql-contract-ts typecheck` a
 **Recommended next action:** Edit line 7 to read `MongoAdapter — defines lower(plan: MongoQueryPlan): Promise<AnyMongoWireCommand>, the contract for converting a typed query plan into a wire command`. No other lines need touching (L8's `MongoDriver.execute<Row>(wireCommand): AsyncIterable<Row>` signature is unchanged; L13–L14's dependency narrative stays accurate). Land in a follow-up commit on the m4 task list. After editing, no validation gate re-run is needed — README-only changes do not affect typecheck/test/lint outcomes.
 
 **Status:** resolved (commit `6f567afa3`). On-disk verification at HEAD `47ce86a6f`: [`packages/2-mongo-family/6-transport/mongo-lowering/README.md` line 7](../../../packages/2-mongo-family/6-transport/mongo-lowering/README.md:7) now narrates `lower(plan: MongoQueryPlan): Promise<AnyMongoWireCommand>` and adds the async-at-the-boundary semantics sentence (callers must `await lower(...)` so adapters may run async codec encodes via `resolveValue`). The narrated signature exactly matches the source-of-truth interface in [`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts (L5)`](../../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts:5). L8's `MongoDriver.execute<Row>` and L13–L14's dependency narrative are unchanged, as recommended. README-only change; no validation gate re-run needed.
+
+### F5 — ADR 204 declares a fictional `Codec` interface signature in both Decision and Architecture sections
+
+**Severity:** should-fix
+
+**Where:**
+- [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md` § Decision item 1 (L31–L37)](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md:31-37)
+- [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md` § Architecture › `Codec` interface shape (L57–L71)](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md:57-71)
+
+**What:** ADR 204 declares the `Codec` interface in two places — the prose method listing in § Decision item 1, and the code block in § Architecture — using generics and member types that do not exist in the actual interface at [`packages/1-framework/1-core/framework-components/src/codec-types.ts (L27–L50)`](../../../packages/1-framework/1-core/framework-components/src/codec-types.ts:27-50):
+
+| Position | ADR 204 (claimed) | Real (`framework-components/src/codec-types.ts`) |
+|---|---|---|
+| Generic list | `<TInput, TWire, TJson, TJsonInput, TOutput>` (5 generics, but `TJson` and `TJsonInput` are fictional and `Id` / `TTraits` are missing) | `<Id extends string = string, TTraits extends readonly CodecTrait[] = readonly CodecTrait[], TWire = unknown, TInput = unknown, TOutput = TInput>` (5 generics in a different order with different names) |
+| `id` | `readonly id: string` | `readonly id: Id` |
+| `traits` | absent | `readonly traits?: TTraits` |
+| `encodeJson` return | `TJson` | `JsonValue` |
+| `decodeJson` parameter | `TJsonInput` | `JsonValue` |
+| `decodeJson` return | `TOutput` | `TInput` |
+| `renderOutputType` signature | `(): TypeNode` | `(typeParams: Record<string, unknown>): string \| undefined` |
+
+ADR 184 (referenced from ADR 204 itself) defines `encodeJson` / `decodeJson` as bridging to `JsonValue`; there is no `TJson` / `TJsonInput` generic anywhere in the real type system, and `TypeNode` is not the actual return type of `renderOutputType`. The ADR's prose claim "the interface uses the same five generics across SQL and Mongo" (L73) is structurally true (5 generics in `BaseCodec` and `MongoCodec`) but the specific 5 generics listed in the ADR are fictional.
+
+**Why it matters:** ADR 204 is **canonical and persistent**. It is the document a future contributor reaches for to understand the public codec contract — particularly during cross-family work or when the future `codecSync()` opt-in lands. Presenting a fictional interface signature in both the Decision listing and the Architecture code block teaches the wrong generic shape and the wrong build-time return types. The Decision section is especially load-bearing: it states the contract the runtime is built around. A reader who treats § Decision as the source of truth would conclude `decodeJson(json): TOutput` is the build-time contract, when in fact `decodeJson(json: JsonValue): TInput` is.
+
+The fix is a localized doc-block replacement and prose correction; the **substance** of ADR 204 — single-path always-await design, build-time vs query-time seam, cross-family parity, walk-back framing — is sound and correctly preserved by the fix. AC-DW1 is structurally PASS on substance; F5 is a doc-quality defect inside the canonical artifact.
+
+**Recommended next action:** Replace the § Architecture code block (L57–L71) with the actual interface declaration, either copy-pasted from `framework-components/src/codec-types.ts (L27–L50)` (preferred — the real declaration is short and reviewable) or paraphrased as:
+
+```ts
+import type { JsonValue } from '@prisma-next/contract/types';
+
+interface Codec<
+  Id extends string = string,
+  TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
+  TWire = unknown,
+  TInput = unknown,
+  TOutput = TInput,
+> {
+  readonly id: Id;
+  readonly targetTypes: readonly string[];
+  readonly traits?: TTraits;
+
+  // Query-time (per-row): always Promise-returning at the public boundary.
+  encode(value: TInput): Promise<TWire>;
+  decode(wire: TWire): Promise<TOutput>;
+
+  // Build-time (per-contract-load): synchronous.
+  encodeJson(value: TInput): JsonValue;
+  decodeJson(json: JsonValue): TInput;
+  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
+}
+```
+
+In § Decision item 1 (L31–L37), update the prose listing to match:
+- `encodeJson(value): JsonValue` — build-time, required, synchronous.
+- `decodeJson(json: JsonValue): TInput` — build-time, required, synchronous.
+- `renderOutputType(typeParams): string | undefined` — build-time, optional, synchronous.
+
+Per [`AGENTS.md`](../../../AGENTS.md) typesafety guidance, ensure no fictional generic names leak into the prose (`TJson`/`TJsonInput`/`TypeNode` should not appear anywhere in ADR 204).
+
+After editing, re-run a quick consistency check by comparing the ADR's interface declaration line-by-line with `framework-components/src/codec-types.ts`. No validation gate re-run is needed; ADR-only change.
+
+**Status:** open.
+
+### F6 — ADR 204 + relational-core README + mongo-codec README factory examples use `id:` config key instead of `typeId:`
+
+**Severity:** should-fix
+
+**Where:**
+- [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md` § Architecture › factory examples (L81–L98)](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md:81-98) — 2 examples (`textCodec`, `secretCodec`)
+- [`packages/2-sql/4-lanes/relational-core/README.md` Codec Factory section](../../../packages/2-sql/4-lanes/relational-core/README.md) — 2 examples (`textCodec`, `secretCodec`) (commit `e2fdf6b5d`)
+- [`packages/2-mongo-family/1-foundation/mongo-codec/README.md` Examples section](../../../packages/2-mongo-family/1-foundation/mongo-codec/README.md) — 2 examples (`intCodec`, `secretCodec`) (commit `e2fdf6b5d`)
+
+**What:** All six factory call examples in the m5 docs (ADR 204 plus two of the m5 T5.8 READMEs) declare the codec config object with `id: 'pg/text@1'` (or equivalent). The actual factory config field is **`typeId`**, not `id`. The constructed `Codec` instance exposes the property as `id` — the factory does the rename internally — but the input config key is `typeId`. Verified at:
+
+- SQL `codec()` factory: [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts (L207–L240)`](../../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts:207-240) — config type is `{ typeId: Id; targetTypes: readonly string[]; ... }` (L208); the constructed value has `id: config.typeId` (L225).
+- Mongo `mongoCodec()` factory: [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts (L62–L88)`](../../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts:62-88) — config type is `{ typeId: Id; ... }` (L63); the constructed value has `id: config.typeId` (L76).
+- Real fixture exercising both factories with the correct field: [`packages/2-sql/5-runtime/test/seeded-secret-codec.ts`](../../../packages/2-sql/5-runtime/test/seeded-secret-codec.ts) uses `typeId,` (L60).
+
+A reader copy-pasting any of the six examples into TS will get a compile-time error: `Object literal may only specify known properties, and 'id' does not exist in type ...`.
+
+**Why it matters:** READMEs and ADRs land at the front door for developers and AI agents. The relational-core and mongo-codec READMEs were touched in m5 T5.8 explicitly to reflect the m1 codec story (sync-or-async authoring through one factory) — the examples are the user-facing demonstration of that story. ADR 204 is canonical reference material with the same mandate. Six broken examples in the artifacts that should be the cleanest is a real correctness defect, not a stylistic one. Each is one-character-trivial to fix (`id` → `typeId`).
+
+**Recommended next action:** Rename `id: '<value>'` to `typeId: '<value>'` at all six call sites:
+
+- ADR 204 lines 82 (`id: 'pg/text@1'` → `typeId: 'pg/text@1'`) and 92 (`id: 'pg/secret@1'` → `typeId: 'pg/secret@1'`).
+- `relational-core/README.md` (commit `e2fdf6b5d`): both `textCodec` and `secretCodec` examples — rename `id:` → `typeId:` once each.
+- `mongo-codec/README.md` (commit `e2fdf6b5d`): both `intCodec` and `secretCodec` examples — rename `id:` → `typeId:` once each.
+
+After editing, optionally compile-test one example by adding it to a scratch `.ts` file (no commit) to confirm. No validation gate re-run is required for the codebase; ADR / README-only change.
+
+**Status:** open.
+
+### F7 — ADR 030 supersession pointer lists synchronous `encodeJson` / `decodeJson` as superseded, but they remain synchronous in ADR 204
+
+**Severity:** low / process
+
+**Where:** [`docs/architecture docs/adrs/ADR 030 - Result decoding & codecs registry.md` (L3)](../../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md:3) (commit `e855c9beb`)
+
+**What:** The partial-supersession pointer at the top of ADR 030 reads:
+
+> the runtime-shape and codec-invocation parts of this ADR — specifically the codec method signatures (synchronous `encode` / `decode` / `encodeJson` / `decodeJson`), the **Decoding pipeline** section's row-by-row synchronous loop, and the **Streaming and cursors** statement that "codecs must be synchronous and non-blocking" — have been superseded by [ADR 204 — Single-Path Async Codec Runtime].
+
+The "superseded" listing groups all four codec methods (`encode` / `decode` / `encodeJson` / `decodeJson`) together. ADR 204 supersedes only the **query-time** signatures (`encode` / `decode` move to `Promise`-returning); the **build-time** signatures (`encodeJson` / `decodeJson`) remain synchronous in ADR 204 § Decision item 1 and § Architecture. The next sentence ("Codec query-time methods are now uniformly `Promise`-returning at the public interface") clarifies the actual scope, so a careful reader can disambiguate, but the listing itself is misleading.
+
+**Why it matters:** ADR canon is read in both directions — readers come to ADR 030 from a search hit and follow the supersession pointer to ADR 204. The first sentence is the highest-traffic part of the ADR. Presenting `encodeJson` / `decodeJson` as superseded creates ambiguity about whether the build-time vs query-time seam (the central decision of ADR 204) is the design choice or whether build-time also became async. Tightening the listing to `(synchronous query-time `encode` / `decode`)` aligns the pointer with what was actually superseded.
+
+**Recommended next action:** Edit ADR 030 line 3. Replace `the codec method signatures (synchronous `encode` / `decode` / `encodeJson` / `decodeJson`)` with `the codec query-time method signatures (synchronous `encode` / `decode`)`. Leave the rest of the sentence (Decoding pipeline, Streaming and cursors clauses) unchanged — those are correctly superseded.
+
+After editing, optionally re-read the resulting first sentence to confirm it is unambiguous about scope. No validation gate re-run needed; ADR-only change.
+
+**Status:** open.
+
+### F8 — T5.4 deferred-test header comment overstates what the `it.skip` bodies contain
+
+**Severity:** should-fix
+
+**Where:** [`packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts` (L395–L435)](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:395-435) (commit `29613b1c7`)
+
+**What:** The header comment introducing the three `it.skip` blocks for the include-aggregate child-row codec decoding tests claims that "**The assertions themselves are preserved verbatim against the single-path contract**" (L405–L406). On disk, all three `it.skip` bodies contain only `expect(true).toBe(true)` stubs (L426, L430, L434), with a sub-comment promising the assertions will be authored "when child-row codec decoding is added". No PR #375-derived assertion shapes (decoded child-row equality checks, JSON-Schema failure shape on child cells, codec-context wrapping shape on child decode failures) are present in any of the three blocks.
+
+For contrast, the parallel T5.2 deferred test ([`json-schema-validation.test.ts` L613–L661](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:613-661)) is genuinely "preserved verbatim": the `it.skip` body retains the full leakyPlaintext fixture, the leaky codec, the plan, the `await ... .catch((e) => e)` rejection capture, and four concrete assertions (`err.code`, `err.message` redaction, `err.details` redaction, `err.cause` retention). T5.2 demonstrates the deferred-test discipline the T5.4 header comment claims for itself but does not actually deliver.
+
+**Why it matters:** The deferred-test mechanism's only purpose is to encode the assertion shape so a future implementer activating the test can read the spec from the test file directly. T5.2 does this correctly; T5.4 does not. A future implementer adding child-row codec decoding to the single-query include path will:
+
+1. Read the header comment and conclude that activating the test is a matter of removing `.skip` and possibly adjusting plan-fixture shapes.
+2. Remove `.skip` and find that the test passes trivially because the body is `expect(true).toBe(true)` — no actual coverage.
+3. Have to derive the assertion shapes from scratch by either consulting PR #375's pre-translation source (an unstable upstream that may have moved or be hard to reconstruct) or by re-reasoning about the include-aggregate contract from the runtime side.
+
+This is the rotting-knowledge problem the spec's deferred-test pattern is supposed to prevent. The implementer correctly chose to defer the activation work (legitimate per AC-SE4's deferral note — child-row codec decoding is orthogonal ORM work outside async-shape scope), but the test artifact does not preserve the assertion shape the comment promises.
+
+The deferral itself is sound — AC-SE4 stays PASS-with-scope-note. F8 is a doc-quality defect inside the deferred-test artifact: either the comment overpromises or the bodies underdeliver; closing the gap requires touching one or the other.
+
+**Recommended next action:** Pick one of the two options:
+
+- **Option A (preferred — preserves the deferred-test discipline T5.2 demonstrates):** Replace each `expect(true).toBe(true)` body with the structural assertions from PR #375, adapted to the single-path contract. The three test cases would carry, respectively:
+  - **Decoding case:** `expect(decodedRow.posts[0].embedding).toEqual([...]); expect(decodedRow.posts[0].embedding).not.toBeInstanceOf(Promise);` — child-cell equality + plain-T contract.
+  - **JSON-Schema failure case:** `await expect(dispatchCollectionRows(...)).rejects.toMatchObject({ code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED', details: { table: '<child-table>', column: '<child-column>', direction: 'decode' } });` — failure-shape + path.
+  - **Codec-context wrapping case:** `await expect(...).rejects.toMatchObject({ code: 'RUNTIME.DECODE_FAILED', details: { table, column, codec: 'pg/<id>@1' }, cause: expect.any(Error) });` — child-cell envelope shape + cause preservation.
+
+  The implementer adapts the plan / mock-row fixtures from the existing `dispatchCollectionRows` tests in the same file. The `it.skip` keeps the test inactive until child-row codec decoding lands; the assertions stay preserved as the activation contract.
+
+- **Option B (cheaper — corrects the comment to match reality):** Edit the header comment to drop the "preserved verbatim" claim. Replace L403–L406 with something like: "Three placeholder `it.skip` blocks are kept here so the test names appear in the suite list; bodies are stubs because activating these tests is gated on child-row codec decoding (a separate ORM feature) and the assertion shapes will be authored alongside that activation. Refer to PR #375 § `collection-dispatch.test.ts` test 5 / 6 / 7 for the original assertion shape if needed before activation."
+
+  This is a one-edit cleanup that aligns the comment with what's actually on disk. It does not preserve the assertion shape, so the future implementer will still need to consult PR #375 or rederive — but at least the artifact is honest about its scope.
+
+After editing, no validation gate re-run is needed for Option B; for Option A, re-run `pnpm --filter @prisma-next/sql-orm-client test` to confirm the new bodies typecheck (they remain `it.skip` so the suite count stays at 3 skipped). The test count should remain `Tests 463 passed | 3 skipped (466)`.
+
+**Status:** open.
 
 ## Round notes
 
@@ -630,6 +781,109 @@ A fresh reviewer pass was performed against the on-disk state at HEAD `0d7bd780b
 - **Stale-snapshot note for orchestrator.** The orchestrator's delegation cited HEAD `47ce86a6f`, but on entry HEAD was `0d7bd780b` (the artifact-commit by an earlier reviewer subagent). The second-pass reviewer treated this as a snapshot-drift situation rather than a re-do trigger — surfacing the situation here for the orchestrator's audit trail.
 
 **Verdict carry-forward:** m4 R2 → **SATISFIED** (unchanged; reaffirmed by independent re-verification).
+
+### m5 — Round 1 — ANOTHER ROUND NEEDED
+
+**Verdict:** ANOTHER ROUND NEEDED.
+
+**Round summary.** m5 R1 lands the security-tests translation from PR #375, the new ADR 204 (single-path async codec runtime), the partial-supersession pointer in ADR 030, and the m5 T5.8 README sweep across five packages. The substantive work — eight commits, `52c69e899`..`5ac4a3de6` — is complete and well-structured. Validation gates were independently re-run by the reviewer and are fully green (with one transient `pnpm test:packages` failure on `sql-orm-client` and one transient `pnpm test:integration` 100ms timeout, both resolved cleanly on re-run; documented as pre-existing flakes). The seven m5 ACs are all PASS or PASS-with-scope-note (AC-SE2 / AC-SE4 / AC-DW3) on substance.
+
+The verdict is ANOTHER ROUND NEEDED because four doc-quality findings against ADR 204, ADR 030, the m5-touched READMEs, and one deferred-test header comment are blocking — F5 (ADR 204 declares a fictional `Codec` interface signature in two places), F6 (six factory examples across ADR 204 + relational-core README + mongo-codec README use the wrong config key `id:` instead of `typeId:`), F7 (ADR 030's supersession pointer over-claims by listing the build-time methods as superseded), and F8 (T5.4's `it.skip` header comment claims "assertions preserved verbatim" but bodies are `expect(true).toBe(true)` stubs — the artifact does not deliver the deferred-test discipline T5.2 demonstrates). All four are addressable in m5 R2 with localized doc/test-comment edits; no source code changes required, no spec touches required, and no validation-gate re-run required after the doc fixes land. After F5/F6/F7/F8 are closed, m5 R2 should be SATISFIED on inspection alone.
+
+**What was reviewed:**
+
+- Branch / HEAD: `feat/codec-async-single-path` at `5ac4a3de6`. Worktree clean on entry.
+- Commit range under review: `47ce86a6f..5ac4a3de6` (m4 R2 SATISFIED → m5 R1 implementation HEAD; 11 commits total counting orchestrator artifact-commits, of which 8 are source-touching).
+- Implementer's verification artifact: [`m5-ac-verification.md`](m5-ac-verification.md) (read-only input; reports 23 PASS / 0 FAIL / 0 NOT VERIFIED with 4 PARTIALs on AC-SE2, AC-SE4, AC-DW3).
+- Source-touching commits (in order):
+  - `52c69e899` — `test(sql-runtime): T5.5 add seeded-secret-codec fixture (AES-GCM async crypto)`
+  - `6ba8769a3` — `test(sql-runtime): T5.1 + T5.3 add async envelope wrapping + JSON-Schema-against-resolved-value tests`
+  - `50028a91b` — `test(sql-runtime): T5.2 translate validator-message redaction tests as it.skip with scope rationale`
+  - `29613b1c7` — `test(sql-orm-client): T5.4 translate include-aggregate child-row codec decoding tests as it.skip; drop PR #375 promise-valued child-cell test`
+  - `ddf698c72` — `docs(adrs): T5.6 add ADR 204 — Single-Path Async Codec Runtime`
+  - `e855c9beb` — `docs(adrs): T5.7 add partial-supersession pointer to ADR 030 (codec method signatures + decoding pipeline + streaming clauses)`
+  - `e2fdf6b5d` — `docs(readmes): T5.8 reflect async-at-the-boundary codec story across affected packages`
+  - `5ac4a3de6` — `docs(reviews): T5.9 add m5 AC verification artifact`
+- T5.11 (strip `projects/` references) and T5.12 (delete `projects/codec-async-single-path/**`) **were not executed** — orchestrator-deferred to a separate close-out PR after the user reviews `user-attention.md`. This is reflected in AC-DW3's PASS-with-scope-note.
+
+**Task verification:**
+
+- **T5.5 — seeded-secret-codec fixture (AES-GCM async crypto path).** Verified at [`packages/2-sql/5-runtime/test/seeded-secret-codec.ts`](../../../packages/2-sql/5-runtime/test/seeded-secret-codec.ts). The fixture is a verbatim translation of PR #375's seeded-secret-codec with the `runtime: { encode: 'async', decode: 'async' } as const` marker stripped (per the spec's no-marker design). The fixture's JSDoc explicitly notes the marker stripping and references ADR 204. Encrypts via AES-GCM with a deterministic test key; decode round-trips. Used by T5.1/T5.3/T5.5 tests as the canonical async-crypto codec.
+- **T5.1 + T5.3 — SQL runtime envelope tests + JSON-Schema validation against resolved values.** Verified across three test files in commit `6ba8769a3`:
+  - [`codec-async.test.ts (L529–L620)`](../../../packages/2-sql/5-runtime/test/codec-async.test.ts:529-620) adds the seeded-secret roundtrip suite: `encodeParams` encrypts `'plaintext'` to ciphertext, `decodeRow` decrypts back to the original, no Promise-typed cells reach user code, and `decodeRow` failures wrap into `RUNTIME.DECODE_FAILED` with original error chained on `cause`.
+  - [`json-schema-validation.test.ts (L570–L600)`](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:570-600) adds T5.3's `runs JSON schema validation against the resolved value of an async decoder` — pins that an async-decoder failure case surfaces as `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` against the resolved value, not an unresolved Promise.
+  - [`sql-runtime.test.ts (L460–L500)`](../../../packages/2-sql/5-runtime/test/sql-runtime.test.ts:460-500) adds T5.1's `createRuntime` test that the runtime awaits async parameter encoding before driver execution and wraps encode failures in `RUNTIME.ENCODE_FAILED`.
+  All three are verbatim translations of PR #375's analogous tests with the marker artifacts (`runtime: 'async'`, `kind`, `TRuntime`) stripped. Assertions are equivalent to the originals; no semantic drift.
+- **T5.2 — validator-message redaction translated as `it.skip`.** Verified at [`json-schema-validation.test.ts (L613–L685)`](../../../packages/2-sql/5-runtime/test/json-schema-validation.test.ts:613-685) (commit `50028a91b`). The PR #375 test for codec-authored `error.message` redaction is preserved as a `it.skip` block with a header JSDoc explaining the deferral: `wrapDecodeFailure` directly interpolates `error.message` from the raised codec error; activating these assertions would require a redaction-spelling change that [`spec.md` § Non-goals (L92)](../spec.md) explicitly lists as out of scope ("Changes to the redaction-trigger spelling itself ... tracked separately"). The assertion shape is preserved verbatim so a future redaction-spelling project can flip `it.skip` → `it` without re-deriving the test. **Spec-legitimate deferral; AC-SE2 is PASS with scope note.**
+- **T5.4 — include-aggregate child-row decoding translated as `it.skip` (×3); PR #375 test 8 dropped.** Verified at [`packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts (L422–L436)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:422-436) (commit `29613b1c7`). Three `it.skip` placeholders translate the three include-aggregate child-row decoding tests from PR #375; the assertions are placeholder `expect(true).toBe(true)` rather than verbatim translations because the dispatcher does not invoke codecs on `jsonb_agg` child cells today (verified: `rg 'codec\.(encode|decode)' packages/3-extensions/sql-orm-client/src` returns zero matches in `src/`). Adding child-codec dispatch is a new ORM feature outside this project's async-shape scope. The header comment clearly records this is a "concrete blocker requiring a spec amendment" and references the structural gap. **However**, the same header comment also claims "the assertions themselves are preserved verbatim against the single-path contract" — that claim does not match the on-disk bodies (filed as F8). The deferral itself remains spec-legitimate; the artifact's documentation is what F8 targets. PR #375's test 8 (promise-valued child cells) is **dropped, not skipped**, with rationale that asserting `expect(typeof row.posts[0].author.then).toBe('function')` directly contradicts AC-RT2's "rows yielded by runtime have plain field values" guarantee. The drop is correct: landing PR #375 test 8 verbatim would create a regression-locked invariant for a behavior that this project explicitly forbids. **Borderline-but-acceptable deferral under the "concrete blocker" clause; AC-SE4 is PASS with scope note for the include-aggregate piece (the JSON-Schema piece passes outright); F8 filed against the artifact's header comment.**
+- **T5.6 — ADR 204.** Verified at [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md`](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) (commit `ddf698c72`). The ADR is born in the canonical location, references ADR 030 (forward) and ADR 184 (codec build-time JSON bridge) appropriately, and substantively covers all six required topics from plan T5.6: single-path query-time design (§ Decision items 1–4); build-time vs query-time seam (§ Decision item 1, § Architecture); cross-family portability (§ Architecture › Cross-family parity at the `BaseCodec` seam); walk-back framing (§ Architecture › Walk-back framing); the seven NFR #5 walk-back constraints transcribed verbatim from `spec.md` (§ Architecture › Walk-back framing › "The seven walk-back constraints"); and trade-offs / consequences. The ADR is canonical and persistent — does **not** link to `projects/codec-async-single-path/**` or to `wip/review-code/pr-375/**`, both of which are transient. **Substance PASS; F5 (interface-declaration accuracy) and F6 (factory-example accuracy) filed as doc-quality findings.**
+- **T5.7 — ADR 030 partial-supersession pointer.** Verified at [`docs/architecture docs/adrs/ADR 030 - Result decoding & codecs registry.md` (L3)](../../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md:3) (commit `e855c9beb`). The pointer correctly identifies the three section types that became stale (codec method signatures, Decoding pipeline section, Streaming and cursors clause). The non-superseded pieces (registry model, lookup precedence, traits, error-envelope shape) are preserved unchanged. Format is consistent with the rest of the ADR canon (italicized note at top of the ADR; matches the supersession-style of e.g. ADR 184). **F7 filed for over-claiming the supersession scope by listing build-time methods (`encodeJson`/`decodeJson`) alongside query-time methods.**
+- **T5.8 — five package READMEs updated.** Verified across the five m5 T5.8 commits (commit `e2fdf6b5d`):
+  - [`packages/1-framework/1-core/framework-components/README.md`](../../../packages/1-framework/1-core/framework-components/README.md) — narrates the `Codec` base interface, build-time vs query-time seam, always-await runtime, factory contract; references ADR 204. Mentions the `./codec` subpath import; verified [`packages/1-framework/1-core/framework-components/package.json`](../../../packages/1-framework/1-core/framework-components/package.json) `exports` correctly exposes `./codec` via `src/exports/codec.ts`.
+  - [`packages/2-sql/4-lanes/relational-core/README.md`](../../../packages/2-sql/4-lanes/relational-core/README.md) — narrates the `codec()` factory (sync or async authoring), runtime always-await, references ADR 204. **F6 issue: factory examples use `id:` instead of the correct `typeId:` config key.**
+  - [`packages/3-extensions/sql-orm-client/README.md`](../../../packages/3-extensions/sql-orm-client/README.md) — narrates codec roundtrip (read returns plain `T`; write accepts plain `T`), single shared field type-map, references ADR 204.
+  - [`packages/2-mongo-family/1-foundation/mongo-codec/README.md`](../../../packages/2-mongo-family/1-foundation/mongo-codec/README.md) — narrates `mongoCodec()` (sync-or-async authoring, `BaseCodec`-aliased shape, Promise-returning query-time + sync build-time), cross-family parity at the `BaseCodec` seam, references ADR 204. **F6 issue: factory examples use `id:` instead of the correct `typeId:` config key.**
+  - [`packages/3-mongo-target/2-mongo-adapter/README.md`](../../../packages/3-mongo-target/2-mongo-adapter/README.md) — narrates `MongoAdapter.lower()` (async, await before consuming), `resolveValue` (concurrent dispatch via `Promise.all`), Mongo-decode scope boundary (out of project scope), references ADR 204.
+  All five focus on what-the-package-does and when-to-use-it with concrete examples per [`.cursor/rules/doc-maintenance.mdc`](../../../.cursor/rules/doc-maintenance.mdc); implementation detail is appropriately delegated to ADR 204. **Substance PASS; F6 is the only recurring quality issue.**
+- **T5.9 — m5 AC verification artifact.** Verified at [`m5-ac-verification.md`](m5-ac-verification.md) (commit `5ac4a3de6`). The implementer self-reports 23 PASS / 0 FAIL / 0 NOT VERIFIED with 4 PARTIALs (AC-SE2, AC-SE4, AC-DW3). On reviewer disposition: AC-SE2 → PASS scope-noted (spec-legitimate deferral per § Non-goals); AC-SE4 → PASS scope-noted (JSON-Schema piece outright PASS; include-aggregate piece deferral acceptable under concrete-blocker clause); AC-DW3 → PASS scope-noted (ADR migration done; close-out cleanup orchestrator-deferred). All three PARTIALs converted to PASS-with-scope-note in this round.
+- **T5.11 / T5.12 — projects directory close-out.** Not executed. Orchestrator-deferred to a separate close-out PR; reflected in AC-DW3's scope note.
+
+**AC scoreboard delta (m4 R2 → m5 R1):**
+
+- AC-SE1 (envelope shape with `cause`): NOT VERIFIED → **PASS**.
+- AC-SE2 (validator-message redaction): NOT VERIFIED → **PASS — scope-noted** (test preserved as `it.skip`; activation deferred per spec § Non-goals).
+- AC-SE3 (seeded-secret-codec fixture): NOT VERIFIED → **PASS**.
+- AC-SE4 (JSON-Schema + include-aggregate): NOT VERIFIED → **PASS — scope-noted** (JSON-Schema piece full PASS; include-aggregate deferred under concrete-blocker clause).
+- AC-DW1 (ADR 204 + ADR 030 pointer): NOT VERIFIED → **PASS** (substance complete; F5/F6/F7 are quality findings inside the canonical artifacts).
+- AC-DW2 (no walk-back constraints introduced): NOT VERIFIED (m5 portion) → **PASS** (all seven constraints verified absent; m1–m4 portions also clean).
+- AC-DW3 (PR #375 review artifacts referenced + close-out cleanup): NOT VERIFIED → **PASS — scope-noted** (ADR migrates content; close-out cleanup orchestrator-deferred to separate PR).
+- All other ACs (AC-CF1..4, AC-RT1..7, AC-OC1..3, AC-CX1..4) unchanged from m4 R2 SATISFIED.
+
+**New totals: 26 PASS / 0 FAIL / 0 NOT VERIFIED.**
+
+**Triage of implementer flags:**
+
+- "AC-SE2 PARTIAL — `it.skip` with scope rationale" → **accepted as spec-legitimate**. § Non-goals explicitly carves out redaction-trigger spelling. Scope note recorded in the AC row.
+- "AC-SE4 PARTIAL — include-aggregate `it.skip` × 3" → **accepted under concrete-blocker clause**. Adding child-codec dispatch to the include-aggregate path is new ORM feature work outside this project's async-shape scope. Scope note recorded in the AC row. The orchestrator may want to surface include-aggregate child-codec dispatch as a follow-up project in `user-attention.md`.
+- "AC-DW3 PARTIAL — close-out cleanup deferred to separate PR" → **accepted on orchestrator instruction**. The user wants `user-attention.md` reviewed before the cleanup commit lands. Scope note recorded in the AC row. The orchestrator should ensure the close-out PR is sequenced after the user-attention review and tracks the T5.11 / T5.12 work explicitly.
+- "PR #375 test 8 dropped (promise-valued child cells)" → **accepted; correct behavior**. The dropped test contradicts AC-RT2's plain-`T` guarantee; landing it would freeze the wrong invariant. Rationale documented in T5.4's header comment in `collection-dispatch.test.ts`.
+
+**New findings filed:** F5 (should-fix), F6 (should-fix), F7 (low / process), F8 (should-fix). All four are doc / test-comment-quality defects (three in canonical ADR / README artifacts, one inside the T5.4 deferred-test header comment); all four are addressable with localized edits (no source code change, no spec touch, no validation-gate re-run for F5/F6/F7; F8 Option A would re-run `pnpm --filter @prisma-next/sql-orm-client test`, F8 Option B requires no re-run). See § Findings log above.
+
+**Items for the user's attention (escalations to orchestrator):**
+
+1. **Include-aggregate child-codec dispatch is a follow-up project.** Currently the ORM dispatcher does not invoke codecs on `jsonb_agg` child cells (verified: `rg 'codec\.(encode|decode)' packages/3-extensions/sql-orm-client/src` returns zero matches in `src/`). PR #375 had three security-test patterns covering this scenario, all of which translated to `it.skip` placeholders with a "concrete blocker" rationale. The work is real (codec coverage on aggregate-child cells closes a redaction-correctness hole at the ORM layer), but it is out of this project's async-shape scope. Recommend the orchestrator capture this as a separate follow-up project (potentially titled `orm-include-aggregate-codec-dispatch`) and mention it in `user-attention.md` so the user sees the open hole when they review.
+2. **PR #375 test 8 (promise-valued child cells) was dropped, not skipped.** This is the correct behavior — landing the test verbatim would assert the inverse of AC-RT2 — but the orchestrator should mention it in `user-attention.md` so the user is not surprised that one PR #375 test is missing entirely from the m5 translation rather than being preserved as `it.skip`.
+3. **T5.11 / T5.12 close-out.** Reminder that the close-out PR (strip `projects/` references and delete the directory) is queued behind the user's review of `user-attention.md`. The close-out PR will need its own SDR / walkthrough refresh? — orchestrator's call.
+
+**Validation results table (m5 R1):**
+
+| Gate | Command | Result | Notes |
+|---|---|---|---|
+| Type-check | `pnpm typecheck` | PASS (120/120 tasks) | Workspace-wide; full Turbo cache hit on second pass. |
+| Package tests | `pnpm test:packages` | PASS (111/111 tasks) | Workspace-wide. First run had transient `sql-orm-client` `TypeCheckError: Cannot find module '@prisma-next/sql-relational-core/ast'` — re-running `pnpm --filter @prisma-next/sql-orm-client test` cleared it (transient cache / concurrency artifact); subsequent `pnpm test:packages` re-run also PASS. 4 documented `it.skip` blocks counted as expected (1 in `json-schema-validation.test.ts`; 3 in `collection-dispatch.test.ts`). |
+| Integration tests | `pnpm test:integration` | PASS (104 files / 521 tests) | Workspace-wide. First run timed out at 100ms on `test/authoring/side-by-side-contracts.test.ts > side-by-side contract examples > loads the side-by-side fixture files from disk` (known pre-existing flake, surfaced in [`user-attention.md`](user-attention.md)); re-run PASS. |
+| Full suite | `pnpm test:all` | PASS | Workspace-wide. Aggregates packages + integration + e2e. |
+| Layering / imports | `pnpm lint:deps` | PASS (no violations across 606 modules / 1198 deps) | Workspace-wide; `scripts/check-imports.mjs` reports 0 violations. |
+| Build | `pnpm build` | PASS | Workspace-wide. All package builds green; `dist/*.d.mts` declarations refreshed for type-changed packages. |
+
+The transient `sql-orm-client` `TypeCheckError` and the integration-suite 100ms timeout flake are both pre-existing and surfaced in [`user-attention.md`](user-attention.md). Per the round prompt, neither is filed as a finding.
+
+**Mandatory artifact refresh:** All three review artifacts (`code-review.md`, `system-design-review.md`, `walkthrough.md`) refreshed in this round. SDR appends a new "M5 R1 — security tests + ADR 204 + supersession pointer + README sweep" section with final architectural snapshot. Walkthrough appends a new project-spanning "m5 — security, ADR, close-out" section so the walkthrough now narrates the complete project end-to-end (m1 → m5) per the round's pre-PR readiness requirement.
+
+**Stale-artifact note:** Round-end state: SDR captures m5 final architectural snapshot at HEAD `5ac4a3de6`; walkthrough is project-spanning (m1 → m5). After F5/F6/F7/F8 are closed in m5 R2, both artifacts will need a small delta refresh to reflect the corrected ADR 204 / READMEs / T5.4 test artifact (mostly to confirm the documentation defects are closed; no architectural delta).
+
+**Files modified (m5 R1 review artifact commit):** `code-review.md`, `system-design-review.md`, `walkthrough.md`.
+
+**Verdict carry-forward:** m5 R1 → **ANOTHER ROUND NEEDED**. F5, F6, F7, F8 must close in m5 R2 before the create-pr handoff.
+
+### m5 — Round 1 — second-pass reviewer addendum
+
+**Reviewer note:** The m5 R1 round notes above were authored by an earlier reviewer subagent (commits `2c1e6c869`..`<artifact-commit>` on this branch). On entry to this round the orchestrator's delegation cited HEAD `5ac4a3de6` (clean worktree) and treated R1 as the active review pass. The second-pass reviewer (this pass) re-validated independently — re-ran all six validation gates, re-read every translated test against the PR #375 originals, re-read ADR 204 against `framework-components/src/codec-types.ts` and the spec, and re-read every package README. The substantive findings F5/F6/F7 written by the earlier reviewer are correct and are reaffirmed. F8 (T5.4 header comment overpromises) is new in this pass — the earlier reviewer noted the placeholder assertions but framed them under the "concrete blocker" deferral clause without flagging the comment-vs-body inconsistency as a separate defect.
+
+**Why F8 is filed as a separate finding rather than folded into F5–F7:** F8 lives inside a deferred-test artifact, not inside an ADR or README; its remediation path is independent (pick Option A — preserve assertions verbatim — or Option B — correct the comment); and the deferred-test discipline F8 targets is the spec mechanism by which "open items" are kept activatable without spec amendments (T5.2's `it.skip` demonstrates the discipline correctly; T5.4's does not). Treating F8 as a separate finding makes the m5 R2 worklist explicit: four localized edits, four close-confirmations, no architectural changes, no spec touches, no source code changes.
+
+**Verdict (this pass):** m5 R1 → **ANOTHER ROUND NEEDED** (carries forward the earlier reviewer's verdict; updated to reflect the addition of F8). On confirmation that F5/F6/F7/F8 close in m5 R2, the phase is SATISFIED on inspection; the create-pr handoff is then unblocked.
 
 ---
 
