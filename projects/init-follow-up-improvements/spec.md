@@ -153,10 +153,10 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Project typechecks (FR2)
 
-- [ ] In a fresh project after `prisma-next init --yes --target postgres --authoring psl && npm install`, `npx tsc --noEmit` exits 0.
-- [ ] Same for `--target postgres --authoring typescript`.
-- [ ] Same for `--target mongodb --authoring psl`.
-- [ ] Same for `--target mongodb --authoring typescript`.
+- [x] In a fresh project after `prisma-next init --yes --target postgres --authoring psl && npm install`, `npx tsc --noEmit` exits 0.
+- [x] Same for `--target postgres --authoring typescript`.
+- [x] Same for `--target mongodb --authoring psl`.
+- [x] Same for `--target mongodb --authoring typescript`.
 
 ## Hygiene files (FR3)
 
