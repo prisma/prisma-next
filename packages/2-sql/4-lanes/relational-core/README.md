@@ -100,7 +100,7 @@ flowchart TD
 ```ts
 // Sync authoring:
 const textCodec = codec({
-  id: 'pg/text@1',
+  typeId: 'pg/text@1',
   targetTypes: ['text'],
   encode: (v: string) => v,
   decode: (w: string) => w,
@@ -110,7 +110,7 @@ const textCodec = codec({
 
 // Async authoring (e.g. KMS-backed encryption): same factory, same shape.
 const secretCodec = codec({
-  id: 'pg/secret@1',
+  typeId: 'pg/secret@1',
   targetTypes: ['text'],
   encode: async (v: string) => encrypt(v, await getKey()),
   decode: async (w: string) => decrypt(w, await getKey()),

@@ -29,11 +29,11 @@ The runtime treats codec query-time methods as **uniformly Promise-returning** a
 Concretely:
 
 1. **Public `Codec` interface (uniform).**
-   - `encode(value): Promise<TWire>` — query-time, required, Promise-returning.
-   - `decode(wire): Promise<TOutput>` — query-time, required, Promise-returning.
-   - `encodeJson(value): TJson` — build-time, required, synchronous.
-   - `decodeJson(json): TOutput` — build-time, required, synchronous.
-   - `renderOutputType(): TypeNode` — build-time, optional, synchronous.
+   - `encode(value: TInput): Promise<TWire>` — query-time, required, Promise-returning.
+   - `decode(wire: TWire): Promise<TOutput>` — query-time, required, Promise-returning.
+   - `encodeJson(value: TInput): JsonValue` — build-time, required, synchronous.
+   - `decodeJson(json: JsonValue): TInput` — build-time, required, synchronous.
+   - `renderOutputType?(typeParams): string | undefined` — build-time, optional, synchronous.
    - **No** `runtime` / `kind` / equivalent marker. **No** `TRuntime` generic. **No** conditional return types.
 
 2. **Single factory.** `codec()` (in `relational-core`) and its cross-family analog `mongoCodec()` (in `mongo-codec`) accept `encode` and `decode` in either sync or async form. Sync functions are wrapped to return `Promise.resolve(...)`; async functions pass through unchanged. The constructed `Codec` value always exposes Promise-returning query-time methods, regardless of how it was authored. `encode` may be omitted (identity default); `decode` is required.
@@ -55,18 +55,25 @@ Concretely:
 ### `Codec` interface shape
 
 ```ts
-interface Codec<TInput, TWire, TJson, TJsonInput, TOutput> {
-  readonly id: string;
+interface Codec<
+  Id extends string = string,
+  TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
+  TWire = unknown,
+  TInput = unknown,
+  TOutput = TInput,
+> {
+  readonly id: Id;
   readonly targetTypes: readonly string[];
+  readonly traits?: TTraits;
 
   // Query-time (per-row): always Promise-returning at the public boundary.
   encode(value: TInput): Promise<TWire>;
   decode(wire: TWire): Promise<TOutput>;
 
   // Build-time (per-contract-load): synchronous.
-  encodeJson(value: TInput): TJson;
-  decodeJson(json: TJsonInput): TOutput;
-  renderOutputType?(): TypeNode;
+  encodeJson(value: TInput): JsonValue;
+  decodeJson(json: JsonValue): TInput;
+  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
 }
 ```
 
@@ -79,7 +86,7 @@ The factory is the **only** place where author-side sync/async authoring is obse
 ```ts
 // Sync authoring — works exactly the same end-to-end.
 const textCodec = codec({
-  id: 'pg/text@1',
+  typeId: 'pg/text@1',
   targetTypes: ['text'],
   encode: (v: string) => v,
   decode: (w: string) => w,
@@ -89,7 +96,7 @@ const textCodec = codec({
 
 // Async authoring — same factory, same shape.
 const secretCodec = codec({
-  id: 'pg/secret@1',
+  typeId: 'pg/secret@1',
   targetTypes: ['text'],
   encode: async (v: string) => encrypt(v, await getKey()),
   decode: async (w: string) => decrypt(w, await getKey()),

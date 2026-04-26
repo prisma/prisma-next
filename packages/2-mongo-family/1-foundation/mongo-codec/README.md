@@ -14,7 +14,7 @@ Codec interface and registry for MongoDB value serialization.
 ```ts
 // Sync authoring:
 const intCodec = mongoCodec({
-  id: 'mongo/int@1',
+  typeId: 'mongo/int@1',
   targetTypes: ['int'],
   encode: (v: number) => v,
   decode: (w: number) => w,
@@ -24,7 +24,7 @@ const intCodec = mongoCodec({
 
 // Async authoring (e.g. KMS-backed encryption): same factory, same shape.
 const secretCodec = mongoCodec({
-  id: 'mongo/secret@1',
+  typeId: 'mongo/secret@1',
   targetTypes: ['string'],
   encode: async (v: string) => encrypt(v, await getKey()),
   decode: async (w: string) => decrypt(w, await getKey()),
