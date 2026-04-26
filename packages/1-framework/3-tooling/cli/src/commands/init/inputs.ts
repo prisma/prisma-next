@@ -119,16 +119,50 @@ export async function resolveInitInputs(ctx: {
         ? await promptSchemaPath(finalAuthoring)
         : defaultSchemaPath(finalAuthoring);
 
+  // FR3.2: `--write-env` is the explicit opt-in for non-interactive
+  // mode. Interactive runs additionally get a single confirm — but only
+  // when the flag was not already supplied (an explicit `--write-env`
+  // suppresses the prompt) and `--yes` did not auto-accept everything
+  // (in which case interactive mode is effectively non-interactive and
+  // the flag-only contract applies). See Style Guide § Interactivity.
+  const writeEnv = await resolveWriteEnv({
+    flag: options.writeEnv,
+    canPrompt,
+    autoAcceptPrompts,
+  });
+
   return {
     target: finalTarget,
     authoring: finalAuthoring,
     schemaPath: finalSchemaPath,
     install: options.install !== false,
-    writeEnv: Boolean(options.writeEnv),
+    writeEnv,
     probeDb: Boolean(options.probeDb),
     strictProbe: Boolean(options.strictProbe),
     reinit,
   };
+}
+
+async function resolveWriteEnv(opts: {
+  readonly flag: boolean | undefined;
+  readonly canPrompt: boolean;
+  readonly autoAcceptPrompts: boolean;
+}): Promise<boolean> {
+  if (opts.flag !== undefined) {
+    return Boolean(opts.flag);
+  }
+  if (!opts.canPrompt || opts.autoAcceptPrompts) {
+    return false;
+  }
+  const result = await clack.confirm({
+    message: 'Also write a .env file from .env.example? (gitignored)',
+    initialValue: false,
+    output: process.stderr,
+  });
+  if (clack.isCancel(result)) {
+    throw errorInitUserAborted();
+  }
+  return Boolean(result);
 }
 
 async function resolveReinit(opts: {

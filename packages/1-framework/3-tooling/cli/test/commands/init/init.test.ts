@@ -194,7 +194,12 @@ describe('runInit (interactive)', () => {
   it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
 
-    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+    // Pass `writeEnv: false` so the FR3.2 opt-in prompt does not fire —
+    // we want to lock in the re-init prompt's contract specifically here.
+    await runInitTest(tmpDir, {
+      options: { install: false, writeEnv: false },
+      flags: interactiveFlags(),
+    });
 
     expect(clack.confirm).toHaveBeenCalledTimes(1);
     // Style Guide § Destructive operation confirmation requires the prompt
@@ -241,10 +246,51 @@ describe('runInit (interactive)', () => {
     expect(config).toBe('existing config');
   });
 
-  it('does not prompt when prisma-next.config.ts does not exist', async () => {
-    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+  it('does not prompt for re-init when prisma-next.config.ts does not exist', async () => {
+    // Pass `writeEnv: false` to suppress the FR3.2 opt-in prompt — this
+    // test specifically asserts the re-init confirm does not fire on a
+    // green-field run.
+    await runInitTest(tmpDir, {
+      options: { install: false, writeEnv: false },
+      flags: interactiveFlags(),
+    });
 
     expect(clack.confirm).not.toHaveBeenCalled();
+  });
+
+  it('prompts for the .env opt-in interactively (FR3.2) and writes .env when accepted', async () => {
+    vi.mocked(clack.confirm).mockResolvedValue(true);
+    await runInitTest(tmpDir, {
+      options: { install: false },
+      flags: interactiveFlags(),
+    });
+
+    expect(clack.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: expect.stringMatching(/\.env/i),
+      }),
+    );
+    expect(existsSync(join(tmpDir, '.env'))).toBe(true);
+  });
+
+  it('does not write .env when the FR3.2 prompt is declined', async () => {
+    vi.mocked(clack.confirm).mockResolvedValue(false);
+    await runInitTest(tmpDir, {
+      options: { install: false },
+      flags: interactiveFlags(),
+    });
+    expect(existsSync(join(tmpDir, '.env'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
+  });
+
+  it('skips the FR3.2 prompt entirely when --write-env is passed explicitly', async () => {
+    vi.mocked(clack.confirm).mockClear();
+    await runInitTest(tmpDir, {
+      options: { install: false, writeEnv: true },
+      flags: interactiveFlags(),
+    });
+    expect(clack.confirm).not.toHaveBeenCalled();
+    expect(existsSync(join(tmpDir, '.env'))).toBe(true);
   });
 
   it('normalizes configPath when schema path starts with ./', async () => {
@@ -278,7 +324,7 @@ describe('runInit (interactive)', () => {
     );
     expect(execFile).toHaveBeenCalledWith(
       'pnpm',
-      ['add', '-D', 'prisma-next'],
+      ['add', '-D', 'prisma-next', '@types/node'],
       expect.anything(),
       expect.any(Function),
     );
@@ -299,7 +345,7 @@ describe('runInit (interactive)', () => {
     );
     expect(execFile).toHaveBeenCalledWith(
       'deno',
-      ['add', '--dev', 'npm:prisma-next'],
+      ['add', '--dev', 'npm:prisma-next', 'npm:@types/node'],
       expect.anything(),
       expect.any(Function),
     );
@@ -352,6 +398,237 @@ describe('runInit (interactive)', () => {
     await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
 
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR2 / FR3 — Project hygiene + scaffold typechecks (M4)
+// ---------------------------------------------------------------------------
+
+describe('runInit hygiene + tsconfig (FR2 / FR3)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-hygiene-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('writes a fresh tsconfig.json with types: ["node"] (FR2.2)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const tsconfig = JSON.parse(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')) as {
+      compilerOptions: { types: string[] };
+    };
+    expect(tsconfig.compilerOptions.types).toContain('node');
+  });
+
+  it('merges types: ["node"] into an existing tsconfig.json without clobbering user types', async () => {
+    writeFileSync(
+      join(tmpDir, 'tsconfig.json'),
+      JSON.stringify({ compilerOptions: { strict: true, types: ['vitest/globals'] } }),
+    );
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const tsconfig = JSON.parse(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')) as {
+      compilerOptions: { strict: boolean; types: string[] };
+    };
+    expect(tsconfig.compilerOptions.strict).toBe(true);
+    expect(tsconfig.compilerOptions.types).toEqual(
+      expect.arrayContaining(['vitest/globals', 'node']),
+    );
+  });
+
+  it('writes a target-appropriate .env.example with min DB version comment (FR3.1)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'mongodb', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const envExample = readFileSync(join(tmpDir, '.env.example'), 'utf-8');
+    expect(envExample).toContain('DATABASE_URL=');
+    expect(envExample).toContain('mongodb://');
+    expect(envExample).toMatch(/Requires MongoDB >= \d/);
+  });
+
+  it('does not write .env when --write-env is not supplied (FR3.2 default)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    expect(existsSync(join(tmpDir, '.env'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.env.example'))).toBe(true);
+  });
+
+  it('writes .env when --write-env is supplied (FR3.2 opt-in)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', writeEnv: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+    const envFile = readFileSync(join(tmpDir, '.env'), 'utf-8');
+    expect(envFile).toContain('DATABASE_URL=');
+  });
+
+  it('never overwrites an existing .env even with --write-env (secrets are sacred)', async () => {
+    writeFileSync(join(tmpDir, '.env'), 'DATABASE_URL=secret://existing');
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', writeEnv: true, install: false },
+      flags: noninteractiveFlags({ json: true }),
+    });
+    expect(readFileSync(join(tmpDir, '.env'), 'utf-8')).toBe('DATABASE_URL=secret://existing');
+  });
+
+  it('writes .gitignore with .env, dist/, node_modules/ when missing (FR3.3)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const gitignore = readFileSync(join(tmpDir, '.gitignore'), 'utf-8');
+    expect(gitignore).toContain('node_modules/');
+    expect(gitignore).toContain('dist/');
+    expect(gitignore).toContain('.env');
+  });
+
+  it('appends only missing entries to an existing .gitignore (FR3.3 idempotent)', async () => {
+    writeFileSync(join(tmpDir, '.gitignore'), 'node_modules/\n');
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const gitignore = readFileSync(join(tmpDir, '.gitignore'), 'utf-8');
+    // node_modules/ should appear exactly once.
+    expect(gitignore.split('node_modules/').length - 1).toBe(1);
+    expect(gitignore).toContain('dist/');
+    expect(gitignore).toContain('.env');
+  });
+
+  it('writes .gitattributes with linguist-generated lines for emitted artefacts (FR3.4)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const gitattributes = readFileSync(join(tmpDir, '.gitattributes'), 'utf-8');
+    expect(gitattributes).toContain('prisma/contract.json linguist-generated');
+    expect(gitattributes).toContain('prisma/contract.d.ts linguist-generated');
+  });
+
+  it('writes .gitattributes relative to a non-default --schema-path (FR3.4)', async () => {
+    await runInitTest(tmpDir, {
+      options: {
+        target: 'postgres',
+        authoring: 'psl',
+        schemaPath: 'db/schema.prisma',
+        install: false,
+      },
+      flags: noninteractiveFlags(),
+    });
+    const gitattributes = readFileSync(join(tmpDir, '.gitattributes'), 'utf-8');
+    expect(gitattributes).toContain('db/contract.json linguist-generated');
+    expect(gitattributes).not.toContain('prisma/contract.json');
+  });
+
+  it('adds contract:emit to package.json#scripts (FR3.5)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+      scripts?: Record<string, string>;
+    };
+    expect(pkg.scripts?.['contract:emit']).toBe('prisma-next contract emit');
+  });
+
+  it("warns and preserves the user's contract:emit when it maps to a different command (FR3.5)", async () => {
+    writeFileSync(
+      join(tmpDir, 'package.json'),
+      JSON.stringify(
+        {
+          name: 'test-app',
+          scripts: { 'contract:emit': './scripts/custom.sh' },
+        },
+        null,
+        2,
+      ),
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      expect(parsed.warnings.join('\n')).toMatch(/"contract:emit"/);
+      const pkg = JSON.parse(readFileSync(join(tmpDir, 'package.json'), 'utf-8')) as {
+        scripts: Record<string, string>;
+      };
+      expect(pkg.scripts['contract:emit']).toBe('./scripts/custom.sh');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('is idempotent across re-init: second run does not mutate hygiene files (FR9.3)', async () => {
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    const snapshot = {
+      gitignore: readFileSync(join(tmpDir, '.gitignore'), 'utf-8'),
+      gitattributes: readFileSync(join(tmpDir, '.gitattributes'), 'utf-8'),
+      packageJson: readFileSync(join(tmpDir, 'package.json'), 'utf-8'),
+      tsconfig: readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8'),
+    };
+
+    await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', force: true, install: false },
+      flags: noninteractiveFlags(),
+    });
+
+    expect(readFileSync(join(tmpDir, '.gitignore'), 'utf-8')).toBe(snapshot.gitignore);
+    expect(readFileSync(join(tmpDir, '.gitattributes'), 'utf-8')).toBe(snapshot.gitattributes);
+    expect(readFileSync(join(tmpDir, 'package.json'), 'utf-8')).toBe(snapshot.packageJson);
+    expect(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')).toBe(snapshot.tsconfig);
+  });
+
+  it('reports hygiene files in filesWritten via --json (FR1.5)', async () => {
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', writeEnv: true, install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      const parsed = JSON.parse(writes.join('').trim()) as { filesWritten: string[] };
+      expect(parsed.filesWritten).toEqual(
+        expect.arrayContaining([
+          '.env',
+          '.env.example',
+          '.gitignore',
+          '.gitattributes',
+          'package.json',
+          'tsconfig.json',
+        ]),
+      );
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
 
