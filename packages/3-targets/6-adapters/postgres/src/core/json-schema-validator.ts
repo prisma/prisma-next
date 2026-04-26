@@ -42,19 +42,12 @@ export function compileJsonSchemaValidator(schema: Record<string, unknown>): Jso
       return { valid: true };
     }
 
-    // Defensive `??` fallbacks: Ajv populates `validate.errors` and `err.message`
-    // for every failed validation under our config (`strict: false`, default
-    // messages enabled), so these `??` right-hand branches are unreachable but
-    // kept for type narrowing.
-    const errors: JsonSchemaValidationError[] =
-      /* v8 ignore next */
-      (validate.errors ?? []).map((err) => ({
-        path: err.instancePath || '/',
-        message:
-          /* v8 ignore next */
-          err.message ?? 'unknown validation error',
-        keyword: err.keyword,
-      }));
+    // biome-ignore lint/style/noNonNullAssertion: Ajv guarantees `errors` is populated whenever `validate(...)` returns false.
+    const errors: JsonSchemaValidationError[] = validate.errors!.map((err) => ({
+      path: err.instancePath || '/',
+      message: err.message ?? 'unknown validation error',
+      keyword: err.keyword,
+    }));
 
     return { valid: false, errors };
   };
