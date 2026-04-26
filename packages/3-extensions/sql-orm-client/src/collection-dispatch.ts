@@ -15,7 +15,7 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { isToOneCardinality, resolvePolymorphismInfo } from './collection-contract';
 import {

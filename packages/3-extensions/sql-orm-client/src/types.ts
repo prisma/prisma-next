@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
   ExtractQueryOperationTypes,

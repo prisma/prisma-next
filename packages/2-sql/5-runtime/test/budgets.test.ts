@@ -1,5 +1,5 @@
 import type { Contract, PlanMeta } from '@prisma-next/contract/types';
-import type { AfterExecuteResult } from '@prisma-next/runtime-executor';
+import type { AfterExecuteResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,

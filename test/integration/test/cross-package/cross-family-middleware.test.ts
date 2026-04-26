@@ -1,15 +1,15 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
+import type {
+  ExecutionPlan,
+  QueryPlan,
+  RuntimeMiddleware,
+  RuntimeMiddlewareContext,
+} from '@prisma-next/framework-components/runtime';
+import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { createMongoRuntime } from '@prisma-next/mongo-runtime';
-import {
-  createRuntimeCore,
-  type MarkerReader,
-  type MarkerStatement,
-  type RuntimeFamilyAdapter,
-} from '@prisma-next/runtime-executor';
 import { describe, expect, it, vi } from 'vitest';
 
 function collectingTelemetry() {
@@ -18,48 +18,38 @@ function collectingTelemetry() {
   return { middleware, events };
 }
 
-class MockMarkerReader implements MarkerReader {
-  readMarkerStatement(): MarkerStatement {
-    return { sql: 'SELECT 1', params: [] };
-  }
+interface MockSqlPlan extends QueryPlan {
+  readonly sql: string;
+  readonly params: readonly unknown[];
 }
 
-interface MockSqlContract {
-  readonly target: string;
-  readonly targetFamily: string;
-  readonly storageHash: string;
+interface MockSqlExec extends ExecutionPlan {
+  readonly sql: string;
+  readonly params: readonly unknown[];
 }
 
-class MockFamilyAdapter implements RuntimeFamilyAdapter<MockSqlContract> {
-  readonly contract: MockSqlContract;
-  readonly markerReader: MarkerReader;
-
-  constructor(contract: MockSqlContract) {
-    this.contract = contract;
-    this.markerReader = new MockMarkerReader();
+class MockSqlRuntime extends RuntimeCore<MockSqlPlan, MockSqlExec, RuntimeMiddleware<MockSqlExec>> {
+  constructor(
+    middleware: ReadonlyArray<RuntimeMiddleware<MockSqlExec>>,
+    ctx: RuntimeMiddlewareContext,
+    private readonly rows: ReadonlyArray<Record<string, unknown>>,
+  ) {
+    super({ middleware, ctx });
   }
 
-  validatePlan(_plan: ExecutionPlan, _contract: MockSqlContract): void {}
-}
-
-class MockSqlDriver {
-  private rows: ReadonlyArray<Record<string, unknown>>;
-
-  constructor(rows: ReadonlyArray<Record<string, unknown>> = []) {
-    this.rows = rows;
+  protected lower(plan: MockSqlPlan): MockSqlExec {
+    return { sql: plan.sql, params: plan.params, meta: plan.meta };
   }
 
-  async query(_sql: string, _params: readonly unknown[]) {
-    return { rows: [] };
-  }
-
-  async *execute<Row = Record<string, unknown>>(_options: {
-    sql: string;
-    params: readonly unknown[];
-  }): AsyncIterable<Row> {
-    for (const row of this.rows) {
-      yield row as Row;
-    }
+  protected runDriver(_exec: MockSqlExec): AsyncIterable<Record<string, unknown>> {
+    const rows = this.rows;
+    return {
+      async *[Symbol.asyncIterator](): AsyncIterator<Record<string, unknown>> {
+        for (const row of rows) {
+          yield row;
+        }
+      },
+    };
   }
 
   async close(): Promise<void> {}
@@ -101,27 +91,20 @@ function createMongoPlan(meta: PlanMeta = mongoMeta): MongoQueryPlan {
   } as unknown as MongoQueryPlan;
 }
 
+const sqlCtx: RuntimeMiddlewareContext = {
+  contract: {},
+  mode: 'strict',
+  now: () => Date.now(),
+  log: { info: () => {}, warn: () => {}, error: () => {} },
+};
+
 describe('cross-family middleware proof', () => {
   it('same middleware observes queries from an SQL runtime', async () => {
     const { middleware, events } = collectingTelemetry();
 
-    const sqlContract: MockSqlContract = {
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:sql-test',
-    };
+    const sqlRuntime = new MockSqlRuntime([middleware], sqlCtx, [{ id: 1, name: 'Alice' }]);
 
-    const sqlRuntime = createRuntimeCore({
-      familyAdapter: new MockFamilyAdapter(sqlContract),
-      driver: new MockSqlDriver([{ id: 1, name: 'Alice' }]),
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      middleware: [middleware],
-    });
-
-    const sqlPlan: ExecutionPlan & {
-      readonly sql: string;
-      readonly params: readonly unknown[];
-    } = {
+    const sqlPlan: MockSqlPlan = {
       sql: 'SELECT id, name FROM users',
       params: [],
       meta: {
@@ -189,18 +172,7 @@ describe('cross-family middleware proof', () => {
   it('same middleware instance works across SQL and Mongo runtimes', async () => {
     const { middleware, events } = collectingTelemetry();
 
-    const sqlContract: MockSqlContract = {
-      target: 'postgres',
-      targetFamily: 'sql',
-      storageHash: 'sha256:sql-hash',
-    };
-
-    const sqlRuntime = createRuntimeCore({
-      familyAdapter: new MockFamilyAdapter(sqlContract),
-      driver: new MockSqlDriver([{ id: 1 }]),
-      verify: { mode: 'onFirstUse', requireMarker: false },
-      middleware: [middleware],
-    });
+    const sqlRuntime = new MockSqlRuntime([middleware], sqlCtx, [{ id: 1 }]);
 
     const mongoRuntime = createMongoRuntime({
       adapter: createMockMongoAdapter(),
@@ -210,10 +182,7 @@ describe('cross-family middleware proof', () => {
       middleware: [middleware],
     });
 
-    const sqlPlan2: ExecutionPlan & {
-      readonly sql: string;
-      readonly params: readonly unknown[];
-    } = {
+    const sqlPlan2: MockSqlPlan = {
       sql: 'SELECT 1',
       params: [],
       meta: {

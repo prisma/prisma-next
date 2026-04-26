@@ -18,9 +18,7 @@ import type { RuntimeMiddleware, RuntimeMiddlewareContext } from './runtime-midd
  *     The original error is then rethrown.
  *
  * This helper is the single canonical implementation of the middleware
- * orchestration loop; family runtimes should not reimplement it. The body
- * is lifted from the SQL-flavored `RuntimeCoreImpl.#executeWith` so that
- * cross-family adoption in M3/M4 preserves observable behavior bit-for-bit.
+ * orchestration loop; family runtimes should not reimplement it.
  */
 export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
   exec: TExec,

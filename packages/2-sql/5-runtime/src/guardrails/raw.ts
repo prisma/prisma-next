@@ -32,8 +32,8 @@ export interface RawGuardrailResult {
 
 /**
  * Minimal plan view consumed by raw-SQL guardrails. Structurally satisfied
- * by `SqlExecutionPlan` from the SQL domain; declared here as an inline
- * shape so the framework guardrail does not name a SQL plan type.
+ * by `SqlExecutionPlan`; declared inline so this module stays decoupled
+ * from a specific plan type at the call site.
  */
 interface RawGuardrailPlan {
   readonly sql: string;

@@ -1,5 +1,5 @@
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import type { Runtime } from '../src/exports';

@@ -1,4 +1,4 @@
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
 import { resolvePolymorphismInfo } from '../src/collection-contract';
 import {
