@@ -23,7 +23,7 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  * `loadConfig` is mocked because resolving a real `prisma-next.config.ts`
  * would pull in TypeScript transpilation and a target adapter. Everything
  * downstream of `loadConfig` runs against real on-disk fixtures: the
- * tampered package and the contract.json. The `loadAllBundles` /
+ * tampered package and the contract.json. The `loadAllMigrationPackages` /
  * `readMigrationPackage` paths inside each command are exercised
  * unmocked, so the loader-boundary integrity check inside
  * `readMigrationPackage` is what actually fires the diagnostic.
@@ -141,7 +141,7 @@ async function setupTamperFixture(): Promise<TamperFixture> {
   await writeFile(join(packageDir, 'ops.json'), JSON.stringify(TAMPERED_OPS, null, 2));
 
   // contract.json at the default location so commands that read the contract
-  // (apply, plan, status) reach `loadAllBundles` without erroring earlier.
+  // (apply, plan, status) reach `loadAllMigrationPackages` without erroring earlier.
   const contractDir = join(cwd, 'src', 'prisma');
   await mkdir(contractDir, { recursive: true });
   await writeFile(
@@ -331,8 +331,8 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
     async () => {
       // `migration show` calls `readMigrationPackage` directly when given an
       // explicit path argument, exercising the integrity check on the
-      // single-package code path (distinct from `loadAllBundles` used by
-      // apply/plan/status). Both paths funnel through the same loader, so
+      // single-package code path (distinct from `loadAllMigrationPackages` used
+      // by apply/plan/status). Both paths funnel through the same loader, so
       // the diagnostic is uniform — that's exactly what T3.5 verifies.
       const { createMigrationShowCommand } = await import('../../src/commands/migration-show');
       const fixture = await setupTamperFixture();

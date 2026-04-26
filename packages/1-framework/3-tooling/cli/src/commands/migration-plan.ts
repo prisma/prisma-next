@@ -34,7 +34,7 @@ import {
 import {
   addGlobalOptions,
   getTargetMigrations,
-  loadAllBundles,
+  loadAllMigrationPackages,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -178,7 +178,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { bundles, graph } = await loadAllBundles(migrationsDir);
+    const { bundles, graph } = await loadAllMigrationPackages(migrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);

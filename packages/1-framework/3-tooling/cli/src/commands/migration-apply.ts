@@ -20,8 +20,8 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllBundles,
-  type MigrationBundleSet,
+  loadAllMigrationPackages,
+  type MigrationPackageSet,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -195,9 +195,9 @@ async function executeMigrationApplyCommand(
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
-  let migrations: MigrationBundleSet;
+  let migrations: MigrationPackageSet;
   try {
-    migrations = await loadAllBundles(migrationsDir);
+    migrations = await loadAllMigrationPackages(migrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
