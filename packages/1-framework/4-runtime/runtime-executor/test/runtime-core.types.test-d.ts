@@ -1,5 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
+import type { ExecutionPlan, RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import { expectTypeOf, test } from 'vitest';
 import type { RuntimeCore } from '../src/runtime-core';
 

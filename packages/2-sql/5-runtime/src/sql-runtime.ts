@@ -1,4 +1,4 @@
-import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
@@ -25,7 +25,7 @@ import type {
   LoweredStatement,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
@@ -109,7 +109,7 @@ export interface RuntimeTransaction extends RuntimeQueryable {
 
 export interface RuntimeQueryable {
   execute<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
   ): AsyncIterableResult<Row>;
 }
 
@@ -118,7 +118,7 @@ export interface TransactionContext extends RuntimeQueryable {
 }
 
 interface CoreQueryable {
-  execute<Row = Record<string, unknown>>(plan: ExecutionPlan<Row>): AsyncIterableResult<Row>;
+  execute<Row = Record<string, unknown>>(plan: SqlExecutionPlan<Row>): AsyncIterableResult<Row>;
 }
 
 export type { RuntimeTelemetryEvent, RuntimeVerifyOptions, TelemetryOutcome };
@@ -174,9 +174,11 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private async toExecutionPlan<Row>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): Promise<ExecutionPlan<Row>> {
-    const isSqlQueryPlan = (p: ExecutionPlan<Row> | SqlQueryPlan<Row>): p is SqlQueryPlan<Row> => {
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): Promise<SqlExecutionPlan<Row>> {
+    const isSqlQueryPlan = (
+      p: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
+    ): p is SqlQueryPlan<Row> => {
       return 'ast' in p && !('sql' in p);
     };
 
@@ -197,7 +199,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   private executeAgainstQueryable<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
     queryable: CoreQueryable,
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated(this.contract);
@@ -207,7 +209,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     ): AsyncGenerator<Row, void, unknown> {
       const executablePlan = await self.toExecutionPlan(plan);
       const encodedParams = encodeParams(executablePlan, self.codecRegistry);
-      const planWithEncodedParams: ExecutionPlan<Row> = {
+      const planWithEncodedParams: SqlExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
       };
@@ -229,7 +231,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   }
 
   execute<Row = Record<string, unknown>>(
-    plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
   ): AsyncIterableResult<Row> {
     return this.executeAgainstQueryable(plan, this.core);
   }
@@ -244,7 +246,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           commit: coreTx.commit.bind(coreTx),
           rollback: coreTx.rollback.bind(coreTx),
           execute<Row = Record<string, unknown>>(
-            plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+            plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
           ): AsyncIterableResult<Row> {
             return self.executeAgainstQueryable(plan, coreTx);
           },
@@ -253,7 +255,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       release: coreConn.release.bind(coreConn),
       destroy: coreConn.destroy.bind(coreConn),
       execute<Row = Record<string, unknown>>(
-        plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+        plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
       ): AsyncIterableResult<Row> {
         return self.executeAgainstQueryable(plan, coreConn);
       },
@@ -291,7 +293,7 @@ export async function withTransaction<R>(
       return invalidated;
     },
     execute<Row = Record<string, unknown>>(
-      plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
+      plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
     ): AsyncIterableResult<Row> {
       if (invalidated) {
         throw transactionClosedError();

@@ -1,4 +1,4 @@
-import type { Contract, ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { Contract, PlanMeta } from '@prisma-next/contract/types';
 import type {
   AfterExecuteResult,
   RuntimeMiddleware,
@@ -6,6 +6,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
 export interface SqlMiddlewareContext extends RuntimeMiddlewareContext {
   readonly contract: Contract<SqlStorage>;
@@ -20,7 +21,7 @@ export interface DraftPlan {
   readonly meta: PlanMeta;
 }
 
-export interface SqlMiddleware extends RuntimeMiddleware {
+export interface SqlMiddleware extends RuntimeMiddleware<SqlExecutionPlan> {
   readonly familyId?: 'sql';
   /**
    * Rewrite the query AST before it is lowered to SQL. Middlewares run in
@@ -41,14 +42,14 @@ export interface SqlMiddleware extends RuntimeMiddleware {
    * See `docs/architecture docs/subsystems/4. Runtime & Middleware Framework.md`.
    */
   beforeCompile?(draft: DraftPlan, ctx: SqlMiddlewareContext): Promise<DraftPlan | undefined>;
-  beforeExecute?(plan: ExecutionPlan, ctx: SqlMiddlewareContext): Promise<void>;
+  beforeExecute?(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext): Promise<void>;
   onRow?(
     row: Record<string, unknown>,
-    plan: ExecutionPlan,
+    plan: SqlExecutionPlan,
     ctx: SqlMiddlewareContext,
   ): Promise<void>;
   afterExecute?(
-    plan: ExecutionPlan,
+    plan: SqlExecutionPlan,
     result: AfterExecuteResult,
     ctx: SqlMiddlewareContext,
   ): Promise<void>;
