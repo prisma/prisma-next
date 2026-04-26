@@ -1,3 +1,4 @@
+export type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 export type { SimplifyDeep } from '@prisma-next/utils/simplify-deep';
 export type { MongoCollection } from '../collection';
 export { createMongoCollection } from '../collection';
