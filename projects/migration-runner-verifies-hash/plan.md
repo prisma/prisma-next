@@ -42,7 +42,8 @@ packages/1-framework/3-tooling/migration/src/
 │                            #   exports: MigrationMetadata, MigrationHints
 ├── migration-base.ts        # imports updated; identifier renames (MigrationMeta kept as-is)
 ├── package.ts               # ⤳ extracted from types.ts
-│                            #   exports: MigrationPackage
+│                            #   exports: MigrationPackage, MigrationOps
+│                            #   (MigrationOps lives here because a package contains ops)
 └── graph.ts                 # ⤳ extracted from types.ts
                              #   exports: MigrationGraph, MigrationChainEntry
 
@@ -84,6 +85,16 @@ examples/**/migration*/*/migration.json   # 113 files: top-level field migration
 
 The work splits into three integrity-behavior phases (1-3) and three rename-and-restructure phases (4-6), then close-out. They can ship in a single PR but are reviewed in this order.
 
+### Pre-flight — Architectural pre-conditions
+
+The spec's load-bearing claim is that adding integrity verification to `readMigrationPackage` covers every existing on-disk loading path by construction (see [`spec.md` § Where the loader lives](./spec.md#where-the-loader-lives)). That assumption must hold *before* Phase 1 ships, not after — otherwise Phase 1's design is insufficient and would need either an additional verification call at the offending site, or a refactor to route through the loader.
+
+**Tasks:**
+
+- [ ] **T0.1 — Audit other on-disk loaders.** Grep for `readFile.*migration\.json`, `JSON\.parse.*manifest`, and any direct `fs` reads of migration files in `packages/`. Confirm zero non-loader paths construct a `MigrationBundle`/`MigrationPackage` from disk. Expected: only `migration-tools/src/io.ts` (the loader itself) shows up; test files reading `migration.json` for assertions are fine because they don't construct a bundle. **If the audit surfaces any production-source violation, STOP and surface to the parent agent / spec author** — that's a correctness invalidation of the spec, not a finding to address inside Phase 1.
+
+**Validation gate for Pre-flight:** the audit returns zero non-loader bundle constructions in production source. Phase 1 cannot start until this gate passes.
+
 ### Phase 1 — Verifying loader (integrity behavior)
 
 Add the integrity check to `readMigrationPackage` and the supporting error factory. Land tests-first per repo convention. Uses **current** names; the rename comes later.
@@ -98,33 +109,39 @@ Add the integrity check to `readMigrationPackage` and the supporting error facto
 
 **Validation gate for Phase 1:** `pnpm -F @prisma-next/migration-tools test` passes, including the new tampering cases. `pnpm -F @prisma-next/migration-tools build` passes.
 
+**Release coupling — Phase 1 must ship together with Phase 2.** Do not land Phase 1 on `main` without Phase 2's commit alongside it. The intermediate state ships double verification: every successful `migration apply` recomputes each package's hash twice (once inside `readMigrationPackage`, once inside the still-present CLI loop in `migration-apply.ts`). The cost is small and the path is not hot, but the duplication is wasted work and could surface as confusing diagnostics if a future test asserts on the loop's `errorRuntime` error shape vs. the loader's `errorBundleCorrupt`/`errorMigrationHashMismatch` shape. As of this plan a grep confirms no such test exists today; the constraint exists to avoid surprises if one is added between phases.
+
 ### Phase 2 — CLI clean-up + invariant docs (integrity behavior)
 
 Drop the now-redundant CLI loop and document the trusted-input invariant on the runner SPI and the framework operation. No behavior change for consumers.
+
+**Release coupling — Phase 2 must ship together with Phase 1.** Same constraint as the gate above. Phase 2 deletes the CLI loop that Phase 1 made redundant; landing Phase 2 without Phase 1 would remove the only verification step entirely (a correctness regression), and landing Phase 1 without Phase 2 leaves a wasted second hash per package on the apply path. The two phases are reviewed separately for clarity but always commit-pair on `main`.
 
 **Tasks:**
 
 - [ ] **T2.1 — Delete the CLI verification loop.** In `packages/1-framework/3-tooling/cli/src/commands/migration-apply.ts`: delete the `for (const bundle of migrations.bundles) { … }` block (lines 213-233 at HEAD). Delete the `verifyMigrationBundle` import on line 1.
 - [ ] **T2.2 — Add JSDoc invariant to `MigrationRunner.execute`.** In `packages/1-framework/1-core/framework-components/src/control-migration-types.ts:334-361`, augment the existing comment block with a paragraph: "The `plan` parameter is trusted input. Callers are responsible for upstream verification of the originating migration package — typically by obtaining the package via `readMigrationPackage` from `@prisma-next/migration-tools/io`, which performs hash-integrity checks at the load boundary."
 - [ ] **T2.3 — Add JSDoc invariant to `executeMigrationApply`.** In `packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts`, add the same note (adapted to refer to `pendingMigrations`) to the operation function's docstring.
-- [ ] **T2.4 — Audit other on-disk loaders.** Grep for `readFile.*migration.json`, `readFile.*ops.json`, `JSON.parse.*manifest`, and any direct `fs` reads of migration files in `packages/`. Confirm zero non-loader paths construct a `MigrationBundle` from disk. (Expected: zero hits outside `migration-tools/src/io.ts` itself.)
 
 **Validation gate for Phase 2:** `pnpm -F @prisma-next/cli typecheck` passes, `pnpm -F @prisma-next/cli build` passes, `pnpm -F @prisma-next/cli test` passes (existing happy-path tests should be unchanged; if any test was implicitly depending on the duplicate verification loop's logging/wording, update it to match the new diagnostic).
 
 ### Phase 3 — End-to-end coverage (integrity behavior)
 
-Prove the integration: every CLI command that loads packages hard-fails on tamper, with the unified diagnostic.
+Prove the integration: every CLI command that loads packages hard-fails on tamper, with the unified diagnostic. The "same diagnostic across commands" property in the spec is a uniformity guarantee, not a presence guarantee — substring assertions are too weak to catch divergence (e.g. one command rendering `why`/`fix` while another renders only the code). Each tamper test below captures the rendered diagnostic text into a shared collection; a final assertion in T3.5 proves text equality across commands.
+
+**Shared test scaffolding.** The four tamper tests share a fixture pattern. A test-only helper (likely in `cli/test/commands/_shared/diagnostic-fixture.ts` or co-located in each test) sets up a valid migration directory, mutates `ops.json` post-creation (append a synthetic op), invokes the CLI command, and returns the captured diagnostic text plus exit code. Each test asserts on its own row (non-zero exit + `MIGRATION.BUNDLE_CORRUPT` substring); the cross-command equality assertion is centralized in T3.5 (or an equivalent shared spec) so the uniformity property is testable in one place.
 
 **Tasks:**
 
-- [ ] **T3.1 — `migration apply` tamper integration test.** Add a case to `packages/1-framework/3-tooling/cli/test/commands/migration-apply.test.ts` (or its e2e sibling): set up a valid migration directory, mutate `ops.json` post-creation (append a synthetic op), invoke `migration apply`, assert non-zero exit + `MIGRATION.BUNDLE_CORRUPT` in the diagnostic.
-- [ ] **T3.2 — `migration plan` tamper integration test.** Same pattern in `migration-plan.test.ts`. Verify the diagnostic surfaces before any planning work happens.
-- [ ] **T3.3 — `migration status` tamper integration test.** Same pattern in a `migration-status.test.ts` (create if missing — confirm whether one exists by quick scan of `packages/1-framework/3-tooling/cli/test/commands/`).
-- [ ] **T3.4 — `migration show` tamper integration test.** Same pattern in `migration-show.test.ts` (`readMigrationPackage` is called directly here, not through `loadAllBundles`).
-- [ ] **T3.5 — Confirm existing happy-path integration tests are untouched.** Run `pnpm -F @prisma-next/cli test:integration` (or repo-equivalent); zero pre-existing tests should need adjustment apart from the diagnostic-text change in `migration apply`'s tamper test from before this work (if such a test existed for the now-removed CLI loop).
-- [ ] **T3.6 — File the emit-drift follow-up Linear issue.** Title: "Implement ADR 192 step 2: emit-drift detection for `migration.ts`". Description: re-emit `migration.ts` in-memory at apply time and compare its hash to `ops.json`; covers the user-edited-migration.ts-after-emit failure mode that the bundle-integrity check does not. File under WS4 / M11. Link this spec from the new issue and link the new issue from `spec.md` § Out of scope.
+- [ ] **T3.1 — `migration apply` tamper integration test.** Add a case to `packages/1-framework/3-tooling/cli/test/commands/migration-apply.test.ts` (or its e2e sibling): set up a valid migration directory, mutate `ops.json` post-creation (append a synthetic op), invoke `migration apply`, assert non-zero exit + `MIGRATION.BUNDLE_CORRUPT` substring in the diagnostic. Capture the rendered diagnostic text into a shared collection (see scaffolding above) for the equality check in T3.5.
+- [ ] **T3.2 — `migration plan` tamper integration test.** Same pattern in `migration-plan.test.ts`. Verify the diagnostic surfaces before any planning work happens. Capture the rendered diagnostic text into the shared collection.
+- [ ] **T3.3 — `migration status` tamper integration test.** Same pattern in a `migration-status.test.ts` (create if missing — confirm whether one exists by quick scan of `packages/1-framework/3-tooling/cli/test/commands/`). Capture the rendered diagnostic text into the shared collection.
+- [ ] **T3.4 — `migration show` tamper integration test.** Same pattern in `migration-show.test.ts` (`readMigrationPackage` is called directly here, not through `loadAllBundles`). Capture the rendered diagnostic text into the shared collection.
+- [ ] **T3.5 — Cross-command diagnostic-equality assertion.** Add a single assertion (in a shared spec or as the final step of the suite) that proves text equality across all four commands — concretely: `expect(new Set(diagnosticTexts).size).toBe(1)` or an equivalent canonical-string comparison. This is the assertion that pins the spec's "same human-readable diagnostic regardless of which command triggered the load" acceptance criterion. Substring presence (T3.1-T3.4) is a necessary but not sufficient condition; this task is what catches divergence (e.g. one command rendering only the code while another renders the full `why`/`fix`).
+- [ ] **T3.6 — Confirm existing happy-path integration tests are untouched.** Run `pnpm -F @prisma-next/cli test:integration` (or repo-equivalent); zero pre-existing tests should need adjustment apart from the diagnostic-text change in `migration apply`'s tamper test from before this work (if such a test existed for the now-removed CLI loop).
+- [ ] **T3.7 — File the emit-drift follow-up Linear issue.** Title: "Implement ADR 192 step 2: emit-drift detection for `migration.ts`". Description: re-emit `migration.ts` in-memory at apply time and compare its hash to `ops.json`; covers the user-edited-migration.ts-after-emit failure mode that the bundle-integrity check does not. File under WS4 / M11. Link this spec from the new issue and link the new issue from `spec.md` § Out of scope.
 
-**Validation gate for Phase 3:** `pnpm test:integration` passes; the four new tamper cases all hit the new diagnostic; `pnpm lint:deps` reports zero violations (no new cross-plane edges introduced).
+**Validation gate for Phase 3:** `pnpm test:integration` passes; the four new tamper cases all hit the new diagnostic; the cross-command equality assertion from T3.5 passes (proving uniformity, not just presence); `pnpm lint:deps` reports zero violations (no new cross-plane edges introduced).
 
 > **Checkpoint:** at the end of Phase 3 the integrity work is complete and could ship as-is. Phases 4-6 are the naming + restructure cleanup that's bundled into the same PR.
 
@@ -135,7 +152,7 @@ Land the type renames and the `types.ts` split. This is the biggest single sourc
 **Tasks:**
 
 - [ ] **T4.1 — Create `metadata.ts`.** Extract `MigrationManifest` and `MigrationHints` from `types.ts` into a new `packages/1-framework/3-tooling/migration/src/metadata.ts`. Rename the interface to `MigrationMetadata`. Update its JSDoc to use "metadata" vocabulary (e.g. "metadata envelope" instead of "manifest envelope"). Re-export from `types.ts` as a barrel during this task to keep imports green; delete the barrel in T4.7.
-- [ ] **T4.2 — Create `package.ts`.** Extract `MigrationBundle` from `types.ts` into `packages/1-framework/3-tooling/migration/src/package.ts`. Rename the interface to `MigrationPackage`. Rename its `manifest` field to `metadata`. Re-export from `types.ts` as a barrel.
+- [ ] **T4.2 — Create `package.ts`.** Extract `MigrationBundle` from `types.ts` into `packages/1-framework/3-tooling/migration/src/package.ts`. Rename the interface to `MigrationPackage`. Rename its `manifest` field to `metadata`. Also move `MigrationOps` from `types.ts` into `package.ts` — it lives here because a package contains ops. Re-export both types from `types.ts` as a barrel.
 - [ ] **T4.3 — Create `graph.ts`.** Extract `MigrationGraph` and `MigrationChainEntry` from `types.ts` into `packages/1-framework/3-tooling/migration/src/graph.ts`. Rename the `migrationId` field on `MigrationChainEntry` to `migrationHash`. Re-export from `types.ts` as a barrel.
 - [ ] **T4.4 — Rename `attestation.ts` → `hash.ts`.** `git mv packages/1-framework/3-tooling/migration/src/attestation.ts packages/1-framework/3-tooling/migration/src/hash.ts`. Inside the file: rename `computeMigrationId` → `computeMigrationHash`; rename `verifyMigrationBundle` → `verifyMigrationHash`; rename `VerifyResult.storedMigrationId/computedMigrationId` → `storedHash/computedHash`; update parameter names (`manifest` → `metadata`, `bundle` → `pkg`); rewrite the JSDoc on `computeMigrationHash` per [`spec.md` § Documentation home](./spec.md#documentation-home); add a brief JSDoc on `verifyMigrationHash` pointing at it.
 - [ ] **T4.5 — Update `errors.ts`.** Rename `errorBundleCorrupt` → `errorMigrationHashMismatch`; rename its code `MIGRATION.BUNDLE_CORRUPT` → `MIGRATION.HASH_MISMATCH`; update parameter names (`storedMigrationId/computedMigrationId` → `storedHash/computedHash`). Rename `errorDuplicateMigrationId` → `errorDuplicateMigrationHash` and its code `MIGRATION.DUPLICATE_MIGRATION_ID` → `MIGRATION.DUPLICATE_MIGRATION_HASH`. Update prose in unrelated factories that mention "migrationId" to say "migrationHash".
@@ -198,8 +215,8 @@ Every acceptance criterion in `spec.md` is mapped to a test below. Identifiers b
 | `migration status` hard-fails on tampered package | Integration | T3.3 | New (and confirms the `loadAllMigrationPackages` path covers status). |
 | `migration show` hard-fails on tampered package | Integration | T3.4 | Direct `readMigrationPackage` caller — exercises the non-`loadAllMigrationPackages` path. |
 | `migration new` hard-fails on tampered package when reading the existing graph | Integration | (deferred) | `migration new` calls `readMigrationsDir` to compute `from`. The change makes this fail at the loader; covering this with a dedicated test is low-value relative to the other four. **Decision:** rely on T1.2 (loader-level) + the unified diagnostic; do not add a CLI-level test for `migration new` unless a reviewer disagrees. |
-| Same diagnostic text across all commands | Integration | Implicit via T3.1-T3.4 | Each test asserts on the same `MIGRATION.HASH_MISMATCH` substring + `errorMigrationHashMismatch`'s `why`. |
-| Intact-package apply behaves identically pre/post change | Integration | T3.5 | Existing happy-path suite passes without modification. |
+| Same diagnostic text across all commands | Integration | T3.5 (text equality) — set on top of T3.1-T3.4 (presence) | T3.5 asserts `expect(new Set(diagnosticTexts).size).toBe(1)` over the four commands' captured outputs. Substring presence alone is too weak (one command could render `why`/`fix` while another renders only the code). |
+| Intact-package apply behaves identically pre/post change | Integration | T3.6 | Existing happy-path suite passes without modification. |
 | `verifyMigration(dir)` removed; no production references | Static | T1.4 + grep audit | `rg verifyMigration packages/` returns zero hits in `src/` after deletion. |
 | `verifyMigrationHash` API at `migration-tools/src/hash.ts` | Unit | T4.4 + T1.5 | Existing in-memory test (renamed from `attestation.test.ts`) still passes. |
 | `migration-apply.ts` no longer imports `verifyMigrationBundle`/`verifyMigrationHash` and has no per-package loop | Static | T2.1 + grep | Trivial verification. |
@@ -210,7 +227,7 @@ Every acceptance criterion in `spec.md` is mapped to a test below. Identifiers b
 | All 113 on-disk `migration.json` files carry `migrationHash` | Static | T5.3 | `rg '"migrationId"' --type json` returns zero. |
 | `computeMigrationHash` carries the structural-canonicalization JSDoc | Manual | T4.4 | Reviewer-checked against the verbatim text in `spec.md` § Documentation home. |
 | Identifiers across `packages/` use target names | Static | T4.6 + T6.3 | Final audit at T6.3. |
-| No new cross-plane edges | Static | T3.5 (lint:deps step) | `pnpm lint:deps` passes. |
+| No new cross-plane edges | Static | T3.6 (lint:deps step) | `pnpm lint:deps` passes. |
 
 ## Open items
 
@@ -220,4 +237,4 @@ Every acceptance criterion in `spec.md` is mapped to a test below. Identifiers b
 - **`errorMigrationHashMismatch` export visibility.** Open question 2. Default: export.
 - **Codemod commit organization.** Open question 4. Default: single commit for all 113 files.
 - **ADR 192 wording update.** Optional close-out tweak (C2); not required for the project to be considered complete.
-- **Emit-drift follow-up ticket** (T3.6) is filed but not executed in this project. It belongs to the same milestone (WS4 / M11) and is a natural successor.
+- **Emit-drift follow-up ticket** (T3.7) is filed but not executed in this project. It belongs to the same milestone (WS4 / M11) and is a natural successor.
