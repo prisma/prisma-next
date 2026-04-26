@@ -1,0 +1,128 @@
+import { type } from 'arktype';
+import type { GlobalFlags } from '../../utils/global-flags';
+import type { TerminalUI } from '../../utils/terminal-ui';
+
+/**
+ * arktype schema for the structured output document `init --json` writes to
+ * stdout (FR1.5). The same shape backs the human-readable outro renderer
+ * (FR10), so the two output modes carry identical information.
+ *
+ * `target` is normalised to the user-facing flag value (`mongodb` rather
+ * than the internal `mongo`) so consumers can round-trip the document
+ * straight into a follow-up `--target` invocation.
+ */
+export const InitOutputSchema = type({
+  ok: 'boolean',
+  target: "'postgres'|'mongodb'",
+  authoring: "'psl'|'typescript'",
+  schemaPath: 'string',
+  filesWritten: 'string[]',
+  packagesInstalled: {
+    skipped: 'boolean',
+    deps: 'string[]',
+    devDeps: 'string[]',
+  },
+  contractEmitted: 'boolean',
+  nextSteps: 'string[]',
+  warnings: 'string[]',
+});
+
+export type InitOutput = typeof InitOutputSchema.infer;
+
+/**
+ * Serialises the output document for `--json`. Sorted keys are not enforced
+ * — `JSON.stringify` preserves insertion order, and the schema field order
+ * is the documented order, which matches what users will see when they
+ * `jq .` the result.
+ */
+export function formatInitJson(output: InitOutput): string {
+  return JSON.stringify(output, null, 2);
+}
+
+/**
+ * Renders the human-readable outro on stderr (FR10.1). Re-uses the same
+ * data structure as the JSON output so the two stay in lock-step.
+ *
+ * Warnings come before "Next steps" because they describe state the user
+ * needs to be aware of before acting on the next-steps list.
+ */
+export function renderInitOutro(ui: TerminalUI, output: InitOutput, flags: GlobalFlags): void {
+  if (flags.quiet || flags.json) {
+    return;
+  }
+
+  for (const warning of output.warnings) {
+    ui.warn(warning);
+  }
+
+  const lines: string[] = [];
+  lines.push(`Target:    ${output.target}`);
+  lines.push(`Authoring: ${output.authoring}`);
+  lines.push(`Schema:    ${output.schemaPath}`);
+  lines.push('');
+  lines.push('Files written:');
+  for (const file of output.filesWritten) {
+    lines.push(`  • ${file}`);
+  }
+
+  if (!output.packagesInstalled.skipped) {
+    lines.push('');
+    lines.push('Packages installed:');
+    for (const dep of output.packagesInstalled.deps) {
+      lines.push(`  • ${dep}`);
+    }
+    for (const dep of output.packagesInstalled.devDeps) {
+      lines.push(`  • ${dep} (dev)`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Next steps:');
+  for (const step of output.nextSteps) {
+    lines.push(`  ${step}`);
+  }
+
+  ui.note(lines.join('\n'), 'Done');
+}
+
+/**
+ * Builds the `nextSteps` array from the resolved scaffold state. Steps are
+ * ordered by the workflow a user needs to follow: configure connection →
+ * (emit if not yet done) → run a starter query → docs / agent skill.
+ *
+ * The strings are stable and human-readable; agents wanting to act on them
+ * should match on substrings (e.g. "DATABASE_URL") rather than exact text,
+ * since copy may evolve.
+ */
+export function buildNextSteps(options: {
+  readonly target: 'postgres' | 'mongodb';
+  readonly contractEmitted: boolean;
+  readonly emitCommand: string;
+  readonly schemaPath: string;
+}): string[] {
+  const steps: string[] = [];
+  steps.push(
+    '1. Set DATABASE_URL in your environment (a .env.example will be added in a follow-up release).',
+  );
+  if (!options.contractEmitted) {
+    steps.push(`2. Emit the contract: \`${options.emitCommand}\``);
+    steps.push(`3. Edit your schema at ${options.schemaPath}, then re-run the emit command.`);
+    steps.push(
+      '4. Open prisma-next.md for a quick reference on how to write your first typed query.',
+    );
+    steps.push(
+      '5. The .agents/skills/prisma-next/SKILL.md file is wired up for AI-coding agents in this project.',
+    );
+  } else {
+    steps.push(
+      `2. Edit your schema at ${options.schemaPath}, then re-run \`${options.emitCommand}\`.`,
+    );
+    steps.push(
+      '3. Open prisma-next.md for a quick reference on how to write your first typed query.',
+    );
+    steps.push(
+      '4. The .agents/skills/prisma-next/SKILL.md file is wired up for AI-coding agents in this project.',
+    );
+  }
+  return steps;
+}
