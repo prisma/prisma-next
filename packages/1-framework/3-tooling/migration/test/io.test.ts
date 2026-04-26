@@ -10,7 +10,7 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '../src/io';
-import { createTestManifest, createTestOps, writeAttestedTestPackage } from './fixtures';
+import { createTestManifest, createTestOps, writeTestPackage } from './fixtures';
 
 function expectMigrationError(error: unknown, code: string) {
   expect(MigrationToolsError.is(error)).toBe(true);
@@ -34,7 +34,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('round-trips manifest and ops', async () => {
     const dir = join(tmpDir, '20260225T1430_add_users');
-    const { manifest, ops } = await writeAttestedTestPackage(dir);
+    const { manifest, ops } = await writeTestPackage(dir);
 
     const pkg = await readMigrationPackage(dir);
 
@@ -46,7 +46,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('writes pretty-printed JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
-    await writeAttestedTestPackage(dir);
+    await writeTestPackage(dir);
 
     const manifestJson = await readFile(join(dir, 'migration.json'), 'utf-8');
     expect(manifestJson).toContain('\n');
@@ -219,7 +219,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('accepts manifest with optional authorship field', async () => {
     const dir = join(tmpDir, '20260225T1430_with_author');
-    await writeAttestedTestPackage(dir, {
+    await writeTestPackage(dir, {
       authorship: { author: 'test', email: 'test@example.com' },
     });
 
@@ -259,7 +259,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('creates missing parent directories before writing package files', async () => {
     const dir = join(tmpDir, 'nested', '20260225T1430_nested');
-    await writeAttestedTestPackage(dir);
+    await writeTestPackage(dir);
 
     const pkg = await readMigrationPackage(dir);
     expect(pkg.dirName).toBe('20260225T1430_nested');
@@ -278,9 +278,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('throws MIGRATION.BUNDLE_CORRUPT when ops.json is tampered post-write', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered_ops');
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
-    await writeMigrationPackage(dir, manifest, ops);
+    const { manifest, ops } = await writeTestPackage(dir);
 
     const tamperedOps = [
       ...ops,
@@ -308,9 +306,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('throws MIGRATION.BUNDLE_CORRUPT when a non-migrationId field in migration.json is tampered', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered_manifest');
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
-    await writeMigrationPackage(dir, manifest, ops);
+    const { manifest } = await writeTestPackage(dir);
 
     const manifestPath = join(dir, 'migration.json');
     const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
@@ -348,10 +344,10 @@ describe('readMigrationsDir', () => {
   });
 
   it('returns two packages sorted by name', async () => {
-    await writeAttestedTestPackage(join(tmpDir, '20260225T1400_first'), {
+    await writeTestPackage(join(tmpDir, '20260225T1400_first'), {
       createdAt: '2026-02-25T14:00:00.000Z',
     });
-    await writeAttestedTestPackage(join(tmpDir, '20260225T1500_second'), {
+    await writeTestPackage(join(tmpDir, '20260225T1500_second'), {
       createdAt: '2026-02-25T15:00:00.000Z',
     });
 
@@ -362,7 +358,7 @@ describe('readMigrationsDir', () => {
   });
 
   it('skips non-migration subdirectories', async () => {
-    await writeAttestedTestPackage(join(tmpDir, '20260225T1400_valid'));
+    await writeTestPackage(join(tmpDir, '20260225T1400_valid'));
     await mkdir(join(tmpDir, 'README'), { recursive: true });
     await writeFile(join(tmpDir, 'README', 'content.md'), '# readme');
 
@@ -395,9 +391,8 @@ describe('readMigrationsDir', () => {
     const intactDir = join(tmpDir, '20260225T1400_intact');
     const tamperedDir = join(tmpDir, '20260225T1500_tampered');
 
-    await writeAttestedTestPackage(intactDir);
-    const ops = createTestOps();
-    await writeMigrationPackage(tamperedDir, createTestManifest({}, ops), ops);
+    await writeTestPackage(intactDir);
+    await writeTestPackage(tamperedDir);
     await writeFile(join(tamperedDir, 'ops.json'), JSON.stringify([], null, 2));
 
     await expect(readMigrationsDir(tmpDir)).rejects.toSatisfy((e) => {
