@@ -50,6 +50,7 @@
     "./control": "./dist/control.mjs",
     "./data-transform": "./dist/data-transform.mjs",
     "./default-normalizer": "./dist/default-normalizer.mjs",
+    "./errors": "./dist/errors.mjs",
     "./issue-planner": "./dist/issue-planner.mjs",
     "./migration": "./dist/migration.mjs",
     "./native-type-normalizer": "./dist/native-type-normalizer.mjs",
