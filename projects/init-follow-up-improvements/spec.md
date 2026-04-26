@@ -202,8 +202,8 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Re-init (FR9)
 
-- [ ] After `init --target postgres` then `init --force --target mongodb`, the project contains no Postgres-target artefacts (no `@prisma-next/postgres` in `package.json#dependencies`; no Postgres `contract.d.ts` lingering).
-- [ ] After two consecutive `init --force` runs with the same arguments, the diff between the project after run 1 and run 2 is empty (modulo `package.json` ordering, which is itself stable).
+- [x] After `init --target postgres` then `init --force --target mongodb`, the project contains no Postgres-target artefacts (no `@prisma-next/postgres` in `package.json#dependencies`; no Postgres `contract.d.ts` lingering). Asserted in `init.test.ts > "after target switch, project contains no Postgres-target artefacts"`.
+- [x] After two consecutive `init --force` runs with the same arguments, the diff between the project after run 1 and run 2 is empty (modulo `package.json` ordering, which is itself stable). Asserted in `init.test.ts > "is idempotent across re-init: second run does not mutate hygiene files"` (existed pre-M8) plus M8's partial-overlap idempotency tests for `.gitignore` / `.gitattributes` / `package.json#scripts`.
 
 ## Outro (FR10)
 

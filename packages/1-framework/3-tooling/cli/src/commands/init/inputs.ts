@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import * as clack from '@clack/prompts';
 import { extname, join, normalize } from 'pathe';
 import type { GlobalFlags } from '../../utils/global-flags';
@@ -9,7 +9,13 @@ import {
   errorInitStrictProbeWithoutProbe,
   errorInitUserAborted,
 } from './errors';
-import { type AuthoringId, defaultSchemaPath, type TargetId } from './templates/code-templates';
+import {
+  type AuthoringId,
+  defaultSchemaPath,
+  type TargetId,
+  targetLabel,
+  targetPackageName,
+} from './templates/code-templates';
 
 /**
  * Raw command-line input as Commander.js parses it. `target` here uses the
@@ -45,6 +51,16 @@ export interface ResolvedInitInputs {
    * has agreed (or `--force` has been supplied) to overwrite it.
    */
   readonly reinit: boolean;
+  /**
+   * FR9.2 — set to the **previous** facade package name (e.g.
+   * `@prisma-next/postgres`) when re-init is switching targets and the
+   * user has consented to remove it from `package.json#dependencies`.
+   * `null` when no removal is needed: not a re-init, no previous facade
+   * present, the previous facade matches the chosen target, or the user
+   * declined the interactive confirm. The chosen-target facade itself
+   * is added separately via the install step.
+   */
+  readonly removePreviousFacade: string | null;
 }
 
 const TARGET_ALIASES: ReadonlyMap<string, TargetId> = new Map([
@@ -131,6 +147,20 @@ export async function resolveInitInputs(ctx: {
     autoAcceptPrompts,
   });
 
+  // FR9.2 — when re-init switches targets, ask whether to drop the
+  // previous facade from `dependencies`. Detection happens here (not in
+  // `runInit`) so the prompt sequence stays in one place; the actual
+  // edit is applied during `runInit`'s precondition phase alongside the
+  // other `package.json` merges.
+  const removePreviousFacade = await resolveRemovePreviousFacade({
+    baseDir,
+    target: finalTarget,
+    reinit,
+    force,
+    canPrompt,
+    autoAcceptPrompts,
+  });
+
   return {
     target: finalTarget,
     authoring: finalAuthoring,
@@ -140,6 +170,7 @@ export async function resolveInitInputs(ctx: {
     probeDb: Boolean(options.probeDb),
     strictProbe: Boolean(options.strictProbe),
     reinit,
+    removePreviousFacade,
   };
 }
 
@@ -163,6 +194,79 @@ async function resolveWriteEnv(opts: {
     throw errorInitUserAborted();
   }
   return Boolean(result);
+}
+
+/**
+ * FR9.2 — detects whether re-init is switching targets (the previous
+ * facade differs from the chosen target's facade) and resolves the
+ * remove-or-keep question.
+ *
+ * The non-interactive contract is the same as the `--force` re-init
+ * gate above: a non-interactive run that reaches this helper always
+ * has `--force` (otherwise `resolveReinit` would have thrown 5002), so
+ * the removal proceeds without further prompting. Interactive runs see
+ * a `clack.confirm` with `initialValue: true` — the destructive default
+ * is correct because keeping both facades produces a project that
+ * imports from one but pays for both in the lockfile, which is a
+ * silent foot-gun the user almost never wants.
+ *
+ * Returns the previous facade package name when the user consented (or
+ * was force-ed) to remove it, otherwise `null`. Parse failures on
+ * `package.json` resolve to `null` here — `runInit`'s precondition
+ * gate surfaces a structured 5010 error for the same file shortly
+ * after, so we avoid double-reporting and keep this helper side-effect
+ * free under hostile inputs.
+ */
+async function resolveRemovePreviousFacade(opts: {
+  readonly baseDir: string;
+  readonly target: TargetId;
+  readonly reinit: boolean;
+  readonly force: boolean;
+  readonly canPrompt: boolean;
+  readonly autoAcceptPrompts: boolean;
+}): Promise<string | null> {
+  if (!opts.reinit) {
+    return null;
+  }
+  const packageJsonPath = join(opts.baseDir, 'package.json');
+  if (!existsSync(packageJsonPath)) {
+    return null;
+  }
+  const otherTarget: TargetId = opts.target === 'postgres' ? 'mongo' : 'postgres';
+  const otherFacade = targetPackageName(otherTarget);
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  const deps = parsed['dependencies'];
+  if (deps === null || typeof deps !== 'object' || Array.isArray(deps)) {
+    return null;
+  }
+  if (!Object.hasOwn(deps as Record<string, unknown>, otherFacade)) {
+    return null;
+  }
+
+  // `--force` (and `--yes` in interactive mode) auto-confirms the
+  // removal. The `!canPrompt` branch is unreachable in practice because
+  // the FR9.0 reinit gate already required `--force` for non-interactive
+  // re-init, but we keep the guard for defence-in-depth.
+  if (opts.force || (opts.canPrompt && opts.autoAcceptPrompts)) {
+    return otherFacade;
+  }
+  if (!opts.canPrompt) {
+    return otherFacade;
+  }
+  const result = await clack.confirm({
+    message: `Switching from ${targetLabel(otherTarget)} to ${targetLabel(opts.target)} — remove ${otherFacade} from package.json dependencies?`,
+    initialValue: true,
+    output: process.stderr,
+  });
+  if (clack.isCancel(result)) {
+    throw errorInitUserAborted();
+  }
+  return result === true ? otherFacade : null;
 }
 
 async function resolveReinit(opts: {

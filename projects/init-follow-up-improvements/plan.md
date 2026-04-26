@@ -101,9 +101,9 @@ Closes FR9.
 
 **Tasks (sketch):**
 
-- [ ] On re-init, delete previously-emitted contract artefacts before rewriting templates (FR9.1).
-- [ ] On target switch, remove the previous facade dep from `package.json` with confirm (FR9.2).
-- [ ] Verify idempotency on `tsconfig.json`, `.gitignore`, `.gitattributes`, `package.json#scripts` (FR9.3).
+- [x] On re-init, delete previously-emitted contract artefacts before rewriting templates (FR9.1). Implemented in `commands/init/reinit-cleanup.ts` (`findStaleArtefacts`); the artefact list mirrors `hygiene-gitattributes.ts` so the file `init` advertises as `linguist-generated` is exactly the file `init` is willing to delete on re-init. Deletions are surfaced in `--json` as a new `filesDeleted: string[]` field (and in the human outro) so a CI / agent run can audit them.
+- [x] On target switch, remove the previous facade dep from `package.json` with confirm (FR9.2). Detection lives in `inputs.ts` (`resolveRemovePreviousFacade`); `--force` (and interactive `--yes`) auto-confirm, the bare interactive path prompts (`initialValue: true`), and a declined prompt leaves the dep in place. The edit itself runs in `runInit`'s precondition phase via the new `removeDependency` helper, chained before `mergePackageScripts` so the two `package.json` mutations round-trip a single re-stringification.
+- [x] Verify idempotency on `tsconfig.json`, `.gitignore`, `.gitattributes`, `package.json#scripts` (FR9.3). Existing merge helpers were already idempotent; the M8 work adds explicit hardening tests for the partial-overlap case (`.gitignore` already has `node_modules/`, `.gitattributes` already has `prisma/contract.json linguist-generated`, `package.json#scripts` already has the exact `contract:emit` entry) so a regression in any merger surfaces as a deduplication failure rather than a snapshot drift.
 
 ## Decisions baked in
 
