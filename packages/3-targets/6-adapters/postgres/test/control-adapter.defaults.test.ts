@@ -1,8 +1,8 @@
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { PostgresControlAdapter } from '../src/core/control-adapter';
-import { parsePostgresDefault } from '../src/core/default-normalizer';
 
 const createMockDriver = (
   columns: Array<{

@@ -1,4 +1,4 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { quoteIdentifier } from '../../sql-utils';
 import { type Op, step } from './shared';
 
 export function createExtension(extensionName: string): Op {

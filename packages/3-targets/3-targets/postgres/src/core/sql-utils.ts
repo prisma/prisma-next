@@ -1,14 +1,15 @@
 /**
- * Shared SQL utility functions for the Postgres adapter.
+ * Shared SQL utility functions for the Postgres target.
  *
  * These functions handle safe SQL identifier and literal escaping
  * with security validations to prevent injection and encoding issues.
+ *
+ * They live in `target-postgres` because both the control adapter (used at
+ * emit time) and the runtime adapter (used at execute time) need the same
+ * escaping/validation behavior, and the target package is the natural shared
+ * home that both adapters can depend on without crossing planes.
  */
 
-/**
- * Error thrown when an invalid SQL identifier or literal is detected.
- * Boundary layers map this to structured envelopes.
- */
 export class SqlEscapeError extends Error {
   constructor(
     message: string,
@@ -20,9 +21,6 @@ export class SqlEscapeError extends Error {
   }
 }
 
-/**
- * Maximum length for PostgreSQL identifiers (NAMEDATALEN - 1).
- */
 const MAX_IDENTIFIER_LENGTH = 63;
 
 /**
@@ -46,10 +44,7 @@ export function quoteIdentifier(identifier: string): string {
       'identifier',
     );
   }
-  // PostgreSQL will truncate identifiers longer than 63 characters.
-  // We don't throw here because it's not a security issue, but callers should be aware.
   if (identifier.length > MAX_IDENTIFIER_LENGTH) {
-    // Log warning in development, but don't fail - PostgreSQL handles truncation
     console.warn(
       `Identifier "${identifier.slice(0, 20)}..." exceeds PostgreSQL's ${MAX_IDENTIFIER_LENGTH}-character limit and will be truncated`,
     );
@@ -98,8 +93,6 @@ export function qualifyName(schemaName: string, objectName: string): string {
  * @throws {SqlEscapeError} If the value exceeds the maximum length
  */
 export function validateEnumValueLength(value: string, enumTypeName: string): void {
-  // PostgreSQL uses byte length, not character length. For simplicity, we use
-  // character length as a conservative approximation (multi-byte chars would fail earlier).
   if (value.length > MAX_IDENTIFIER_LENGTH) {
     throw new SqlEscapeError(
       `Enum value "${value.slice(0, 20)}..." for type "${enumTypeName}" exceeds PostgreSQL's ` +

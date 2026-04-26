@@ -38,7 +38,6 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
 
   let inner = expr.replace(TIMESTAMP_CAST_SUFFIX, '').trim();
 
-  // Strip outer parentheses
   if (inner.startsWith('(') && inner.endsWith(')')) {
     inner = inner.slice(1, -1).trim();
   }
@@ -46,7 +45,6 @@ function canonicalizeTimestampDefault(expr: string): string | undefined {
   if (NOW_FUNCTION_PATTERN.test(inner)) return 'now()';
   if (CLOCK_TIMESTAMP_PATTERN.test(inner)) return 'clock_timestamp()';
 
-  // Handle 'now'::text form (Postgres casts the string literal 'now' through ::text)
   inner = inner.replace(TEXT_CAST_SUFFIX, '').trim();
   if (NOW_LITERAL_PATTERN.test(inner)) return 'now()';
 
@@ -72,33 +70,27 @@ export function parsePostgresDefault(
   const normalizedType = nativeType?.toLowerCase();
   const isBigInt = normalizedType === 'bigint' || normalizedType === 'int8';
 
-  // Autoincrement: nextval('tablename_column_seq'::regclass)
   if (NEXTVAL_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'autoincrement()' };
   }
 
-  // Timestamp defaults: now()/CURRENT_TIMESTAMP → 'now()', clock_timestamp() → 'clock_timestamp()'
   const canonicalTimestamp = canonicalizeTimestampDefault(trimmed);
   if (canonicalTimestamp) {
     return { kind: 'function', expression: canonicalTimestamp };
   }
 
-  // gen_random_uuid()
   if (UUID_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'gen_random_uuid()' };
   }
 
-  // uuid_generate_v4() from uuid-ossp extension
   if (UUID_OSSP_PATTERN.test(trimmed)) {
     return { kind: 'function', expression: 'gen_random_uuid()' };
   }
 
-  // NULL or NULL::type — explicit null default
   if (NULL_PATTERN.test(trimmed)) {
     return { kind: 'literal', value: null };
   }
 
-  // Boolean literals
   if (TRUE_PATTERN.test(trimmed)) {
     return { kind: 'literal', value: true };
   }
@@ -106,7 +98,6 @@ export function parsePostgresDefault(
     return { kind: 'literal', value: false };
   }
 
-  // Numeric literals (integer or decimal)
   if (NUMERIC_PATTERN.test(trimmed)) {
     const num = Number(trimmed);
     if (!Number.isFinite(num)) return undefined;
@@ -116,9 +107,6 @@ export function parsePostgresDefault(
     return { kind: 'literal', value: num };
   }
 
-  // String literals: 'value'::type or just 'value'
-  // Match: 'some text'::text, 'hello'::character varying, 'value', etc.
-  // Strip the ::type cast so the normalized expression matches what contract authors write.
   const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
   if (stringMatch?.[1] !== undefined) {
     const unescaped = stringMatch[1].replace(/''/g, "'");
@@ -139,7 +127,5 @@ export function parsePostgresDefault(
     return { kind: 'literal', value: unescaped };
   }
 
-  // Unrecognized expression - return as a function with the raw expression
-  // This preserves the information for debugging while still being comparable
   return { kind: 'function', expression: trimmed };
 }
