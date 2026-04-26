@@ -54,7 +54,7 @@ What's missing, and what this project delivers:
 
 4. **Extend `MongoRunnerDependencies` with `introspectSchema`.** Add `readonly introspectSchema: () => Promise<MongoSchemaIR>` to the interface in [`packages/3-mongo-target/1-mongo-target/src/core/mongo-runner.ts`](../../packages/3-mongo-target/1-mongo-target/src/core/mongo-runner.ts).
 
-5. **Wire `introspectSchema` in `createMongoRunnerDeps`.** Update [`packages/3-mongo-target/2-mongo-adapter/src/core/runner-deps.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/core/runner-deps.ts) to capture the `Db` instance and expose `introspectSchema: () => introspectSchema(db)` (re-using the existing import from `@prisma-next/adapter-mongo/control`).
+5. **Wire `introspectSchema` in `createMongoRunnerDeps` to compose the framework primitive.** The callback's body must delegate to `family.introspect({ driver })`, not directly to the adapter helper `introspectSchema(db)`. The runner thus composes the framework SPI primitive at the wiring boundary while keeping its own deps surface decoupled from the family instance ([ADR 198](../../docs/architecture%20docs/adrs/ADR%20198%20-%20Runner%20decoupled%20from%20driver%20via%20visitor%20SPIs.md) preserved). Threading: `mongoTargetDescriptor.migrations.createRunner(family)` already receives the `family` instance — drop the unused `_` prefix and pass it through to `createMongoRunnerDeps(driver, family)` ([`packages/3-mongo-target/2-mongo-adapter/src/core/runner-deps.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/core/runner-deps.ts) gains a `family` parameter; the deps object exposes `introspectSchema: () => family.introspect({ driver })`).
 
 ### Runner options
 
@@ -147,6 +147,12 @@ What's missing, and what this project delivers:
 - [ ] `pnpm test:packages` passes including new unit + integration tests.
 
 # Other Considerations
+
+## Layering: actions vs primitives
+
+The runner's post-apply verify is a **composition of primitives** (`family.introspect` + pure `verifyMongoSchema`), not a delegation to the peer `family.schemaVerify` action. `migration apply` is itself a compound domain action with one user intent and one audit/analytics boundary; reaching into `family.schemaVerify` mid-flow would double-count the intent and conflate the runner's audit boundary with the verify-action's CLI metadata.
+
+This is the principle established in [ADR 204 — Domain actions vs composable primitives in the control plane](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Domain%20actions%20vs%20composable%20primitives%20in%20the%20control%20plane.md). It is also why task 1.4 (refactoring `MongoFamilyInstance.schemaVerify` to delegate to `verifyMongoSchema`) is load-bearing rather than a stylistic cleanup: it converts an action that *inlines* a not-yet-extracted primitive into an action that *composes* the canonical one. The runner then composes the same primitive at its own action boundary, and any future compound action (TML-2319, drift-detection daemons, CI preflight) composes it too.
 
 ## Concurrency / drift between introspect and operation loop
 
