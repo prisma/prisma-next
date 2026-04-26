@@ -24,12 +24,18 @@ function attestedManifest(
 }
 
 /**
- * Build an attested manifest and write the package in one step. The
- * `migrationId` is computed over the same `ops` passed to the writer,
- * so the resulting package round-trips through `readMigrationPackage`'s
- * integrity check.
+ * Canonical helper for writing a test migration package to disk. Always
+ * produces a *consistent* (attested) package: the `migrationId` is computed
+ * over the exact `ops` passed to the writer, so the resulting package
+ * round-trips through `readMigrationPackage`'s integrity check.
+ *
+ * Tampering tests use this same helper and then surgically overwrite the
+ * offending file post-hoc — see the equivalent helper in
+ * `migration-tools/test/fixtures.ts` for the canonical pattern. (The CLI
+ * copy mirrors the migration-tools fixture; consolidation into a published
+ * `@prisma-next/migration-tools/testing` subpath is queued as a follow-up.)
  */
-async function writeAttestedPackage(
+async function writeTestPackage(
   dir: string,
   base: Omit<MigrationManifest, 'migrationId'>,
   ops: readonly MigrationPlanOperation[],
@@ -88,7 +94,7 @@ describe('migration plan → emit end-to-end', () => {
 
       const dirName = formatMigrationDirName(new Date(), 'initial');
       const packageDir = join(migrationsDir, dirName);
-      const manifest = await writeAttestedPackage(
+      const manifest = await writeTestPackage(
         packageDir,
         {
           from: EMPTY_CONTRACT_HASH,
@@ -150,7 +156,7 @@ describe('migration plan → emit end-to-end', () => {
         const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
         const path1 = join(migrationsDir, dir1);
         const ops1 = [createTableOp('user')];
-        await writeAttestedPackage(
+        await writeTestPackage(
           path1,
           {
             from: EMPTY_CONTRACT_HASH,
@@ -173,7 +179,7 @@ describe('migration plan → emit end-to-end', () => {
         const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
         const path2 = join(migrationsDir, dir2);
         const ops2 = [createTableOp('post')];
-        await writeAttestedPackage(
+        await writeTestPackage(
           path2,
           {
             from: 'sha256:hash-a',
@@ -226,7 +232,7 @@ describe('migration plan → emit end-to-end', () => {
       // First migration
       const dir1 = formatMigrationDirName(new Date(), 'initial');
       const path1 = join(migrationsDir, dir1);
-      await writeAttestedPackage(
+      await writeTestPackage(
         path1,
         {
           from: EMPTY_CONTRACT_HASH,
