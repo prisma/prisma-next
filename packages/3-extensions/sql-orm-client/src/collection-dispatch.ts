@@ -1,3 +1,35 @@
+/**
+ * Collection row dispatch.
+ *
+ * Per-row decoding is performed upstream in `sql-runtime`'s row-yielding async
+ * generator (it `await`s `decodeRow` once per row before yielding). This file
+ * never calls codec query-time methods directly; it consumes plain decoded
+ * cells through `executeQueryPlan` → `scope.execute(plan)` →
+ * `AsyncIterableResult<Row>`. Every `for await` / `.toArray()` consumer below
+ * therefore sees plain `T` values, not `Promise<T>`.
+ *
+ * See `packages/2-sql/5-runtime/src/codecs/decoding.ts` for the decode-once-
+ * per-row contract; this file is the consumer side of that contract.
+ */
+
+/**
+ * Collection-side row dispatch.
+ *
+ * This module orchestrates ORM row materialization (selection, polymorphism
+ * mapping, include stitching). It is intentionally codec-agnostic: every row
+ * it consumes already arrived from `sql-runtime` through
+ * `executeQueryPlan` → `runtime.execute`, which awaits `codec.decode` per row
+ * before yielding. So the `for await` (and `for ... of` over awaited
+ * `.toArray()`) loops below are guaranteed to see plain `T` cell values, not
+ * `Promise<T>`.
+ *
+ * The decode-once-per-row contract is owned by `sql-runtime`'s
+ * `executeAgainstQueryable` async generator; this dispatch layer never
+ * invokes `codec.encode`/`codec.decode` itself. See ADR 030 (codecs registry
+ * & decode boundary) and the m3 E2E coverage in
+ * `test/codec-async.e2e.test.ts` and `test/integration/codec-async.test.ts`.
+ */
+
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
