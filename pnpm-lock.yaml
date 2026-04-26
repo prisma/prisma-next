@@ -2146,6 +2146,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -2159,6 +2162,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: 'catalog:'
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
