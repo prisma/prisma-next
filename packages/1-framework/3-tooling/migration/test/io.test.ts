@@ -1,6 +1,6 @@
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
-import { join } from 'pathe';
+import { join, relative } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import {
@@ -10,7 +10,7 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '../src/io';
-import { createTestManifest, createTestOps } from './fixtures';
+import { createTestManifest, createTestOps, writeAttestedTestPackage } from './fixtures';
 
 function expectMigrationError(error: unknown, code: string) {
   expect(MigrationToolsError.is(error)).toBe(true);
@@ -33,11 +33,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
   });
 
   it('round-trips manifest and ops', async () => {
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
     const dir = join(tmpDir, '20260225T1430_add_users');
+    const { manifest, ops } = await writeAttestedTestPackage(dir);
 
-    await writeMigrationPackage(dir, manifest, ops);
     const pkg = await readMigrationPackage(dir);
 
     expect(JSON.stringify(pkg.manifest)).toBe(JSON.stringify(manifest));
@@ -48,8 +46,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('writes pretty-printed JSON', async () => {
     const dir = join(tmpDir, '20260225T1430_test');
-    const ops = createTestOps();
-    await writeMigrationPackage(dir, createTestManifest({}, ops), ops);
+    await writeAttestedTestPackage(dir);
 
     const manifestJson = await readFile(join(dir, 'migration.json'), 'utf-8');
     expect(manifestJson).toContain('\n');
@@ -222,14 +219,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('accepts manifest with optional authorship field', async () => {
     const dir = join(tmpDir, '20260225T1430_with_author');
-    const ops = createTestOps();
-    const manifest = createTestManifest(
-      { authorship: { author: 'test', email: 'test@example.com' } },
-      ops,
-    );
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
-    await writeFile(join(dir, 'ops.json'), JSON.stringify(ops));
+    await writeAttestedTestPackage(dir, {
+      authorship: { author: 'test', email: 'test@example.com' },
+    });
 
     const pkg = await readMigrationPackage(dir);
     expect(pkg.manifest.authorship).toEqual({ author: 'test', email: 'test@example.com' });
@@ -267,8 +259,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('creates missing parent directories before writing package files', async () => {
     const dir = join(tmpDir, 'nested', '20260225T1430_nested');
-    const ops = createTestOps();
-    await writeMigrationPackage(dir, createTestManifest({}, ops), ops);
+    await writeAttestedTestPackage(dir);
 
     const pkg = await readMigrationPackage(dir);
     expect(pkg.dirName).toBe('20260225T1430_nested');
@@ -299,15 +290,18 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.BUNDLE_CORRUPT');
-      const details = (e as MigrationToolsError).details;
-      expect(details).toMatchObject({
+      const mte = e as MigrationToolsError;
+      expect(mte.details).toMatchObject({
         dir,
         storedMigrationId: manifest.migrationId,
       });
-      expect(details).toHaveProperty('computedMigrationId');
-      expect((details as { computedMigrationId: string }).computedMigrationId).not.toBe(
+      expect(mte.details).toHaveProperty('computedMigrationId');
+      expect((mte.details as { computedMigrationId: string }).computedMigrationId).not.toBe(
         manifest.migrationId,
       );
+      const relativeDir = relative(process.cwd(), dir);
+      expect(mte.why).toContain(relativeDir);
+      expect(mte.fix).toContain(relativeDir);
       return true;
     });
   });
@@ -325,15 +319,18 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.BUNDLE_CORRUPT');
-      const details = (e as MigrationToolsError).details;
-      expect(details).toMatchObject({
+      const mte = e as MigrationToolsError;
+      expect(mte.details).toMatchObject({
         dir,
         storedMigrationId: manifest.migrationId,
       });
-      expect(details).toHaveProperty('computedMigrationId');
-      expect((details as { computedMigrationId: string }).computedMigrationId).not.toBe(
+      expect(mte.details).toHaveProperty('computedMigrationId');
+      expect((mte.details as { computedMigrationId: string }).computedMigrationId).not.toBe(
         manifest.migrationId,
       );
+      const relativeDir = relative(process.cwd(), dir);
+      expect(mte.why).toContain(relativeDir);
+      expect(mte.fix).toContain(relativeDir);
       return true;
     });
   });
@@ -351,12 +348,12 @@ describe('readMigrationsDir', () => {
   });
 
   it('returns two packages sorted by name', async () => {
-    const ops = createTestOps();
-    const manifest1 = createTestManifest({ createdAt: '2026-02-25T14:00:00.000Z' }, ops);
-    const manifest2 = createTestManifest({ createdAt: '2026-02-25T15:00:00.000Z' }, ops);
-
-    await writeMigrationPackage(join(tmpDir, '20260225T1400_first'), manifest1, ops);
-    await writeMigrationPackage(join(tmpDir, '20260225T1500_second'), manifest2, ops);
+    await writeAttestedTestPackage(join(tmpDir, '20260225T1400_first'), {
+      createdAt: '2026-02-25T14:00:00.000Z',
+    });
+    await writeAttestedTestPackage(join(tmpDir, '20260225T1500_second'), {
+      createdAt: '2026-02-25T15:00:00.000Z',
+    });
 
     const packages = await readMigrationsDir(tmpDir);
     expect(packages).toHaveLength(2);
@@ -365,12 +362,7 @@ describe('readMigrationsDir', () => {
   });
 
   it('skips non-migration subdirectories', async () => {
-    const ops = createTestOps();
-    await writeMigrationPackage(
-      join(tmpDir, '20260225T1400_valid'),
-      createTestManifest({}, ops),
-      ops,
-    );
+    await writeAttestedTestPackage(join(tmpDir, '20260225T1400_valid'));
     await mkdir(join(tmpDir, 'README'), { recursive: true });
     await writeFile(join(tmpDir, 'README', 'content.md'), '# readme');
 
@@ -400,11 +392,11 @@ describe('readMigrationsDir', () => {
   });
 
   it('propagates MIGRATION.BUNDLE_CORRUPT from any tampered child package', async () => {
-    const ops = createTestOps();
     const intactDir = join(tmpDir, '20260225T1400_intact');
     const tamperedDir = join(tmpDir, '20260225T1500_tampered');
 
-    await writeMigrationPackage(intactDir, createTestManifest({}, ops), ops);
+    await writeAttestedTestPackage(intactDir);
+    const ops = createTestOps();
     await writeMigrationPackage(tamperedDir, createTestManifest({}, ops), ops);
     await writeFile(join(tamperedDir, 'ops.json'), JSON.stringify([], null, 2));
 

@@ -1,3 +1,5 @@
+import { relative } from 'pathe';
+
 /**
  * Structured error for migration tooling operations.
  *
@@ -192,9 +194,13 @@ export function errorBundleCorrupt(
   storedMigrationId: string,
   computedMigrationId: string,
 ): MigrationToolsError {
+  // Render a cwd-relative path in the human-readable diagnostic so users
+  // running CLI commands from the project root see a familiar short path.
+  // Keep the absolute path in `details.dir` for machine consumers.
+  const relativeDir = relative(process.cwd(), dir);
   return new MigrationToolsError('MIGRATION.BUNDLE_CORRUPT', 'Migration package is corrupt', {
-    why: `Stored migrationId "${storedMigrationId}" does not match the recomputed hash "${computedMigrationId}" for "${dir}". The migration.json or ops.json has been edited or partially written since emit.`,
-    fix: `Re-emit the package by running \`node "${dir}/migration.ts"\`, or restore the directory from version control.`,
+    why: `Stored migrationId "${storedMigrationId}" does not match the recomputed hash "${computedMigrationId}" for "${relativeDir}". The migration.json or ops.json has been edited or partially written since emit.`,
+    fix: `Re-emit the package by running \`node "${relativeDir}/migration.ts"\`, or restore the directory from version control.`,
     details: { dir, storedMigrationId, computedMigrationId },
   });
 }
