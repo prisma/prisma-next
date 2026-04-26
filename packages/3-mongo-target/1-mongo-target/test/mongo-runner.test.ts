@@ -35,10 +35,10 @@ import {
 
 type Row = Record<string, unknown>;
 // The wire-command union is exposed on `MongoAdapter['lower']`'s return type
-// and on `MongoDriver.execute`'s parameter type. Re-deriving it here avoids a
-// dependency on `@prisma-next/mongo-wire`, which `target-mongo` does not list
-// as a direct devDependency.
-type WireCommand = ReturnType<MongoAdapter['lower']>;
+// (Promise<AnyMongoWireCommand>) and on `MongoDriver.execute`'s parameter
+// type. Re-deriving it here avoids a dependency on `@prisma-next/mongo-wire`,
+// which `target-mongo` does not list as a direct devDependency.
+type WireCommand = Awaited<ReturnType<MongoAdapter['lower']>>;
 
 const ALL_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
@@ -83,7 +83,7 @@ class StubMongoDriver implements MongoDriver {
 class StubMongoAdapter implements MongoAdapter {
   readonly loweredPlans: MongoQueryPlan[] = [];
 
-  lower(plan: MongoQueryPlan): WireCommand {
+  async lower(plan: MongoQueryPlan): Promise<WireCommand> {
     this.loweredPlans.push(plan);
     const kind = plan.command.kind;
     const wireKind = kind === 'aggregate' || kind === 'rawAggregate' ? 'aggregate' : 'updateMany';
