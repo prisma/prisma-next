@@ -4,7 +4,6 @@ export type {
   Middleware,
   MiddlewareContext,
 } from '@prisma-next/runtime-executor';
-export type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 export {
   extractCodecIds,
   validateCodecRegistryCompleteness,

@@ -210,7 +210,10 @@ describe('cross-family middleware proof', () => {
       middleware: [middleware],
     });
 
-    for await (const _row of sqlRuntime.execute({
+    const sqlPlan2: ExecutionPlan & {
+      readonly sql: string;
+      readonly params: readonly unknown[];
+    } = {
       sql: 'SELECT 1',
       params: [],
       meta: {
@@ -219,7 +222,9 @@ describe('cross-family middleware proof', () => {
         lane: 'sql',
         paramDescriptors: [],
       },
-    })) {
+    };
+
+    for await (const _row of sqlRuntime.execute(sqlPlan2)) {
       void _row;
     }
 
