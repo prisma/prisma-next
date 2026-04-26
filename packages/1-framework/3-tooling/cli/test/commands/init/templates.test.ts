@@ -106,11 +106,14 @@ describe('templates', () => {
       expect(prismaNextImports).toHaveLength(1);
     });
 
-    it('generates mongo db.ts with single @prisma-next import', () => {
+    it('generates mongo db.ts with lazy facade and DATABASE_URL binding', () => {
       const db = dbFile('mongo');
 
       expect(db).toContain("from '@prisma-next/mongo/runtime'");
-      expect(db).toContain('mongo<Contract>({ contractJson })');
+      expect(db).toContain('mongo<Contract>({');
+      expect(db).toContain('contractJson,');
+      expect(db).toContain("url: process.env['DATABASE_URL']!,");
+      expect(db).not.toContain('await db.connect');
       const prismaNextImports = db.split('\n').filter((l) => l.includes("from '@prisma-next/"));
       expect(prismaNextImports).toHaveLength(1);
     });
@@ -169,11 +172,21 @@ describe('templates', () => {
       expect(md).toContain('mongodb://');
     });
 
-    it('contains ORM query example for mongo', () => {
+    it('contains lazy ORM query example for mongo (no manual connect step)', () => {
       const md = quickReferenceMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
 
-      expect(md).toContain('db.connect(');
-      expect(md).toContain('client.orm.User');
+      expect(md).toContain('db.orm.users');
+      expect(md).toContain('.where({ email:');
+      expect(md).toContain('.first()');
+      expect(md).not.toContain('await db.connect(');
+      expect(md).not.toContain('client.orm.User');
+    });
+
+    it('documents the replica-set requirement for transactions and change streams', () => {
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
+
+      expect(md).toContain('replica set');
+      expect(md).toContain('TML-2313');
     });
   });
 
@@ -215,14 +228,23 @@ describe('templates', () => {
       expect(md).toContain('Workflow for common tasks');
     });
 
-    it('uses ORM query pattern for mongo', () => {
+    it('uses lazy ORM pattern with lowercased plural roots for mongo', () => {
       const md = agentSkillMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
 
       expect(md).toContain('MongoDB');
       expect(md).toContain('@prisma-next/mongo');
-      expect(md).toContain('db.orm.User');
+      expect(md).toContain('db.orm.users');
+      expect(md).toContain('db.orm.posts');
       expect(md).toContain('.first()');
-      expect(md).toContain('Use `db.orm` for queries');
+      expect(md).not.toContain('db.sql');
+      expect(md).not.toContain('db.orm.User');
+    });
+
+    it('documents replica-set requirement and lazy connection for mongo', () => {
+      const md = agentSkillMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
+
+      expect(md).toContain('replica set');
+      expect(md).toContain('connects lazily');
     });
   });
 

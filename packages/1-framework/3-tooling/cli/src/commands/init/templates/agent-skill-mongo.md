@@ -23,71 +23,70 @@ This project uses **Prisma Next** with **MongoDB** via `@prisma-next/mongo`. Pri
 
 ## How to write queries
 
-Always use the ORM (`db.orm`). Only fall back to `db.sql` if the user explicitly asks for raw queries or the ORM doesn't support the operation.
+Use the ORM (`db.orm`). Each root accessor is the lowercased plural form emitted by `prisma-next contract emit` (typically the `@@map`-ped collection name) — for `model User { @@map("users") }` use `db.orm.users`, for `model Post { @@map("posts") }` use `db.orm.posts`. The Mongo facade has no raw-SQL surface; drop down to the underlying `mongodb` driver via `db.runtime()` only when the ORM cannot express the query.
 
 ```typescript
 import { db } from '{{dbImportPath}}';
 
 // Find one record
-const user = await db.orm.User
-  .where(user => user.email.eq('alice@example.com'))
+const user = await db.orm.users
+  .where({ email: 'alice@example.com' })
   .first();
-// Returns { id: ObjectId; email: string; ... } | null
+// Returns { _id: ObjectId; email: string; ... } | null
 
 // Find multiple records
-const users = await db.orm.User
-  .select('id', 'email')
+const users = await db.orm.users
+  .select('_id', 'email')
   .take(10)
   .all();
-// Returns Array<{ id: ObjectId; email: string }>
+// Returns Array<{ _id: ObjectId; email: string }>
 
 // Filter, order, limit
-const recentPosts = await db.orm.Post
-  .where(post => post.authorId.eq(userId))
-  .orderBy(post => post.createdAt.desc())
-  .select('id', 'title', 'createdAt')
+const recentPosts = await db.orm.posts
+  .where({ authorId: userId })
+  .orderBy({ createdAt: -1 })
+  .select('_id', 'title', 'createdAt')
   .take(50)
   .all();
 
-// Include relations
-const usersWithPosts = await db.orm.User
-  .select('id', 'email')
-  .include('posts', post =>
-    post.select('id', 'title').orderBy(p => p.createdAt.desc()).take(5)
-  )
+// Include relations (reference relations only — embedded relations come back automatically)
+const usersWithPosts = await db.orm.users
+  .select('_id', 'email')
+  .include('posts')
   .take(10)
   .all();
 ```
 
 ### Key ORM methods
 
-- `.where(predicate)` — filter records. Predicate receives a model accessor with `.eq()`, `.neq()`, `.ilike()`, `.lt()`, `.gt()`, etc.
+- `.where({ field: value, ... })` — filter records by an equality object. Pass a raw filter expression for `$gt`/`$in`/`$regex` etc.
 - `.select('field1', 'field2', ...)` — pick which fields to return
-- `.orderBy(accessor => accessor.field.asc()` or `.desc())` — sort results
-- `.take(n)` — limit number of results
-- `.all()` — execute and return all matching records as an array
-- `.first()` — execute and return the first matching record, or `null`
-- `.first({ id: value })` — find a single record by primary key, or `null`
-- `.include('relation', builder => ...)` — eager-load a relation
+- `.orderBy({ field: 1 | -1 })` — sort results (1 = ascending, -1 = descending)
+- `.take(n)` / `.skip(n)` — limit and offset
+- `.all()` — execute and return all matching records as an `AsyncIterableResult`
+- `.first()` — execute with limit 1 and return the first matching row, or `null`
+- `.include('relationName')` — eager-load a reference relation (`$lookup`); embedded relations are already part of the row
+- `.variant('VariantName')` — narrow a polymorphic collection to a discriminator value
 
 ## Rules
 
 - **Never hand-edit** `contract.json` or `contract.d.ts`. Always regenerate them with `contract emit`.
 - **Always emit after contract changes.** When you modify `{{schemaPath}}`, run `{{pkgRun}} contract emit` before writing any code that depends on the new or changed models.
-- **Don't restructure `db.ts`.** It's scaffolded by init and works as-is.
-- **Use `db.orm` for queries**, not `db.sql`. The ORM is the primary query surface.
+- **Don't restructure `db.ts`.** It's scaffolded by init and works as-is. `db` connects lazily on the first query — there is no `db.connect(...)` step.
+- **Root accessors are emitter-driven.** Use the lowercased plural collection name (e.g. `db.orm.users`, `db.orm.posts`) — not the PascalCase model name. Re-run `{{pkgRun}} contract emit` if a new model's accessor isn't appearing on `db.orm`.
 - **Connection string** is `DATABASE_URL` in `.env`. If the user reports connection errors, check this value and the `.env` file.
+- **Transactions and change streams** require a MongoDB **replica set**. The Mongo facade does not yet expose `db.transaction(...)` — see the quick reference for the dev-environment options and the linked roadmap ticket.
 
 ## Workflow for common tasks
 
 **User wants to add a new model or field:**
 1. Edit `{{schemaPath}}`
 2. Run `{{pkgRun}} contract emit`
-3. Write query code using `db.orm.ModelName`
+3. Write query code using `db.orm.<collection>` (lowercased plural, see Rules above)
 
 **User wants to query data:**
 1. Import `db` from `{{dbImportPath}}`
-2. Use `db.orm.ModelName` with `.where()`, `.select()`, `.all()`, `.first()`, etc.
+2. Use `db.orm.<collection>` with `.where()`, `.select()`, `.all()`, `.first()`, etc.
 
 **User wants to set up or change the database connection:**
 1. Edit `DATABASE_URL` in `.env`

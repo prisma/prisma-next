@@ -23,15 +23,15 @@ Every model you define in your contract can be queried from your app. Your edito
 ```typescript
 import { db } from '{{dbImportPath}}';
 
-const client = await db.connect(process.env['DATABASE_URL']!, 'mydb');
-
-const user = await client.orm.User
+const user = await db.orm.users
   .where({ email: 'alice@example.com' })
   .first();
 
 // Your editor will show the type of user as
-// { id: ObjectId; email: string; name: string | null; posts: Post[] } | null
+// { _id: ObjectId; email: string; name: string | null; posts: Post[] } | null
 ```
+
+`db` connects to MongoDB lazily on the first query, so there is no manual `connect(...)` step in your application code. Call `await db.close()` if you need to release the underlying connection (typically only in tests or short-lived scripts).
 
 Your contract has two companion files in the same directory:
 
@@ -91,6 +91,16 @@ You can customize how your environment variables are loaded by changing or remov
 1. Edit [`{{schemaPath}}`]({{schemaPath}}) to add or change models.
 2. Run `{{pkgRun}} contract emit` to regenerate the contract.
 3. Query your models — your IDE will autocomplete everything.
+
+## Transactions and change streams (Mongo)
+
+Multi-document transactions and change streams require MongoDB to run as a **replica set** — even single-node setups for development. A standalone `mongod` will reject `withTransaction()` at runtime. For local development you have a few options:
+
+- **Docker Compose:** start `mongo` with `--replSet rs0` and run `rs.initiate()` once.
+- **`mongodb-memory-server`:** use `MongoMemoryReplSet` instead of `MongoMemoryServer` in tests.
+- **MongoDB Atlas:** every Atlas cluster is already a replica set.
+
+The transaction API (`db.transaction(...)`) is on the roadmap and tracked under [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams). Prisma Next's Mongo facade does not expose it yet — drop down to the underlying `mongodb` client via `db.runtime()` if you need transactions before that ticket lands.
 
 ## Monorepo notes (pnpm workspaces)
 
