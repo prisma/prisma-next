@@ -20,6 +20,8 @@
     "@prisma-next/target-mongo": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
+    "@types/node": "catalog:",
+    "dotenv": "^16.4.5",
     "pg": "catalog:"
   }
 }
