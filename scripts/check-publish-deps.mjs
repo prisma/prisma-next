@@ -23,6 +23,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const DEP_FIELDS = /** @type {const} */ ([
   'dependencies',
@@ -31,19 +32,32 @@ const DEP_FIELDS = /** @type {const} */ ([
   'optionalDependencies',
 ]);
 
-const args = new Set(process.argv.slice(2));
-const json = args.has('--json');
-
-function isLeak(spec) {
+/**
+ * Returns true if `spec` is a published-tarball-poisoning specifier
+ * (`workspace:*`, `catalog:foo`, etc.). Both pnpm-internal protocols are
+ * meaningless on the registry and break downstream installs.
+ *
+ * Exported so the unit test in
+ * `test/scripts/check-publish-deps.test.mjs` can exercise the rule
+ * without packing tarballs.
+ */
+export function isLeak(spec) {
   return typeof spec === 'string' && (spec.startsWith('workspace:') || spec.startsWith('catalog:'));
 }
 
-/** @returns {Array<{ field: string; name: string; spec: string }>} */
-function findLeaks(pkgJson) {
+/**
+ * Walks every dependency field on a package.json-shaped object and
+ * returns the list of `(field, name, spec)` triples that
+ * {@link isLeak} flags. Pure / side-effect-free; exported for tests.
+ *
+ * @param {Record<string, unknown>} pkgJson
+ * @returns {Array<{ field: string; name: string; spec: string }>}
+ */
+export function findLeaks(pkgJson) {
   const leaks = [];
   for (const field of DEP_FIELDS) {
     const deps = pkgJson[field];
-    if (!deps) continue;
+    if (!deps || typeof deps !== 'object') continue;
     for (const [name, spec] of Object.entries(deps)) {
       if (isLeak(spec)) {
         leaks.push({ field, name, spec });
@@ -97,6 +111,9 @@ function tarballNameFor(pkgName, version) {
 }
 
 function main() {
+  const args = new Set(process.argv.slice(2));
+  const json = args.has('--json');
+
   const dirs = listPublishablePackageDirs();
   const dest = mkdtempSync(join(tmpdir(), 'pn-publish-check-'));
 
@@ -154,4 +171,9 @@ function main() {
   }
 }
 
-main();
+// Only run `main` when invoked directly. Importing the module from a unit
+// test (or any other tool) gets you the pure helpers (`findLeaks`,
+// `isLeak`) without packing every workspace tarball.
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main();
+}
