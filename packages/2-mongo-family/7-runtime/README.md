@@ -14,6 +14,6 @@ MongoDB runtime executor for Prisma Next.
 - **Depends on**:
   - `@prisma-next/mongo-lowering` (`MongoAdapter`, `MongoDriver` interfaces)
   - `@prisma-next/mongo-query-ast` (`MongoQueryPlan`, `AnyMongoCommand` — the typed plan shape)
-  - `@prisma-next/runtime-executor` (`AsyncIterableResult` return type)
+  - `@prisma-next/framework-components` (`AsyncIterableResult` return type, `RuntimeMiddleware` SPI)
 - **Depended on by**:
   - Integration tests (`test/integration/test/mongo/`)
