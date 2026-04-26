@@ -48,6 +48,7 @@ vi.mock('../../../src/control-api/operations/contract-emit', () => ({
 
 import { execFile } from 'node:child_process';
 import * as clack from '@clack/prompts';
+import { detectPnpmCatalogOverrides } from '../../../src/commands/init/detect-pnpm-catalog';
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
@@ -56,6 +57,7 @@ import {
   INIT_EXIT_USER_ABORTED,
 } from '../../../src/commands/init/exit-codes';
 import {
+  buildCatalogWarnings,
   isRecognisedPnpmResolutionError,
   redactSecrets,
   runInit,
@@ -890,5 +892,274 @@ describe('deriveCanPrompt (F14, action-handler bridge)', () => {
     expect(
       deriveCanPrompt({ flagsInteractive: false, optionInteractive: undefined, stdinIsTTY: false }),
     ).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// F03 / FR7.3 — pnpm workspace catalog detection + structured warning
+// ---------------------------------------------------------------------------
+
+describe('detectPnpmCatalogOverrides (F03)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-catalog-detect-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns null when no pnpm-workspace.yaml exists in any ancestor', () => {
+    const result = detectPnpmCatalogOverrides(tmpDir, ['prisma-next']);
+    expect(result).toBeNull();
+  });
+
+  it('returns matching catalog entries with their raw version strings', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      [
+        'packages:',
+        '  - packages/*',
+        '',
+        'catalog:',
+        '  arktype: ^2.0.0',
+        '  prisma-next: 1.2.3',
+        "  '@prisma-next/postgres': ^1.0.0",
+        '',
+      ].join('\n'),
+    );
+    const result = detectPnpmCatalogOverrides(tmpDir, [
+      'prisma-next',
+      '@prisma-next/postgres',
+      '@prisma-next/mongo',
+    ]);
+    expect(result).not.toBeNull();
+    expect(result?.entries).toEqual([
+      { name: 'prisma-next', version: '1.2.3' },
+      { name: '@prisma-next/postgres', version: '^1.0.0' },
+    ]);
+  });
+
+  it('returns an empty entries list when the catalog has no relevant overrides', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  arktype: ^2.0.0', '  vitest: 4.0.0', ''].join('\n'),
+    );
+    const result = detectPnpmCatalogOverrides(tmpDir, ['prisma-next']);
+    expect(result?.entries).toEqual([]);
+  });
+
+  it('finds pnpm-workspace.yaml in an ancestor directory', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', "  '@prisma-next/postgres': 2.0.0", ''].join('\n'),
+    );
+    const child = join(tmpDir, 'apps', 'web');
+    mkdirSync(child, { recursive: true });
+    writeFileSync(join(child, 'package.json'), JSON.stringify({ name: 'web' }));
+
+    const result = detectPnpmCatalogOverrides(child, ['@prisma-next/postgres']);
+    expect(result?.entries).toEqual([{ name: '@prisma-next/postgres', version: '2.0.0' }]);
+  });
+
+  it('stops scanning the catalog block at the next top-level key', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  prisma-next: 1.0.0', 'overrides:', '  prisma-next: 9.9.9', ''].join('\n'),
+    );
+    const result = detectPnpmCatalogOverrides(tmpDir, ['prisma-next']);
+    expect(result?.entries).toEqual([{ name: 'prisma-next', version: '1.0.0' }]);
+  });
+
+  it('ignores `catalogs:` (named catalogs) — only the unnamed top-level catalog applies', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalogs:', '  legacy:', '    prisma-next: 0.0.1', ''].join('\n'),
+    );
+    const result = detectPnpmCatalogOverrides(tmpDir, ['prisma-next']);
+    expect(result?.entries).toEqual([]);
+  });
+});
+
+describe('buildCatalogWarnings (F03 message shape)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-catalog-warn-'));
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('returns no warnings when no workspace exists', () => {
+    expect(buildCatalogWarnings(tmpDir, ['prisma-next'])).toEqual([]);
+  });
+
+  it('returns a single structured warning naming each overridden entry and the source file', () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  prisma-next: 1.2.3', "  '@prisma-next/postgres': ^1.0.0", ''].join('\n'),
+    );
+    const warnings = buildCatalogWarnings(tmpDir, ['prisma-next', '@prisma-next/postgres']);
+    expect(warnings).toHaveLength(1);
+    const text = warnings[0] ?? '';
+    expect(text).toContain('pnpm workspace catalog overrides detected');
+    expect(text).toContain('prisma-next: 1.2.3');
+    expect(text).toContain('@prisma-next/postgres: ^1.0.0');
+    expect(text).toContain('pnpm-workspace.yaml');
+    expect(text).toMatch(/remove or update the catalog entry/);
+  });
+});
+
+describe('runInit catalog warning surface (F03 / FR7.3)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-catalog-runinit-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    // `pnpm-lock.yaml` makes the package-manager detector pick pnpm —
+    // catalog warnings only fire for pnpm runs.
+    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+    vi.clearAllMocks();
+    vi.mocked(execFile).mockImplementation(
+      (_cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+        const callback = cb as (err: null) => void;
+        callback(null);
+        return undefined as never;
+      },
+    );
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('surfaces a catalog override warning in --json output when pnpm-workspace.yaml pins our packages', async () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', "  '@prisma-next/postgres': 1.0.0", '  prisma-next: 1.2.3', ''].join('\n'),
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: true },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_OK);
+
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      const allWarnings = parsed.warnings.join('\n');
+      expect(allWarnings).toMatch(/catalog overrides detected/);
+      expect(allWarnings).toContain('@prisma-next/postgres: 1.0.0');
+      expect(allWarnings).toContain('prisma-next: 1.2.3');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('does not surface a catalog warning when the workspace catalog has no relevant entries', async () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  vitest: 4.0.0', ''].join('\n'),
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: true },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_OK);
+
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      expect(parsed.warnings.join('\n')).not.toMatch(/catalog overrides detected/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('still surfaces the catalog warning under --no-install (manual-steps path)', async () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_OK);
+
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      expect(parsed.warnings.join('\n')).toMatch(/catalog overrides detected/);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('suppresses the catalog warning when the pnpm → npm fallback fires (npm bypasses the catalog)', async () => {
+    writeFileSync(
+      join(tmpDir, 'pnpm-workspace.yaml'),
+      ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
+    );
+    vi.mocked(execFile).mockImplementation(
+      (cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+        const callback = cb as (err: unknown, stdout?: string, stderr?: string) => void;
+        if (cmd === 'pnpm') {
+          callback(
+            Object.assign(new Error('pnpm failed'), {
+              stderr:
+                'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND In packages/foo: "@prisma-next/utils@workspace:*"',
+            }),
+          );
+        } else {
+          callback(null, '', '');
+        }
+        return undefined as never;
+      },
+    );
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: true },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_OK);
+
+      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+      const allWarnings = parsed.warnings.join('\n');
+      // Fallback warning replaces the catalog warning so the user gets
+      // one consistent message rather than two contradictory ones.
+      expect(allWarnings).toMatch(/Falling back to `npm install`/);
+      expect(allWarnings).not.toMatch(/catalog overrides detected/);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

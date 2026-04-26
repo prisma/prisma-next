@@ -35,6 +35,7 @@ Closes FR7. Unblocks `pnpm dlx` for the published packages and is a precondition
 - [ ] Add a publish-time CI gate that fails when any published package has a `workspace:*` / `catalog:` dependency.
 - [ ] Strip the leak in `@prisma-next/migration-tools` (and any other offenders found by the audit).
 - [ ] Implement the `pnpm` → `npm` fallback in `init` with a clear warning on the recognised error class.
+- [ ] Detect `pnpm-workspace.yaml` catalog entries that override the packages `init` installs and emit a structured warning (FR7.3 / Decision 8).
 - [ ] Document workspace-catalog interaction with `pnpm dlx` in `prisma-next.md` (FR7.3).
 
 ### Milestone 3 — Mongo facade parity (R2)
