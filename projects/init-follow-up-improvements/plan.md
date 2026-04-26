@@ -70,9 +70,9 @@ Closes FR5. Eliminates the "TS-authoring users get PSL docs" mismatch and the fo
 
 **Tasks (sketch):**
 
-- [ ] Reconcile the Postgres and Mongo TS schema templates to a single shape (FR5.3).
-- [ ] Parametrise `prisma-next.md` and `agent-skill-{postgres,mongo}.md` by `(target, authoring)`.
-- [ ] Add snapshot tests covering all four cells (FR5.4); each scaffolded project typechecks against the published facade.
+- [x] Reconcile the Postgres and Mongo TS schema templates to a single shape (FR5.3) — both targets now use the callback-factory `defineContract` signature, string relation references, and inline `relations: { ... }` (axes 1, 2, 4 of F17). Axis 3 (`field.text` vs `field.string`) is a genuine storage-capability difference and is intentionally preserved.
+- [x] Parametrise `prisma-next.md` and `agent-skill-{postgres,mongo}.md` by `(target, authoring)` — `quickReferenceMd` injects an authoring-appropriate schema sample (PSL `model { … }` for PSL, TS `defineContract(...)` for TypeScript); `agentSkillMd` labels the contract file by authoring style.
+- [x] Add snapshot tests covering all four cells (FR5.4) in `templates.test.ts`; the per-cell typecheck guarantee against the published facade is delivered by `test/integration/test/cli.init-templates.e2e.test.ts` (already in place from M4 / FR2.3).
 
 ### Milestone 6 — Hostile-input survival + atomic init (R7, R10)
 

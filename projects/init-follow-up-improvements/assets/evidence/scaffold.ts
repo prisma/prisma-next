@@ -45,10 +45,13 @@ const files = [
   { path: schemaPath, content: starterSchema(target, authoring) },
   { path: 'prisma-next.config.ts', content: configFile(target, configPath) },
   { path: join(schemaDir, 'db.ts'), content: dbFile(target) },
-  { path: 'prisma-next.md', content: quickReferenceMd(target, schemaPath, 'pnpm prisma-next') },
+  {
+    path: 'prisma-next.md',
+    content: quickReferenceMd(target, authoring, schemaPath, 'pnpm prisma-next'),
+  },
   {
     path: '.agents/skills/prisma-next/SKILL.md',
-    content: agentSkillMd(target, schemaPath, 'pnpm prisma-next'),
+    content: agentSkillMd(target, authoring, schemaPath, 'pnpm prisma-next'),
   },
 ];
 

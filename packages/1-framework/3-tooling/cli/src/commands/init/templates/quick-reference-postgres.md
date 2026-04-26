@@ -8,15 +8,7 @@ This project is set up for PostgreSQL. Prisma Next also supports other databases
 
 Your data contract is the heart of your application. It lives at [`{{schemaPath}}`]({{schemaPath}}) and describes your models:
 
-```prisma
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  posts     Post[]
-  createdAt DateTime @default(now())
-}
-```
+{{schemaSample}}
 
 Every model you define in your contract can be queried from your app. Your editor will autocomplete the query methods and show you what type each model field is:
 

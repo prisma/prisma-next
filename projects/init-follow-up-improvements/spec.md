@@ -176,10 +176,10 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Templates × authoring (FR5)
 
-- [ ] `prisma-next init --target postgres --authoring typescript` produces a `prisma-next.md` whose schema example block is TypeScript (no PSL `model { ... }`).
-- [ ] Same for Mongo.
-- [ ] The agent-skill file in a TS-authoring scaffold references `prisma/contract.ts` (not `.prisma`).
-- [ ] The Postgres TS template and the Mongo TS template share `defineContract` signature, builder API shape, and field method names where capabilities overlap. (Snapshot test.)
+- [x] `prisma-next init --target postgres --authoring typescript` produces a `prisma-next.md` whose schema example block is TypeScript (no PSL `model { ... }`).
+- [x] Same for Mongo.
+- [x] The agent-skill file in a TS-authoring scaffold references `prisma/contract.ts` (not `.prisma`).
+- [x] The Postgres TS template and the Mongo TS template share `defineContract` signature, builder API shape, and field method names where capabilities overlap. (Snapshot test.)
 
 ## Hostile inputs (FR6)
 
