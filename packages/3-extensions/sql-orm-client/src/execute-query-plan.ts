@@ -1,4 +1,4 @@
-import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { RuntimeScope } from './types';
 

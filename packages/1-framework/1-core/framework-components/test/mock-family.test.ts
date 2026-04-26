@@ -1,12 +1,8 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type {
-  ExecutionPlan,
-  QueryPlan,
-  RuntimeMiddleware,
-  RuntimeMiddlewareContext,
-} from '@prisma-next/framework-components/runtime';
-import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
+import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
+import { RuntimeCore } from '../src/runtime-core';
+import type { RuntimeMiddleware, RuntimeMiddlewareContext } from '../src/runtime-middleware';
 
 /**
  * Cross-family demonstration: a fictional "mock" family extends the
@@ -16,10 +12,9 @@ import { describe, expect, it } from 'vitest';
  * base is family-agnostic — i.e. SQL and Mongo are not the only families
  * that can plug in.
  *
- * This file evolved from a `RuntimeCoreImpl`-shaped mock-family test
- * landed by the cross-family middleware SPI project. Adapted in this
- * project's M2 to point at the new abstract base instead. See
- * `projects/cross-family-runtime-unification/plan.md` § Milestone 2.
+ * Originated as a mock-family test for the cross-family middleware SPI
+ * project; relocated to framework-components alongside the abstract
+ * `RuntimeCore` base in the cross-family runtime unification project.
  */
 
 interface MockContract {
