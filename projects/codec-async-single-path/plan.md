@@ -21,52 +21,73 @@ Single branch (`feat/codec-async-single-path`), milestone-by-milestone with inte
 
 ## Milestones
 
-### Milestone 1: Codec interface + factory
+### Milestone 1 (m1): Codec interface + factory
 
 Establishes the public `Codec` shape and the `codec()` factory. Demonstrable via interface and factory unit tests covering both sync and async author forms.
 
 **Tasks:**
 
-- [ ] Write tests for the public `Codec` interface shape: `encode` / `decode` required and Promise-returning, `encodeJson` / `decodeJson` required and synchronous, `renderOutputType` optional and synchronous, no `runtime` / `kind` / `TRuntime` discriminators.
-- [ ] Write tests for `codec()` factory: accepts sync `encode` / `decode`, accepts async `encode` / `decode`, accepts mixed (sync `encode`, async `decode` and vice versa), installs identity default when `encode` is omitted, passes `encodeJson` / `decodeJson` / `renderOutputType` through unchanged.
-- [ ] Update [`packages/1-framework/1-core/framework-components/src/codec-types.ts`](../../packages/1-framework/1-core/framework-components/src/codec-types.ts): `Codec<Id, Traits, Wire, Input, Output>` with Promise-returning query-time methods, synchronous build-time methods, no async marker.
-- [ ] Update [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts): export the `codec()` factory; accept sync-or-async author functions; lift sync via `async (x) => fn(x)`; install identity default when `encode` omitted.
-- [ ] Run interface/factory tests; iterate until green.
-- [ ] Internal review/refine gate: confirm M1 interface + factory shape with the project owner before starting M2.
+- [ ] **T1.1** Write tests for the public `Codec` interface shape: `encode` / `decode` required and Promise-returning, `encodeJson` / `decodeJson` required and synchronous, `renderOutputType` optional and synchronous, no `runtime` / `kind` / `TRuntime` discriminators.
+- [ ] **T1.2** Write tests for `codec()` factory: accepts sync `encode` / `decode`, accepts async `encode` / `decode`, accepts mixed (sync `encode`, async `decode` and vice versa), installs identity default when `encode` is omitted, passes `encodeJson` / `decodeJson` / `renderOutputType` through unchanged.
+- [ ] **T1.3** Update [`packages/1-framework/1-core/framework-components/src/codec-types.ts`](../../packages/1-framework/1-core/framework-components/src/codec-types.ts): `Codec<Id, Traits, Wire, Input, Output>` with Promise-returning query-time methods, synchronous build-time methods, no async marker.
+- [ ] **T1.4** Update [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts): export the `codec()` factory; accept sync-or-async author functions; lift sync via `async (x) => fn(x)`; install identity default when `encode` omitted.
+- [ ] **T1.5** Run interface/factory tests; iterate until green.
+- [ ] **T1.6** Internal review/refine gate: confirm M1 interface + factory shape with the project owner before starting M2.
 
-### Milestone 2: SQL runtime (always-await, concurrent dispatch)
+**Validation gate:**
+
+- `pnpm typecheck` — workspace-wide (M1 changes a public type that other packages reference).
+- `pnpm test:packages` — workspace-wide (any consumer test that constructs a codec exercises the new shape).
+- `pnpm lint:deps` — no new layering violations introduced.
+- Type-only assertion (covered by T1.1/T1.5 tests): `validateContract<Contract>(contractJson)` and `postgres({...})` infer as synchronous (no `await` required at call site).
+
+### Milestone 2 (m2): SQL runtime (always-await, concurrent dispatch)
 
 The SQL runtime adopts a single async path per direction. Demonstrable via a SQL runtime exercising async and sync codecs end-to-end, with per-row `Promise.all` dispatch and standard error envelopes.
 
 **Tasks:**
 
-- [ ] Write tests for `encodeParams`: concurrent dispatch via `Promise.all`, mixed sync/async parameter codecs, error envelope wrapping (`RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and `cause`).
-- [ ] Write tests for `decodeRow` / `decodeField`: concurrent dispatch via `Promise.all`, JSON-Schema validation against resolved values, error envelope wrapping (`RUNTIME.DECODE_FAILED` with `{ table, column, codec }` and `cause`), single-armed `decodeField` (no per-codec branch).
-- [ ] Update [`packages/2-sql/5-runtime/src/codecs/encoding.ts`](../../packages/2-sql/5-runtime/src/codecs/encoding.ts): `encodeParams` async with `Promise.all`; `encodeParam` always awaits; standard envelope on failure.
-- [ ] Update [`packages/2-sql/5-runtime/src/codecs/decoding.ts`](../../packages/2-sql/5-runtime/src/codecs/decoding.ts): `decodeRow` async with per-cell `Promise.all`; single-armed `decodeField` (codec → await → JSON-Schema validate → return plain value); standard envelope on failure.
-- [ ] Verify [`packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts`](../../packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts) operates on resolved values; no shape changes expected, but confirm `validateJsonValue` is called after `await`.
-- [ ] Update [`packages/2-sql/5-runtime/src/sql-runtime.ts`](../../packages/2-sql/5-runtime/src/sql-runtime.ts): one async path per direction; remove any plan-walker / `WeakMap` cache / `instanceof Promise` defensive guards (none should exist on `main`, but verify).
-- [ ] Add regression test: `validateContract` stays synchronous (typed assertion + runtime check that no `await` is required).
-- [ ] Add regression test: `postgres({...})` client construction stays synchronous.
-- [ ] Run SQL runtime tests; iterate until green.
-- [ ] Internal review/refine gate: confirm M2 runtime shape with the project owner before starting M3.
+- [ ] **T2.1** Write tests for `encodeParams`: concurrent dispatch via `Promise.all`, mixed sync/async parameter codecs, error envelope wrapping (`RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and `cause`).
+- [ ] **T2.2** Write tests for `decodeRow` / `decodeField`: concurrent dispatch via `Promise.all`, JSON-Schema validation against resolved values, error envelope wrapping (`RUNTIME.DECODE_FAILED` with `{ table, column, codec }` and `cause`), single-armed `decodeField` (no per-codec branch).
+- [ ] **T2.3** Update [`packages/2-sql/5-runtime/src/codecs/encoding.ts`](../../packages/2-sql/5-runtime/src/codecs/encoding.ts): `encodeParams` async with `Promise.all`; `encodeParam` always awaits; standard envelope on failure.
+- [ ] **T2.4** Update [`packages/2-sql/5-runtime/src/codecs/decoding.ts`](../../packages/2-sql/5-runtime/src/codecs/decoding.ts): `decodeRow` async with per-cell `Promise.all`; single-armed `decodeField` (codec → await → JSON-Schema validate → return plain value); standard envelope on failure.
+- [ ] **T2.5** Verify [`packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts`](../../packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts) operates on resolved values; no shape changes expected, but confirm `validateJsonValue` is called after `await`.
+- [ ] **T2.6** Update [`packages/2-sql/5-runtime/src/sql-runtime.ts`](../../packages/2-sql/5-runtime/src/sql-runtime.ts): one async path per direction; remove any plan-walker / `WeakMap` cache / `instanceof Promise` defensive guards (none should exist on `main`, but verify).
+- [ ] **T2.7** Add regression test: `validateContract` stays synchronous (typed assertion + runtime check that no `await` is required).
+- [ ] **T2.8** Add regression test: `postgres({...})` client construction stays synchronous.
+- [ ] **T2.9** Run SQL runtime tests; iterate until green.
+- [ ] **T2.10** Internal review/refine gate: confirm M2 runtime shape with the project owner before starting M3.
 
-### Milestone 3: ORM client types and dispatch
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration` — SQL runtime is exercised by integration tests.
+- `pnpm lint:deps`
+
+### Milestone 3 (m3): ORM client types and dispatch
 
 Collapses read/write field type-maps to a single shared map; ORM dispatch awaits uniformly per row. Demonstrable via end-to-end ORM tests where async-codec columns surface plain `T` on both reads and writes.
 
 **Tasks:**
 
-- [ ] Write type tests for `DefaultModelRow` / `InferRootRow` with mixed sync/async codec columns: row fields are plain `T` (not `Promise<T>` or `T | Promise<T>`), in both `.first()` and streaming (`for await`) paths.
-- [ ] Write type tests for write surfaces (`MutationUpdateInput`, `CreateInput`, `UniqueConstraintCriterion`, `ShorthandWhereFilter`, `DefaultModelInputRow`): inputs are plain `T`.
-- [ ] Update [`packages/3-extensions/sql-orm-client/src/types.ts`](../../packages/3-extensions/sql-orm-client/src/types.ts): one field type-map shared by read and write surfaces; remove any read/write split for codec output types (none should exist on `main`, but verify against the spec — the constraint is "do not introduce a split").
-- [ ] Update [`packages/3-extensions/sql-orm-client/src/collection-dispatch.ts`](../../packages/3-extensions/sql-orm-client/src/collection-dispatch.ts): per-row decoding awaits uniformly; row yields plain values to consumers.
-- [ ] Add E2E test: query roundtrip with an async codec column exposes plain values on the resulting row, both via `.first()` and via `for await` streaming.
-- [ ] Add E2E test: write surface accepts plain `T` for an async-codec column; encode runs through the runtime's async path.
-- [ ] Run ORM client tests; iterate until green.
-- [ ] Internal review/refine gate: confirm M3 client surface with the project owner before starting M4.
+- [ ] **T3.1** Write type tests for `DefaultModelRow` / `InferRootRow` with mixed sync/async codec columns: row fields are plain `T` (not `Promise<T>` or `T | Promise<T>`), in both `.first()` and streaming (`for await`) paths.
+- [ ] **T3.2** Write type tests for write surfaces (`MutationUpdateInput`, `CreateInput`, `UniqueConstraintCriterion`, `ShorthandWhereFilter`, `DefaultModelInputRow`): inputs are plain `T`.
+- [ ] **T3.3** Update [`packages/3-extensions/sql-orm-client/src/types.ts`](../../packages/3-extensions/sql-orm-client/src/types.ts): one field type-map shared by read and write surfaces; remove any read/write split for codec output types (none should exist on `main`, but verify against the spec — the constraint is "do not introduce a split").
+- [ ] **T3.4** Update [`packages/3-extensions/sql-orm-client/src/collection-dispatch.ts`](../../packages/3-extensions/sql-orm-client/src/collection-dispatch.ts): per-row decoding awaits uniformly; row yields plain values to consumers.
+- [ ] **T3.5** Add E2E test: query roundtrip with an async codec column exposes plain values on the resulting row, both via `.first()` and via `for await` streaming.
+- [ ] **T3.6** Add E2E test: write surface accepts plain `T` for an async-codec column; encode runs through the runtime's async path.
+- [ ] **T3.7** Run ORM client tests; iterate until green.
+- [ ] **T3.8** Internal review/refine gate: confirm M3 client surface with the project owner before starting M4.
 
-### Milestone 4: Cross-family parity (Mongo)
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration` — ORM client integration coverage.
+- `pnpm lint:deps`
+
+### Milestone 4 (m4): Cross-family parity (Mongo)
 
 The Mongo `Codec` interface, factory, and encode-side runtime invocation pattern match SQL's. Demonstrable via a cross-family test that imports a single codec module and exercises it against both runtimes, plus a reshape of `resolveValue` / `MongoAdapter.lower()` / `MongoRuntime.execute()` to the always-await pattern.
 
@@ -74,37 +95,52 @@ The Mongo `Codec` interface, factory, and encode-side runtime invocation pattern
 
 **Tasks:**
 
-- [ ] Write a cross-family test: a single `codec({...})` value is imported into both a SQL runtime fixture and a Mongo runtime fixture; encoding (and, for the SQL fixture, decoding) produces identical results for matching wire inputs.
-- [ ] Update [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts`](../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts): adopt the unified `Codec` interface (re-export from `framework-components` or align the local shape), adopt the same factory entry point (`mongoCodec` accepts sync-or-async `encode` / `decode`, lifts sync), ensure query-time methods on the constructed codec are Promise-returning.
-- [ ] Update built-in Mongo codecs ([`packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts)) to use the unified factory; codec definitions stay sync (factory lifts).
-- [ ] Write tests for `resolveValue`: async dispatch, concurrent encoding of multiple codec-encoded leaves via `Promise.all`, identity passthrough for non-`MongoParamRef` values.
-- [ ] Update [`packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts): async; for object/array nodes, dispatch child resolutions concurrently via `Promise.all`; await `codec.encode(...)` when present.
-- [ ] Update [`packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts): `MongoAdapterImpl.lower()` async; `#resolveDocument` async (`Promise.all` over entries).
-- [ ] Update the `MongoAdapter` interface in [`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts`](../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts) to make `lower()` async (`Promise<AnyMongoWireCommand>`).
-- [ ] Update [`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts): `execute()` awaits `adapter.lower(plan)` before passing to the driver.
-- [ ] Update existing test fixtures: [`resolve-value.test.ts`](../../packages/3-mongo-target/2-mongo-adapter/test/resolve-value.test.ts) and [`mongo-adapter.test.ts`](../../packages/3-mongo-target/2-mongo-adapter/test/mongo-adapter.test.ts) — `await` expectations.
-- [ ] Add regression test: `validateContract` for Mongo contracts stays synchronous; client construction stays sync.
-- [ ] Run Mongo + cross-family tests; iterate until green.
-- [ ] Internal review/refine gate: confirm M4 cross-family parity with the project owner before starting M5.
+- [ ] **T4.1** Write a cross-family test: a single `codec({...})` value is imported into both a SQL runtime fixture and a Mongo runtime fixture; encoding (and, for the SQL fixture, decoding) produces identical results for matching wire inputs.
+- [ ] **T4.2** Update [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts`](../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts): adopt the unified `Codec` interface (re-export from `framework-components` or align the local shape), adopt the same factory entry point (`mongoCodec` accepts sync-or-async `encode` / `decode`, lifts sync), ensure query-time methods on the constructed codec are Promise-returning.
+- [ ] **T4.3** Update built-in Mongo codecs ([`packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/core/codecs.ts)) to use the unified factory; codec definitions stay sync (factory lifts).
+- [ ] **T4.4** Write tests for `resolveValue`: async dispatch, concurrent encoding of multiple codec-encoded leaves via `Promise.all`, identity passthrough for non-`MongoParamRef` values.
+- [ ] **T4.5** Update [`packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts): async; for object/array nodes, dispatch child resolutions concurrently via `Promise.all`; await `codec.encode(...)` when present.
+- [ ] **T4.6** Update [`packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts): `MongoAdapterImpl.lower()` async; `#resolveDocument` async (`Promise.all` over entries).
+- [ ] **T4.7** Update the `MongoAdapter` interface in [`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts`](../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts) to make `lower()` async (`Promise<AnyMongoWireCommand>`).
+- [ ] **T4.8** Update [`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts): `execute()` awaits `adapter.lower(plan)` before passing to the driver.
+- [ ] **T4.9** Update existing test fixtures: [`resolve-value.test.ts`](../../packages/3-mongo-target/2-mongo-adapter/test/resolve-value.test.ts) and [`mongo-adapter.test.ts`](../../packages/3-mongo-target/2-mongo-adapter/test/mongo-adapter.test.ts) — `await` expectations.
+- [ ] **T4.10** Add regression test: `validateContract` for Mongo contracts stays synchronous; client construction stays sync.
+- [ ] **T4.11** Run Mongo + cross-family tests; iterate until green.
+- [ ] **T4.12** Internal review/refine gate: confirm M4 cross-family parity with the project owner before starting M5.
 
-### Milestone 5: Security tests, ADR, and close-out
+**Validation gate:**
+
+- `pnpm typecheck`
+- `pnpm test:packages`
+- `pnpm test:integration` — Mongo + cross-family integration tests.
+- `pnpm lint:deps`
+- Cross-package consumer audit: `rg -n "\\.lower\\(" packages/ examples/ test/` should show only awaited call sites for `MongoAdapter.lower`. Same audit for `resolveValue(` to confirm async signature change is propagated.
+
+### Milestone 5 (m5): Security tests, ADR, and close-out
 
 Translates PR #375's security tests and fixtures to the new runtime; writes the ADR; closes the project.
 
 **Tasks:**
 
-- [ ] Translate envelope-redaction tests from PR #375 to the new SQL runtime; verify codec error messages route via `cause` and bounded `wirePreview` is enforced.
-- [ ] Translate validator-message redaction tests from PR #375; verify the trigger fires when expected.
-- [ ] Translate JSON-Schema failure shape tests from PR #375.
-- [ ] Translate include-aggregate test patterns from PR #375.
-- [ ] Add (or translate) the `seeded-secret-codec` fixture: realistic crypto path via async `encode` / `decode`; exercise end-to-end including envelope redaction on failure.
-- [ ] Author the new ADR (e.g. *ADR 0NN — Single-Path Async Codec Runtime*) documenting: single-path query-time design; build-time vs. query-time seam; cross-family portability requirement (interface always; encode-side runtime pattern parity in this project); walk-back framing for the future sync fast path; explicit list of walk-back constraints to preserve.
-- [ ] Add a "Superseded by" pointer at the top of [ADR 030](../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md) for the async-runtime parts the new ADR replaces.
-- [ ] Update affected package READMEs (`framework-components`, `relational-core`, `sql-orm-client`, `mongo-codec`, `mongo-adapter`) where their public surface narrative changes.
-- [ ] Verify all spec acceptance criteria are met; produce a brief verification note (paste-into-PR-description-friendly).
-- [ ] Migrate the ADR (and any long-lived doc) into `docs/`.
-- [ ] Strip repo-wide references to `projects/codec-async-single-path/**` (replace with canonical `docs/` links or remove).
-- [ ] As part of the implementation PR (or a follow-up close-out PR): delete `projects/codec-async-single-path/`.
+- [ ] **T5.1** Translate envelope-redaction tests from PR #375 to the new SQL runtime; verify codec error messages route via `cause` and bounded `wirePreview` is enforced.
+- [ ] **T5.2** Translate validator-message redaction tests from PR #375; verify the trigger fires when expected.
+- [ ] **T5.3** Translate JSON-Schema failure shape tests from PR #375.
+- [ ] **T5.4** Translate include-aggregate test patterns from PR #375.
+- [ ] **T5.5** Add (or translate) the `seeded-secret-codec` fixture: realistic crypto path via async `encode` / `decode`; exercise end-to-end including envelope redaction on failure.
+- [ ] **T5.6** Author the new ADR (e.g. *ADR 0NN — Single-Path Async Codec Runtime*) documenting: single-path query-time design; build-time vs. query-time seam; cross-family portability requirement (interface always; encode-side runtime pattern parity in this project); walk-back framing for the future sync fast path; explicit list of walk-back constraints to preserve.
+- [ ] **T5.7** Add a "Superseded by" pointer at the top of [ADR 030](../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md) for the async-runtime parts the new ADR replaces.
+- [ ] **T5.8** Update affected package READMEs (`framework-components`, `relational-core`, `sql-orm-client`, `mongo-codec`, `mongo-adapter`) where their public surface narrative changes.
+- [ ] **T5.9** Verify all spec acceptance criteria are met; produce a brief verification note (paste-into-PR-description-friendly).
+- [ ] **T5.10** Migrate the ADR (and any long-lived doc) into `docs/`.
+- [ ] **T5.11** Strip repo-wide references to `projects/codec-async-single-path/**` (replace with canonical `docs/` links or remove).
+- [ ] **T5.12** As part of the implementation PR (or a follow-up close-out PR): delete `projects/codec-async-single-path/`.
+
+**Validation gate:**
+
+- `pnpm test:all` — full suite as the final gate.
+- `pnpm typecheck`
+- `pnpm lint:deps`
+- `pnpm build`
 
 ## Test Coverage
 
