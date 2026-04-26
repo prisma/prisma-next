@@ -83,9 +83,13 @@ function makeContract(
 }
 
 function bareContract(storageHash: string): MongoContract {
-  // Same rationale as `makeContract` above: data-transform tests only need
-  // a destination storage hash on the contract; everything else is unused.
-  return { storage: { storageHash } } as unknown as MongoContract;
+  // Same rationale as `makeContract` above. The post-apply verify step also
+  // reads `storage.collections` via `contractToMongoSchemaIR`, so the empty
+  // map is required for runner.execute() to reach a passing verify against
+  // an unconstrained live schema.
+  return {
+    storage: { storageHash, collections: {} },
+  } as unknown as MongoContract;
 }
 
 function planForContract(
@@ -513,6 +517,7 @@ describe('MongoMigrationRunner - data transforms', () => {
       plan: makeDataTransformPlan([op]),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
+      strictVerification: false,
       frameworkComponents: [],
     });
 
@@ -559,6 +564,7 @@ describe('MongoMigrationRunner - data transforms', () => {
       plan: makeDataTransformPlan([op]),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
+      strictVerification: false,
       frameworkComponents: [],
     });
 
@@ -606,6 +612,7 @@ describe('MongoMigrationRunner - data transforms', () => {
       plan: makeDataTransformPlan([op]),
       destinationContract: bareContract('sha256:dest-dt'),
       policy: { allowedOperationClasses: ['data'] },
+      strictVerification: false,
       frameworkComponents: [],
     });
 
@@ -838,6 +845,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
       plan,
       destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
+      strictVerification: false,
       frameworkComponents: [],
     });
     expect(result1.ok).toBe(true);
@@ -851,6 +859,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
       plan,
       destinationContract: bareContract('sha256:retry'),
       policy: { allowedOperationClasses: ['data'] },
+      strictVerification: false,
       frameworkComponents: [],
     });
     // Marker has been wiped, but the postcheck (no docs missing `active`) is
