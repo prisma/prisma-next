@@ -48,18 +48,21 @@ export interface CodecMeta {
 /**
  * SQL codec interface — extends the framework base with SQL-specific fields.
  *
- * Codecs are pure, synchronous functions with no side effects or IO.
- * They provide deterministic conversion between database wire types and JS values,
- * and between JS values and contract JSON.
+ * Query-time methods (`encode`, `decode`) are Promise-returning at the boundary;
+ * authors may write them as sync or async, and the `codec()` factory lifts sync
+ * functions transparently. Build-time methods (`encodeJson`, `decodeJson`,
+ * `renderOutputType`) stay synchronous so `validateContract` and client
+ * construction remain sync.
  */
 export interface Codec<
   Id extends string = string,
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
-  TJs = unknown,
+  TInput = unknown,
+  TOutput = TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TJs> {
+> extends BaseCodec<Id, TTraits, TWire, TInput, TOutput> {
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -180,30 +183,44 @@ class CodecRegistryImpl implements CodecRegistry {
 }
 
 /**
- * Codec factory - creates a codec with typeId and encode/decode functions.
- * Provides identity defaults for encodeJson/decodeJson when not supplied.
+ * Codec factory — constructs a codec from sync or async author functions.
+ *
+ * Query-time methods (`encode`, `decode`) accept either `T => U` or
+ * `T => Promise<U>` author functions; sync functions are lifted to
+ * Promise-shaped methods via `async (x) => fn(x)`. The factory installs
+ * an identity default for `encode` when omitted (codecs that omit `encode`
+ * are declaring "the input value is already the wire value", so `TInput`
+ * and `TWire` are interchangeable for that codec).
+ *
+ * Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType`) are
+ * passed through synchronously; identity defaults are installed for
+ * `encodeJson` / `decodeJson` when omitted.
  */
 export function codec<
   Id extends string,
   const TTraits extends readonly CodecTrait[],
   TWire,
-  TJs,
+  TInput,
+  TOutput = TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
-  encode: (value: TJs) => TWire;
-  decode: (wire: TWire) => TJs;
-  encodeJson?: (value: TJs) => JsonValue;
-  decodeJson?: (json: JsonValue) => TJs;
+  encode?: (value: TInput) => TWire | Promise<TWire>;
+  decode: (wire: TWire) => TOutput | Promise<TOutput>;
+  encodeJson?: (value: TInput) => JsonValue;
+  decodeJson?: (json: JsonValue) => TInput;
   meta?: CodecMeta;
   paramsSchema?: Type<TParams>;
   init?: (params: TParams) => THelper;
   traits?: TTraits;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+}): Codec<Id, TTraits, TWire, TInput, TOutput, TParams, THelper> {
   const identity = (v: unknown) => v;
+  const userEncode =
+    config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
+  const userDecode = config.decode;
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
@@ -215,10 +232,10 @@ export function codec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: config.encode,
-    decode: config.decode,
-    encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
+    encode: async (value) => userEncode(value),
+    decode: async (wire) => userDecode(wire),
+    encodeJson: (config.encodeJson ?? identity) as (value: TInput) => JsonValue,
+    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
 }
 
@@ -228,9 +245,9 @@ export function codec<
 export type CodecId<T> =
   T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
 export type CodecInput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+  T extends Codec<string, readonly CodecTrait[], unknown, infer In> ? In : never;
 export type CodecOutput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+  T extends Codec<string, readonly CodecTrait[], unknown, unknown, infer Out> ? Out : never;
 export type CodecTraits<T> =
   T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
 

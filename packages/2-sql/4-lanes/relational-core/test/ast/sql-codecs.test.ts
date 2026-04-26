@@ -150,28 +150,28 @@ describe('sql-codecs', () => {
     },
   ];
 
-  it.each(codecRoundTripCases)('encodes and decodes $scalar values', ({
+  it.each(codecRoundTripCases)('encodes and decodes $scalar values', async ({
     scalar,
     input,
     expectedEncoded,
     expectedDecoded,
   }) => {
     const codec = sqlCodecDefinitions[scalar].codec as {
-      encode: (value: unknown) => unknown;
-      decode: (wire: unknown) => unknown;
+      encode: (value: unknown) => Promise<unknown>;
+      decode: (wire: unknown) => Promise<unknown>;
     };
 
-    expect(codec.encode(input)).toBe(expectedEncoded);
-    expect(codec.decode(input)).toBe(expectedDecoded);
+    expect(await codec.encode(input)).toBe(expectedEncoded);
+    expect(await codec.decode(input)).toBe(expectedDecoded);
   });
 
-  it('trims trailing spaces when decoding char values', () => {
+  it('trims trailing spaces when decoding char values', async () => {
     const charCodec = sqlCodecDefinitions.char.codec as {
-      decode: (wire: string) => string;
+      decode: (wire: string) => Promise<string>;
     };
 
-    expect(charCodec.decode('user_001                            ')).toBe('user_001');
-    expect(charCodec.decode('user_001')).toBe('user_001');
+    expect(await charCodec.decode('user_001                            ')).toBe('user_001');
+    expect(await charCodec.decode('user_001')).toBe('user_001');
   });
 
   it('initializes helpers for length-parameterized codecs', () => {
@@ -188,16 +188,16 @@ describe('sql-codecs', () => {
     });
   });
 
-  it('normalizes Date values for timestamp codecs', () => {
+  it('normalizes Date values for timestamp codecs', async () => {
     const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
-      encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+      encode: (value: string | Date) => Promise<string>;
+      decode: (wire: string | Date) => Promise<string>;
     };
 
     const instant = new Date('2024-01-15T10:30:00Z');
 
-    expect(timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
-    expect(timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(await timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(await timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
   });
 
   describe('renderOutputType', () => {
