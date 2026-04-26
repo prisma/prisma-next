@@ -1,25 +1,21 @@
-import type {
-  RuntimeMiddleware,
-  RuntimeMiddlewareContext,
-} from '@prisma-next/framework-components/runtime';
+import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import {
-  AsyncIterableResult,
   checkMiddlewareCompatibility,
+  RuntimeCore,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoExecutionPlan } from './mongo-execution-plan';
+import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
 
 function noop() {}
-function now() {
-  return Date.now();
-}
 
 export interface MongoRuntimeOptions {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
   readonly contract: unknown;
   readonly targetId: string;
-  readonly middleware?: readonly RuntimeMiddleware[];
+  readonly middleware?: readonly MongoMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
 
@@ -28,88 +24,44 @@ export interface MongoRuntime {
   close(): Promise<void>;
 }
 
-class MongoRuntimeImpl implements MongoRuntime {
+class MongoRuntimeImpl
+  extends RuntimeCore<MongoQueryPlan, MongoExecutionPlan, MongoMiddleware>
+  implements MongoRuntime
+{
   readonly #adapter: MongoAdapter;
   readonly #driver: MongoDriver;
-  readonly #middleware: readonly RuntimeMiddleware[];
-  readonly #middlewareContext: RuntimeMiddlewareContext;
 
   constructor(options: MongoRuntimeOptions) {
-    this.#adapter = options.adapter;
-    this.#driver = options.driver;
-
     const middleware = options.middleware ? [...options.middleware] : [];
     for (const mw of middleware) {
       checkMiddlewareCompatibility(mw, 'mongo', options.targetId);
     }
-    this.#middleware = middleware;
 
-    this.#middlewareContext = {
+    const ctx: MongoMiddlewareContext = {
       contract: options.contract,
       mode: options.mode ?? 'strict',
-      now,
+      now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
     };
+
+    super({ middleware, ctx });
+
+    this.#adapter = options.adapter;
+    this.#driver = options.driver;
   }
 
-  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row> {
-    const adapter = this.#adapter;
-    const driver = this.#driver;
-    const middleware = this.#middleware;
-    const ctx = this.#middlewareContext;
-
-    const iterator = async function* (): AsyncGenerator<Row, void, unknown> {
-      const startedAt = ctx.now();
-      let rowCount = 0;
-      let completed = false;
-      let failed = false;
-
-      try {
-        for (const mw of middleware) {
-          if (mw.beforeExecute) {
-            await mw.beforeExecute(plan, ctx);
-          }
-        }
-
-        const wireCommand = await adapter.lower(plan);
-
-        for await (const row of driver.execute<Row>(wireCommand)) {
-          for (const mw of middleware) {
-            if (mw.onRow) {
-              await mw.onRow(row as Record<string, unknown>, plan, ctx);
-            }
-          }
-          rowCount++;
-          yield row;
-        }
-
-        completed = true;
-      } catch (error) {
-        failed = true;
-        throw error;
-      } finally {
-        const latencyMs = ctx.now() - startedAt;
-        for (const mw of middleware) {
-          if (!mw.afterExecute) continue;
-
-          if (failed) {
-            try {
-              await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
-            } catch {
-              // Ignore errors from afterExecute during error handling
-            }
-            continue;
-          }
-
-          await mw.afterExecute(plan, { rowCount, latencyMs, completed }, ctx);
-        }
-      }
+  protected override async lower(plan: MongoQueryPlan): Promise<MongoExecutionPlan> {
+    return {
+      command: await this.#adapter.lower(plan),
+      meta: plan.meta,
     };
-
-    return new AsyncIterableResult(iterator());
   }
 
-  async close(): Promise<void> {
+  protected override runDriver(exec: MongoExecutionPlan): AsyncIterable<Record<string, unknown>> {
+    return this.#driver.execute<Record<string, unknown>>(exec.command);
+  }
+
+  override async close(): Promise<void> {
     await this.#driver.close();
   }
 }
