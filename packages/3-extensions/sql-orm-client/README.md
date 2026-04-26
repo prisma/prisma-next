@@ -20,7 +20,7 @@ This package depends on:
 
 - `@prisma-next/sql-contract` for contract shape and mappings
 - `@prisma-next/contract` for `ExecutionPlan` metadata
-- `@prisma-next/runtime-executor` for `AsyncIterableResult`
+- `@prisma-next/framework-components` for `AsyncIterableResult` (imported from `@prisma-next/framework-components/runtime`)
 - `@prisma-next/sql-relational-core` for SQL AST and plan types
 
 This package should not depend on target adapters or drivers directly; execution is delegated to the runtime queryable interface.

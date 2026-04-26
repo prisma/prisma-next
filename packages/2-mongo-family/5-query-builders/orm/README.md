@@ -14,6 +14,6 @@ MongoDB ORM client for Prisma Next.
 
 - **Depends on**:
   - `@prisma-next/mongo-core` (contract types, row inference, query plan types)
-  - `@prisma-next/runtime-executor` (`AsyncIterableResult` return type)
+  - `@prisma-next/framework-components` (`AsyncIterableResult` return type, imported from `@prisma-next/framework-components/runtime`)
 - **Depended on by**:
   - `@prisma-next/mongo-runtime` (structurally satisfies `MongoQueryExecutor`)
