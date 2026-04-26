@@ -23,7 +23,18 @@ export interface GenericDraftPlan {
   readonly meta: PlanMeta;
 }
 
-export interface Middleware<TContract = unknown> extends RuntimeMiddleware {
+/**
+ * Legacy contract-typed middleware used by `RuntimeCoreImpl`.
+ *
+ * Structurally a `RuntimeMiddleware<ExecutionPlan>` — the override only
+ * narrows the context type to `MiddlewareContext<TContract>` and adds the
+ * `beforeCompile?` AST-rewriting hook. SQL middleware (`SqlMiddleware`)
+ * extends `RuntimeMiddleware` directly, not this type, so this interface
+ * survives only to preserve the contract-typed context for callers of
+ * `RuntimeCoreImpl`. M3 deletes `RuntimeCoreImpl` and folds this type
+ * away alongside it.
+ */
+export interface Middleware<TContract = unknown> extends RuntimeMiddleware<ExecutionPlan> {
   beforeCompile?(
     draft: GenericDraftPlan,
     ctx: MiddlewareContext<TContract>,
