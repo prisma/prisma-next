@@ -259,7 +259,7 @@ export class MongoMigrationRunner {
     }
 
     for (const plan of op.run) {
-      const wireCommand = adapter.lower(plan);
+      const wireCommand = await adapter.lower(plan);
       for await (const _ of driver.execute(wireCommand)) {
         /* consume */
       }
@@ -307,7 +307,7 @@ export class MongoMigrationRunner {
           },
         );
       }
-      const wireCommand = adapter.lower(check.source);
+      const wireCommand = await adapter.lower(check.source);
       let matchFound = false;
       for await (const row of driver.execute<Record<string, unknown>>(wireCommand)) {
         if (filterEvaluator.evaluate(check.filter, row)) {
