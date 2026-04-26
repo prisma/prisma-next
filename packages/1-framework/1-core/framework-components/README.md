@@ -10,6 +10,7 @@ Framework component types, authoring logic, control stack assembly, and emission
 
 - **Component types** (`./components`): Base descriptor and instance interfaces for framework components (family, target, adapter, driver, extension), pack refs, and type renderer system
 - **Authoring types** (`./authoring`): Declarative authoring contribution types, template resolution, and validation for type constructors and field presets
+- **Codec base interface** (`./codec`): The cross-family `Codec` base type that SQL `Codec` and Mongo `MongoCodec` extend
 - **Control stack** (`./control`): Assembly functions that combine component descriptors into a unified `ControlStack` with derived state (codec imports, renderers, authoring contributions)
 - **Emission SPI** (`./emission`): Types for the emission pipeline — `TargetFamilyHook`, `ValidationContext`, `GenerateContractTypesOptions`, `TypeRenderEntry`, `TypeRenderer`, `ParameterizedCodecDescriptor`, and related types
 - **Execution types** (`./execution`): Execution-plane stack and instance interfaces
@@ -19,9 +20,19 @@ Framework component types, authoring logic, control stack assembly, and emission
 ```typescript
 import { ComponentMetadata, FamilyDescriptor, normalizeRenderer } from '@prisma-next/framework-components/components';
 import { AuthoringContributions, instantiateAuthoringTypeConstructor } from '@prisma-next/framework-components/authoring';
+import type { Codec } from '@prisma-next/framework-components/codec';
 import { createControlStack, ControlStack } from '@prisma-next/framework-components/control';
 import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 ```
+
+## `Codec` interface
+
+The base `Codec` interface lands on the seam between **query-time** methods (per-row, IO-relevant) and **build-time** methods (per-contract-load):
+
+- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TOutput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`codec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
+- Build-time: `encodeJson`, `decodeJson`, and the optional `renderOutputType` are **synchronous** so `validateContract` and client construction stay synchronous.
+
+There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
 
 ## Why SPI types live here (dependency inversion)
 
