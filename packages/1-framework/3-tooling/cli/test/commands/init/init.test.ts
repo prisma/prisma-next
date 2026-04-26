@@ -1534,6 +1534,138 @@ describe('runInit catalog warning surface (F03 / FR7.3)', () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// FR6 — Hostile-input survival + atomic init
+// ---------------------------------------------------------------------------
+
+describe('runInit hostile inputs (FR6)', () => {
+  let tmpDir: string;
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-hostile-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('merges into a JSONC tsconfig.json with comments and trailing commas (FR6.1)', async () => {
+    // Real-world JSONC straight out of a Vite / TS-team-blessed template:
+    // line comments, block comments, trailing commas. The pre-jsonc-parser
+    // implementation crashed here mid-init.
+    const jsoncTsconfig = [
+      '// Project tsconfig — JSONC is the TS team default.',
+      '{',
+      '  /* compiler options */',
+      '  "compilerOptions": {',
+      '    "strict": true, // user override',
+      '    "target": "ES2022",',
+      '    "types": [',
+      '      "vitest/globals", // for tests',
+      '    ],',
+      '  },',
+      '}',
+      '',
+    ].join('\n');
+    writeFileSync(join(tmpDir, 'tsconfig.json'), jsoncTsconfig);
+
+    const exit = await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+    });
+    expect(exit).toBe(INIT_EXIT_OK);
+
+    const merged = readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8');
+    // Comments survive the merge (FR6.1 "preserved where possible").
+    expect(merged).toContain('// Project tsconfig');
+    expect(merged).toContain('/* compiler options */');
+    expect(merged).toContain('// user override');
+    // The required compiler options are merged in.
+    expect(merged).toContain('"moduleResolution"');
+    expect(merged).toContain('"node"');
+    expect(merged).toContain('vitest/globals');
+  });
+
+  it('exits PRECONDITION on an unparseable tsconfig.json with PN-CLI-5011 (FR6.1)', async () => {
+    // Bare JSON syntax error (unclosed brace) — well beyond JSONC tolerance.
+    writeFileSync(join(tmpDir, 'tsconfig.json'), '{ "compilerOptions": { "strict": true ');
+
+    const writes: string[] = [];
+    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+      if (typeof chunk === 'string') writes.push(chunk);
+      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+      return true;
+    });
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', install: false },
+        flags: noninteractiveFlags({ json: true }),
+      });
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+
+      const envelope = JSON.parse(writes.join('').trim()) as {
+        ok: false;
+        code: string;
+        meta?: { path?: string };
+      };
+      expect(envelope.ok).toBe(false);
+      expect(envelope.code).toBe('PN-CLI-5011');
+      expect(envelope.meta?.path).toBe('tsconfig.json');
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('leaves the project byte-identical when an unparseable tsconfig.json aborts init (FR6.2 atomicity)', async () => {
+    const originalTsconfig = '{ "compilerOptions": { broken syntax';
+    writeFileSync(join(tmpDir, 'tsconfig.json'), originalTsconfig);
+    const originalPkgJson = readFileSync(join(tmpDir, 'package.json'), 'utf-8');
+
+    const exit = await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags({ json: true, quiet: true }),
+    });
+    expect(exit).toBe(INIT_EXIT_PRECONDITION);
+
+    // tsconfig.json untouched.
+    expect(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')).toBe(originalTsconfig);
+    // package.json untouched.
+    expect(readFileSync(join(tmpDir, 'package.json'), 'utf-8')).toBe(originalPkgJson);
+    // None of the scaffold files were written.
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma-next.md'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.agents'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.env.example'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.gitignore'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.gitattributes'))).toBe(false);
+  });
+
+  it('leaves the project byte-identical when a malformed package.json aborts init (FR6.2)', async () => {
+    // The `runInit hygiene` block already locks in the PN-CLI-5010 surface;
+    // here we additionally lock in the FR6.2 atomicity contract — no
+    // partial scaffold survives the precondition failure.
+    const brokenPkg = '{ "name": "broken", ';
+    writeFileSync(join(tmpDir, 'package.json'), brokenPkg);
+    writeFileSync(join(tmpDir, 'tsconfig.json'), JSON.stringify({}));
+    const originalTsconfig = readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8');
+
+    const exit = await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags({ json: true }),
+    });
+    expect(exit).toBe(INIT_EXIT_PRECONDITION);
+
+    expect(readFileSync(join(tmpDir, 'package.json'), 'utf-8')).toBe(brokenPkg);
+    expect(readFileSync(join(tmpDir, 'tsconfig.json'), 'utf-8')).toBe(originalTsconfig);
+    expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma'))).toBe(false);
+    expect(existsSync(join(tmpDir, '.env.example'))).toBe(false);
+  });
+});
+
 describe('hasDirectDep (FR2.1)', () => {
   it('detects a direct devDependency', () => {
     expect(hasDirectDep({ devDependencies: { '@types/node': '^18' } }, '@types/node')).toBe(true);

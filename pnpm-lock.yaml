@@ -775,6 +775,9 @@ importers:
       esbuild:
         specifier: ^0.25.11
         version: 0.25.11
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       package-manager-detector:
         specifier: ^1.6.0
         version: 1.6.0
@@ -5889,6 +5892,9 @@ packages:
     engines: {node: '>=6'}
     hasBin: true
 
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
+
   jsonify@0.0.1:
     resolution: {integrity: sha512-2/Ki0GcmuqSrgFyelQq9M05y7PS0mEwuIzrf3f1fPqkVDVRvZrPZtVSMHxdgo8Aq0sxAOb/cr2aqqA3LeWHVPg==}
 
@@ -9022,6 +9028,8 @@ snapshots:
       object-keys: 1.1.1
 
   json5@2.2.3: {}
+
+  jsonc-parser@3.3.1: {}
 
   jsonify@0.0.1: {}
 

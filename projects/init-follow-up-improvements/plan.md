@@ -80,9 +80,9 @@ Closes FR6 and the atomicity NFR (NFR3).
 
 **Tasks (sketch):**
 
-- [ ] Replace `JSON.parse(existing)` in `mergeTsConfig` with `jsonc-parser` (preserve comments / trailing commas).
-- [ ] Reorder `runInit` so all preconditions and validations run before any file write.
-- [ ] Add E2E coverage: `init` against an existing JSONC `tsconfig.json` succeeds; `init` mid-run failure leaves the project byte-identical to its pre-init state.
+- [x] Replace `JSON.parse(existing)` in `mergeTsConfig` with `jsonc-parser` (FR6.1) — comments and trailing commas survive via `parse` + `modify` + `applyEdits`. Bare unparseable input throws a typed `TsConfigParseError`, mapped at the boundary to `errorInitInvalidTsconfig` (PN-CLI-5011, exit code `PRECONDITION`).
+- [x] Reorder `runInit` so all preconditions and validations run before any file write (FR6.2 / NFR3) — `runInit` now builds a complete `filesToWrite` plan (parsing tsconfig and package.json, computing every merge) and only then enters a single write phase. A failure during the precondition phase leaves the working tree byte-identical.
+- [x] Add unit and component coverage: JSONC tsconfig with comments and trailing commas merges cleanly (`tsconfig-env.test.ts`); init aborts with PN-CLI-5011 on unparseable tsconfig and leaves the project byte-identical (`init.test.ts` / "FR6 — Hostile-input survival + atomic init"); equivalent atomicity assertion for malformed `package.json`.
 
 ### Milestone 7 — DB target version compatibility (R11)
 

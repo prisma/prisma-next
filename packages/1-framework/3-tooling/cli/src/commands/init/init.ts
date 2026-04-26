@@ -20,6 +20,7 @@ import {
   errorInitEmitFailed,
   errorInitInstallFailed,
   errorInitInvalidManifest,
+  errorInitInvalidTsconfig,
   errorInitMissingManifest,
 } from './errors';
 import {
@@ -44,11 +45,19 @@ import { agentSkillMd } from './templates/agent-skill';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
 import { envExampleContent, envFileContent } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
-import { defaultTsConfig, mergeTsConfig } from './templates/tsconfig';
+import { defaultTsConfig, mergeTsConfig, TsConfigParseError } from './templates/tsconfig';
 
 interface FileEntry {
   readonly path: string;
   readonly content: string;
+  /**
+   * Optional human-mode message printed *after* the file is written —
+   * matches the legacy `Updated tsconfig.json with required compiler
+   * options.` line emitted when an existing tsconfig is merged. Kept
+   * with the entry so the precondition phase decides what to say and
+   * the write phase remains a dumb loop (FR6.2 atomicity).
+   */
+  readonly logMessage?: string;
 }
 
 interface InstallReport {
@@ -114,7 +123,16 @@ export async function runInit(
     ? inputs.schemaPath
     : `./${inputs.schemaPath}`;
 
-  const files: FileEntry[] = [
+  // -----------------------------------------------------------------
+  // Precondition phase (FR6.2 / NFR3 atomicity)
+  //
+  // Read every file we may need to merge with, parse it, compute the
+  // merged content, and accumulate the full set of writes — *before*
+  // touching the filesystem. A failure here (malformed package.json,
+  // unparseable tsconfig.json, …) returns a structured error and the
+  // user's project on disk stays byte-identical to its pre-init state.
+  // -----------------------------------------------------------------
+  const filesToWrite: FileEntry[] = [
     { path: inputs.schemaPath, content: starterSchema(inputs.target, inputs.authoring) },
     {
       path: 'prisma-next.config.ts',
@@ -132,23 +150,12 @@ export async function runInit(
     { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
 
-  for (const file of files) {
-    const fullPath = join(baseDir, file.path);
-    mkdirSync(dirname(fullPath), { recursive: true });
-    writeFileSync(fullPath, file.content, 'utf-8');
-    filesWritten.push(file.path);
-  }
-
-  // FR3.2: write a real `.env` only when the user opted in via flag or
-  // interactive prompt. We never overwrite an existing `.env` — secrets
-  // already live there and clobbering them is the most damaging
-  // possible side-effect of `init`. Touching `.env.example` is fine
-  // because it's documented to be regenerated.
+  // FR3.2: a real `.env` is only written when the user opted in. Never
+  // overwrite an existing `.env` — secrets live there and clobbering
+  // them is the most damaging possible side-effect of `init`.
   if (inputs.writeEnv) {
-    const envPath = join(baseDir, '.env');
-    if (!existsSync(envPath)) {
-      writeFileSync(envPath, envFileContent(inputs.target), 'utf-8');
-      filesWritten.push('.env');
+    if (!existsSync(join(baseDir, '.env'))) {
+      filesToWrite.push({ path: '.env', content: envFileContent(inputs.target) });
     } else {
       warnings.push(
         '.env already exists; leaving it untouched. Compare with .env.example for any new keys.',
@@ -156,21 +163,33 @@ export async function runInit(
     }
   }
 
-  // FR2.2: tsconfig.json gets the minimum compiler options the
-  // scaffolded files need (notably `types: ["node"]` so `process.env`
-  // resolves under `moduleResolution: "bundler"`).
+  // FR2.2 / FR6.1: tsconfig.json gets the minimum compiler options the
+  // scaffolded files need. JSONC (TS's actual configured dialect) is
+  // accepted; an unparseable file is mapped to a structured
+  // precondition error (5011) rather than crashing mid-write.
   const tsconfigPath = join(baseDir, 'tsconfig.json');
-  const tsconfigRel = 'tsconfig.json';
   if (existsSync(tsconfigPath)) {
     const existing = readFileSync(tsconfigPath, 'utf-8');
-    writeFileSync(tsconfigPath, mergeTsConfig(existing), 'utf-8');
-    if (!flags.json && !flags.quiet) {
-      ui.log('Updated tsconfig.json with required compiler options.');
+    let merged: string;
+    try {
+      merged = mergeTsConfig(existing);
+    } catch (err) {
+      if (err instanceof TsConfigParseError) {
+        return emitError(
+          ui,
+          flags,
+          errorInitInvalidTsconfig({ path: 'tsconfig.json', cause: err.message }),
+        );
+      }
+      throw err;
     }
-    filesWritten.push(tsconfigRel);
+    filesToWrite.push({
+      path: 'tsconfig.json',
+      content: merged,
+      logMessage: 'Updated tsconfig.json with required compiler options.',
+    });
   } else {
-    writeFileSync(tsconfigPath, defaultTsConfig(), 'utf-8');
-    filesWritten.push(tsconfigRel);
+    filesToWrite.push({ path: 'tsconfig.json', content: defaultTsConfig() });
   }
 
   // FR3.3: idempotent .gitignore — append only what's missing.
@@ -180,13 +199,12 @@ export async function runInit(
     : undefined;
   const newGitignore = mergeGitignore(existingGitignore);
   if (newGitignore !== null) {
-    writeFileSync(gitignorePath, newGitignore, 'utf-8');
-    filesWritten.push('.gitignore');
+    filesToWrite.push({ path: '.gitignore', content: newGitignore });
   }
 
-  // FR3.4: idempotent .gitattributes — append linguist-generated lines
-  // for the artefacts emitted into `schemaDir` so GitHub diff stats and
-  // code review collapse the generated files by default.
+  // FR3.4: idempotent .gitattributes — linguist-generated entries for
+  // the emitted artefacts so GitHub diff stats / code review collapse
+  // them by default.
   const gitattributesPath = join(baseDir, '.gitattributes');
   const existingGitattributes = existsSync(gitattributesPath)
     ? readFileSync(gitattributesPath, 'utf-8')
@@ -196,8 +214,7 @@ export async function runInit(
     requiredGitattributesLines(schemaDir, inputs.target),
   );
   if (newGitattributes !== null) {
-    writeFileSync(gitattributesPath, newGitattributes, 'utf-8');
-    filesWritten.push('.gitattributes');
+    filesToWrite.push({ path: '.gitattributes', content: newGitattributes });
   }
 
   // Read + parse package.json once for both the FR3.5 scripts merge and
@@ -206,9 +223,8 @@ export async function runInit(
   // generic INTERNAL_ERROR fallback so CI/agents can branch on it.
   const packageJsonPath = join(baseDir, 'package.json');
   let parsedPackageJson: Record<string, unknown> | null = null;
-  let pkgRaw: string | null = null;
   if (existsSync(packageJsonPath)) {
-    pkgRaw = readFileSync(packageJsonPath, 'utf-8');
+    const pkgRaw = readFileSync(packageJsonPath, 'utf-8');
     try {
       parsedPackageJson = JSON.parse(pkgRaw) as Record<string, unknown>;
     } catch (err) {
@@ -221,21 +237,35 @@ export async function runInit(
       }
       throw err;
     }
-  }
 
-  // FR3.5: idempotent package.json#scripts updater. Collisions with a
-  // user-written script of the same name produce a structured warning
-  // and the user's script is preserved.
-  if (pkgRaw !== null) {
+    // FR3.5: idempotent package.json#scripts updater. Collisions with a
+    // user-written script of the same name produce a structured warning
+    // and the user's script is preserved.
     const { content: nextPkg, warnings: scriptWarnings } = mergePackageScripts(
       pkgRaw,
       REQUIRED_SCRIPTS,
     );
     if (nextPkg !== null) {
-      writeFileSync(packageJsonPath, nextPkg, 'utf-8');
-      filesWritten.push('package.json');
+      filesToWrite.push({ path: 'package.json', content: nextPkg });
     }
     warnings.push(...scriptWarnings);
+  }
+
+  // -----------------------------------------------------------------
+  // Write phase — every input has been parsed and every merged file is
+  // staged. From here on, failures are only possible at the
+  // install/emit stages, which the spec treats as discrete subsequent
+  // phases (FR6.3): scaffold files remain on disk so the user can fix
+  // and retry.
+  // -----------------------------------------------------------------
+  for (const file of filesToWrite) {
+    const fullPath = join(baseDir, file.path);
+    mkdirSync(dirname(fullPath), { recursive: true });
+    writeFileSync(fullPath, file.content, 'utf-8');
+    filesWritten.push(file.path);
+    if (file.logMessage !== undefined && !flags.json && !flags.quiet) {
+      ui.log(file.logMessage);
+    }
   }
 
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
@@ -356,6 +386,7 @@ function exitCodeForError(error: CliStructuredError): number {
     case '5004': // invalid flag value — precondition
     case '5005': // --strict-probe without --probe-db — precondition
     case '5010': // invalid manifest (malformed package.json) — precondition
+    case '5011': // invalid tsconfig (unparseable JSONC) — precondition
       return INIT_EXIT_PRECONDITION;
     case '5006': // user aborted interactive prompt
       return INIT_EXIT_USER_ABORTED;

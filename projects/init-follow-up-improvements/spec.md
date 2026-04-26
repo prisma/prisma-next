@@ -183,8 +183,8 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## Hostile inputs (FR6)
 
-- [ ] `init` against an existing JSONC `tsconfig.json` (with `// comments` and trailing commas) succeeds. The file's comments and ordering are preserved post-merge where possible.
-- [ ] When `init` would have to fail mid-run (e.g. tsconfig is unparseable JSONC and JSON5), the project on disk is byte-identical to its pre-init state. `init` exits non-zero with an actionable error.
+- [x] `init` against an existing JSONC `tsconfig.json` (with `// comments` and trailing commas) succeeds. The file's comments and ordering are preserved post-merge where possible.
+- [x] When `init` would have to fail mid-run (e.g. tsconfig is unparseable JSONC and JSON5), the project on disk is byte-identical to its pre-init state. `init` exits non-zero with an actionable error.
 
 ## pnpm install (FR7)
 
