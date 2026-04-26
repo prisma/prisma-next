@@ -1,4 +1,3 @@
-import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import pgvectorDescriptor from '@prisma-next/extension-pgvector/control';
 import type {
@@ -11,6 +10,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import type { PostgresColumnDefault } from '@prisma-next/target-postgres/types';
 import { describe, expect, it } from 'vitest';
+import postgresAdapterDescriptor from '../../src/exports/control';
 
 type PostgresStorageColumn = Omit<StorageColumn, 'default'> & {
   readonly default?: PostgresColumnDefault;

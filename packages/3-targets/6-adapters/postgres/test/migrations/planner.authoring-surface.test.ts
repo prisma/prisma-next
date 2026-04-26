@@ -1,4 +1,3 @@
-import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   contractToSchemaIR as contractToSchemaIRImpl,
@@ -14,6 +13,7 @@ import postgresTargetDescriptor, {
   postgresRenderDefault,
 } from '@prisma-next/target-postgres/control';
 import { describe, expect, it } from 'vitest';
+import postgresAdapterDescriptor from '../../src/exports/control';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
