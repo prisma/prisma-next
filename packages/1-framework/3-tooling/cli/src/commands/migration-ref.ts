@@ -1,3 +1,4 @@
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
   deleteRef,
@@ -7,7 +8,6 @@ import {
   validateRefValue,
   writeRef,
 } from '@prisma-next/migration-tools/refs';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';

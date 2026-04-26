@@ -37,10 +37,6 @@
     "node": ">=20"
   },
   "exports": {
-    "./types": {
-      "types": "./dist/exports/types.d.mts",
-      "import": "./dist/exports/types.mjs"
-    },
     "./metadata": {
       "types": "./dist/exports/metadata.d.mts",
       "import": "./dist/exports/metadata.mjs"
@@ -52,6 +48,10 @@
     "./graph": {
       "types": "./dist/exports/graph.d.mts",
       "import": "./dist/exports/graph.mjs"
+    },
+    "./errors": {
+      "types": "./dist/exports/errors.d.mts",
+      "import": "./dist/exports/errors.mjs"
     },
     "./io": {
       "types": "./dist/exports/io.d.mts",
