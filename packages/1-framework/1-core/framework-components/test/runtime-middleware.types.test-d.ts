@@ -1,22 +1,32 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 import { assertType, expectTypeOf, test } from 'vitest';
+import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
 import type {
   RuntimeExecutor,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
 } from '../src/runtime-middleware';
 
-test('ExecutionPlan satisfies RuntimeExecutor plan constraint', () => {
-  type SqlExecutor = RuntimeExecutor<ExecutionPlan>;
+test('framework ExecutionPlan satisfies RuntimeExecutor plan constraint', () => {
+  type Executor = RuntimeExecutor<ExecutionPlan>;
+  expectTypeOf<Executor>().toHaveProperty('execute');
+  expectTypeOf<Executor>().toHaveProperty('close');
+});
+
+test('SQL-shaped plan satisfies RuntimeExecutor plan constraint', () => {
+  interface SqlShapedPlan extends QueryPlan {
+    readonly sql: string;
+    readonly params: readonly unknown[];
+  }
+  type SqlExecutor = RuntimeExecutor<SqlShapedPlan>;
   expectTypeOf<SqlExecutor>().toHaveProperty('execute');
   expectTypeOf<SqlExecutor>().toHaveProperty('close');
 });
 
 test('MongoQueryPlan-shaped type satisfies RuntimeExecutor plan constraint', () => {
-  interface MongoLikePlan {
+  interface MongoLikePlan extends QueryPlan {
     readonly collection: string;
     readonly command: unknown;
-    readonly meta: PlanMeta;
   }
   type MongoExecutor = RuntimeExecutor<MongoLikePlan>;
   expectTypeOf<MongoExecutor>().toHaveProperty('execute');
@@ -24,11 +34,11 @@ test('MongoQueryPlan-shaped type satisfies RuntimeExecutor plan constraint', () 
 });
 
 test('type without meta does not satisfy plan constraint', () => {
-  // @ts-expect-error - missing meta property
+  // @ts-expect-error - missing meta property required by QueryPlan
   type _Invalid = RuntimeExecutor<{ sql: string }>;
 });
 
-test('RuntimeMiddleware hooks accept both ExecutionPlan and MongoQueryPlan-shaped plans', () => {
+test('RuntimeMiddleware default plan parameter sees only QueryPlan fields', () => {
   const middleware: RuntimeMiddleware = {
     name: 'test',
     async beforeExecute(plan) {
@@ -43,6 +53,21 @@ test('RuntimeMiddleware hooks accept both ExecutionPlan and MongoQueryPlan-shape
       assertType<number>(result.rowCount);
       assertType<number>(result.latencyMs);
       assertType<boolean>(result.completed);
+    },
+  };
+  void middleware;
+});
+
+test('RuntimeMiddleware narrowed to a SQL plan sees the SQL fields', () => {
+  interface SqlExec extends ExecutionPlan {
+    readonly sql: string;
+    readonly params: readonly unknown[];
+  }
+  const middleware: RuntimeMiddleware<SqlExec> = {
+    name: 'sql-test',
+    async beforeExecute(plan) {
+      assertType<string>(plan.sql);
+      assertType<readonly unknown[]>(plan.params);
     },
   };
   void middleware;
