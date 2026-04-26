@@ -22,26 +22,31 @@
  * 5. Verifies the migration's `targetId` matches `config.target.targetId`
  *    (`PN-MIG-2006` on mismatch).
  * 6. Instantiates the migration with the assembled stack.
- * 7. Delegates to `serializeMigration` from `@prisma-next/migration-tools`
- *    to write `ops.json` + `migration.json` (or print them in dry-run mode).
+ * 7. Reads any previously-scaffolded `migration.json`, then calls
+ *    `buildMigrationArtifacts` from `@prisma-next/migration-tools` to
+ *    produce in-memory `ops.json` + `migration.json` content. Persists
+ *    the result to disk (or prints in dry-run mode).
  *
- * Lives in `@prisma-next/cli` because it's the only place that legitimately
- * combines config loading, stack assembly, and on-disk serialization in one
- * place. `@prisma-next/migration-tools` stays focused on persistence;
- * `Migration` stays a pure abstract class.
+ * File I/O lives here, in `@prisma-next/cli`: this is the only place
+ * that legitimately combines config loading, stack assembly, and
+ * on-disk persistence. `@prisma-next/migration-tools` owns the pure
+ * conversion from a `Migration` instance to artifact strings; `Migration`
+ * stays a pure abstract class.
  */
 
+import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { CliStructuredError } from '@prisma-next/errors/control';
 import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import {
+  buildMigrationArtifacts,
   isDirectEntrypoint,
   type Migration,
   printMigrationHelp,
-  serializeMigration,
 } from '@prisma-next/migration-tools/migration';
-import { dirname } from 'pathe';
+import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import { dirname, join } from 'pathe';
 import { loadConfig } from './config-loader';
 
 /**
@@ -152,8 +157,9 @@ export class MigrationCLI {
       // check below is what rescues concrete subclasses that cast inside their
       // constructor (e.g. `PostgresMigration` casts `stack.adapter.create(stack)`
       // to `SqlControlAdapter<'postgres'>`); a wrong-target stack would produce a
-      // misshapen adapter, but the instance never reaches `serializeMigration`
-      // because we throw `errorMigrationTargetMismatch` before that.
+      // misshapen adapter, but the instance never reaches the
+      // serialization step because we throw `errorMigrationTargetMismatch`
+      // before that.
       const instance = new MigrationClass(stack);
 
       if (instance.targetId !== config.target.targetId) {
@@ -163,7 +169,7 @@ export class MigrationCLI {
         });
       }
 
-      serializeMigration(instance, migrationDir, args.dryRun);
+      serializeMigrationToDisk(instance, migrationDir, args.dryRun);
     } catch (err) {
       if (CliStructuredError.is(err)) {
         process.stderr.write(`${err.message}: ${err.why}\n`);
@@ -173,4 +179,61 @@ export class MigrationCLI {
       process.exitCode = 1;
     }
   }
+}
+
+/**
+ * Read a previously-scaffolded `migration.json` from disk, returning
+ * `null` when the file is missing or unparseable. The CLI feeds this into
+ * `buildMigrationArtifacts` so the pure builder can preserve fields owned
+ * by `migration plan` (contract bookends, hints, labels, `createdAt`)
+ * across re-emits.
+ */
+function readExistingManifest(manifestPath: string): Partial<MigrationManifest> | null {
+  let raw: string;
+  try {
+    raw = readFileSync(manifestPath, 'utf-8');
+  } catch {
+    return null;
+  }
+  try {
+    return JSON.parse(raw) as Partial<MigrationManifest>;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Persist a migration instance's artifacts to `migrationDir`. In
+ * `dryRun` mode the artifacts are printed to stdout (with the same
+ * `--- migration.json --- / --- ops.json ---` framing the legacy
+ * `serializeMigration` helper used) and no files are written. Otherwise
+ * `ops.json` and `migration.json` are written next to `migration.ts` and
+ * a confirmation line is printed.
+ *
+ * File I/O lives in the CLI rather than `@prisma-next/migration-tools`
+ * so the migration-tools package stays focused on the pure
+ * `Migration` → in-memory artifact conversion. The CLI is the only
+ * legitimate site for combining config loading, stack assembly, and
+ * filesystem persistence.
+ */
+function serializeMigrationToDisk(
+  instance: Migration,
+  migrationDir: string,
+  dryRun: boolean,
+): void {
+  const manifestPath = join(migrationDir, 'migration.json');
+  const existing = readExistingManifest(manifestPath);
+  const { opsJson, manifestJson } = buildMigrationArtifacts(instance, existing);
+
+  if (dryRun) {
+    process.stdout.write(`--- migration.json ---\n${manifestJson}\n`);
+    process.stdout.write('--- ops.json ---\n');
+    process.stdout.write(`${opsJson}\n`);
+    return;
+  }
+
+  writeFileSync(join(migrationDir, 'ops.json'), opsJson);
+  writeFileSync(manifestPath, manifestJson);
+
+  process.stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
 }
