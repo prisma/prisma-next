@@ -3,8 +3,8 @@
  *
  * H — Plan JSON envelope and attestation: plan an initial migration with
  *     --json, verify the envelope contains operations, from/to hashes,
- *     migrationId, and dir. Then verify the planned migration passes
- *     attestation and the on-disk chain linkage is correct.
+ *     and dir. Then verify the planned migration passes attestation and
+ *     the on-disk chain linkage is correct.
  *
  * I — Destructive planning: plan an initial migration, swap to a contract
  *     that removes a column, plan the drop-column migration, and verify the
@@ -52,7 +52,7 @@ withTempDir(({ createTempDir }) => {
         // H.02: migration plan --json (plan+self-emit so the migration is
         // attested on disk for H.03's verifyMigration check).
         //
-        // `migrationId` was removed from `MigrationPlanResult` in PR 3 — it
+        // `migrationHash` was removed from `MigrationPlanResult` in PR 3 — it
         // was tied to the old `migration emit` path — so we no longer assert
         // on it here.
         const plan = await runMigrationPlanAndEmit(ctx, ['--name', 'initial', '--json']);
@@ -84,7 +84,7 @@ withTempDir(({ createTempDir }) => {
 
         // Phase 1 of TML-2264 (commit 6aad313ff) folded `verifyMigration`
         // into `readMigrationPackage`'s load boundary: a successful read is
-        // proof of attestation, and any tamper throws MIGRATION.BUNDLE_CORRUPT.
+        // proof of attestation, and any tamper throws MIGRATION.HASH_MISMATCH.
         const pkgDir = join(migrationsDir, packages[0]!.dirName);
         await expect(
           readMigrationPackage(pkgDir),
@@ -92,8 +92,8 @@ withTempDir(({ createTempDir }) => {
         ).resolves.toBeDefined();
 
         // H.04: chain linkage
-        expect(packages[0]!.manifest.from, 'H.04: from empty').toBe(EMPTY_CONTRACT_HASH);
-        expect(packages[0]!.manifest.to, 'H.04: to matches plan output').toBe(result.to);
+        expect(packages[0]!.metadata.from, 'H.04: from empty').toBe(EMPTY_CONTRACT_HASH);
+        expect(packages[0]!.metadata.to, 'H.04: to matches plan output').toBe(result.to);
       },
       timeouts.spinUpPpgDev,
     );
@@ -160,7 +160,7 @@ withTempDir(({ createTempDir }) => {
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'I.04: two migration packages').toHaveLength(2);
 
-        const destructivePkg = packages.find((p) => p.manifest.from !== EMPTY_CONTRACT_HASH)!;
+        const destructivePkg = packages.find((p) => p.metadata.from !== EMPTY_CONTRACT_HASH)!;
         const destructiveOps = destructivePkg.ops.filter(
           (op) => op.operationClass === 'destructive',
         );

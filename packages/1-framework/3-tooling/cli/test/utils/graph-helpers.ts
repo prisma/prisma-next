@@ -1,7 +1,7 @@
-import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/types';
+import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/graph';
 
 export function entry(from: string, to: string, dirName: string): MigrationChainEntry {
-  return { from, to, dirName, migrationId: `mid_${dirName}`, createdAt: '', labels: [] };
+  return { from, to, dirName, migrationHash: `mid_${dirName}`, createdAt: '', labels: [] };
 }
 
 export function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
@@ -17,7 +17,7 @@ export function buildGraph(entries: MigrationChainEntry[]): MigrationGraph {
     forwardChain.get(e.from)!.push(e);
     if (!reverseChain.has(e.to)) reverseChain.set(e.to, []);
     reverseChain.get(e.to)!.push(e);
-    migrationById.set(e.migrationId, e);
+    migrationById.set(e.migrationHash, e);
   }
 
   return { nodes, forwardChain, reverseChain, migrationById };

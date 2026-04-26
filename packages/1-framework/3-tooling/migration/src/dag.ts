@@ -2,13 +2,14 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { EMPTY_CONTRACT_HASH } from './constants';
 import {
   errorAmbiguousTarget,
-  errorDuplicateMigrationId,
+  errorDuplicateMigrationHash,
   errorNoInitialMigration,
   errorNoTarget,
   errorSameSourceAndTarget,
 } from './errors';
+import type { MigrationChainEntry, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
-import type { MigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
+import type { MigrationPackage } from './package';
 
 /** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
@@ -30,14 +31,14 @@ function appendEdge(
   else map.set(key, [entry]);
 }
 
-export function reconstructGraph(packages: readonly MigrationBundle[]): MigrationGraph {
+export function reconstructGraph(packages: readonly MigrationPackage[]): MigrationGraph {
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
   const migrationById = new Map<string, MigrationChainEntry>();
 
   for (const pkg of packages) {
-    const { from, to } = pkg.manifest;
+    const { from, to } = pkg.metadata;
 
     if (from === to) {
       throw errorSameSourceAndTarget(pkg.dirName, from);
@@ -49,16 +50,16 @@ export function reconstructGraph(packages: readonly MigrationBundle[]): Migratio
     const migration: MigrationChainEntry = {
       from,
       to,
-      migrationId: pkg.manifest.migrationId,
+      migrationHash: pkg.metadata.migrationHash,
       dirName: pkg.dirName,
-      createdAt: pkg.manifest.createdAt,
-      labels: pkg.manifest.labels,
+      createdAt: pkg.metadata.createdAt,
+      labels: pkg.metadata.labels,
     };
 
-    if (migrationById.has(migration.migrationId)) {
-      throw errorDuplicateMigrationId(migration.migrationId);
+    if (migrationById.has(migration.migrationHash)) {
+      throw errorDuplicateMigrationHash(migration.migrationHash);
     }
-    migrationById.set(migration.migrationId, migration);
+    migrationById.set(migration.migrationHash, migration);
 
     appendEdge(forwardChain, from, migration);
     appendEdge(reverseChain, to, migration);
@@ -70,7 +71,7 @@ export function reconstructGraph(packages: readonly MigrationBundle[]): Migratio
 // ---------------------------------------------------------------------------
 // Deterministic tie-breaking for BFS neighbour order.
 // Used by `findPath` and `findPathWithDecision` only; not a general-purpose
-// utility. Ordering: label priority → createdAt → to → migrationId.
+// utility. Ordering: label priority → createdAt → to → migrationHash.
 // ---------------------------------------------------------------------------
 
 const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
@@ -91,7 +92,7 @@ function compareTieBreak(a: MigrationChainEntry, b: MigrationChainEntry): number
   if (ca !== 0) return ca;
   const tc = a.to.localeCompare(b.to);
   if (tc !== 0) return tc;
-  return a.migrationId.localeCompare(b.migrationId);
+  return a.migrationHash.localeCompare(b.migrationHash);
 }
 
 function sortedNeighbors(edges: readonly MigrationChainEntry[]): readonly MigrationChainEntry[] {
@@ -111,7 +112,7 @@ function bfsOrdering(
  * exists. Returns an empty array when `fromHash === toHash` (no-op).
  *
  * Neighbor ordering is deterministic via the tie-break sort key:
- * label priority → createdAt → to → migrationId.
+ * label priority → createdAt → to → migrationHash.
  */
 export function findPath(
   graph: MigrationGraph,
@@ -202,8 +203,8 @@ export function findPathWithDecision(
       if (reachable.length > 1) {
         alternativeCount += reachable.length - 1;
         const sorted = sortedNeighbors(reachable);
-        if (sorted[0] && sorted[0].migrationId === edge.migrationId) {
-          if (reachable.some((e) => e.migrationId !== edge.migrationId)) {
+        if (sorted[0] && sorted[0].migrationHash === edge.migrationHash) {
+          if (reachable.some((e) => e.migrationHash !== edge.migrationHash)) {
             tieBreakReasons.push(
               `at ${edge.from}: ${reachable.length} candidates, selected by tie-break`,
             );

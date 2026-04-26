@@ -4,15 +4,15 @@ import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -44,10 +44,10 @@ async function writeAttestedMigration(
     timestamp: Date;
     slug: string;
   },
-): Promise<{ dirName: string; migrationId: string }> {
+): Promise<{ dirName: string; migrationHash: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
   const packageDir = join(migrationsDir, dirName);
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
     kind: 'regular',
@@ -61,10 +61,10 @@ async function writeAttestedMigration(
     labels: [],
     createdAt: opts.timestamp.toISOString(),
   };
-  const migrationId = computeMigrationId(baseManifest, opts.ops);
-  const manifest: MigrationManifest = { ...baseManifest, migrationId };
-  await writeMigrationPackage(packageDir, manifest, opts.ops);
-  return { dirName, migrationId };
+  const migrationHash = computeMigrationHash(baseMetadata, opts.ops);
+  const metadata: MigrationMetadata = { ...baseMetadata, migrationHash };
+  await writeMigrationPackage(packageDir, metadata, opts.ops);
+  return { dirName, migrationHash };
 }
 
 // These tests write migration packages to disk, attest them (SHA-256 + read/write),
@@ -283,9 +283,11 @@ describe(
 
     it('rejects legacy draft packages (`migrationId: null`) at read time', async () => {
       // After the draft state was collapsed, the schema rejects any
-      // on-disk manifest with `migrationId: null`. We construct one
+      // on-disk migration.json with `migrationId: null`. We construct one
       // directly to confirm the read path surfaces a schema error
       // pointing at the offending file rather than silently skipping it.
+      // (The on-disk wire shape still uses `migrationId`; Phase 5 of
+      // TML-2264 collapses it back to a single in-memory shape.)
       const tempDir = await createTempDir('reject-legacy-draft');
       const migrationsDir = join(tempDir, 'migrations');
       await mkdir(migrationsDir, { recursive: true });
@@ -304,7 +306,7 @@ describe(
         migrationsDir,
         formatMigrationDirName(new Date(2026, 0, 2), 'legacy-draft'),
       );
-      const baseManifest = {
+      const baseWireMetadata = {
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
         kind: 'regular' as const,
@@ -314,7 +316,7 @@ describe(
         labels: [],
         createdAt: new Date().toISOString(),
       };
-      const legacyJson = JSON.stringify({ ...baseManifest, migrationId: null });
+      const legacyJson = JSON.stringify({ ...baseWireMetadata, migrationId: null });
       await mkdir(legacyDraftDir, { recursive: true });
       await writeFile(join(legacyDraftDir, 'migration.json'), legacyJson);
       await writeFile(join(legacyDraftDir, 'ops.json'), '[]');
@@ -420,8 +422,8 @@ describe(
       for (const migration of path) {
         const pkg = attested.find((p) => p.dirName === migration.dirName);
         expect(pkg).toBeDefined();
-        expect(pkg!.manifest.from).toBe(migration.from);
-        expect(pkg!.manifest.to).toBe(migration.to);
+        expect(pkg!.metadata.from).toBe(migration.from);
+        expect(pkg!.metadata.to).toBe(migration.to);
       }
 
       expect(path[0]!.dirName).toBe(m1.dirName);

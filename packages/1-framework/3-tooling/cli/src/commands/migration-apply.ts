@@ -1,7 +1,7 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type { MigrationBundle } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -63,7 +63,7 @@ export interface MigrationApplyResult {
     readonly refName?: string;
     readonly selectedPath: readonly {
       readonly dirName: string;
-      readonly migrationId: string;
+      readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
     }[];
@@ -94,12 +94,12 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: MigrationBundle): MigrationApplyStep {
+function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
-    from: pkg.manifest.from,
-    to: pkg.manifest.to,
-    toContract: pkg.manifest.toContract,
+    from: pkg.metadata.from,
+    to: pkg.metadata.to,
+    toContract: pkg.metadata.toContract,
     operations: pkg.ops,
   };
 }

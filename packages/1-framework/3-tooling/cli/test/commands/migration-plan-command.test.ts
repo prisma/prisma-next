@@ -163,7 +163,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: SAME_HASH,
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
 
       const command = createMigrationPlanCommand();
@@ -200,7 +200,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -225,7 +225,7 @@ describe('migration plan command', () => {
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
         ],
       });
-      expect(result).not.toHaveProperty('migrationId');
+      expect(result).not.toHaveProperty('migrationHash');
     });
   });
 
@@ -282,7 +282,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -319,7 +319,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: 'sha256:old',
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -368,7 +368,7 @@ describe('migration plan command', () => {
       mocks.loadAllBundles.mockResolvedValue({
         bundles: [
           {
-            manifest: { migrationId: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
+            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
             dirPath: '/tmp/test/migrations/20260301T0900_prev',
             dirName: '20260301T0900_prev',
           },
@@ -377,7 +377,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);

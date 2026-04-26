@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "type": "module",
   "sideEffects": false,
-  "description": "On-disk migration persistence, attestation, and chain reconstruction for Prisma Next",
+  "description": "On-disk migration persistence, hash verification, and chain reconstruction for Prisma Next",
   "scripts": {
     "build": "tsdown",
     "test": "vitest run",
@@ -41,13 +41,25 @@
       "types": "./dist/exports/types.d.mts",
       "import": "./dist/exports/types.mjs"
     },
+    "./metadata": {
+      "types": "./dist/exports/metadata.d.mts",
+      "import": "./dist/exports/metadata.mjs"
+    },
+    "./package": {
+      "types": "./dist/exports/package.d.mts",
+      "import": "./dist/exports/package.mjs"
+    },
+    "./graph": {
+      "types": "./dist/exports/graph.d.mts",
+      "import": "./dist/exports/graph.mjs"
+    },
     "./io": {
       "types": "./dist/exports/io.d.mts",
       "import": "./dist/exports/io.mjs"
     },
-    "./attestation": {
-      "types": "./dist/exports/attestation.d.mts",
-      "import": "./dist/exports/attestation.mjs"
+    "./hash": {
+      "types": "./dist/exports/hash.d.mts",
+      "import": "./dist/exports/hash.mjs"
     },
     "./dag": {
       "types": "./dist/exports/dag.d.mts",
