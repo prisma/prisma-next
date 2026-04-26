@@ -1,5 +1,6 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import { errorRunnerFailed } from '@prisma-next/errors/execution';
+import { verifyMongoSchema } from '@prisma-next/family-mongo/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationOperationPolicy,
@@ -182,6 +183,21 @@ export class MongoMigrationRunner {
       existingMarker.profileHash === profileHash
     ) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
+    }
+
+    const liveSchema = await this.deps.introspectSchema();
+    const verifyResult = verifyMongoSchema({
+      contract: options.destinationContract,
+      schema: liveSchema,
+      strict: options.strictVerification ?? true,
+      frameworkComponents: options.frameworkComponents,
+      ...(options.context ? { context: options.context } : {}),
+    });
+    if (!verifyResult.ok) {
+      return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
+        why: 'The resulting database schema does not satisfy the destination contract.',
+        meta: { issues: verifyResult.schema.issues },
+      });
     }
 
     if (existingMarker) {
