@@ -109,7 +109,8 @@ packages/1-framework/3-tooling/migration/src/
 │                          #   exports: MigrationMetadata, MigrationHints
 ├── migration-base.ts      # imports updated (MigrationMetadata, etc.)
 ├── package.ts             # ⤳ extracted from types.ts
-│                          #   exports: MigrationPackage
+│                          #   exports: MigrationPackage, MigrationOps
+│                          #   (MigrationOps lives here because a package contains ops)
 ├── graph.ts               # ⤳ extracted from types.ts
 │                          #   exports: MigrationGraph, MigrationChainEntry
 └── exports/               # subpath re-exports updated to match new files
@@ -230,7 +231,7 @@ The control client path (the `db update` apply flow that does not load on-disk p
 In `packages/1-framework/3-tooling/migration/src/`:
 
 - Create `metadata.ts` with `MigrationMetadata` (renamed from `MigrationManifest`) and `MigrationHints`. Update the JSDoc that talks about "manifest envelope" to "metadata envelope".
-- Create `package.ts` with `MigrationPackage` (renamed from `MigrationBundle`). Field renames: `manifest` → `metadata`. `dirName` and `dirPath` stay.
+- Create `package.ts` with `MigrationPackage` (renamed from `MigrationBundle`) and `MigrationOps` (moved from `types.ts`; lives here because a package contains ops). Field renames: `manifest` → `metadata`. `dirName` and `dirPath` stay.
 - Create `graph.ts` with `MigrationGraph` and `MigrationChainEntry`. The `migrationId` field on `MigrationChainEntry` becomes `migrationHash`.
 - Delete `types.ts`.
 - Update `attestation.ts` → `hash.ts`. Inside: `computeMigrationId` → `computeMigrationHash`; `verifyMigrationBundle` → `verifyMigrationHash`; `VerifyResult.storedMigrationId/computedMigrationId` → `storedHash/computedHash`. Move the structural-canonicalization JSDoc onto `computeMigrationHash` (see [Documentation home](#documentation-home)).
@@ -320,7 +321,7 @@ In `packages/1-framework/3-tooling/migration/README.md`:
 
 - **No new runtime cost on the apply hot path.** The hash recomputation is O(canonical-JSON serialization) per package and was already happening once per command. Moving it from one consumer (CLI `migration apply`) into the loader does not change the total work — it just runs in one place.
 - **No new public surface to maintain.** The visible API delta is one new error code (`MIGRATION.HASH_MISMATCH`), one removed function (`verifyMigration`), one new error factory, and an invariant note in two pieces of JSDoc. Renames replace existing surface; they do not add to it.
-- **Plane-clean.** All changes live in `@prisma-next/migration-tools` (migration plane) and `@prisma-next/cli` (migration plane). No new cross-plane edges, no target-specific code.
+- **Plane-clean.** All code-level changes live in `@prisma-next/migration-tools` (migration plane) and `@prisma-next/cli` (migration plane). The only ripple into `@prisma-next/framework-components` (1-core) is a JSDoc invariant note on `MigrationRunner.execute`. No new cross-plane edges, no target-specific code.
 
 ## Out of scope
 
