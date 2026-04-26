@@ -630,3 +630,48 @@ m5 R1 records one architectural decision worth lifting into the ADR canon, beyon
 - **Mongo decode-side is intentionally out of project scope; future Mongo row decoding should mirror SQL's `decodeRow` pattern.** Captured in ADR 204 § Cross-family scope notes. The single-path always-await, `Promise.all` per-cell concurrency, and await-before-yield invariants are the same on both sides; the next project to extend Mongo with row decoding can adopt the SQL `decodeRow` shape directly.
 
 The remaining architectural decisions in m5 R1's ADR (single-path always-await, build-time vs query-time seam, cross-family parity at `BaseCodec`, walk-back framing) are restatements / consolidations of decisions already implemented and tested in m1..m4 R2. ADR 204's contribution is to record them as canonical for future contributors.
+
+## M5 R2 — F5/F6/F7 doc fixes
+
+> Doc-quality closure round. No architectural deltas; ADR 204 + ADR 030 + two READMEs are now correct on the points F5/F6/F7 flagged. F8 (T5.4 deferred-test header comment vs `it.skip` bodies) was unaddressed in this round and remains open at HEAD `a4aeba917`; surfaced to the orchestrator for an explicit decision (re-delegate to R3 or visibly override).
+
+### M5 R2.1 What changed since m5 R1
+
+A single doc-only commit (`a4aeba917`) closes F5, F6, and F7 with localized edits to four files:
+
+- [`docs/architecture docs/adrs/ADR 204 - Single-Path Async Codec Runtime.md`](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) — § Decision item 1 prose listing now narrates the real build-time signatures (`encodeJson(value): JsonValue`, `decodeJson(json: JsonValue): TInput`, `renderOutputType(typeParams): string | undefined`); § Architecture › `Codec` interface shape carries the verbatim source-of-truth interface from [`framework-components/src/codec-types.ts:27-50`](../../../packages/1-framework/1-core/framework-components/src/codec-types.ts:27-50) (5 generics — `Id, TTraits, TWire, TInput, TOutput=TInput`; correct method signatures; no fictional `TJson` / `TJsonInput` / `TypeNode`); § Architecture factory examples renamed `id:` → `typeId:` for `textCodec` and `secretCodec`. **F5 + F6 closed in this file.**
+- [`packages/2-sql/4-lanes/relational-core/README.md`](../../../packages/2-sql/4-lanes/relational-core/README.md) — `textCodec` and `secretCodec` examples renamed `id:` → `typeId:`. **F6 closed.**
+- [`packages/2-mongo-family/1-foundation/mongo-codec/README.md`](../../../packages/2-mongo-family/1-foundation/mongo-codec/README.md) — `intCodec` and `secretCodec` examples renamed `id:` → `typeId:`. **F6 closed.**
+- [`docs/architecture docs/adrs/ADR 030 - Result decoding & codecs registry.md`](../../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md) — supersession pointer at L3 trimmed to "the codec query-time method signatures (synchronous `encode` / `decode`)"; build-time `encodeJson` / `decodeJson` no longer appear in the listing. **F7 closed.**
+
+The fix also corrects a peripheral defect noted in passing in m5 R1: ADR 204 § Decision item 1 had `decodeJson(json: JsonValue): TOutput` (the real return type is `TInput`); the implementer corrected it to match the source-of-truth.
+
+### M5 R2.2 Architectural snapshot at HEAD `a4aeba917`
+
+No change from m5 R1's snapshot. The architectural shape — single-path always-await, build-time vs query-time seam, cross-family parity at the `BaseCodec` seam, walk-back framing — is unchanged; the only deltas are doc-quality alignment between ADR canon and source-of-truth.
+
+ADR 204's `Codec` interface block is now diff-clean against `framework-components/src/codec-types.ts:27-50` (presentational differences only — JSDoc presence in source, top-level vs in-block `import type { JsonValue }`). Future drift can be guarded by a CI hook that diffs the ADR block against the source file; not adopted in m5 R2 (out of scope), but recorded as an option for the close-out PR or a follow-up if the doc-source drift recurs.
+
+### M5 R2.3 F8 status (open at end of m5 R2)
+
+F8 was filed by the second-pass reviewer in m5 R1 against the T5.4 deferred-test header comment in [`collection-dispatch.test.ts (L405–L406)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:405-406). The header comment claims "the assertions themselves are preserved verbatim against the single-path contract", but the three `it.skip` bodies at [L426](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:426), [L430](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:430), and [L434](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:434) carry only `expect(true).toBe(true)` stubs. The orchestrator's R2 delegation prompt to the implementer enumerated only F5 / F6 / F7; F8 was not in their scope. The implementer correctly executed the assigned worklist; F8 remains as it was at end of m5 R1.
+
+The reviewer's findings discipline ([`.agents/skills/drive-orchestrate-plan/SKILL.md`](../../../.agents/skills/drive-orchestrate-plan/SKILL.md) § "Findings discipline") requires the findings log to be empty of opens for a phase SATISFIED verdict; F8 therefore blocks SATISFIED. Two paths forward (orchestrator's call): re-delegate F8 to an R3 implementer with a one-task worklist (Option B preferred — one-comment edit at [`collection-dispatch.test.ts (L403–L406)`](../../../packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:403-406); Option A — preserve PR #375 assertion shapes inside the `it.skip` bodies — preferred for deferred-test-discipline preservation), or visibly override F8 with an explicit recorded rationale per § Loop algorithm step 7 of the SKILL.
+
+### M5 R2.4 Validation gates
+
+Workspace-wide light gates re-run after the doc fixes:
+
+| Gate | Command | Result | Notes |
+|---|---|---|---|
+| Layering / imports | `pnpm lint:deps` | PASS (0 violations across 606 modules / 1198 deps) | Sanity check after doc-only edits. |
+| Type-check | `pnpm typecheck` | PASS (120/120 tasks) | Sanity check that codeblock-extracted code in ADR 204 stays syntactically valid; the new `Codec` interface block is verbatim source-of-truth so any type-level issue would surface in `framework-components` first. |
+
+`pnpm test:packages` / `pnpm test:integration` / `pnpm test:all` were skipped per the round prompt — R2 is doc-only and the m5 R1 test results carry forward unchanged.
+
+### M5 R2.5 AC scoreboard delta
+
+- **AC-DW1** (ADR 204 documents single-path design / seam / cross-family / walk-back; ADR 030 has supersession pointer): `PASS — substance complete; F5/F6/F7 are doc-quality findings inside the canonical artifacts` → **PASS unconditionally**. F5/F6/F7 closed by `a4aeba917`.
+- All other ACs unchanged from m5 R1.
+
+**Totals at end of m5 R2: 26 PASS / 0 FAIL / 0 NOT VERIFIED** (with three PASS-with-scope-note entries on AC-SE2, AC-SE4, AC-DW3 — all unchanged from m5 R1).
