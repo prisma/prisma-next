@@ -21,6 +21,15 @@ Single branch (`feat/codec-async-single-path`), milestone-by-milestone with inte
 
 ## Milestones
 
+### Validation gate convention
+
+The async-ness change starts at the codec interface (M1) and propagates outward through SQL runtime (M2), ORM client + SQL extensions (M3), and Mongo family (M4) consumers. Workspace-wide test gates therefore go green progressively rather than at every milestone boundary. Each milestone's gate names:
+
+- **In-scope packages** that must be green for the milestone to be SATISFIED.
+- **Expected residual** packages whose breakage is acceptable at this milestone boundary because their reshape is scheduled for a later milestone.
+
+`pnpm lint:deps` must pass workspace-wide at every milestone boundary. `pnpm test:all` is the definitive workspace-wide gate at M5.
+
 ### Milestone 1 (m1): Codec interface + factory
 
 Establishes the public `Codec` shape and the `codec()` factory. Demonstrable via interface and factory unit tests covering both sync and async author forms.
@@ -36,10 +45,10 @@ Establishes the public `Codec` shape and the `codec()` factory. Demonstrable via
 
 **Validation gate:**
 
-- `pnpm typecheck` — workspace-wide (M1 changes a public type that other packages reference).
-- `pnpm test:packages` — workspace-wide (any consumer test that constructs a codec exercises the new shape).
-- `pnpm lint:deps` — no new layering violations introduced.
-- Type-only assertion (covered by T1.1/T1.5 tests): `validateContract<Contract>(contractJson)` and `postgres({...})` infer as synchronous (no `await` required at call site).
+- **In-scope packages must be green:** `framework-components`, `relational-core` — `pnpm typecheck` and `pnpm test` per package.
+- **Expected residual** (acceptable to fail here, scheduled for later milestones): `sql-runtime` + `adapter-postgres` + `adapter-sqlite` (M2); `sql-orm-client` + `extension-pgvector` (M3); `mongo-codec` (M4). All of these break with the same uniform failure: consumers call sync `codec.encode`/`codec.decode` or extend `BaseCodec` with sync members.
+- `pnpm lint:deps` — workspace-wide; no new layering violations introduced.
+- Type-only assertion (covered by T1.1/T1.5 tests): the public `Codec` interface's build-time methods (`encodeJson`, `decodeJson`, `renderOutputType`) remain synchronous, so `validateContract` and `postgres({...})` (which only consume build-time methods) stay structurally sync. The literal `validateContract` / `postgres({...})` regression tests are deferred to T2.7 / T2.8 in M2 (the postgres package needs M2 to typecheck end-to-end).
 
 ### Milestone 2 (m2): SQL runtime (always-await, concurrent dispatch)
 
@@ -60,10 +69,10 @@ The SQL runtime adopts a single async path per direction. Demonstrable via a SQL
 
 **Validation gate:**
 
-- `pnpm typecheck`
-- `pnpm test:packages`
-- `pnpm test:integration` — SQL runtime is exercised by integration tests.
-- `pnpm lint:deps`
+- **In-scope packages must be green:** M1 packages, plus `sql-runtime`, `adapter-postgres`, `adapter-sqlite` — `pnpm typecheck` and `pnpm test` per package.
+- **Expected residual:** `sql-orm-client` + `extension-pgvector` (M3); `mongo-codec` (M4).
+- `pnpm test:integration` — SQL runtime integration tests for the in-scope packages must pass.
+- `pnpm lint:deps` — workspace-wide.
 
 ### Milestone 3 (m3): ORM client types and dispatch
 
@@ -82,10 +91,10 @@ Collapses read/write field type-maps to a single shared map; ORM dispatch awaits
 
 **Validation gate:**
 
-- `pnpm typecheck`
-- `pnpm test:packages`
-- `pnpm test:integration` — ORM client integration coverage.
-- `pnpm lint:deps`
+- **In-scope packages must be green:** M1+M2 packages, plus `sql-orm-client`, `extension-pgvector` — `pnpm typecheck` and `pnpm test` per package. If M3 surfaces other SQL extensions (or framework-side ORM consumers) as additional consumer reshape sites, they belong in this list.
+- **Expected residual:** `mongo-codec` (M4) and any other mongo-family packages whose breakage stems from the codec interface change.
+- `pnpm test:integration` — ORM client integration coverage for the in-scope packages.
+- `pnpm lint:deps` — workspace-wide.
 
 ### Milestone 4 (m4): Cross-family parity (Mongo)
 
@@ -110,10 +119,9 @@ The Mongo `Codec` interface, factory, and encode-side runtime invocation pattern
 
 **Validation gate:**
 
-- `pnpm typecheck`
-- `pnpm test:packages`
+- **Workspace-wide green required:** `pnpm typecheck` and `pnpm test:packages` workspace-wide. M4 closes out the consumer reshape; no codec-shape breakage should remain.
 - `pnpm test:integration` — Mongo + cross-family integration tests.
-- `pnpm lint:deps`
+- `pnpm lint:deps` — workspace-wide.
 - Cross-package consumer audit: `rg -n "\\.lower\\(" packages/ examples/ test/` should show only awaited call sites for `MongoAdapter.lower`. Same audit for `resolveValue(` to confirm async signature change is propagated.
 
 ### Milestone 5 (m5): Security tests, ADR, and close-out
