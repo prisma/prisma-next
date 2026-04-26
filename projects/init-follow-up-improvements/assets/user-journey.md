@@ -1,8 +1,8 @@
 # User Journeys: `prisma-next init` follow-up
 
-This document catalogs how real users (and agents) experience `prisma-next init` today, what works, and where they hit friction. It is the primary input for the project spec under `projects/init-follow-up-improvements/spec.md` (TBD).
+This document catalogs how real users (and agents) experience `prisma-next init` today, what works, and where they hit friction. It is the primary input for the project spec at [`../spec.md`](../spec.md).
 
-The previous shaping ([`projects/one-package-install/`](../one-package-install/)) shipped a working `init` command and the per-target facade (`@prisma-next/postgres`, `@prisma-next/mongo`). This follow-up is about making `init` actually deliver on the experience that spec promised — for **every** combination of (target × authoring × persona × project state), not just the Postgres-PSL happy path.
+The previous shaping ([`projects/one-package-install/`](../../one-package-install/)) shipped a working `init` command and the per-target facade (`@prisma-next/postgres`, `@prisma-next/mongo`). This follow-up is about making `init` actually deliver on the experience that spec promised — for **every** combination of (target × authoring × persona × project state), not just the Postgres-PSL happy path.
 
 ---
 
@@ -10,8 +10,8 @@ The previous shaping ([`projects/one-package-install/`](../one-package-install/)
 
 Friction is annotated with **[E#]** evidence pointers. Evidence comes from one of:
 
-- **Live runs** of `pnpm dlx prisma-next@latest init` (or scaffolded equivalents) under [`wip/init-experiments/`](../../wip/init-experiments/) — gitignored. See `init-output.txt` / `install-npm-output.txt` / `scaffold-output.txt` in each scenario directory.
-- **Code reads** of [`packages/1-framework/3-tooling/cli/src/commands/init/`](../../packages/1-framework/3-tooling/cli/src/commands/init/) and the published `@prisma-next/{postgres,mongo}` runtimes (`node_modules/@prisma-next/mongo/dist/runtime.d.mts`, etc.).
+- **Live runs** of `pnpm dlx prisma-next@latest init` (or scaffolded equivalents). The captured outputs live under [`evidence/`](./evidence/) — see [`evidence/README.md`](./evidence/README.md) for the E1–E14 index and reproduction instructions. (The original runs were performed in the gitignored `wip/init-experiments/` tree; this directory is the in-repo, committed snapshot.)
+- **Code reads** of [`packages/1-framework/3-tooling/cli/src/commands/init/`](../../../packages/1-framework/3-tooling/cli/src/commands/init/) and the published `@prisma-next/{postgres,mongo}` runtimes (`node_modules/@prisma-next/mongo/dist/runtime.d.mts`, etc.).
 - **Reproductions of user-reported behaviour** in the prior chat (TML-2263).
 
 Test environment: macOS, Node 24.13.0, pnpm 10.27.0, npm 11.6.2. Published packages at versions: `prisma-next@0.4.1`, `@prisma-next/postgres@0.4.1`, `@prisma-next/mongo@0.4.1` (latest dist-tag).
@@ -52,7 +52,7 @@ P1 is what `init` was designed for. P2–P8 currently range from "subtly broken"
 
 - The 5-file scaffold (contract, config, db.ts, quick-reference.md, agent skill) lands as advertised.
 - Templates are correct PSL with realistic models.
-- After `npm install` finishes, `npx prisma-next contract emit` produces a clean `contract.json` + `contract.d.ts` with **no missing-deps warning** [**E1**: `wip/init-experiments/02-pg-psl/install-npm-output.txt`].
+- After `npm install` finishes, `npx prisma-next contract emit` produces a clean `contract.json` + `contract.d.ts` with **no missing-deps warning** [**E1**: `02-pg-psl/install-npm-output.txt`].
 - Once `@types/node` is present and `tsconfig.types` is set to `["node"]`, a real `db.orm.User.where(...).first()` query typechecks cleanly. [**E2**: ditto + `query.ts` in same dir]
 
 ### Friction
@@ -63,7 +63,7 @@ P1 is what `init` was designed for. P2–P8 currently range from "subtly broken"
 - **F4 — No `.gitignore` updates.** Init does not add `dist/`, `.env`, or anything else to `.gitignore`. The scaffolded `tsconfig.json` defines `"outDir": "dist"` but nothing tells git to ignore it.
 - **F5 — No "what next?" actionables tied to the user's database.** The outro ("Done! Open `prisma-next.md` to get started.") is information-poor. There's no `pnpm prisma-next db init` suggestion, no `pnpm dev` pointer, no link to a starter query.
 - **F6 — `pnpm install` fails for some users.** When init detects pnpm and runs `pnpm add prisma-next`, it can fail with `ERR_PNPM_WORKSPACE_PKG_NOT_FOUND` (`@prisma-next/core-control-plane@workspace:*` leaks via `@prisma-next/migration-tools`) or `ERR_PNPM_SPEC_NOT_SUPPORTED_BY_ANY_RESOLVER` (`arktype@catalog:` leaks the same way). The same install via npm succeeds. Init has no fallback strategy. [**E4**: `02-pg-psl/install-output.txt` initial error block]
-- **F7 — No `.gitattributes` updates.** Init emits `prisma/contract.json` and `prisma/contract.d.ts` and tells the user to commit them. Without a `linguist-generated` mark on these files, GitHub treats every emit as a hand-written diff: PRs balloon, the repo's "Languages" stat is dominated by emitted JSON/TS, and reviewers are nudged to scrutinize generated code. The Prisma Next monorepo itself solves this with [`.gitattributes`](../../.gitattributes) (lines 3–4) — user projects need the same entries.
+- **F7 — No `.gitattributes` updates.** Init emits `prisma/contract.json` and `prisma/contract.d.ts` and tells the user to commit them. Without a `linguist-generated` mark on these files, GitHub treats every emit as a hand-written diff: PRs balloon, the repo's "Languages" stat is dominated by emitted JSON/TS, and reviewers are nudged to scrutinize generated code. The Prisma Next monorepo itself solves this with [`.gitattributes`](../../../.gitattributes) (lines 3–4) — user projects need the same entries.
 - **F8 — No DB-target version requirement is enforced anywhere in the system.** Prisma Next does not declare a minimum required Postgres / MongoDB server version, does not check it at `init` / `contract emit` / `db init` / first connection, and does not surface incompatibilities until the user hits a runtime error from the driver. The user could happily `init` against Postgres 9 or MongoDB 3.6 and only discover the gap when a query fails for unexplained reasons. Init is the natural place to detect (or at least communicate) the supported version range.
 
 ### Severity
@@ -88,9 +88,9 @@ Identical to J1 except they pick MongoDB at the first prompt.
 
 All of P1's friction (F1–F8) plus:
 
-- **F9 — Agent skill is wrong for Mongo.** [`agent-skill-mongo.md`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-mongo.md) tells the agent to use `db.orm.User.where(...)`. With the published `@prisma-next/mongo@0.4.1`, `db` is `MongoClient<Contract>` which **has no `.orm` property** — `tsc` says `Property 'orm' does not exist on type 'MongoClient<Contract>'`. An LLM following this skill would generate non-compiling code on the very first query. [**E6**: `03-04-05-mongo-psl/query.ts`+ tsc output]
-- **F10 — Even the *correct* documented Mongo pattern doesn't typecheck.** [`quick-reference-mongo.md`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/quick-reference-mongo.md) tells the human user to do `const client = await db.connect(url, 'mydb'); client.orm.User.where(...)`. With the published facade, `client.orm.User.where` resolves as `Property 'where' does not exist on type 'never'` — even though `@prisma-next/mongo-orm` clearly exports a typed orm. The Mongo type chain breaks somewhere between the facade and the orm. [**E7**: same file]
-- **F11 — Mongo agent skill is a copy-paste of the Postgres skill.** Line 26 of [`agent-skill-mongo.md`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-mongo.md) says "Only fall back to `db.sql` if the user explicitly asks for raw queries". `db.sql` is meaningless on Mongo. The skill also uses Postgres examples (`field.eq`, `orderBy`) without verifying they work for Mongo's orm.
+- **F9 — Agent skill is wrong for Mongo.** [`agent-skill-mongo.md`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-mongo.md) tells the agent to use `db.orm.User.where(...)`. With the published `@prisma-next/mongo@0.4.1`, `db` is `MongoClient<Contract>` which **has no `.orm` property** — `tsc` says `Property 'orm' does not exist on type 'MongoClient<Contract>'`. An LLM following this skill would generate non-compiling code on the very first query. [**E6**: `03-04-05-mongo-psl/query.ts`+ tsc output]
+- **F10 — Even the *correct* documented Mongo pattern doesn't typecheck.** [`quick-reference-mongo.md`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/quick-reference-mongo.md) tells the human user to do `const client = await db.connect(url, 'mydb'); client.orm.User.where(...)`. With the published facade, `client.orm.User.where` resolves as `Property 'where' does not exist on type 'never'` — even though `@prisma-next/mongo-orm` clearly exports a typed orm. The Mongo type chain breaks somewhere between the facade and the orm. [**E7**: same file]
+- **F11 — Mongo agent skill is a copy-paste of the Postgres skill.** Line 26 of [`agent-skill-mongo.md`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/agent-skill-mongo.md) says "Only fall back to `db.sql` if the user explicitly asks for raw queries". `db.sql` is meaningless on Mongo. The skill also uses Postgres examples (`field.eq`, `orderBy`) without verifying they work for Mongo's orm.
 - **F12 — Mongo and Postgres facades aren't at parity.** Postgres: `db.orm.User.where(...).first()` works directly off the runtime client. Mongo: requires an explicit `connect(url, dbName)` call before any query, and even then the typed orm is broken. The mongo-flavoured `prisma-next.md` papers over this with a different code sample, but the asymmetry leaks into every doc, every tutorial, every agent skill.
 - **F13 — Mongo TS schema requires a `dbName` argument that doesn't exist anywhere in the scaffold.** Both `prisma-next.md` and the agent skill assume the user knows to put the database name (`'mydb'`) in code. There's no prompt for it during init, no `.env` variable for it, no comment in `db.ts` mentioning it.
 - **F14 — Mongo-specific feature gaps surface only at runtime.** Several Mongo features (e.g. multi-document transactions, change streams, `$lookup` aggregations used by relations) require a replica-set deployment and a minimum server version. Init doesn't ask the user about their deployment shape and doesn't warn that a standalone `mongod` will silently degrade behaviour. (See also F8 for the system-wide DB-version-check gap.)
@@ -119,8 +119,8 @@ Same as J1/J2 but selects "TypeScript (.ts)" at the second prompt.
 All of P1/P2 friction plus:
 
 - **F15 — `prisma-next.md` is wrong for TS users.** The scaffolded quick-reference shows a **PSL `model User { ... }` code block** even when the user picked TypeScript. The doc only differentiates by target (`postgres`/`mongo`), not by authoring (`psl`/`typescript`). A new user reading this is told "your schema looks like this" and shown syntax that has nothing to do with the file they actually have. [**E8**: `03-04-05-pg-ts/prisma-next.md` lines 10–19]
-- **F16 — Agent skill has the same problem.** [`agent-skill-{postgres,mongo}.md`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/) hard-codes `prisma/contract.prisma` and PSL examples. A TS-authoring project gets an agent skill that contradicts the actual contract.
-- **F17 — TS schema templates are inconsistent across targets.** Four axes of divergence between `starterSchemaTsPostgres()` and `starterSchemaTsMongo()` (see [`code-templates.ts`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates.ts) lines 66–135):
+- **F16 — Agent skill has the same problem.** [`agent-skill-{postgres,mongo}.md`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/) hard-codes `prisma/contract.prisma` and PSL examples. A TS-authoring project gets an agent skill that contradicts the actual contract.
+- **F17 — TS schema templates are inconsistent across targets.** Four axes of divergence between `starterSchemaTsPostgres()` and `starterSchemaTsMongo()` (see [`code-templates.ts`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/code-templates.ts) lines 66–135):
   1. Builder API: callback `(builders) => ({...})` for Postgres vs. top-level `field/model/rel` imports for Mongo.
   2. `defineContract` signature: 2-arg curried for Postgres vs. single-object with `models` key for Mongo.
   3. Field method names: `field.text()` for Postgres vs. `field.string()` for Mongo.
@@ -151,10 +151,10 @@ Nothing. There is no non-interactive mode.
 ### Friction
 
 - **F19 — `--yes` is rejected as `unknown option`.** [**E9**: `06-noninteractive/init-output.txt`]
-- **F20 — No init-specific flags exist.** The init command only registers `--no-install`. There is no `--target`, `--authoring`, `--schema-path`, `--force`. [Code: [`commands/init/index.ts`](../../packages/1-framework/3-tooling/cli/src/commands/init/index.ts) lines 13–15.]
+- **F20 — No init-specific flags exist.** The init command only registers `--no-install`. There is no `--target`, `--authoring`, `--schema-path`, `--force`. [Code: [`commands/init/index.ts`](../../../packages/1-framework/3-tooling/cli/src/commands/init/index.ts) lines 13–15.]
 - **F21 — No-TTY exit is silent and lies about success.** Run `prisma-next init </dev/null` (simulating any CI/agent environment): the CLI renders the first clack `select` prompt, then aborts when stdin closes — and exits with **status code 0**. No error message, no `--no-interactive` advice, no files created. An automation that doesn't check for files-on-disk would think init succeeded. [**E10**: `06-noninteractive/init-output.txt` "EXIT=0"]
 - **F22 — No machine-readable output.** Even if the prompts were skippable, the spinner output goes to stderr and has no `--json` mode. An agent that wants to know "what files were written, what packages were installed, what's the next command" has nothing structured to parse.
-- **F23 — No `addGlobalOptions` wiring.** The CLI's standard global flags (`--json`, `-q`, `-v`, `--trace`, `--no-color`, `--interactive`, `--no-interactive`, `-y`) are defined in [`utils/command-helpers.ts`](../../packages/1-framework/3-tooling/cli/src/utils/command-helpers.ts) but not applied to the `init` command. Every other command gets them; init doesn't.
+- **F23 — No `addGlobalOptions` wiring.** The CLI's standard global flags (`--json`, `-q`, `-v`, `--trace`, `--no-color`, `--interactive`, `--no-interactive`, `-y`) are defined in [`utils/command-helpers.ts`](../../../packages/1-framework/3-tooling/cli/src/utils/command-helpers.ts) but not applied to the `init` command. Every other command gets them; init doesn't.
 
 ### Severity
 
@@ -200,7 +200,7 @@ Medium. The current behaviour is at least correct and gives an actionable hint, 
 
 ### Friction
 
-- **F26 — `mergeTsConfig` crashes on JSONC `tsconfig.json`.** `init` calls [`mergeTsConfig`](../../packages/1-framework/3-tooling/cli/src/commands/init/templates/tsconfig.ts) which does `JSON.parse(existing)` directly. Real-world `tsconfig.json` files have `// comments` (officially supported by TS, used by `tsc --init` output, used by every Next.js scaffolder). `init` then throws `SyntaxError: Expected property name or '}' in JSON` and **leaves the project half-initialized** (the schema, config, and db.ts files are written before tsconfig is merged). [**E12**: `08-existing-tsconfig/scaffold-output.txt`]
+- **F26 — `mergeTsConfig` crashes on JSONC `tsconfig.json`.** `init` calls [`mergeTsConfig`](../../../packages/1-framework/3-tooling/cli/src/commands/init/templates/tsconfig.ts) which does `JSON.parse(existing)` directly. Real-world `tsconfig.json` files have `// comments` (officially supported by TS, used by `tsc --init` output, used by every Next.js scaffolder). `init` then throws `SyntaxError: Expected property name or '}' in JSON` and **leaves the project half-initialized** (the schema, config, and db.ts files are written before tsconfig is merged). [**E12**: `08-existing-tsconfig/scaffold-output.txt`]
 - **F27 — No collision detection for existing `prisma/` artefacts.** If the user already has `prisma/schema.prisma` (from Prisma ORM) or another `db.ts`, init silently overwrites them with no warning. The only existing-file check is for `prisma-next.config.ts` itself.
 - **F28 — No framework detection.** Init doesn't notice it's running inside a Next.js project. There's no Next-specific advice ("add `experimental.serverActions = true`"), no plugin auto-install (the quick-reference mentions an unspecified "Prisma Next plugin"), no `app/` vs `pages/` awareness.
 - **F29 — `package.json` script collisions.** Init doesn't add scripts, but if it did (per F3), it has no logic to detect existing `db:generate` / similar scripts the framework template might already define.
@@ -252,7 +252,7 @@ Medium. Most users won't re-init. Those who do hit a half-initialized project th
 
 ### Friction (inferred)
 
-- **F35 — Lockfile is at the repo root, not the cwd.** [`detectPackageManager`](../../packages/1-framework/3-tooling/cli/src/commands/init/detect-package-manager.ts) checks for lockfiles in `baseDir`. In a pnpm workspace, only the root has `pnpm-lock.yaml`. The detector likely falls back to `npm` for sub-packages, leading to mixed-PM installs (npm in a pnpm workspace).
+- **F35 — Lockfile is at the repo root, not the cwd.** [`detectPackageManager`](../../../packages/1-framework/3-tooling/cli/src/commands/init/detect-package-manager.ts) checks for lockfiles in `baseDir`. In a pnpm workspace, only the root has `pnpm-lock.yaml`. The detector likely falls back to `npm` for sub-packages, leading to mixed-PM installs (npm in a pnpm workspace).
 - **F36 — `pnpm-workspace.yaml` interferes with `pnpm dlx`.** Confirmed live: even our scratch dir under `wip/` had pnpm resolve `@prisma-next/mongo@latest` to `0.3.0` (an older version) instead of `0.4.1`, presumably because the parent workspace's catalog/store cache won. The published `latest` is 0.4.1; pnpm installed 0.3.0. The 0.3.0 version doesn't list `@prisma-next/adapter-mongo` and `@prisma-next/mongo-contract` as direct deps, so it would also re-trigger the missing-deps warning. [**E14**: `04b-mongo-pnpm/install-pnpm-output.txt`]
 - **F37 — Prisma Next config and contract paths are relative to cwd.** No friction in itself, but the agent skill / quick-ref docs assume project root layout (`./prisma/db.ts`). In a monorepo, the user might want `apps/api/prisma/db.ts` but the docs don't help them think about this.
 
@@ -333,39 +333,45 @@ Prisma Next has no declared minimum supported Postgres or MongoDB server version
 6. **Telemetry.** Track init success/failure (anonymized) to learn which scenarios actually break in the wild?
 7. **`prisma-next-doctor`-equivalent.** Should `init --check` (or a new `prisma-next doctor` command) re-run the post-init validations and print a green/red list?
 8. **DB version policy and where to enforce it (R11).** Where does the supported-version range live (per-target package metadata? the family contract? `target-postgres` / `target-mongo`?)? Does `init` *probe* (requires `DATABASE_URL` at init time, which we don't currently demand) or just *declare* (write the requirement into `.env.example` + `prisma-next.md` and defer the actual check to first connection or a separate `prisma-next doctor`)? For Mongo, do we go further and require / advise a replica-set deployment?
-9. **`.gitattributes` ownership.** Always create one? Append to an existing one? Use `linguist-generated` (GitHub-only) or also `merge=binary` / `-diff` (universal)? Which paths exactly — just `prisma/contract.{json,d.ts}` or also future emitted artefacts (`prisma/migrations/...`, `prisma/ops.json`, `prisma/end-contract.*`)? Mirror exactly the entries from this repo's [`.gitattributes`](../../.gitattributes), or a project-scoped subset?
+9. **`.gitattributes` ownership.** Always create one? Append to an existing one? Use `linguist-generated` (GitHub-only) or also `merge=binary` / `-diff` (universal)? Which paths exactly — just `prisma/contract.{json,d.ts}` or also future emitted artefacts (`prisma/migrations/...`, `prisma/ops.json`, `prisma/end-contract.*`)? Mirror exactly the entries from this repo's [`.gitattributes`](../../../.gitattributes), or a project-scoped subset?
 
 ---
 
 ## Evidence index
 
+The captured outputs are committed under [`evidence/`](./evidence/). See [`evidence/README.md`](./evidence/README.md) for the full index with reproduction instructions.
+
 | ID | Source |
 |---|---|
-| E1 | `wip/init-experiments/02-pg-psl/install-npm-output.txt` (Postgres install + emit, no warning) |
-| E2 | `wip/init-experiments/02-pg-psl/query.ts` + tsc result (`TSC_EXIT=0` after `--types node`) |
-| E3 | `wip/init-experiments/02-pg-psl/install-npm-output.txt` (`TSC_EXIT=2` without `--types node`) |
-| E4 | `wip/init-experiments/02-pg-psl/install-output.txt` (initial `pnpm` attempt before fallback to npm) |
-| E5 | `wip/init-experiments/03-04-05-mongo-psl/install-npm-output.txt` (Mongo emit succeeds, no warning) |
-| E6 | `wip/init-experiments/03-04-05-mongo-psl/query.ts` (tsc: `Property 'orm' does not exist on type 'MongoClient<Contract>'`) |
-| E7 | Same dir, modified `query.ts` using `client = await db.connect(...)` (tsc: `Property 'where' does not exist on type 'never'`) |
-| E8 | `wip/init-experiments/03-04-05-pg-ts/prisma-next.md` (PSL code block in TS scaffold) |
-| E9 | `wip/init-experiments/06-noninteractive/init-output.txt` (`error: unknown option '--yes'`) |
+| E1 | [`evidence/02-pg-psl/install-npm-output.txt`](./evidence/02-pg-psl/install-npm-output.txt) (Postgres install + emit, no warning) |
+| E2 | [`evidence/02-pg-psl/query.ts`](./evidence/02-pg-psl/query.ts) + tsc result (`TSC_EXIT=0` after `--types node`) |
+| E3 | [`evidence/02-pg-psl/install-npm-output.txt`](./evidence/02-pg-psl/install-npm-output.txt) (`TSC_EXIT=2` without `--types node`) |
+| E4 | [`evidence/02-pg-psl/install-output.txt`](./evidence/02-pg-psl/install-output.txt) (initial `pnpm` attempt before fallback to npm) |
+| E5 | [`evidence/03-04-05-mongo-psl/install-npm-output.txt`](./evidence/03-04-05-mongo-psl/install-npm-output.txt) (Mongo emit succeeds, no warning) |
+| E6 | [`evidence/03-04-05-mongo-psl/query.ts`](./evidence/03-04-05-mongo-psl/query.ts) (tsc: `Property 'orm' does not exist on type 'MongoClient<Contract>'`) |
+| E7 | Same file, modified to `client = await db.connect(...)` (tsc: `Property 'where' does not exist on type 'never'`) |
+| E8 | [`evidence/03-04-05-pg-ts/prisma-next.md`](./evidence/03-04-05-pg-ts/prisma-next.md) (PSL code block in TS scaffold) |
+| E9 | [`evidence/06-noninteractive/init-output.txt`](./evidence/06-noninteractive/init-output.txt) (`error: unknown option '--yes'`) |
 | E10 | Same file (`</dev/null` run, exits 0 after rendering first prompt) |
-| E11 | `wip/init-experiments/01-blank-dir/init-output.txt` |
-| E12 | `wip/init-experiments/08-existing-tsconfig/scaffold-output.txt` (`SyntaxError: Expected property name or '}'`) |
-| E13 | `wip/init-experiments/07-reinit/` (no `contract.json` rewrite after target switch) |
-| E14 | `wip/init-experiments/04b-mongo-pnpm/install-pnpm-output.txt` (`@prisma-next/mongo 0.3.0 (0.4.1 is available)`) |
+| E11 | [`evidence/01-blank-dir/init-output.txt`](./evidence/01-blank-dir/init-output.txt) |
+| E12 | [`evidence/08-existing-tsconfig/scaffold-output.txt`](./evidence/08-existing-tsconfig/scaffold-output.txt) (`SyntaxError: Expected property name or '}'`) |
+| E13 | [`evidence/07-reinit/directory-listing.txt`](./evidence/07-reinit/directory-listing.txt) (no `contract.json` rewrite after target switch) |
+| E14 | [`evidence/04b-mongo-pnpm/install-pnpm-output.txt`](./evidence/04b-mongo-pnpm/install-pnpm-output.txt) (`@prisma-next/mongo 0.3.0 (0.4.1 is available)`) |
 
-The `wip/init-experiments/` tree is gitignored. Live re-runs:
+[`evidence/scaffold.ts`](./evidence/scaffold.ts) is the deterministic-scaffold reproduction script. It imports the CLI's template functions directly and writes their output to a target directory — bypassing `clack` so the scaffold step is reproducible without TTY simulation. To regenerate any scenario, copy it into the gitignored `wip/` tree and run from there:
 
 ```bash
+mkdir -p wip/init-experiments
+cp projects/init-follow-up-improvements/assets/evidence/scaffold.ts wip/init-experiments/
+
 # Re-run the missing-deps + facade tests:
-cd wip/init-experiments/02-pg-psl    && npm install && npx prisma-next contract emit && npx tsc --noEmit --types node
-cd wip/init-experiments/03-04-05-mongo-psl && npm install && npx prisma-next contract emit && npx tsc --noEmit --types node
+pnpm exec tsx wip/init-experiments/scaffold.ts wip/init-experiments/02-pg-psl postgres psl
+cd wip/init-experiments/02-pg-psl && npm install && npx prisma-next contract emit && npx tsc --noEmit --types node
+cd ../03-04-05-mongo-psl && npm install && npx prisma-next contract emit && npx tsc --noEmit --types node
 
 # Re-run the no-TTY test:
-cd wip/init-experiments/06-noninteractive && pnpm dlx prisma-next@latest init </dev/null
+mkdir -p wip/init-experiments/06-noninteractive && cd wip/init-experiments/06-noninteractive && pnpm init -y && pnpm dlx prisma-next@latest init </dev/null
 
 # Re-run the JSONC tsconfig test:
-cd wip/init-experiments/08-existing-tsconfig && pnpm exec tsx ../scaffold.ts . postgres psl
+pnpm exec tsx wip/init-experiments/scaffold.ts wip/init-experiments/08-existing-tsconfig postgres psl
 ```
