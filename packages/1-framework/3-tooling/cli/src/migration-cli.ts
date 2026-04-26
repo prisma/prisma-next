@@ -18,11 +18,13 @@
  * 2. Parses CLI args (`--help`, `--dry-run`, `--config <path>`).
  * 3. Loads the project's `prisma-next.config.ts` via the same `loadConfig`
  *    the CLI commands use, walking up from the migration file's directory.
- * 4. Assembles a `ControlStack` from the loaded config descriptors.
- * 5. Verifies the migration's `targetId` matches `config.target.targetId`
- *    (`PN-MIG-2006` on mismatch).
- * 6. Instantiates the migration with the assembled stack.
- * 7. Reads any previously-scaffolded `migration.json`, then calls
+ * 4. Probe-instantiates the migration class without a stack so it can read
+ *    `targetId` and verify it matches `config.target.targetId`
+ *    (`PN-MIG-2006` on mismatch) before any stack-driven adapter
+ *    construction runs.
+ * 5. Assembles a `ControlStack` from the loaded config descriptors and
+ *    constructs the migration with that stack.
+ * 6. Reads any previously-scaffolded `migration.json`, then calls
  *    `buildMigrationArtifacts` from `@prisma-next/migration-tools` to
  *    produce in-memory `ops.json` + `migration.json` content. Persists
  *    the result to disk (or prints in dry-run mode).
@@ -36,7 +38,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { CliStructuredError } from '@prisma-next/errors/control';
+import { CliStructuredError, errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
 import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import {
@@ -79,6 +81,11 @@ interface ParsedArgs {
  * `--config=<path>`. Unknown flags are ignored to keep the surface
  * forgiving for ad-hoc tooling that wraps a migration file.
  *
+ * Throws `errorMigrationCliInvalidConfigArg` (`PN-CLI-4012`) when
+ * `--config` is missing its path argument or is followed by another flag
+ * (e.g. `--config --dry-run`); silently consuming the next flag would
+ * either drop dry-run handling or serialize against the wrong project.
+ *
  * NOTE: this hand-rolled parser is a known wart, tracked separately by
  * TML-2318 ("Migration CLI: replace handrolled arg parser with shared
  * CLI library"). Until that lands the surface is intentionally tiny.
@@ -96,10 +103,14 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
       dryRun = true;
     } else if (arg === '--config') {
       const next = argv[i + 1];
-      if (next !== undefined) {
-        configPath = next;
-        i++;
+      if (next === undefined) {
+        throw errorMigrationCliInvalidConfigArg();
       }
+      if (next.startsWith('-')) {
+        throw errorMigrationCliInvalidConfigArg({ nextToken: next });
+      }
+      configPath = next;
+      i++;
     } else if (arg.startsWith('--config=')) {
       configPath = arg.slice('--config='.length);
     }
@@ -138,36 +149,40 @@ export class MigrationCLI {
     if (!importMetaUrl) return;
     if (!isDirectEntrypoint(importMetaUrl)) return;
 
-    const args = parseArgs(process.argv.slice(2));
-
-    if (args.help) {
-      printMigrationHelp();
-      return;
-    }
-
-    const migrationFile = fileURLToPath(importMetaUrl);
-    const migrationDir = dirname(migrationFile);
-
     try {
+      const args = parseArgs(process.argv.slice(2));
+
+      if (args.help) {
+        printMigrationHelp();
+        return;
+      }
+
+      const migrationFile = fileURLToPath(importMetaUrl);
+      const migrationDir = dirname(migrationFile);
+
       const config = await loadConfig(args.configPath);
 
-      const stack = createControlStack(config);
+      // Probe-instantiate without a stack so we can read `targetId` before
+      // any target-specific constructor side effects (e.g.
+      // `PostgresMigration`'s `stack.adapter.create(stack)`) run. Concrete
+      // subclasses are required to accept the no-arg form; the abstract
+      // `Migration` constructor declares `stack?` and target subclasses
+      // (Postgres, Mongo) propagate that optionality. This makes the
+      // target-mismatch guard fail fast with `PN-MIG-2006` before any
+      // stack-driven adapter construction begins, even if the wrong-target
+      // adapter's `create` would otherwise succeed and silently misshapen
+      // the stored adapter cast.
+      const probe = new MigrationClass();
 
-      // Construct first so we can read `instance.targetId`. The target-mismatch
-      // check below is what rescues concrete subclasses that cast inside their
-      // constructor (e.g. `PostgresMigration` casts `stack.adapter.create(stack)`
-      // to `SqlControlAdapter<'postgres'>`); a wrong-target stack would produce a
-      // misshapen adapter, but the instance never reaches the
-      // serialization step because we throw `errorMigrationTargetMismatch`
-      // before that.
-      const instance = new MigrationClass(stack);
-
-      if (instance.targetId !== config.target.targetId) {
+      if (probe.targetId !== config.target.targetId) {
         throw errorMigrationTargetMismatch({
-          migrationTargetId: instance.targetId,
+          migrationTargetId: probe.targetId,
           configTargetId: config.target.targetId,
         });
       }
+
+      const stack = createControlStack(config);
+      const instance = new MigrationClass(stack);
 
       serializeMigrationToDisk(instance, migrationDir, args.dryRun);
     } catch (err) {

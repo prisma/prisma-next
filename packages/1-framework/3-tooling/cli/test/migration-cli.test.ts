@@ -58,6 +58,32 @@ class WrongTargetMigration extends Migration {
   }
 }
 
+/**
+ * Mirrors `PostgresMigration`'s constructor side effect: when given a
+ * stack, eagerly invokes `stack.adapter.create(stack)` to materialize a
+ * control adapter. Used to assert that `MigrationCLI.run` never
+ * constructs a wrong-target migration with the assembled stack — the
+ * static `stackUsed` flag stays `false` when the target-mismatch guard
+ * fires before stack construction.
+ */
+class StackHungryWrongTargetMigration extends Migration {
+  readonly targetId = 'mongo' as const;
+  static stackUsed = false;
+  constructor(stack?: unknown) {
+    super(stack as never);
+    if (stack !== undefined) {
+      StackHungryWrongTargetMigration.stackUsed = true;
+      (stack as { adapter: { create: (s: unknown) => unknown } }).adapter.create(stack);
+    }
+  }
+  override get operations() {
+    return [];
+  }
+  override describe() {
+    return { from: 'sha256:from', to: 'sha256:to' };
+  }
+}
+
 let stderrSpy: ReturnType<typeof vi.spyOn>;
 let stdoutSpy: ReturnType<typeof vi.spyOn>;
 let originalArgv: typeof process.argv;
@@ -255,5 +281,46 @@ describe('MigrationCLI.run', () => {
     await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(loadConfigMock).toHaveBeenCalledWith('/equals/config.ts');
+  });
+
+  it('rejects --config when followed by another flag instead of a path', async () => {
+    process.argv = ['node', migrationFile, '--config', '--dry-run'];
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+
+    expect(process.exitCode).toBe(1);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
+    expect(stderrText).toContain('--config');
+    expect(stderrText).toContain('--dry-run');
+  });
+
+  it('rejects a bare trailing --config with no path argument', async () => {
+    process.argv = ['node', migrationFile, '--config'];
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+
+    expect(process.exitCode).toBe(1);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
+    expect(stderrText).toContain('--config');
+  });
+
+  it('rejects target-mismatched migrations before any stack-driven construction', async () => {
+    loadConfigMock.mockResolvedValue({
+      family: { familyId: 'sql' },
+      target: { targetId: 'postgres' },
+      adapter: { kind: 'adapter' },
+      extensionPacks: [],
+    });
+    const adapterCreate = vi.fn(() => ({}));
+    createControlStackMock.mockReturnValue({ adapter: { create: adapterCreate } });
+    StackHungryWrongTargetMigration.stackUsed = false;
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, StackHungryWrongTargetMigration);
+
+    expect(process.exitCode).toBe(1);
+    expect(StackHungryWrongTargetMigration.stackUsed).toBe(false);
+    expect(adapterCreate).not.toHaveBeenCalled();
   });
 });

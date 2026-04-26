@@ -11,6 +11,7 @@ export {
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorJsonFormatNotSupported,
+  errorMigrationCliInvalidConfigArg,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,
