@@ -394,7 +394,7 @@ export async function runMigrationShow(
 
 /**
  * Self-emits a migration package by running its `migration.ts` directly with
- * `tsx`. The migration.ts invokes `Migration.run(import.meta.url, …)`, which
+ * `tsx`. The migration.ts invokes `runMigration(import.meta.url, …)`, which
  * serializes the class's `operations` to `ops.json` and attests
  * `migration.json` in the package directory.
  *
