@@ -1,9 +1,4 @@
-import type {
-  Contract,
-  ResultType as CoreResultType,
-  ExecutionPlan,
-  PlanRefs,
-} from '@prisma-next/contract/types';
+import type { Contract, PlanRefs } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
 import type {
   ExtractFieldOutputTypes,
@@ -11,9 +6,9 @@ import type {
   StorageColumn,
 } from '@prisma-next/sql-contract/types';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
-import type { AnyQueryAst, ColumnRef, ParamRef } from './ast/types';
-import type { SqlQueryPlan } from './plan';
+import type { ColumnRef, ParamRef } from './ast/types';
 import type { ExecutionContext } from './query-lane-context';
+import type { SqlExecutionPlan } from './sql-execution-plan';
 
 export type Expr = ColumnRef | ParamRef;
 
@@ -179,10 +174,11 @@ export type HasIncludeManyCapabilities<TContract extends Contract<SqlStorage>> =
   : false;
 
 /**
- * SQL-specific Plan type that refines the ast field to use AnyQueryAst.
- * This is the type used by SQL query builders.
+ * Alias for the SQL-domain executable plan, exposed under the legacy
+ * `SqlPlan` name for compatibility with SQL builder/utility call sites.
+ * The canonical name is `SqlExecutionPlan` (`./sql-execution-plan`).
  */
-export type SqlPlan<Row = unknown> = ExecutionPlan<Row, AnyQueryAst>;
+export type SqlPlan<Row = unknown> = SqlExecutionPlan<Row>;
 
 /**
  * Helper types for extracting contract structure.
@@ -260,10 +256,10 @@ export interface RawFunctionOptions extends RawTemplateOptions {
 export type RawTemplateFactory = (
   strings: TemplateStringsArray,
   ...values: readonly unknown[]
-) => ExecutionPlan;
+) => SqlExecutionPlan;
 
 export interface RawFactory extends RawTemplateFactory {
-  (text: string, options: RawFunctionOptions): ExecutionPlan;
+  (text: string, options: RawFunctionOptions): SqlExecutionPlan;
   with(options: RawTemplateOptions): RawTemplateFactory;
 }
 
@@ -287,10 +283,3 @@ export interface BuildOptions {
 export interface SqlBuilderOptions<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly context: ExecutionContext<TContract>;
 }
-
-/**
- * SQL-specific ResultType that works with both Plan and SqlQueryPlan.
- * This extends the core ResultType to also handle SqlQueryPlan.
- * Example: `type Row = ResultType<typeof plan>`
- */
-export type ResultType<P> = P extends SqlQueryPlan<infer R> ? R : CoreResultType<P>;

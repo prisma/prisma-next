@@ -11,7 +11,7 @@ Core contract data types and JSON schemas for Prisma Next.
 This package provides the foundational type definitions for Prisma Next data contracts:
 
 - **Contract data types**: The canonical description of an application's data model and storage layout (`ContractBase`, `DocumentContract`, `Source`, `FieldType`)
-- **Plan types**: Target-family-agnostic execution plan types (`ExecutionPlan`, `PlanMeta`, `ParamDescriptor`)
+- **Plan metadata**: Target-family-agnostic plan metadata types (`PlanMeta`, `ParamDescriptor`, `PlanRefs`). The plan markers themselves (`QueryPlan`, `ExecutionPlan`) live in `@prisma-next/framework-components/runtime`; family-specific plans (`SqlExecutionPlan`, `MongoExecutionPlan`) live in their respective domains.
 - **Hash types**: Branded hash types for storage, execution, and profile hashing (`StorageHashBase`, `ExecutionHashBase`, `ProfileHashBase`)
 - **JSON Schemas**: Validation schemas for contract files
 - **Type guards**: Runtime type guards for narrowing contract types (`isDocumentContract`)
@@ -25,7 +25,6 @@ import type {
   Contract,
   ContractMarkerRecord,
   DocumentContract,
-  ExecutionPlan,
   PlanMeta,
 } from '@prisma-next/contract/types';
 import { isDocumentContract, coreHash, profileHash } from '@prisma-next/contract/types';

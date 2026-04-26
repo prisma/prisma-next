@@ -1,4 +1,5 @@
-import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MarkerReader, RuntimeFamilyAdapter } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';

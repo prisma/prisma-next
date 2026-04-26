@@ -1,8 +1,20 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
 import type { Middleware } from '../src/middleware/types';
 import { createRuntimeCore } from '../src/runtime-core';
 import type { MarkerReader, MarkerStatement, RuntimeFamilyAdapter } from '../src/runtime-spi';
+
+/**
+ * Local SQL wire-plan shape used to drive RuntimeCoreImpl in tests. The
+ * cross-family `ExecutionPlan` marker only requires `meta + _row`, but
+ * `RuntimeCoreImpl` is currently SQL-flavored and reads `sql`/`params`
+ * from the plan it receives. See `runtime-core.ts:WirePlanView` and the
+ * cross-family runtime unification project for the M3 generalization.
+ */
+interface MockWirePlan extends ExecutionPlan {
+  readonly sql: string;
+  readonly params: readonly unknown[];
+}
 
 interface MockContract {
   readonly target: string;
@@ -111,7 +123,7 @@ describe('runtime-core with mock family', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    const plan: ExecutionPlan = {
+    const plan: MockWirePlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {
@@ -149,7 +161,7 @@ describe('runtime-core with mock family', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    const invalidPlan: ExecutionPlan = {
+    const invalidPlan: MockWirePlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {
@@ -211,7 +223,7 @@ describe('runtime-core with mock family', () => {
       middleware: [middleware],
     });
 
-    const plan: ExecutionPlan = {
+    const plan: MockWirePlan = {
       sql: 'SELECT * FROM mock_table',
       params: [],
       meta: {

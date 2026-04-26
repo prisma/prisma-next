@@ -177,38 +177,6 @@ export interface PlanMeta {
 }
 
 /**
- * Canonical execution plan shape used by runtimes.
- *
- * - Row is the inferred result row type (TypeScript-only).
- * - Ast is the optional, family-specific AST type (e.g. SQL QueryAst).
- *
- * The payload executed by the runtime is represented by the sql + params pair
- * for now; future families can specialize this via Ast or additional metadata.
- */
-export interface ExecutionPlan<Row = unknown, Ast = unknown> {
-  readonly sql: string;
-  readonly params: readonly unknown[];
-  readonly ast?: Ast;
-  readonly meta: PlanMeta;
-  /**
-   * Phantom property to carry the Row generic for type-level utilities.
-   * Not set at runtime; used only for ResultType extraction.
-   */
-  readonly _row?: Row;
-}
-
-/**
- * Utility type to extract the Row type from an ExecutionPlan.
- * Example: `type Row = ResultType<typeof plan>`
- *
- * Works with both ExecutionPlan and SqlQueryPlan (SQL query plans before lowering).
- * SqlQueryPlan includes a phantom `_Row` property to preserve the generic parameter
- * for type extraction.
- */
-export type ResultType<P> =
-  P extends ExecutionPlan<infer R, unknown> ? R : P extends { readonly _Row?: infer R } ? R : never;
-
-/**
  * Contract marker record stored in the database.
  * Represents the current contract identity for a database.
  */

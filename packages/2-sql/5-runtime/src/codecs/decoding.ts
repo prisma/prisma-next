@@ -1,6 +1,6 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
 
@@ -11,7 +11,7 @@ const WIRE_PREVIEW_LIMIT = 100;
 
 function resolveRowCodec(
   alias: string,
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
 ): Codec | null {
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
@@ -35,7 +35,11 @@ function resolveRowCodec(
   return null;
 }
 
-function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
+/**
+ * Builds a lookup index from column name → { table, column } ref.
+ * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
+ */
+function buildColumnRefIndex(plan: SqlExecutionPlan): ColumnRefIndex | null {
   const columns = plan.meta.refs?.columns;
   if (!columns) return null;
 
@@ -64,7 +68,7 @@ function parseProjectionRef(value: string): ColumnRef | null {
 
 function resolveColumnRefForAlias(
   alias: string,
-  projection: ExecutionPlan['meta']['projection'],
+  projection: SqlExecutionPlan['meta']['projection'],
   fallbackColumnRefIndex: ColumnRefIndex | null,
 ): ColumnRef | undefined {
   if (projection && !Array.isArray(projection)) {
@@ -160,10 +164,10 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
 async function decodeField(
   alias: string,
   wireValue: unknown,
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
-  projection: ExecutionPlan['meta']['projection'],
+  projection: SqlExecutionPlan['meta']['projection'],
   fallbackColumnRefIndex: ColumnRefIndex | null,
 ): Promise<unknown> {
   if (wireValue === null || wireValue === undefined) {
@@ -205,7 +209,7 @@ async function decodeField(
  */
 export async function decodeRow(
   row: Record<string, unknown>,
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Promise<Record<string, unknown>> {

@@ -1,6 +1,7 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 import type {
   AfterExecuteResult,
+  ExecutionPlan,
   RuntimeLog,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,

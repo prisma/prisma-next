@@ -1,4 +1,5 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
@@ -117,7 +118,10 @@ describe('cross-family middleware proof', () => {
       middleware: [middleware],
     });
 
-    const sqlPlan: ExecutionPlan = {
+    const sqlPlan: ExecutionPlan & {
+      readonly sql: string;
+      readonly params: readonly unknown[];
+    } = {
       sql: 'SELECT id, name FROM users',
       params: [],
       meta: {

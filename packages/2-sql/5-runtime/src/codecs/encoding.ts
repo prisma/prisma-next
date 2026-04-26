@@ -1,6 +1,7 @@
-import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
 function resolveParamCodec(
   paramDescriptor: ParamDescriptor,
@@ -72,7 +73,7 @@ export async function encodeParam(
  * return`. Param-level failures are wrapped in `RUNTIME.ENCODE_FAILED`.
  */
 export async function encodeParams(
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
 ): Promise<readonly unknown[]> {
   if (plan.params.length === 0) {

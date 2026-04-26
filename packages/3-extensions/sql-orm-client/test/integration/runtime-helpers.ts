@@ -1,11 +1,10 @@
 import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import {
   createExecutionContext,
   createRuntime,
@@ -44,7 +43,7 @@ interface SeedComment {
 }
 
 export interface PgIntegrationRuntime extends RuntimeQueryable {
-  readonly executions: readonly ExecutionPlan[];
+  readonly executions: readonly SqlExecutionPlan[];
   query<Row extends Record<string, unknown> = Record<string, unknown>>(
     sqlText: string,
     params?: readonly unknown[],
@@ -85,9 +84,11 @@ export async function createPgIntegrationRuntime(
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
 
-  const executions: ExecutionPlan[] = [];
+  const executions: SqlExecutionPlan[] = [];
 
-  const toLoweredPlan = <Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): ExecutionPlan<Row> => {
+  const toLoweredPlan = <Row>(
+    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
+  ): SqlExecutionPlan<Row> => {
     if ('sql' in plan) {
       return plan;
     }
@@ -120,7 +121,7 @@ export async function createPgIntegrationRuntime(
     async close() {
       await realRuntime.close();
     },
-    execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
       executions.push(toLoweredPlan(plan));
       return realRuntime.execute(plan);
     },

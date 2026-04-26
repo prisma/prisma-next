@@ -1,4 +1,4 @@
-import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   type ExecutionStackInstance,
@@ -22,7 +22,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
@@ -225,8 +225,8 @@ function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
 }
 
 function createRawExecutionPlan<Row = Record<string, unknown>>(
-  overrides?: Partial<ExecutionPlan<Row>>,
-): ExecutionPlan<Row> {
+  overrides?: Partial<SqlExecutionPlan<Row>>,
+): SqlExecutionPlan<Row> {
   const metaOverrides = overrides?.meta;
   return {
     sql: 'select 1',
@@ -772,7 +772,7 @@ describe('withTransaction', () => {
 
   it('throws on execute after commit (invalidation)', async () => {
     const { runtime } = createRuntimeForTransaction();
-    let savedTx: { execute: (plan: ExecutionPlan) => unknown } | undefined;
+    let savedTx: { execute: (plan: SqlExecutionPlan) => unknown } | undefined;
 
     await withTransaction(runtime, async (tx) => {
       savedTx = tx;

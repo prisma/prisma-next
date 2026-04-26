@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 
 export interface MarkerStatement {
   readonly sql: string;
