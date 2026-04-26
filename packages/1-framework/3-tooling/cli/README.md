@@ -951,12 +951,12 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 2. Reads existing migrations from `config.migrations.dir` (default: `migrations/`)
 3. Determines the starting point: `--from <hash>` if provided, otherwise the latest migration target
 4. Diffs the starting contract against the new contract using the target's migration planner
-5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationId` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), `ops.json` (the planned ops, or `[]` in the placeholder-blocked case), and contract bookends. The package is **always** fully attested — there is no draft state on disk.
-6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before re-emitting. The on-disk `ops.json` is `[]` and `migrationId` is the hash of `(manifest, [])`, so applying the migration as-written will not advance the storage hash to the intended destination — the runner's destination-hash post-check surfaces this as a state mismatch. After filling in the placeholders, run `node migrations/<dir>/migration.ts` to re-emit `ops.json` and the corresponding `migrationId`. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
+5. Scaffolds a new migration package: `migration.ts` (containing `placeholder(...)` lambdas for any data transforms), `migration.json` (with a content-addressed `migrationHash` over the planned ops, or over `[]` when the planner could not lower any calls because of placeholders), `ops.json` (the planned ops, or `[]` in the placeholder-blocked case), and contract bookends. The package is **always** fully attested — there is no draft state on disk.
+6. If the plan has unfilled `placeholder(...)` slots, the command returns a successful `pendingPlaceholders` envelope (a warning, not a failure) asking the developer to fill in the slots before re-emitting. The on-disk `ops.json` is `[]` and `migrationHash` is the hash of `(metadata, [])`, so applying the migration as-written will not advance the storage hash to the intended destination — the runner's destination-hash post-check surfaces this as a state mismatch. After filling in the placeholders, run `node migrations/<dir>/migration.ts` to re-emit `ops.json` and the corresponding `migrationHash`. `PN-MIG-2001` is raised only at self-emit time when a slot is still unfilled.
 
 **Outputs:**
 - `migrations/<dir>/migration.ts` — editable migration source (with `placeholder(...)` slots when the planner inserted them)
-- `migrations/<dir>/migration.json` — fully attested manifest (`migrationId: string`, never null)
+- `migrations/<dir>/migration.json` — fully attested metadata (`migrationHash: string`, never null)
 - `migrations/<dir>/ops.json` — planned operations (empty list `[]` if placeholders blocked the planner)
 - `migrations/<dir>/start-contract.{json,d.ts}` — bookend from the "from" side (when applicable)
 - `migrations/<dir>/end-contract.{json,d.ts}` — bookend from the "to" side
@@ -965,14 +965,14 @@ prisma-next migration plan [--config <path>] [--name <slug>] [--from <hash>] [--
 
 ### `prisma-next migration show`
 
-Display a migration package's operations, DDL preview, and metadata. Accepts a directory path, a hash prefix (git-style matching against `migrationId`), or defaults to the latest migration.
+Display a migration package's operations, DDL preview, and metadata. Accepts a directory path, a hash prefix (git-style matching against `migrationHash`), or defaults to the latest migration.
 
 ```bash
 prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--color/--no-color]
 ```
 
 **Options:**
-- `[target]`: Migration directory path or migrationId hash prefix (defaults to latest)
+- `[target]`: Migration directory path or `migrationHash` prefix (defaults to latest)
 - `--config <path>`: Path to `prisma-next.config.ts`
 - `--json`: Output as JSON object
 - `-q, --quiet`: Quiet mode (errors only)
@@ -980,7 +980,7 @@ prisma-next migration show [target] [--config <path>] [--json] [-v] [-q] [--colo
 
 **What it does:**
 1. If `target` is a path (contains `/` or `\`), reads that directory directly
-2. If `target` is a hash prefix, scans all attested migrations and matches against `migrationId`
+2. If `target` is a hash prefix, scans all attested migrations and matches against `migrationHash`
 3. If no target, defaults to the latest migration
 4. Displays operations with operation class badges, destructive warnings, and DDL preview
 
@@ -1034,15 +1034,14 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 - `-v, --verbose`: Verbose output (debug info, timings)
 
 **What it does:**
-1. Reads migration packages from `config.migrations.dir` (every package is attested — there is no on-disk draft state)
-2. **Defense in depth:** rehashes `(manifest, ops)` for each loaded bundle and confirms it matches the stored `migrationId`. If a bundle has been hand-edited or partially written since emit, apply aborts with a structured runtime error pointing at the offending directory and asks the developer to re-run `node migrations/<dir>/migration.ts` (or restore from version control).
-3. Reconstructs the migration graph from all loaded bundles
-4. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
-5. Connects to the database and reads the current marker hash
-6. Finds the shortest path from the marker hash to the destination using graph pathfinding
-7. Executes each pending migration in order using the target's `MigrationRunner`
-8. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
-9. After each migration, the runner verifies the schema and updates the marker/ledger
+1. Reads migration packages from `config.migrations.dir`. Every package is attested — there is no on-disk draft state. The loader (`readMigrationPackage` in `@prisma-next/migration-tools/io`) rehashes `(metadata, ops)` for each `MigrationPackage` it returns and confirms the result matches the stored `migrationHash`. If a package has been hand-edited or partially written since emit, the load fails with `MIGRATION.HASH_MISMATCH` pointing at the offending directory and asks the developer to re-run `node migrations/<dir>/migration.ts` (or restore from version control).
+2. Reconstructs the migration graph from all loaded packages
+3. Determines the destination hash: from `--ref` (via `refs.json`) or from `contract.json`
+4. Connects to the database and reads the current marker hash
+5. Finds the shortest path from the marker hash to the destination using graph pathfinding
+6. Executes each pending migration in order using the target's `MigrationRunner`
+7. Each migration runs in its own transaction with prechecks, postchecks, and idempotency checks enabled
+8. After each migration, the runner verifies the schema and updates the marker/ledger
 
 **Config requirements:** Requires `driver` and `db.connection` (or `--db`). `migrations.dir` is optional and defaults to `migrations/`.
 
@@ -1050,7 +1049,7 @@ prisma-next migration apply [--db <url>] [--ref <name>] [--config <path>] [--jso
 
 **Ref-based routing:** With `--ref`, apply targets the ref's hash instead of the contract hash. This enables multi-environment workflows where staging and production track different points in the migration graph.
 
-### Emitting `ops.json` and computing `migrationId`
+### Emitting `ops.json` and computing `migrationHash`
 
 There is no dedicated CLI command for emitting a migration — migrations
 self-emit. After scaffolding (via `migration plan` or `migration new`),
@@ -1061,7 +1060,7 @@ run `migration.ts` directly with Node to produce `ops.json` and attest
 node migrations/<dir>/migration.ts
 ```
 
-The scaffolded `migration.ts` calls `MigrationCLI.run(import.meta.url, ...)` from `@prisma-next/cli/migration-cli` when invoked as the entrypoint. (Postgres scaffolds re-export `MigrationCLI` through `@prisma-next/target-postgres/migration` so a Postgres `migration.ts` only needs the single facade import; Mongo scaffolds still pull from `@prisma-next/cli/migration-cli` directly.) The CLI entrypoint loads `prisma-next.config.ts`, assembles a `ControlStack`, instantiates the migration with that stack (so `dataTransform` and other adapter-aware helpers can materialize a real adapter), and serializes operations to `ops.json` while writing the content-addressed `migrationId` into `migration.json`. If `migration.ts` contains unfilled `placeholder()` slots, the script exits with `PN-MIG-2001` and reports the slot to fill in.
+The scaffolded `migration.ts` calls `MigrationCLI.run(import.meta.url, ...)` from `@prisma-next/cli/migration-cli` when invoked as the entrypoint. (Postgres scaffolds re-export `MigrationCLI` through `@prisma-next/target-postgres/migration` so a Postgres `migration.ts` only needs the single facade import; Mongo scaffolds still pull from `@prisma-next/cli/migration-cli` directly.) The CLI entrypoint loads `prisma-next.config.ts`, assembles a `ControlStack`, instantiates the migration with that stack (so `dataTransform` and other adapter-aware helpers can materialize a real adapter), and serializes operations to `ops.json` while writing the content-addressed `migrationHash` into `migration.json`. If `migration.ts` contains unfilled `placeholder()` slots, the script exits with `PN-MIG-2001` and reports the slot to fill in.
 
 ### `prisma-next migration ref`
 
@@ -1266,7 +1265,7 @@ export default defineConfig({
 - **`commander`**: CLI argument parsing and command routing
 - **`esbuild`**: Bundling TypeScript contract files with import allowlisting
 - **`@prisma-next/emitter`**: Contract emission engine (returns strings)
-- **`@prisma-next/migration-tools`**: On-disk migration I/O, attestation, and history reconstruction
+- **`@prisma-next/migration-tools`**: On-disk migration I/O, hash verification, and history reconstruction
 - **`@prisma-next/framework-components`**: Control plane types, migration operation types, control stack (via `./control`)
 - **`@prisma-next/errors`**: Error types and factories (via `./control`)
 
