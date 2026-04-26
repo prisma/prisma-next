@@ -604,4 +604,59 @@ describe('JSON Schema decoding validation', () => {
       },
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // T5.2 — codec-authored error.message redaction (DEFERRED)
+  //
+  // Translated verbatim from PR #375 § json-schema-validation.test.ts. Asserts
+  // that codec-authored error messages are not embedded into the
+  // RUNTIME.DECODE_FAILED envelope (`err.message` / `err.details`), while the
+  // original error remains reachable via `err.cause`.
+  //
+  // The current `wrapDecodeFailure` (packages/2-sql/5-runtime/src/codecs/
+  // decoding.ts) embeds `error.message` into the envelope's wrapped message.
+  // Implementing the redaction trigger is out of scope for the
+  // codec-async-single-path project (see spec.md § Open Items: "Redaction-
+  // trigger spelling — independent of this design; tracked separately"). The
+  // assertion is preserved here as an `it.skip` so it can be activated when
+  // redaction policy lands.
+  // ---------------------------------------------------------------------------
+  it.skip('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
+    const leakyPlaintext = 'super-secret-plaintext-value';
+    const leakyCodec = codec({
+      typeId: 'pg/leaky@1',
+      targetTypes: ['text'],
+      encode: (v: string) => v,
+      decode: async (_w: string) => {
+        throw new Error(`decrypt failed for value=${leakyPlaintext}`);
+      },
+    });
+    const registry = createCodecRegistry();
+    registry.register(leakyCodec);
+
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { secret: 'pg/leaky@1' },
+        refs: { columns: [{ table: 'user', column: 'secret' }] },
+      },
+    });
+
+    const row = { secret: 'wire-bytes' };
+    const rejection = await decodeRow(row, plan, registry).catch((e: unknown) => e);
+
+    const err = rejection as Error & {
+      code?: string;
+      details?: Record<string, unknown>;
+      cause?: unknown;
+    };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe('RUNTIME.DECODE_FAILED');
+    expect(err.message).not.toContain(leakyPlaintext);
+    expect(JSON.stringify(err.details ?? {})).not.toContain(leakyPlaintext);
+    expect((err.cause as Error | undefined)?.message).toContain(leakyPlaintext);
+  });
 });
