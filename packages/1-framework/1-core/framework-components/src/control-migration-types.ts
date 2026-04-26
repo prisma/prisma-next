@@ -335,6 +335,16 @@ export interface MigrationRunner<
   TFamilyId extends string = string,
   TTargetId extends string = string,
 > {
+  /**
+   * Execute a migration plan against the configured driver.
+   *
+   * The `plan` parameter is trusted input. Callers are responsible for
+   * upstream verification of the originating migration package — typically
+   * by obtaining the package via `readMigrationPackage` from
+   * `@prisma-next/migration-tools/io`, which performs hash-integrity checks
+   * at the load boundary. Runners do not re-verify the plan and assume the
+   * `(metadata, ops)` pair on disk has not been tampered with since emit.
+   */
   execute(options: {
     readonly plan: MigrationPlan;
     readonly driver: ControlDriverInstance<TFamilyId, TTargetId>;
