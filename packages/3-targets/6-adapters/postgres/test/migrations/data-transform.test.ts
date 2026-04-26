@@ -161,6 +161,9 @@ describe('dataTransform factory', () => {
     const adapter = makeAdapter();
     lowerMock.mockReturnValue({ sql: 'X', params: [] });
     dataTransform(contract, 'forwards-contract', { run: () => makePlan() }, adapter);
-    expect(lowerMock).toHaveBeenCalledWith(expect.anything(), { contract });
+    expect(lowerMock).toHaveBeenCalled();
+    for (const [, ctx] of lowerMock.mock.calls) {
+      expect(ctx).toEqual({ contract });
+    }
   });
 });

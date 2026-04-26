@@ -8,10 +8,10 @@
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { errorConfigFileNotFound } from '@prisma-next/errors/control';
 import { Migration } from '@prisma-next/migration-tools/migration';
+import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const loadConfigMock = vi.fn();

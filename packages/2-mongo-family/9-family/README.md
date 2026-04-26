@@ -104,11 +104,11 @@ import { Migration, createIndex, createCollection }
   from "@prisma-next/family-mongo/migration"
 
 class AddUsersCollection extends Migration {
-  describe() {
+  override describe() {
     return { from: "abc123", to: "def456", labels: ["add-users"] }
   }
 
-  plan() {
+  override get operations() {
     return [
       createCollection("users", {
         validator: { $jsonSchema: { required: ["email"] } },
