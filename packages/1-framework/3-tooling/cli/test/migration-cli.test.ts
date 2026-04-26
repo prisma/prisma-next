@@ -1,9 +1,10 @@
 /**
- * Unit tests for the `runMigration` orchestrator. Covers diagnostic
- * surfaces (target mismatch, config not found) and the dry-run /
- * write paths via mocked `loadConfig` + `createControlStack`. The
- * heavier "full migration round-trips to disk" path is exercised by
- * the existing example-migration round-trip tests (target-postgres).
+ * Unit tests for `MigrationCLI.run` (the migration-file CLI entrypoint).
+ * Covers diagnostic surfaces (target mismatch, config not found) and the
+ * dry-run / write paths via mocked `loadConfig` +
+ * `createControlStack`. The heavier "full migration round-trips to disk"
+ * path is exercised by the existing example-migration round-trip tests
+ * (target-postgres).
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -28,7 +29,7 @@ vi.mock('@prisma-next/framework-components/control', async () => {
   return { ...actual, createControlStack: createControlStackMock };
 });
 
-const { runMigration } = await import('../src/migration-runner');
+const { MigrationCLI } = await import('../src/migration-cli');
 
 class FakeMigration extends Migration {
   readonly targetId: string;
@@ -65,7 +66,7 @@ let workDir: string;
 let migrationFile: string;
 
 beforeEach(() => {
-  workDir = mkdtempSync(join(tmpdir(), 'runmigration-test-'));
+  workDir = mkdtempSync(join(tmpdir(), 'migrationcli-test-'));
   migrationFile = join(workDir, 'migration.ts');
   originalArgv = process.argv;
   originalExitCode = process.exitCode;
@@ -90,7 +91,7 @@ afterEach(() => {
   stdoutSpy.mockRestore();
 });
 
-describe('runMigration', () => {
+describe('MigrationCLI.run', () => {
   it('writes ops.json + migration.json under the migration directory on success', async () => {
     loadConfigMock.mockResolvedValue({
       family: { familyId: 'sql' },
@@ -100,7 +101,7 @@ describe('runMigration', () => {
     });
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(process.exitCode).not.toBe(1);
     const ops = JSON.parse(readFileSync(join(workDir, 'ops.json'), 'utf-8'));
@@ -119,7 +120,7 @@ describe('runMigration', () => {
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
     process.argv = ['node', migrationFile, '--dry-run'];
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(process.exitCode).not.toBe(1);
     expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
@@ -137,7 +138,7 @@ describe('runMigration', () => {
     });
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
-    await runMigration(pathToFileURL(migrationFile).href, WrongTargetMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, WrongTargetMigration);
 
     expect(process.exitCode).toBe(1);
     const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
@@ -149,7 +150,7 @@ describe('runMigration', () => {
   it('exits non-zero with the loader diagnostic when config is missing', async () => {
     loadConfigMock.mockRejectedValue(errorConfigFileNotFound('/path/to/prisma-next.config.ts'));
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(process.exitCode).toBe(1);
     const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
@@ -159,7 +160,7 @@ describe('runMigration', () => {
   it('no-ops silently when the file is being imported (not the entrypoint)', async () => {
     process.argv = ['node', '/some/other/file.js'];
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(loadConfigMock).not.toHaveBeenCalled();
     expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
@@ -168,7 +169,7 @@ describe('runMigration', () => {
   it('prints help and exits cleanly on --help', async () => {
     process.argv = ['node', migrationFile, '--help'];
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(loadConfigMock).not.toHaveBeenCalled();
     const stdoutText = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
@@ -185,7 +186,7 @@ describe('runMigration', () => {
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
     process.argv = ['node', migrationFile, '--config', '/explicit/config.ts'];
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(loadConfigMock).toHaveBeenCalledWith('/explicit/config.ts');
   });
@@ -200,7 +201,7 @@ describe('runMigration', () => {
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
     process.argv = ['node', migrationFile, '--config=/equals/config.ts'];
 
-    await runMigration(pathToFileURL(migrationFile).href, FakeMigration);
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
     expect(loadConfigMock).toHaveBeenCalledWith('/equals/config.ts');
   });

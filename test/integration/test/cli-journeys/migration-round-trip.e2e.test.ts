@@ -116,11 +116,10 @@ withTempDir(({ createTempDir }) => {
         );
 
         const migrationTs = `
-import { runMigration } from '@prisma-next/cli/migration-runner';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import { Migration, addColumn, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/target-postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import endContract from './end-contract.json' with { type: 'json' };
 
@@ -148,7 +147,7 @@ export default class M extends Migration {
   }
 }
 
-runMigration(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);
 `;
         writeFileSync(migrationTsPath, migrationTs);
 

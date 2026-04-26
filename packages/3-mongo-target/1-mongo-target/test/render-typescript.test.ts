@@ -28,12 +28,12 @@ describe('renderCallsToTypeScript', () => {
     const output = renderTypeScript(calls);
 
     expect(output).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
-    expect(output).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
+    expect(output).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
     expect(output).toContain("import { createIndex } from '@prisma-next/target-mongo/migration';");
     expect(output).toContain('class M extends Migration');
     expect(output).toContain('override get operations()');
     expect(output).toContain('export default M;');
-    expect(output).toContain('runMigration(import.meta.url, M);');
+    expect(output).toContain('MigrationCLI.run(import.meta.url, M);');
   });
 
   it('prepends a node shebang as the first line under the default test env', () => {
@@ -42,7 +42,7 @@ describe('renderCallsToTypeScript', () => {
     const output = renderTypeScript(calls);
 
     expect(output.split('\n')[0]).toBe('#!/usr/bin/env -S node');
-    expect(output).toContain('runMigration(import.meta.url, M);');
+    expect(output).toContain('MigrationCLI.run(import.meta.url, M);');
   });
 
   it('only imports used factory functions', () => {
@@ -224,7 +224,7 @@ describe('renderCallsToTypeScript', () => {
     const output = renderTypeScript([]);
 
     expect(output).toContain("import { Migration } from '@prisma-next/family-mongo/migration';");
-    expect(output).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
+    expect(output).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
     expect(output).not.toContain('@prisma-next/target-mongo/migration');
     expect(output).toContain('return [');
     expect(output).toContain('];');

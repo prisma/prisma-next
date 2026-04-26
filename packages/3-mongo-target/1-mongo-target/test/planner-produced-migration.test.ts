@@ -56,7 +56,7 @@ describe('PlannerProducedMongoMigration', () => {
     expect(migration.operations).toEqual([]);
   });
 
-  it('renders authoring TypeScript that wires up runMigration and embeds describe() metadata', () => {
+  it('renders authoring TypeScript that wires up MigrationCLI.run and embeds describe() metadata', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
     const migration = new PlannerProducedMongoMigration(calls, META);
 
@@ -67,8 +67,8 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain('createIndex');
     expect(source).toContain(META.from);
     expect(source).toContain(META.to);
-    expect(source).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
-    expect(source).toContain('runMigration(import.meta.url, M);');
+    expect(source).toContain("import { MigrationCLI } from '@prisma-next/cli/migration-cli';");
+    expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
   });
 
   it('renders an empty-class stub when constructed with no calls', () => {

@@ -110,9 +110,9 @@ export function errorMigrationInvalidDefaultExport(
 
 /**
  * The migration class declares one `targetId` but the loaded
- * `prisma-next.config.ts` declares another. Thrown by `runMigration` when
- * a migration script is invoked against a config whose target descriptor
- * disagrees with the migration's own `targetId`. Distinct from generic
+ * `prisma-next.config.ts` declares another. Thrown by `MigrationCLI.run`
+ * when a migration script is invoked against a config whose target
+ * descriptor disagrees with the migration's own `targetId`. Distinct from generic
  * config-validation errors because the mismatch is between two valid
  * artifacts (the script and the config), not a malformed input.
  */

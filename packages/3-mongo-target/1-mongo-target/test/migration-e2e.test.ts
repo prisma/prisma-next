@@ -15,8 +15,8 @@ const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 const familyMongoRoot = resolve(repoRoot, 'packages/2-mongo-family/9-family');
 const migrationExport = pathToFileURL(join(familyMongoRoot, 'src/exports/migration.ts')).href;
 const factoryExport = pathToFileURL(join(packageRoot, 'src/exports/migration.ts')).href;
-const cliMigrationRunnerExport = pathToFileURL(
-  resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/migration-runner.ts'),
+const cliMigrationCliExport = pathToFileURL(
+  resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/migration-cli.ts'),
 ).href;
 const cliConfigTypesExport = pathToFileURL(
   resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/exports/config-types.ts'),
@@ -29,7 +29,7 @@ const adapterMongoControlExport = pathToFileURL(
 ).href;
 
 /**
- * `runMigration` requires a `prisma-next.config.ts` to assemble a
+ * `MigrationCLI.run` requires a `prisma-next.config.ts` to assemble a
  * `ControlStack`. Tests have no workspace `node_modules` resolution from
  * `tmpDir`, so we write a bespoke config alongside `migration.ts` whose
  * imports all use absolute `file://` URLs into the live workspace
@@ -50,7 +50,7 @@ const fixtureConfigSource = [
 ].join('\n');
 
 /**
- * `runMigration(..., --dry-run)` prints both `--- migration.json ---` and
+ * `MigrationCLI.run(..., --dry-run)` prints both `--- migration.json ---` and
  * `--- ops.json ---` sections to stdout. Tests only care about the ops body,
  * so this helper extracts it.
  */
@@ -90,7 +90,7 @@ describe('migration file E2E', () => {
 
   describe('factory-based migration', () => {
     const factoryMigration = [
-      `import { runMigration } from '${cliMigrationRunnerExport}';`,
+      `import { MigrationCLI } from '${cliMigrationCliExport}';`,
       `import { Migration } from '${migrationExport}';`,
       `import { createIndex, createCollection } from '${factoryExport}';`,
       '',
@@ -108,7 +108,7 @@ describe('migration file E2E', () => {
       '}',
       'export default M;',
       '',
-      'runMigration(import.meta.url, M);',
+      'MigrationCLI.run(import.meta.url, M);',
     ].join('\n');
 
     it('produces ops.json with correct structure', async () => {
@@ -147,7 +147,7 @@ describe('migration file E2E', () => {
 
   describe('strategy-based migration', () => {
     const strategyMigration = [
-      `import { runMigration } from '${cliMigrationRunnerExport}';`,
+      `import { MigrationCLI } from '${cliMigrationCliExport}';`,
       `import { Migration } from '${migrationExport}';`,
       `import { validatedCollection } from '${factoryExport}';`,
       '',
@@ -163,7 +163,7 @@ describe('migration file E2E', () => {
       '}',
       'export default M;',
       '',
-      'runMigration(import.meta.url, M);',
+      'MigrationCLI.run(import.meta.url, M);',
     ].join('\n');
 
     it('produces ops.json from strategy composition', async () => {
@@ -209,7 +209,7 @@ describe('migration file E2E', () => {
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
-        .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerExport}'`);
+        .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
 
       const result = await runFile('migration.ts');
@@ -252,7 +252,7 @@ describe('migration file E2E', () => {
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
-        .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerExport}'`);
+        .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
 
       const result = await runFile('migration.ts');
@@ -281,7 +281,7 @@ describe('migration file E2E', () => {
       const resolvedSource = tsSource
         .replace("'@prisma-next/family-mongo/migration'", `'${migrationExport}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${factoryExport}'`)
-        .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerExport}'`);
+        .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliExport}'`);
       await writeFile(join(tmpDir, 'migration.ts'), resolvedSource);
 
       const result = await runFile('migration.ts');
@@ -302,7 +302,7 @@ describe('migration file E2E', () => {
 
   describe('data transform migration', () => {
     const dataTransformMigration = [
-      `import { runMigration } from '${cliMigrationRunnerExport}';`,
+      `import { MigrationCLI } from '${cliMigrationCliExport}';`,
       `import { Migration } from '${migrationExport}';`,
       `import { createCollection, dataTransform } from '${factoryExport}';`,
       '',
@@ -328,7 +328,7 @@ describe('migration file E2E', () => {
       '}',
       'export default M;',
       '',
-      'runMigration(import.meta.url, M);',
+      'MigrationCLI.run(import.meta.url, M);',
     ].join('\n');
 
     it('produces ops.json with mixed DDL and data transform operations', async () => {
@@ -355,7 +355,7 @@ describe('migration file E2E', () => {
 
     it('produces ops.json with check object', async () => {
       const migrationWithCheck = [
-        `import { runMigration } from '${cliMigrationRunnerExport}';`,
+        `import { MigrationCLI } from '${cliMigrationCliExport}';`,
         `import { Migration } from '${migrationExport}';`,
         `import { dataTransform } from '${factoryExport}';`,
         '',
@@ -391,7 +391,7 @@ describe('migration file E2E', () => {
         '}',
         'export default M;',
         '',
-        'runMigration(import.meta.url, M);',
+        'MigrationCLI.run(import.meta.url, M);',
       ].join('\n');
 
       await writeFile(join(tmpDir, 'migration.ts'), migrationWithCheck);
@@ -416,13 +416,13 @@ describe('migration file E2E', () => {
   describe('scaffolded migration is directly runnable', () => {
     const familyMongoDistMigrationPath = join(familyMongoRoot, 'dist/migration.mjs');
     const targetMongoDistMigrationPath = join(packageRoot, 'dist/migration.mjs');
-    const cliMigrationRunnerDistPath = resolve(
+    const cliMigrationCliDistPath = resolve(
       repoRoot,
-      'packages/1-framework/3-tooling/cli/dist/migration-runner.mjs',
+      'packages/1-framework/3-tooling/cli/dist/migration-cli.mjs',
     );
     const familyMongoDistMigration = pathToFileURL(familyMongoDistMigrationPath).href;
     const targetMongoDistMigration = pathToFileURL(targetMongoDistMigrationPath).href;
-    const cliMigrationRunnerDist = pathToFileURL(cliMigrationRunnerDistPath).href;
+    const cliMigrationCliDist = pathToFileURL(cliMigrationCliDistPath).href;
 
     it('runs via ./migration.ts on POSIX (or node migration.ts on Windows) and prints operations JSON', async (ctx) => {
       const distsExist = await Promise.all([
@@ -434,14 +434,14 @@ describe('migration file E2E', () => {
           () => true,
           () => false,
         ),
-        stat(cliMigrationRunnerDistPath).then(
+        stat(cliMigrationCliDistPath).then(
           () => true,
           () => false,
         ),
       ]);
       if (!distsExist.every(Boolean)) {
         ctx.skip(
-          `dist migration entrypoints not built: ${familyMongoDistMigrationPath}, ${targetMongoDistMigrationPath}, ${cliMigrationRunnerDistPath} — run \`pnpm build\` for @prisma-next/family-mongo, @prisma-next/target-mongo, and @prisma-next/cli`,
+          `dist migration entrypoints not built: ${familyMongoDistMigrationPath}, ${targetMongoDistMigrationPath}, ${cliMigrationCliDistPath} — run \`pnpm build\` for @prisma-next/family-mongo, @prisma-next/target-mongo, and @prisma-next/cli`,
         );
       }
 
@@ -458,7 +458,7 @@ describe('migration file E2E', () => {
       })
         .replace("'@prisma-next/family-mongo/migration'", `'${familyMongoDistMigration}'`)
         .replace("'@prisma-next/target-mongo/migration'", `'${targetMongoDistMigration}'`)
-        .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerDist}'`);
+        .replace("'@prisma-next/cli/migration-cli'", `'${cliMigrationCliDist}'`);
       await writeMigrationTs(tmpDir, migrationSource);
 
       const migrationPath = join(tmpDir, 'migration.ts');
@@ -493,7 +493,7 @@ describe('migration file E2E', () => {
   describe('serialization format', () => {
     it('produces JSON that the runner can consume (correct kind discriminants)', async () => {
       const migration = [
-        `import { runMigration } from '${cliMigrationRunnerExport}';`,
+        `import { MigrationCLI } from '${cliMigrationCliExport}';`,
         `import { Migration } from '${migrationExport}';`,
         `import { createIndex, dropIndex, createCollection, dropCollection, setValidation } from '${factoryExport}';`,
         '',
@@ -511,7 +511,7 @@ describe('migration file E2E', () => {
         '}',
         'export default M;',
         '',
-        'runMigration(import.meta.url, M);',
+        'MigrationCLI.run(import.meta.url, M);',
       ].join('\n');
 
       await writeFile(join(tmpDir, 'migration.ts'), migration);

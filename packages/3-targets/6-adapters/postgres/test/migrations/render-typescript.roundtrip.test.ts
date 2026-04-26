@@ -40,9 +40,6 @@ const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
 const targetPostgresMigrationExport = pathToFileURL(
   resolve(targetPostgresRoot, 'src/exports/migration.ts'),
 ).href;
-const cliMigrationRunnerExport = pathToFileURL(
-  resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/migration-runner.ts'),
-).href;
 const cliConfigTypesExport = pathToFileURL(
   resolve(repoRoot, 'packages/1-framework/3-tooling/cli/src/exports/config-types.ts'),
 ).href;
@@ -57,7 +54,7 @@ const adapterPostgresControlExport = pathToFileURL(
 ).href;
 
 /**
- * `runMigration` requires a `prisma-next.config.ts` to assemble a
+ * `MigrationCLI.run` requires a `prisma-next.config.ts` to assemble a
  * `ControlStack`. Tests have no workspace `node_modules` resolution from
  * `tmpDir`, so we write a bespoke config alongside `migration.ts` whose
  * imports all use absolute `file://` URLs into the live workspace
@@ -79,16 +76,18 @@ const fixtureConfigSource = [
 ].join('\n');
 
 /**
- * Rewrite the two bare imports the renderer always emits so that running
- * the rendered scaffold from a temp directory (which has no workspace
+ * Rewrite the bare import the renderer always emits so that running the
+ * rendered scaffold from a temp directory (which has no workspace
  * `node_modules` resolution) still reaches the live in-source modules.
- * Both rewrites are required — the migration class needs the workspace
- * `Migration` base, and the entrypoint needs the workspace `runMigration`.
+ * The renderer pulls both `Migration` (the base class) and
+ * `MigrationCLI` (the entrypoint) from the postgres migration facade, so
+ * a single rewrite is enough.
  */
 function rewriteImports(tsSource: string): string {
-  return tsSource
-    .replace("'@prisma-next/target-postgres/migration'", `'${targetPostgresMigrationExport}'`)
-    .replace("'@prisma-next/cli/migration-runner'", `'${cliMigrationRunnerExport}'`);
+  return tsSource.replace(
+    "'@prisma-next/target-postgres/migration'",
+    `'${targetPostgresMigrationExport}'`,
+  );
 }
 
 const META = {
