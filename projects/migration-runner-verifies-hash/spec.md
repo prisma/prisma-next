@@ -325,7 +325,7 @@ In `packages/1-framework/3-tooling/migration/README.md`:
 
 ## Out of scope
 
-- **Emit-drift detection** (ADR 192 step 2): re-emitting `migration.ts` in-memory at apply time and comparing the resulting hash to `ops.json`. This catches a different failure mode (the user edited `migration.ts` after emit and forgot to re-run it) and requires loading + executing the user's TypeScript module at apply time, which is a much larger change. File a separate Linear issue under WS4 / M11; link it from this spec.
+- **Emit-drift detection** (ADR 192 step 2): re-emitting `migration.ts` in-memory at apply time and comparing the resulting hash to `ops.json`. This catches a different failure mode (the user edited `migration.ts` after emit and forgot to re-run it) and requires loading + executing the user's TypeScript module at apply time, which is a much larger change. Tracked as [TML-2316 — Implement ADR 192 step 2: emit-drift detection for `migration.ts`](https://linear.app/prisma-company/issue/TML-2316/implement-adr-192-step-2-emit-drift-detection-for-migrationts) (WS4 / M11).
 - **Schema verification** (does the live database match the contract before/after apply). Different concern, covered elsewhere (e.g. `verifySqlSchema`).
 - **Signature / cryptographic provenance** of `migration.json`. The schema already accommodates a `signature` field but no signing flow exists; out of scope here.
 - **Changes to the runner SPI or `MigrationPlan` shape.** The runner stays consuming a stripped `MigrationPlan` with no `migrationHash`. Verification happens upstream of plan construction.
@@ -345,6 +345,7 @@ In `packages/1-framework/3-tooling/migration/README.md`:
 
 - [TML-2264 (this ticket)](https://linear.app/prisma-company/issue/TML-2264/migration-runner-should-verify-migration-matches-its-hash)
 - [TML-2301 — Migration control-adapter DI + `Migration` base split](https://linear.app/prisma-company/issue/TML-2301) (sibling; coordinate)
+- [TML-2316 — Implement ADR 192 step 2: emit-drift detection for `migration.ts`](https://linear.app/prisma-company/issue/TML-2316/implement-adr-192-step-2-emit-drift-detection-for-migrationts) (follow-up; out of scope here)
 - [ADR 192 — `ops.json` is the migration contract](../../docs/architecture%20docs/adrs/ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) (apply-time verification, two-step model)
 - [ADR 199 — Storage-only migration identity](../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md) (`migrationHash` definition; written using the old `migrationId` term — not retroactively edited)
 - [Migration System subsystem doc](../../docs/architecture%20docs/subsystems/7.%20Migration%20System.md)
