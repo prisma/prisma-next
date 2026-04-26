@@ -1,7 +1,10 @@
 import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/control';
 import type { Contract } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
-import type { MigratableTargetDescriptor } from '@prisma-next/framework-components/control';
+import type {
+  MigratableTargetDescriptor,
+  MigrationRunner,
+} from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import {
   contractToMongoSchemaIR,
@@ -32,21 +35,30 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
     createPlanner(_family: MongoControlFamilyInstance) {
       return new MongoMigrationPlanner();
     },
-    createRunner(_family: MongoControlFamilyInstance) {
+    createRunner(family: MongoControlFamilyInstance) {
       // Deps are bound to the first driver passed to execute() and cached for
       // subsequent calls. Callers must not change the driver between calls.
       let cachedDeps: MongoRunnerDependencies | undefined;
-      return {
+      const runner: MigrationRunner<'mongo', 'mongo'> = {
         async execute(options) {
           cachedDeps ??= createMongoRunnerDeps(
             options.driver,
             MongoDriverImpl.fromDb(extractDb(options.driver)),
+            family,
           );
           const { driver: _, ...runnerOptions } = options;
-          const runner = new MongoMigrationRunner(cachedDeps);
-          return runner.execute(runnerOptions);
+          // The framework `MigrationRunner` interface types `destinationContract`
+          // as `unknown`; the Mongo runner narrows to `MongoContract`. The CLI
+          // and the family-level facade only ever pass a validated MongoContract
+          // here, so the cast preserves the framework signature without
+          // weakening the runner's typed surface.
+          return new MongoMigrationRunner(cachedDeps).execute({
+            ...runnerOptions,
+            destinationContract: runnerOptions.destinationContract as MongoContract,
+          });
         },
       };
+      return runner;
     },
     contractToSchema(contract: Contract | null) {
       return contractToMongoSchemaIR(contract as MongoContract | null);

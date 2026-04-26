@@ -3,6 +3,7 @@ import type {
   MigrationPlan,
   MigrationRunnerExecutionChecks,
 } from '@prisma-next/framework-components/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AnyMongoDdlCommand,
@@ -24,6 +25,7 @@ import {
   type MongoQueryPlan,
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { createCollection, dataTransform } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
@@ -212,6 +214,7 @@ function makeHarness(): Harness {
     adapter,
     driver,
     markerOps: NOOP_MARKER_OPS,
+    introspectSchema: async () => new MongoSchemaIR([]),
   };
   return {
     runner: new MongoMigrationRunner(deps),
@@ -223,6 +226,13 @@ function makeHarness(): Harness {
   };
 }
 
+function makeContract(profileHash: string): MongoContract {
+  // Tests do not exercise contract canonicalization; only `profileHash` is read
+  // by the runner. The double cast keeps the test harness independent of the
+  // full MongoContract structure (target, models, storage, etc.).
+  return { profileHash } as unknown as MongoContract;
+}
+
 async function execute(
   harness: Harness,
   ops: readonly AnyMongoMigrationOperation[],
@@ -230,7 +240,7 @@ async function execute(
 ) {
   return harness.runner.execute({
     plan: makePlan(ops),
-    destinationContract: { profileHash: 'sha256:dest' },
+    destinationContract: makeContract('sha256:dest'),
     policy: ALL_POLICY,
     frameworkComponents: [],
     ...(executionChecks ? { executionChecks } : {}),
