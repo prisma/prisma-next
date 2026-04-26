@@ -38,10 +38,17 @@ import { loadConfig } from './config-loader';
 
 /**
  * Constructor shape accepted by `runMigration`. `Migration` subclasses
- * accept an optional `ControlStack` in their constructor; the runner
- * always passes one assembled from the loaded config.
+ * accept an optional `ControlStack` in their constructor (each subclass
+ * narrows the stack to its own family/target generics); the runner
+ * always passes one assembled from the loaded config. We use a rest-args
+ * `any[]` constructor signature so that subclass constructors with
+ * narrower parameter types remain assignable - constructor type
+ * compatibility in TS is contravariant in the parameter, and a wider
+ * `unknown` parameter on the alias side would reject any narrower
+ * subclass signature.
  */
-export type MigrationConstructor = new (stack: unknown) => Migration;
+// biome-ignore lint/suspicious/noExplicitAny: see JSDoc - rest args with any are the idiomatic TS pattern for accepting arbitrary subclass constructor signatures
+export type MigrationConstructor = new (...args: any[]) => Migration;
 
 interface ParsedArgs {
   readonly help: boolean;
