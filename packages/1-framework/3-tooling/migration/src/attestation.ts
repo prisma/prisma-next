@@ -1,13 +1,12 @@
 import { createHash } from 'node:crypto';
 import { canonicalizeJson } from './canonicalize-json';
-import { readMigrationPackage } from './io';
 import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
 
 export interface VerifyResult {
   readonly ok: boolean;
   readonly reason?: 'mismatch';
-  readonly storedMigrationId?: string;
-  readonly computedMigrationId?: string;
+  readonly storedMigrationId: string;
+  readonly computedMigrationId: string;
 }
 
 function sha256Hex(input: string): string {
@@ -72,10 +71,4 @@ export function verifyMigrationBundle(bundle: MigrationBundle): VerifyResult {
     storedMigrationId: bundle.manifest.migrationId,
     computedMigrationId: computed,
   };
-}
-
-/** Convenience wrapper: read the package from disk then verify it. */
-export async function verifyMigration(dir: string): Promise<VerifyResult> {
-  const pkg = await readMigrationPackage(dir);
-  return verifyMigrationBundle(pkg);
 }

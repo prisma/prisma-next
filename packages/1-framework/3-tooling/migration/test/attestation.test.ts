@@ -1,12 +1,8 @@
 import { createHash } from 'node:crypto';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import type { Contract } from '@prisma-next/contract/types';
-import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { computeMigrationId, verifyMigration, verifyMigrationBundle } from '../src/attestation';
+import { describe, expect, it } from 'vitest';
+import { computeMigrationId, verifyMigrationBundle } from '../src/attestation';
 import { canonicalizeJson } from '../src/canonicalize-json';
-import { writeMigrationPackage } from '../src/io';
 import { createTestContract, createTestManifest, createTestOps } from './fixtures';
 
 describe('computeMigrationId', () => {
@@ -162,45 +158,12 @@ describe('computeMigrationId', () => {
   });
 });
 
-describe('verifyMigration', () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'migration-attest-'));
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  it('passes for a freshly written attested package', async () => {
-    const dir = join(tmpDir, '20260225T1430_test');
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
-    await writeMigrationPackage(dir, manifest, ops);
-
-    const result = await verifyMigration(dir);
-    expect(result.ok).toBe(true);
-  });
-
-  it('detects tampered ops', async () => {
-    const dir = join(tmpDir, '20260225T1430_tampered');
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
-    await writeMigrationPackage(dir, manifest, ops);
-
-    await writeFile(join(dir, 'ops.json'), JSON.stringify([], null, 2));
-
-    const result = await verifyMigration(dir);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('mismatch');
-  });
-
-  it('verifyMigrationBundle reports mismatch for an in-memory tampered bundle', () => {
-    // Mirrors the apply-time defense-in-depth check: every loaded bundle
-    // is rehashed and a tampered ops list (post-load corruption) must
-    // surface a mismatch with both the stored and recomputed ids so the
-    // CLI can point users at the offending directory.
+describe('verifyMigrationBundle', () => {
+  it('reports mismatch for an in-memory tampered bundle', () => {
+    // The on-disk variants of this case are covered by io.test.ts (the
+    // loader throws MIGRATION.BUNDLE_CORRUPT). This case keeps the
+    // in-memory primitive under test so callers that hold a hand-built
+    // bundle (e.g. the planner before write) still have coverage.
     const ops = createTestOps();
     const baseManifest = {
       from: 'sha256:empty',
@@ -229,23 +192,5 @@ describe('verifyMigration', () => {
     expect(result.reason).toBe('mismatch');
     expect(result.storedMigrationId).toBe(storedMigrationId);
     expect(result.computedMigrationId).not.toBe(storedMigrationId);
-  });
-
-  it('detects tampered manifest field', async () => {
-    const dir = join(tmpDir, '20260225T1430_tampered_manifest');
-    const ops = createTestOps();
-    const manifest = createTestManifest({}, ops);
-    await writeMigrationPackage(dir, manifest, ops);
-
-    const manifestPath = join(dir, 'migration.json');
-    const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
-    content.labels = ['tampered'];
-    // Keep the original migrationId so the only thing that changed is the
-    // hashed input; verify must surface this as a mismatch.
-    await writeFile(manifestPath, JSON.stringify(content, null, 2));
-
-    const result = await verifyMigration(dir);
-    expect(result.ok).toBe(false);
-    expect(result.reason).toBe('mismatch');
   });
 });
