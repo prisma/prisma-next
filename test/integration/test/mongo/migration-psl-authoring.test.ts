@@ -2,6 +2,7 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import type { JsonValue } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { interpretPslDocumentToMongoContract } from '@prisma-next/mongo-contract-psl';
@@ -21,6 +22,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
+
+function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  // ControlStack arg is unused by the mongo factory; an empty object suffices for these integration tests.
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
 
 const bsonTypesByCodecId: Record<string, string> = {
   'mongo/string@1': 'string',
@@ -89,7 +97,11 @@ async function planAndApply(
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
     const runner = new MongoMigrationRunner(
-      createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+      createMongoRunnerDeps(
+        controlDriver,
+        MongoDriverImpl.fromDb(extractDb(controlDriver)),
+        makeFamily(),
+      ),
     );
     const runResult = await runner.execute({
       plan: {
