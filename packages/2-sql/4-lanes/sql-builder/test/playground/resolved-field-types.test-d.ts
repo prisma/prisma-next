@@ -1,6 +1,6 @@
-import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { Char } from '@prisma-next/target-postgres/codec-types';
 import { assertType, expectTypeOf, test } from 'vitest';
 import { db } from './preamble';
 
