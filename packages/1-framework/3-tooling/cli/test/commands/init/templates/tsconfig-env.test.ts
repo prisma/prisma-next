@@ -1,5 +1,11 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'pathe';
 import { describe, expect, it } from 'vitest';
-import { envExampleContent, envFileContent } from '../../../../src/commands/init/templates/env';
+import {
+  envExampleContent,
+  envFileContent,
+  MIN_SERVER_VERSION,
+} from '../../../../src/commands/init/templates/env';
 import {
   defaultTsConfig,
   mergeTsConfig,
@@ -169,4 +175,45 @@ describe('envFileContent (FR3.2)', () => {
     expect(envFileContent('postgres')).toBe(envExampleContent('postgres'));
     expect(envFileContent('mongo')).toBe(envExampleContent('mongo'));
   });
+});
+
+// ---------------------------------------------------------------------------
+// FR8.1 — minimum server version is declared by the target package and
+// mirrored by the CLI's `MIN_SERVER_VERSION` constant. The constant is
+// checked into source so we don't pay a workspace-fs read at every CLI
+// startup, but a drift between the two values would silently mislead
+// every freshly-initialised user about which server versions Prisma
+// Next actually supports. This test fails loudly when the two diverge,
+// flagging the bump as a coordinated change.
+// ---------------------------------------------------------------------------
+
+describe('MIN_SERVER_VERSION mirrors target packages (FR8.1)', () => {
+  // Resolved relative to this test file so the assertion does not
+  // depend on the test runner's `cwd`.
+  const REPO_ROOT = join(import.meta.dirname, '../../../../../../../..');
+  const TARGET_PACKAGE_JSONS = {
+    postgres: join(REPO_ROOT, 'packages/3-targets/3-targets/postgres/package.json'),
+    mongo: join(REPO_ROOT, 'packages/3-mongo-target/1-mongo-target/package.json'),
+  } as const;
+
+  function readMinServerVersion(packageJsonPath: string): string {
+    const pkg = JSON.parse(readFileSync(packageJsonPath, 'utf-8')) as {
+      prismaNext?: { minServerVersion?: unknown };
+    };
+    const value = pkg.prismaNext?.minServerVersion;
+    if (typeof value !== 'string') {
+      throw new Error(
+        `${packageJsonPath} is missing a string "prismaNext.minServerVersion" field. ` +
+          'FR8.1 requires every target package to declare its minimum server version.',
+      );
+    }
+    return value;
+  }
+
+  for (const [target, packageJsonPath] of Object.entries(TARGET_PACKAGE_JSONS)) {
+    it(`${target}: matches package.json#prismaNext.minServerVersion`, () => {
+      const declared = readMinServerVersion(packageJsonPath);
+      expect(MIN_SERVER_VERSION[target as keyof typeof MIN_SERVER_VERSION]).toBe(declared);
+    });
+  }
 });

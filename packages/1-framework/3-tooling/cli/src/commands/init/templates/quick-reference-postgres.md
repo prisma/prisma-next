@@ -4,6 +4,8 @@ Prisma Next lets you query your database in simple, easy-to-read TypeScript. Def
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
 
+{{requirements}}
+
 ## Your data contract
 
 Your data contract is the heart of your application. It lives at [`{{schemaPath}}`]({{schemaPath}}) and describes your models:

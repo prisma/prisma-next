@@ -1,22 +1,24 @@
 import type { TargetId } from './code-templates';
 
 /**
- * The minimum supported server version for each target. M7 (FR8.1) will
- * read this value from the target package's `package.json#prismaNext.minServerVersion`
- * field; until then this module is the single source of truth so the
- * scaffold's `.env.example` (FR3.1, FR8.2) does not lie about what the
- * runtime actually supports.
+ * The minimum supported server version for each target (FR8.1). The
+ * authoritative source of truth is each target package's
+ * `package.json#prismaNext.minServerVersion` field — this module
+ * mirrors those values and a workspace-level test asserts the two
+ * never drift (`templates/tsconfig-env.test.ts`).
  *
- * Bumping a value here in isolation is safe — it only changes the
- * `# Requires …` comment in `.env.example`. Bumping the runtime support
- * is the M7 contract and lives elsewhere.
+ * Bumping a value here in isolation is **not** safe: edit the
+ * corresponding target package's `package.json` first, then mirror
+ * here. The scaffold's `.env.example` (FR3.1, FR8.2) and the
+ * "Requirements" section of `prisma-next.md` both read from this
+ * constant, so a stale value lies to every freshly initialised user.
  */
-const MIN_SERVER_VERSION: Record<TargetId, string> = {
+export const MIN_SERVER_VERSION: Record<TargetId, string> = {
   postgres: '14',
   mongo: '6.0',
 };
 
-const TARGET_LABEL: Record<TargetId, string> = {
+export const TARGET_LABEL: Record<TargetId, string> = {
   postgres: 'PostgreSQL',
   mongo: 'MongoDB',
 };

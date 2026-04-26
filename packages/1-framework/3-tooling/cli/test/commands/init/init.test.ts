@@ -64,6 +64,7 @@ import {
   runInit,
 } from '../../../src/commands/init/init';
 import type { InitFlagOptions } from '../../../src/commands/init/inputs';
+import type { ProbeOverrides } from '../../../src/commands/init/probe-db';
 import type { GlobalFlags } from '../../../src/utils/global-flags';
 
 /**
@@ -80,12 +81,14 @@ async function runInitTest(
     readonly options: InitFlagOptions;
     readonly flags: GlobalFlags;
     readonly canPrompt?: boolean;
+    readonly probeOverrides?: ProbeOverrides;
   },
 ): Promise<number> {
   return runInit(tmpDir, {
     options: args.options,
     flags: args.flags,
     canPrompt: args.canPrompt ?? args.flags.interactive !== false,
+    ...(args.probeOverrides !== undefined ? { probeOverrides: args.probeOverrides } : {}),
   });
 }
 
@@ -856,6 +859,117 @@ describe('runInit (non-interactive, FR1)', () => {
     expect(exit).toBe(INIT_EXIT_PRECONDITION);
     // Should fail before any file is written — offline guarantee starts at input validation.
     expect(existsSync(join(tmpDir, 'prisma-next.config.ts'))).toBe(false);
+  });
+
+  // FR8.3 — offline-by-default + opt-in probe contract. The probe must
+  // not run unless `--probe-db` is set; under `--probe-db` the
+  // outcome surfaces as a warning by default and as a fatal error
+  // under `--strict-probe`.
+
+  it('does not invoke the probe when --probe-db is not set (FR8.3 / NFR9 offline-by-default)', async () => {
+    const probePostgres = vi.fn();
+    const probeMongo = vi.fn();
+
+    const exit = await runInitTest(tmpDir, {
+      options: { target: 'postgres', authoring: 'psl', install: false },
+      flags: noninteractiveFlags(),
+      probeOverrides: {
+        probePostgres: probePostgres as never,
+        probeMongo: probeMongo as never,
+      },
+    });
+
+    expect(exit).toBe(INIT_EXIT_OK);
+    expect(probePostgres).not.toHaveBeenCalled();
+    expect(probeMongo).not.toHaveBeenCalled();
+  });
+
+  it('with --probe-db, surfaces a below-minimum result as a warning and exits 0 (FR8.3)', async () => {
+    const previousUrl = process.env['DATABASE_URL'];
+    process.env['DATABASE_URL'] = 'postgres://localhost:5432/db';
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', probeDb: true, install: false },
+        flags: noninteractiveFlags(),
+        probeOverrides: { probePostgres: async () => ({ serverVersion: '12.4' }) },
+      });
+
+      expect(exit).toBe(INIT_EXIT_OK);
+    } finally {
+      if (previousUrl === undefined) delete process.env['DATABASE_URL'];
+      else process.env['DATABASE_URL'] = previousUrl;
+    }
+  });
+
+  it('with --probe-db --strict-probe, escalates a connection failure to PRECONDITION (FR8.3)', async () => {
+    const previousUrl = process.env['DATABASE_URL'];
+    process.env['DATABASE_URL'] = 'postgres://localhost:5432/db';
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: {
+          target: 'postgres',
+          authoring: 'psl',
+          probeDb: true,
+          strictProbe: true,
+          install: false,
+        },
+        flags: noninteractiveFlags(),
+        probeOverrides: {
+          probePostgres: () => {
+            throw new Error('connect ECONNREFUSED');
+          },
+        },
+      });
+
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+    } finally {
+      if (previousUrl === undefined) delete process.env['DATABASE_URL'];
+      else process.env['DATABASE_URL'] = previousUrl;
+    }
+  });
+
+  it('with --probe-db but no DATABASE_URL, succeeds with a warning (FR8.3)', async () => {
+    const previousUrl = process.env['DATABASE_URL'];
+    delete process.env['DATABASE_URL'];
+    try {
+      const probePostgres = vi.fn();
+      const exit = await runInitTest(tmpDir, {
+        options: { target: 'postgres', authoring: 'psl', probeDb: true, install: false },
+        flags: noninteractiveFlags(),
+        probeOverrides: { probePostgres: probePostgres as never },
+      });
+
+      expect(exit).toBe(INIT_EXIT_OK);
+      expect(probePostgres).not.toHaveBeenCalled();
+    } finally {
+      if (previousUrl !== undefined) process.env['DATABASE_URL'] = previousUrl;
+    }
+  });
+
+  it('with --probe-db --strict-probe and no DATABASE_URL, escalates to PRECONDITION (FR8.3)', async () => {
+    const previousUrl = process.env['DATABASE_URL'];
+    delete process.env['DATABASE_URL'];
+    try {
+      const exit = await runInitTest(tmpDir, {
+        options: {
+          target: 'postgres',
+          authoring: 'psl',
+          probeDb: true,
+          strictProbe: true,
+          install: false,
+        },
+        flags: noninteractiveFlags(),
+        probeOverrides: {
+          probePostgres: () => {
+            throw new Error('probe must not be invoked without DATABASE_URL');
+          },
+        },
+      });
+
+      expect(exit).toBe(INIT_EXIT_PRECONDITION);
+    } finally {
+      if (previousUrl !== undefined) process.env['DATABASE_URL'] = previousUrl;
+    }
   });
 
   it('exits PRECONDITION when re-init is needed but --force is not supplied', async () => {

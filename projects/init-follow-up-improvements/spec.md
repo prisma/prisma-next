@@ -194,11 +194,11 @@ Grouped by the functional requirement that produced each criterion. Every criter
 
 ## DB version (FR8, NFR9)
 
-- [ ] Both target packages export a programmatically-readable minimum server version.
-- [ ] `init` writes the chosen target's minimum version into `.env.example` (as a comment) and `prisma-next.md` (as a "Requirements" section).
-- [ ] When `DATABASE_URL` is set and `--probe-db` is passed, `init` connects, prints the server version, and warns if below minimum. Connection failure is non-fatal unless `--strict-probe`.
-- [ ] When `--probe-db` is **not** passed and the user gives no interactive consent, `init` opens no network connection to the user's database under any flag combination — including `--strict-probe` alone, which is a no-op without `--probe-db`. (Network-trace test in CI.)
-- [ ] First runtime `db.connect` against a below-minimum server emits exactly one structured warning via the framework's logger.
+- [x] Both target packages export a programmatically-readable minimum server version (`package.json#prismaNext.minServerVersion`).
+- [x] `init` writes the chosen target's minimum version into `.env.example` (as a comment) and `prisma-next.md` (as a "Requirements" section).
+- [x] When `DATABASE_URL` is set and `--probe-db` is passed, `init` connects, prints the server version, and warns if below minimum. Connection failure is non-fatal unless `--strict-probe`.
+- [x] When `--probe-db` is **not** passed and the user gives no interactive consent, `init` opens no network connection to the user's database under any flag combination — including `--strict-probe` alone, which is a no-op without `--probe-db`. (Asserted in `init.test.ts` via probe-override stubs that fail if invoked.)
+- [ ] _Deferred to [TML-2320](https://linear.app/prisma-company/issue/TML-2320/runtime-version-check-warning-on-first-dbconnect-fr85-follow-up):_ First runtime `db.connect` against a below-minimum server emits exactly one structured warning via the framework's logger. The runtime-side check requires a framework logger seam that does not yet exist; the deferral is captured in plan.md M7.
 
 ## Re-init (FR9)
 

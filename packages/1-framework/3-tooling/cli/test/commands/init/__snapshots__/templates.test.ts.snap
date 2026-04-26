@@ -171,6 +171,11 @@ Prisma Next lets you query your database in simple, easy-to-read TypeScript. Def
 
 This project is set up for MongoDB. Prisma Next also supports other databases.
 
+## Requirements
+
+- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
+
 ## Your data contract
 
 Your data contract is the heart of your application. It lives at [\`prisma/contract.prisma\`](prisma/contract.prisma) and describes your models:
@@ -477,6 +482,11 @@ exports[`templates > per-cell snapshots (FR5.4) > mongo + typescript > quickRefe
 Prisma Next lets you query your database in simple, easy-to-read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every collection, field, and relation.
 
 This project is set up for MongoDB. Prisma Next also supports other databases.
+
+## Requirements
+
+- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
 
@@ -785,6 +795,11 @@ Prisma Next lets you query your database in simple, easy-to-read TypeScript. Def
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
 
+## Requirements
+
+- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
+
 ## Your data contract
 
 Your data contract is the heart of your application. It lives at [\`prisma/contract.prisma\`](prisma/contract.prisma) and describes your models:
@@ -1037,6 +1052,11 @@ exports[`templates > per-cell snapshots (FR5.4) > postgres + typescript > quickR
 Prisma Next lets you query your database in simple, easy-to-read TypeScript. Define what your data looks like, and Prisma Next gives you a fully typed client — with autocomplete for every table, column, and relation.
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
+
+## Requirements
+
+- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
 
