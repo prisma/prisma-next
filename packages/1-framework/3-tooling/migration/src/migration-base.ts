@@ -1,4 +1,4 @@
-import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
@@ -8,7 +8,6 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import { join } from 'pathe';
 import { computeMigrationId } from './attestation';
 import type { MigrationHints, MigrationManifest, MigrationOps } from './types';
 
@@ -123,10 +122,25 @@ function printHelp(): void {
 }
 
 /**
- * Build the attested manifest written alongside `ops.json`.
+ * In-memory artifacts produced from a `Migration` instance: the
+ * serialized `ops.json` body, the `migration.json` manifest object, and
+ * its serialized form. Returned by `buildMigrationArtifacts` so callers
+ * (today: `MigrationCLI.run` in `@prisma-next/cli/migration-cli`) can
+ * decide how to persist them — write to disk, print in dry-run, ship
+ * over the wire — without coupling artifact construction to file I/O.
+ */
+export interface MigrationArtifacts {
+  readonly opsJson: string;
+  readonly manifest: MigrationManifest;
+  readonly manifestJson: string;
+}
+
+/**
+ * Build the attested manifest from `describe()`-derived metadata, the
+ * operations list, and the previously-scaffolded manifest (if any).
  *
- * When a `migration.json` already exists in the directory (the common case:
- * the package was scaffolded by `migration plan`), preserve the contract
+ * When a `migration.json` already exists for this package (the common
+ * case: it was scaffolded by `migration plan`), preserve the contract
  * bookends, hints, labels, and `createdAt` set there — those fields are
  * owned by the CLI scaffolder, not the authored class. Only the
  * `describe()`-derived fields (`from`, `to`, `kind`) and the operations
@@ -139,12 +153,10 @@ function printHelp(): void {
  * the on-disk artifacts are always fully attested.
  */
 function buildAttestedManifest(
-  migrationDir: string,
   meta: MigrationMeta,
   ops: MigrationOps,
+  existing: Partial<MigrationManifest> | null,
 ): MigrationManifest {
-  const existing = readExistingManifest(join(migrationDir, 'migration.json'));
-
   const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: meta.from,
     to: meta.to,
@@ -181,40 +193,23 @@ function normalizeHints(existing: MigrationHints | undefined): MigrationHints {
   };
 }
 
-function readExistingManifest(manifestPath: string): Partial<MigrationManifest> | null {
-  let raw: string;
-  try {
-    raw = readFileSync(manifestPath, 'utf-8');
-  } catch {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as Partial<MigrationManifest>;
-  } catch {
-    return null;
-  }
-}
-
 /**
- * Serialize a migration instance to `ops.json` + `migration.json` in
- * `migrationDir`. When `dryRun` is true, prints both artifacts to stdout
- * and skips the writes. Called by `MigrationCLI.run` from
- * `@prisma-next/cli/migration-cli`; the entrypoint owns config loading
- * and stack assembly, this owns the "lower the instance to disk artifacts"
- * step.
+ * Pure conversion from a `Migration` instance (plus the previously
+ * scaffolded manifest, when one exists on disk) to the in-memory
+ * artifacts that downstream tooling persists. Owns metadata validation,
+ * manifest synthesis/preservation, hint normalization, and the
+ * content-addressed `migrationId` computation, but performs no file I/O
+ * — callers handle reads (to source `existing`) and writes (to persist
+ * `opsJson` / `manifestJson`).
  */
-export function serializeMigration(
+export function buildMigrationArtifacts(
   instance: Migration,
-  migrationDir: string,
-  dryRun: boolean,
-): void {
+  existing: Partial<MigrationManifest> | null,
+): MigrationArtifacts {
   const ops = instance.operations;
-
   if (!Array.isArray(ops)) {
     throw new Error('operations must be an array');
   }
-
-  const serializedOps = JSON.stringify(ops, null, 2);
 
   const rawMeta: unknown = instance.describe();
   const parsed = MigrationMetaSchema(rawMeta);
@@ -222,17 +217,11 @@ export function serializeMigration(
     throw new Error(`describe() returned invalid metadata: ${parsed.summary}`);
   }
 
-  const manifest = buildAttestedManifest(migrationDir, parsed, ops);
+  const manifest = buildAttestedManifest(parsed, ops, existing);
 
-  if (dryRun) {
-    process.stdout.write(`--- migration.json ---\n${JSON.stringify(manifest, null, 2)}\n`);
-    process.stdout.write('--- ops.json ---\n');
-    process.stdout.write(`${serializedOps}\n`);
-    return;
-  }
-
-  writeFileSync(join(migrationDir, 'ops.json'), serializedOps);
-  writeFileSync(join(migrationDir, 'migration.json'), JSON.stringify(manifest, null, 2));
-
-  process.stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
+  return {
+    opsJson: JSON.stringify(ops, null, 2),
+    manifest,
+    manifestJson: JSON.stringify(manifest, null, 2),
+  };
 }

@@ -1,9 +1,7 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
 import type { ControlStack } from '@prisma-next/framework-components/control';
-import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { Migration, serializeMigration } from '../src/migration-base';
+import { describe, expect, it } from 'vitest';
+import { buildMigrationArtifacts, Migration } from '../src/migration-base';
+import type { MigrationManifest } from '../src/types';
 
 describe('Migration', () => {
   describe('operations + describe() contract', () => {
@@ -112,27 +110,13 @@ describe('Migration', () => {
 });
 
 /**
- * Direct unit tests for `serializeMigration` — the file-I/O step that was
- * previously only exercised through the now-removed `Migration.run` static
- * via subprocess. Running it in-process keeps the behavior coverage
- * (manifest synthesis, manifest preservation, hint normalization,
- * dry-run output, error surfaces) while dropping the subprocess + tsx
- * round-trip overhead.
+ * Direct unit tests for `buildMigrationArtifacts` — the pure
+ * `Migration` → in-memory artifact conversion. File I/O (reading
+ * existing `migration.json`, writing the rendered artifacts to disk,
+ * dry-run stdout output) lives in `@prisma-next/cli` and is exercised
+ * there.
  */
-describe('serializeMigration', () => {
-  let tmpDir: string;
-  let stdoutSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'serialize-migration-'));
-    stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
-  });
-
-  afterEach(async () => {
-    stdoutSpy.mockRestore();
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
+describe('buildMigrationArtifacts', () => {
   function makeMigration(
     operations: unknown,
     meta: { readonly from: string; readonly to: string; readonly labels?: readonly string[] } = {
@@ -152,13 +136,14 @@ describe('serializeMigration', () => {
     return new M();
   }
 
-  it('writes ops.json and migration.json with synthesized manifest fields', async () => {
-    serializeMigration(makeMigration([{ id: 'op1', label: 'Test op' }]), tmpDir, false);
+  it('produces ops.json + migration.json strings with synthesized manifest fields', () => {
+    const { opsJson, manifest, manifestJson } = buildMigrationArtifacts(
+      makeMigration([{ id: 'op1', label: 'Test op' }]),
+      null,
+    );
 
-    const ops = JSON.parse(await readFile(join(tmpDir, 'ops.json'), 'utf-8'));
-    expect(ops).toEqual([{ id: 'op1', label: 'Test op' }]);
+    expect(JSON.parse(opsJson)).toEqual([{ id: 'op1', label: 'Test op' }]);
 
-    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.from).toBe('abc');
     expect(manifest.to).toBe('def');
     expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -168,36 +153,34 @@ describe('serializeMigration', () => {
     expect(manifest.fromContract).toBeNull();
     expect(manifest.toContract).toEqual({ storage: { storageHash: 'def' } });
     expect(manifest.hints).toMatchObject({ used: [], applied: [] });
+
+    expect(JSON.parse(manifestJson)).toEqual(manifest);
   });
 
-  it('preserves contract bookends, hints, labels, and createdAt from an existing manifest', async () => {
-    const existingManifest = {
+  it('preserves contract bookends, hints, labels, and createdAt from an existing manifest', () => {
+    const existingManifest: Partial<MigrationManifest> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      migrationId: null,
       kind: 'regular',
-      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
-      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
+      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' } as never,
+      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' } as never,
       hints: {
         used: ['idx_a'],
         applied: ['additive_only'],
         plannerVersion: '2.0.0',
-      },
+      } as never,
       labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',
     };
-    await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
 
-    serializeMigration(
+    const { manifest } = buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
         from: 'sha256:from',
         to: 'sha256:to',
       }),
-      tmpDir,
-      false,
+      existingManifest,
     );
 
-    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.fromContract).toEqual(existingManifest.fromContract);
     expect(manifest.toContract).toEqual(existingManifest.toContract);
     expect(manifest.hints).toEqual(existingManifest.hints);
@@ -206,35 +189,31 @@ describe('serializeMigration', () => {
     expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting an older manifest', async () => {
-    const existingManifest = {
+  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting an older manifest', () => {
+    const existingManifest: Partial<MigrationManifest> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      migrationId: null,
       kind: 'regular',
-      fromContract: { storage: { storageHash: 'sha256:from' } },
-      toContract: { storage: { storageHash: 'sha256:to' } },
+      fromContract: { storage: { storageHash: 'sha256:from' } } as never,
+      toContract: { storage: { storageHash: 'sha256:to' } } as never,
       hints: {
         used: ['idx_a'],
         applied: ['additive_only'],
         plannerVersion: '2.0.0',
         planningStrategy: 'legacy-strategy',
-      },
+      } as never,
       labels: [],
       createdAt: '2026-01-15T10:00:00.000Z',
     };
-    await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
 
-    serializeMigration(
+    const { manifest } = buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Op', operationClass: 'additive' }], {
         from: 'sha256:from',
         to: 'sha256:to',
       }),
-      tmpDir,
-      false,
+      existingManifest,
     );
 
-    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.hints).toEqual({
       used: ['idx_a'],
       applied: ['additive_only'],
@@ -243,41 +222,15 @@ describe('serializeMigration', () => {
     expect(manifest.hints).not.toHaveProperty('planningStrategy');
   });
 
-  it('prints both ops.json and migration.json sections in dry-run mode without writing files', async () => {
-    serializeMigration(
-      makeMigration([{ id: 'op1', label: 'Dry run op' }], {
-        from: 'abc',
-        to: 'def',
-        labels: ['test'],
-      }),
-      tmpDir,
-      true,
-    );
-
-    const stdoutText = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stdoutText).toContain('--- migration.json ---');
-    expect(stdoutText).toContain('--- ops.json ---');
-    expect(stdoutText).toContain('"op1"');
-    expect(stdoutText).toContain('"from"');
-    expect(stdoutText).toContain('"to"');
-
-    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
-    const manifestExists = await readFile(join(tmpDir, 'migration.json'), 'utf-8').catch(
-      () => null,
-    );
-    expect(opsExists).toBeNull();
-    expect(manifestExists).toBeNull();
-  });
-
   it('throws when operations is not an array', () => {
-    expect(() => serializeMigration(makeMigration('not an array'), tmpDir, false)).toThrow(
+    expect(() => buildMigrationArtifacts(makeMigration('not an array'), null)).toThrow(
       /operations/,
     );
   });
 
   it('throws a clear error when describe() returns invalid metadata', () => {
     expect(() =>
-      serializeMigration(makeMigration([{ id: 'op1' }], { bad: true } as never), tmpDir, false),
+      buildMigrationArtifacts(makeMigration([{ id: 'op1' }], { bad: true } as never), null),
     ).toThrow(/describe\(\).*invalid/);
   });
 });

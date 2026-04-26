@@ -1,7 +1,8 @@
 export {
+  buildMigrationArtifacts,
   isDirectEntrypoint,
   Migration,
+  type MigrationArtifacts,
   type MigrationMeta,
   printMigrationHelp,
-  serializeMigration,
 } from '../migration-base';

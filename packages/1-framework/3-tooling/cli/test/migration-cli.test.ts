@@ -191,6 +191,57 @@ describe('MigrationCLI.run', () => {
     expect(loadConfigMock).toHaveBeenCalledWith('/explicit/config.ts');
   });
 
+  it('preserves contract bookends from a previously-scaffolded migration.json', async () => {
+    loadConfigMock.mockResolvedValue({
+      family: { familyId: 'sql' },
+      target: { targetId: 'postgres' },
+      adapter: { kind: 'adapter' },
+      extensionPacks: [],
+    });
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+
+    const existing = {
+      from: 'sha256:from',
+      to: 'sha256:to',
+      migrationId: null,
+      kind: 'regular',
+      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
+      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
+      hints: { used: [], applied: [], plannerVersion: '2.0.0' },
+      labels: ['scaffolded'],
+      createdAt: '2026-01-15T10:00:00.000Z',
+    };
+    writeFileSync(join(workDir, 'migration.json'), JSON.stringify(existing, null, 2));
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+
+    const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
+    expect(manifest.fromContract).toEqual(existing.fromContract);
+    expect(manifest.toContract).toEqual(existing.toContract);
+    expect(manifest.labels).toEqual(existing.labels);
+    expect(manifest.createdAt).toBe(existing.createdAt);
+  });
+
+  it('falls back to a synthesized manifest when the existing migration.json is unparseable', async () => {
+    loadConfigMock.mockResolvedValue({
+      family: { familyId: 'sql' },
+      target: { targetId: 'postgres' },
+      adapter: { kind: 'adapter' },
+      extensionPacks: [],
+    });
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+
+    writeFileSync(join(workDir, 'migration.json'), '{ this is not json');
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+
+    const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
+    expect(manifest.from).toBe('sha256:from');
+    expect(manifest.to).toBe('sha256:to');
+    expect(manifest.fromContract).toBeNull();
+    expect(manifest.toContract).toEqual({ storage: { storageHash: 'sha256:to' } });
+  });
+
   it('forwards --config=<path> (equals form) to loadConfig', async () => {
     loadConfigMock.mockResolvedValue({
       family: { familyId: 'sql' },
