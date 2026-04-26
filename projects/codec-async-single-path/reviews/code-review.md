@@ -601,6 +601,36 @@ Branch HEAD on entry `47ce86a6f`. Worktree clean against HEAD. Implementer's str
 
 **Files modified (m4 R2):** `code-review.md`, `system-design-review.md`, `walkthrough.md`.
 
+#### m4 R2 — independent re-verification (post-artifact-commit)
+
+A fresh reviewer pass was performed against the on-disk state at HEAD `0d7bd780b` (the artifact-commit that landed the m4 R2 review narratives above). Branch `feat/codec-async-single-path`. Worktree clean. The orchestrator's delegation prompt for this pass cited HEAD `47ce86a6f` (the implementation HEAD), one commit prior to the artifact-commit; the second-pass reviewer reconciled the snapshot drift by independently re-verifying both the source state at `47ce86a6f` and the artifact narratives at `0d7bd780b`, rather than re-doing already-committed review work.
+
+- **Source-of-truth re-inspection — clean.** [`packages/2-mongo-family/6-transport/mongo-lowering/README.md` line 7](../../../packages/2-mongo-family/6-transport/mongo-lowering/README.md:7) narrates `Promise<AnyMongoWireCommand>` and the async-at-the-boundary sentence, matching [`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts (L5)`](../../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts:5) exactly. [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts (L30–L36)`](../../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts:30-36) declares 5 generics aliasing `BaseCodec`; factory (L56–L88) threads `TInput`/`TOutput` through `encode`/`decode`/`encodeJson`/`decodeJson`; extractors (L90–L98) are `MongoCodecInput`/`MongoCodecOutput`. [`packages/2-mongo-family/1-foundation/mongo-codec/test/codecs.test-d.ts (L65–L112)`](../../../packages/2-mongo-family/1-foundation/mongo-codec/test/codecs.test-d.ts:65-112) pins strict `toEqualTypeOf<BaseCodec<…>>()` identity, `TOutput=TInput` default, asymmetric expressibility through method signatures, and extractor symmetric round-trip. Cross-family seam in [`packages/1-framework/1-core/framework-components/src/codec-types.ts`](../../../packages/1-framework/1-core/framework-components/src/codec-types.ts) and SQL `Codec` extends-`BaseCodec` declaration in [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`](../../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts) confirm the 5-generic positional alignment.
+
+- **Validation gates — re-run, fully green.** All gates re-executed locally in this second pass (subject to a Node.js version warning that did not block any task — `engines.node: >=24` wanted, `v22.22.0` present):
+
+  - `pnpm --filter @prisma-next/mongo-codec typecheck` — PASS.
+  - `pnpm --filter @prisma-next/mongo-codec test` — PASS (18/18; 10 runtime + 8 type tests).
+  - `pnpm --filter @prisma-next/adapter-mongo typecheck` — PASS.
+  - `pnpm --filter @prisma-next/adapter-mongo test` — PASS (215/215 across 7 files).
+  - `pnpm --filter @prisma-next/target-mongo typecheck` — PASS.
+  - `pnpm --filter @prisma-next/target-mongo test` — PASS (366/366 across 16 files; CAS flake did not reproduce).
+  - `pnpm --filter @prisma-next/mongo-contract typecheck` — PASS.
+  - `pnpm --filter @prisma-next/mongo-contract test` — PASS (76/76 across 3 files).
+  - `pnpm --filter @prisma-next/mongo-lowering typecheck` — PASS.
+  - `pnpm --filter @prisma-next/mongo-lowering test` — PASS (no test files; types-only at this layer, as expected).
+  - `pnpm --filter @prisma-next/integration-tests exec vitest run --passWithNoTests cross-family-codec` — PASS (3/3).
+  - `pnpm typecheck` (workspace-wide) — PASS (120/120 tasks).
+  - `pnpm test:packages` (workspace-wide) — PASS (111/111 tasks; full Turbo cache hit).
+  - `pnpm test:integration` (full suite) — PASS (104 files / 521 tests).
+  - `pnpm lint:deps` — PASS (606 modules / 1198 deps; no violations).
+
+- **Concordance.** Every counts-and-shapes claim in the m4 R2 round notes above (test counts, file paths, generic positions, extractor names, README signature, JSDoc-level documentation) re-verified bit-for-bit against on-disk state. AC-CX1 strictly PASS confirmed. F4 closure confirmed. No drift. No new findings filed by the second-pass reviewer.
+
+- **Stale-snapshot note for orchestrator.** The orchestrator's delegation cited HEAD `47ce86a6f`, but on entry HEAD was `0d7bd780b` (the artifact-commit by an earlier reviewer subagent). The second-pass reviewer treated this as a snapshot-drift situation rather than a re-do trigger — surfacing the situation here for the orchestrator's audit trail.
+
+**Verdict carry-forward:** m4 R2 → **SATISFIED** (unchanged; reaffirmed by independent re-verification).
+
 ---
 
 ## Finding template

@@ -480,3 +480,14 @@ Same as M4.6.2; no R2-specific deferrals.
 R2 records one decision worth lifting into the m5 ADR:
 
 - **Mongo `MongoCodec` is a structural alias of `BaseCodec`, not a syntactically extended type.** SQL's `Codec` extends `BaseCodec` with `meta`/`paramsSchema`/`init`/`TParams`/`THelper` because the SQL family genuinely needs those extras (parameterized codecs, init hooks). The Mongo family currently has no equivalent need. Aliasing rather than extending keeps `MongoCodec` exactly equivalent to `BaseCodec` at the type level, which is the simplest possible expression of "the cross-family contract is at `BaseCodec`." Any future Mongo-specific extras would be added by changing the alias to an `extends` declaration — an additive change with a clear migration path.
+
+### M4 R2.10 Independent re-verification (post-artifact-commit)
+
+A second-pass reviewer independently re-verified the m4 R2 narrative above against on-disk state at HEAD `0d7bd780b` (the artifact-commit). The new orchestrator delegation cited HEAD `47ce86a6f` (the implementation HEAD), one commit prior to the artifact-commit; the second pass reconciled this snapshot drift by re-running every validation gate and re-inspecting every cited source file rather than re-doing the already-committed review.
+
+- **Source state — concordance confirmed.** [`packages/2-mongo-family/6-transport/mongo-lowering/README.md (L7)`](../../../packages/2-mongo-family/6-transport/mongo-lowering/README.md:7), [`packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts (L5)`](../../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts:5), [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts (L30–L98)`](../../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts:30-98), and [`packages/2-mongo-family/1-foundation/mongo-codec/test/codecs.test-d.ts (L65–L112)`](../../../packages/2-mongo-family/1-foundation/mongo-codec/test/codecs.test-d.ts:65-112) all match the M4 R2.1–R2.9 narrative bit-for-bit.
+- **Validation gates — green at HEAD `0d7bd780b`.** All 14 gates listed in [code-review.md § m4 — Round 2](code-review.md) re-ran fully green (mongo-codec 18/18 typecheck+test; adapter-mongo 215/215; target-mongo 366/366; mongo-contract 76/76; mongo-lowering types-only typecheck PASS; cross-family-codec 3/3; workspace typecheck 120/120; test:packages 111/111; test:integration 104 files / 521 tests; lint:deps 606 modules / 1198 deps no violations). No drift; CAS flake did not reproduce.
+- **No new findings; no AC-scoreboard movement.** AC-CX1 strictly PASS confirmed; the M4 R2.5 risk register and M4 R2.8 open-questions register stand unchanged.
+- **Stale-snapshot disposition.** The orchestrator's delegation prompt assumed HEAD `47ce86a6f`. Treated as audit-trail noise (the implementation HEAD vs the artifact-commit HEAD), not as a finding.
+
+This subsection is informational; it does not alter any of M4 R2.1–R2.9.

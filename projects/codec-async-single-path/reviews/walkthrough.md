@@ -805,3 +805,13 @@ All gates re-run at HEAD `47ce86a6f`:
 - **m4 R1 follow-up #1 (`MongoCodec` 4-vs-5 generic asymmetry).** **Resolved by widening.** AC-CX1 is now strictly PASS; M4.7.1 in [system-design-review.md](system-design-review.md) is closed by design.
 - **m4 R1 follow-up #2 (`MongoMigrationRunner` CAS flake).** Carried over unchanged.
 - **m5 work ahead.** Security tests translation (AC-SE1–AC-SE4); ADR + walk-back closure (AC-DW1–AC-DW3); package READMEs refresh (T5.8). The new ADR (T5.6) should record the m4 R2 decision: `MongoCodec` was widened to 5 generics matching `BaseCodec` exactly to satisfy strict spec wording and to enable asymmetric `TInput ≠ TOutput` codecs in the Mongo family. The orchestrator's optional `user-attention.md` capture of the latent extractor union behavior is a documentation-only follow-up.
+
+### Independent re-verification (post-artifact-commit, m4 R2)
+
+A second-pass reviewer re-ran the m4 R2 verification against on-disk state at HEAD `0d7bd780b` (the artifact-commit that landed this walkthrough delta and the SDR / code-review refreshes). The orchestrator's delegation cited HEAD `47ce86a6f` (the implementation HEAD, one commit prior); the second pass reconciled the snapshot drift by independently re-inspecting every cited source file and re-running every validation gate, rather than re-doing already-committed review work.
+
+- **All cited sources concord with the narrative above.** [README L7](../../../packages/2-mongo-family/6-transport/mongo-lowering/README.md:7), [adapter-types L5](../../../packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts:5), [codecs.ts L30–L98](../../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts:30-98), and [codecs.test-d.ts L65–L112](../../../packages/2-mongo-family/1-foundation/mongo-codec/test/codecs.test-d.ts:65-112) all match the m4 R2 delta bit-for-bit.
+- **All 14 validation gates re-ran green** (mongo-codec 18/18; adapter-mongo 215/215; target-mongo 366/366 with no CAS-flake reproduction; mongo-contract 76/76; mongo-lowering types-only typecheck PASS; cross-family-codec 3/3; workspace typecheck 120/120; test:packages 111/111; test:integration 104 files / 521 tests; lint:deps 606 modules / 1198 deps no violations).
+- **AC-CX1 strictly PASS confirmed**; no new findings filed.
+
+The reviewer-side audit trail of this second pass is captured in [code-review.md § m4 — Round 2 — independent re-verification](code-review.md).
