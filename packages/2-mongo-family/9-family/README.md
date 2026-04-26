@@ -23,6 +23,7 @@ This package is the Mongo family integration point for both control-plane assemb
 - `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
 - `./migration`: migration authoring — `Migration` class, factory functions, and strategies (re-exported from `@prisma-next/target-mongo/migration`)
 - `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
+- `./schema-verify`: pure `verifyMongoSchema(...)` shared by `MongoFamilyInstance.schemaVerify` (i.e. `db verify --schema-only`) and the `MongoMigrationRunner` post-apply verify step, so both surfaces agree on "matches the contract" by construction
 
 ## Usage
 
@@ -131,9 +132,11 @@ Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-r
 - `src/core/control-instance.ts`: `createMongoFamilyInstance()` and `MongoControlFamilyInstance`
 - `src/core/mongo-target-descriptor.ts`: pre-built control target descriptor derived from `@prisma-next/target-mongo/pack`
 - `src/core/mongo-migration.ts`: `MongoMigration` class (fixes the `Migration<TOperation>` type parameter to `MongoMigrationPlanOperation`)
+- `src/core/schema-verify/verify-mongo-schema.ts`: pure `verifyMongoSchema(...)` (no DB I/O); composes `contractToMongoSchemaIR` + `diffMongoSchemas`
 - `src/exports/control.ts`: control-plane entrypoint
 - `src/exports/migration.ts`: migration authoring entrypoint
 - `src/exports/pack.ts`: authoring-time family pack ref
+- `src/exports/schema-verify.ts`: pure schema-verify entrypoint
 
 ## Dependencies
 
