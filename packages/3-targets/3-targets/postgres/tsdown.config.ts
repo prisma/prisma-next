@@ -2,6 +2,9 @@ import { defineConfig } from '@prisma-next/tsdown';
 
 export default defineConfig({
   entry: [
+    'src/exports/codec-ids.ts',
+    'src/exports/codec-types.ts',
+    'src/exports/codecs.ts',
     'src/exports/control.ts',
     'src/exports/default-normalizer.ts',
     'src/exports/migration.ts',

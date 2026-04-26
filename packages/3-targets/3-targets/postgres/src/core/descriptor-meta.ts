@@ -1,4 +1,4 @@
-import type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
+import type { CodecTypes } from '../exports/codec-types';
 import { postgresAuthoringFieldPresets, postgresAuthoringTypes } from './authoring';
 
 const postgresTargetDescriptorMetaBase = {
