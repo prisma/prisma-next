@@ -1,10 +1,10 @@
 #!/usr/bin/env -S node
-import { runMigration } from '@prisma-next/cli/migration-runner';
 import {
   addForeignKey,
   createIndex,
   createTable,
   Migration,
+  MigrationCLI,
   rawSql,
 } from '@prisma-next/target-postgres/migration';
 
@@ -153,4 +153,4 @@ export default class M extends Migration {
   }
 }
 
-runMigration(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);

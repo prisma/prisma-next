@@ -265,7 +265,7 @@ describe('TypeScriptRenderablePostgresMigration', () => {
 
     const source = migration.renderTypeScript();
     expect(source).toContain(
-      "import { Migration, dropTable } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, MigrationCLI, dropTable } from '@prisma-next/target-postgres/migration';",
     );
     expect(source).toContain('dropTable("public", "stale")');
   });

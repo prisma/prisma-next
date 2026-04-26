@@ -89,10 +89,10 @@ export abstract class Migration<
 
 /**
  * Returns true when `import.meta.url` resolves to the same file that was
- * invoked as the node entrypoint (`process.argv[1]`). Used by `runMigration`
- * (in `@prisma-next/cli/migration-runner`) to no-op when the migration
- * module is being imported (e.g. by another script) rather than executed
- * directly.
+ * invoked as the node entrypoint (`process.argv[1]`). Used by
+ * `MigrationCLI.run` (in `@prisma-next/cli/migration-cli`) to no-op when
+ * the migration module is being imported (e.g. by another script) rather
+ * than executed directly.
  */
 export function isDirectEntrypoint(importMetaUrl: string): boolean {
   const metaFilename = fileURLToPath(importMetaUrl);
@@ -198,8 +198,8 @@ function readExistingManifest(manifestPath: string): Partial<MigrationManifest> 
 /**
  * Serialize a migration instance to `ops.json` + `migration.json` in
  * `migrationDir`. When `dryRun` is true, prints both artifacts to stdout
- * and skips the writes. Called by `runMigration` from
- * `@prisma-next/cli/migration-runner`; the orchestrator owns config loading
+ * and skips the writes. Called by `MigrationCLI.run` from
+ * `@prisma-next/cli/migration-cli`; the entrypoint owns config loading
  * and stack assembly, this owns the "lower the instance to disk artifacts"
  * step.
  */

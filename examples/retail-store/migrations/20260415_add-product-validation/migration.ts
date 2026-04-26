@@ -1,4 +1,4 @@
-import { runMigration } from '@prisma-next/cli/migration-runner';
+import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, setValidation } from '@prisma-next/target-mongo/migration';
 
@@ -35,4 +35,4 @@ class AddProductValidation extends Migration {
 }
 
 export default AddProductValidation;
-runMigration(import.meta.url, AddProductValidation);
+MigrationCLI.run(import.meta.url, AddProductValidation);

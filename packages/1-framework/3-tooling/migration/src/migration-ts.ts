@@ -18,7 +18,8 @@ const MIGRATION_TS_FILE = 'migration.ts';
  * directory. If the source begins with a shebang, the file is written with
  * executable permissions (0o755) so it can be run directly via
  * `./migration.ts` — the rendered scaffold ends with
- * `runMigration(import.meta.url, M)` from `@prisma-next/cli/migration-runner`,
+ * `MigrationCLI.run(import.meta.url, M)` from
+ * `@prisma-next/cli/migration-cli` (re-exported by the postgres facade),
  * which guards on the entrypoint and serializes when the file is the main
  * module.
  *

@@ -15,16 +15,19 @@ export interface RenderMigrationMeta {
  * - `Migration` from `@prisma-next/family-mongo/migration` — the
  *   user-facing Mongo `Migration` base; subclasses don't need to
  *   redeclare `targetId` or thread family/target generics.
- * - `runMigration` from `@prisma-next/cli/migration-runner` — the
- *   entrypoint orchestrator that loads `prisma-next.config.ts`, assembles
- *   a `ControlStack`, and instantiates the migration class. The migration
- *   file owns this dependency directly: pulling CLI machinery in at
- *   script run time is acceptable because the script's whole purpose is
- *   to be invoked from the project that owns the config.
+ * - `MigrationCLI` from `@prisma-next/cli/migration-cli` — the
+ *   migration-file CLI entrypoint that loads `prisma-next.config.ts`,
+ *   assembles a `ControlStack`, and instantiates the migration class.
+ *   The migration file owns this dependency directly: pulling CLI
+ *   machinery in at script run time is acceptable because the script's
+ *   whole purpose is to be invoked from the project that owns the
+ *   config. (Mirrors the postgres facade pattern; pulling `MigrationCLI`
+ *   into `@prisma-next/family-mongo/migration` so a Mongo migration only
+ *   needs one import is tracked separately as a follow-up.)
  */
 const BASE_IMPORTS: readonly ImportRequirement[] = [
   { moduleSpecifier: '@prisma-next/family-mongo/migration', symbol: 'Migration' },
-  { moduleSpecifier: '@prisma-next/cli/migration-runner', symbol: 'runMigration' },
+  { moduleSpecifier: '@prisma-next/cli/migration-cli', symbol: 'MigrationCLI' },
 ];
 
 /**
@@ -40,9 +43,9 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
  * `renderTypeScript()` expression and declares its own
  * `importRequirements()`. The top-level renderer aggregates imports
  * across all nodes and emits one `import { … } from "…"` line per module.
- * The `Migration` and `runMigration` imports are always emitted — they're
+ * The `Migration` and `MigrationCLI` imports are always emitted — they're
  * structural to the rendered scaffold (extends `Migration`, calls
- * `runMigration`), not driven by any node.
+ * `MigrationCLI.run`), not driven by any node.
  */
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<OpFactoryCall>,
@@ -65,7 +68,7 @@ export function renderCallsToTypeScript(
     '}',
     '',
     'export default M;',
-    'runMigration(import.meta.url, M);',
+    'MigrationCLI.run(import.meta.url, M);',
     '',
   ].join('\n');
 }

@@ -1,10 +1,9 @@
 #!/usr/bin/env -S node
-import { runMigration } from '@prisma-next/cli/migration-runner';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import postgres from '@prisma-next/postgres/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
-import { Migration, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI, setNotNull } from '@prisma-next/target-postgres/migration';
 import type { Contract } from './end-contract';
 import endContractJson from './end-contract.json' with { type: 'json' };
 
@@ -37,4 +36,4 @@ export default class M extends Migration {
   }
 }
 
-runMigration(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);

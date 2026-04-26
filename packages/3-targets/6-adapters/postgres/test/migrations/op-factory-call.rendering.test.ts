@@ -343,7 +343,7 @@ describe('renderCallsToTypeScript', () => {
       .split('\n')
       .filter((line) => line.includes("from '@prisma-next/target-postgres/migration';"));
     expect(targetPostgresImports).toEqual([
-      "import { Migration, addColumn, createIndex, createTable, dropTable } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, MigrationCLI, addColumn, createIndex, createTable, dropTable } from '@prisma-next/target-postgres/migration';",
     ]);
     // Each call appears once in the operations body.
     expect(source).toContain('createTable(');
@@ -363,7 +363,7 @@ describe('renderCallsToTypeScript', () => {
     // as `this.dataTransform(...)` so `PostgresMigration` can inject the
     // control adapter.
     expect(source).toContain(
-      "import { Migration, placeholder } from '@prisma-next/target-postgres/migration';",
+      "import { Migration, MigrationCLI, placeholder } from '@prisma-next/target-postgres/migration';",
     );
     expect(source).toContain(
       'import endContract from \'./end-contract.json\' with { type: "json" };',
@@ -383,7 +383,9 @@ describe('renderCallsToTypeScript', () => {
     expect(source).toContain('from: "sha256:a",');
     expect(source).toContain('to: "sha256:b",');
     expect(source).toContain('export default class M extends Migration {');
-    expect(source).toContain("import { runMigration } from '@prisma-next/cli/migration-runner';");
-    expect(source).toContain('runMigration(import.meta.url, M);');
+    expect(source).toContain(
+      "import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';",
+    );
+    expect(source).toContain('MigrationCLI.run(import.meta.url, M);');
   });
 });
