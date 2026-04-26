@@ -87,9 +87,10 @@ export function errorInitInvalidFlagValue(options: {
 
 /**
  * The user cancelled an interactive prompt (Ctrl-C, escape, declined a
- * selection). Distinct from `errorInitReinitNotConfirmed` because no
- * pre-existing project state is implied — this is the generic "user said
- * no" path. Maps to exit code 3 (USER_ABORTED).
+ * selection). Distinct from `errorInitReinitNeedsForce` because that path
+ * applies to non-interactive mode where the user was never given the
+ * choice; this one is the generic "user said no" path. Maps to exit code
+ * 3 (USER_ABORTED).
  */
 export function errorInitUserAborted(): CliStructuredError {
   return new CliStructuredError('5006', 'Init cancelled', {
@@ -114,5 +115,59 @@ export function errorInitStrictProbeWithoutProbe(): CliStructuredError {
     why: '`--strict-probe` only changes how a *failed* probe is reported; without `--probe-db` no probe is attempted in the first place. (`init` is offline-by-default — it never opens a connection to your database without explicit consent.)',
     fix: 'Add `--probe-db` to opt in to the probe, or drop `--strict-probe` if you do not need the version check.',
     docsUrl: 'https://prisma-next.dev/docs/cli/init',
+  });
+}
+
+/**
+ * Dependency installation failed and the pnpm → npm fallback (FR7.2)
+ * either did not apply (pm ≠ pnpm or stderr did not match a recognised
+ * leak) or also failed. Files scaffolded before the install step are
+ * already on disk; `meta.filesWritten` carries the list so a follow-up
+ * agent can resume manually. Maps to exit code `4 = INSTALL_FAILED`.
+ */
+export function errorInitInstallFailed(options: {
+  readonly addCommand: string;
+  readonly addDevCommand: string;
+  readonly emitCommand: string;
+  readonly filesWritten: readonly string[];
+  readonly stderrLines: readonly string[];
+}): CliStructuredError {
+  const trimmed = options.stderrLines.map((s) => s.trim()).filter(Boolean);
+  const why =
+    trimmed.length === 0
+      ? 'The package manager exited with an error and no recoverable fallback applied.'
+      : `The package manager exited with: ${trimmed[0]}`;
+  return new CliStructuredError('5007', 'Failed to install dependencies', {
+    domain: 'CLI',
+    why,
+    fix: `Install manually:\n  ${options.addCommand}\n  ${options.addDevCommand}\nThen run \`${options.emitCommand}\` to emit the contract.`,
+    docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    meta: {
+      filesWritten: options.filesWritten,
+      stderr: trimmed,
+    },
+  });
+}
+
+/**
+ * `prisma-next contract emit` failed after a successful install. Surface
+ * the underlying error so the user can fix it and re-run; files and
+ * dependencies remain on disk untouched. Maps to exit code
+ * `5 = EMIT_FAILED`.
+ */
+export function errorInitEmitFailed(options: {
+  readonly emitCommand: string;
+  readonly filesWritten: readonly string[];
+  readonly cause: string;
+}): CliStructuredError {
+  return new CliStructuredError('5008', 'Failed to emit contract', {
+    domain: 'CLI',
+    why: `\`prisma-next contract emit\` failed: ${options.cause}`,
+    fix: `Inspect your contract file, fix the underlying issue, then re-run \`${options.emitCommand}\`. Pass \`-v\` for the full error envelope.`,
+    docsUrl: 'https://prisma-next.dev/docs/cli/contract-emit',
+    meta: {
+      filesWritten: options.filesWritten,
+      cause: options.cause,
+    },
   });
 }

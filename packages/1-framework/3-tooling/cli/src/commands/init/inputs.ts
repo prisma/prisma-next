@@ -61,29 +61,23 @@ const AUTHORING_VALUES: ReadonlyMap<string, AuthoringId> = new Map([
 ]);
 
 /**
- * Whether `runInit` is allowed to render an interactive prompt. Trusts
- * `flags.interactive`: the action handler is responsible for downgrading
- * the flag to `false` when the environment cannot service prompts (no
- * stdin TTY, etc.). Keeping `canPrompt` flag-only makes input resolution
- * deterministic in tests.
- */
-export function canPrompt(flags: GlobalFlags): boolean {
-  return flags.interactive !== false;
-}
-
-/**
  * Resolves every required input for `runInit`. In interactive mode, missing
  * inputs are prompted via clack; in non-interactive mode, missing required
  * inputs throw a structured error listing exactly which flags are missing
  * (FR1.4). Throws `CliStructuredError` on any unrecoverable input issue.
+ *
+ * `canPrompt` is decoupled from `flags.interactive` so the action handler
+ * (`./index.ts`) owns the merge of stdout-TTY (decoration) and stdin-TTY
+ * (prompts). `flags.interactive` continues to gate `TerminalUI` decoration
+ * — see [Style Guide § Interactivity](../../../../../../../docs/CLI%20Style%20Guide.md#interactivity).
  */
 export async function resolveInitInputs(ctx: {
   readonly baseDir: string;
   readonly options: InitFlagOptions;
   readonly flags: GlobalFlags;
+  readonly canPrompt: boolean;
 }): Promise<ResolvedInitInputs> {
-  const { baseDir, options, flags } = ctx;
-  const interactive = canPrompt(flags);
+  const { baseDir, options, flags, canPrompt } = ctx;
   // `--force` and `--yes` are deliberately separate: `--force` is the
   // contract for "overwrite an existing scaffold" (works in both modes);
   // `--yes` only auto-accepts interactive prompts and never substitutes
@@ -99,7 +93,7 @@ export async function resolveInitInputs(ctx: {
     throw errorInitStrictProbeWithoutProbe();
   }
 
-  const reinit = await resolveReinit({ baseDir, force, interactive, autoAcceptPrompts });
+  const reinit = await resolveReinit({ baseDir, force, canPrompt, autoAcceptPrompts });
   const target = resolveTarget(options.target);
   const authoring = resolveAuthoring(options.authoring);
 
@@ -108,7 +102,7 @@ export async function resolveInitInputs(ctx: {
   if (target === undefined) missing.push('target');
   if (authoring === undefined) missing.push('authoring');
 
-  if (!interactive && missing.length > 0) {
+  if (!canPrompt && missing.length > 0) {
     const reason = process.stdin.isTTY
       ? 'Non-interactive mode is active (`--no-interactive` or stdout is piped).'
       : 'stdin is not a TTY, so `init` cannot prompt interactively.';
@@ -120,8 +114,8 @@ export async function resolveInitInputs(ctx: {
   const finalAuthoring = authoring ?? (await promptAuthoring());
   const finalSchemaPath =
     options.schemaPath !== undefined
-      ? validateSchemaPath(options.schemaPath)
-      : interactive
+      ? validateSchemaPath(options.schemaPath, finalAuthoring)
+      : canPrompt
         ? await promptSchemaPath(finalAuthoring)
         : defaultSchemaPath(finalAuthoring);
 
@@ -140,7 +134,7 @@ export async function resolveInitInputs(ctx: {
 async function resolveReinit(opts: {
   readonly baseDir: string;
   readonly force: boolean;
-  readonly interactive: boolean;
+  readonly canPrompt: boolean;
   readonly autoAcceptPrompts: boolean;
 }): Promise<boolean> {
   const configPath = join(opts.baseDir, 'prisma-next.config.ts');
@@ -150,7 +144,7 @@ async function resolveReinit(opts: {
   if (opts.force) {
     return true;
   }
-  if (!opts.interactive) {
+  if (!opts.canPrompt) {
     throw errorInitReinitNeedsForce();
   }
   // In interactive mode, `--yes` auto-accepts the re-init confirm.
@@ -195,7 +189,14 @@ function resolveAuthoring(value: string | undefined): AuthoringId | undefined {
   return mapped;
 }
 
-function validateSchemaPath(value: string): string {
+/**
+ * Validates `--schema-path` against the chosen `--authoring` style: PSL
+ * authoring requires a `.prisma` file and TypeScript authoring requires a
+ * `.ts` file. Mismatched combinations would silently scaffold PSL content
+ * into a `.ts` file (or vice versa); this validator surfaces the mistake
+ * as a precondition error naming both flags.
+ */
+function validateSchemaPath(value: string, authoring: AuthoringId): string {
   const trimmed = value.trim();
   if (trimmed.length === 0) {
     throw errorInitInvalidFlagValue({
@@ -211,11 +212,13 @@ function validateSchemaPath(value: string): string {
       allowed: ['<file path, not a directory>'],
     });
   }
-  if (!extname(trimmed)) {
+  const ext = extname(trimmed).toLowerCase();
+  const expected = authoring === 'typescript' ? '.ts' : '.prisma';
+  if (ext !== expected) {
     throw errorInitInvalidFlagValue({
       flag: 'schema-path',
       value,
-      allowed: ['<file path with .prisma or .ts extension>'],
+      allowed: [`<file path ending in ${expected} for --authoring ${authoring}>`],
     });
   }
   return normalize(trimmed);

@@ -67,6 +67,10 @@
       "types": "./dist/exports/config-types.d.mts",
       "import": "./dist/exports/config-types.mjs"
     },
+    "./init-output": {
+      "types": "./dist/exports/init-output.d.mts",
+      "import": "./dist/exports/init-output.mjs"
+    },
     "./commands/db-init": {
       "types": "./dist/commands/db-init.d.mts",
       "import": "./dist/commands/db-init.mjs"
