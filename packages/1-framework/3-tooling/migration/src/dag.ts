@@ -35,7 +35,7 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
   const nodes = new Set<string>();
   const forwardChain = new Map<string, MigrationChainEntry[]>();
   const reverseChain = new Map<string, MigrationChainEntry[]>();
-  const migrationById = new Map<string, MigrationChainEntry>();
+  const migrationByHash = new Map<string, MigrationChainEntry>();
 
   for (const pkg of packages) {
     const { from, to } = pkg.metadata;
@@ -56,16 +56,16 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
       labels: pkg.metadata.labels,
     };
 
-    if (migrationById.has(migration.migrationHash)) {
+    if (migrationByHash.has(migration.migrationHash)) {
       throw errorDuplicateMigrationHash(migration.migrationHash);
     }
-    migrationById.set(migration.migrationHash, migration);
+    migrationByHash.set(migration.migrationHash, migration);
 
     appendEdge(forwardChain, from, migration);
     appendEdge(reverseChain, to, migration);
   }
 
-  return { nodes, forwardChain, reverseChain, migrationById };
+  return { nodes, forwardChain, reverseChain, migrationByHash };
 }
 
 // ---------------------------------------------------------------------------

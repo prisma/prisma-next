@@ -74,7 +74,7 @@ describe('reconstructGraph', () => {
   it('indexes migrations by their hash', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    expect(graph.migrationById.size).toBe(2);
+    expect(graph.migrationByHash.size).toBe(2);
   });
 
   it('rejects same source and target with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
@@ -293,7 +293,7 @@ describe('detectCycles', () => {
     const nodes = new Set<string>();
     const forwardChain = new Map<string, MigrationChainEntry[]>();
     const reverseChain = new Map<string, MigrationChainEntry[]>();
-    const migrationById = new Map<string, MigrationChainEntry>();
+    const migrationByHash = new Map<string, MigrationChainEntry>();
     let prev: string = E;
     for (let i = 0; i < length; i++) {
       const next = `h:${i}`;
@@ -313,10 +313,10 @@ describe('detectCycles', () => {
       const rev = reverseChain.get(next);
       if (rev) rev.push(entry);
       else reverseChain.set(next, [entry]);
-      migrationById.set(entry.migrationHash, entry);
+      migrationByHash.set(entry.migrationHash, entry);
       prev = next;
     }
-    const graph = { nodes, forwardChain, reverseChain, migrationById };
+    const graph = { nodes, forwardChain, reverseChain, migrationByHash };
     expect(() => detectCycles(graph)).not.toThrow();
     expect(detectCycles(graph)).toEqual([]);
   });
