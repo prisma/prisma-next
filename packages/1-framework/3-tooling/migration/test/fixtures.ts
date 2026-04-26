@@ -1,26 +1,31 @@
 import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '../src/attestation';
+import { computeMigrationHash } from '../src/hash';
 import { writeMigrationPackage } from '../src/io';
-import type { MigrationBundle, MigrationManifest, MigrationOps } from '../src/types';
+import {
+  type MigrationMetadata,
+  type MigrationMetadataWire,
+  metadataToWire,
+} from '../src/metadata';
+import type { MigrationOps, MigrationPackage } from '../src/package';
 
 export function createTestContract(overrides: Partial<Contract> = {}): Contract {
   return createContract(overrides);
 }
 
 /**
- * Build a fully-attested test manifest. By default the `migrationId` is
- * computed over `(manifest, [])` so the bundle is internally consistent
- * for `verifyMigrationBundle`. Pass `ops` when the test cares about
+ * Build fully-attested test metadata. By default the `migrationHash` is
+ * computed over `(metadata, [])` so the package is internally consistent
+ * for `verifyMigrationHash`. Pass `ops` when the test cares about
  * matching a specific op list.
  */
-export function createTestManifest(
-  overrides: Partial<MigrationManifest> = {},
+export function createTestMetadata(
+  overrides: Partial<MigrationMetadata> = {},
   ops: MigrationOps = [],
-): MigrationManifest {
+): MigrationMetadata {
   const toContract = overrides.toContract ?? createTestContract();
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: 'sha256:empty',
     to: 'sha256:abc123',
     kind: 'regular',
@@ -36,31 +41,38 @@ export function createTestManifest(
     ...overrides,
   };
   return {
-    ...baseManifest,
-    migrationId: overrides.migrationId ?? computeMigrationId(baseManifest, ops),
+    ...baseMetadata,
+    migrationHash: overrides.migrationHash ?? computeMigrationHash(baseMetadata, ops),
   };
 }
 
 /**
- * Backwards-compatible alias for tests written before the draft state was
- * collapsed. Manifests are now always attested, so this is the same as
- * `createTestManifest`.
+ * Build an attested test record in its on-disk wire shape — useful for tests
+ * that bypass `writeMigrationPackage` and write `migration.json` directly,
+ * but still need a structurally-valid file. The wire shape uses the legacy
+ * field name `migrationId`; Phase 5 of TML-2264 collapses this back to a
+ * single shape.
  */
-export const createAttestedManifest = createTestManifest;
+export function createTestWireMetadata(
+  overrides: Partial<MigrationMetadata> = {},
+  ops: MigrationOps = [],
+): MigrationMetadataWire {
+  return metadataToWire(createTestMetadata(overrides, ops));
+}
 
 /**
- * Build an attested test bundle (manifest + ops + dir metadata) with a
- * `migrationId` computed over the supplied ops.
+ * Build an attested test package (metadata + ops + dir info) with a
+ * `migrationHash` computed over the supplied ops.
  */
-export function createAttestedBundle(
+export function createAttestedPackage(
   dirName: string,
-  manifestOverrides: Partial<MigrationManifest> = {},
+  metadataOverrides: Partial<MigrationMetadata> = {},
   ops: MigrationOps = createTestOps(),
-): MigrationBundle {
+): MigrationPackage {
   return {
     dirName,
     dirPath: `/tmp/migrations/${dirName}`,
-    manifest: createTestManifest(manifestOverrides, ops),
+    metadata: createTestMetadata(metadataOverrides, ops),
     ops,
   };
 }
@@ -77,9 +89,9 @@ export function createTestOps(): readonly MigrationPlanOperation[] {
 
 /**
  * Canonical helper for writing a test migration package to disk. Always
- * produces a *consistent* (attested) package: the `migrationId` is computed
- * over the exact `ops` passed to the writer, so the resulting package
- * round-trips through `readMigrationPackage`'s integrity check.
+ * produces a *consistent* (attested) package: the `migrationHash` is
+ * computed over the exact `ops` passed to the writer, so the resulting
+ * package round-trips through `readMigrationPackage`'s integrity check.
  *
  * Tampering tests use this same helper and then surgically overwrite the
  * offending file post-hoc (e.g. `fs.writeFile(join(dir, 'ops.json'), ...)`).
@@ -90,10 +102,10 @@ export function createTestOps(): readonly MigrationPlanOperation[] {
  */
 export async function writeTestPackage(
   dir: string,
-  manifestOverrides: Partial<MigrationManifest> = {},
+  metadataOverrides: Partial<MigrationMetadata> = {},
   ops: MigrationOps = createTestOps(),
-): Promise<{ manifest: MigrationManifest; ops: MigrationOps }> {
-  const manifest = createTestManifest(manifestOverrides, ops);
-  await writeMigrationPackage(dir, manifest, ops);
-  return { manifest, ops };
+): Promise<{ metadata: MigrationMetadata; ops: MigrationOps }> {
+  const metadata = createTestMetadata(metadataOverrides, ops);
+  await writeMigrationPackage(dir, metadata, ops);
+  return { metadata, ops };
 }

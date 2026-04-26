@@ -3,8 +3,9 @@ import type { ControlTargetDescriptor } from '@prisma-next/framework-components/
 import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
 import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type { MigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -111,7 +112,7 @@ export interface PathDecisionResult {
   readonly refName?: string;
   readonly selectedPath: readonly {
     readonly dirName: string;
-    readonly migrationId: string;
+    readonly migrationHash: string;
     readonly from: string;
     readonly to: string;
   }[];
@@ -129,7 +130,7 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
     ...ifDefined('refName', decision.refName),
     selectedPath: decision.selectedPath.map((entry) => ({
       dirName: entry.dirName,
-      migrationId: entry.migrationId,
+      migrationHash: entry.migrationHash,
       from: entry.from,
       to: entry.to,
     })),
@@ -146,13 +147,13 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
 
 /**
  * Reads the migrations directory and builds the migration graph from all
- * bundles. Throws on I/O or graph errors — callers handle error mapping.
+ * packages. Throws on I/O or graph errors — callers handle error mapping.
  *
- * Every on-disk bundle is content-addressed (`migrationId` is always a
+ * Every on-disk package is content-addressed (`migrationHash` is always a
  * string); there is no draft state to filter out.
  */
 export async function loadMigrationBundles(migrationsDir: string): Promise<{
-  bundles: readonly MigrationBundle[];
+  bundles: readonly MigrationPackage[];
   graph: MigrationGraph;
 }> {
   const bundles = await readMigrationsDir(migrationsDir);
@@ -161,7 +162,7 @@ export async function loadMigrationBundles(migrationsDir: string): Promise<{
 }
 
 export interface MigrationBundleSet {
-  readonly bundles: readonly MigrationBundle[];
+  readonly bundles: readonly MigrationPackage[];
   readonly graph: MigrationGraph;
 }
 

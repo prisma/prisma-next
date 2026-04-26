@@ -2,9 +2,9 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import stripAnsi from 'strip-ansi';
@@ -12,7 +12,7 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 /**
- * End-to-end coverage for the `MIGRATION.BUNDLE_CORRUPT` diagnostic. Each
+ * End-to-end coverage for the `MIGRATION.HASH_MISMATCH` diagnostic. Each
  * tamper case lays down a valid migration package, surgically corrupts
  * `ops.json` after attestation, drives a real CLI command, and captures
  * the rendered diagnostic. T3.5 then asserts that all four commands
@@ -71,15 +71,15 @@ interface CliErrorEnvelope {
 
 async function writeTestPackage(
   dir: string,
-  manifestBase: Omit<MigrationManifest, 'migrationId'>,
+  metadataBase: Omit<MigrationMetadata, 'migrationHash'>,
   ops: readonly MigrationPlanOperation[],
-): Promise<MigrationManifest> {
-  const manifest: MigrationManifest = {
-    ...manifestBase,
-    migrationId: computeMigrationId(manifestBase, ops),
+): Promise<MigrationMetadata> {
+  const metadata: MigrationMetadata = {
+    ...metadataBase,
+    migrationHash: computeMigrationHash(metadataBase, ops),
   };
-  await writeMigrationPackage(dir, manifest, ops);
-  return manifest;
+  await writeMigrationPackage(dir, metadata, ops);
+  return metadata;
 }
 
 function setupConfigMock(): void {
@@ -134,10 +134,10 @@ async function setupTamperFixture(): Promise<TamperFixture> {
     ORIGINAL_OPS,
   );
 
-  // Tamper: append a synthetic op to ops.json after attestation. The manifest's
-  // stored migrationId now disagrees with the recomputed hash over the new op
+  // Tamper: append a synthetic op to ops.json after attestation. The metadata's
+  // stored migrationHash now disagrees with the recomputed hash over the new op
   // list, which is exactly the failure mode `readMigrationPackage` flags via
-  // `errorBundleCorrupt`.
+  // `errorMigrationHashMismatch`.
   await writeFile(join(packageDir, 'ops.json'), JSON.stringify(TAMPERED_OPS, null, 2));
 
   // contract.json at the default location so commands that read the contract
@@ -253,7 +253,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   });
 
   it(
-    'migration apply surfaces MIGRATION.BUNDLE_CORRUPT before connecting (T3.1)',
+    'migration apply surfaces MIGRATION.HASH_MISMATCH before connecting (T3.1)',
     async () => {
       const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
       const fixture = await setupTamperFixture();
@@ -269,7 +269,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
       );
 
       expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
       expect(captured.humanText).toContain('Migration package is corrupt');
 
       diagnostics.push(captured);
@@ -278,7 +278,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   );
 
   it(
-    'migration plan surfaces MIGRATION.BUNDLE_CORRUPT before planning work (T3.2)',
+    'migration plan surfaces MIGRATION.HASH_MISMATCH before planning work (T3.2)',
     async () => {
       const { createMigrationPlanCommand } = await import('../../src/commands/migration-plan');
       const fixture = await setupTamperFixture();
@@ -294,7 +294,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
       );
 
       expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
       expect(captured.humanText).toContain('Migration package is corrupt');
 
       diagnostics.push(captured);
@@ -303,7 +303,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   );
 
   it(
-    'migration status surfaces MIGRATION.BUNDLE_CORRUPT (T3.3)',
+    'migration status surfaces MIGRATION.HASH_MISMATCH (T3.3)',
     async () => {
       const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
       const fixture = await setupTamperFixture();
@@ -319,7 +319,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
       );
 
       expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
       expect(captured.humanText).toContain('Migration package is corrupt');
 
       diagnostics.push(captured);
@@ -328,7 +328,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   );
 
   it(
-    'migration show surfaces MIGRATION.BUNDLE_CORRUPT via readMigrationPackage (T3.4)',
+    'migration show surfaces MIGRATION.HASH_MISMATCH via readMigrationPackage (T3.4)',
     async () => {
       // `migration show` calls `readMigrationPackage` directly when given an
       // explicit path argument, exercising the integrity check on the
@@ -342,8 +342,9 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
 
       // Pass a cwd-relative path so the rendered "where" matches the form
       // used by readMigrationsDir-driven commands (apply/plan/status). Both
-      // paths reach the same `errorBundleCorrupt(dir, ...)` site; the only
-      // observable difference would be how the `dir` argument was resolved.
+      // paths reach the same `errorMigrationHashMismatch(dir, ...)` site;
+      // the only observable difference would be how the `dir` argument was
+      // resolved.
       const captured = await captureDiagnostic(
         () => executeCommand(createMigrationShowCommand(), [fixture.relativePackageDir, '--json']),
         () =>
@@ -358,7 +359,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
       );
 
       expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
       expect(captured.humanText).toContain('Migration package is corrupt');
 
       diagnostics.push(captured);
@@ -367,7 +368,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   );
 
   it(
-    'migration new surfaces MIGRATION.BUNDLE_CORRUPT for the existing on-disk migration (T3.8)',
+    'migration new surfaces MIGRATION.HASH_MISMATCH for the existing on-disk migration (T3.8)',
     async () => {
       // `migration new` calls `readMigrationsDir` to compute the `from`
       // reference for the new migration. When an existing on-disk
@@ -392,7 +393,7 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
       );
 
       expect(captured.exitCode).not.toBe(0);
-      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.HASH_MISMATCH');
       expect(captured.humanText).toContain('Migration package is corrupt');
 
       diagnostics.push(captured);

@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest';
-import { computeMigrationId } from '../src/attestation';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
 import {
   detectCycles,
@@ -12,8 +11,10 @@ import {
   reconstructGraph,
 } from '../src/dag';
 import { MigrationToolsError } from '../src/errors';
-import type { MigrationBundle, MigrationChainEntry } from '../src/types';
-import { createAttestedManifest, createTestOps } from './fixtures';
+import type { MigrationChainEntry } from '../src/graph';
+import { computeMigrationHash } from '../src/hash';
+import type { MigrationPackage } from '../src/package';
+import { createTestMetadata, createTestOps } from './fixtures';
 
 let migrationCounter = 0;
 
@@ -23,22 +24,22 @@ function pkg(
   dirName: string,
   createdAt = '2026-02-25T14:00:00.000Z',
   labels: readonly string[] = [],
-): MigrationBundle {
-  const manifest = createAttestedManifest({ from, to, createdAt, labels });
+): MigrationPackage {
+  const metadata = createTestMetadata({ from, to, createdAt, labels });
   const ops = createTestOps();
-  const migrationId = computeMigrationId(
-    { ...manifest, createdAt: `${createdAt}-${migrationCounter++}` },
+  const migrationHash = computeMigrationHash(
+    { ...metadata, createdAt: `${createdAt}-${migrationCounter++}` },
     ops,
   );
   return {
     dirName,
     dirPath: `/migrations/${dirName}`,
-    manifest: { ...manifest, migrationId },
+    metadata: { ...metadata, migrationHash },
     ops,
   };
 }
 
-function chain(...specs: Array<[string, string, string]>): MigrationBundle[] {
+function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
   return specs.map(([from, to, dirName]) => pkg(from!, to!, dirName!));
 }
 
@@ -70,7 +71,7 @@ describe('reconstructGraph', () => {
     expect(graph.forwardChain.get('H2')).toHaveLength(1);
   });
 
-  it('builds migrationById index', () => {
+  it('indexes migrations by their hash', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
     expect(graph.migrationById.size).toBe(2);
@@ -91,18 +92,18 @@ describe('reconstructGraph', () => {
     }
   });
 
-  it('rejects duplicate migrationId values', () => {
+  it('rejects duplicate migrationHash values', () => {
     const first = pkg(E, 'H1', 'm1');
     const secondBase = pkg('H1', 'H2', 'm2');
     const second = {
       ...secondBase,
-      manifest: {
-        ...secondBase.manifest,
-        migrationId: first.manifest.migrationId,
+      metadata: {
+        ...secondBase.metadata,
+        migrationHash: first.metadata.migrationHash,
       },
     };
 
-    expect(() => reconstructGraph([first, second])).toThrow('Duplicate migrationId');
+    expect(() => reconstructGraph([first, second])).toThrow('Duplicate migrationHash');
   });
 });
 
@@ -277,7 +278,7 @@ describe('detectCycles', () => {
   });
 
   it('detects cycle in node graph', () => {
-    const packages: MigrationBundle[] = [
+    const packages: MigrationPackage[] = [
       pkg('A', 'B', 'm1'),
       pkg('B', 'C', 'm2'),
       pkg('C', 'A', 'm3'),
@@ -301,7 +302,7 @@ describe('detectCycles', () => {
       const entry: MigrationChainEntry = {
         from: prev,
         to: next,
-        migrationId: `mid:${i}`,
+        migrationHash: `mid:${i}`,
         dirName: `m${i}`,
         createdAt: new Date(i * 1000).toISOString(),
         labels: [],
@@ -312,7 +313,7 @@ describe('detectCycles', () => {
       const rev = reverseChain.get(next);
       if (rev) rev.push(entry);
       else reverseChain.set(next, [entry]);
-      migrationById.set(entry.migrationId, entry);
+      migrationById.set(entry.migrationHash, entry);
       prev = next;
     }
     const graph = { nodes, forwardChain, reverseChain, migrationById };

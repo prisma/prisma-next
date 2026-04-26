@@ -1,7 +1,7 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type { MigrationBundle } from '@prisma-next/migration-tools/types';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -31,7 +31,7 @@ export interface MigrationShowResult {
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string;
+  readonly migrationHash: string;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -48,11 +48,11 @@ function looksLikePath(target: string): boolean {
 }
 
 export function resolveByHashPrefix(
-  packages: readonly MigrationBundle[],
+  packages: readonly MigrationPackage[],
   prefix: string,
-): Result<MigrationBundle, CliStructuredError> {
+): Result<MigrationPackage, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
-  const matches = packages.filter((p) => p.manifest.migrationId.startsWith(normalizedPrefix));
+  const matches = packages.filter((p) => p.metadata.migrationHash.startsWith(normalizedPrefix));
 
   if (matches.length === 1) {
     return ok(matches[0]!);
@@ -61,13 +61,13 @@ export function resolveByHashPrefix(
   if (matches.length === 0) {
     return notOk(
       errorRuntime('No migration found matching prefix', {
-        why: `No migration has a migrationId starting with "${normalizedPrefix}"`,
+        why: `No migration has a migrationHash starting with "${normalizedPrefix}"`,
         fix: 'Run `prisma-next migration show` (no argument) to see the latest migration, or check the migrations directory for available packages.',
       }),
     );
   }
 
-  const candidates = matches.map((p) => `  ${p.dirName}  ${p.manifest.migrationId}`).join('\n');
+  const candidates = matches.map((p) => `  ${p.dirName}  ${p.metadata.migrationHash}`).join('\n');
   return notOk(
     errorRuntime('Ambiguous hash prefix', {
       why: `Multiple migrations match prefix "${normalizedPrefix}":\n${candidates}`,
@@ -110,7 +110,7 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  let pkg: MigrationBundle;
+  let pkg: MigrationPackage;
 
   try {
     if (target && looksLikePath(target)) {
@@ -142,7 +142,7 @@ async function executeMigrationShowCommand(
           );
         }
         const leafPkg = allPackages.find(
-          (p) => p.manifest.migrationId === latestMigration.migrationId,
+          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
         );
         if (!leafPkg) {
           return notOk(
@@ -179,11 +179,11 @@ async function executeMigrationShowCommand(
     ok: true,
     dirName: pkg.dirName,
     dirPath: relative(process.cwd(), pkg.dirPath),
-    from: pkg.manifest.from,
-    to: pkg.manifest.to,
-    migrationId: pkg.manifest.migrationId,
-    kind: pkg.manifest.kind,
-    createdAt: pkg.manifest.createdAt,
+    from: pkg.metadata.from,
+    to: pkg.metadata.to,
+    migrationHash: pkg.metadata.migrationHash,
+    kind: pkg.metadata.kind,
+    createdAt: pkg.metadata.createdAt,
     operations: ops.map((op) => ({
       id: op.id,
       label: op.label,
@@ -209,10 +209,7 @@ export function createMigrationShowCommand(): Command {
     'prisma-next migration show sha256:a1b2c3',
   ]);
   addGlobalOptions(command)
-    .argument(
-      '[target]',
-      'Migration directory path or migrationId hash prefix (defaults to latest)',
-    )
+    .argument('[target]', 'Migration directory path or migrationHash prefix (defaults to latest)')
     .option('--config <path>', 'Path to prisma-next.config.ts')
     .action(async (target: string | undefined, options: MigrationShowOptions) => {
       const flags = parseGlobalFlags(options);

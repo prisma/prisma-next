@@ -4,9 +4,10 @@ import { relative } from 'pathe';
  * Structured error for migration tooling operations.
  *
  * Follows the NAMESPACE.SUBCODE convention from ADR 027. All codes live under
- * the MIGRATION namespace. These are tooling-time errors (file I/O, attestation,
- * migration history reconstruction), distinct from the runtime MIGRATION.* codes for apply-time
- * failures (PRECHECK_FAILED, POSTCHECK_FAILED, etc.).
+ * the MIGRATION namespace. These are tooling-time errors (file I/O, hash
+ * verification, migration history reconstruction), distinct from the runtime
+ * MIGRATION.* codes for apply-time failures (PRECHECK_FAILED, POSTCHECK_FAILED,
+ * etc.).
  *
  * Fields:
  * - code:     Stable machine-readable code (MIGRATION.SUBCODE)
@@ -72,8 +73,8 @@ export function errorInvalidJson(filePath: string, parseError: string): Migratio
 
 export function errorInvalidManifest(filePath: string, reason: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_MANIFEST', 'Invalid migration manifest', {
-    why: `Manifest at "${filePath}" is invalid: ${reason}`,
-    fix: 'Ensure the manifest has all required fields (from, to, kind, toContract). If corrupt, delete and re-plan.',
+    why: `Migration manifest at "${filePath}" is invalid: ${reason}`,
+    fix: 'Ensure migration.json has all required fields (from, to, kind, toContract). If corrupt, delete and re-plan.',
     details: { filePath, reason },
   });
 }
@@ -177,30 +178,30 @@ export function errorInvalidRefValue(value: string): MigrationToolsError {
   });
 }
 
-export function errorDuplicateMigrationId(migrationId: string): MigrationToolsError {
+export function errorDuplicateMigrationHash(migrationHash: string): MigrationToolsError {
   return new MigrationToolsError(
-    'MIGRATION.DUPLICATE_MIGRATION_ID',
-    'Duplicate migrationId in migration graph',
+    'MIGRATION.DUPLICATE_MIGRATION_HASH',
+    'Duplicate migrationHash in migration graph',
     {
-      why: `Multiple migrations share migrationId "${migrationId}". Each migration must have a unique content-addressed identity.`,
-      fix: 'Regenerate one of the conflicting migrations so each migrationId is unique, then re-run migration commands.',
-      details: { migrationId },
+      why: `Multiple migrations share migrationHash "${migrationHash}". Each migration must have a unique content-addressed identity.`,
+      fix: 'Regenerate one of the conflicting migrations so each migrationHash is unique, then re-run migration commands.',
+      details: { migrationHash },
     },
   );
 }
 
-export function errorBundleCorrupt(
+export function errorMigrationHashMismatch(
   dir: string,
-  storedMigrationId: string,
-  computedMigrationId: string,
+  storedHash: string,
+  computedHash: string,
 ): MigrationToolsError {
   // Render a cwd-relative path in the human-readable diagnostic so users
   // running CLI commands from the project root see a familiar short path.
   // Keep the absolute path in `details.dir` for machine consumers.
   const relativeDir = relative(process.cwd(), dir);
-  return new MigrationToolsError('MIGRATION.BUNDLE_CORRUPT', 'Migration package is corrupt', {
-    why: `Stored migrationId "${storedMigrationId}" does not match the recomputed hash "${computedMigrationId}" for "${relativeDir}". The migration.json or ops.json has been edited or partially written since emit.`,
+  return new MigrationToolsError('MIGRATION.HASH_MISMATCH', 'Migration package is corrupt', {
+    why: `Stored migrationHash "${storedHash}" does not match the recomputed hash "${computedHash}" for "${relativeDir}". The migration.json or ops.json has been edited or partially written since emit.`,
     fix: `Re-emit the package by running \`node "${relativeDir}/migration.ts"\`, or restore the directory from version control.`,
-    details: { dir, storedMigrationId, computedMigrationId },
+    details: { dir, storedHash, computedHash },
   });
 }

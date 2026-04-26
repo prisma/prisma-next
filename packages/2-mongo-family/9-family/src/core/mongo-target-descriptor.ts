@@ -23,7 +23,7 @@ import type { MongoControlFamilyInstance } from './control-instance';
  * itself back to such a file; `MongoMigrationPlanner.emptyMigration()`
  * returns the same shape for `migration new`. Users run the scaffolded
  * `migration.ts` directly (via `node migration.ts`) to self-emit
- * `ops.json` and attest the `migrationId`.
+ * `ops.json` and attest the `migrationHash`.
  */
 export const mongoTargetDescriptor: MigratableTargetDescriptor<
   'mongo',

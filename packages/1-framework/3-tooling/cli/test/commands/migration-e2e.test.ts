@@ -3,29 +3,29 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
-function attestedManifest(
-  base: Omit<MigrationManifest, 'migrationId'>,
+function attestedMetadata(
+  base: Omit<MigrationMetadata, 'migrationHash'>,
   ops: readonly MigrationPlanOperation[],
-): MigrationManifest {
-  return { ...base, migrationId: computeMigrationId(base, ops) };
+): MigrationMetadata {
+  return { ...base, migrationHash: computeMigrationHash(base, ops) };
 }
 
 /**
  * Canonical helper for writing a test migration package to disk. Always
- * produces a *consistent* (attested) package: the `migrationId` is computed
+ * produces a *consistent* (attested) package: the `migrationHash` is computed
  * over the exact `ops` passed to the writer, so the resulting package
  * round-trips through `readMigrationPackage`'s integrity check.
  *
@@ -37,12 +37,12 @@ function attestedManifest(
  */
 async function writeTestPackage(
   dir: string,
-  base: Omit<MigrationManifest, 'migrationId'>,
+  base: Omit<MigrationMetadata, 'migrationHash'>,
   ops: readonly MigrationPlanOperation[],
-): Promise<MigrationManifest> {
-  const manifest = attestedManifest(base, ops);
-  await writeMigrationPackage(dir, manifest, ops);
-  return manifest;
+): Promise<MigrationMetadata> {
+  const metadata = attestedMetadata(base, ops);
+  await writeMigrationPackage(dir, metadata, ops);
+  return metadata;
 }
 
 function createTableOp(table: string): MigrationPlanOperation {
@@ -94,7 +94,7 @@ describe('migration plan → emit end-to-end', () => {
 
       const dirName = formatMigrationDirName(new Date(), 'initial');
       const packageDir = join(migrationsDir, dirName);
-      const manifest = await writeTestPackage(
+      const metadata = await writeTestPackage(
         packageDir,
         {
           from: EMPTY_CONTRACT_HASH,
@@ -114,11 +114,11 @@ describe('migration plan → emit end-to-end', () => {
       );
 
       const pkg = await readMigrationPackage(packageDir);
-      expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
-      expect(pkg.manifest.to).toBe('sha256:initial-hash');
-      expect(pkg.manifest.migrationId).toBe(manifest.migrationId);
-      expect(pkg.manifest.fromContract).toBeNull();
-      expect(pkg.manifest.toContract).toEqual(toContract);
+      expect(pkg.metadata.from).toBe(EMPTY_CONTRACT_HASH);
+      expect(pkg.metadata.to).toBe('sha256:initial-hash');
+      expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
+      expect(pkg.metadata.fromContract).toBeNull();
+      expect(pkg.metadata.toContract).toEqual(toContract);
       expect(pkg.ops).toHaveLength(1);
     });
   });
@@ -206,9 +206,9 @@ describe('migration plan → emit end-to-end', () => {
         expect(leaf).toBe('sha256:hash-b');
 
         // Verify chain integrity
-        const pkg1 = packages.find((p) => p.manifest.to === 'sha256:hash-a')!;
-        const pkg2 = packages.find((p) => p.manifest.to === 'sha256:hash-b')!;
-        expect(pkg1.manifest.to).toBe(pkg2.manifest.from);
+        const pkg1 = packages.find((p) => p.metadata.to === 'sha256:hash-a')!;
+        const pkg2 = packages.find((p) => p.metadata.to === 'sha256:hash-b')!;
+        expect(pkg1.metadata.to).toBe(pkg2.metadata.from);
       });
     },
     timeouts.databaseOperation,
@@ -269,11 +269,13 @@ describe('migration plan → emit end-to-end', () => {
     // Pre-collapse migrations could have `migrationId: null` on disk; the
     // schema now refuses them. The matching `MIGRATION.INVALID_MANIFEST`
     // surfaces the exact file so users know which directory to re-emit.
+    // (The on-disk wire shape still uses `migrationId`; Phase 5 of TML-2264
+    // collapses it back to a single in-memory shape.)
     await withTempDir(async (root) => {
       const dirName = formatMigrationDirName(new Date(), 'legacy-draft');
       const packageDir = join(root, dirName);
       await mkdir(packageDir, { recursive: true });
-      const legacyManifest = {
+      const legacyWireMetadata = {
         from: EMPTY_CONTRACT_HASH,
         to: EMPTY_CONTRACT_HASH,
         migrationId: null,
@@ -284,7 +286,7 @@ describe('migration plan → emit end-to-end', () => {
         labels: [],
         createdAt: new Date().toISOString(),
       };
-      await writeFile(join(packageDir, 'migration.json'), JSON.stringify(legacyManifest));
+      await writeFile(join(packageDir, 'migration.json'), JSON.stringify(legacyWireMetadata));
       await writeFile(join(packageDir, 'ops.json'), '[]');
 
       await expect(readMigrationPackage(packageDir)).rejects.toMatchObject({

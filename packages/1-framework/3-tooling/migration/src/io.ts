@@ -1,17 +1,23 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
-import { verifyMigrationBundle } from './attestation';
 import {
-  errorBundleCorrupt,
   errorDirectoryExists,
   errorInvalidDestName,
   errorInvalidJson,
   errorInvalidManifest,
   errorInvalidSlug,
+  errorMigrationHashMismatch,
   errorMissingFile,
 } from './errors';
-import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
+import { verifyMigrationHash } from './hash';
+import {
+  type MigrationMetadata,
+  type MigrationMetadataWire,
+  metadataFromWire,
+  metadataToWire,
+} from './metadata';
+import type { MigrationOps, MigrationPackage } from './package';
 
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
@@ -27,7 +33,12 @@ const MigrationHintsSchema = type({
   plannerVersion: 'string',
 });
 
-const MigrationManifestSchema = type({
+// Wire-format schema for migration.json. The on-disk JSON still uses the
+// `migrationId` field name; the in-memory `MigrationMetadata` type uses
+// `migrationHash`. Phase 4 of TML-2264 bridges the two with translator
+// helpers in `metadata.ts`; Phase 5's wire-format codemod renames this
+// field on disk and collapses the translation.
+const MigrationMetadataWireSchema = type({
   from: 'string',
   to: 'string',
   migrationId: 'string',
@@ -58,7 +69,7 @@ const MigrationOpsSchema = MigrationOpSchema.array();
 
 export async function writeMigrationPackage(
   dir: string,
-  manifest: MigrationManifest,
+  metadata: MigrationMetadata,
   ops: MigrationOps,
 ): Promise<void> {
   await mkdir(dirname(dir), { recursive: true });
@@ -72,7 +83,9 @@ export async function writeMigrationPackage(
     throw error;
   }
 
-  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), { flag: 'wx' });
+  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(metadataToWire(metadata), null, 2), {
+    flag: 'wx',
+  });
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
 }
 
@@ -100,18 +113,21 @@ export async function copyFilesWithRename(
   }
 }
 
-export async function writeMigrationManifest(
+export async function writeMigrationMetadata(
   dir: string,
-  manifest: MigrationManifest,
+  metadata: MigrationMetadata,
 ): Promise<void> {
-  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(
+    join(dir, MANIFEST_FILE),
+    `${JSON.stringify(metadataToWire(metadata), null, 2)}\n`,
+  );
 }
 
 export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise<void> {
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
-export async function readMigrationPackage(dir: string): Promise<MigrationBundle> {
+export async function readMigrationPackage(dir: string): Promise<MigrationPackage> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);
 
@@ -135,9 +151,9 @@ export async function readMigrationPackage(dir: string): Promise<MigrationBundle
     throw error;
   }
 
-  let manifest: MigrationManifest;
+  let wireMetadata: MigrationMetadataWire;
   try {
-    manifest = JSON.parse(manifestRaw);
+    wireMetadata = JSON.parse(manifestRaw);
   } catch (e) {
     throw errorInvalidJson(manifestPath, e instanceof Error ? e.message : String(e));
   }
@@ -149,29 +165,29 @@ export async function readMigrationPackage(dir: string): Promise<MigrationBundle
     throw errorInvalidJson(opsPath, e instanceof Error ? e.message : String(e));
   }
 
-  validateManifest(manifest, manifestPath);
+  validateWireMetadata(wireMetadata, manifestPath);
   validateOps(ops, opsPath);
 
-  const bundle: MigrationBundle = {
+  const pkg: MigrationPackage = {
     dirName: basename(dir),
     dirPath: dir,
-    manifest,
+    metadata: metadataFromWire(wireMetadata),
     ops,
   };
 
-  const verification = verifyMigrationBundle(bundle);
+  const verification = verifyMigrationHash(pkg);
   if (!verification.ok) {
-    throw errorBundleCorrupt(dir, verification.storedMigrationId, verification.computedMigrationId);
+    throw errorMigrationHashMismatch(dir, verification.storedHash, verification.computedHash);
   }
 
-  return bundle;
+  return pkg;
 }
 
-function validateManifest(
-  manifest: unknown,
+function validateWireMetadata(
+  wire: unknown,
   filePath: string,
-): asserts manifest is MigrationManifest {
-  const result = MigrationManifestSchema(manifest);
+): asserts wire is MigrationMetadataWire {
+  const result = MigrationMetadataWireSchema(wire);
   if (result instanceof type.errors) {
     throw errorInvalidManifest(filePath, result.summary);
   }
@@ -186,7 +202,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly MigrationBundle[]> {
+): Promise<readonly MigrationPackage[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -197,7 +213,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: MigrationBundle[] = [];
+  const packages: MigrationPackage[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);
