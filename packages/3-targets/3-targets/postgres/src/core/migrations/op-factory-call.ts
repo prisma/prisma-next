@@ -802,11 +802,6 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
-      // `dataTransform` is no longer a free factory import; it is called as
-      // `this.dataTransform(...)` so `PostgresMigration` can inject the
-      // control adapter. `placeholder` is still re-exported from
-      // `@prisma-next/target-postgres/migration` so the user's `migration.ts`
-      // only depends on a single migration-authoring entrypoint.
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
       {
         moduleSpecifier: './end-contract.json',
