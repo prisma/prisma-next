@@ -15,6 +15,7 @@ import {
   hasProjectManifest,
   type PackageManager,
 } from './detect-package-manager';
+import { detectPnpmCatalogOverrides, type PnpmCatalogOverride } from './detect-pnpm-catalog';
 import { errorInitEmitFailed, errorInitInstallFailed, errorInitMissingManifest } from './errors';
 import {
   INIT_EXIT_EMIT_FAILED,
@@ -45,7 +46,7 @@ interface InstallReport {
   readonly skipped: boolean;
   readonly deps: readonly string[];
   readonly devDeps: readonly string[];
-  readonly warning?: string;
+  readonly warnings: readonly string[];
 }
 
 /**
@@ -161,9 +162,7 @@ export async function runInit(
     }
     throw error;
   }
-  if (install.warning !== undefined) {
-    warnings.push(install.warning);
-  }
+  warnings.push(...install.warnings);
 
   let contractEmitted = false;
   if (!install.skipped) {
@@ -301,6 +300,15 @@ async function runInstall(ctx: {
   const addDevCommand = `${pm} ${formatAddDevArgs(pm, devDeps).join(' ')}`;
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
 
+  // FR7.3 / Spec Decision 8 — honour-and-warn: if the surrounding pnpm
+  // workspace pins one of our packages via the catalog, surface a
+  // structured warning so the user knows the catalog version (not the
+  // published `latest`) is what ends up installed. We collect the
+  // warning whether or not we actually run install — the override
+  // applies to a manual install too — but only when pnpm is the chosen
+  // PM (catalog: specifiers are pnpm-specific).
+  const catalogWarnings = pm === 'pnpm' ? buildCatalogWarnings(baseDir, [...deps, ...devDeps]) : [];
+
   if (!install) {
     if (!flags.json && !flags.quiet) {
       ui.note(
@@ -317,7 +325,7 @@ async function runInstall(ctx: {
         'Manual steps',
       );
     }
-    return { skipped: true, deps: [], devDeps: [] };
+    return { skipped: true, deps: [], devDeps: [], warnings: catalogWarnings };
   }
 
   const exec = promisify(execFile);
@@ -331,7 +339,7 @@ async function runInstall(ctx: {
   try {
     await runPair(pm);
     spinner.stop(`Installed ${pkg}, dotenv, and prisma-next`);
-    return { skipped: false, deps, devDeps };
+    return { skipped: false, deps, devDeps, warnings: catalogWarnings };
   } catch (err) {
     const stderrText = redactSecrets(readChildStderr(err));
 
@@ -357,7 +365,12 @@ async function runInstall(ctx: {
           skipped: false,
           deps,
           devDeps,
-          warning: fallbackWarning,
+          // The pnpm fallback fired, so the workspace catalog is not the
+          // version that was actually installed (npm bypassed pnpm's
+          // resolver). Surface the fallback warning but suppress the
+          // catalog-honour warning to avoid a contradictory message
+          // pair.
+          warnings: [fallbackWarning],
         };
       } catch (npmErr) {
         spinner.stop('Installation failed');
@@ -381,6 +394,38 @@ async function runInstall(ctx: {
       stderrLines: [stderrText],
     });
   }
+}
+
+/**
+ * Builds the FR7.3 catalog-honoured warning(s) for the surrounding pnpm
+ * workspace, if any. Returns an empty array when no `pnpm-workspace.yaml`
+ * exists in any ancestor or when the workspace's catalog has no entry
+ * for any of the packages `init` is about to install.
+ *
+ * Exported for unit tests.
+ */
+export function buildCatalogWarnings(
+  baseDir: string,
+  packages: readonly string[],
+): readonly string[] {
+  const result = detectPnpmCatalogOverrides(baseDir, packages);
+  if (result === null || result.entries.length === 0) {
+    return [];
+  }
+  return [formatCatalogWarning(result.workspaceFile, result.entries)];
+}
+
+function formatCatalogWarning(
+  workspaceFile: string,
+  entries: readonly PnpmCatalogOverride[],
+): string {
+  const list = entries.map((entry) => `  • ${entry.name}: ${entry.version}`).join('\n');
+  return [
+    'pnpm workspace catalog overrides detected — pnpm will install these versions instead of `latest`:',
+    list,
+    `Catalog source: ${workspaceFile}`,
+    'To use the published `latest` instead, remove or update the catalog entry, then re-run `pnpm install`.',
+  ].join('\n');
 }
 
 /**
