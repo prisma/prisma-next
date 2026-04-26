@@ -1,7 +1,13 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
+
+type ColumnRef = { table: string; column: string };
+type ColumnRefIndex = Map<string, ColumnRef>;
+
+const WIRE_PREVIEW_LIMIT = 100;
 
 function resolveRowCodec(
   alias: string,
@@ -29,12 +35,6 @@ function resolveRowCodec(
   return null;
 }
 
-type ColumnRefIndex = Map<string, { table: string; column: string }>;
-
-/**
- * Builds a lookup index from column name → { table, column } ref.
- * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
- */
 function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
   const columns = plan.meta.refs?.columns;
   if (!columns) return null;
@@ -46,7 +46,7 @@ function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
   return index;
 }
 
-function parseProjectionRef(value: string): { table: string; column: string } | null {
+function parseProjectionRef(value: string): ColumnRef | null {
   if (value.startsWith('include:') || value.startsWith('operation:')) {
     return null;
   }
@@ -66,7 +66,7 @@ function resolveColumnRefForAlias(
   alias: string,
   projection: ExecutionPlan['meta']['projection'],
   fallbackColumnRefIndex: ColumnRefIndex | null,
-): { table: string; column: string } | undefined {
+): ColumnRef | undefined {
   if (projection && !Array.isArray(projection)) {
     const mappedRef = (projection as Record<string, string>)[alias];
     if (typeof mappedRef !== 'string') {
@@ -78,18 +78,148 @@ function resolveColumnRefForAlias(
   return fallbackColumnRefIndex?.get(alias);
 }
 
-export function decodeRow(
+function previewWireValue(wireValue: unknown): string {
+  if (typeof wireValue === 'string') {
+    return wireValue.length > WIRE_PREVIEW_LIMIT
+      ? `${wireValue.substring(0, WIRE_PREVIEW_LIMIT)}...`
+      : wireValue;
+  }
+  return String(wireValue).substring(0, WIRE_PREVIEW_LIMIT);
+}
+
+function isJsonSchemaValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
+  );
+}
+
+function wrapDecodeFailure(
+  error: unknown,
+  alias: string,
+  ref: ColumnRef | undefined,
+  codec: Codec,
+  wireValue: unknown,
+): never {
+  const message = error instanceof Error ? error.message : String(error);
+  const target = ref ? `${ref.table}.${ref.column}` : alias;
+  const wrapped = runtimeError(
+    'RUNTIME.DECODE_FAILED',
+    `Failed to decode column ${target} with codec '${codec.id}': ${message}`,
+    {
+      ...(ref ? { table: ref.table, column: ref.column } : { alias }),
+      codec: codec.id,
+      wirePreview: previewWireValue(wireValue),
+    },
+  );
+  wrapped.cause = error;
+  throw wrapped;
+}
+
+function wrapIncludeAggregateFailure(error: unknown, alias: string, wireValue: unknown): never {
+  const message = error instanceof Error ? error.message : String(error);
+  const wrapped = runtimeError(
+    'RUNTIME.DECODE_FAILED',
+    `Failed to parse JSON array for include alias '${alias}': ${message}`,
+    {
+      alias,
+      wirePreview: previewWireValue(wireValue),
+    },
+  );
+  wrapped.cause = error;
+  throw wrapped;
+}
+
+function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
+  if (wireValue === null || wireValue === undefined) {
+    return [];
+  }
+
+  try {
+    let parsed: unknown;
+    if (typeof wireValue === 'string') {
+      parsed = JSON.parse(wireValue);
+    } else if (Array.isArray(wireValue)) {
+      parsed = wireValue;
+    } else {
+      parsed = JSON.parse(String(wireValue));
+    }
+
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Expected array for include alias '${alias}', got ${typeof parsed}`);
+    }
+
+    return parsed;
+  } catch (error) {
+    wrapIncludeAggregateFailure(error, alias, wireValue);
+  }
+}
+
+/**
+ * Decodes a single field. Single-armed: every cell takes the same path —
+ * `codec.decode → await → JSON-Schema validate → return plain value` — so
+ * sync- and async-authored codecs are indistinguishable to callers.
+ */
+async function decodeField(
+  alias: string,
+  wireValue: unknown,
+  plan: ExecutionPlan,
+  registry: CodecRegistry,
+  jsonValidators: JsonSchemaValidatorRegistry | undefined,
+  projection: ExecutionPlan['meta']['projection'],
+  fallbackColumnRefIndex: ColumnRefIndex | null,
+): Promise<unknown> {
+  if (wireValue === null || wireValue === undefined) {
+    return wireValue;
+  }
+
+  const codec = resolveRowCodec(alias, plan, registry);
+  if (!codec) {
+    return wireValue;
+  }
+
+  const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
+
+  let decoded: unknown;
+  try {
+    decoded = await codec.decode(wireValue);
+  } catch (error) {
+    wrapDecodeFailure(error, alias, ref, codec, wireValue);
+  }
+
+  if (jsonValidators && ref) {
+    try {
+      validateJsonValue(jsonValidators, ref.table, ref.column, decoded, 'decode', codec.id);
+    } catch (error) {
+      if (isJsonSchemaValidationError(error)) throw error;
+      wrapDecodeFailure(error, alias, ref, codec, wireValue);
+    }
+  }
+
+  return decoded;
+}
+
+/**
+ * Decodes a row by dispatching all per-cell codec calls concurrently via
+ * `Promise.all`. Each cell follows the single-armed `decodeField` path.
+ * Failures are wrapped in `RUNTIME.DECODE_FAILED` with `{ table, column,
+ * codec }` (or `{ alias, codec }` when no column ref is resolvable) and the
+ * original error attached on `cause`.
+ */
+export async function decodeRow(
   row: Record<string, unknown>,
   plan: ExecutionPlan,
   registry: CodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
-): Record<string, unknown> {
-  const decoded: Record<string, unknown> = {};
+): Promise<Record<string, unknown>> {
   const projection = plan.meta.projection;
 
-  // Fallback for plans that do not provide projection alias -> table.column mapping.
+  // Build a column-ref index when the projection alias-to-ref mapping is
+  // unavailable so that decode failures and JSON-Schema validation can both
+  // surface { table, column } from `meta.refs.columns` when present.
   const fallbackColumnRefIndex =
-    jsonValidators && (!projection || Array.isArray(projection)) ? buildColumnRefIndex(plan) : null;
+    !projection || Array.isArray(projection) ? buildColumnRefIndex(plan) : null;
 
   let aliases: readonly string[];
   if (projection && !Array.isArray(projection)) {
@@ -100,7 +230,11 @@ export function decodeRow(
     aliases = Object.keys(row);
   }
 
-  for (const alias of aliases) {
+  const tasks: Promise<unknown>[] = [];
+  const includeIndices: { index: number; alias: string; value: unknown }[] = [];
+
+  for (let i = 0; i < aliases.length; i++) {
+    const alias = aliases[i] as string;
     const wireValue = row[alias];
 
     const projectionValue =
@@ -109,113 +243,35 @@ export function decodeRow(
         : undefined;
 
     if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {
-      if (wireValue === null || wireValue === undefined) {
-        decoded[alias] = [];
-        continue;
-      }
-
-      try {
-        let parsed: unknown;
-        if (typeof wireValue === 'string') {
-          parsed = JSON.parse(wireValue);
-        } else if (Array.isArray(wireValue)) {
-          parsed = wireValue;
-        } else {
-          parsed = JSON.parse(String(wireValue));
-        }
-
-        if (!Array.isArray(parsed)) {
-          throw new Error(`Expected array for include alias '${alias}', got ${typeof parsed}`);
-        }
-
-        decoded[alias] = parsed;
-      } catch (error) {
-        const decodeError = new Error(
-          `Failed to parse JSON array for include alias '${alias}': ${error instanceof Error ? error.message : String(error)}`,
-        ) as Error & {
-          code: string;
-          category: string;
-          severity: string;
-          details?: Record<string, unknown>;
-        };
-        decodeError.code = 'RUNTIME.DECODE_FAILED';
-        decodeError.category = 'RUNTIME';
-        decodeError.severity = 'error';
-        decodeError.details = {
-          alias,
-          wirePreview:
-            typeof wireValue === 'string' && wireValue.length > 100
-              ? `${wireValue.substring(0, 100)}...`
-              : String(wireValue).substring(0, 100),
-        };
-        throw decodeError;
-      }
+      includeIndices.push({ index: i, alias, value: wireValue });
+      tasks.push(Promise.resolve(undefined));
       continue;
     }
 
-    if (wireValue === null || wireValue === undefined) {
-      decoded[alias] = wireValue;
-      continue;
-    }
-
-    const codec = resolveRowCodec(alias, plan, registry);
-
-    if (!codec) {
-      decoded[alias] = wireValue;
-      continue;
-    }
-
-    try {
-      const decodedValue = codec.decode(wireValue);
-
-      // Validate decoded JSON value against schema
-      if (jsonValidators) {
-        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
-        if (ref) {
-          validateJsonValue(
-            jsonValidators,
-            ref.table,
-            ref.column,
-            decodedValue,
-            'decode',
-            codec.id,
-          );
-        }
-      }
-
-      decoded[alias] = decodedValue;
-    } catch (error) {
-      // Re-throw JSON schema validation errors as-is
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
-      ) {
-        throw error;
-      }
-
-      const decodeError = new Error(
-        `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
-      ) as Error & {
-        code: string;
-        category: string;
-        severity: string;
-        details?: Record<string, unknown>;
-      };
-      decodeError.code = 'RUNTIME.DECODE_FAILED';
-      decodeError.category = 'RUNTIME';
-      decodeError.severity = 'error';
-      decodeError.details = {
+    tasks.push(
+      decodeField(
         alias,
-        codec: codec.id,
-        wirePreview:
-          typeof wireValue === 'string' && wireValue.length > 100
-            ? `${wireValue.substring(0, 100)}...`
-            : String(wireValue).substring(0, 100),
-      };
-      throw decodeError;
-    }
+        wireValue,
+        plan,
+        registry,
+        jsonValidators,
+        projection,
+        fallbackColumnRefIndex,
+      ),
+    );
   }
 
+  const settled = await Promise.all(tasks);
+
+  // Include aggregates are decoded synchronously after concurrent codec
+  // dispatch settles, so any decode failures upstream propagate first.
+  for (const entry of includeIndices) {
+    settled[entry.index] = decodeIncludeAggregate(entry.alias, entry.value);
+  }
+
+  const decoded: Record<string, unknown> = {};
+  for (let i = 0; i < aliases.length; i++) {
+    decoded[aliases[i] as string] = settled[i];
+  }
   return decoded;
 }
