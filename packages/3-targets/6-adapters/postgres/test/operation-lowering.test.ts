@@ -135,4 +135,28 @@ describe('Operation lowering', () => {
     const lowered = adapter.lower(ast, { contract, params: [] });
     expect(lowered.sql).toContain(`contains("user"."email", 'test''value')`);
   });
+
+  it('does not re-substitute tokens that appear inside an already-rendered argument', () => {
+    // Regression: the previous implementation called `String.prototype.replace`
+    // for `{{self}}` first and then for each `{{argN}}` against the running
+    // result, so a literal containing `{{arg1}}` rendered into the SQL got
+    // corrupted on the second pass. The single-pass callback must preserve it.
+    const operationExpr = new OperationExpr({
+      method: 'echo',
+      self: LiteralExpr.of('{{arg1}}'),
+      args: [LiteralExpr.of('replacement')],
+      returns: { codecId: 'pg/text@1', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'echo({{self}}, {{arg0}})',
+      },
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('echoed', operationExpr),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+    expect(lowered.sql).toContain(`echo('{{arg1}}', 'replacement')`);
+  });
 });
