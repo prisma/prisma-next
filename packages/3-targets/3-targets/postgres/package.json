@@ -50,9 +50,12 @@
   ],
   "exports": {
     "./control": "./dist/control.mjs",
+    "./default-normalizer": "./dist/default-normalizer.mjs",
     "./migration": "./dist/migration.mjs",
+    "./native-type-normalizer": "./dist/native-type-normalizer.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./sql-utils": "./dist/sql-utils.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

@@ -72,15 +72,12 @@ describe('escapeLiteral', () => {
   });
 
   it('handles potential SQL injection patterns safely', () => {
-    // These should all be safely escaped
     expect(escapeLiteral("'; DROP TABLE users; --")).toBe("''; DROP TABLE users; --");
     expect(escapeLiteral("1' OR '1'='1")).toBe("1'' OR ''1''=''1");
     expect(escapeLiteral("admin'--")).toBe("admin''--");
   });
 
   it('preserves backslashes (standard_conforming_strings=on)', () => {
-    // In PostgreSQL with standard_conforming_strings=on (default since 9.1),
-    // backslashes are treated literally, not as escape characters
     expect(escapeLiteral('path\\to\\file')).toBe('path\\to\\file');
     expect(escapeLiteral("value\\'test")).toBe("value\\''test");
   });
@@ -124,7 +121,6 @@ describe('qualifyName', () => {
 
 describe('enum value security scenarios', () => {
   it('handles enum values with quotes safely', () => {
-    // Simulating how enum values would be used in CREATE TYPE
     const values = ["it's", "don't", "can't"];
     const escaped = values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
     expect(escaped).toBe("'it''s', 'don''t', 'can''t'");
@@ -140,7 +136,7 @@ describe('enum value security scenarios', () => {
   });
 
   it('rejects enum values with null bytes', () => {
-    const maliciousValue = 'active\0'; // null byte could truncate
+    const maliciousValue = 'active\0';
     expect(() => escapeLiteral(maliciousValue)).toThrow(SqlEscapeError);
   });
 
@@ -159,7 +155,6 @@ describe('type name security scenarios', () => {
 
   it('handles schema names with injection attempts', () => {
     const maliciousSchema = 'public"; DROP SCHEMA public; --';
-    // The double quotes get escaped, preventing injection
     expect(quoteIdentifier(maliciousSchema)).toBe('"public""; DROP SCHEMA public; --"');
   });
 });

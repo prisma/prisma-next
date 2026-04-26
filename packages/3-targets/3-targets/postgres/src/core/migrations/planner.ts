@@ -1,7 +1,3 @@
-import {
-  normalizeSchemaNativeType,
-  parsePostgresDefault,
-} from '@prisma-next/adapter-postgres/control';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
@@ -16,6 +12,8 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import { parsePostgresDefault } from '../default-normalizer';
+import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';

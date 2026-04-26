@@ -1,5 +1,11 @@
 import type { SqlControlAdapterDescriptor } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import {
+  escapeLiteral,
+  qualifyName,
+  quoteIdentifier,
+  SqlEscapeError,
+} from '@prisma-next/target-postgres/sql-utils';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -7,7 +13,6 @@ import {
   createPostgresScalarTypeDescriptors,
 } from '../core/control-mutation-defaults';
 import { postgresAdapterDescriptorMeta } from '../core/descriptor-meta';
-import { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
 const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
   ...postgresAdapterDescriptorMeta,
@@ -23,6 +28,6 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
 
 export default postgresAdapterDescriptor;
 
-export { normalizeSchemaNativeType } from '../core/control-adapter';
-export { parsePostgresDefault } from '../core/default-normalizer';
+export { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+export { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 export { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError };

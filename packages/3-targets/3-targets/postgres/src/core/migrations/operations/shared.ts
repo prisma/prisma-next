@@ -1,7 +1,7 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { quoteIdentifier } from '../../sql-utils';
 import type { OperationClass, PostgresPlanTargetDetails } from '../planner-target-details';
 
 export type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;

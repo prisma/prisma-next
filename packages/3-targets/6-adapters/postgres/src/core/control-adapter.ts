@@ -16,8 +16,9 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
+import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { parsePostgresDefault } from './default-normalizer';
 import { pgEnumControlHooks } from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
@@ -470,52 +471,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     const match = versionString.match(/PostgreSQL (\d+\.\d+)/);
     return match?.[1] ?? 'unknown';
   }
-}
-
-/**
- * Pre-computed lookup map for simple prefix-based type normalization.
- * Maps short Postgres type names to their canonical SQL names.
- * Using a Map for O(1) lookup instead of multiple startsWith checks.
- */
-const TYPE_PREFIX_MAP: ReadonlyMap<string, string> = new Map([
-  ['varchar', 'character varying'],
-  ['bpchar', 'character'],
-  ['varbit', 'bit varying'],
-]);
-
-/**
- * Normalizes a Postgres schema native type to its canonical form for comparison.
- *
- * Uses a pre-computed lookup map for simple prefix replacements (O(1))
- * and handles complex temporal type normalization separately.
- */
-export function normalizeSchemaNativeType(nativeType: string): string {
-  const trimmed = nativeType.trim();
-
-  // Fast path: check simple prefix replacements using the lookup map
-  for (const [prefix, replacement] of TYPE_PREFIX_MAP) {
-    if (trimmed.startsWith(prefix)) {
-      return replacement + trimmed.slice(prefix.length);
-    }
-  }
-
-  // Temporal types with time zone handling
-  // Check for 'with time zone' suffix first (more specific)
-  if (trimmed.includes(' with time zone')) {
-    if (trimmed.startsWith('timestamp')) {
-      return `timestamptz${trimmed.slice(9).replace(' with time zone', '')}`;
-    }
-    if (trimmed.startsWith('time')) {
-      return `timetz${trimmed.slice(4).replace(' with time zone', '')}`;
-    }
-  }
-
-  // Handle 'without time zone' suffix - just strip it
-  if (trimmed.includes(' without time zone')) {
-    return trimmed.replace(' without time zone', '');
-  }
-
-  return trimmed;
 }
 
 function normalizeFormattedType(formattedType: string, dataType: string, udtName: string): string {
