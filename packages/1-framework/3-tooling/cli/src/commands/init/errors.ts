@@ -150,6 +150,30 @@ export function errorInitInstallFailed(options: {
 }
 
 /**
+ * The user's project manifest (typically `package.json`) failed to parse
+ * as JSON. Init reads the manifest to merge `scripts` (FR3.5) and to
+ * skip `@types/node` when it is already declared (FR2.1); a malformed
+ * file would otherwise surface as an `INTERNAL_ERROR` with a raw
+ * `SyntaxError` stack, which violates the FR1.6 contract that every
+ * documented failure mode maps to a stable exit code.
+ *
+ * Maps to exit code `2 = PRECONDITION` — the user can fix the manifest
+ * and re-run.
+ */
+export function errorInitInvalidManifest(options: {
+  readonly path: string;
+  readonly cause: string;
+}): CliStructuredError {
+  return new CliStructuredError('5010', `Failed to parse ${options.path}`, {
+    domain: 'CLI',
+    why: `\`${options.path}\` is not valid JSON: ${options.cause}`,
+    fix: `Fix the JSON syntax in \`${options.path}\` (a missing comma or unbalanced brace is the most common cause), then re-run \`prisma-next init\`.`,
+    docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    meta: { path: options.path, cause: options.cause },
+  });
+}
+
+/**
  * `prisma-next contract emit` failed after a successful install. Surface
  * the underlying error so the user can fix it and re-run; files and
  * dependencies remain on disk untouched. Maps to exit code

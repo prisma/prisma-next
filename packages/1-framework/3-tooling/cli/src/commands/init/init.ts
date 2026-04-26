@@ -16,7 +16,12 @@ import {
   type PackageManager,
 } from './detect-package-manager';
 import { detectPnpmCatalogOverrides, type PnpmCatalogOverride } from './detect-pnpm-catalog';
-import { errorInitEmitFailed, errorInitInstallFailed, errorInitMissingManifest } from './errors';
+import {
+  errorInitEmitFailed,
+  errorInitInstallFailed,
+  errorInitInvalidManifest,
+  errorInitMissingManifest,
+} from './errors';
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
@@ -195,12 +200,33 @@ export async function runInit(
     filesWritten.push('.gitattributes');
   }
 
+  // Read + parse package.json once for both the FR3.5 scripts merge and
+  // the FR2.1 `@types/node`-presence check. A malformed manifest is
+  // mapped to a structured precondition error (5010) rather than the
+  // generic INTERNAL_ERROR fallback so CI/agents can branch on it.
+  const packageJsonPath = join(baseDir, 'package.json');
+  let parsedPackageJson: Record<string, unknown> | null = null;
+  let pkgRaw: string | null = null;
+  if (existsSync(packageJsonPath)) {
+    pkgRaw = readFileSync(packageJsonPath, 'utf-8');
+    try {
+      parsedPackageJson = JSON.parse(pkgRaw) as Record<string, unknown>;
+    } catch (err) {
+      if (err instanceof SyntaxError) {
+        return emitError(
+          ui,
+          flags,
+          errorInitInvalidManifest({ path: 'package.json', cause: err.message }),
+        );
+      }
+      throw err;
+    }
+  }
+
   // FR3.5: idempotent package.json#scripts updater. Collisions with a
   // user-written script of the same name produce a structured warning
   // and the user's script is preserved.
-  const packageJsonPath = join(baseDir, 'package.json');
-  if (existsSync(packageJsonPath)) {
-    const pkgRaw = readFileSync(packageJsonPath, 'utf-8');
+  if (pkgRaw !== null) {
     const { content: nextPkg, warnings: scriptWarnings } = mergePackageScripts(
       pkgRaw,
       REQUIRED_SCRIPTS,
@@ -224,6 +250,8 @@ export async function runInit(
       flags,
       ui,
       filesWritten,
+      hasTypesNode:
+        parsedPackageJson !== null ? hasDirectDep(parsedPackageJson, '@types/node') : false,
     });
   } catch (error) {
     if (CliStructuredError.is(error)) {
@@ -327,6 +355,7 @@ function exitCodeForError(error: CliStructuredError): number {
     case '5003': // missing flags — precondition
     case '5004': // invalid flag value — precondition
     case '5005': // --strict-probe without --probe-db — precondition
+    case '5010': // invalid manifest (malformed package.json) — precondition
       return INIT_EXIT_PRECONDITION;
     case '5006': // user aborted interactive prompt
       return INIT_EXIT_USER_ABORTED;
@@ -359,19 +388,29 @@ async function runInstall(ctx: {
   readonly flags: GlobalFlags;
   readonly ui: TerminalUI;
   readonly filesWritten: readonly string[];
+  /**
+   * FR2.1 — set when the user already declares `@types/node` directly in
+   * `dependencies` or `devDependencies`. We then skip adding it so a
+   * pinned major (e.g. `^18` for a Node 18 runtime) survives `init`
+   * unchanged. Transitive presence is intentionally ignored: detecting
+   * it requires lockfile introspection and the realistic clobber risk
+   * is the direct-pin case.
+   */
+  readonly hasTypesNode: boolean;
 }): Promise<InstallReport> {
-  const { baseDir, pm, target, install, flags, ui, filesWritten } = ctx;
+  const { baseDir, pm, target, install, flags, ui, filesWritten, hasTypesNode } = ctx;
   const pkg = targetPackageName(target);
   const deps = [pkg, 'dotenv'];
-  // FR2.1: `@types/node` is unconditional — under
-  // `moduleResolution: 'bundler'` (FR2.2) the scaffolded `db.ts` /
-  // `prisma-next.config.ts` reference `process.env`, which only
-  // typechecks with Node's ambient types in the resolution graph. We
-  // pin it as a devDep rather than relying on a transitive resolution
-  // through `dotenv` because `dotenv`'s own types bundle is internal
-  // and not guaranteed across versions. Listed last so the install log
-  // still leads with the user-relevant `prisma-next` line.
-  const devDeps = ['prisma-next', '@types/node'];
+  // FR2.1: under `moduleResolution: 'bundler'` (FR2.2) the scaffolded
+  // `db.ts` / `prisma-next.config.ts` reference `process.env`, which
+  // only typechecks with Node's ambient types in the resolution graph.
+  // Pin it as a devDep rather than relying on a transitive resolution
+  // through `dotenv` (whose types bundle is internal and not guaranteed
+  // across versions). Skip when the user already declares `@types/node`
+  // directly so a pinned major (e.g. `^18` for a Node 18 runtime) is
+  // preserved. Listed last so the install log still leads with the
+  // user-relevant `prisma-next` line.
+  const devDeps = hasTypesNode ? ['prisma-next'] : ['prisma-next', '@types/node'];
 
   const addCommand = `${pm} ${formatAddArgs(pm, deps).join(' ')}`;
   const addDevCommand = `${pm} ${formatAddDevArgs(pm, devDeps).join(' ')}`;
@@ -527,6 +566,25 @@ export function isRecognisedPnpmResolutionError(stderr: string): boolean {
     /workspace:[^\s]+ is not a valid (version|spec)/i.test(stderr) ||
     /catalog:[^\s]* is not a valid (version|spec)/i.test(stderr)
   );
+}
+
+/**
+ * FR2.1 — true when the parsed `package.json` declares `name` directly
+ * in either `dependencies` or `devDependencies`. We deliberately don't
+ * inspect `peerDependencies` (irrelevant for a leaf project) or the
+ * lockfile (transitive presence is brittle to detect and not the
+ * realistic clobber-risk path).
+ *
+ * Exported for unit tests.
+ */
+export function hasDirectDep(parsed: Record<string, unknown>, name: string): boolean {
+  for (const field of ['dependencies', 'devDependencies'] as const) {
+    const value = parsed[field];
+    if (value !== null && typeof value === 'object' && name in value) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function readChildStderr(err: unknown): string {

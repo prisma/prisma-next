@@ -60,7 +60,7 @@ Out of scope (phase 2): framework auto-detection, telemetry, a dedicated `prisma
 
 ### FR2 — A freshly initialised project typechecks (closes R5)
 
-- **FR2.1** `init` adds `@types/node` to `devDependencies` if it isn't already present (transitively or directly).
+- **FR2.1** `init` adds `@types/node` to `devDependencies` unless the user's `package.json` already declares it directly in `dependencies` or `devDependencies` (transitive presence is intentionally not inspected: detecting it requires lockfile introspection, and the realistic clobber-risk path is the direct pin).
 - **FR2.2** Scaffolded `tsconfig.json` includes the minimal compiler options needed for the scaffolded `prisma-next.config.ts` and `db.ts` to typecheck (notably `"types": ["node"]` when `moduleResolution` is `bundler` and Node types are otherwise hidden).
 - **FR2.3** Running `tsc --noEmit` against a freshly initialised project (no edits) succeeds with exit 0 for all four (target × authoring) cells.
 
