@@ -27,6 +27,13 @@ import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '@prisma-next/target-postgre
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import type { PostgresContract } from './types';
 
+// Mirrors `VECTOR_CODEC_ID` in `@prisma-next/extension-pgvector/core/constants`.
+// Duplicated here rather than imported because the canonical export is not
+// part of the extension's public subpath surface, and `@prisma-next/adapter-postgres`
+// does not (and should not) take a runtime dependency on the extension package
+// just for one constant. The whole `getCodecParamCast` switch is slated for
+// removal under TML-2310 ("Move SQL param-cast metadata onto codec descriptors"),
+// at which point this and the JSON/JSONB IDs below also disappear.
 const VECTOR_CODEC_ID = 'pg/vector@1' as const;
 
 /**
@@ -104,7 +111,7 @@ export function renderLoweredSql(
   return Object.freeze({ sql, params: Object.freeze(params) });
 }
 
-function renderSelect(ast: SelectAst, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderSelect(ast: SelectAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const selectClause = `SELECT ${renderDistinctPrefix(ast.distinct, ast.distinctOn, contract, pim)}${renderProjection(
     ast.projection,
     contract,
@@ -150,8 +157,8 @@ function renderSelect(ast: SelectAst, contract?: PostgresContract, pim?: ParamIn
 
 function renderProjection(
   projection: ReadonlyArray<ProjectionItem>,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   return projection
     .map((item) => {
@@ -167,8 +174,8 @@ function renderProjection(
 function renderDistinctPrefix(
   distinct: true | undefined,
   distinctOn: ReadonlyArray<AnyExpression> | undefined,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   if (distinctOn && distinctOn.length > 0) {
     const rendered = distinctOn.map((expr) => renderExpr(expr, contract, pim)).join(', ');
@@ -182,8 +189,8 @@ function renderDistinctPrefix(
 
 function renderSource(
   source: AnyFromSource,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const node = source;
   switch (node.kind) {
@@ -212,25 +219,21 @@ function assertScalarSubquery(query: SelectAst): void {
 
 function renderSubqueryExpr(
   expr: SubqueryExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   assertScalarSubquery(expr.query);
   return `(${renderSelect(expr.query, contract, pim)})`;
 }
 
-function renderWhere(
-  expr: AnyExpression,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
-): string {
+function renderWhere(expr: AnyExpression, contract: PostgresContract, pim: ParamIndexMap): string {
   return renderExpr(expr, contract, pim);
 }
 
 function renderNullCheck(
   expr: NullCheckExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const rendered = renderExpr(expr.expr, contract, pim);
   const renderedExpr =
@@ -238,7 +241,7 @@ function renderNullCheck(
   return expr.isNull ? `${renderedExpr} IS NULL` : `${renderedExpr} IS NOT NULL`;
 }
 
-function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderBinary(expr: BinaryExpr, contract: PostgresContract, pim: ParamIndexMap): string {
   if (expr.right.kind === 'list' && expr.right.values.length === 0) {
     if (expr.op === 'in') {
       return 'FALSE';
@@ -257,7 +260,7 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
   let right: string;
   switch (rightNode.kind) {
     case 'list':
-      right = renderListLiteral(rightNode, pim);
+      right = renderListLiteral(rightNode, contract, pim);
       break;
     case 'literal':
       right = renderLiteral(rightNode);
@@ -288,7 +291,11 @@ function renderBinary(expr: BinaryExpr, contract?: PostgresContract, pim?: Param
   return `${leftRendered} ${operatorMap[expr.op]} ${right}`;
 }
 
-function renderListLiteral(expr: ListExpression, pim?: ParamIndexMap): string {
+function renderListLiteral(
+  expr: ListExpression,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
+): string {
   if (expr.values.length === 0) {
     return '(NULL)';
   }
@@ -296,7 +303,7 @@ function renderListLiteral(expr: ListExpression, pim?: ParamIndexMap): string {
     .map((v) => {
       if (v.kind === 'param-ref') return renderParamRef(v, pim);
       if (v.kind === 'literal') return renderLiteral(v);
-      return renderExpr(v, undefined, pim);
+      return renderExpr(v, contract, pim);
     })
     .join(', ');
   return `(${values})`;
@@ -311,8 +318,8 @@ function renderColumn(ref: ColumnRef): string {
 
 function renderAggregateExpr(
   expr: AggregateExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const fn = expr.fn.toUpperCase();
   if (!expr.expr) {
@@ -323,8 +330,8 @@ function renderAggregateExpr(
 
 function renderJsonObjectExpr(
   expr: JsonObjectExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const args = expr.entries
     .flatMap((entry): [string, string] => {
@@ -340,8 +347,8 @@ function renderJsonObjectExpr(
 
 function renderOrderByItems(
   items: ReadonlyArray<OrderByItem>,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   return items
     .map((item) => `${renderExpr(item.expr, contract, pim)} ${item.dir.toUpperCase()}`)
@@ -350,8 +357,8 @@ function renderOrderByItems(
 
 function renderJsonArrayAggExpr(
   expr: JsonArrayAggExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const aggregateOrderBy =
     expr.orderBy && expr.orderBy.length > 0
@@ -364,7 +371,7 @@ function renderJsonArrayAggExpr(
   return aggregated;
 }
 
-function renderExpr(expr: AnyExpression, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamIndexMap): string {
   const node = expr;
   switch (node.kind) {
     case 'column-ref':
@@ -407,7 +414,7 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract, pim?: Para
     case 'literal':
       return renderLiteral(node);
     case 'list':
-      return renderListLiteral(node, pim);
+      return renderListLiteral(node, contract, pim);
     // v8 ignore next 4
     default:
       throw new Error(
@@ -416,8 +423,8 @@ function renderExpr(expr: AnyExpression, contract?: PostgresContract, pim?: Para
   }
 }
 
-function renderParamRef(ref: ParamRef, pim?: ParamIndexMap): string {
-  const index = pim?.get(ref);
+function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
+  const index = pim.get(ref);
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
@@ -455,8 +462,8 @@ function renderLiteral(expr: LiteralExpr): string {
 
 function renderOperation(
   expr: OperationExpr,
-  contract?: PostgresContract,
-  pim?: ParamIndexMap,
+  contract: PostgresContract,
+  pim: ParamIndexMap,
 ): string {
   const self = renderExpr(expr.self, contract, pim);
   const args = expr.args.map((arg) => {
@@ -472,7 +479,7 @@ function renderOperation(
   return result;
 }
 
-function renderJoin(join: JoinAst, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderJoin(join: JoinAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const joinType = join.joinType.toUpperCase();
   const lateral = join.lateral ? 'LATERAL ' : '';
   const source = renderSource(join.source, contract, pim);
@@ -480,7 +487,7 @@ function renderJoin(join: JoinAst, contract?: PostgresContract, pim?: ParamIndex
   return `${joinType} JOIN ${lateral}${source} ON ${onClause}`;
 }
 
-function renderJoinOn(on: JoinOnExpr, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderJoinOn(on: JoinOnExpr, contract: PostgresContract, pim: ParamIndexMap): string {
   if (on.kind === 'eq-col-join-on') {
     const left = renderColumn(on.left);
     const right = renderColumn(on.right);
@@ -514,7 +521,7 @@ function getInsertColumnOrder(
   return Object.keys(contract.storage.tables[tableName]?.columns ?? {});
 }
 
-function renderInsertValue(value: InsertValue | undefined, pim?: ParamIndexMap): string {
+function renderInsertValue(value: InsertValue | undefined, pim: ParamIndexMap): string {
   if (!value || value.kind === 'default-value') {
     return 'DEFAULT';
   }
@@ -532,7 +539,7 @@ function renderInsertValue(value: InsertValue | undefined, pim?: ParamIndexMap):
   }
 }
 
-function renderInsert(ast: InsertAst, contract: PostgresContract, pim?: ParamIndexMap): string {
+function renderInsert(ast: InsertAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const table = quoteIdentifier(ast.table.name);
   const rows = ast.rows;
   if (rows.length === 0) {
@@ -604,7 +611,7 @@ function renderInsert(ast: InsertAst, contract: PostgresContract, pim?: ParamInd
   return `${insertClause}${onConflictClause}${returningClause}`;
 }
 
-function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim?: ParamIndexMap): string {
+function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const table = quoteIdentifier(ast.table.name);
   const setClauses = Object.entries(ast.set).map(([col, val]) => {
     const column = quoteIdentifier(col);
@@ -633,7 +640,7 @@ function renderUpdate(ast: UpdateAst, contract: PostgresContract, pim?: ParamInd
   return `UPDATE ${table} SET ${setClauses.join(', ')}${whereClause}${returningClause}`;
 }
 
-function renderDelete(ast: DeleteAst, contract?: PostgresContract, pim?: ParamIndexMap): string {
+function renderDelete(ast: DeleteAst, contract: PostgresContract, pim: ParamIndexMap): string {
   const table = quoteIdentifier(ast.table.name);
   const whereClause = ast.where ? ` WHERE ${renderWhere(ast.where, contract, pim)}` : '';
   const returningClause = ast.returning?.length
