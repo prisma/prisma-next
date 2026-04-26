@@ -25,8 +25,8 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  * downstream of `loadConfig` runs against real on-disk fixtures: the
  * tampered package and the contract.json. The `loadAllBundles` /
  * `readMigrationPackage` paths inside each command are exercised
- * unmocked, so the loader-boundary integrity check from Phase 1 is what
- * actually fires the diagnostic.
+ * unmocked, so the loader-boundary integrity check inside
+ * `readMigrationPackage` is what actually fires the diagnostic.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -161,13 +161,12 @@ async function setupTamperFixture(): Promise<TamperFixture> {
  * Replaces a fixture's per-test absolute path with a stable token so the
  * captured envelopes from different tempdirs are byte-comparable.
  *
- * Phase 1 R1 F08 made the human-rendered `why`/`fix` use cwd-relative
- * paths, so in practice the rendered text is already identical across
- * tests (each test chdirs into its own tempdir before invoking the
- * command, and uses the same package dir name). This normalization is a
- * defensive belt: it scrubs the absolute `details.dir` in the JSON
- * envelope and any future leakage of an absolute path into the rendered
- * surface.
+ * The human-rendered `why`/`fix` paths are cwd-relative, so in practice
+ * the rendered text is already identical across tests (each test chdirs
+ * into its own tempdir before invoking the command, and uses the same
+ * package dir name). This normalization is a defensive belt: it scrubs
+ * the absolute `details.dir` in the JSON envelope and any future leakage
+ * of an absolute path into the rendered surface.
  */
 function normalizePaths(text: string, tempDir: string): string {
   return text.split(tempDir).join('<TMP_DIR>');
