@@ -14,6 +14,7 @@ export {
   errorDriverRequired,
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
+  errorMigrationCliInvalidConfigArg,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,
