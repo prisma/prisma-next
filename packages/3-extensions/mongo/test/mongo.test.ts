@@ -242,6 +242,74 @@ describe('mongo() facade', () => {
     expect(fakeRuntime.close).not.toHaveBeenCalled();
   });
 
+  it('close() is idempotent (only calls runtime.close once across repeated calls)', async () => {
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    await db.runtime();
+    await db.close();
+    await db.close();
+
+    expect(fakeRuntime.close).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the cached runtime promise after a failed first build, so a later call can retry', async () => {
+    mocks.driverFromConnection
+      .mockReset()
+      .mockRejectedValueOnce(new Error('connection refused'))
+      .mockResolvedValueOnce({ id: 'driver-from-url' });
+
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    await expect(db.runtime()).rejects.toThrow('connection refused');
+    expect(mocks.createMongoRuntime).not.toHaveBeenCalled();
+
+    const runtime = await db.runtime();
+    expect(runtime).toBe(fakeRuntime);
+    expect(mocks.driverFromConnection).toHaveBeenCalledTimes(2);
+    expect(mocks.createMongoRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects orm operations after close() with a clear "client is closed" error', async () => {
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    await db.runtime();
+    await db.close();
+
+    await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
+  });
+
+  it('rejects connect() after close() with a clear "client is closed" error', async () => {
+    const db = mongo({ contract: fakeContract });
+
+    await db.close();
+
+    await expect(db.connect({ url: 'mongodb://localhost:27017/mydb' })).rejects.toThrow(
+      'Mongo client is closed',
+    );
+  });
+
+  it('close() before any build is a no-op and locks the client', async () => {
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    await db.close();
+
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
+    await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
+  });
+
+  it('close() while a build is in flight still locks the client and skips driver-close on a failed build', async () => {
+    mocks.driverFromConnection.mockReset().mockRejectedValueOnce(new Error('connection refused'));
+
+    const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
+
+    const inflight = db.runtime().catch(() => undefined);
+    await db.close();
+    await inflight;
+
+    expect(fakeRuntime.close).not.toHaveBeenCalled();
+    await expect(db.runtime()).rejects.toThrow('Mongo client is closed');
+  });
+
   it('validates the contract via validateMongoContract for both authoring modes', () => {
     const json = { models: {} };
     mongo({ contractJson: json, url: 'mongodb://localhost:27017/mydb' });
