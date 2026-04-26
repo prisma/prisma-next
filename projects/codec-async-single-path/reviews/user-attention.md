@@ -80,8 +80,75 @@ _(populated as the run progresses)_
 
 ### m5
 
-_(pending)_
+**SATISFIED** at HEAD `7b466364b` after R3. Final scoreboard: 26 PASS / 0 FAIL / 0 NOT VERIFIED (3 PASS-with-scope-note on AC-SE2, AC-SE4, AC-DW3 — all spec-legitimate or orchestrator-deferred).
+
+**R1 (commits `52c69e899` → `5ac4a3de6`, 8 commits):** PR #375 security tests translated (T5.1/T5.3 verbatim, T5.5 seeded-secret-codec fixture); ADR 204 — *Single-Path Async Codec Runtime* born in canonical location (T5.6); ADR 030 partial-supersession pointer (T5.7); 5 affected READMEs refreshed (T5.8); AC verification artifact (T5.9). Two `it.skip` deferrals: T5.2 codec-message redaction (out-of-scope per spec § Non-goals — redaction-trigger spelling tracked separately) with verbatim assertion preserved for future activation; T5.4 include-aggregate child-row codec decoding (3 tests + 1 dropped) — orthogonal ORM feature outside async-shape scope. Full M5 gate set ran green: `pnpm typecheck`, `pnpm test:packages` (with 4 documented `it.skip`), `pnpm test:integration` (521/521), `pnpm test:all`, `pnpm lint:deps`, `pnpm build`.
+
+**R1 review (commit `b5dc7b919`) → ANOTHER ROUND NEEDED.** Three doc-quality findings against canonical artifacts:
+- F5 (should-fix): ADR 204 declared a fictional `Codec` interface signature (`<TInput, TWire, TJson, TJsonInput, TOutput>` with `TypeNode`, `decodeJson(json: TJsonInput): TOutput`). None of those types exist; the source-of-truth is `framework-components/src/codec-types.ts:27-50`.
+- F6 (should-fix): Six factory examples used `id:` config key (ADR 204 lines 82, 92; relational-core README lines 103, 113; mongo-codec README lines 17, 27). The actual factory config field is `typeId`.
+- F7 (low/process): ADR 030 supersession pointer over-claimed by listing build-time `encodeJson`/`decodeJson` as superseded. ADR 204 explicitly keeps build-time methods sync.
+
+**Procedural anomaly — F8 filed by the user (commit `e33635ec1`).** Between m5 R1 review and m5 R2 implementation, the user themselves committed `e33635ec1` filing a new finding F8 in the SDR + walkthrough (the `code-review.md` had already recorded it as filed). F8: T5.4 deferred-test header comment in `collection-dispatch.test.ts` lines 403–406 claimed "The assertions themselves are preserved verbatim against the single-path contract" but the three `it.skip` bodies contain only `expect(true).toBe(true)` placeholders. Substance of F8 is sound; the deferral itself remains spec-legitimate (no AC change), only the artifact's documentation was inconsistent. Indicates the user briefly came back to perform a second-pass review before going unavailable again.
+
+**R2 (commit `a4aeba917`, single doc-only commit):** F5/F6/F7 all closed by replacing ADR 204's interface block with the source-of-truth from `framework-components/src/codec-types.ts:27-50`, renaming six `id:` → `typeId:` sites, and trimming ADR 030's supersession pointer parenthetical to query-time methods only. Bonus: `decodeJson(json): TOutput` → `decodeJson(json): TInput` (peripheral fictional-types fix). Implementer raised one minor pushback: the orchestrator's prompt-snippet conflated SQL-extension members (`meta?`/`paramsSchema?`/`init?`) with the framework-components base; the implementer correctly used the base file as source-of-truth (per the orchestrator's primary directive). **For your awareness:** future delegation prompts that touch interface-vs-extension surfaces should explicitly cite the file path of the source-of-truth slice rather than paraphrase the interface.
+
+**R2 review (commit `d57a2a655`) → ANOTHER ROUND NEEDED** — F5/F6/F7 closed; F8 (filed by you between rounds) remained outside the orchestrator's R2 prompt and was still open. Reviewer offered two paths: re-delegate F8 to R3 (Option B — single-comment edit) or visibly override. Orchestrator chose Path A / Option B per the reviewer's preference.
+
+**R3 (commit `a8ea4dbd1`, single doc-only commit):** F8 closed via Option B — rewrote `collection-dispatch.test.ts` lines 395–426 header comment to honestly describe the three `it.skip` blocks as placeholders (titles only, no verbatim PR #375 assertions) while reinforcing the structural deferral evidence. No test bodies changed. Tests pass at 463/3, lint:deps clean.
+
+**R3 review (commit `7b466364b`) → SATISFIED.** All findings closed (F1, F2, F3, F4, F5, F6, F7, F8); pre-PR readiness check confirmed.
+
+**Items for your review (m5 phase):**
+
+1. **Future-project pointers identified during m5 — three orthogonal follow-up projects worth tracking in Linear:**
+   - **`orm-include-aggregate-codec-dispatch`** — closes the include-aggregate redaction-correctness hole at the ORM layer. The current `dispatchCollectionRows` single-query include path JSON-parses payload and applies field-name mapping but does NOT invoke codec query-time methods on `jsonb_agg` child cells. Three `it.skip` placeholders at `packages/3-extensions/sql-orm-client/test/collection-dispatch.test.ts:427-440` are positioned for activation when this project lands and assertions are re-derived from PR #375 § collection-dispatch.test.ts (tests 5–7).
+   - **Mongo row decoding** — next-family extension; should mirror SQL's `decodeRow`/`decodeField` pattern per ADR 204 § Cross-family scope notes. Out of scope for codec-async-single-path because Mongo doesn't currently decode rows; adding it is a separate piece of work (projection-aware document walker, async dispatch, result-shape decisions).
+   - **Redaction-trigger spelling** — orthogonal redaction-policy work; spec § Non-goals item. T5.2's `it.skip` test in `json-schema-validation.test.ts:613-685` is positioned for activation when the redaction policy work lands.
+
+2. **Inline-comment consistency follow-up (one-line edit, optional close-out task).** The first `it.skip` block at `collection-dispatch.test.ts` lines 428–430 carries an inline comment "Translated from PR #375. …" which is technically inconsistent with the rewritten header at L395–L426 (header says bodies are stubs). The reviewer accepted as honestly-resolved within R3 scope (governed by the rewritten header). **Recommend folding into the close-out PR as a one-line edit** — drop the "Translated from PR #375. " prefix or replace with "Placeholder body. ". Not blocking; surfaced for awareness.
+
+3. **Close-out PR (T5.11 / T5.12) is queued behind your review of this file.** Per the orchestrator's M5 R1 mandate, close-out work (strip repo-wide references to `projects/codec-async-single-path/**` and delete the project directory) is sequenced after you review `user-attention.md`. The close-out PR can fold in item 2 above.
 
 ## Final summary
 
-_(populated at end of run)_
+**Project: codec-async-single-path. Status: implementation complete; pre-PR readiness confirmed at HEAD `7b466364b`. PR opening is the next step.**
+
+### What landed
+
+A complete single-path async codec runtime across SQL and Mongo families:
+
+- **Public `Codec` interface** (5 generics: `<Id, TTraits, TWire, TInput, TOutput=TInput>`) with Promise-returning query-time methods (`encode`, `decode`) and synchronous build-time methods (`encodeJson`, `decodeJson`, optional `renderOutputType`). No async marker, no `TRuntime` generic, no per-codec discriminator.
+- **Single `codec()` / `mongoCodec()` factory** transparently lifting sync author functions to Promise-shaped methods. Authors write whichever shape is natural per method without annotations.
+- **Always-await runtime path** with concurrent `Promise.all` dispatch in `encodeParams` and `decodeRow` (SQL) plus `resolveValue` and `MongoAdapter.lower()` (Mongo encode side). Standard error envelopes (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED`) with `cause` chaining preserved end-to-end.
+- **Single field type-map shared by ORM read and write surfaces** (no read/write split). Rows yield plain `T`; writes accept plain `T`. Build-time paths (`validateContract`, `postgres({...})`, `createMongoAdapter()`) remain synchronous, regression-locked.
+- **Strict cross-family parity:** `MongoCodec` is structurally identical to `BaseCodec`; a single `codec({...})` value is exercised against both runtimes (verified by integration test `cross-family-codec.test.ts`).
+- **ADR 204 — Single-Path Async Codec Runtime** captures the design (single-path query-time, build-time-vs-query-time seam, cross-family portability, walk-back framing for the future additive sync fast-path). ADR 030 carries a partial-supersession pointer for the runtime-shape parts.
+- **PR #375's security tests translated** to the new design (envelope wrapping, JSON-Schema validation against resolved values, seeded-secret-codec async crypto fixture).
+
+### Validation
+
+Workspace-wide green at HEAD `7b466364b`: `pnpm typecheck` (120/120 tasks), `pnpm test:packages` (111/111 turbo tasks; 4 documented `it.skip` for spec-legitimate deferrals), `pnpm test:integration` (104 files / 521 tests), `pnpm test:all` (full suite), `pnpm lint:deps` (606 modules / 1198 deps; 0 violations), `pnpm build` (61/61 tasks). The deferred-test discipline is now consistent project-wide: T5.2 preserves verbatim assertions; T5.4 honestly describes its bodies as stubs.
+
+### Findings closed
+
+F1, F2, F3, F4, F5, F6, F7, F8 — all closed across m1..m5. Findings log has zero open items. AC scoreboard: 26 PASS / 0 FAIL / 0 NOT VERIFIED.
+
+### Procedural anomalies (audit trail)
+
+Three rounds (m1 R2, m4 R1, m5 between R1/R2) saw work appear in git history before the orchestrator's delegation prompt — variously authored by the user themselves or by an earlier reviewer subagent. Substance was correct in every case; the orchestrator reconciled by independently re-verifying rather than re-doing committed work. F8 filing in particular was authored by the user (Will Madden, `madden@prisma.io`) at commit `e33635ec1`, indicating you briefly returned for a second-pass review before going unavailable again.
+
+### What's queued behind your review
+
+- **Close-out PR (T5.11 + T5.12).** Strip repo-wide references to `projects/codec-async-single-path/**` (replace with canonical `docs/` links or remove); delete `projects/codec-async-single-path/`. Optional: fold in the inline-comment consistency follow-up at `collection-dispatch.test.ts:428-430`.
+- **Three follow-up projects to track in Linear** (per § m5 item 1 above): include-aggregate child-codec dispatch; Mongo row decoding; redaction-trigger spelling.
+- **Pre-existing flake follow-ups** (per § m4 above): `MongoMigrationRunner` CAS robustness; CLI Postgres-timing flake.
+- **Linear ticket ID for the closes-link in the PR body** — ticket slug is `codec-async-single-path` (from the branch name), but the ID (e.g., `TML-XXXX`) needs to be filled in by you. The PR body uses a `<TBD>` placeholder.
+
+### Recommended order
+
+1. Review this `user-attention.md` file end-to-end.
+2. Fill in the Linear ticket ID in the PR body (search for `<TBD>`).
+3. Approve / merge the codec-async-single-path PR.
+4. Open the close-out PR (T5.11 + T5.12, optionally folding in the inline-comment fix).
+5. Open Linear tickets for the three follow-up projects + the two pre-existing flakes.
