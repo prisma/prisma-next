@@ -13,6 +13,7 @@ import {
   formatAddDevArgs,
   formatRunCommand,
   hasProjectManifest,
+  type PackageManager,
 } from './detect-package-manager';
 import { errorInitMissingManifest } from './errors';
 import { INIT_EXIT_OK, INIT_EXIT_PRECONDITION, INIT_EXIT_USER_ABORTED } from './exit-codes';
@@ -205,8 +206,13 @@ function emitError(
 
 /**
  * Drives the `pnpm add` / `npm install` step. Failures are non-fatal in
- * the current design (we surface a manual-install warning and continue);
- * the `pnpm` → `npm` fallback is M2 and slots in here.
+ * the current design — we surface a manual-install warning and let
+ * `runInit` continue to emit the contract step (which will also fail
+ * gracefully). For pnpm specifically, we additionally implement the
+ * FR7.2 fallback: if pnpm fails with a recognised workspace/catalog
+ * resolution error class (typically caused by a registry version that
+ * leaked `workspace:*` or `catalog:` specifiers), retry the install
+ * using `npm` and surface a warning explaining the swap.
  */
 async function runInstall(ctx: {
   readonly baseDir: string;
@@ -241,27 +247,113 @@ async function runInstall(ctx: {
   }
 
   const exec = promisify(execFile);
+  const runPair = async (manager: PackageManager): Promise<void> => {
+    await exec(manager, formatAddArgs(manager, deps), { cwd: baseDir });
+    await exec(manager, formatAddDevArgs(manager, devDeps), { cwd: baseDir });
+  };
+
   const spinner = ui.spinner();
   spinner.start(`Installing ${pkg}, dotenv, and prisma-next...`);
   try {
-    await exec(pm, formatAddArgs(pm, deps), { cwd: baseDir });
-    await exec(pm, formatAddDevArgs(pm, devDeps), { cwd: baseDir });
+    await runPair(pm);
     spinner.stop(`Installed ${pkg}, dotenv, and prisma-next`);
     return { skipped: false, deps, devDeps, succeeded: true };
   } catch (err) {
+    const stderrText = readChildStderr(err);
+
+    // FR7.2: detect a recognised pnpm workspace/catalog resolution error
+    // and fall back to npm. Limited to pnpm specifically; npm/yarn/bun/deno
+    // failures keep the existing manual-install warning path.
+    if (pm === 'pnpm' && isRecognisedPnpmResolutionError(stderrText)) {
+      spinner.message(
+        'pnpm could not resolve a workspace/catalog dependency, retrying with npm...',
+      );
+      try {
+        await runPair('npm');
+        spinner.stop(`Installed ${pkg}, dotenv, and prisma-next via npm (pnpm fallback)`);
+        return {
+          skipped: false,
+          deps,
+          devDeps,
+          succeeded: true,
+          warning: [
+            'pnpm could not install: a published Prisma Next dependency leaked a `workspace:*` or `catalog:` specifier.',
+            'Falling back to `npm install` so init can complete.',
+            stderrText ? `  pnpm error: ${stderrText.trim().split('\n')[0]}` : '',
+            'Once the offending package republishes a clean version, re-run `pnpm install` to switch back.',
+          ]
+            .filter(Boolean)
+            .join('\n'),
+        };
+      } catch (npmErr) {
+        spinner.stop('Installation failed');
+        const npmStderr = readChildStderr(npmErr);
+        return {
+          skipped: false,
+          deps,
+          devDeps,
+          succeeded: false,
+          warning: buildManualInstallWarning(pm, deps, devDeps, [stderrText, npmStderr]),
+        };
+      }
+    }
+
     spinner.stop('Installation failed');
-    const stderrText =
-      err instanceof Error && 'stderr' in err ? String((err as { stderr: string }).stderr) : '';
-    const warning = [
-      'Could not install dependencies automatically.',
-      ...(stderrText ? [`  ${stderrText.trim()}`] : []),
-      '',
-      'Run manually:',
-      `  ${pm} ${formatAddArgs(pm, deps).join(' ')}`,
-      `  ${pm} ${formatAddDevArgs(pm, devDeps).join(' ')}`,
-    ].join('\n');
-    return { skipped: false, deps, devDeps, succeeded: false, warning };
+    return {
+      skipped: false,
+      deps,
+      devDeps,
+      succeeded: false,
+      warning: buildManualInstallWarning(pm, deps, devDeps, [stderrText]),
+    };
   }
+}
+
+/**
+ * Recognised pnpm error signatures that justify a fallback to npm.
+ *
+ * These patterns indicate the published artefact itself is at fault
+ * (a leaked `workspace:*` or `catalog:` specifier), not the user's
+ * environment — pnpm is faithfully reporting "I cannot resolve this
+ * registry version", and npm is willing to install it because npm
+ * doesn't care about the protocol prefix when there's a fallback range.
+ *
+ * Exported for unit tests; do not depend on this from outside the init
+ * command.
+ */
+export function isRecognisedPnpmResolutionError(stderr: string): boolean {
+  if (!stderr) return false;
+  return (
+    stderr.includes('ERR_PNPM_WORKSPACE_PKG_NOT_FOUND') ||
+    stderr.includes('ERR_PNPM_NO_MATCHING_VERSION') ||
+    /No matching version found for .* in the catalog/i.test(stderr) ||
+    /workspace:[^\s]+ is not a valid (version|spec)/i.test(stderr) ||
+    /catalog:[^\s]* is not a valid (version|spec)/i.test(stderr)
+  );
+}
+
+function readChildStderr(err: unknown): string {
+  if (err instanceof Error && 'stderr' in err) {
+    return String((err as { stderr: string }).stderr ?? '');
+  }
+  return '';
+}
+
+function buildManualInstallWarning(
+  pm: PackageManager,
+  deps: readonly string[],
+  devDeps: readonly string[],
+  stderrs: readonly string[],
+): string {
+  const trimmed = stderrs.map((s) => s.trim()).filter(Boolean);
+  return [
+    'Could not install dependencies automatically.',
+    ...trimmed.map((s) => `  ${s}`),
+    '',
+    'Run manually:',
+    `  ${pm} ${formatAddArgs(pm, [...deps]).join(' ')}`,
+    `  ${pm} ${formatAddDevArgs(pm, [...devDeps]).join(' ')}`,
+  ].join('\n');
 }
 
 async function runEmit(ctx: {
