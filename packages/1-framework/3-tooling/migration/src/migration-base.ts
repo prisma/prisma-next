@@ -9,7 +9,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { computeMigrationHash } from './hash';
-import { type MigrationHints, type MigrationMetadata, metadataToWire } from './metadata';
+import type { MigrationHints, MigrationMetadata } from './metadata';
 import type { MigrationOps } from './package';
 
 export interface MigrationMeta {
@@ -130,13 +130,8 @@ function printHelp(): void {
  * decide how to persist them — write to disk, print in dry-run, ship
  * over the wire — without coupling artifact construction to file I/O.
  *
- * `metadataJson` is the on-disk wire form (see `metadataToWire` in
- * `./metadata`): it carries the `migrationId` field name that the
- * arktype loader-schema validates against. The Phase-4 type rename
- * (`migrationId` → `migrationHash` in TS) is decoupled from the Phase-5
- * codemod that renames the on-disk field; until Phase 5 lands, callers
- * persisting `metadataJson` write the wire shape and the in-memory
- * `metadata` carries `migrationHash`.
+ * `metadataJson` is `JSON.stringify(metadata, null, 2)` — the canonical
+ * on-disk shape that the arktype loader-schema in `./io` validates.
  */
 export interface MigrationArtifacts {
   readonly opsJson: string;
@@ -231,6 +226,6 @@ export function buildMigrationArtifacts(
   return {
     opsJson: JSON.stringify(ops, null, 2),
     metadata,
-    metadataJson: JSON.stringify(metadataToWire(metadata), null, 2),
+    metadataJson: JSON.stringify(metadata, null, 2),
   };
 }

@@ -1,6 +1,1 @@
-export type {
-  MigrationHints,
-  MigrationMetadata,
-  MigrationMetadataWire,
-} from '../metadata';
-export { metadataFromWire, metadataToWire } from '../metadata';
+export type { MigrationHints, MigrationMetadata } from '../metadata';

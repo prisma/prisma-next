@@ -11,12 +11,7 @@ import {
   errorMissingFile,
 } from './errors';
 import { verifyMigrationHash } from './hash';
-import {
-  type MigrationMetadata,
-  type MigrationMetadataWire,
-  metadataFromWire,
-  metadataToWire,
-} from './metadata';
+import type { MigrationMetadata } from './metadata';
 import type { MigrationOps, MigrationPackage } from './package';
 
 const MANIFEST_FILE = 'migration.json';
@@ -33,15 +28,10 @@ const MigrationHintsSchema = type({
   plannerVersion: 'string',
 });
 
-// Wire-format schema for migration.json. The on-disk JSON still uses the
-// `migrationId` field name; the in-memory `MigrationMetadata` type uses
-// `migrationHash`. Phase 4 of TML-2264 bridges the two with translator
-// helpers in `metadata.ts`; Phase 5's wire-format codemod renames this
-// field on disk and collapses the translation.
-const MigrationMetadataWireSchema = type({
+const MigrationMetadataSchema = type({
   from: 'string',
   to: 'string',
-  migrationId: 'string',
+  migrationHash: 'string',
   kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',
@@ -83,7 +73,7 @@ export async function writeMigrationPackage(
     throw error;
   }
 
-  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(metadataToWire(metadata), null, 2), {
+  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(metadata, null, 2), {
     flag: 'wx',
   });
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
@@ -117,10 +107,7 @@ export async function writeMigrationMetadata(
   dir: string,
   metadata: MigrationMetadata,
 ): Promise<void> {
-  await writeFile(
-    join(dir, MANIFEST_FILE),
-    `${JSON.stringify(metadataToWire(metadata), null, 2)}\n`,
-  );
+  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(metadata, null, 2)}\n`);
 }
 
 export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise<void> {
@@ -151,9 +138,9 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
     throw error;
   }
 
-  let wireMetadata: MigrationMetadataWire;
+  let metadata: MigrationMetadata;
   try {
-    wireMetadata = JSON.parse(manifestRaw);
+    metadata = JSON.parse(manifestRaw);
   } catch (e) {
     throw errorInvalidJson(manifestPath, e instanceof Error ? e.message : String(e));
   }
@@ -165,13 +152,13 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
     throw errorInvalidJson(opsPath, e instanceof Error ? e.message : String(e));
   }
 
-  validateWireMetadata(wireMetadata, manifestPath);
+  validateMetadata(metadata, manifestPath);
   validateOps(ops, opsPath);
 
   const pkg: MigrationPackage = {
     dirName: basename(dir),
     dirPath: dir,
-    metadata: metadataFromWire(wireMetadata),
+    metadata,
     ops,
   };
 
@@ -183,11 +170,11 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   return pkg;
 }
 
-function validateWireMetadata(
-  wire: unknown,
+function validateMetadata(
+  metadata: unknown,
   filePath: string,
-): asserts wire is MigrationMetadataWire {
-  const result = MigrationMetadataWireSchema(wire);
+): asserts metadata is MigrationMetadata {
+  const result = MigrationMetadataSchema(metadata);
   if (result instanceof type.errors) {
     throw errorInvalidManifest(filePath, result.summary);
   }

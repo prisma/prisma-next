@@ -265,20 +265,18 @@ describe('migration plan → emit end-to-end', () => {
     });
   });
 
-  it('rejects legacy draft package (`migrationId: null`) at read time', async () => {
-    // Pre-collapse migrations could have `migrationId: null` on disk; the
-    // schema now refuses them. The matching `MIGRATION.INVALID_MANIFEST`
-    // surfaces the exact file so users know which directory to re-emit.
-    // (The on-disk wire shape still uses `migrationId`; Phase 5 of TML-2264
-    // collapses it back to a single in-memory shape.)
+  it('rejects migration.json with `migrationHash: null` at read time', async () => {
+    // The arktype schema in `io.ts` requires `migrationHash` to be a string;
+    // a null value (or any non-string) must surface as
+    // `MIGRATION.INVALID_MANIFEST` pointing at the offending directory.
     await withTempDir(async (root) => {
-      const dirName = formatMigrationDirName(new Date(), 'legacy-draft');
+      const dirName = formatMigrationDirName(new Date(), 'invalid-hash');
       const packageDir = join(root, dirName);
       await mkdir(packageDir, { recursive: true });
-      const legacyWireMetadata = {
+      const invalidMetadata = {
         from: EMPTY_CONTRACT_HASH,
         to: EMPTY_CONTRACT_HASH,
-        migrationId: null,
+        migrationHash: null,
         kind: 'regular' as const,
         fromContract: null,
         toContract: createSqlContract({ storage: { tables: {} } }),
@@ -286,7 +284,7 @@ describe('migration plan → emit end-to-end', () => {
         labels: [],
         createdAt: new Date().toISOString(),
       };
-      await writeFile(join(packageDir, 'migration.json'), JSON.stringify(legacyWireMetadata));
+      await writeFile(join(packageDir, 'migration.json'), JSON.stringify(invalidMetadata));
       await writeFile(join(packageDir, 'ops.json'), '[]');
 
       await expect(readMigrationPackage(packageDir)).rejects.toMatchObject({

@@ -10,12 +10,7 @@ import {
   readMigrationsDir,
   writeMigrationPackage,
 } from '../src/io';
-import {
-  createTestMetadata,
-  createTestOps,
-  createTestWireMetadata,
-  writeTestPackage,
-} from './fixtures';
+import { createTestMetadata, createTestOps, writeTestPackage } from './fixtures';
 
 function expectMigrationError(error: unknown, code: string) {
   expect(MigrationToolsError.is(error)).toBe(true);
@@ -73,7 +68,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
   it('errors on missing ops.json with code MIGRATION.FILE_MISSING', async () => {
     const dir = join(tmpDir, '20260225T1430_no_ops');
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestWireMetadata()));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
       expectMigrationError(e, 'MIGRATION.FILE_MISSING');
@@ -106,11 +101,11 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when migrationId is missing from migration.json', async () => {
+  it('errors when migrationHash is missing from migration.json', async () => {
     const dir = join(tmpDir, '20260225T1430_no_edgeid');
-    const { migrationId: _, ...wireWithoutMigrationId } = createTestWireMetadata();
+    const { migrationHash: _, ...metadataWithoutHash } = createTestMetadata();
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wireWithoutMigrationId));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithoutHash));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -119,11 +114,11 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when migrationId has wrong type', async () => {
+  it('errors when migrationHash has wrong type', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_edgeid');
-    const wire = { ...createTestWireMetadata(), migrationId: 123 };
+    const metadata = { ...createTestMetadata(), migrationHash: 123 };
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wire));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -134,9 +129,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('errors when "from" is not a string', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_from');
-    const wire = { ...createTestWireMetadata(), from: 42 };
+    const metadata = { ...createTestMetadata(), from: 42 };
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wire));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -147,9 +142,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('errors when "kind" has invalid value', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_kind');
-    const wire = { ...createTestWireMetadata(), kind: 'rollback' };
+    const metadata = { ...createTestMetadata(), kind: 'rollback' };
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wire));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -160,9 +155,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('errors when "toContract" is missing', async () => {
     const dir = join(tmpDir, '20260225T1430_no_contract');
-    const { toContract: _, ...wireWithout } = createTestWireMetadata();
+    const { toContract: _, ...metadataWithout } = createTestMetadata();
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wireWithout));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -173,9 +168,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('errors when "createdAt" is missing', async () => {
     const dir = join(tmpDir, '20260225T1430_no_created');
-    const { createdAt: _, ...wireWithout } = createTestWireMetadata();
+    const { createdAt: _, ...metadataWithout } = createTestMetadata();
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wireWithout));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -186,9 +181,9 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
 
   it('errors when "hints" is missing', async () => {
     const dir = join(tmpDir, '20260225T1430_no_hints');
-    const { hints: _, ...wireWithout } = createTestWireMetadata();
+    const { hints: _, ...metadataWithout } = createTestMetadata();
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(wireWithout));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadataWithout));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -200,7 +195,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
   it('errors when ops is not an array', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_ops');
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestWireMetadata()));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
     await writeFile(join(dir, 'ops.json'), JSON.stringify({ not: 'an array' }));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -212,7 +207,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
   it('errors when ops entry is missing required fields', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_op_entry');
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestWireMetadata()));
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(createTestMetadata()));
     await writeFile(join(dir, 'ops.json'), JSON.stringify([{ id: 'x' }]));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -231,15 +226,11 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.metadata.authorship).toEqual({ author: 'test', email: 'test@example.com' });
   });
 
-  it('rejects migration.json with migrationId: null (legacy draft)', async () => {
-    const dir = join(tmpDir, '20260225T1430_legacy_draft');
-    // Construct a legacy-shaped wire record by hand — `createTestWireMetadata`
-    // never produces a null `migrationId` since the schema was tightened, so
-    // we build the JSON directly.
-    const baseWire = createTestWireMetadata();
-    const legacyJson = JSON.stringify({ ...baseWire, migrationId: null });
+  it('rejects migration.json with migrationHash: null', async () => {
+    const dir = join(tmpDir, '20260225T1430_null_hash');
+    const metadata = { ...createTestMetadata(), migrationHash: null };
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), legacyJson);
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
     await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
@@ -308,7 +299,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('throws MIGRATION.HASH_MISMATCH when a non-migrationId field in migration.json is tampered', async () => {
+  it('throws MIGRATION.HASH_MISMATCH when a non-migrationHash field in migration.json is tampered', async () => {
     const dir = join(tmpDir, '20260225T1430_tampered_manifest');
     const { metadata } = await writeTestPackage(dir);
 
