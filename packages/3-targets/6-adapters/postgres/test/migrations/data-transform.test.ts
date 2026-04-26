@@ -4,9 +4,8 @@ import { placeholder } from '@prisma-next/errors/migration';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { dataTransform } from '@prisma-next/target-postgres/data-transform';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-import { dataTransform } from '../../src/core/migrations/operations/data-transform';
 
 const CONTRACT_HASH = 'sha256:contract-abc';
 

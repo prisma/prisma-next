@@ -1,6 +1,5 @@
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { ForeignKey, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import { describe, expect, it } from 'vitest';
 import {
   buildAddColumnSql,
   buildColumnDefaultSql,
@@ -8,7 +7,8 @@ import {
   buildCreateTableSql,
   buildForeignKeySql,
   renderDefaultLiteral,
-} from '../../src/core/migrations/planner-ddl-builders';
+} from '@prisma-next/target-postgres/planner-ddl-builders';
+import { describe, expect, it } from 'vitest';
 
 const noHooks = new Map<string, CodecControlHooks>();
 

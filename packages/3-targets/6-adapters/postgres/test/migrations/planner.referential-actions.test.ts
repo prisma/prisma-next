@@ -2,8 +2,8 @@ import { type Contract, coreHash, profileHash } from '@prisma-next/contract/type
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { ForeignKey, ReferentialAction, SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
 
 function createRefActionContract(
   onDelete?: ReferentialAction,

@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
   buildExpectedFormatType,
   columnExistsCheck,
@@ -9,7 +8,8 @@ import {
   tableHasPrimaryKeyCheck,
   tableIsEmptyCheck,
   toRegclassLiteral,
-} from '../../src/core/migrations/planner-sql-checks';
+} from '@prisma-next/target-postgres/planner-sql-checks';
+import { describe, expect, it } from 'vitest';
 
 describe('qualifyTableName', () => {
   it('quotes schema and table', () => {

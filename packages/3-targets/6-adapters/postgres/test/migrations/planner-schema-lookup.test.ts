@@ -1,12 +1,12 @@
 import type { ForeignKey } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import { describe, expect, it } from 'vitest';
 import {
   buildSchemaLookupMap,
   hasForeignKey,
   hasIndex,
   hasUniqueConstraint,
-} from '../../src/core/migrations/planner-schema-lookup';
+} from '@prisma-next/target-postgres/planner-schema-lookup';
+import { describe, expect, it } from 'vitest';
 
 function makeTable(
   overrides: Partial<SqlSchemaIR['tables'][string]> = {},

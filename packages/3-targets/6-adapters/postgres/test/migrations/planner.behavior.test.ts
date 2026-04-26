@@ -9,9 +9,9 @@ import { type CodecControlHooks, INIT_ADDITIVE_POLICY } from '@prisma-next/famil
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import { buildBuiltinIdentityValue } from '@prisma-next/target-postgres/planner-identity-values';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import { buildBuiltinIdentityValue } from '../../src/core/migrations/planner-identity-values';
 
 describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
   const planner = createPostgresMigrationPlanner();

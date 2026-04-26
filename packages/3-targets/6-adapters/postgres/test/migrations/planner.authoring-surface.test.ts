@@ -10,8 +10,10 @@ import type {
   MigrationPlannerSuccessResult,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import postgresTargetDescriptor, {
+  postgresRenderDefault,
+} from '@prisma-next/target-postgres/control';
 import { describe, expect, it } from 'vitest';
-import postgresTargetDescriptor, { postgresRenderDefault } from '../../src/exports/control';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {

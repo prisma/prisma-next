@@ -8,10 +8,10 @@ import sqlFamilyDescriptor, {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
+import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
+import type { SqlStatement } from '@prisma-next/target-postgres/statement-builders';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
-import type { PostgresPlanTargetDetails } from '../../../src/core/migrations/planner-target-details';
-import type { SqlStatement } from '../../../src/core/migrations/statement-builders';
-import postgresTargetDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
   target: 'postgres',

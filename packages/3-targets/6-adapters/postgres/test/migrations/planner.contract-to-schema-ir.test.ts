@@ -14,10 +14,10 @@ import {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { postgresRenderDefault } from '@prisma-next/target-postgres/control';
+import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/planner';
+import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { describe, expect, it } from 'vitest';
-import { createPostgresMigrationPlanner } from '../../src/core/migrations/planner';
-import type { PostgresPlanTargetDetails } from '../../src/core/migrations/planner-target-details';
-import { postgresRenderDefault } from '../../src/exports/control';
 
 const adapterCodecHooks = extractCodecControlHooks([postgresAdapterDescriptor]);
 const expandParameterizedNativeType: NativeTypeExpander = (input) => {
