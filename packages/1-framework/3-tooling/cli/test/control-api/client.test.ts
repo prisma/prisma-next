@@ -470,35 +470,39 @@ describe('ControlClient progress emission', () => {
       timeouts.databaseOperation,
     );
 
-    it('passes declared source inputs to the provider', async () => {
-      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
-      const load = vi.fn<ContractSourceProvider['load']>(async () =>
-        ok({ test: true } as unknown as Contract),
-      );
-      const source = createSourceProvider(load, ['/tmp/schema.prisma']);
+    it(
+      'passes declared source inputs to the provider',
+      async () => {
+        const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+        const load = vi.fn<ContractSourceProvider['load']>(async () =>
+          ok({ test: true } as unknown as Contract),
+        );
+        const source = createSourceProvider(load, ['/tmp/schema.prisma']);
 
-      const client = createControlClient({
-        family: mockFamily,
-        target: mockTarget,
-        adapter: mockAdapter,
-      });
+        const client = createControlClient({
+          family: mockFamily,
+          target: mockTarget,
+          adapter: mockAdapter,
+        });
 
-      const result = await client.emit({
-        contractConfig: {
-          source,
-          output: '/tmp/contract.json',
-        },
-      });
+        const result = await client.emit({
+          contractConfig: {
+            source,
+            output: '/tmp/contract.json',
+          },
+        });
 
-      await client.close();
+        await client.close();
 
-      expect(result.ok).toBe(true);
-      expect(load).toHaveBeenCalledWith(
-        expect.objectContaining({
-          resolvedInputs: ['/tmp/schema.prisma'],
-        }),
-      );
-    });
+        expect(result.ok).toBe(true);
+        expect(load).toHaveBeenCalledWith(
+          expect.objectContaining({
+            resolvedInputs: ['/tmp/schema.prisma'],
+          }),
+        );
+      },
+      timeouts.databaseOperation,
+    );
 
     it(
       'emits resolveSource and emit spans when source is a provider object',
