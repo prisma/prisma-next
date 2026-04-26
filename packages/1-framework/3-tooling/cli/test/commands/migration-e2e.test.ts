@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId, verifyMigration } from '@prisma-next/migration-tools/attestation';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -91,10 +91,6 @@ describe('migration plan → emit end-to-end', () => {
       const dirName = formatMigrationDirName(new Date(), 'initial');
       const packageDir = join(migrationsDir, dirName);
       await writeMigrationPackage(packageDir, manifest, ops);
-
-      const verifyResult = await verifyMigration(packageDir);
-      expect(verifyResult.ok).toBe(true);
-      expect(verifyResult.storedMigrationId).toBe(manifest.migrationId);
 
       const pkg = await readMigrationPackage(packageDir);
       expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
@@ -198,10 +194,6 @@ describe('migration plan → emit end-to-end', () => {
         const pkg1 = packages.find((p) => p.manifest.to === 'sha256:hash-a')!;
         const pkg2 = packages.find((p) => p.manifest.to === 'sha256:hash-b')!;
         expect(pkg1.manifest.to).toBe(pkg2.manifest.from);
-
-        // Both packages verify
-        expect((await verifyMigration(path1)).ok).toBe(true);
-        expect((await verifyMigration(path2)).ok).toBe(true);
       });
     },
     timeouts.databaseOperation,

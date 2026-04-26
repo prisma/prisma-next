@@ -186,3 +186,15 @@ export function errorDuplicateMigrationId(migrationId: string): MigrationToolsEr
     },
   );
 }
+
+export function errorBundleCorrupt(
+  dir: string,
+  storedMigrationId: string,
+  computedMigrationId: string,
+): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.BUNDLE_CORRUPT', 'Migration package is corrupt', {
+    why: `Stored migrationId "${storedMigrationId}" does not match the recomputed hash "${computedMigrationId}" for "${dir}". The migration.json or ops.json has been edited or partially written since emit.`,
+    fix: `Re-emit the package by running \`node "${dir}/migration.ts"\`, or restore the directory from version control.`,
+    details: { dir, storedMigrationId, computedMigrationId },
+  });
+}

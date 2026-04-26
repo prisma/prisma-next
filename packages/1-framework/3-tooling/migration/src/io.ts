@@ -1,7 +1,9 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
+import { verifyMigrationBundle } from './attestation';
 import {
+  errorBundleCorrupt,
   errorDirectoryExists,
   errorInvalidDestName,
   errorInvalidJson,
@@ -150,12 +152,19 @@ export async function readMigrationPackage(dir: string): Promise<MigrationBundle
   validateManifest(manifest, manifestPath);
   validateOps(ops, opsPath);
 
-  return {
+  const bundle: MigrationBundle = {
     dirName: basename(dir),
     dirPath: dir,
     manifest,
     ops,
   };
+
+  const verification = verifyMigrationBundle(bundle);
+  if (!verification.ok) {
+    throw errorBundleCorrupt(dir, verification.storedMigrationId, verification.computedMigrationId);
+  }
+
+  return bundle;
 }
 
 function validateManifest(
