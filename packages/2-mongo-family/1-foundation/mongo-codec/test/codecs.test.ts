@@ -3,7 +3,7 @@ import { createMongoCodecRegistry } from '../src/codec-registry';
 import { type MongoCodec, mongoCodec } from '../src/codecs';
 
 describe('mongoCodec()', () => {
-  it('creates a codec with the given config', () => {
+  it('creates a codec with the given config', async () => {
     const codec = mongoCodec({
       typeId: 'test/string@1',
       targetTypes: ['string'],
@@ -13,12 +13,12 @@ describe('mongoCodec()', () => {
 
     expect(codec.id).toBe('test/string@1');
     expect(codec.targetTypes).toEqual(['string']);
-    expect(codec.traits).toEqual([]);
-    expect(codec.decode('hello')).toBe('hello');
-    expect(codec.encode?.('hello')).toBe('hello');
+    expect(codec.traits).toBeUndefined();
+    expect(await codec.decode('hello')).toBe('hello');
+    expect(await codec.encode('hello')).toBe('hello');
   });
 
-  it('creates a codec with encode and decode', () => {
+  it('creates a codec with encode and decode', async () => {
     const codec = mongoCodec({
       typeId: 'test/upper@1',
       targetTypes: ['text'],
@@ -26,8 +26,34 @@ describe('mongoCodec()', () => {
       encode: (value: string) => value.toLowerCase(),
     });
 
-    expect(codec.decode('hello')).toBe('HELLO');
-    expect(codec.encode?.('HELLO')).toBe('hello');
+    expect(await codec.decode('hello')).toBe('HELLO');
+    expect(await codec.encode('HELLO')).toBe('hello');
+  });
+
+  it('lifts sync author functions to Promise-returning methods', () => {
+    const codec = mongoCodec({
+      typeId: 'test/sync@1',
+      targetTypes: ['string'],
+      decode: (wire: string) => wire,
+      encode: (value: string) => value,
+    });
+
+    const decoded = codec.decode('x');
+    const encoded = codec.encode('y');
+    expect(typeof (decoded as { then?: unknown }).then).toBe('function');
+    expect(typeof (encoded as { then?: unknown }).then).toBe('function');
+  });
+
+  it('accepts async author functions and uses them directly', async () => {
+    const codec = mongoCodec({
+      typeId: 'test/async@1',
+      targetTypes: ['string'],
+      decode: async (wire: string) => `decoded:${wire}`,
+      encode: async (value: string) => `encoded:${value}`,
+    });
+
+    expect(await codec.decode('a')).toBe('decoded:a');
+    expect(await codec.encode('b')).toBe('encoded:b');
   });
 });
 

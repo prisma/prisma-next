@@ -428,3 +428,23 @@ describe('MongoAdapter with codec registry', () => {
     expect(wire.documents).toEqual([{ name: 'ALICE' }, { name: 'BOB' }]);
   });
 });
+
+// T4.10 — regression: createMongoAdapter() must remain synchronous.
+// Even though the adapter's `lower()` method became async in m4, the
+// construction path stays sync so that `mongo({...})` clients can be
+// instantiated without `await`.
+describe('createMongoAdapter (sync construction regression)', () => {
+  it('returns a non-Promise adapter at runtime', () => {
+    const adapter = createMongoAdapter();
+    expect(adapter).toBeDefined();
+    const thenable = adapter as unknown as { then?: unknown };
+    expect(typeof thenable.then).toBe('undefined');
+  });
+
+  it('binds to a synchronous type at the call site', () => {
+    // Type-level regression: this must compile without `await`. If
+    // createMongoAdapter becomes Promise-returning, this assignment fails.
+    const adapter = createMongoAdapter();
+    expect(adapter.lower).toBeTypeOf('function');
+  });
+});
