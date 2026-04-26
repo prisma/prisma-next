@@ -141,6 +141,24 @@ function isCliErrorDomain(value: unknown): value is CliErrorDomain {
 }
 
 // ============================================================================
+// Numeric range conventions for `PN-CLI-NNNN`
+// ============================================================================
+//
+// Sub-clustering inside the `CLI` domain uses the numeric prefix:
+//
+// - `4xxx` — generic / cross-command CLI errors authored here (config
+//   missing, file not found, contract validation, etc.).
+// - `5xxx` — command-specific CLI errors authored alongside the command
+//   itself (e.g. `init` errors live in
+//   `packages/1-framework/3-tooling/cli/src/commands/init/errors.ts`).
+//   The 5xxx range avoids collisions with the shared 4xxx pool while
+//   still belonging to the `CLI` domain — consumers branch on the full
+//   `PN-CLI-5007` form, so the prefix is purely an authoring guide.
+//
+// See [`docs/CLI Style Guide.md` § Errors](../../../../../../docs/CLI%20Style%20Guide.md#errors)
+// and the per-command error file for the live reservation list.
+
+// ============================================================================
 // Config Errors (PN-CLI-4001-4007)
 // ============================================================================
 
