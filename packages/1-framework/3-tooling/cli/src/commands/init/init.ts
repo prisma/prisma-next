@@ -24,6 +24,9 @@ import {
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
 } from './exit-codes';
+import { mergeGitattributes, requiredGitattributesLines } from './hygiene-gitattributes';
+import { mergeGitignore } from './hygiene-gitignore';
+import { mergePackageScripts, REQUIRED_SCRIPTS } from './hygiene-package-scripts';
 import { type InitFlagOptions, type ResolvedInitInputs, resolveInitInputs } from './inputs';
 import {
   buildNextSteps,
@@ -34,6 +37,7 @@ import {
 } from './output';
 import { agentSkillMd } from './templates/agent-skill';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
+import { envExampleContent, envFileContent } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
 import { defaultTsConfig, mergeTsConfig } from './templates/tsconfig';
 
@@ -120,6 +124,7 @@ export async function runInit(
       path: '.agents/skills/prisma-next/SKILL.md',
       content: agentSkillMd(inputs.target, inputs.schemaPath, pkgRun),
     },
+    { path: '.env.example', content: envExampleContent(inputs.target) },
   ];
 
   for (const file of files) {
@@ -129,6 +134,26 @@ export async function runInit(
     filesWritten.push(file.path);
   }
 
+  // FR3.2: write a real `.env` only when the user opted in via flag or
+  // interactive prompt. We never overwrite an existing `.env` — secrets
+  // already live there and clobbering them is the most damaging
+  // possible side-effect of `init`. Touching `.env.example` is fine
+  // because it's documented to be regenerated.
+  if (inputs.writeEnv) {
+    const envPath = join(baseDir, '.env');
+    if (!existsSync(envPath)) {
+      writeFileSync(envPath, envFileContent(inputs.target), 'utf-8');
+      filesWritten.push('.env');
+    } else {
+      warnings.push(
+        '.env already exists; leaving it untouched. Compare with .env.example for any new keys.',
+      );
+    }
+  }
+
+  // FR2.2: tsconfig.json gets the minimum compiler options the
+  // scaffolded files need (notably `types: ["node"]` so `process.env`
+  // resolves under `moduleResolution: "bundler"`).
   const tsconfigPath = join(baseDir, 'tsconfig.json');
   const tsconfigRel = 'tsconfig.json';
   if (existsSync(tsconfigPath)) {
@@ -141,6 +166,50 @@ export async function runInit(
   } else {
     writeFileSync(tsconfigPath, defaultTsConfig(), 'utf-8');
     filesWritten.push(tsconfigRel);
+  }
+
+  // FR3.3: idempotent .gitignore — append only what's missing.
+  const gitignorePath = join(baseDir, '.gitignore');
+  const existingGitignore = existsSync(gitignorePath)
+    ? readFileSync(gitignorePath, 'utf-8')
+    : undefined;
+  const newGitignore = mergeGitignore(existingGitignore);
+  if (newGitignore !== null) {
+    writeFileSync(gitignorePath, newGitignore, 'utf-8');
+    filesWritten.push('.gitignore');
+  }
+
+  // FR3.4: idempotent .gitattributes — append linguist-generated lines
+  // for the artefacts emitted into `schemaDir` so GitHub diff stats and
+  // code review collapse the generated files by default.
+  const gitattributesPath = join(baseDir, '.gitattributes');
+  const existingGitattributes = existsSync(gitattributesPath)
+    ? readFileSync(gitattributesPath, 'utf-8')
+    : undefined;
+  const newGitattributes = mergeGitattributes(
+    existingGitattributes,
+    requiredGitattributesLines(schemaDir, inputs.target),
+  );
+  if (newGitattributes !== null) {
+    writeFileSync(gitattributesPath, newGitattributes, 'utf-8');
+    filesWritten.push('.gitattributes');
+  }
+
+  // FR3.5: idempotent package.json#scripts updater. Collisions with a
+  // user-written script of the same name produce a structured warning
+  // and the user's script is preserved.
+  const packageJsonPath = join(baseDir, 'package.json');
+  if (existsSync(packageJsonPath)) {
+    const pkgRaw = readFileSync(packageJsonPath, 'utf-8');
+    const { content: nextPkg, warnings: scriptWarnings } = mergePackageScripts(
+      pkgRaw,
+      REQUIRED_SCRIPTS,
+    );
+    if (nextPkg !== null) {
+      writeFileSync(packageJsonPath, nextPkg, 'utf-8');
+      filesWritten.push('package.json');
+    }
+    warnings.push(...scriptWarnings);
   }
 
   const emitCommand = formatRunCommand(pm, 'prisma-next', 'contract emit');
@@ -294,7 +363,15 @@ async function runInstall(ctx: {
   const { baseDir, pm, target, install, flags, ui, filesWritten } = ctx;
   const pkg = targetPackageName(target);
   const deps = [pkg, 'dotenv'];
-  const devDeps = ['prisma-next'];
+  // FR2.1: `@types/node` is unconditional — under
+  // `moduleResolution: 'bundler'` (FR2.2) the scaffolded `db.ts` /
+  // `prisma-next.config.ts` reference `process.env`, which only
+  // typechecks with Node's ambient types in the resolution graph. We
+  // pin it as a devDep rather than relying on a transitive resolution
+  // through `dotenv` because `dotenv`'s own types bundle is internal
+  // and not guaranteed across versions. Listed last so the install log
+  // still leads with the user-relevant `prisma-next` line.
+  const devDeps = ['prisma-next', '@types/node'];
 
   const addCommand = `${pm} ${formatAddArgs(pm, deps).join(' ')}`;
   const addDevCommand = `${pm} ${formatAddDevArgs(pm, devDeps).join(' ')}`;
@@ -334,11 +411,12 @@ async function runInstall(ctx: {
     await exec(manager, formatAddDevArgs(manager, devDeps), { cwd: baseDir });
   };
 
+  const allPackages = [...deps, ...devDeps].join(', ');
   const spinner = ui.spinner();
-  spinner.start(`Installing ${pkg}, dotenv, and prisma-next...`);
+  spinner.start(`Installing ${allPackages}...`);
   try {
     await runPair(pm);
-    spinner.stop(`Installed ${pkg}, dotenv, and prisma-next`);
+    spinner.stop(`Installed ${allPackages}`);
     return { skipped: false, deps, devDeps, warnings: catalogWarnings };
   } catch (err) {
     const stderrText = redactSecrets(readChildStderr(err));
@@ -352,7 +430,7 @@ async function runInstall(ctx: {
       );
       try {
         await runPair('npm');
-        spinner.stop(`Installed ${pkg}, dotenv, and prisma-next via npm (pnpm fallback)`);
+        spinner.stop(`Installed ${allPackages} via npm (pnpm fallback)`);
         const fallbackWarning = [
           'pnpm could not install: a published Prisma Next dependency leaked a `workspace:*` or `catalog:` specifier.',
           'Falling back to `npm install` so init can complete.',
