@@ -419,11 +419,11 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
     expect(new Set(renderedTexts).size).toBe(1);
 
     // Machine-readable envelope shape: every command must carry the full
-    // `details` payload from `errorMigrationHashMismatch` in `meta`. This
-    // pins the F12 fix — `migration status` / `migration new` previously
-    // dropped `dir` / `storedHash` / `computedHash`, surfacing only `code`.
-    // After the shared `mapMigrationToolsError` helper landed, the envelope
-    // shape is identical across all five commands.
+    // `details` payload from `errorMigrationHashMismatch` in `meta`.
+    // The shared `mapMigrationToolsError` helper in `cli-errors` is the
+    // single mapping site, so the envelope shape (`dir`, `storedHash`,
+    // `computedHash` alongside `code`) is identical across all five
+    // commands by construction.
     const metaKeys = diagnostics.map((d) =>
       Object.keys(d.envelope.meta ?? {})
         .sort()
