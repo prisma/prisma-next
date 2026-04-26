@@ -228,6 +228,43 @@ describe('templates', () => {
       expect(md).not.toContain('client.orm.User');
     });
 
+    // FR8.2: Requirements section surfaces the minimum supported server
+    // version on the user-facing quick reference, so a freshly-init'd
+    // project does not silently lie about which servers it supports.
+    describe('Requirements section (FR8.2)', () => {
+      it('postgres: documents the minimum PostgreSQL version', () => {
+        const md = quickReferenceMd(
+          'postgres',
+          'psl',
+          'prisma/contract.prisma',
+          'pnpm prisma-next',
+        );
+
+        expect(md).toMatch(/## Requirements/);
+        expect(md).toMatch(/PostgreSQL \d+ or newer/);
+        expect(md).toContain('SELECT version()');
+      });
+
+      it('mongo: documents the minimum MongoDB version', () => {
+        const md = quickReferenceMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
+
+        expect(md).toMatch(/## Requirements/);
+        expect(md).toMatch(/MongoDB \d/);
+        expect(md).toContain('buildInfo');
+      });
+
+      it('mentions the --probe-db opt-in so users know init does not connect by default', () => {
+        const md = quickReferenceMd(
+          'postgres',
+          'psl',
+          'prisma/contract.prisma',
+          'pnpm prisma-next',
+        );
+
+        expect(md).toContain('--probe-db');
+      });
+    });
+
     it('documents the replica-set requirement for transactions and change streams', () => {
       const md = quickReferenceMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
 

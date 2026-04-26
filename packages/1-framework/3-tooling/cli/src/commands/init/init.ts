@@ -22,6 +22,7 @@ import {
   errorInitInvalidManifest,
   errorInitInvalidTsconfig,
   errorInitMissingManifest,
+  errorInitProbeFailed,
 } from './errors';
 import {
   INIT_EXIT_EMIT_FAILED,
@@ -41,9 +42,10 @@ import {
   InitOutputSchema,
   renderInitOutro,
 } from './output';
+import { type ProbeOutcome, type ProbeOverrides, probeServerVersion } from './probe-db';
 import { agentSkillMd } from './templates/agent-skill';
 import { configFile, dbFile, starterSchema, targetPackageName } from './templates/code-templates';
-import { envExampleContent, envFileContent } from './templates/env';
+import { envExampleContent, envFileContent, MIN_SERVER_VERSION } from './templates/env';
 import { quickReferenceMd } from './templates/quick-reference';
 import { defaultTsConfig, mergeTsConfig, TsConfigParseError } from './templates/tsconfig';
 
@@ -90,9 +92,18 @@ export async function runInit(
      * mode) — see [Style Guide § Interactivity](../../../../../../../docs/CLI%20Style%20Guide.md#interactivity).
      */
     readonly canPrompt: boolean;
+    /**
+     * FR8.3 — test-only seam for the optional database version probe.
+     * Production callers omit this; tests inject stub `probePostgres` /
+     * `probeMongo` functions so the probe contract (env handling,
+     * comparator, message formatting, `--strict-probe` escalation) can
+     * be exercised without a live database. Never read at runtime by a
+     * user invocation of the CLI.
+     */
+    readonly probeOverrides?: ProbeOverrides;
   },
 ): Promise<number> {
-  const { options, flags, canPrompt } = runOptions;
+  const { options, flags, canPrompt, probeOverrides } = runOptions;
   const ui = new TerminalUI({ color: flags.color, interactive: flags.interactive });
   const warnings: string[] = [];
   const filesWritten: string[] = [];
@@ -304,6 +315,30 @@ export async function runInit(
     }
   }
 
+  // FR8.3 — optional database version probe. Strictly opt-in: we never
+  // open a network connection to the user's database without
+  // `--probe-db`. The probe runs after install + emit so the target
+  // driver (`pg` / `mongodb`) is guaranteed present in node_modules
+  // for the CJS `createRequire` resolution.
+  if (inputs.probeDb) {
+    const outcome = await probeServerVersion(
+      {
+        baseDir,
+        target: inputs.target,
+        databaseUrl: process.env['DATABASE_URL'],
+        minVersion: MIN_SERVER_VERSION[inputs.target],
+      },
+      probeOverrides ?? {},
+    );
+    const escalated = applyProbeOutcome(outcome, {
+      strictProbe: inputs.strictProbe,
+      warnings,
+    });
+    if (escalated !== null) {
+      return emitError(ui, flags, errorInitProbeFailed({ cause: escalated, filesWritten }));
+    }
+  }
+
   const output: InitOutput = {
     ok: true,
     target: inputs.target === 'mongo' ? 'mongodb' : 'postgres',
@@ -387,6 +422,7 @@ function exitCodeForError(error: CliStructuredError): number {
     case '5005': // --strict-probe without --probe-db — precondition
     case '5010': // invalid manifest (malformed package.json) — precondition
     case '5011': // invalid tsconfig (unparseable JSONC) — precondition
+    case '5012': // probe failed under --strict-probe — precondition
       return INIT_EXIT_PRECONDITION;
     case '5006': // user aborted interactive prompt
       return INIT_EXIT_USER_ABORTED;
@@ -396,6 +432,46 @@ function exitCodeForError(error: CliStructuredError): number {
       return INIT_EXIT_EMIT_FAILED;
     default:
       return INIT_EXIT_PRECONDITION;
+  }
+}
+
+/**
+ * Folds a `ProbeOutcome` into init's warning channel and returns the
+ * fatal cause string when `--strict-probe` should escalate. Mirrors
+ * the FR8.3 contract:
+ *
+ * - `ok` — informational; nothing surfaced unless verbose. (We could
+ *   plumb a `note` here, but the spec only requires the warning side
+ *   of the contract; an "all good" line would just be noise on the
+ *   common path.)
+ * - `below-minimum` — warning regardless of `--strict-probe`. The
+ *   probe ran successfully and found an old server; that is not a
+ *   probe *failure* (which is what `--strict-probe` escalates), it
+ *   is the probe doing its job.
+ * - `no-database-url` / `connection-failed` / `driver-missing` —
+ *   warning by default, fatal under `--strict-probe`.
+ *
+ * Exported for unit tests so the branching contract can be asserted
+ * without spinning up a full `runInit` round trip.
+ */
+export function applyProbeOutcome(
+  outcome: ProbeOutcome,
+  ctx: { readonly strictProbe: boolean; readonly warnings: string[] },
+): string | null {
+  switch (outcome.kind) {
+    case 'ok':
+      return null;
+    case 'below-minimum':
+      ctx.warnings.push(outcome.message);
+      return null;
+    case 'no-database-url':
+    case 'connection-failed':
+    case 'driver-missing':
+      if (ctx.strictProbe) {
+        return outcome.message;
+      }
+      ctx.warnings.push(outcome.message);
+      return null;
   }
 }
 

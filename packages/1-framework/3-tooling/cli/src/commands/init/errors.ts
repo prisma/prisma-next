@@ -201,6 +201,36 @@ export function errorInitInvalidTsconfig(options: {
 }
 
 /**
+ * `--probe-db` was supplied along with `--strict-probe` and the probe
+ * could not complete (no `DATABASE_URL`, network/auth error, the target
+ * driver was not installed, …). Without `--strict-probe` the probe
+ * surfaces these as warnings; `--strict-probe` escalates them to
+ * fatal so a CI gate can rely on "init exit code 2 means something
+ * about the runtime environment is wrong" (FR8.3).
+ *
+ * Maps to exit code `2 = PRECONDITION`. The caller's project files
+ * are already on disk by this point — the probe runs after the write
+ * phase — but the install/emit steps may or may not have completed
+ * depending on `--no-install` and the exact failure mode; `meta`
+ * carries `filesWritten` so a follow-up agent can resume manually.
+ */
+export function errorInitProbeFailed(options: {
+  readonly cause: string;
+  readonly filesWritten: readonly string[];
+}): CliStructuredError {
+  return new CliStructuredError('5012', 'Database probe failed', {
+    domain: 'CLI',
+    why: `\`--probe-db\` could not complete and \`--strict-probe\` was set: ${options.cause}`,
+    fix: 'Confirm `DATABASE_URL` points at a reachable server, or drop `--strict-probe` to treat probe failures as warnings.',
+    docsUrl: 'https://prisma-next.dev/docs/cli/init',
+    meta: {
+      filesWritten: options.filesWritten,
+      cause: options.cause,
+    },
+  });
+}
+
+/**
  * `prisma-next contract emit` failed after a successful install. Surface
  * the underlying error so the user can fix it and re-run; files and
  * dependencies remain on disk untouched. Maps to exit code

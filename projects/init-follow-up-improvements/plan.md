@@ -86,14 +86,14 @@ Closes FR6 and the atomicity NFR (NFR3).
 
 ### Milestone 7 — DB target version compatibility (R11)
 
-Closes FR8.
+Closes FR8.1, FR8.2, FR8.3 (FR8.4 was closed in M3). FR8.5 is deferred to a follow-up ticket — see below.
 
 **Tasks (sketch):**
 
-- [ ] Declare minimum supported server version in `@prisma-next/target-postgres` and `@prisma-next/target-mongo` (FR8.1).
-- [ ] Surface the requirement in `.env.example` and `prisma-next.md` (FR8.2, FR8.4).
-- [ ] Add the optional probe (FR8.3): `SELECT version()` for Postgres, `db.runCommand({buildInfo:1})` for Mongo, gated on `--probe-db` / interactive opt-in.
-- [ ] Add a runtime-side check on first `db.connect` that emits a structured warning once if below minimum (FR8.5).
+- [x] Declare minimum supported server version in `@prisma-next/postgres` and `@prisma-next/mongo` target packages as a `prismaNext.minServerVersion` field in each `package.json` (FR8.1). The CLI's `MIN_SERVER_VERSION` constant in `templates/env.ts` mirrors those values; a workspace-level test (`tsconfig-env.test.ts > MIN_SERVER_VERSION mirrors target packages`) fails loudly if the two ever drift.
+- [x] Surface the requirement in `.env.example` (`# Requires PostgreSQL >= 14.` / `# Requires MongoDB >= 6.0.`) and as a "Requirements" section in `prisma-next.md` rendered by `quickReferenceMd` (FR8.2). Snapshot tests in `templates.test.ts` cover all four `(target × authoring)` cells.
+- [x] Add the optional probe (FR8.3): `SELECT version()` for Postgres, `db.runCommand({ buildInfo: 1 })` for Mongo, gated on `--probe-db`. `--strict-probe` escalates probe **failures** (no `DATABASE_URL`, network/auth error, driver missing) to fatal but never triggers a probe by itself. Implemented in `commands/init/probe-db.ts`; the comparator, parser, and outcome routing are unit-tested in `probe-db.test.ts`; the offline-by-default contract (no probe without `--probe-db`) is asserted in `init.test.ts`.
+- [ ] Defer: runtime-side check on first `db.connect` that emits a structured warning once if below minimum (FR8.5) — tracked under [TML-2320](https://linear.app/prisma-company/issue/TML-2320/runtime-version-check-warning-on-first-dbconnect-fr85-follow-up). The change touches `@prisma-next/mongo-runtime`, `@prisma-next/postgres-runtime`, and the framework-components logger seam (which does not yet exist), well outside the `init` boundary that this project owns.
 
 ### Milestone 8 — Re-init cleanup (R9)
 
