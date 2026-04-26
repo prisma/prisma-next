@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
@@ -76,6 +77,106 @@ function resolveColumnRefForAlias(
   }
 
   return fallbackColumnRefIndex?.get(alias);
+}
+
+export function isJsonSchemaValidationError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
+  );
+}
+
+export function wirePreview(value: unknown): string {
+  return typeof value === 'string' && value.length > 100
+    ? `${value.substring(0, 100)}...`
+    : String(value).substring(0, 100);
+}
+
+export function decodeFailure(
+  alias: string,
+  codecId: string,
+  wireValue: unknown,
+  error: unknown,
+): Error {
+  // Codec-authored error messages may embed the decrypted value (e.g.
+  // `Error("bad tag for <plaintext>")`). Keep the human message bounded to
+  // the alias + codec ID and surface the original error through `cause` so
+  // diagnostics stay available to debuggers but never flow into telemetry.
+  const envelope = runtimeError(
+    'RUNTIME.DECODE_FAILED',
+    `Failed to decode row alias '${alias}' with codec '${codecId}'`,
+    {
+      alias,
+      codec: codecId,
+      wirePreview: wirePreview(wireValue),
+    },
+  );
+  (envelope as Error).cause = error;
+  return envelope;
+}
+
+export interface DecodeFieldOptions {
+  readonly alias: string;
+  readonly wireValue: unknown;
+  readonly codec: Codec;
+  readonly jsonValidators?: JsonSchemaValidatorRegistry | undefined;
+  readonly tableName?: string | undefined;
+  readonly columnName?: string | undefined;
+}
+
+/**
+ * Runs codec.decode on a single wire value, threading JSON-schema validation
+ * and error redaction through a single place. Sync codecs return the decoded
+ * value directly; async codecs return a `Promise<unknown>` with unread
+ * rejections silenced so floating promise fields don't trigger Node's
+ * `unhandledRejection` for rows whose async field is never awaited. Consumers
+ * that do await the promise still receive the rejection.
+ *
+ * Schema-validation errors for async-decode codecs are redacted (validator
+ * `message` strings are dropped) so decrypted plaintext cannot flow into
+ * telemetry. See ADR 030.
+ */
+export function decodeField(options: DecodeFieldOptions): unknown {
+  const { alias, wireValue, codec, jsonValidators, tableName, columnName } = options;
+  const redactValues = codec.runtime?.decode === 'async';
+  const runValidation = (value: unknown): void => {
+    if (!jsonValidators || !tableName || !columnName) return;
+    validateJsonValue(
+      jsonValidators,
+      tableName,
+      columnName,
+      value,
+      'decode',
+      codec.id,
+      redactValues,
+    );
+  };
+
+  try {
+    const decoded = codec.decode(wireValue);
+    if (decoded instanceof Promise) {
+      const promise = (async () => {
+        try {
+          const resolved = await decoded;
+          runValidation(resolved);
+          return resolved;
+        } catch (error) {
+          if (isJsonSchemaValidationError(error)) throw error;
+          throw decodeFailure(alias, codec.id, wireValue, error);
+        }
+      })();
+      // Silence unread async fields; consumers that await still see the rejection.
+      promise.catch(() => {});
+      return promise;
+    }
+
+    runValidation(decoded);
+    return decoded;
+  } catch (error) {
+    if (isJsonSchemaValidationError(error)) throw error;
+    throw decodeFailure(alias, codec.id, wireValue, error);
+  }
 }
 
 export function decodeRow(
@@ -165,56 +266,17 @@ export function decodeRow(
       continue;
     }
 
-    try {
-      const decodedValue = codec.decode(wireValue);
-
-      // Validate decoded JSON value against schema
-      if (jsonValidators) {
-        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
-        if (ref) {
-          validateJsonValue(
-            jsonValidators,
-            ref.table,
-            ref.column,
-            decodedValue,
-            'decode',
-            codec.id,
-          );
-        }
-      }
-
-      decoded[alias] = decodedValue;
-    } catch (error) {
-      // Re-throw JSON schema validation errors as-is
-      if (
-        error instanceof Error &&
-        'code' in error &&
-        (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
-      ) {
-        throw error;
-      }
-
-      const decodeError = new Error(
-        `Failed to decode row alias '${alias}' with codec '${codec.id}': ${error instanceof Error ? error.message : String(error)}`,
-      ) as Error & {
-        code: string;
-        category: string;
-        severity: string;
-        details?: Record<string, unknown>;
-      };
-      decodeError.code = 'RUNTIME.DECODE_FAILED';
-      decodeError.category = 'RUNTIME';
-      decodeError.severity = 'error';
-      decodeError.details = {
-        alias,
-        codec: codec.id,
-        wirePreview:
-          typeof wireValue === 'string' && wireValue.length > 100
-            ? `${wireValue.substring(0, 100)}...`
-            : String(wireValue).substring(0, 100),
-      };
-      throw decodeError;
-    }
+    const ref = jsonValidators
+      ? resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex)
+      : undefined;
+    decoded[alias] = decodeField({
+      alias,
+      wireValue,
+      codec,
+      jsonValidators,
+      tableName: ref?.table,
+      columnName: ref?.column,
+    });
   }
 
   return decoded;

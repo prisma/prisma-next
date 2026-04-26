@@ -11,11 +11,17 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { decodeRow } from '../src/codecs/decoding';
-import { encodeParam, encodeParams } from '../src/codecs/encoding';
+import {
+  encodeParam,
+  encodeParams,
+  encodeParamsAsync,
+  hasAsyncParamEncoding,
+} from '../src/codecs/encoding';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
+import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 import { createStubAdapter, createTestContext } from './utils';
 
 // =============================================================================
@@ -71,6 +77,8 @@ const postMetadataSchema: Record<string, unknown> = {
   required: ['postTitle'],
 };
 
+const asyncSecretSeed = 'json-schema-validation-secret';
+
 function createMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
   const validators = new Map<string, JsonSchemaValidateFn>();
   validators.set('user.metadata', createStubValidator(metadataSchema));
@@ -108,6 +116,21 @@ function createTestCodecRegistry(): CodecRegistry {
       targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
+    }),
+  );
+  return registry;
+}
+
+function createAsyncCodecRegistry(): CodecRegistry {
+  const registry = createTestCodecRegistry();
+  registry.register(createAsyncSecretCodec({ seed: asyncSecretSeed }));
+  registry.register(
+    codec({
+      typeId: 'pg/async-jsonb@1',
+      targetTypes: ['jsonb'],
+      runtime: { decode: 'async' } as const,
+      encode: (value: unknown) => JSON.stringify(value),
+      decode: async (wire: string) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
     }),
   );
   return registry;
@@ -228,6 +251,15 @@ function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
     },
     ...overrides,
   };
+}
+
+function expectPromise(value: unknown): Promise<unknown> {
+  expect(value).toBeInstanceOf(Promise);
+  // Vitest's matcher checks runtime shape but does not narrow `unknown` for TypeScript.
+  if (!(value instanceof Promise)) {
+    throw new Error('Expected promise-valued decode result');
+  }
+  return value;
 }
 
 // =============================================================================
@@ -373,6 +405,53 @@ describe('JSON Schema encoding validation', () => {
 
     const result = encodeParam({ age: 30 }, descriptor, 0, codecRegistry);
     expect(result).toBe('{"age":30}');
+  });
+
+  it('detects when a plan needs async parameter encoding', () => {
+    const codecRegistry = createAsyncCodecRegistry();
+    const plan = createTestPlan({
+      params: ['Alice'],
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [
+          {
+            name: 'secret',
+            codecId: 'pg/secret@1',
+            source: 'dsl' as const,
+          },
+        ],
+      },
+    });
+
+    expect(hasAsyncParamEncoding(plan, codecRegistry)).toBe(true);
+  });
+
+  it('awaits async codec parameter encoding on the async path', async () => {
+    const codecRegistry = createAsyncCodecRegistry();
+    const plan = createTestPlan({
+      params: ['Alice'],
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [
+          {
+            name: 'secret',
+            codecId: 'pg/secret@1',
+            source: 'dsl' as const,
+          },
+        ],
+      },
+    });
+
+    const result = await encodeParamsAsync(plan, codecRegistry);
+    // IV is random per encryption, so assert on the decrypted round-trip
+    // instead of matching exact ciphertext bytes.
+    expect(typeof result[0]).toBe('string');
+    expect(result[0]).not.toBe('Alice');
+    await expect(decryptSecret(result[0] as string, asyncSecretSeed)).resolves.toBe('Alice');
   });
 });
 
@@ -567,5 +646,126 @@ describe('JSON Schema decoding validation', () => {
     const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
     expect(result['id']).toBe(42);
     expect(result['metadata']).toEqual({ name: 'Alice' });
+  });
+
+  it('returns mixed rows with plain sync fields and promise-valued async decode fields', async () => {
+    const codecRegistry = createAsyncCodecRegistry();
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: {
+          id: 'pg/int4@1',
+          secret: 'pg/secret@1',
+        },
+        refs: {
+          columns: [
+            { table: 'user', column: 'id' },
+            { table: 'user', column: 'secret' },
+          ],
+        },
+      },
+    });
+
+    const row = { id: 7, secret: await encryptSecret('Alice', asyncSecretSeed) };
+    const result = decodeRow(row, plan, codecRegistry);
+
+    expect(result['id']).toBe(7);
+    await expect(expectPromise(result['secret'])).resolves.toBe('Alice');
+  });
+
+  it('wraps async decode failures with runtime context', async () => {
+    const codecRegistry = createAsyncCodecRegistry();
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { secret: 'pg/secret@1' },
+        refs: { columns: [{ table: 'user', column: 'secret' }] },
+      },
+    });
+
+    const row = { secret: 'bad-payload' };
+    const result = decodeRow(row, plan, codecRegistry);
+
+    await expect(expectPromise(result['secret'])).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+      details: expect.objectContaining({
+        alias: 'secret',
+        codec: 'pg/secret@1',
+      }),
+    });
+  });
+
+  it('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
+    const leakyPlaintext = 'super-secret-plaintext-value';
+    const leakyCodec = codec({
+      typeId: 'pg/leaky@1',
+      targetTypes: ['text'],
+      runtime: { decode: 'async' } as const,
+      encode: (v: string) => v,
+      decode: async (_w: string) => {
+        throw new Error(`decrypt failed for value=${leakyPlaintext}`);
+      },
+    });
+    const registry = createCodecRegistry();
+    registry.register(leakyCodec);
+
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { secret: 'pg/leaky@1' },
+        refs: { columns: [{ table: 'user', column: 'secret' }] },
+      },
+    });
+
+    const row = { secret: 'wire-bytes' };
+    const result = decodeRow(row, plan, registry);
+
+    const rejection = await expectPromise(result['secret']).catch((e: unknown) => e);
+    const err = rejection as Error & { code?: string; details?: Record<string, unknown> };
+    expect(err).toBeInstanceOf(Error);
+    expect(err.code).toBe('RUNTIME.DECODE_FAILED');
+    // Plaintext must not appear anywhere in the serializable envelope.
+    expect(err.message).not.toContain(leakyPlaintext);
+    expect(JSON.stringify(err.details ?? {})).not.toContain(leakyPlaintext);
+    // The original error is reachable via `cause` for developer diagnostics.
+    expect(((err as Error & { cause?: unknown }).cause as Error)?.message).toContain(
+      leakyPlaintext,
+    );
+  });
+
+  it('preserves JSON schema validation for async decoded values', async () => {
+    const codecRegistry = createAsyncCodecRegistry();
+    const plan = createTestPlan({
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:test',
+        lane: 'dsl',
+        paramDescriptors: [],
+        projectionTypes: { metadata: 'pg/async-jsonb@1' },
+        refs: { columns: [{ table: 'user', column: 'metadata' }] },
+      },
+    });
+
+    const row = { metadata: '{"age":30}' };
+    const result = decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+
+    await expect(expectPromise(result['metadata'])).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      details: expect.objectContaining({
+        table: 'user',
+        column: 'metadata',
+        direction: 'decode',
+        codecId: 'pg/async-jsonb@1',
+      }),
+    });
   });
 });

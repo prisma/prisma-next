@@ -92,6 +92,7 @@ import {
   type CollectionState,
   type CollectionTypeState,
   type DefaultCollectionTypeState,
+  type DefaultModelInputRow,
   type DefaultModelRow,
   emptyState,
   type IncludeCombine,
@@ -558,7 +559,7 @@ export class Collection<
 
   cursor(
     cursorValues: State['hasOrderBy'] extends true
-      ? Partial<Record<keyof DefaultModelRow<TContract, ModelName> & string, unknown>>
+      ? Partial<DefaultModelInputRow<TContract, ModelName>>
       : never,
   ): Collection<TContract, ModelName, Row, State> {
     const mappedCursor = mapCursorValuesToColumns(
@@ -954,7 +955,7 @@ export class Collection<
    */
   async upsert(input: {
     create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
-    update: Partial<DefaultModelRow<TContract, ModelName>>;
+    update: Partial<DefaultModelInputRow<TContract, ModelName>>;
     conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
   }): Promise<Row> {
     assertReturningCapability(this.contract, 'upsert()');
@@ -1040,14 +1041,16 @@ export class Collection<
 
     const rows = await this.updateAll(
       data as State['hasWhere'] extends true
-        ? Partial<DefaultModelRow<TContract, ModelName>>
+        ? Partial<DefaultModelInputRow<TContract, ModelName>>
         : never,
     );
     return rows[0] ?? null;
   }
 
   updateAll(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true
+      ? Partial<DefaultModelInputRow<TContract, ModelName>>
+      : never,
   ): AsyncIterableResult<Row> {
     assertReturningCapability(this.contract, 'updateAll()');
 
@@ -1081,7 +1084,9 @@ export class Collection<
   }
 
   async updateCount(
-    data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
+    data: State['hasWhere'] extends true
+      ? Partial<DefaultModelInputRow<TContract, ModelName>>
+      : never,
   ): Promise<number> {
     const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
@@ -1217,6 +1222,7 @@ export class Collection<
 
     const rows = await dispatchCollectionRows<Row>({
       contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       state: resultState,
       tableName: this.tableName,
@@ -1287,6 +1293,7 @@ export class Collection<
   #dispatch(): AsyncIterableResult<Row> {
     return dispatchCollectionRows<Row>({
       contract: this.contract,
+      context: this.ctx.context,
       runtime: this.ctx.runtime,
       state: this.state,
       tableName: this.tableName,

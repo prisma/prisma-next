@@ -16,8 +16,8 @@ import type { UnionToIntersection } from './authoring-type-utils';
 import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
-  ? C extends Record<string, { output: unknown }>
-    ? C
+  ? Exclude<C, undefined> extends Record<string, { readonly output: unknown }>
+    ? Exclude<C, undefined>
     : Record<string, never>
   : Record<string, never>;
 
@@ -500,9 +500,41 @@ type FieldOutputType<
     : unknown
   : unknown;
 
+type FieldInputType<
+  Definition,
+  ModelName extends ModelNames<Definition>,
+  FieldName extends ModelFieldNames<Definition, ModelName>,
+> = ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
+  ? Col extends { readonly codecId: infer Id extends string }
+    ? Id extends keyof CodecTypesFromDefinition<Definition>
+      ? CodecTypesFromDefinition<Definition>[Id] extends { readonly input: infer I }
+        ? Col extends { readonly nullable: true }
+          ? I | null
+          : I
+        : CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+          ? // Fallback: codec exposed only `output`. Strip Promise wrapping so
+            // async-decode codecs still accept plain input values on writes.
+            Col extends { readonly nullable: true }
+            ? Awaited<O> | null
+            : Awaited<O>
+          : unknown
+      : unknown
+    : unknown
+  : unknown;
+
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {
     readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldOutputType<
+      Definition,
+      ModelName,
+      FieldName
+    >;
+  };
+};
+
+type FieldInputTypes<Definition> = {
+  readonly [ModelName in ModelNames<Definition>]: {
+    readonly [FieldName in ModelFieldNames<Definition, ModelName>]: FieldInputType<
       Definition,
       ModelName,
       FieldName
@@ -529,6 +561,7 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
     CodecTypesFromDefinition<Definition>,
     Record<string, never>,
     Record<string, never>,
-    FieldOutputTypes<Definition>
+    FieldOutputTypes<Definition>,
+    FieldInputTypes<Definition>
   >
 >;

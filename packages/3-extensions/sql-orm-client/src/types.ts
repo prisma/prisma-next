@@ -2,6 +2,7 @@ import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type {
   ExtractCodecTypes,
+  ExtractFieldInputTypes,
   ExtractQueryOperationTypes,
   SqlStorage,
   StorageColumn,
@@ -208,10 +209,10 @@ type CodecArgJsType<Arg, TCodecTypes extends Record<string, unknown>> = Arg exte
   readonly nullable: infer N;
 }
   ? CId extends keyof TCodecTypes
-    ? TCodecTypes[CId] extends { readonly output: infer O }
+    ? TCodecTypes[CId] extends { readonly input: infer I }
       ? N extends true
-        ? O | null
-        : O
+        ? I | null
+        : I
       : unknown
     : unknown
   : unknown;
@@ -401,7 +402,7 @@ export type RelationFilterAccessor<
 
 type ScalarModelAccessor<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: ComparisonMethods<
-    FieldJsType<TContract, ModelName, K>,
+    FieldInputJsType<TContract, ModelName, K>,
     FieldTraits<TContract, ModelName, K>
   > &
     FieldOperations<TContract, ModelName, K>;
@@ -425,6 +426,13 @@ export type ModelAccessor<
 
 export type DefaultModelRow<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in keyof FieldsOf<TContract, ModelName> & string]: FieldJsType<TContract, ModelName, K>;
+};
+
+export type DefaultModelInputRow<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+> = {
+  [K in keyof FieldsOf<TContract, ModelName> & string]: FieldInputJsType<TContract, ModelName, K>;
 };
 
 // ---------------------------------------------------------------------------
@@ -545,8 +553,8 @@ export type ShorthandWhereFilter<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
 > = Partial<{
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]:
-    | DefaultModelRow<TContract, ModelName>[K]
+  [K in keyof DefaultModelInputRow<TContract, ModelName> & string]:
+    | DefaultModelInputRow<TContract, ModelName>[K]
     | null
     | undefined;
 }>;
@@ -662,6 +670,27 @@ type FieldJsType<
   ? unknown
   : FieldStorageJsType<TContract, ModelName, FieldName>;
 
+type FieldInputFromTypeMaps<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = ModelName extends keyof ExtractFieldInputTypes<TContract>
+  ? FieldName extends keyof ExtractFieldInputTypes<TContract>[ModelName]
+    ? ExtractFieldInputTypes<TContract>[ModelName][FieldName]
+    : never
+  : never;
+
+type FieldInputJsType<
+  TContract extends Contract<SqlStorage>,
+  ModelName extends string,
+  FieldName extends string,
+> = [FieldInputFromTypeMaps<TContract, ModelName, FieldName>] extends [never]
+  ? // Fallback resolves through the storage JS (output-side) type; strip
+    // Promise wrapping so async codec fields stay plain on write/filter/cursor
+    // surfaces even when the contract's input type map is missing an entry.
+    Awaited<FieldJsType<TContract, ModelName, FieldName>>
+  : FieldInputFromTypeMaps<TContract, ModelName, FieldName>;
+
 type FieldStorageColumn<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
@@ -751,7 +780,7 @@ type IsOptionalCreateField<
 type CreateFieldNames<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = keyof DefaultModelRow<TContract, ModelName> & string;
+> = keyof DefaultModelInputRow<TContract, ModelName> & string;
 
 type RequiredCreateFieldNames<TContract extends Contract<SqlStorage>, ModelName extends string> = {
   [K in CreateFieldNames<TContract, ModelName>]-?: IsOptionalCreateField<
@@ -774,11 +803,11 @@ type OptionalCreateFieldNames<TContract extends Contract<SqlStorage>, ModelName 
 }[CreateFieldNames<TContract, ModelName>];
 
 export type CreateInput<TContract extends Contract<SqlStorage>, ModelName extends string> = Pick<
-  DefaultModelRow<TContract, ModelName>,
+  DefaultModelInputRow<TContract, ModelName>,
   RequiredCreateFieldNames<TContract, ModelName>
 > &
   Partial<
-    Pick<DefaultModelRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
+    Pick<DefaultModelInputRow<TContract, ModelName>, OptionalCreateFieldNames<TContract, ModelName>>
   > &
   RelationMutationFields<TContract, ModelName>;
 
@@ -860,14 +889,14 @@ type FieldNameForColumn<
   ModelName extends string,
   ColumnName extends string,
 > = {
-  [K in keyof DefaultModelRow<TContract, ModelName> & string]: FieldColumnName<
+  [K in keyof DefaultModelInputRow<TContract, ModelName> & string]: FieldColumnName<
     TContract,
     ModelName,
     K
   > extends ColumnName
     ? K
     : never;
-}[keyof DefaultModelRow<TContract, ModelName> & string] extends infer Matched
+}[keyof DefaultModelInputRow<TContract, ModelName> & string] extends infer Matched
   ? Matched extends string
     ? Matched
     : ColumnName
@@ -877,8 +906,8 @@ type RowValueForField<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   FieldName extends string,
-> = FieldName extends keyof DefaultModelRow<TContract, ModelName>
-  ? DefaultModelRow<TContract, ModelName>[FieldName]
+> = FieldName extends keyof DefaultModelInputRow<TContract, ModelName>
+  ? DefaultModelInputRow<TContract, ModelName>[FieldName]
   : unknown;
 
 type CriterionFromConstraintColumns<
@@ -1025,12 +1054,12 @@ type NestedRequiredCreateFieldNames<
 >;
 
 type NestedCreateInput<TContract extends Contract<SqlStorage>, ModelName extends string> = Pick<
-  DefaultModelRow<TContract, ModelName>,
+  DefaultModelInputRow<TContract, ModelName>,
   NestedRequiredCreateFieldNames<TContract, ModelName>
 > &
   Partial<
     Pick<
-      DefaultModelRow<TContract, ModelName>,
+      DefaultModelInputRow<TContract, ModelName>,
       NestedOptionalCreateFieldNames<TContract, ModelName>
     >
   >;
@@ -1055,7 +1084,8 @@ export type MutationCreateInputWithRelations<
 export type MutationUpdateInput<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
-> = Partial<DefaultModelRow<TContract, ModelName>> & RelationMutationFields<TContract, ModelName>;
+> = Partial<DefaultModelInputRow<TContract, ModelName>> &
+  RelationMutationFields<TContract, ModelName>;
 
 // ---------------------------------------------------------------------------
 // Relation helpers

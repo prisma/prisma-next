@@ -14,6 +14,7 @@ export type {
   ComparisonMethods,
   CreateInput,
   DefaultCollectionTypeState,
+  DefaultModelInputRow,
   DefaultModelRow,
   IncludeExpr,
   ModelAccessor,

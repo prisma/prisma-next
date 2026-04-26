@@ -30,7 +30,7 @@ import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
-import { encodeParams } from './codecs/encoding';
+import { encodeParams, encodeParamsAsync, hasAsyncParamEncoding } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { lowerSqlPlan } from './lower-sql-plan';
 import type {
@@ -131,6 +131,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly codecRegistry: CodecRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
+  // Plans are re-executed often; async-encode is a pure function of
+  // (paramDescriptors, registry). Caching by plan identity keeps the sync
+  // hot path free of per-execute registry walks.
+  private readonly asyncEncodingCache = new WeakMap<object, boolean>();
 
   constructor(options: RuntimeOptions<TContract>) {
     const { context, adapter, driver, verify, middleware, mode, log } = options;
@@ -180,17 +184,33 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     return isSqlQueryPlan(plan) ? lowerSqlPlan(this.adapter, this.contract, plan) : plan;
   }
 
+  private resolveAsyncParamEncoding(plan: object, executablePlan: ExecutionPlan<unknown>): boolean {
+    const cached = this.asyncEncodingCache.get(plan);
+    if (cached !== undefined) return cached;
+    const computed = hasAsyncParamEncoding(executablePlan, this.codecRegistry);
+    this.asyncEncodingCache.set(plan, computed);
+    // Also cache by the lowered plan so callers reusing `ExecutionPlan` objects
+    // avoid the walk; a fresh lowering produces a new object so this is cheap.
+    if (plan !== executablePlan) {
+      this.asyncEncodingCache.set(executablePlan, computed);
+    }
+    return computed;
+  }
+
   private executeAgainstQueryable<Row = Record<string, unknown>>(
     plan: ExecutionPlan<Row> | SqlQueryPlan<Row>,
     queryable: CoreQueryable,
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated(this.contract);
     const executablePlan = this.toExecutionPlan(plan);
+    const needsAsyncEncode = this.resolveAsyncParamEncoding(plan, executablePlan);
 
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
+      const encodedParams = needsAsyncEncode
+        ? await encodeParamsAsync(executablePlan, self.codecRegistry)
+        : encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,

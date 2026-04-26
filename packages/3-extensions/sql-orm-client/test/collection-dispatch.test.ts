@@ -1,11 +1,18 @@
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type {
+  ExecutionContext,
+  JsonSchemaValidateFn,
+  JsonSchemaValidatorRegistry,
+} from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
+import { Collection } from '../src/collection';
 import { dispatchCollectionRows, stitchIncludes } from '../src/collection-dispatch';
 import type { IncludeExpr, RuntimeScope } from '../src/types';
 import { emptyState } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract } from './helpers';
 
 function withSingleQueryCapabilities(contract: TestContract): TestContract {
   return {
@@ -52,6 +59,138 @@ function emptyScope(): RuntimeScope {
       return new AsyncIterableResult((async function* () {})());
     },
   };
+}
+
+function createAsyncCodecRegistry() {
+  const registry = createCodecRegistry();
+  registry.register(
+    codec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
+      traits: ['equality', 'order', 'numeric'],
+      encode: (value: number) => value,
+      decode: (value: number) => value,
+    }),
+  );
+  registry.register(
+    codec({
+      typeId: 'pg/text@1',
+      targetTypes: ['text'],
+      traits: ['equality', 'order', 'textual'],
+      encode: (value: string) => value,
+      decode: (value: string) => value,
+    }),
+  );
+  registry.register(
+    codec({
+      typeId: 'pg/secret@1',
+      targetTypes: ['text'],
+      traits: ['equality', 'order', 'textual'],
+      runtime: { decode: 'async' } as const,
+      encode: (value: string) => value,
+      decode: async (value: string) => {
+        if (!value.startsWith('enc:')) {
+          throw new Error('invalid secret payload');
+        }
+        return value.slice(4);
+      },
+    }),
+  );
+  registry.register(
+    codec({
+      typeId: 'pg/jsonb@1',
+      targetTypes: ['jsonb'],
+      traits: ['equality'],
+      runtime: { decode: 'async' } as const,
+      encode: (value: unknown) => value,
+      decode: async (value: unknown) => value,
+    }),
+  );
+  return registry;
+}
+
+function createValidatorRegistry(): JsonSchemaValidatorRegistry {
+  const validators = new Map<string, JsonSchemaValidateFn>();
+  validators.set('posts.metadata', (value: unknown) => {
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      typeof (value as { title?: unknown }).title === 'string'
+    ) {
+      return { valid: true };
+    }
+    return {
+      valid: false,
+      errors: [{ path: '/', message: 'title is required', keyword: 'required' }],
+    };
+  });
+  return {
+    get(key: string) {
+      return validators.get(key);
+    },
+    size: validators.size,
+  };
+}
+
+function withAsyncPostContract(base: TestContract): TestContract {
+  return {
+    ...base,
+    models: {
+      ...base.models,
+      Post: {
+        ...base.models.Post,
+        storage: {
+          ...base.models.Post.storage,
+          fields: {
+            ...base.models.Post.storage.fields,
+            secret: { column: 'secret' },
+            metadata: { column: 'metadata' },
+          },
+        },
+        fields: {
+          ...base.models.Post.fields,
+          secret: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/secret@1' },
+          },
+          metadata: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/jsonb@1' },
+          },
+        },
+      },
+    },
+    storage: {
+      ...base.storage,
+      tables: {
+        ...base.storage.tables,
+        posts: {
+          ...base.storage.tables.posts,
+          columns: {
+            ...base.storage.tables.posts.columns,
+            secret: { nativeType: 'text', codecId: 'pg/secret@1', nullable: false },
+            metadata: { nativeType: 'jsonb', codecId: 'pg/jsonb@1', nullable: false },
+          },
+        },
+      },
+    },
+  } as TestContract;
+}
+
+function createAsyncPostCollection(contract: TestContract): {
+  collection: Collection<TestContract, 'User'>;
+  runtime: MockRuntime;
+  context: ExecutionContext<TestContract>;
+} {
+  const runtime = createMockRuntime();
+  const context = {
+    ...getTestContext(),
+    contract,
+    codecs: createAsyncCodecRegistry(),
+    jsonSchemaValidators: createValidatorRegistry(),
+  } as ExecutionContext<TestContract>;
+  const collection = new Collection({ runtime, context }, 'User');
+  return { collection, runtime, context };
 }
 
 describe('collection-dispatch', () => {
@@ -191,6 +330,134 @@ describe('collection-dispatch', () => {
         author: null,
       },
     ]);
+  });
+
+  it('dispatchCollectionRows() single-query include decodes async child fields and validates decoded values', async () => {
+    const contract = withSingleQueryCapabilities(withAsyncPostContract(getTestContract()));
+    const { collection, runtime, context } = createAsyncPostCollection(contract);
+    const scoped = collection.select('name').include('posts');
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts:
+            '[{"id":10,"title":"Post A","user_id":1,"secret":"enc:alpha","metadata":{"title":"A"}}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      context,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    const post = rows[0]?.['posts'] as Record<string, unknown>[] | undefined;
+    expect(post).toBeDefined();
+    expect(post?.[0]?.['id']).toBe(10);
+    expect(post?.[0]?.['title']).toBe('Post A');
+    expect(post?.[0]?.['userId']).toBe(1);
+    await expect(post?.[0]?.['secret']).resolves.toBe('alpha');
+    await expect(post?.[0]?.['metadata']).resolves.toEqual({ title: 'A' });
+  });
+
+  it('dispatchCollectionRows() single-query include preserves JSON schema validation failures for async child decodes', async () => {
+    const contract = withSingleQueryCapabilities(withAsyncPostContract(getTestContract()));
+    const { collection, runtime, context } = createAsyncPostCollection(contract);
+    const scoped = collection.select('name').include('posts');
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts:
+            '[{"id":10,"title":"Post A","user_id":1,"secret":"enc:alpha","metadata":{"missing":"title"}}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      context,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    const post = rows[0]?.['posts'] as Record<string, unknown>[] | undefined;
+    await expect(post?.[0]?.['metadata']).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+    });
+  });
+
+  it('dispatchCollectionRows() single-query include wraps async child decode failures with codec context', async () => {
+    const contract = withSingleQueryCapabilities(withAsyncPostContract(getTestContract()));
+    const { collection, runtime, context } = createAsyncPostCollection(contract);
+    const scoped = collection.select('name').include('posts');
+    runtime.setNextResults([
+      [
+        {
+          id: 1,
+          name: 'Alice',
+          posts:
+            '[{"id":10,"title":"Post A","user_id":1,"secret":"broken","metadata":{"title":"A"}}]',
+        },
+      ],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      context,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    const post = rows[0]?.['posts'] as Record<string, unknown>[] | undefined;
+    await expect(post?.[0]?.['secret']).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+      details: {
+        alias: 'secret',
+        codec: 'pg/secret@1',
+        wirePreview: 'broken',
+      },
+    });
+  });
+
+  it('dispatchCollectionRows() multi-query path preserves promise-valued async codec fields on child rows', async () => {
+    const contract = withAsyncPostContract(getTestContract());
+    const { collection, runtime } = createAsyncPostCollection(contract);
+    const scoped = collection.select('name').include('posts', (posts) => posts.select('title'));
+
+    // Multi-query path hands child rows back from executeQueryPlan unchanged.
+    // In production that runtime applies decodeRow, which yields Promise<T>
+    // for async-decode columns; here we simulate the same shape directly so
+    // the unit test asserts the ORM stitching does not unwrap or drop the
+    // promise fields.
+    const secretPromise = Promise.resolve('alpha');
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice' }],
+      [{ user_id: 1, title: 'Post A', secret: secretPromise }],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    const posts = rows[0]?.['posts'] as Record<string, unknown>[] | undefined;
+    expect(posts?.[0]?.['title']).toBe('Post A');
+    expect(posts?.[0]?.['secret']).toBeInstanceOf(Promise);
+    await expect(posts?.[0]?.['secret']).resolves.toBe('alpha');
   });
 
   it('dispatchCollectionRows() multi-query path stitches includes, strips hidden fields, and releases scope', async () => {

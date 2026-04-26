@@ -10,6 +10,15 @@
       "assignee": null,
       "linear": null,
       "notes": "See packages/3-targets/3-targets/postgres/test/migrations/operation-resolver.integration.test.ts for the targeted coverage. Coverage will recover naturally when existing legacy-planner integration tests migrate to the descriptor pipeline."
+    },
+    {
+      "package": "3-extensions/sql-orm-client",
+      "reason": "Pre-existing branch-coverage gaps predate the feat/async-codecs work: running `vitest run --coverage` against main's src/ produces the same numbers (collection.ts branch 89.24%, filters.ts branch 81.25%, model-accessor.ts branch 92.68%, query-plan-meta.ts branch 90.00%, query-plan-mutations.ts branch 80.43%, query-plan-select.ts branch 85.07%, types.ts branch 50.00%). Most uncovered branches are defensive error throws and edge-case nullability guards. Demoting to a warning to unblock the async-codecs PR; targeted coverage should land in a follow-up focused on these query-plan helpers.",
+      "addedDate": "2026-04-24",
+      "expiryDays": 60,
+      "assignee": null,
+      "linear": null,
+      "notes": "Verified pre-existing via `git checkout main -- packages/3-extensions/sql-orm-client && pnpm --filter @prisma-next/sql-orm-client exec vitest run --coverage --typecheck=false` — identical coverage percentages on collection.ts, filters.ts, model-accessor.ts, query-plan-meta.ts, query-plan-mutations.ts, query-plan-select.ts, and types.ts."
     }
   ],
   "excludedPackages": ["1-framework/3-tooling/eslint-plugin"]
