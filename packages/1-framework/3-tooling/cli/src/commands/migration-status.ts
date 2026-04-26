@@ -5,11 +5,11 @@ import {
   findPathWithDecision,
   findReachableLeaves,
 } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
