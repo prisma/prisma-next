@@ -400,22 +400,27 @@ describe('collection-dispatch', () => {
   // dispatcher routes embedded child rows through the codec registry and
   // surfaces decoded values (or wrapped failures) on each child cell.
   //
-  // The single-path async runtime translates these patterns by asserting
-  // plain decoded values on child cells instead of PR #375's promise-valued
-  // cells. The assertions themselves are preserved verbatim against the
-  // single-path contract.
+  // Under the single-path async runtime those tests would assert plain
+  // decoded values on child cells instead of PR #375's promise-valued cells.
+  // The three `it.skip` blocks below are placeholders: the titles describe
+  // what each case would assert, but the bodies are stubbed
+  // (`expect(true).toBe(true)`) — assertions are not carried over verbatim.
+  // A future include-aggregate-child-codec project will need to re-derive
+  // assertions from PR #375 § collection-dispatch.test.ts (tests 5–7) when
+  // child-row codec dispatch lands.
   //
-  // However, the current `dispatchCollectionRows` single-query path
-  // (packages/3-extensions/sql-orm-client/src/collection-dispatch.ts) only
-  // JSON.parses the include payload and applies field-name mapping; it does
-  // not invoke codec query-time methods on child cells. Adding child-row
-  // codec decoding to the single-query include path is a separate piece of
-  // ORM work, orthogonal to the codec async-shape decision in this project's
-  // spec/plan. The translated tests are kept here as `it.skip` so they can
-  // be activated when child-row codec decoding lands.
+  // The deferral is structural: the current `dispatchCollectionRows`
+  // single-query path (packages/3-extensions/sql-orm-client/src/
+  // collection-dispatch.ts) only JSON.parses the include payload and
+  // applies field-name mapping; it does not invoke codec query-time methods
+  // on child cells (`rg 'codec\.(encode|decode)' packages/3-extensions/
+  // sql-orm-client/src` returns zero matches). Adding child-row codec
+  // decoding to the single-query include path is a separate piece of ORM
+  // work, orthogonal to the codec async-shape decision in this project's
+  // spec/plan.
   //
   // PR #375 test 8 ("multi-query path preserves promise-valued async codec
-  // fields on child rows") is not translated: it asserts PR #375's
+  // fields on child rows") is not carried over: it asserts PR #375's
   // promise-valued cell contract, which the single-path runtime explicitly
   // reverses (cells are plain T after the runtime awaits decodeRow).
   // ---------------------------------------------------------------------------
