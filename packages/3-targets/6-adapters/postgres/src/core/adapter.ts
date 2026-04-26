@@ -76,13 +76,8 @@ class PostgresAdapterImpl
     return parameterizedCodecs;
   }
 
-  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>) {
-    const body = renderLoweredSql(ast, context.contract);
-
-    return Object.freeze({
-      profileId: this.profile.id,
-      body,
-    });
+  lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
+    return renderLoweredSql(ast, context.contract);
   }
 }
 

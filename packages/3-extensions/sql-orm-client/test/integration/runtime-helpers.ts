@@ -98,8 +98,8 @@ export async function createPgIntegrationRuntime(
     });
 
     return {
-      sql: lowered.body.sql,
-      params: lowered.body.params ?? plan.params,
+      sql: lowered.sql,
+      params: lowered.params ?? plan.params,
       ast: plan.ast,
       meta: plan.meta,
     };

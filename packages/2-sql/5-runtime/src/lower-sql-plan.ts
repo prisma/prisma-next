@@ -21,11 +21,9 @@ export function lowerSqlPlan<Row>(
     params: queryPlan.params,
   });
 
-  const body = lowered.body;
-
   return Object.freeze({
-    sql: body.sql,
-    params: body.params ?? queryPlan.params,
+    sql: lowered.sql,
+    params: lowered.params ?? queryPlan.params,
     ast: queryPlan.ast,
     meta: queryPlan.meta,
   });

@@ -81,10 +81,7 @@ function createStubAdapter() {
       },
     },
     lower(ast: SelectAst) {
-      return {
-        profileId: 'test-profile',
-        body: Object.freeze({ sql: JSON.stringify(ast), params: [] }),
-      };
+      return Object.freeze({ sql: JSON.stringify(ast), params: [] });
     },
   };
 }

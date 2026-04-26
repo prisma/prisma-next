@@ -69,8 +69,8 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract });
-    expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
-    expect(lowered.body.sql).toContain('AS "distance"');
+    expect(lowered.sql).toContain('"user"."vector" <=> $1::vector');
+    expect(lowered.sql).toContain('AS "distance"');
   });
 
   it('lowers function operations with multiple arguments', () => {
@@ -94,7 +94,7 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract });
-    expect(lowered.body.sql).toContain(
+    expect(lowered.sql).toContain(
       'cosine_similarity("user"."vector", "user"."otherVector", $1::vector, 42)',
     );
   });
@@ -112,8 +112,8 @@ describe('Operation lowering', () => {
 
     const lowered = adapter.lower(ast, { contract });
 
-    expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
-    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $3::vector ASC');
+    expect(lowered.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
+    expect(lowered.sql).toContain('ORDER BY "user"."vector" <=> $3::vector ASC');
   });
 
   it('lowers operations with literal arguments', () => {
@@ -133,6 +133,6 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain(`contains("user"."email", 'test''value')`);
+    expect(lowered.sql).toContain(`contains("user"."email", 'test''value')`);
   });
 });
