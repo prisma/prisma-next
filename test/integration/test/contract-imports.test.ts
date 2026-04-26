@@ -367,6 +367,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
             ],
+            '@prisma-next/target-postgres/*': [
+              `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/*`,
+            ],
             '@prisma-next/framework-components/codec': [
               `${relativeToWorkspace}/packages/1-framework/1-core/framework-components/dist/codec.d.mts`,
             ],
