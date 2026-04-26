@@ -1,8 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 
