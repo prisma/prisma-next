@@ -95,6 +95,14 @@ function setupConfigMock(): void {
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
     driver: { kind: 'driver' },
     db: { connection: 'postgres://localhost/tamper-test' },
+    // `migration new` resolves the contract path off `config.contract.output`
+    // with a different default ('contract.json' next to the config) than
+    // the other commands' `resolveContractPath` helper ('src/prisma/contract.json').
+    // Setting `contract.output` explicitly aligns all five tests on the
+    // same on-disk path the fixture writes to. For apply/plan/status/show
+    // this is a no-op (they already resolve to `src/prisma/contract.json`
+    // by default).
+    contract: { output: join('src', 'prisma', 'contract.json') },
   });
 }
 
@@ -210,7 +218,7 @@ async function captureDiagnostic(
 
 const diagnostics: CapturedDiagnostic[] = [];
 
-describe('migration tamper diagnostic uniformity (T3.1-T3.5)', () => {
+describe('migration tamper diagnostic uniformity (T3.1-T3.5, T3.8)', () => {
   let consoleOutput: string[];
   let consoleErrors: string[];
   let cleanupMocks: () => void;
@@ -358,8 +366,42 @@ describe('migration tamper diagnostic uniformity (T3.1-T3.5)', () => {
     timeouts.typeScriptCompilation,
   );
 
+  it(
+    'migration new surfaces MIGRATION.BUNDLE_CORRUPT for the existing on-disk migration (T3.8)',
+    async () => {
+      // `migration new` calls `readMigrationsDir` to compute the `from`
+      // reference for the new migration. When an existing on-disk
+      // package is tampered, the integrity check fires before any
+      // scaffolding work — the user asks to *create* a new migration
+      // and the diagnostic surfaces the **existing** corrupt package
+      // verbatim, with no off-topic "couldn't generate new migration"
+      // framing. T3.5's set-equality assertion automatically extends
+      // to this fifth capture, pinning the unified-UX guarantee.
+      const { createMigrationNewCommand } = await import('../../src/commands/migration-new');
+      const fixture = await setupTamperFixture();
+      tempDirs.push(fixture.cwd);
+      process.chdir(fixture.cwd);
+
+      const captured = await captureDiagnostic(
+        () => executeCommand(createMigrationNewCommand(), ['--name', 'next', '--json']),
+        () =>
+          executeCommand(createMigrationNewCommand(), ['--name', 'next', '--no-color', '--quiet']),
+        consoleOutput,
+        consoleErrors,
+        fixture.cwd,
+      );
+
+      expect(captured.exitCode).not.toBe(0);
+      expect(captured.envelope.meta?.['code']).toBe('MIGRATION.BUNDLE_CORRUPT');
+      expect(captured.humanText).toContain('Migration package is corrupt');
+
+      diagnostics.push(captured);
+    },
+    timeouts.typeScriptCompilation,
+  );
+
   it('renders the same human diagnostic regardless of which command triggered the load (T3.5)', () => {
-    expect(diagnostics).toHaveLength(4);
+    expect(diagnostics).toHaveLength(5);
 
     const userVisible = diagnostics.map((d) => ({
       summary: d.envelope.summary,
