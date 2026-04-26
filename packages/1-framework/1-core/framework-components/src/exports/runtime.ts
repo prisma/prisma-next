@@ -1,4 +1,5 @@
 export { AsyncIterableResult } from '../async-iterable-result';
+export type { ExecutionPlan, QueryPlan, ResultType } from '../query-plan';
 export type { RuntimeErrorEnvelope } from '../runtime-error';
 export { isRuntimeError, runtimeError } from '../runtime-error';
 export type {
