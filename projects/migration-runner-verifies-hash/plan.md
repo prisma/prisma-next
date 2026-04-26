@@ -1,6 +1,6 @@
 # Verify migration package integrity at load time — Plan
 
-This plan executes the [spec](./spec.md): hoist the on-disk `migrationHash` integrity check out of the `migration apply` CLI command and into `readMigrationPackage` in `@prisma-next/migration-tools`, so every consumer (CLI commands, the future in-process apply path, the control client) inherits verification by construction. The same PR also cleans up vocabulary and file layout in `@prisma-next/migration-tools` (rename `migrationId` → `migrationHash`, `MigrationBundle` → `MigrationPackage`, `MigrationManifest` → `MigrationMetadata`; split `types.ts` into per-concept files; rename `attestation.ts` → `hash.ts`).
+This plan executes the [spec](./spec.md): hoist the on-disk `migrationHash` integrity check out of the `migration apply` CLI command and into `readMigrationPackage` in `@prisma-next/migration-tools`, so every consumer (CLI commands and any future programmatic load-path consumer such as the control client) inherits verification by construction. The same PR also cleans up vocabulary and file layout in `@prisma-next/migration-tools` (rename `migrationId` → `migrationHash`, `MigrationBundle` → `MigrationPackage`, `MigrationManifest` → `MigrationMetadata`; split `types.ts` into per-concept files; rename `attestation.ts` → `hash.ts`).
 
 ## Summary
 
@@ -14,7 +14,7 @@ The integrity work itself is small: one loader gets one extra step, one structur
 |---|---|---|
 | Maker | TBD (assignee on TML-2264) | Drives execution end-to-end. |
 | Reviewer | Migration system owner | Reviews loader-boundary semantics + JSDoc invariants. |
-| Coordination | Author of TML-2301 | The `Migration.run()` orchestrator added in TML-2301 must consume `readMigrationPackage` rather than raw `fs.readFile`; coordinate so the verifying loader exists when their wiring lands. Also: `MigrationMeta` rename (open question 3) is theirs to decide during the `migration-base.ts` split. |
+| Coordination | Author of TML-2301 | **Resolved.** TML-2301 merged into `main` during this PR's development and was integrated via merge commit `39157ef76`. TML-2301 ultimately landed `MigrationCLI.run` as a *write* path (regenerating packages from authored sources); no load-path coordination required. Open question 3 (`MigrationMeta` rename) resolved against renaming. See [`spec.md` § Decision 6](./spec.md#6-tml-2301-coordination--resolved-two-loader-architectural-split). |
 
 ## Critical risks up front
 
@@ -22,9 +22,11 @@ The integrity work itself is small: one loader gets one extra step, one structur
 
 **Wire-format codemod accidentally re-hashing.** The codemod must rename only the JSON key, not re-emit the file. A naive implementation that round-trips the JSON could subtly change formatting (e.g. trailing newlines, quote style) without changing semantic content; the hash check still passes because `computeMigrationHash` strips the field before hashing. But sloppy serialization could still produce a noisy diff. Mitigation: the codemod (Phase 5) preserves the original `JSON.stringify` shape (2-space indent + trailing newline, matching the writer in `io.ts`); the resulting diff for each file is one-line.
 
-**TML-2301 timing.** TML-2301 introduces a new on-disk loading path inside the `Migration.run()` orchestrator. If TML-2301 lands first and uses raw `fs.readFile` + `JSON.parse`, that path is exempted from verification. Mitigation: explicit cross-link in the TML-2301 spec, plus a one-line review check on its PR ("does it call `readMigrationPackage`?"). If TML-2301 lands first, this project's PR includes the trivial conversion.
+**TML-2301 timing — resolved.** TML-2301 merged into `main` and was integrated into this branch via merge commit `39157ef76`. The risk turned out moot for an unanticipated reason: TML-2301 landed `MigrationCLI.run` as a **write** path (regenerating packages from authored sources), not a load-path consumer. It does not load `MigrationPackage`s and is structurally incapable of verifying hashes (it only reads `migration.json` for scaffolding-context preservation, never `ops.json`). The two-loader architectural split is documented in [`spec.md` § Decision 6](./spec.md#6-tml-2301-coordination--resolved-two-loader-architectural-split). All apply-time loaders still route through `readMigrationPackage` / `readMigrationsDir` and inherit verification.
 
-**Rename conflicts with TML-2301.** TML-2301 splits `migration-base.ts` and may touch the same imports we rename here. Mitigation: rebase if necessary; both PRs change the same identifiers in the same files in mostly-compatible ways. The conflict surface is small (a half-dozen import lines).
+**Rename conflicts with TML-2301 — resolved.** Merge integrated cleanly with one real conflict in `migration-base.ts` (TML-2301's pure-function `buildMigrationArtifacts` over our Phase 4 renamed types). Resolution preserved Phase 4's renames + wire-translator pattern; integrated TML-2301's pure-function decomposition over them. Two Phase 2 JSDoc invariants (`MigrationRunner.execute`, `executeMigrationApply`) preserved against the pre-Phase-2 baseline TML-2301 was developed against. Full strengthened gate green post-merge.
+
+**Stale `dist/` artifacts after merge — process learning.** First post-merge validation pass had 16 spurious test failures driven by stale `dist/*.mjs` files in `migration-tools` and `errors` packages. Fix: full `pnpm build` after `pnpm install` is part of the post-merge validation protocol. Class-of-merge issue, not a one-off; flagged for the orchestrator skill's `learnings.md`.
 
 ## Where we're going
 
@@ -173,16 +175,21 @@ Land the type renames and the `types.ts` split. This is the biggest single sourc
 
 ### Phase 5 — Wire-format codemod for `migration.json`
 
-Rename the on-disk JSON field `migrationId` → `migrationHash` in all 113 `migration.json` files. Mechanical and one-off.
+Rename the on-disk JSON field `migrationId` → `migrationHash` in all 113 `migration.json` files, then collapse the wire-translator pattern (`MigrationMetadataWire`, `metadataFromWire`, `metadataToWire`) that Phase 4 introduced to bridge the transient on-disk-vs-in-memory mismatch. Mechanical and one-off.
 
 **Tasks:**
 
 - [ ] **T5.1 — Run the codemod.** Execute the script from [`spec.md` § Wire-format migration](./spec.md#wire-format-migration) against the workspace root. Verify with `git diff --stat` that all 113 files are touched and only the top-level field name changed (no value changes, no formatting changes other than the field's position).
 - [ ] **T5.2 — Update arktype schema.** In `migration-tools/src/io.ts`, the schema `MigrationMetadataSchema` (renamed from `MigrationManifestSchema` in T4.4 or done here) lists `migrationHash: 'string'` (renamed from `migrationId: 'string'`). This is the wire-format validation point.
-- [ ] **T5.3 — Run the full test suite.** `pnpm test` across the workspace. Migration-graph fixture tests (`packages/1-framework/3-tooling/migration/test/dag.test.ts` and similar) must reconstruct correctly from the renamed fields. CLI integration tests that load `examples/**/migration-fixtures/` must pass.
-- [ ] **T5.4 — Sanity-check hash values.** Pick one of the example app migrations (e.g. `examples/prisma-next-demo/migrations/20260422T0720_initial/`); manually run `readMigrationPackage` on it (e.g. via a one-off script) and confirm the loader does not throw. This validates that the field rename did not break hash verification.
+- [ ] **T5.3 — Collapse the wire-translator pattern.** With the on-disk field name now matching the in-memory type, the `MigrationMetadataWire` translator pattern Phase 4 introduced to bridge the mismatch becomes redundant. Delete it across three call sites and the type itself:
+  - **`packages/1-framework/3-tooling/migration/src/migration-base.ts:234`.** The `JSON.stringify(metadataToWire(metadata), null, 2)` call simplifies to `JSON.stringify(metadata, null, 2)` (now identical because the in-memory type is the wire shape). Update the `MigrationArtifacts` JSDoc at line 133-139 (which currently calls out the Phase-5 fold-in) to remove the transient note — the wire-vs-in-memory split has been folded.
+  - **`packages/1-framework/3-tooling/cli/src/migration-cli.ts:209-229`.** The `readExistingMetadata` helper's destructure-rename (`const { migrationId, ...rest } = parsed; return migrationId !== undefined ? { ...rest, migrationHash: migrationId } : rest;`) collapses to a direct `JSON.parse` + `Partial<MigrationMetadata>` cast. Remove the inline comment at lines 209-212 referencing "Phase 5 of TML-2264" — replace with a short durable note about the helper's scaffolding-preservation purpose, or delete if redundant with the function's existing JSDoc. Also remove the import of `MigrationMetadataWire` from `@prisma-next/migration-tools/metadata`.
+  - **`packages/1-framework/3-tooling/migration/src/metadata.ts`.** Delete the `MigrationMetadataWire` type, the `metadataFromWire` translator, and the `metadataToWire` translator.
+  - **Audit other consumers.** `rg 'metadataToWire|metadataFromWire|MigrationMetadataWire' packages/ test/` should return zero hits after this task. If `io.ts` had a translator-using path (it parses on-disk JSON), simplify it analogously.
+- [ ] **T5.4 — Run the full test suite.** `pnpm test` across the workspace. Migration-graph fixture tests (`packages/1-framework/3-tooling/migration/test/dag.test.ts` and similar) must reconstruct correctly from the renamed fields. CLI integration tests that load `examples/**/migration-fixtures/` must pass. `migration-base.test.ts`'s `metadataJson` round-trip assertion (which currently uses `metadataToWire`) needs updating to assert the simpler `JSON.parse(metadataJson) → metadata` equality.
+- [ ] **T5.5 — Sanity-check hash values.** Pick one of the example app migrations (e.g. `examples/prisma-next-demo/migrations/20260422T0720_initial/`); manually run `readMigrationPackage` on it (e.g. via a one-off script) and confirm the loader does not throw. This validates that the field rename did not break hash verification.
 
-**Validation gate for Phase 5:** `pnpm test` (workspace-wide) passes. Every `migration.json` under the repo carries `migrationHash`, none carries `migrationId`. `rg '"migrationId"' --type json` (against the workspace, excluding `node_modules`) returns zero hits.
+**Validation gate for Phase 5:** `pnpm test` (workspace-wide) passes. `pnpm typecheck` passes. Every `migration.json` under the repo carries `migrationHash`, none carries `migrationId`. `rg '"migrationId"' --type json` (against the workspace, excluding `node_modules`) returns zero hits. `rg 'metadataToWire|metadataFromWire|MigrationMetadataWire' packages/ test/` returns zero hits (the translator pattern is fully gone). `rg '@prisma-next/migration-tools/metadata' packages/` returns hits only for `MigrationMetadata` / `MigrationHints` (no `MigrationMetadataWire`).
 
 ### Phase 6 — CLI helper renames + README refresh
 
@@ -231,15 +238,16 @@ Every acceptance criterion in `spec.md` is mapped to a test below. Identifiers b
 | `executeMigrationApply` JSDoc carries the trusted-input invariant | Manual | T2.3 | Reviewer-checked. |
 | `types.ts` deleted; per-concept files exist | Static | T4.7 + grep | `ls packages/1-framework/3-tooling/migration/src/` shows `metadata.ts`, `package.ts`, `graph.ts`; no `types.ts`. |
 | `attestation.ts` renamed to `hash.ts` | Static | T4.4 | `git log --diff-filter=R` shows the rename. |
-| All 113 on-disk `migration.json` files carry `migrationHash` | Static | T5.3 | `rg '"migrationId"' --type json` returns zero. |
+| All 113 on-disk `migration.json` files carry `migrationHash` | Static | T5.1 | `rg '"migrationId"' --type json` returns zero (verified at Phase 5 validation gate). |
+| Wire-translator pattern (`MigrationMetadataWire`, `metadataFromWire`, `metadataToWire`) deleted | Static | T5.3 | `rg 'metadataToWire\|metadataFromWire\|MigrationMetadataWire' packages/ test/` returns zero. |
 | `computeMigrationHash` carries the structural-canonicalization JSDoc | Manual | T4.4 | Reviewer-checked against the verbatim text in `spec.md` § Documentation home. |
 | Identifiers across `packages/` use target names | Static | T4.6 + T6.3 | Final audit at T6.3. |
 | No new cross-plane edges | Static | T3.6 (lint:deps step) | `pnpm lint:deps` passes. |
 
 ## Open items
 
-- **TML-2301 ordering.** Coordinate with the assignee. If TML-2301 merges first, add a one-line check to its PR review that `Migration.run()`'s on-disk loading goes through `readMigrationPackage` (under whichever name it has at that point). If this ticket merges first, no coordination needed beyond the cross-link in TML-2301's spec.
-- **`MigrationMeta` rename.** Open question 3 in the spec. Defer to TML-2301; this PR keeps `MigrationMeta` as-is.
+- **TML-2301 ordering — resolved.** TML-2301 merged into `main` and was integrated via merge commit `39157ef76`. The original concern (orchestrator might add a non-verifying load path) didn't materialize — `MigrationCLI.run` is a write path, not a read path. All apply-time consumers still route through `readMigrationPackage` / `readMigrationsDir`. See [`spec.md` § Decision 6](./spec.md#6-tml-2301-coordination--resolved-two-loader-architectural-split).
+- **`MigrationMeta` rename — resolved.** Open question 3 in the spec resolved against renaming. TML-2301 chose to keep `MigrationMeta` as the durable name for the user-authored `describe()` return type; coexists with `MigrationMetadata` (on-disk-attested record) by design.
 - **`./types` export subpath shape.** Open question 1 in the spec. Default: replace with `./metadata` + `./package` + `./graph`.
 - **`errorMigrationHashMismatch` export visibility.** Open question 2. Default: export.
 - **Codemod commit organization.** Open question 4. Default: single commit for all 113 files.
