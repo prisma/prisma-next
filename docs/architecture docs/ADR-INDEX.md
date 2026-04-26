@@ -13,6 +13,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 005 | Thin Core Fat Targets | Keeps core minimal while pushing target-specific behavior into adapters | [ADR 005 - Thin Core Fat Targets.md](adrs/ADR%20005%20-%20Thin%20Core%20Fat%20Targets.md) |
 | 140 | Package Layering & Target-Family Namespacing | Establishes ring-based package layout and per-family namespaces; introduces target-agnostic runtime core and family runtimes | [ADR 140 - Package Layering & Target-Family Namespacing.md](adrs/ADR%20140%20-%20Package%20Layering%20%26%20Target-Family%20Namespacing.md) |
 | 150 | Family-Agnostic CLI and Pack Entry Points | Config-only CLI, /cli vs /runtime entrypoints, family helpers + TargetFamilyHook | [ADR 150 - Family-Agnostic CLI and Pack Entry Points.md](adrs/ADR%20150%20-%20Family-Agnostic%20CLI%20and%20Pack%20Entry%20Points.md) |
+| 204 | Domain actions vs composable primitives in the control plane | Distinguishes action methods (single user intents, CLI envelopes, audit boundaries) from composable primitives (raw data, no audit), and forbids compound actions from calling peer actions | [ADR 204 - Domain actions vs composable primitives in the control plane.md](adrs/ADR%20204%20-%20Domain%20actions%20vs%20composable%20primitives%20in%20the%20control%20plane.md) |
 
 ## Contract & Schema
 
