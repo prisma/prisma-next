@@ -188,6 +188,15 @@ describe('templates', () => {
       expect(md).toContain('replica set');
       expect(md).toContain('TML-2313');
     });
+
+    it('documents the escape hatches and steers users away from db.runtime() for mongo', () => {
+      const md = quickReferenceMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
+
+      expect(md).toContain('db.query');
+      expect(md).toContain('mongoClient');
+      expect(md).not.toMatch(/drop down[^\n]*via `db\.runtime\(\)`/);
+      expect(md).not.toMatch(/use `db\.runtime\(\)`[^.\n]*if you need transactions/i);
+    });
   });
 
   describe('agentSkillMd', () => {
@@ -245,6 +254,16 @@ describe('templates', () => {
 
       expect(md).toContain('replica set');
       expect(md).toContain('connects lazily');
+    });
+
+    it('documents the escape hatches and steers users away from db.runtime() for mongo', () => {
+      const md = agentSkillMd('mongo', 'prisma/contract.prisma', 'pnpm prisma-next');
+
+      expect(md).toContain('db.query');
+      expect(md).toContain('mongoClient');
+      expect(md).toContain('Escape hatches');
+      expect(md).not.toMatch(/drop down[^\n]*via `db\.runtime\(\)`/);
+      expect(md).not.toMatch(/`db\.runtime\(\)`[^\n]*only when the ORM/);
     });
   });
 
