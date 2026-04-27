@@ -191,7 +191,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     );
 
     const planToLower: SqlQueryPlan<Row> =
-      rewrittenDraft.ast === plan.ast ? plan : { ...plan, ast: rewrittenDraft.ast };
+      rewrittenDraft.ast === plan.ast
+        ? plan
+        : { ...plan, ast: rewrittenDraft.ast, meta: rewrittenDraft.meta };
 
     return lowerSqlPlan(this.adapter, this.contract, planToLower);
   }
