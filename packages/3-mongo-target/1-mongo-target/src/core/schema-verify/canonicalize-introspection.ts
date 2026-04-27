@@ -355,7 +355,7 @@ function stripUnspecifiedFields(
   if (expected === undefined) return undefined;
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(expected)) {
-    if (key in live) out[key] = live[key];
+    if (Object.hasOwn(live, key)) out[key] = live[key];
   }
   return out;
 }
