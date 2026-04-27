@@ -325,4 +325,49 @@ describe('verifyMongoSchema', () => {
       expect(result.contract.profileHash).toBeUndefined();
     });
   });
+
+  describe('synthetic-contract opt-out (F1 regression)', () => {
+    // Locks in the minimum well-formed shape that synthetic-contract test
+    // fixtures must use when they pair with `strictVerification: false` to
+    // opt out of post-apply verification. The reviewer found three fixtures
+    // (in test/integration and examples/) that supplied `{}` as the
+    // contract; `contractToMongoSchemaIR` reads `contract.storage.collections`
+    // unconditionally, so the runner crashed with `TypeError` before the
+    // strict flag was consulted.
+    function minimalContract(): MongoContract {
+      // Mirrors the documented minimum shape: synthetic fixtures cannot
+      // construct a fully-typed MongoContract, so they bypass the type
+      // system with a single-purpose `as unknown as` cast and supply only
+      // the `storage` shape `contractToMongoSchemaIR` actually reads.
+      return {
+        storage: { storageHash: 'sha256:authoring-test', collections: {} },
+      } as unknown as MongoContract;
+    }
+
+    it('does not throw when contract has empty storage.collections', () => {
+      expect(() =>
+        verifyMongoSchema({
+          contract: minimalContract(),
+          schema: ir([coll('users', { indexes: [idx([{ field: 'email', direction: 1 }])] })]),
+          strict: false,
+          frameworkComponents: [],
+        }),
+      ).not.toThrow();
+    });
+
+    it('returns ok with strict: false even when live schema has extra collections/indexes', () => {
+      const result = verifyMongoSchema({
+        contract: minimalContract(),
+        schema: ir([
+          coll('users', { indexes: [idx([{ field: 'email', direction: 1 }], { unique: true })] }),
+          coll('posts'),
+        ]),
+        strict: false,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.counts.fail).toBe(0);
+    });
+  });
 });

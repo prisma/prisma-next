@@ -103,8 +103,20 @@ describe(
             },
             operations: JSON.parse(opsJson),
           },
-
-          destinationContract: {} as unknown as MongoContract,
+          // Synthetic-contract opt-out (paired with `strictVerification: false`):
+          // this test feeds a hand-rolled ops JSON file to the runner; we have
+          // no authored MongoContract to pass. Supply the minimum well-formed
+          // shape `contractToMongoSchemaIR` reads (`storage.collections`) so
+          // the verifier degrades to an empty-expected diff rather than
+          // crashing in `contractToMongoSchemaIR` before the strict flag
+          // is consulted.
+          destinationContract: {
+            storage: {
+              storageHash:
+                'sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d',
+              collections: {},
+            },
+          } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
           strictVerification: false,
