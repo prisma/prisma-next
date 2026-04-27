@@ -23,8 +23,6 @@ packages/
     1-core/              # Layer 1: Core
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
-    4-runtime/           # Layer 4: Runtime
-      runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
   2-mongo-family/        # Domain 2: Mongo family
   2-sql/                 # Domain 2: SQL family
@@ -66,11 +64,9 @@ The framework domain (`packages/1-framework/`) contains target-agnostic packages
 |   |-- contract/      → @prisma-next/contract-authoring
 |   |-- psl-parser/    → @prisma-next/psl-parser
 |-- 3-tooling (migration plane)
-|   |-- cli/           → @prisma-next/cli
-|   |-- emitter/       → @prisma-next/emitter
-|   |-- migration/     → @prisma-next/migration-tools
-|-- 4-runtime (runtime plane)
-    |-- runtime-executor/ → @prisma-next/runtime-executor
+    |-- cli/           → @prisma-next/cli
+    |-- emitter/       → @prisma-next/emitter
+    |-- migration/     → @prisma-next/migration-tools
 ```
 
 ### SQL Family Domain
@@ -173,7 +169,7 @@ Clean Architecture layers for Prisma Next:
 - **Authoring** – PSL/TS authoring surfaces plus shared descriptor types that produce contracts.
 - **Targets** – family-specific contract types and emitter hooks.
 - **Lanes** – query DSLs/ORMs that produce AST plans.
-- **Runtime** – target-neutral runtime core plus per-family runtime implementations.
+- **Runtime** – per-family runtime implementations that extend `RuntimeCore` from `@prisma-next/framework-components/runtime` (core layer).
 - **Adapters** – database adapters/drivers and optional compat layers.
 
 Dependencies flow downward (toward core); lateral dependencies within the same layer are permitted. Example: `@prisma-next/sql-lane` and `@prisma-next/sql-orm-lane` both live in the Lanes layer, so they may share helpers via `@prisma-next/sql-relational-core`, but neither may depend on Runtime or Adapters. Optional compat packages live at the edge alongside adapters; they can depend on inner layers but do not form a separate layer.
@@ -190,17 +186,15 @@ graph LR
   Core[Core] --> Authoring
   Authoring --> Targets
   Targets --> Lanes
-  Lanes --> RuntimeCore[Runtime Core]
-  RuntimeCore --> FamilyRuntime[Family Runtime]
-  FamilyRuntime --> Adapters
+  Lanes --> Runtime
+  Runtime --> Adapters
 
   %% lateral relationships (same ring) shown as loops
   Core --> Core
   Authoring --> Authoring
   Targets --> Targets
   Lanes --> Lanes
-  RuntimeCore --> RuntimeCore
-  FamilyRuntime --> FamilyRuntime
+  Runtime --> Runtime
   Adapters --> Adapters
   Compat --> Compat
 
@@ -208,10 +202,11 @@ graph LR
   style Authoring fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
   style Targets fill:#fff3e0,stroke:#e65100,stroke-width:2px
   style Lanes fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-  style RuntimeCore fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-  style FamilyRuntime fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+  style Runtime fill:#fce4ec,stroke:#880e4f,stroke-width:2px
   style Adapters fill:#e0f2f1,stroke:#004d40,stroke-width:2px
 ```
+
+The runtime ring is a single layer: `RuntimeCore` (the abstract base) lives on `@prisma-next/framework-components/runtime` (core layer) and is extended directly by family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`). See [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
 
 ### Dependency Rules
 
@@ -284,15 +279,15 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 
 ### Runtime Layer
 
-Target-agnostic runtime kernel plus per-family runtime implementations.
-
-**Framework Domain (Runtime Plane):**
-- `packages/1-framework/4-runtime/runtime-executor/` → `@prisma-next/runtime-executor` – verification, marker checks, plugin SPI
+Per-family runtime implementations that extend the abstract `RuntimeCore` from `@prisma-next/framework-components/runtime` (core layer). There is no separate target-agnostic runtime package; the kernel collapsed into `framework-components` per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
 
 **SQL Domain (Runtime Plane):**
-- `packages/2-sql/5-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that composes runtime-executor with SQL adapters (future document runtimes will mirror this)
+- `packages/2-sql/5-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that extends `RuntimeCore` from `@prisma-next/framework-components/runtime` with SQL adapters (future document runtimes will mirror this)
 
-**Dependency Rules:** runtime-executor can import from inner layers only. Family runtimes can import from runtime-executor, targets, and their family's adapters.
+**Mongo Domain (Runtime Plane):**
+- `packages/2-mongo-family/7-runtime/` → `@prisma-next/mongo-runtime` – Mongo family runtime that extends `RuntimeCore` from `@prisma-next/framework-components/runtime` with the Mongo adapter
+
+**Dependency Rules:** Family runtimes import the runtime SPI (`RuntimeCore`, `RuntimeMiddleware`, `RuntimeExecutor`, `runWithMiddleware`) from `@prisma-next/framework-components/runtime` (core layer) and may also import from their family's lanes, transport, and adapter packages. There is no separate target-agnostic runtime package; per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md), the runtime kernel collapsed into `@prisma-next/framework-components` and family runtimes extend it directly.
 
 ### Adapters Layer (Targets Domain, Multi-Plane)
 
@@ -320,7 +315,7 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 - Encode target family in the package name prefix (e.g., `@prisma-next/sql-...`)
 - Collapse nested directories to hyphenated names (no slashes after scope)
 - Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`). They are located under `packages/3-targets/**` as separate packages (target, adapter, driver) to enable mix-and-match.
-- Layers constrain dependencies but don't appear in package names except when meaningful (e.g., `runtime-executor`)
+- Layers constrain dependencies but don't generally appear in package names
 
 ### Examples
 
@@ -335,7 +330,6 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/1-framework/4-runtime/runtime-executor/` | `@prisma-next/runtime-executor` |
 | `packages/2-mongo-family/1-foundation/mongo-contract/` | `@prisma-next/mongo-contract` |
 | `packages/2-mongo-family/2-authoring/contract-psl/` | `@prisma-next/mongo-contract-psl` |
 | `packages/2-mongo-family/2-authoring/contract-ts/` | `@prisma-next/mongo-contract-ts` |
@@ -384,9 +378,8 @@ Database adapters, drivers, and targets (dialects) live in the Targets domain as
 - **`2-sql/3-tooling/*`** → can import from `1-core/*` and `2-authoring/*` only
 - **`2-mongo-family/3-tooling/*`** and **`2-mongo-family/9-family`** → can import from `1-core/*` and `2-authoring/*` only
 - **`2-sql/4-lanes/*`** → can import from `1-core/*`, `2-authoring/*`, `2-sql/3-tooling/*` only
-- **`1-framework/4-runtime/runtime-executor`** → can import from `1-core/*`, `2-authoring/*`, `3-tooling/*` only (no direct imports from `3-targets/*`)
-- **`2-sql/5-runtime`** → can import from `4-runtime/runtime-executor` and `2-sql/3-tooling/*` and `3-targets/6-adapters/*` only
-- **`2-mongo-family/4-query/*`, `5-query-builders/*`, `6-transport/*`, `7-runtime`** → follow the same downward-only rule within the Mongo family plus allowed framework imports
+- **`2-sql/5-runtime`** → can import from `1-framework/1-core/framework-components` (for `RuntimeCore` / `RuntimeMiddleware` / `runWithMiddleware`), `2-sql/3-tooling/*`, `2-sql/4-lanes/*`, and `3-targets/6-adapters/*` only
+- **`2-mongo-family/4-query/*`, `5-query-builders/*`, `6-transport/*`, `7-runtime`** → follow the same downward-only rule within the Mongo family plus allowed framework imports (notably `1-framework/1-core/framework-components` for the runtime SPI)
 - **`3-targets/6-adapters/*`** → can import from `2-sql/3-tooling/*` and `2-sql/5-runtime` only
 - **`3-mongo-target/2-mongo-adapter`** → can import from Mongo family shared/runtime layers, not SQL family packages
 
@@ -455,7 +448,7 @@ Dependency Cruiser:
 - Reports violations with detailed context
 - Can be run locally or in CI
 - Supports incremental checks for lint-staged hooks
-- Enforces the dependency direction: `core → authoring → targets → lanes → runtime-executor → family-runtime → adapters`
+- Enforces the dependency direction: `core → authoring → targets → lanes → runtime → adapters`
 
 **Implementation:**
 - Uses data-driven configuration from `architecture.config.json`
@@ -536,5 +529,4 @@ The numbered prefixes ensure:
 ## References
 
 - [ADR 140 - Package Layering & Target-Family Namespacing](../adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
-- [Brief 12 - Package Layering](../../briefs/12-Package-Layering.md)
 - [ADR 005 - Thin Core, Fat Targets](../adrs/ADR%20005%20-%20Thin%20Core,%20Fat%20Targets.md)

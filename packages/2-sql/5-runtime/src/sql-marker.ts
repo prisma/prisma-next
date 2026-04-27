@@ -1,4 +1,4 @@
-import type { MarkerStatement } from '@prisma-next/runtime-executor';
+import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 
 export interface SqlStatement {
   readonly sql: string;

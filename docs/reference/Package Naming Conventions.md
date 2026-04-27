@@ -13,8 +13,6 @@ packages/
     1-core/              # Layer 1: Core
     2-authoring/         # Layer 2: Authoring
     3-tooling/           # Layer 3: Tooling
-    4-runtime/           # Layer 4: Runtime
-      runtime-executor/
   2-document/            # Domain 2: Document (placeholder)
   2-mongo-family/        # Domain 2: Mongo family
   2-sql/                 # Domain 2: SQL family
@@ -43,7 +41,7 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 - Encode target family with a family-specific prefix such as `sql-` or `mongo-` for discoverability.
 - Collapse nested dirs to hyphenated names; no slashes after the scope.
 - Keep conventional names for adapters/drivers (e.g., `@prisma-next/adapter-postgres`, `@prisma-next/driver-postgres`) even when nested under `packages/3-targets/**`.
-- Layers (core/authoring/tooling/lanes/runtime/adapters) constrain dependency direction; they generally do not appear in package names, except when meaningful (e.g., `runtime-executor`).
+- Layers (core/authoring/tooling/lanes/runtime/adapters) constrain dependency direction and generally do not appear in package names.
 
 ## Path → Package Name Examples
 
@@ -60,7 +58,6 @@ Planes are a conceptual grouping recorded in `architecture.config.json` but do n
 | `packages/1-framework/2-authoring/psl-parser/` | `@prisma-next/psl-parser` |
 | `packages/1-framework/3-tooling/cli/` | `@prisma-next/cli` |
 | `packages/1-framework/3-tooling/emitter/` | `@prisma-next/emitter` |
-| `packages/1-framework/4-runtime/runtime-executor/` | `@prisma-next/runtime-executor` |
 
 **SQL Domain:**
 
@@ -160,6 +157,6 @@ packages:
 
 ## Enforcement
 
-- Use `scripts/check-imports.mjs` with `architecture.config.json` to enforce dependency direction: `core → authoring → tooling → lanes → runtime-executor → family-runtime → adapters`.
+- Use `scripts/check-imports.mjs` with `architecture.config.json` to enforce dependency direction: `core → authoring → tooling → lanes → runtime → adapters`.
 - The import validation script enforces domain/layer/plane rules: same-layer imports allowed, downward imports allowed, upward imports denied, cross-domain imports denied except framework domain, migration→runtime imports denied, runtime→migration imports allowed for artifacts only.
 - Numbered directory prefixes provide visual reinforcement of dependency direction.

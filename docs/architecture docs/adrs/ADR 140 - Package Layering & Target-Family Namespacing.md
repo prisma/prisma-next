@@ -1,5 +1,7 @@
 # ADR 140 — Package Layering & Target-Family Namespacing
 
+> **Partially superseded by [ADR 204](./ADR%20204%20-%20Single-tier%20runtime.md):** the "Runtime Separation" portion of this ADR — which introduced a two-tier runtime model with a target-agnostic `runtime-executor` package and family runtimes composing it — has been collapsed into a single tier. `RuntimeCore` now lives in `@prisma-next/framework-components` (exposed via the `/runtime` subpath) and is extended directly by family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`). The package-layering, plane-boundary, domain/family-namespacing, and naming guidance in the rest of this ADR is unchanged.
+
 ## Context
 
 - The repository currently mixes contract authoring DSLs, relational schema builders, query lanes, and ORM logic in `@prisma-next/sql-query`. This makes changes risky and creates accidental coupling across unrelated features.

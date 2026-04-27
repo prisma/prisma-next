@@ -1,7 +1,7 @@
-import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, AnyQueryAst, LoweredStatement } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 
 /**
  * Lowers a SQL query plan to an executable Plan by calling the adapter's lower method.
@@ -15,7 +15,7 @@ export function lowerSqlPlan<Row>(
   adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>,
   contract: Contract<SqlStorage>,
   queryPlan: SqlQueryPlan<Row>,
-): ExecutionPlan<Row> {
+): SqlExecutionPlan<Row> {
   const lowered = adapter.lower(queryPlan.ast, {
     contract,
     params: queryPlan.params,

@@ -1,5 +1,5 @@
-import type { Contract, ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { AfterExecuteResult } from '@prisma-next/runtime-executor';
+import type { Contract, PlanMeta } from '@prisma-next/contract/types';
+import type { AfterExecuteResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -9,6 +9,7 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { budgets } from '../src/middleware/budgets';
@@ -38,16 +39,16 @@ const baseMeta: PlanMeta = {
   paramDescriptors: [],
 };
 
-type PlanOverrides = Partial<Omit<ExecutionPlan, 'meta'>> & { meta?: Partial<PlanMeta> };
+type PlanOverrides = Partial<Omit<SqlExecutionPlan, 'meta'>> & { meta?: Partial<PlanMeta> };
 
-function createPlan(overrides: PlanOverrides): ExecutionPlan {
+function createPlan(overrides: PlanOverrides): SqlExecutionPlan {
   const { meta: metaOverrides, ...rest } = overrides;
   return {
     sql: 'SELECT 1',
     params: [],
     meta: { ...baseMeta, ...(metaOverrides ?? {}) } as unknown as PlanMeta,
     ...rest,
-  } as unknown as ExecutionPlan;
+  } as unknown as SqlExecutionPlan;
 }
 
 describe('budgets middleware', () => {

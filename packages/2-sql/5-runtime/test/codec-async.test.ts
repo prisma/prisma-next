@@ -1,7 +1,8 @@
-import type { ExecutionPlan, JsonValue } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   JsonSchemaValidateFn,
   JsonSchemaValidatorRegistry,
@@ -16,7 +17,7 @@ import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-s
 // Shared helpers
 // =============================================================================
 
-function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
+function createTestPlan(overrides?: Partial<SqlExecutionPlan>): SqlExecutionPlan {
   return {
     sql: 'SELECT 1',
     params: [],

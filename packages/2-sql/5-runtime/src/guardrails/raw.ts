@@ -1,4 +1,4 @@
-import type { ExecutionPlan, PlanMeta, PlanRefs } from '@prisma-next/contract/types';
+import type { PlanMeta, PlanRefs } from '@prisma-next/contract/types';
 
 export type LintSeverity = 'error' | 'warn';
 export type BudgetSeverity = 'error' | 'warn';
@@ -30,6 +30,16 @@ export interface RawGuardrailResult {
   readonly statement: 'select' | 'mutation' | 'other';
 }
 
+/**
+ * Minimal plan view consumed by raw-SQL guardrails. Structurally satisfied
+ * by `SqlExecutionPlan`; declared inline so this module stays decoupled
+ * from a specific plan type at the call site.
+ */
+interface RawGuardrailPlan {
+  readonly sql: string;
+  readonly meta: PlanMeta;
+}
+
 const SELECT_STAR_REGEX = /select\s+\*/i;
 const LIMIT_REGEX = /\blimit\b/i;
 const MUTATION_PREFIX_REGEX = /^(insert|update|delete|create|alter|drop|truncate)\b/i;
@@ -37,7 +47,7 @@ const MUTATION_PREFIX_REGEX = /^(insert|update|delete|create|alter|drop|truncate
 const READ_ONLY_INTENTS = new Set(['read', 'report', 'readonly']);
 
 export function evaluateRawGuardrails(
-  plan: ExecutionPlan,
+  plan: RawGuardrailPlan,
   config?: RawGuardrailConfig,
 ): RawGuardrailResult {
   const lints: LintFinding[] = [];

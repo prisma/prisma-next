@@ -15,8 +15,9 @@
  */
 
 import type { Contract } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { isToOneCardinality, resolvePolymorphismInfo } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -41,7 +42,6 @@ import type {
   IncludeExpr,
   IncludeScalar,
   RelationCardinalityTag,
-  RuntimeScope,
 } from './types';
 
 export function dispatchCollectionRows<Row>(options: {
