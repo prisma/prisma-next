@@ -3,26 +3,36 @@ import type { JsonValue } from '@prisma-next/contract/types';
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
 /**
- * Base codec interface for all target families.
+ * A codec is the contract between an application value and its on-wire and
+ * on-contract-disk representations.
  *
- * A codec maps between four representations of a value:
- * - **Input** (`TInput`): the JavaScript type accepted on writes
- * - **Output** (`TOutput`): the JavaScript type produced on reads (defaults to `TInput`)
- * - **Wire** (`TWire`): the format sent to/from the database driver
- * - **JSON** (`JsonValue`): the JSON-safe form stored in contract artifacts
+ * Author one JS type at the app boundary; the codec translates that type
+ * to the database driver's wire format and back, and to the JSON-safe form
+ * used in contract artifacts. Most codecs use one JS type for both writes
+ * and reads, so `TInput` and `TOutput` collapse to the same type. When a
+ * richer return type makes sense (e.g. write `string`, read `Date`), pass
+ * distinct types to `encode`'s parameter and `decode`'s return — the codec
+ * then carries an asymmetric input / output shape.
  *
- * The interface lands on the seam between **query-time** (per-row, IO-relevant)
- * and **build-time** (per-contract-load) methods:
+ * Four representations participate:
+ * - **Input** (`TInput`): the JS type accepted on writes.
+ * - **Output** (`TOutput`): the JS type produced on reads (defaults to `TInput`).
+ * - **Wire** (`TWire`): the format exchanged with the database driver.
+ * - **JSON** (`JsonValue`): a JSON-safe form used in contract artifacts.
  *
- * - **Query-time methods** (`encode`, `decode`) are required and Promise-returning
- *   at the boundary. The codec factory (`codec()`) accepts both sync and async
- *   author functions and lifts sync ones to Promise-shaped methods, so authors
- *   write whichever shape is natural per method.
- * - **Build-time methods** (`encodeJson`, `decodeJson`, `renderOutputType`) are
- *   synchronous so `validateContract` and client construction stay synchronous.
+ * Codec methods split into two groups:
  *
- * Family-specific codec interfaces (SQL `Codec`, Mongo `MongoCodec`) extend
- * this base to add family-specific metadata.
+ * - **Query-time** methods (`encode`, `decode`) run per row/parameter at the
+ *   IO boundary; they are required and Promise-returning. The per-family
+ *   codec factory accepts sync or async author functions and lifts sync
+ *   ones to Promise-shaped methods automatically.
+ * - **Build-time** methods (`encodeJson`, `decodeJson`, `renderOutputType`)
+ *   run when the contract is serialized, loaded, or when client types are
+ *   emitted. They stay synchronous so contract validation and client
+ *   construction are synchronous.
+ *
+ * Target-family codec interfaces extend this base with target-shaped
+ * metadata.
  */
 export interface Codec<
   Id extends string = string,
