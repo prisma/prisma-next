@@ -275,11 +275,11 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       return {
         storageHash: row.core_hash,
         profileHash: row.profile_hash,
-        contractJson: row.contract_json ? safeJsonParse(row.contract_json) : null,
+        contractJson: row.contract_json ? JSON.parse(row.contract_json) : null,
         canonicalVersion: row.canonical_version,
         updatedAt: new Date(row.updated_at),
         appTag: row.app_tag,
-        meta: row.meta ? (safeJsonParse(row.meta) as Record<string, unknown>) : {},
+        meta: row.meta ? JSON.parse(row.meta) : {},
       };
     } catch (error) {
       // Table might not exist yet
@@ -579,13 +579,5 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       return;
     }
     await driver.query(statement.sql);
-  }
-}
-
-function safeJsonParse(value: string): unknown {
-  try {
-    return JSON.parse(value);
-  } catch {
-    return value;
   }
 }

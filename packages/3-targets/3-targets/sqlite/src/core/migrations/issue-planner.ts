@@ -178,15 +178,10 @@ function conflictKindForCall(call: SqliteOpFactoryCall): SqlPlannerConflict['kin
 }
 
 function locationForCall(call: SqliteOpFactoryCall): SqlPlannerConflictLocation | undefined {
-  const anyCall = call as unknown as {
-    tableName?: string;
-    columnName?: string;
-    indexName?: string;
-  };
   const location: { table?: string; column?: string; index?: string } = {};
-  if (anyCall.tableName) location.table = anyCall.tableName;
-  if (anyCall.columnName) location.column = anyCall.columnName;
-  if (anyCall.indexName) location.index = anyCall.indexName;
+  if ('tableName' in call) location.table = call.tableName;
+  if ('columnName' in call) location.column = call.columnName;
+  if ('indexName' in call) location.index = call.indexName;
   return Object.keys(location).length > 0 ? (location as SqlPlannerConflictLocation) : undefined;
 }
 

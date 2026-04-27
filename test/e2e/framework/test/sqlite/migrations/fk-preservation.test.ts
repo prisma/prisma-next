@@ -173,7 +173,14 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
           ]);
         },
       },
-      async ({ driver, schema }) => {
+      async ({ driver, schema, plannedOperationIds }) => {
+        // UserV1 and UserV2 declare the same indexes, so this test only
+        // proves "indexes survived" if the table was actually recreated.
+        // Assert the planner emitted a recreate-table op so a future change
+        // that suppresses recreate for nullability widening fails this test
+        // instead of silently passing on the unchanged table.
+        expect(plannedOperationIds).toContain('recreateTable.User');
+
         const indexCols = schema.tables['User']!.indexes.map((i) => [...i.columns]);
         expect(indexCols).toContainEqual(['email']);
         expect(indexCols).toContainEqual(['name', 'email']);
