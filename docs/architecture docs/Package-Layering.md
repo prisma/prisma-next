@@ -287,7 +287,7 @@ Per-family runtime implementations that extend the abstract `RuntimeCore` from `
 **Mongo Domain (Runtime Plane):**
 - `packages/2-mongo-family/7-runtime/` → `@prisma-next/mongo-runtime` – Mongo family runtime that extends `RuntimeCore` from `@prisma-next/framework-components/runtime` with the Mongo adapter
 
-**Dependency Rules:** Family runtimes import the runtime SPI (`RuntimeCore`, `RuntimeMiddleware`, `RuntimeExecutor`, `runWithMiddleware`) from `@prisma-next/framework-components` (core layer) and may also import from their family's lanes, transport, and adapter packages. There is no separate target-agnostic runtime package; per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md), the runtime kernel collapsed into `@prisma-next/framework-components` and family runtimes extend it directly.
+**Dependency Rules:** Family runtimes import the runtime SPI (`RuntimeCore`, `RuntimeMiddleware`, `RuntimeExecutor`, `runWithMiddleware`) from `@prisma-next/framework-components/runtime` (core layer) and may also import from their family's lanes, transport, and adapter packages. There is no separate target-agnostic runtime package; per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md), the runtime kernel collapsed into `@prisma-next/framework-components` and family runtimes extend it directly.
 
 ### Adapters Layer (Targets Domain, Multi-Plane)
 
