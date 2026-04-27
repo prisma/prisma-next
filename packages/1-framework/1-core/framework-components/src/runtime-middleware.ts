@@ -1,5 +1,5 @@
 import type { AsyncIterableResult } from './async-iterable-result';
-import type { QueryPlan } from './query-plan';
+import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { runtimeError } from './runtime-error';
 
 export interface RuntimeLog {
@@ -14,6 +14,20 @@ export interface RuntimeMiddlewareContext {
   readonly mode: 'strict' | 'permissive';
   readonly now: () => number;
   readonly log: RuntimeLog;
+  /**
+   * Returns a stable string identifying the (storage, statement, params)
+   * tuple of an execution. Two semantically equivalent executions return
+   * the same string. Used by middleware that need per-execution identity
+   * (caching, request coalescing).
+   *
+   * The family runtime owns the implementation:
+   * - SQL: `meta.storageHash` + `exec.sql` + `canonicalStringify(exec.params)`
+   * - Mongo: `meta.storageHash` + `canonicalStringify(exec.command)`
+   *
+   * The returned string is intended to be consumed directly as a `Map` key
+   * — it is not (and should not be) further hashed by callers.
+   */
+  identityKey(exec: ExecutionPlan): string;
 }
 
 export interface AfterExecuteResult {

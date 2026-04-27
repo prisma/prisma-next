@@ -1418,6 +1418,9 @@ importers:
       '@prisma-next/mongo-wire':
         specifier: workspace:*
         version: link:../6-transport/mongo-wire
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*

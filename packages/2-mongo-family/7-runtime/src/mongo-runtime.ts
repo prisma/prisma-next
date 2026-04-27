@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { computeMongoIdentityKey } from './identity-key';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
 
@@ -42,6 +43,7 @@ class MongoRuntimeImpl
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
+      identityKey: (exec) => computeMongoIdentityKey(exec as MongoExecutionPlan),
     };
 
     super({ middleware, ctx });
