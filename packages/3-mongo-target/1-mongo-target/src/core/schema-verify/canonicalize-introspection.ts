@@ -72,8 +72,8 @@ function canonicalizeLiveCollection(
   return new MongoSchemaCollectionCtor({
     name: liveColl.name,
     indexes,
-    ...(liveColl.validator ? { validator: liveColl.validator } : {}),
-    ...(options ? { options } : {}),
+    ...ifDefined('validator', liveColl.validator),
+    ...ifDefined('options', options),
   });
 }
 
@@ -96,8 +96,8 @@ function canonicalizeExpectedCollection(
   return new MongoSchemaCollectionCtor({
     name: expectedColl.name,
     indexes,
-    ...(expectedColl.validator ? { validator: expectedColl.validator } : {}),
-    ...(options ? { options } : {}),
+    ...ifDefined('validator', expectedColl.validator),
+    ...ifDefined('options', options),
   });
 }
 
@@ -181,18 +181,14 @@ function canonicalizeLiveIndex(
   return new MongoSchemaIndexCtor({
     keys: projectedKeys,
     unique: liveIndex.unique,
-    ...(liveIndex.sparse !== undefined ? { sparse: liveIndex.sparse } : {}),
-    ...(liveIndex.expireAfterSeconds !== undefined
-      ? { expireAfterSeconds: liveIndex.expireAfterSeconds }
-      : {}),
-    ...(liveIndex.partialFilterExpression
-      ? { partialFilterExpression: liveIndex.partialFilterExpression }
-      : {}),
-    ...(liveIndex.wildcardProjection ? { wildcardProjection: liveIndex.wildcardProjection } : {}),
-    ...(collation ? { collation } : {}),
-    ...(weights ? { weights } : {}),
-    ...(default_language !== undefined ? { default_language } : {}),
-    ...(language_override !== undefined ? { language_override } : {}),
+    ...ifDefined('sparse', liveIndex.sparse),
+    ...ifDefined('expireAfterSeconds', liveIndex.expireAfterSeconds),
+    ...ifDefined('partialFilterExpression', liveIndex.partialFilterExpression),
+    ...ifDefined('wildcardProjection', liveIndex.wildcardProjection),
+    ...ifDefined('collation', collation),
+    ...ifDefined('weights', weights),
+    ...ifDefined('default_language', default_language),
+    ...ifDefined('language_override', language_override),
   });
 }
 
@@ -327,11 +323,11 @@ function canonicalizeLiveOptions(
   if (!hasMeaningful) return undefined;
 
   return new MongoSchemaCollectionOptionsCtor({
-    ...(liveOptions.capped ? { capped: liveOptions.capped } : {}),
-    ...(timeseries ? { timeseries } : {}),
-    ...(collation ? { collation } : {}),
-    ...(changeStreamPreAndPostImages ? { changeStreamPreAndPostImages } : {}),
-    ...(clusteredIndex ? { clusteredIndex } : {}),
+    ...ifDefined('capped', liveOptions.capped),
+    ...ifDefined('timeseries', timeseries),
+    ...ifDefined('collation', collation),
+    ...ifDefined('changeStreamPreAndPostImages', changeStreamPreAndPostImages),
+    ...ifDefined('clusteredIndex', clusteredIndex),
   });
 }
 
@@ -355,11 +351,11 @@ function canonicalizeExpectedOptions(
   if (!hasMeaningful) return undefined;
 
   return new MongoSchemaCollectionOptionsCtor({
-    ...(expectedOptions.capped ? { capped: expectedOptions.capped } : {}),
-    ...(expectedOptions.timeseries ? { timeseries: expectedOptions.timeseries } : {}),
-    ...(expectedOptions.collation ? { collation: expectedOptions.collation } : {}),
-    ...(changeStreamPreAndPostImages ? { changeStreamPreAndPostImages } : {}),
-    ...(expectedOptions.clusteredIndex ? { clusteredIndex: expectedOptions.clusteredIndex } : {}),
+    ...ifDefined('capped', expectedOptions.capped),
+    ...ifDefined('timeseries', expectedOptions.timeseries),
+    ...ifDefined('collation', expectedOptions.collation),
+    ...ifDefined('changeStreamPreAndPostImages', changeStreamPreAndPostImages),
+    ...ifDefined('clusteredIndex', expectedOptions.clusteredIndex),
   });
 }
 
