@@ -52,12 +52,14 @@ import { detectPnpmCatalogOverrides } from '../../../src/commands/init/detect-pn
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
+  INIT_EXIT_INTERNAL_ERROR,
   INIT_EXIT_OK,
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
 } from '../../../src/commands/init/exit-codes';
 import {
   buildCatalogWarnings,
+  exitCodeForError,
   hasDirectDep,
   isRecognisedPnpmResolutionError,
   redactSecrets,
@@ -2113,5 +2115,29 @@ describe('hasDirectDep (FR2.1)', () => {
 
   it('does not inspect peerDependencies (irrelevant for the clobber-risk path)', () => {
     expect(hasDirectDep({ peerDependencies: { '@types/node': '*' } }, '@types/node')).toBe(false);
+  });
+});
+
+describe('exitCodeForError', () => {
+  it('maps PN-CLI-5009 (invalid output document) to INTERNAL_ERROR, not PRECONDITION', () => {
+    expect(exitCodeForError({ code: '5009' })).toBe(INIT_EXIT_INTERNAL_ERROR);
+    expect(exitCodeForError({ code: '5009' })).not.toBe(INIT_EXIT_PRECONDITION);
+  });
+
+  it('maps unrecognised internal codes to INTERNAL_ERROR (default branch)', () => {
+    expect(exitCodeForError({ code: '5999' })).toBe(INIT_EXIT_INTERNAL_ERROR);
+    expect(exitCodeForError({ code: '9000' })).toBe(INIT_EXIT_INTERNAL_ERROR);
+  });
+
+  it('maps user-facing precondition codes to PRECONDITION', () => {
+    for (const code of ['5001', '5002', '5003', '5004', '5005', '5010', '5011', '5012']) {
+      expect(exitCodeForError({ code })).toBe(INIT_EXIT_PRECONDITION);
+    }
+  });
+
+  it('maps lifecycle codes to their dedicated exit codes', () => {
+    expect(exitCodeForError({ code: '5006' })).toBe(INIT_EXIT_USER_ABORTED);
+    expect(exitCodeForError({ code: '5007' })).toBe(INIT_EXIT_INSTALL_FAILED);
+    expect(exitCodeForError({ code: '5008' })).toBe(INIT_EXIT_EMIT_FAILED);
   });
 });
