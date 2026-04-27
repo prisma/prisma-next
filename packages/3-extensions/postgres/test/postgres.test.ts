@@ -109,7 +109,7 @@ describe('postgres', () => {
     );
   });
 
-  // T2.8 — regression: postgres({...}) must remain synchronous (it only consumes
+  // Regression: postgres({...}) must remain synchronous (it only consumes
   // build-time codec methods via validateContract / type maps). If construction
   // becomes Promise-returning, this assignment loses its synchronous type and
   // every call site needs `await postgres(...)`.

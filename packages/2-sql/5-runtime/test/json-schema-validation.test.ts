@@ -606,7 +606,7 @@ describe('JSON Schema decoding validation', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // T5.2 — codec-authored error.message redaction (DEFERRED)
+  // Codec-authored error.message redaction — DEFERRED follow-up.
   //
   // Translated verbatim from PR #375 § json-schema-validation.test.ts. Asserts
   // that codec-authored error messages are not embedded into the
@@ -615,11 +615,9 @@ describe('JSON Schema decoding validation', () => {
   //
   // The current `wrapDecodeFailure` (packages/2-sql/5-runtime/src/codecs/
   // decoding.ts) embeds `error.message` into the envelope's wrapped message.
-  // Implementing the redaction trigger is out of scope for the
-  // codec-async-single-path project (see spec.md § Open Items: "Redaction-
-  // trigger spelling — independent of this design; tracked separately"). The
-  // assertion is preserved here as an `it.skip` so it can be activated when
-  // redaction policy lands.
+  // Implementing the redaction trigger is independent of the async-codec
+  // boundary work and is tracked separately. The assertion is preserved
+  // here as an `it.skip` so it can be activated when redaction policy lands.
   // ---------------------------------------------------------------------------
   it.skip('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
     const leakyPlaintext = 'super-secret-plaintext-value';

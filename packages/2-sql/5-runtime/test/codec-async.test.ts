@@ -45,7 +45,7 @@ function deferred<T>(): {
 }
 
 // =============================================================================
-// T2.1 — encodeParams: concurrent dispatch + envelope
+// encodeParams: concurrent dispatch + envelope
 // =============================================================================
 
 describe('encodeParams — async, concurrent dispatch', () => {
@@ -251,7 +251,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
 });
 
 // =============================================================================
-// T2.2 — decodeRow / decodeField: concurrent per-cell + envelope + JSON validation
+// decodeRow / decodeField: concurrent per-cell + envelope + JSON validation
 // =============================================================================
 
 describe('decodeRow — async, concurrent per-cell dispatch', () => {
@@ -539,7 +539,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 });
 
 // =============================================================================
-// T5.1 + T5.5 — seeded-secret-codec realistic crypto roundtrip + envelopes
+// seeded-secret-codec — realistic crypto roundtrip + envelopes
 // =============================================================================
 
 describe('seeded-secret-codec — realistic crypto path against the runtime', () => {

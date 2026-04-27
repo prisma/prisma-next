@@ -1,25 +1,24 @@
 /**
- * Type-level coverage for M3 of `codec-async-single-path`.
+ * Type-level coverage for the ORM-client async-codec boundary.
  *
- * These assertions encode the m3 invariant: ORM-client read and write surfaces
- * always present plain `T` values to consumers — never `Promise<T>` or
- * `T | Promise<T>` — even though codec query-time methods (`encode` / `decode`)
- * are lifted to Promise-returning by the `codec()` factory. The lifting lives
- * inside `sql-runtime`'s decode-once-per-row contract; the orm-client itself
- * never adds (or removes) a Promise wrapper, so the type-level surfaces here
- * stay plain by construction.
+ * These assertions encode the invariant that ORM-client read and write
+ * surfaces always present plain `T` values to consumers — never `Promise<T>`
+ * or `T | Promise<T>` — even though codec query-time methods (`encode` /
+ * `decode`) are Promise-returning at the boundary. The Promise lift lives
+ * inside `sql-runtime`'s decode-once-per-row contract; the orm-client
+ * itself never adds (or removes) a Promise wrapper, so the type-level
+ * surfaces here stay plain by construction.
  *
- * Tasks covered:
- * - T3.1: `DefaultModelRow` / `InferRootRow` row shape — plain `T` for both
- *   `.first()` and `for await` consumption paths.
- * - T3.2: write surfaces (`CreateInput`, `MutationUpdateInput`,
- *   `UniqueConstraintCriterion`, `ShorthandWhereFilter`) — plain `T` for
- *   field positions.
- * - T3.3: negative test — no `Promise<T>` form leaks into a row-shape position
- *   (read or write). The ORM client uses one field type-map (rooted in
- *   `DefaultModelRow`); there is no read/write split for codec output types.
- *   `DefaultModelInputRow` (called out in the spec/plan) does not exist as a
- *   distinct type — the absence is itself the verification.
+ * Coverage:
+ * - **Row shape**: `DefaultModelRow` / `InferRootRow` carry plain `T` for
+ *   both `.first()` and `for await` consumption paths.
+ * - **Write surfaces**: `CreateInput`, `MutationUpdateInput`,
+ *   `UniqueConstraintCriterion`, and `ShorthandWhereFilter` carry plain
+ *   `T` for field positions.
+ * - **Negative tests**: no `Promise<T>` form leaks into a row-shape
+ *   position (read or write). The ORM client uses one field type-map
+ *   (rooted in `DefaultModelRow`); there is no read/write split for codec
+ *   output types.
  */
 
 import { expectTypeOf, test } from 'vitest';
@@ -60,7 +59,7 @@ type UserWhere = ShorthandWhereFilter<Contract, 'User'>;
 type UserInferRoot = InferRootRow<Contract, 'User'>;
 
 // ---------------------------------------------------------------------------
-// T3.1 — DefaultModelRow / InferRootRow row fields are plain T
+// Read surfaces — DefaultModelRow / InferRootRow row fields are plain T
 // ---------------------------------------------------------------------------
 
 test('DefaultModelRow exposes plain `string` for pg/text@1 columns', () => {
@@ -120,7 +119,7 @@ test('Collection.all().firstOrThrow() resolves to a plain row (no Promise<T> on 
 });
 
 // ---------------------------------------------------------------------------
-// T3.2 — Write surfaces accept plain T
+// Write surfaces accept plain T
 // ---------------------------------------------------------------------------
 
 test('CreateInput accepts plain `string` for pg/text@1 fields', () => {
@@ -157,7 +156,7 @@ test('ShorthandWhereFilter accepts plain T (or null/undefined) for filterable fi
 });
 
 // ---------------------------------------------------------------------------
-// T3.3 — Negative tests: no Promise<T> leak; one shared field type-map
+// Negative tests — no Promise<T> leak; one shared field type-map
 // ---------------------------------------------------------------------------
 
 test('no DefaultModelRow field position resolves to a Promise<T>', () => {

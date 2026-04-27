@@ -452,10 +452,10 @@ describe('MongoAdapter with codec registry', () => {
   });
 });
 
-// T4.10 — regression: createMongoAdapter() must remain synchronous.
-// Even though the adapter's `lower()` method became async in m4, the
-// construction path stays sync so that `mongo({...})` clients can be
-// instantiated without `await`.
+// Regression: createMongoAdapter() must remain synchronous. Even though
+// the adapter's `lower()` method is async, the construction path stays
+// sync so that `mongo({...})` clients can be instantiated without
+// `await`.
 describe('createMongoAdapter (sync construction regression)', () => {
   it('returns a non-Promise adapter at runtime', () => {
     const adapter = createMongoAdapter();

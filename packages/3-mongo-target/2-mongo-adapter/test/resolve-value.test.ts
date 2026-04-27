@@ -78,8 +78,7 @@ describe('resolveValue', () => {
     expect(await resolveValue(d)).toBe(d);
   });
 
-  // T4.4 — async dispatch + concurrent encoding
-  describe('async dispatch (T4.4)', () => {
+  describe('async dispatch — codec encode + concurrent encoding', () => {
     it('returns a Promise', () => {
       const result = resolveValue(new MongoParamRef('x'));
       expect(typeof (result as { then?: unknown }).then).toBe('function');

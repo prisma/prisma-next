@@ -659,10 +659,10 @@ describe('validateMongoContract()', () => {
     });
   });
 
-  // T4.10 — regression: validateMongoContract must remain synchronous
-  // (consumes only build-time codec methods). If this signature ever drifts
-  // to a Promise, the type-level assertion below fails and `await` becomes
-  // required at every call site.
+  // Regression: validateMongoContract must remain synchronous (it consumes
+  // only build-time codec methods). If the signature ever drifts to Promise,
+  // the type-level assertion below fails and `await` becomes required at
+  // every call site.
   describe('synchronous return (regression)', () => {
     it('returns a non-Promise value at runtime', () => {
       const result = validateMongoContract(makeValidContractJson());

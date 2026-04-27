@@ -853,10 +853,10 @@ describe('validateContract', () => {
     });
   });
 
-  // T2.7 — regression: validateContract must remain synchronous (consumes only
-  // build-time codec methods). If this signature ever drifts to a Promise,
-  // the type-level assertion below fails and `await` becomes required at every
-  // call site (including `postgres({...})`).
+  // Regression: validateContract must remain synchronous (it consumes only
+  // build-time codec methods). If the signature ever drifts to Promise,
+  // the type-level assertion below fails and `await` becomes required at
+  // every call site (including `postgres({...})`).
   describe('synchronous return (regression)', () => {
     it('returns a non-Promise value at runtime', () => {
       const result = validateContract<Contract<SqlStorage>>(

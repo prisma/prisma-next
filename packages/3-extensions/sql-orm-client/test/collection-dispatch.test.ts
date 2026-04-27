@@ -393,7 +393,7 @@ describe('collection-dispatch', () => {
   });
 
   // ---------------------------------------------------------------------------
-  // T5.4 — single-query include child-row codec decoding (DEFERRED)
+  // Single-query include child-row codec decoding — DEFERRED follow-up.
   //
   // PR #375 § collection-dispatch.test.ts asserts that when the single-query
   // include strategy is active (lateral / correlated jsonb_agg payload), the
