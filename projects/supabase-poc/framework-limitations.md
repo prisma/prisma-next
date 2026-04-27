@@ -44,9 +44,8 @@ Limitations encountered while authoring the schema and RLS policies via PN's mig
 
 | ID | Issue | Impact | Workaround in app | Status |
 |---|---|---|---|---|
-| FL-XX | `OperationClass` (the `target.details.objectType` union) is closed: `'dependency' \| 'type' \| 'table' \| 'column' \| 'primaryKey' \| 'unique' \| 'index' \| 'foreignKey'`. There is no `'policy'` value. | Pack-level operation factories that produce kinds outside this set must either fall back to `'dependency'` (losing semantic precision in planner output / target details) or type-cast (a smell). | RLS factories use `objectType: 'dependency'`. | Open — _(record during 1.5)_ |
+| FL-04 | `OperationClass` (the `target.details.objectType` union) is closed: `'dependency' \| 'type' \| 'table' \| 'column' \| 'primaryKey' \| 'unique' \| 'index' \| 'foreignKey'`. There is no `'policy'` value. | Pack-level operation factories that produce kinds outside this set must either fall back to `'dependency'` (losing semantic precision in planner output / target details) or type-cast (a smell). | RLS factories (`enableRowLevelSecurity`, `createRlsPolicy`, `dropRlsPolicy`) set `target.details.objectType = 'dependency'`. | Open — surfaced in T1.5; covered by Sketch 3. |
 | FL-XX | The contract has no first-class concept of RLS (table annotations, role allowlists, policies). | The planner cannot emit `enableRowLevelSecurity` / `createRlsPolicy` calls for migrated tables; RLS authoring is bolted on after the planner runs. | The example hand-edits the planner-emitted migration file to add the RLS factory calls. | Open — _(record during 1.6)_; covered by Sketch 3. |
-| FL-XX | _(populate during 1.5 if `quoteIdentifier` is not part of the public migration surface)_ | | | |
 
 ---
 

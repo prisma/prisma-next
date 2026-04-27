@@ -88,7 +88,7 @@ function rlsPredicate(schema: string, table: string): string {
  * - Postcheck: `pg_class.relrowsecurity = true`  (RLS is now ON).
  *
  * `target.details.objectType` is `'dependency'` because the
- * `OperationClass` union has no `'policy'` slot; FL-01 documents the
+ * `OperationClass` union has no `'policy'` slot; FL-04 documents the
  * limitation.
  */
 export function enableRowLevelSecurity(schema: string, table: string): Op {
