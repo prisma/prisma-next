@@ -1,3 +1,4 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
@@ -19,6 +20,17 @@ import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/ve
  */
 export interface SqlControlAdapter<TTarget extends string = string>
   extends ControlAdapterInstance<'sql', TTarget> {
+  /**
+   * Reads the contract marker from the database, returning `null` if the marker
+   * table or its row is missing. Implementations are responsible for the
+   * dialect-specific existence probe (e.g. Postgres `information_schema.tables`
+   * vs SQLite `sqlite_master`) and parameter placeholders.
+   *
+   * @param driver - ControlDriverInstance for executing queries (target-specific)
+   * @returns Resolved marker record, or `null` if not yet stamped.
+   */
+  readMarker(driver: ControlDriverInstance<'sql', TTarget>): Promise<ContractMarkerRecord | null>;
+
   /**
    * Introspects a database schema and returns a raw SqlSchemaIR.
    *

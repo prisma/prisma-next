@@ -12,7 +12,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import { readMarker } from '@prisma-next/family-sql/verify';
 import type { DataTransformOperation } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -120,7 +119,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     try {
       await this.acquireLock(driver, lockKey);
       await this.ensureControlTables(driver);
-      const existingMarker = await readMarker(driver);
+      const existingMarker = await this.family.readMarker({ driver });
 
       // Validate plan origin matches existing marker (needs marker from DB)
       const markerCheck = this.ensureMarkerCompatibility(existingMarker, options.plan);

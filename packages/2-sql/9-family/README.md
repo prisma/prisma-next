@@ -111,7 +111,7 @@ The descriptor is "pure data + factory" - it only provides the hook and factory 
 - **`src/core/control-descriptor.ts`**: `SqlFamilyDescriptor` class implementing `ControlFamilyDescriptor` interface (pure data + factory)
 - **`src/core/control-instance.ts`**: `createSqlFamilyInstance` function that creates `SqlFamilyInstance` with domain action methods (`validateContract`, `verify`, `schemaVerify`, `introspect`, `toSchemaView`, `emitContract`). Contains `convertOperationManifest` function used internally by instance creation and test utilities in the same package.
 - **`src/core/assembly.ts`**: Assembly helpers for extracting type imports, collecting codec-owned storage type control hooks, and composing mutation-default registries with duplicate detection.
-- **`src/core/verify.ts`**: Verification helpers (`readMarker`, `collectSupportedCodecTypeIds`)
+- **`src/core/verify.ts`**: Verification helpers (`parseContractMarkerRow`, `collectSupportedCodecTypeIds`)
 - **`src/core/control-adapter.ts`**: SQL control adapter interface (`SqlControlAdapter`) for control-plane operations
 - **`src/core/migrations/`**: Migration IR helpers plus planner and runner SPI types (`MigrationPlanner`, `MigrationRunner`, `SqlControlTargetDescriptor`). Runners return `MigrationRunnerResult` which is a union of success/failure.
 - **`src/core/migrations/contract-to-schema-ir.ts`**: `contractToSchemaIR(contract, { annotationNamespace, ... })` converts a contract to `SqlSchemaIR` for offline migration planning (used by `migration plan` to synthesize the "from" schema without a database connection). Also exports `detectDestructiveChanges(from, to)` which compares two `SqlStorage` values and returns a list of destructive changes (dropped tables, dropped columns) for migration policy enforcement.
@@ -135,7 +135,7 @@ The runner returns structured errors with the following codes:
 - **`./control`**: Control plane entry point for CLI/config usage (exports `SqlFamilyDescriptor`)
 - **`./control-adapter`**: SQL control adapter interface (`SqlControlAdapter`, `SqlControlAdapterDescriptor`) for target-specific adapters
 - **`./runtime`**: Runtime plane identity exports only (family ID, types, descriptor identity). Does **not** export runtime creation helpers—use `instantiateExecutionStack` from `@prisma-next/framework-components/execution` and `createExecutionContext`, `createRuntime`, `createSqlExecutionStack` from `@prisma-next/sql-runtime`. See [ADR 152](../../../docs/architecture%20docs/adrs/ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md).
-- **`./verify`**: Verification utilities (`readMarker`, `readMarkerSql`, `parseContractMarkerRow`) for reading contract markers from databases
+- **`./verify`**: Marker row parsing helper (`parseContractMarkerRow`). Marker reads are owned by each `SqlControlAdapter` (e.g. `PostgresControlAdapter.readMarker`) so dialect-specific SQL stays target-local.
 
 ## Dependencies
 

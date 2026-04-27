@@ -1,0 +1,321 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "sqlite",
+  "profileHash": "sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7",
+  "roots": {
+    "post": "Post",
+    "user": "User"
+  },
+  "models": {
+    "Post": {
+      "fields": {
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/datetime@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "title": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/text@1",
+            "kind": "scalar"
+          }
+        },
+        "userId": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        }
+      },
+      "relations": {
+        "user": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        }
+      },
+      "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "userId"
+          }
+        },
+        "table": "post"
+      }
+    },
+    "User": {
+      "fields": {
+        "address": {
+          "nullable": true,
+          "type": {
+            "codecId": "sqlite/json@1",
+            "kind": "scalar"
+          }
+        },
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/datetime@1",
+            "kind": "scalar"
+          }
+        },
+        "displayName": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/text@1",
+            "kind": "scalar"
+          }
+        },
+        "email": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "kind": {
+          "nullable": false,
+          "type": {
+            "codecId": "sqlite/text@1",
+            "kind": "scalar"
+          }
+        }
+      },
+      "relations": {
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "to": "Post"
+        }
+      },
+      "storage": {
+        "fields": {
+          "address": {
+            "column": "address"
+          },
+          "createdAt": {
+            "column": "createdAt"
+          },
+          "displayName": {
+            "column": "displayName"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          },
+          "kind": {
+            "column": "kind"
+          }
+        },
+        "table": "user"
+      }
+    }
+  },
+  "storage": {
+    "storageHash": "sha256:357b86d293f0fd09eead75c96d2665e3c5fa463c584353411e74cfd160f45116",
+    "tables": {
+      "post": {
+        "columns": {
+          "createdAt": {
+            "codecId": "sqlite/datetime@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "title": {
+            "codecId": "sqlite/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "userId": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "foreignKeys": [
+          {
+            "columns": [
+              "userId"
+            ],
+            "constraint": true,
+            "index": true,
+            "name": "post_userId_fkey",
+            "references": {
+              "columns": [
+                "id"
+              ],
+              "table": "user"
+            }
+          }
+        ],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      },
+      "user": {
+        "columns": {
+          "address": {
+            "codecId": "sqlite/json@1",
+            "nativeType": "text",
+            "nullable": true
+          },
+          "createdAt": {
+            "codecId": "sqlite/datetime@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "text",
+            "nullable": false
+          },
+          "displayName": {
+            "codecId": "sqlite/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "email": {
+            "codecId": "sqlite/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "kind": {
+            "codecId": "sqlite/text@1",
+            "nativeType": "text",
+            "nullable": false
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": [
+            "id"
+          ]
+        },
+        "uniques": []
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "post"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "user"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "sql": {
+      "foreignKeys": true,
+      "jsonAgg": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
