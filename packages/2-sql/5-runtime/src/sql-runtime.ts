@@ -29,6 +29,7 @@ import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { computeSqlFingerprint } from './fingerprint';
+import { computeSqlIdentityKey } from './identity-key';
 import { lowerSqlPlan } from './lower-sql-plan';
 import { parseContractMarkerRow } from './marker';
 import { runBeforeCompileChain } from './middleware/before-compile-chain';
@@ -161,8 +162,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         warn: () => {},
         error: () => {},
       },
-      // Stubbed in task 1.0; real implementation lands in 1.0b.
-      identityKey: () => 'identity-key-not-implemented',
+      identityKey: (exec) => computeSqlIdentityKey(exec as SqlExecutionPlan),
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });
