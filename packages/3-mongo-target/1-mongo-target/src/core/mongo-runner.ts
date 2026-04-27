@@ -195,10 +195,20 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
+    const unionedInvariants = unionInvariants(
+      existingMarker?.invariants ?? [],
+      options.invariants ?? [],
+    );
+
+    // Skip marker/ledger writes (and schema verification) only when the apply
+    // is a true no-op: no operations executed, marker already at destination,
+    // and incoming invariants are a subset of the stored set (so the union
+    // wouldn't grow it).
     if (
       operationsExecuted === 0 &&
       existingMarker?.storageHash === destination.storageHash &&
-      existingMarker.profileHash === profileHash
+      existingMarker.profileHash === profileHash &&
+      existingMarker.invariants.length === unionedInvariants.length
     ) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
     }
@@ -217,11 +227,6 @@ export class MongoMigrationRunner {
         meta: { issues: verifyResult.schema.issues },
       });
     }
-
-    const unionedInvariants = unionInvariants(
-      existingMarker?.invariants ?? [],
-      options.invariants ?? [],
-    );
 
     if (existingMarker) {
       const updated = await markerOps.updateMarker(existingMarker.storageHash, {

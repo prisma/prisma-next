@@ -445,6 +445,78 @@ describe('MongoMigrationRunner', () => {
   });
 });
 
+describe('MongoMigrationRunner - invariants', () => {
+  async function readMarkerInvariants(): Promise<readonly string[]> {
+    const marker = await readMarker(db);
+    return marker?.invariants ?? [];
+  }
+
+  function emptyPlan(originHash: string, destinationHash: string): MigrationPlan {
+    return {
+      targetId: 'mongo',
+      operations: [],
+      origin: { storageHash: originHash },
+      destination: { storageHash: destinationHash },
+    };
+  }
+
+  it('unions invariants across repeated applies, sorts ascending, and dedupes', async () => {
+    const contract = makeContract(
+      { users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] } },
+      'sha256:inv',
+    );
+    const initialPlan = serializePlan(planForContract(contract));
+    const runner = makeRunner();
+
+    // First apply: real plan creates the collection. Invariants are intentionally
+    // unsorted on input — the runner is expected to sort them ascending before storage.
+    const first = await runner.execute({
+      plan: initialPlan,
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['delta', 'alpha'],
+    });
+    expect(first.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'delta']);
+
+    // Subsequent applies are empty plans against the same destination, with origin
+    // pointing at the existing marker — i.e., the `migration apply --ref` code path.
+    // This is the case the previous early-return regressed on (no ops + marker
+    // already at destination but new invariants to union in).
+    const second = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['beta'],
+    });
+    expect(second.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta']);
+
+    // Re-declaring an already-stored invariant stays deduped; new ones extend.
+    const third = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['alpha', 'gamma'],
+    });
+    expect(third.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+    // Apply with no invariants option preserves the existing set.
+    const fourth = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+    expect(fourth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+  });
+});
+
 describe('MongoMigrationRunner - data transforms', () => {
   function makeDataTransformPlan(ops: unknown[]): MigrationPlan {
     return {
