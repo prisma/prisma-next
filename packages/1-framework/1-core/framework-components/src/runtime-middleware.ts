@@ -50,6 +50,31 @@ export interface AfterExecuteResult {
 }
 
 /**
+ * Result of a successful `RuntimeMiddleware.intercept` hook.
+ *
+ * Carries the rows that the middleware wishes to return in place of
+ * invoking the driver. The runtime iterates `rows` in order and yields
+ * each row to the consumer; `beforeExecute`, `runDriver`, and `onRow` are
+ * all skipped on the hit path. `afterExecute` still fires with
+ * `source: 'middleware'`.
+ *
+ * `rows` accepts both `Iterable` (arrays, sync generators) and
+ * `AsyncIterable` (async generators). `for await` natively handles both
+ * via `Symbol.asyncIterator` / `Symbol.iterator` fallback, so the
+ * orchestrator does not need to branch on the variant. Cached arrays in
+ * the cache middleware are the common case; streaming variants support
+ * future use cases like mock layers replaying recordings.
+ *
+ * Row shape is `Record<string, unknown>` — the same untyped shape
+ * `onRow` receives. The SQL runtime decodes intercepted rows through its
+ * normal codec pass, so interceptors cache and return raw (undecoded)
+ * rows.
+ */
+export interface InterceptResult {
+  readonly rows: AsyncIterable<Record<string, unknown>> | Iterable<Record<string, unknown>>;
+}
+
+/**
  * Family-agnostic middleware SPI parameterized over the plan marker.
  *
  * `TPlan` defaults to the framework `QueryPlan` marker so a generic
@@ -61,6 +86,28 @@ export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
+  /**
+   * Optional short-circuit hook. Runs inside `runWithMiddleware`, after
+   * the orchestrator receives the lowered plan and before any
+   * `beforeExecute` hook fires. Middleware run in registration order; the
+   * first to return a non-`undefined` `InterceptResult` wins, and
+   * subsequent middleware's `intercept` does not fire.
+   *
+   * On a hit, `beforeExecute`, `runDriver`, and `onRow` are all skipped.
+   * `afterExecute` still fires with `source: 'middleware'`.
+   *
+   * Returning `undefined` (or omitting the hook entirely) signals
+   * passthrough — execution proceeds through the normal driver path.
+   *
+   * Errors thrown inside `intercept` surface via the standard
+   * `runtimeError` envelope; `afterExecute` fires with `completed: false`
+   * and `source: 'middleware'`. Errors thrown by `afterExecute` during
+   * the error path remain swallowed (existing semantics, unchanged).
+   *
+   * Used by middleware that need to short-circuit execution and supply
+   * rows directly: caching, mocks, rate limiting, circuit breaking.
+   */
+  intercept?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<InterceptResult | undefined>;
   beforeExecute?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
   onRow?(row: Record<string, unknown>, plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
   afterExecute?(
