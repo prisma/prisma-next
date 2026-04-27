@@ -67,6 +67,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 | 160 | Plan grouping keys for multi-statement orchestration | Adds `meta.groupingKey` to correlate multiple statement executions that serve one higher-level operation | [ADR 160 - Plan grouping keys for multi-statement orchestration.md](adrs/ADR%20160%20-%20Plan%20grouping%20keys%20for%20multi-statement%20orchestration.md) |
 | 164 | Repository Layer | Defines `@prisma-next/sql-orm-client` as a multi-query orchestration surface in the extensions integrations layer | [ADR 164 - Repository Layer.md](adrs/ADR%20164%20-%20Repository%20Layer.md) |
 | 202 | Codec trait system | Semantic capability traits (`equality`, `order`, `numeric`, `textual`, `boolean`) declared on codecs and consumed by query surfaces to gate operator availability by data type | [ADR 202 - Codec trait system.md](adrs/ADR%20202%20-%20Codec%20trait%20system.md) |
+| 204 | Single-tier runtime | Collapses `runtime-executor` into `framework-components`; family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`) extend `RuntimeCore` directly via the `/runtime` subpath. Partially supersedes ADR 140's "Runtime Separation" two-tier model. | [ADR 204 - Single-tier runtime.md](adrs/ADR%20204%20-%20Single-tier%20runtime.md) |
 
 ## Migration System
 
