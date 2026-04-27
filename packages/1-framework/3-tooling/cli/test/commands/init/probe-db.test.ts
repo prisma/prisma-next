@@ -3,6 +3,7 @@ import { applyProbeOutcome } from '../../../src/commands/init/init';
 import {
   compareVersionPrefix,
   type ProbeOutcome,
+  type ProbeOverrides,
   parsePostgresVersion,
   probeServerVersion,
   redactDatabaseUrlSecrets,
@@ -190,7 +191,7 @@ describe('probeServerVersion (FR8.3)', () => {
   });
 
   it('mongo path uses the mongo override when target=mongo', async () => {
-    const probePostgres = vi.fn();
+    const probePostgres = vi.fn<NonNullable<ProbeOverrides['probePostgres']>>();
     const probeMongo = vi.fn(async () => ({ serverVersion: '7.0.1' }));
 
     const outcome = await probeServerVersion(
@@ -200,7 +201,7 @@ describe('probeServerVersion (FR8.3)', () => {
         databaseUrl: 'mongodb://localhost:27017/db',
         minVersion: '6.0',
       },
-      { probePostgres: probePostgres as never, probeMongo },
+      { probePostgres, probeMongo },
     );
 
     expect(probePostgres).not.toHaveBeenCalled();

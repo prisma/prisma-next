@@ -128,8 +128,10 @@ describe('init generates a typecheckable project', () => {
         const { configPath } = writeInitFiles(testDir, target, authoring);
         await emitContract(testDir, configPath);
 
-        expect(existsSync(join(testDir, 'prisma', 'contract.json'))).toBe(true);
-        expect(existsSync(join(testDir, 'prisma', 'contract.d.ts'))).toBe(true);
+        expect({
+          contractJson: existsSync(join(testDir, 'prisma', 'contract.json')),
+          contractDts: existsSync(join(testDir, 'prisma', 'contract.d.ts')),
+        }).toMatchObject({ contractJson: true, contractDts: true });
 
         await typecheck(testDir);
       },
