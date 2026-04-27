@@ -1,0 +1,51 @@
+{
+  "name": "supabase-todos",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "contract:emit": "prisma-next contract emit",
+    "migrate:up": "prisma-next migration apply",
+    "seed": "tsx scripts/seed.ts",
+    "dev": "vite",
+    "test": "vitest run --passWithNoTests",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/ids": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-builder": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/sql-orm-client": "workspace:*",
+    "@prisma-next/sql-relational-core": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "@supabase/supabase-js": "^2.45.0",
+    "dotenv": "^16.4.5",
+    "hono": "^4.6.0",
+    "jose": "^5.9.0",
+    "pg": "catalog:"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
