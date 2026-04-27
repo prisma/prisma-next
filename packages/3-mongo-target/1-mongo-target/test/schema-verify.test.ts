@@ -630,6 +630,39 @@ describe('verifyMongoSchema', () => {
         expect(result.schema.issues).toEqual([]);
         expect(result.ok).toBe(true);
       });
+
+      it('surfaces drift when live has collation but contract authored none', () => {
+        // `stripUnspecifiedFields` is the "drop server-applied subfields"
+        // helper, not "drop the entire block". When the contract authored
+        // no collation, a live index with a non-default collation must
+        // still surface as drift — otherwise an out-of-band `collation:
+        // {locale: 'en'}` could slip past verify.
+        const contract = buildContract({
+          users: {
+            indexes: [{ keys: [{ field: 'name', direction: 1 }] }],
+          },
+        });
+        const liveSchema = ir([
+          coll('users', {
+            indexes: [
+              new MongoSchemaIndex({
+                keys: [{ field: 'name', direction: 1 }],
+                collation: { locale: 'en', strength: 2 },
+              }),
+            ],
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+      });
     });
 
     describe('collection options collation', () => {
@@ -670,6 +703,31 @@ describe('verifyMongoSchema', () => {
 
         expect(result.schema.issues).toEqual([]);
         expect(result.ok).toBe(true);
+      });
+
+      it('surfaces drift when live has a collection-level collation but contract authored none', () => {
+        const contract = buildContract({
+          posts: {
+            indexes: [],
+          },
+        });
+        const liveSchema = ir([
+          coll('posts', {
+            options: new MongoSchemaCollectionOptions({
+              collation: { locale: 'en', strength: 2 },
+            }),
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
       });
     });
 
@@ -729,6 +787,31 @@ describe('verifyMongoSchema', () => {
         });
         expect(sanity.ok).toBe(true);
       });
+
+      it('surfaces drift when live is a timeseries collection but contract authored a regular collection', () => {
+        const contract = buildContract({
+          metrics: {
+            indexes: [],
+          },
+        });
+        const liveSchema = ir([
+          coll('metrics', {
+            options: new MongoSchemaCollectionOptions({
+              timeseries: { timeField: 'ts', granularity: 'hours' },
+            }),
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+      });
     });
 
     describe('clusteredIndex collection options', () => {
@@ -765,6 +848,36 @@ describe('verifyMongoSchema', () => {
 
         expect(result.schema.issues).toEqual([]);
         expect(result.ok).toBe(true);
+      });
+
+      it('surfaces drift when live has a clusteredIndex but contract authored a regular collection', () => {
+        const contract = buildContract({
+          clustered: {
+            indexes: [],
+          },
+        });
+        const liveSchema = ir([
+          coll('clustered', {
+            options: new MongoSchemaCollectionOptions({
+              clusteredIndex: {
+                name: 'myCluster',
+                key: { _id: 1 },
+                unique: true,
+                v: 2,
+              } as unknown as { name: string },
+            }),
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
       });
     });
 
