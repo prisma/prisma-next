@@ -114,6 +114,35 @@ describe('mongoVectorCodec', () => {
   });
 });
 
+describe('mongoDateCodec', () => {
+  it('decodes wire Date through identity', async () => {
+    const d = new Date('2024-01-02T03:04:05.000Z');
+    expect(await mongoDateCodec.decode(d)).toBe(d);
+  });
+
+  it('encodes Date through identity', async () => {
+    const d = new Date('2024-01-02T03:04:05.000Z');
+    expect(await mongoDateCodec.encode(d)).toBe(d);
+  });
+
+  it('encodeJson serialises to ISO string', () => {
+    const d = new Date('2024-01-02T03:04:05.000Z');
+    expect(mongoDateCodec.encodeJson(d)).toBe('2024-01-02T03:04:05.000Z');
+  });
+
+  it('decodeJson parses ISO string back to Date', () => {
+    const result = mongoDateCodec.decodeJson('2024-01-02T03:04:05.000Z');
+    expect(result).toBeInstanceOf(Date);
+    expect(result.toISOString()).toBe('2024-01-02T03:04:05.000Z');
+  });
+
+  it('decodeJson throws on non-string input', () => {
+    expect(() => mongoDateCodec.decodeJson(123 as unknown as string)).toThrow(
+      'expected ISO date string',
+    );
+  });
+});
+
 describe('mongoVectorCodec.renderOutputType', () => {
   it('renders Vector<length> when length is present', () => {
     expect(mongoVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
