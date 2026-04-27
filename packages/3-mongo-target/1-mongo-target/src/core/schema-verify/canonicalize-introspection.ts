@@ -243,19 +243,17 @@ function projectTextIndexKeys(liveIndex: MongoSchemaIndex): ReadonlyArray<{
   // `[prefix, _fts, _ftsx, suffix]` — keep their original layout. Flattening
   // scalars first would yield `[prefix, suffix, ...text]`, which `sortTextKeys`
   // (downstream) cannot recover because it only reorders text-direction
-  // entries within their existing positions.
+  // entries within their existing positions. MongoDB always emits exactly one
+  // `_fts`/`_ftsx` pair per index, so we don't need to guard against
+  // duplicates.
   type IndexKey = (typeof liveIndex.keys)[number];
   const projectedKeys: IndexKey[] = [];
-  let insertedTextBlock = false;
   for (const key of liveIndex.keys) {
+    if (key.field === '_ftsx') continue;
     if (key.field === '_fts') {
-      if (!insertedTextBlock) {
-        projectedKeys.push(...textKeys);
-        insertedTextBlock = true;
-      }
+      projectedKeys.push(...textKeys);
       continue;
     }
-    if (key.field === '_ftsx') continue;
     projectedKeys.push(key);
   }
   return projectedKeys;
