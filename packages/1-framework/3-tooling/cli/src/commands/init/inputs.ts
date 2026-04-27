@@ -393,6 +393,7 @@ async function promptAuthoring(): Promise<AuthoringId> {
 }
 
 async function promptSchemaPath(authoring: AuthoringId): Promise<string> {
+  const expectedExt = authoring === 'typescript' ? '.ts' : '.prisma';
   const result = await clack.text({
     message: 'Where should the schema file go?',
     initialValue: defaultSchemaPath(authoring),
@@ -401,7 +402,11 @@ async function promptSchemaPath(authoring: AuthoringId): Promise<string> {
       if (trimmed.length === 0) return 'Path cannot be empty';
       if (trimmed.endsWith('/') || trimmed.endsWith('\\'))
         return 'Path must be a file, not a directory';
-      if (!extname(trimmed)) return 'Path must include a file extension (e.g. .prisma or .ts)';
+      const ext = extname(trimmed).toLowerCase();
+      if (ext === '') return 'Path must include a file extension (e.g. .prisma or .ts)';
+      if (ext !== expectedExt) {
+        return `Schema path must end in ${expectedExt} for --authoring ${authoring} (got ${ext}).`;
+      }
       return undefined;
     },
     output: process.stderr,
@@ -409,5 +414,8 @@ async function promptSchemaPath(authoring: AuthoringId): Promise<string> {
   if (clack.isCancel(result)) {
     throw errorInitUserAborted();
   }
-  return normalize((result as string).trim());
+  // Pipe through `validateSchemaPath` so the final value goes through the
+  // same canonicalisation as the flag path — defence-in-depth in case
+  // the inline `validate` ever drifts from the flag-mode rules.
+  return validateSchemaPath(result as string, authoring);
 }

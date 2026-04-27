@@ -197,6 +197,59 @@ describe('runInit (interactive)', () => {
     expect(config).toContain('contract: "./prisma/contract.ts"');
   });
 
+  it('the schema-path prompt rejects an extension that does not match the chosen authoring', async () => {
+    // PSL authoring → schema must end in .prisma; TS authoring → must end in .ts.
+    // Drive the prompt twice and capture the inline `validate` callback in
+    // each direction.
+    vi.mocked(clack.select)
+      .mockReset()
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('psl');
+    vi.mocked(clack.text).mockResolvedValueOnce('prisma/contract.prisma');
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+
+    const pslPromptCall = vi.mocked(clack.text).mock.calls[0]?.[0];
+    expect(pslPromptCall?.validate).toBeDefined();
+    const validatePsl = pslPromptCall?.validate as (v: string | undefined) => string | undefined;
+    expect(validatePsl('prisma/contract.ts')).toMatch(/\.prisma.*--authoring psl/);
+    expect(validatePsl('prisma/contract.prisma')).toBeUndefined();
+
+    rmSync(tmpDir, { recursive: true, force: true });
+    tmpDir = mkdtempSync(join(tmpdir(), 'init-test-'));
+    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+    vi.mocked(clack.text).mockReset();
+    vi.mocked(clack.select)
+      .mockReset()
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('typescript');
+    vi.mocked(clack.text).mockResolvedValueOnce('prisma/contract.ts');
+    await runInitTest(tmpDir, { options: { install: false }, flags: interactiveFlags() });
+
+    const tsPromptCall = vi.mocked(clack.text).mock.calls[0]?.[0];
+    const validateTs = tsPromptCall?.validate as (v: string | undefined) => string | undefined;
+    expect(validateTs('prisma/contract.prisma')).toMatch(/\.ts.*--authoring typescript/);
+    expect(validateTs('prisma/contract.ts')).toBeUndefined();
+  });
+
+  it('exits PRECONDITION if a mismatched schema path bypasses the prompt validator (defence-in-depth)', async () => {
+    // The test stub bypasses clack's interactive validate loop, so the
+    // post-prompt `validateSchemaPath` is the safety net that keeps a
+    // .ts path from being accepted under PSL authoring.
+    vi.mocked(clack.select)
+      .mockReset()
+      .mockResolvedValueOnce('postgres')
+      .mockResolvedValueOnce('psl');
+    vi.mocked(clack.text).mockResolvedValue('prisma/contract.ts');
+
+    const exit = await runInitTest(tmpDir, {
+      options: { install: false },
+      flags: interactiveFlags(),
+    });
+    expect(exit).toBe(INIT_EXIT_PRECONDITION);
+    expect(existsSync(join(tmpDir, 'prisma/contract.prisma'))).toBe(false);
+    expect(existsSync(join(tmpDir, 'prisma/contract.ts'))).toBe(false);
+  });
+
   it('prompts once to re-initialize when prisma-next.config.ts exists', async () => {
     writeFileSync(join(tmpDir, 'prisma-next.config.ts'), 'existing config');
 
