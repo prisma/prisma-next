@@ -52,6 +52,7 @@
     "./control": "./dist/control.mjs",
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
+    "./schema-verify": "./dist/schema-verify.mjs",
     "./package.json": "./package.json"
   }
 }

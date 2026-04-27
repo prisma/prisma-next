@@ -3,6 +3,7 @@ import type {
   MigrationPlan,
   MigrationRunnerExecutionChecks,
 } from '@prisma-next/framework-components/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AnyMongoDdlCommand,
@@ -24,6 +25,7 @@ import {
   type MongoQueryPlan,
   RawUpdateManyCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { MongoSchemaCollection, MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { describe, expect, it } from 'vitest';
 import { createCollection, dataTransform } from '../src/core/migration-factories';
 import { serializeMongoOps } from '../src/core/mongo-ops-serializer';
@@ -212,6 +214,7 @@ function makeHarness(): Harness {
     adapter,
     driver,
     markerOps: NOOP_MARKER_OPS,
+    introspectSchema: async () => new MongoSchemaIR([]),
   };
   return {
     runner: new MongoMigrationRunner(deps),
@@ -223,6 +226,17 @@ function makeHarness(): Harness {
   };
 }
 
+function makeContract(profileHash: string): MongoContract {
+  // The runner reads `profileHash` for marker writes and `storage` (via
+  // `verifyMongoSchema → contractToMongoSchemaIR`) for post-apply
+  // verification. Empty `collections` paired with the harness's empty
+  // `introspectSchema` stub produces a passing verify.
+  return {
+    profileHash,
+    storage: { storageHash: 'sha256:dest', collections: {} },
+  } as unknown as MongoContract;
+}
+
 async function execute(
   harness: Harness,
   ops: readonly AnyMongoMigrationOperation[],
@@ -230,7 +244,7 @@ async function execute(
 ) {
   return harness.runner.execute({
     plan: makePlan(ops),
-    destinationContract: { profileHash: 'sha256:dest' },
+    destinationContract: makeContract('sha256:dest'),
     policy: ALL_POLICY,
     frameworkComponents: [],
     ...(executionChecks ? { executionChecks } : {}),
@@ -368,5 +382,141 @@ describe('MongoMigrationRunner.executeDataTransform', () => {
       'ddl:createCollection:orders',
       `dml:updateMany:${RUN_COLLECTION}`,
     ]);
+  });
+});
+
+describe('MongoMigrationRunner schema verification', () => {
+  interface MarkerCallLog {
+    readonly initMarker: number;
+    readonly updateMarker: number;
+    readonly writeLedgerEntry: number;
+  }
+
+  function makeTrackingMarkerOps(): { ops: MarkerOperations; calls: MarkerCallLog } {
+    const calls = { initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 };
+    const ops: MarkerOperations = {
+      readMarker: async () => null,
+      initMarker: async () => {
+        calls.initMarker++;
+      },
+      updateMarker: async () => {
+        calls.updateMarker++;
+        return true;
+      },
+      writeLedgerEntry: async () => {
+        calls.writeLedgerEntry++;
+      },
+    };
+    return { ops, calls };
+  }
+
+  function makeHarnessWithDrift(): {
+    runner: MongoMigrationRunner;
+    calls: MarkerCallLog;
+  } {
+    const { ops, calls } = makeTrackingMarkerOps();
+    const driver = new StubMongoDriver();
+    const adapter = new StubMongoAdapter();
+    const commandExecutor = new StubCommandExecutor();
+    const inspectionExecutor = new StubInspectionExecutor();
+    const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
+    const deps: MongoRunnerDependencies = {
+      commandExecutor,
+      inspectionExecutor,
+      adapter,
+      driver,
+      markerOps: ops,
+      introspectSchema: async () => driftIR,
+    };
+    return { runner: new MongoMigrationRunner(deps), calls };
+  }
+
+  it('returns SCHEMA_VERIFY_FAILED with issues when live schema diverges from contract', async () => {
+    const { runner, calls } = makeHarnessWithDrift();
+    const ddlOp = createCollection('orders');
+
+    const result = await runner.execute({
+      plan: makePlan([ddlOp]),
+      destinationContract: makeContract('sha256:dest'),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+      executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
+    });
+
+    const failure = result.assertNotOk();
+    expect(failure.code).toBe('SCHEMA_VERIFY_FAILED');
+    expect(failure.why).toMatch(/destination contract/);
+    expect(failure.meta?.['issues']).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'extra_table', table: 'rogue' })]),
+    );
+    expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
+  });
+
+  it('skips verification when the no-op short-circuit fires (no operations + marker matches destination)', async () => {
+    const { ops, calls } = makeTrackingMarkerOps();
+    const trackingReadMarker: MarkerOperations = {
+      ...ops,
+      readMarker: async () => ({
+        storageHash: 'sha256:dest',
+        profileHash: 'sha256:dest',
+        contractJson: null,
+        canonicalVersion: null,
+        updatedAt: new Date(),
+        appTag: null,
+        meta: {},
+      }),
+    };
+    let introspectCalls = 0;
+    const driver = new StubMongoDriver();
+    const adapter = new StubMongoAdapter();
+    const commandExecutor = new StubCommandExecutor();
+    const inspectionExecutor = new StubInspectionExecutor();
+    const driftIR = new MongoSchemaIR([new MongoSchemaCollection({ name: 'rogue' })]);
+    const deps: MongoRunnerDependencies = {
+      commandExecutor,
+      inspectionExecutor,
+      adapter,
+      driver,
+      markerOps: trackingReadMarker,
+      introspectSchema: async () => {
+        introspectCalls++;
+        return driftIR;
+      },
+    };
+
+    const runner = new MongoMigrationRunner(deps);
+    const result = await runner.execute({
+      plan: {
+        targetId: 'mongo',
+        origin: { storageHash: 'sha256:dest' },
+        destination: { storageHash: 'sha256:dest' },
+        operations: [] as unknown as MigrationPlan['operations'],
+      },
+      destinationContract: makeContract('sha256:dest'),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+    });
+
+    expect(result.assertOk()).toEqual({ operationsPlanned: 0, operationsExecuted: 0 });
+    expect(introspectCalls).toBe(0);
+    expect(calls).toEqual({ initMarker: 0, updateMarker: 0, writeLedgerEntry: 0 });
+  });
+
+  it('treats out-of-band collections as warnings under strictVerification: false', async () => {
+    const { runner, calls } = makeHarnessWithDrift();
+    const ddlOp = createCollection('orders');
+
+    const result = await runner.execute({
+      plan: makePlan([ddlOp]),
+      destinationContract: makeContract('sha256:dest'),
+      policy: ALL_POLICY,
+      frameworkComponents: [],
+      strictVerification: false,
+      executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
+    });
+
+    expect(result.assertOk()).toEqual({ operationsPlanned: 1, operationsExecuted: 1 });
+    expect(calls.initMarker).toBe(1);
+    expect(calls.writeLedgerEntry).toBe(1);
   });
 });

@@ -6,9 +6,11 @@ alwaysApply: false
 
 # Family Instance Domain Actions
 
+> See also: [ADR 204 — Domain actions vs composable primitives in the control plane](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Domain%20actions%20vs%20composable%20primitives%20in%20the%20control%20plane.md). ADR 204 establishes the broader principle this rule applies inside family instances: action methods compose primitives; compound actions never call peer actions.
+
 ## Overview
 
-Family instances implement control-plane domain actions (e.g., `emitContract`, `verify`, `schemaVerify`, `introspect`) as methods. These methods should be self-contained and own their implementation logic.
+Family instances implement control-plane domain actions (`emitContract`, `verify`, `schemaVerify`, `sign`) and expose composable primitives (`introspect`, `readMarker`, `validateContract`) as methods. Distinguish them by return shape: actions return CLI/audit envelopes (`...Result` types with `summary`, `code`, `meta`, `timings`); primitives return raw data. Both should be self-contained and own their implementation logic.
 
 ## Pattern: Inline Core Logic, Import Helper Functions
 
@@ -69,6 +71,7 @@ async emitContract({ contractIR }): Promise<EmitContractResult> {
 3. **Flexibility**: Each family can customize the orchestration as needed
 4. **Helper reuse**: Pure helper functions (canonicalization, hashing) are still reusable
 5. **No thin wrappers**: Avoids creating thin wrapper functions in core that just call helpers
+6. **No peer-action delegation**: An action method must not call another action method on the same (or a peer) family instance. If two actions need shared logic, extract a primitive that both compose. Compound actions outside the family instance (e.g. migration runners) compose the same primitives directly — see [ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Domain%20actions%20vs%20composable%20primitives%20in%20the%20control%20plane.md) for why.
 
 ## What to Import vs Inline
 

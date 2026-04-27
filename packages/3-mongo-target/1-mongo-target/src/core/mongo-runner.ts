@@ -8,7 +8,9 @@ import type {
   MigrationRunnerExecutionChecks,
   MigrationRunnerFailure,
   MigrationRunnerResult,
+  OperationContext,
 } from '@prisma-next/framework-components/control';
+import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
   AnyMongoMigrationOperation,
@@ -19,21 +21,13 @@ import type {
   MongoMigrationCheck,
   MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
+import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { notOk, ok } from '@prisma-next/utils/result';
-
-const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
-
-function hasProfileHash(value: unknown): value is { readonly profileHash: string } {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    Object.hasOwn(value, 'profileHash') &&
-    typeof (value as { profileHash: unknown }).profileHash === 'string'
-  );
-}
-
 import { FilterEvaluator } from './filter-evaluator';
 import { deserializeMongoOps } from './mongo-ops-serializer';
+import { verifyMongoSchema } from './schema-verify/verify-mongo-schema';
+
+const READ_ONLY_CHECK_COMMAND_KINDS: ReadonlySet<string> = new Set(['aggregate', 'rawAggregate']);
 
 export interface MarkerOperations {
   readMarker(): Promise<ContractMarkerRecord | null>;
@@ -58,6 +52,21 @@ export interface MongoRunnerDependencies {
   readonly adapter: MongoAdapter;
   readonly driver: MongoDriver;
   readonly markerOps: MarkerOperations;
+  readonly introspectSchema: () => Promise<MongoSchemaIR>;
+}
+
+export interface MongoMigrationRunnerExecuteOptions {
+  readonly plan: MigrationPlan;
+  readonly destinationContract: MongoContract;
+  readonly policy: MigrationOperationPolicy;
+  readonly callbacks?: {
+    onOperationStart?(op: MigrationPlanOperation): void;
+    onOperationComplete?(op: MigrationPlanOperation): void;
+  };
+  readonly executionChecks?: MigrationRunnerExecutionChecks;
+  readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
+  readonly strictVerification?: boolean;
+  readonly context?: OperationContext;
 }
 
 function runnerFailure(
@@ -75,17 +84,7 @@ function runnerFailure(
 export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
-  async execute(options: {
-    readonly plan: MigrationPlan;
-    readonly destinationContract: unknown;
-    readonly policy: MigrationOperationPolicy;
-    readonly callbacks?: {
-      onOperationStart?(op: MigrationPlanOperation): void;
-      onOperationComplete?(op: MigrationPlanOperation): void;
-    };
-    readonly executionChecks?: MigrationRunnerExecutionChecks;
-    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
-  }): Promise<MigrationRunnerResult> {
+  async execute(options: MongoMigrationRunnerExecuteOptions): Promise<MigrationRunnerResult> {
     const { commandExecutor, inspectionExecutor, adapter, driver, markerOps } = this.deps;
     const operations = deserializeMongoOps(options.plan.operations as readonly unknown[]);
 
@@ -176,9 +175,7 @@ export class MongoMigrationRunner {
     }
 
     const destination = options.plan.destination;
-    const profileHash = hasProfileHash(options.destinationContract)
-      ? options.destinationContract.profileHash
-      : destination.storageHash;
+    const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
     if (
       operationsExecuted === 0 &&
@@ -186,6 +183,21 @@ export class MongoMigrationRunner {
       existingMarker.profileHash === profileHash
     ) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
+    }
+
+    const liveSchema = await this.deps.introspectSchema();
+    const verifyResult = verifyMongoSchema({
+      contract: options.destinationContract,
+      schema: liveSchema,
+      strict: options.strictVerification ?? true,
+      frameworkComponents: options.frameworkComponents,
+      ...(options.context ? { context: options.context } : {}),
+    });
+    if (!verifyResult.ok) {
+      return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
+        why: 'The resulting database schema does not satisfy the destination contract.',
+        meta: { issues: verifyResult.schema.issues },
+      });
     }
 
     if (existingMarker) {

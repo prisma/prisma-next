@@ -14,6 +14,8 @@ MongoDB target pack for Prisma Next.
 - `./pack`: pure target pack ref used by `@prisma-next/family-mongo` and `@prisma-next/mongo-contract-ts`
 - `./codec-types`: base Mongo codec type map
 - `./migration`: factory functions (the `Migration` base class is in `@prisma-next/family-mongo/migration`)
+- `./control`: `MongoMigrationRunner` and `createMongoRunnerDeps` for runtime migration execution
+- `./schema-verify`: pure `verifyMongoSchema(...)` (no DB I/O); composes `contractToMongoSchemaIR` and `diffMongoSchemas` so the runner's post-apply verify step and `MongoFamilyInstance.schemaVerify` agree on "matches the contract" by construction
 
 ## Usage
 
