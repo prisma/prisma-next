@@ -14,6 +14,7 @@
     "clean": "rm -rf dist dist-tsc dist-tsc-prod coverage .tmp-output"
   },
   "dependencies": {
+    "@prisma-next/cli": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/errors": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
@@ -28,7 +29,6 @@
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
-    "@prisma-next/adapter-sqlite": "workspace:*",
     "@prisma-next/driver-sqlite": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
@@ -42,10 +42,22 @@
     "src"
   ],
   "exports": {
+    "./codec-ids": "./dist/codec-ids.mjs",
+    "./codec-types": "./dist/codec-types.mjs",
+    "./codecs": "./dist/codecs.mjs",
     "./control": "./dist/control.mjs",
+    "./default-normalizer": "./dist/default-normalizer.mjs",
     "./migration": "./dist/migration.mjs",
+    "./native-type-normalizer": "./dist/native-type-normalizer.mjs",
+    "./op-factory-call": "./dist/op-factory-call.mjs",
     "./pack": "./dist/pack.mjs",
+    "./planner": "./dist/planner.mjs",
+    "./planner-produced-sqlite-migration": "./dist/planner-produced-sqlite-migration.mjs",
+    "./planner-target-details": "./dist/planner-target-details.mjs",
+    "./render-ops": "./dist/render-ops.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./sql-utils": "./dist/sql-utils.mjs",
+    "./statement-builders": "./dist/statement-builders.mjs",
     "./package.json": "./package.json"
   },
   "repository": {

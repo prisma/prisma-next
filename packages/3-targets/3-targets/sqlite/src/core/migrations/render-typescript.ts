@@ -15,10 +15,23 @@ export interface RenderMigrationMeta {
   readonly labels?: readonly string[];
 }
 
-const BASE_IMPORT: ImportRequirement = {
-  moduleSpecifier: '@prisma-next/target-sqlite/migration',
-  symbol: 'Migration',
-};
+/**
+ * Always-present base imports for the rendered scaffold. Both come from
+ * `@prisma-next/target-sqlite/migration` so an authored SQLite
+ * `migration.ts` only needs a single dependency for its base class and
+ * its CLI entrypoint. Mirrors Postgres's `BASE_IMPORTS`.
+ *
+ * - `Migration` — the target-owned re-export fixes the `SqlMigration`
+ *   generic to `SqlitePlanTargetDetails` and the abstract `targetId` to
+ *   `'sqlite'`.
+ * - `MigrationCLI` — the migration-file CLI entrypoint, re-exported from
+ *   `@prisma-next/cli/migration-cli`. Loads `prisma-next.config.ts`,
+ *   assembles a `ControlStack`, and instantiates the migration class.
+ */
+const BASE_IMPORTS: readonly ImportRequirement[] = [
+  { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'Migration' },
+  { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'MigrationCLI' },
+];
 
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<SqliteOpFactoryCall>,
@@ -40,13 +53,13 @@ export function renderCallsToTypeScript(
     '  }',
     '}',
     '',
-    'Migration.run(import.meta.url, M);',
+    'MigrationCLI.run(import.meta.url, M);',
     '',
   ].join('\n');
 }
 
 function buildImports(calls: ReadonlyArray<SqliteOpFactoryCall>): string {
-  const requirements: ImportRequirement[] = [BASE_IMPORT];
+  const requirements: ImportRequirement[] = [...BASE_IMPORTS];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
       requirements.push(req);

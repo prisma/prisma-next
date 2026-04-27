@@ -27,8 +27,8 @@ import {
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { codecDefinitions } from './codecs';
-import { escapeLiteral, quoteIdentifier } from './sql-utils';
+import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
+import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
 const defaultCapabilities = Object.freeze({

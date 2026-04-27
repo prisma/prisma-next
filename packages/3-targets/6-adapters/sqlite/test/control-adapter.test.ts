@@ -1,10 +1,8 @@
 import { DatabaseSync } from 'node:sqlite';
+import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
+import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { describe, expect, it } from 'vitest';
-import {
-  normalizeSqliteNativeType,
-  parseSqliteDefault,
-  SqliteControlAdapter,
-} from '../src/core/control-adapter';
+import { SqliteControlAdapter } from '../src/core/control-adapter';
 
 function createMemoryDriver() {
   const db = new DatabaseSync(':memory:');

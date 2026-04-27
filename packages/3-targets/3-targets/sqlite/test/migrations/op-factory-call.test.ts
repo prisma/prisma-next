@@ -1,5 +1,3 @@
-import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
 import {
   AddColumnCall,
@@ -11,37 +9,30 @@ import {
   DropTableCall,
   RecreateTableCall,
 } from '../../src/core/migrations/op-factory-call';
+import type {
+  SqliteColumnSpec,
+  SqliteTableSpec,
+} from '../../src/core/migrations/operations/shared';
 
-function col(overrides: Partial<StorageColumn> = {}): StorageColumn {
+function colSpec(overrides: Partial<SqliteColumnSpec> = {}): SqliteColumnSpec {
   return {
-    nativeType: 'text',
+    name: 'col',
+    typeSql: 'TEXT',
+    defaultSql: '',
     nullable: true,
-    codecId: 'sqlite/text@1',
     ...overrides,
   };
 }
 
-function table(
-  cols: Record<string, StorageColumn>,
-  extras: Partial<StorageTable> = {},
-): StorageTable {
+function tableSpec(
+  columns: SqliteColumnSpec[],
+  overrides: Partial<SqliteTableSpec> = {},
+): SqliteTableSpec {
   return {
-    columns: cols,
-    foreignKeys: [],
+    columns,
     uniques: [],
-    indexes: [],
-    ...extras,
-  };
-}
-
-function tableIR(name: string): SqlTableIR {
-  return {
-    name,
-    columns: { id: { name: 'id', nativeType: 'INTEGER', nullable: false } },
-    primaryKey: { columns: ['id'] },
     foreignKeys: [],
-    uniques: [],
-    indexes: [],
+    ...overrides,
   };
 }
 
@@ -49,15 +40,13 @@ describe('CreateTableCall', () => {
   it('produces an additive op with correct id, label, and CREATE TABLE SQL', () => {
     const call = new CreateTableCall(
       'user',
-      table(
-        {
-          id: col({ nativeType: 'integer', nullable: false }),
-          email: col({ nativeType: 'text', nullable: false }),
-        },
+      tableSpec(
+        [
+          colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
+          colSpec({ name: 'email', typeSql: 'TEXT', nullable: false }),
+        ],
         { primaryKey: { columns: ['id'] } },
       ),
-      new Map(),
-      {},
     );
     expect(call.factoryName).toBe('createTable');
     expect(call.operationClass).toBe('additive');
@@ -67,24 +56,45 @@ describe('CreateTableCall', () => {
     expect(op.id).toBe('table.user');
     expect(op.label).toBe('Create table user');
     expect(op.execute[0]?.sql).toContain('CREATE TABLE "user"');
-    expect(op.execute[0]?.sql).toContain('PRIMARY KEY');
+    expect(op.execute[0]?.sql).toContain('PRIMARY KEY ("id")');
+    expect(op.execute[0]?.sql).toContain('"email" TEXT NOT NULL');
     expect(op.precheck[0]?.sql).toContain("name = 'user'");
     expect(op.postcheck[0]?.sql).toContain("name = 'user'");
   });
 
-  it('renderTypeScript() emits a createTable(...) expression', () => {
+  it('emits INTEGER PRIMARY KEY AUTOINCREMENT inline when the column carries the flag', () => {
     const call = new CreateTableCall(
       'user',
-      table({ id: col({ nativeType: 'integer', nullable: false }) }),
-      new Map(),
-      {},
+      tableSpec(
+        [
+          colSpec({
+            name: 'id',
+            typeSql: 'INTEGER',
+            nullable: false,
+            inlineAutoincrementPrimaryKey: true,
+          }),
+        ],
+        { primaryKey: { columns: ['id'] } },
+      ),
+    );
+    const sql = call.toOp().execute[0]?.sql ?? '';
+    expect(sql).toContain('"id" INTEGER PRIMARY KEY AUTOINCREMENT');
+    // The table-level PK clause must be suppressed when an inline PK is present.
+    expect(sql).not.toMatch(/PRIMARY KEY \("id"\)/);
+  });
+
+  it('renderTypeScript() emits a createTable(...) expression with the embedded spec', () => {
+    const call = new CreateTableCall(
+      'user',
+      tableSpec([colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false })]),
     );
     const ts = call.renderTypeScript();
     expect(ts).toMatch(/^createTable\("user", /);
+    expect(ts).toContain('typeSql:');
   });
 
   it('importRequirements() points at @prisma-next/target-sqlite/migration', () => {
-    const call = new CreateTableCall('user', table({ id: col() }), new Map(), {});
+    const call = new CreateTableCall('user', tableSpec([colSpec()]));
     expect(call.importRequirements()).toEqual([
       { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'createTable' },
     ]);
@@ -112,10 +122,7 @@ describe('AddColumnCall', () => {
   it('produces an additive op with ALTER TABLE ADD COLUMN', () => {
     const call = new AddColumnCall(
       'user',
-      'bio',
-      col({ nativeType: 'text', nullable: true }),
-      new Map(),
-      {},
+      colSpec({ name: 'bio', typeSql: 'TEXT', nullable: true }),
     );
     expect(call.factoryName).toBe('addColumn');
     expect(call.operationClass).toBe('additive');
@@ -123,7 +130,22 @@ describe('AddColumnCall', () => {
     const op = call.toOp();
     expect(op.id).toBe('column.user.bio');
     expect(op.execute[0]?.sql).toContain('ALTER TABLE "user"');
-    expect(op.execute[0]?.sql).toContain('ADD COLUMN "bio"');
+    expect(op.execute[0]?.sql).toContain('ADD COLUMN "bio" TEXT');
+  });
+
+  it('includes default and NOT NULL', () => {
+    const call = new AddColumnCall(
+      'user',
+      colSpec({
+        name: 'role',
+        typeSql: 'TEXT',
+        defaultSql: "DEFAULT 'user'",
+        nullable: false,
+      }),
+    );
+    const op = call.toOp();
+    expect(op.execute[0]?.sql).toContain("DEFAULT 'user'");
+    expect(op.execute[0]?.sql).toContain('NOT NULL');
   });
 });
 
@@ -159,73 +181,20 @@ describe('DropIndexCall', () => {
 });
 
 describe('RecreateTableCall', () => {
-  it('folds FK-with-index=true into the index recreation steps and dedupes on column set', () => {
-    const contractTable = table(
-      {
-        id: col({ nativeType: 'integer', nullable: false }),
-        userId: col({ nativeType: 'integer', nullable: false }),
-        otherId: col({ nativeType: 'integer', nullable: false }),
-      },
-      {
-        primaryKey: { columns: ['id'] },
-        // userId is covered by both an explicit index AND an FK-with-index;
-        // otherId is covered by an FK-with-index only.
-        indexes: [{ columns: ['userId'], name: 'idx_explicit_user' }],
-        foreignKeys: [
-          {
-            columns: ['userId'],
-            references: { table: 'user', columns: ['id'] },
-            index: true,
-            constraint: true,
-          },
-          {
-            columns: ['otherId'],
-            references: { table: 'other', columns: ['id'] },
-            index: true,
-            constraint: true,
-          },
-        ],
-      },
-    );
-
-    const call = new RecreateTableCall({
-      tableName: 'post',
-      contractTable,
-      schemaTable: tableIR('post'),
-      issues: [],
-      operationClass: 'destructive',
-      codecHooks: new Map(),
-      storageTypes: {},
-    });
-
-    const op = call.toOp();
-    const recreateSteps = op.execute.filter((s) => s.description.startsWith('recreate index'));
-    // Two unique column-sets → two recreate-index steps.
-    expect(recreateSteps).toHaveLength(2);
-    const sqls = recreateSteps.map((s) => s.sql).join('\n');
-    expect(sqls).toContain('"idx_explicit_user"');
-    expect(sqls).toContain('"post_otherId_idx"');
-    // userId column-set should not produce both an "idx_explicit_user" and a
-    // "post_userId_idx" — dedup picks the first.
-    expect(sqls).not.toContain('"post_userId_idx"');
-  });
-
   it('produces a single op with the four core execute steps + index recreation', () => {
-    const contractTable = table(
-      {
-        id: col({ nativeType: 'integer', nullable: false }),
-        email: col({ nativeType: 'text', nullable: false }),
-      },
-      {
-        primaryKey: { columns: ['id'] },
-        indexes: [{ columns: ['email'], name: 'idx_email' }],
-      },
+    const contractSpec = tableSpec(
+      [
+        colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
+        colSpec({ name: 'email', typeSql: 'TEXT', nullable: false }),
+      ],
+      { primaryKey: { columns: ['id'] } },
     );
 
     const call = new RecreateTableCall({
       tableName: 'user',
-      contractTable,
-      schemaTable: tableIR('user'),
+      contractTable: contractSpec,
+      schemaColumnNames: ['id', 'email'],
+      indexes: [{ name: 'idx_email', columns: ['email'] }],
       issues: [
         {
           kind: 'type_mismatch',
@@ -237,8 +206,6 @@ describe('RecreateTableCall', () => {
         },
       ],
       operationClass: 'destructive',
-      codecHooks: new Map(),
-      storageTypes: {},
     });
 
     expect(call.factoryName).toBe('recreateTable');
@@ -254,8 +221,32 @@ describe('RecreateTableCall', () => {
     expect(descriptions[3]).toContain('rename');
     expect(descriptions[4]).toContain('idx_email');
 
-    // Postcheck includes per-issue idempotency check
+    // Per-issue postcheck (type_mismatch)
     expect(op.postcheck.some((s) => s.description.includes('type'))).toBe(true);
+  });
+
+  it('skips columns missing from the live schema in the data-copy column list', () => {
+    const contractSpec = tableSpec(
+      [
+        colSpec({ name: 'id', typeSql: 'INTEGER', nullable: false }),
+        colSpec({ name: 'old_col', typeSql: 'TEXT', nullable: true }),
+        colSpec({ name: 'new_col', typeSql: 'TEXT', nullable: true }),
+      ],
+      { primaryKey: { columns: ['id'] } },
+    );
+
+    const call = new RecreateTableCall({
+      tableName: 'user',
+      contractTable: contractSpec,
+      schemaColumnNames: ['id', 'old_col'],
+      indexes: [],
+      issues: [],
+      operationClass: 'widening',
+    });
+
+    const copyStep = call.toOp().execute.find((s) => s.description.startsWith('copy data'));
+    expect(copyStep?.sql).toContain('"id", "old_col"');
+    expect(copyStep?.sql).not.toContain('"new_col"');
   });
 });
 

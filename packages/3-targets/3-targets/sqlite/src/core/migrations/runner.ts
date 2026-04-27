@@ -1,4 +1,3 @@
-import { normalizeSqliteNativeType, parseSqliteDefault } from '@prisma-next/adapter-sqlite/control';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
@@ -16,6 +15,8 @@ import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
+import { parseSqliteDefault } from '../default-normalizer';
+import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,

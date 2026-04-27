@@ -1,23 +1,49 @@
-import { quoteIdentifier } from '@prisma-next/adapter-sqlite/control';
-import type { CodecControlHooks, MigrationOperationClass } from '@prisma-next/family-sql/control';
+import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { StorageTable, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
-import {
-  buildColumnDefaultSql,
-  buildCreateIndexSql,
-  buildCreateTableSql,
-} from '../planner-ddl-builders';
+import { quoteIdentifier } from '../../sql-utils';
+import { buildCreateIndexSql } from '../planner-ddl-builders';
 import { buildTargetDetails } from '../planner-target-details';
-import { esc, type Op, step } from './shared';
+import {
+  esc,
+  type Op,
+  renderColumnDefinition,
+  renderForeignKeyClause,
+  type SqliteColumnSpec,
+  type SqliteIndexSpec,
+  type SqliteTableSpec,
+  step,
+} from './shared';
 
-export function createTable(
-  tableName: string,
-  table: StorageTable,
-  codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance>,
-): Op {
+/**
+ * Renders the body of a `CREATE TABLE <name> ( … )` statement from a flat
+ * `SqliteTableSpec`. SQLite's `INTEGER PRIMARY KEY AUTOINCREMENT` form is
+ * inline on the column; the table-level PRIMARY KEY clause is emitted only
+ * when no column carries `inlineAutoincrementPrimaryKey`.
+ */
+function renderCreateTableSql(tableName: string, spec: SqliteTableSpec): string {
+  const columnDefs = spec.columns.map(renderColumnDefinition);
+
+  const constraintDefs: string[] = [];
+  const hasInlinePk = spec.columns.some((c) => c.inlineAutoincrementPrimaryKey);
+  if (spec.primaryKey && !hasInlinePk) {
+    constraintDefs.push(`PRIMARY KEY (${spec.primaryKey.columns.map(quoteIdentifier).join(', ')})`);
+  }
+
+  for (const u of spec.uniques ?? []) {
+    const name = u.name ? `CONSTRAINT ${quoteIdentifier(u.name)} ` : '';
+    constraintDefs.push(`${name}UNIQUE (${u.columns.map(quoteIdentifier).join(', ')})`);
+  }
+
+  for (const fk of spec.foreignKeys ?? []) {
+    const clause = renderForeignKeyClause(fk);
+    if (clause) constraintDefs.push(clause);
+  }
+
+  const allDefs = [...columnDefs, ...constraintDefs];
+  return `CREATE TABLE ${quoteIdentifier(tableName)} (\n  ${allDefs.join(',\n  ')}\n)`;
+}
+
+export function createTable(tableName: string, spec: SqliteTableSpec): Op {
   return {
     id: `table.${tableName}`,
     label: `Create table ${tableName}`,
@@ -30,12 +56,7 @@ export function createTable(
         `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
       ),
     ],
-    execute: [
-      step(
-        `create table "${tableName}"`,
-        buildCreateTableSql(tableName, table, codecHooks, storageTypes),
-      ),
-    ],
+    execute: [step(`create table "${tableName}"`, renderCreateTableSql(tableName, spec))],
     postcheck: [
       step(
         `verify table "${tableName}" exists`,
@@ -70,57 +91,36 @@ export function dropTable(tableName: string): Op {
 
 export interface RecreateTableArgs {
   readonly tableName: string;
-  readonly contractTable: StorageTable;
-  readonly schemaTable: SqlTableIR;
+  /** New (post-recreate) shape of the table. Same flat spec as `createTable`. */
+  readonly contractTable: SqliteTableSpec;
+  /**
+   * Names of columns that exist in the live (pre-recreate) schema. Used to
+   * compute the `INSERT INTO temp ... SELECT ... FROM old` column list — only
+   * shared columns are copied, so dropped columns are left behind and added
+   * columns come from defaults.
+   */
+  readonly schemaColumnNames: readonly string[];
+  /**
+   * Indexes (declared + FK-backing, deduped by column-set) to recreate after
+   * the table has been replaced. The planner pre-merges these.
+   */
+  readonly indexes: readonly SqliteIndexSpec[];
   readonly issues: readonly SchemaIssue[];
   readonly operationClass: MigrationOperationClass;
-  readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly storageTypes: Record<string, StorageTypeInstance>;
 }
 
 export function recreateTable(args: RecreateTableArgs): Op {
-  const {
-    tableName,
-    contractTable,
-    schemaTable,
-    issues,
-    operationClass,
-    codecHooks,
-    storageTypes,
-  } = args;
+  const { tableName, contractTable, schemaColumnNames, indexes, issues, operationClass } = args;
   const tempName = `_prisma_new_${tableName}`;
-  const sharedColumns = Object.keys(contractTable.columns).filter(
-    (col) => schemaTable.columns[col] !== undefined,
-  );
+  const liveSet = new Set(schemaColumnNames);
+  const sharedColumns = contractTable.columns.filter((c) => liveSet.has(c.name)).map((c) => c.name);
   const columnList = sharedColumns.map(quoteIdentifier).join(', ');
   const issueDescriptions = issues.map((i) => i.message).join('; ');
 
-  // FK-backing indexes are folded in alongside explicit indexes — same DDL,
-  // same recreate-step description. Dedup on column-set so an explicit index
-  // covering the same columns as an `index: true` FK isn't emitted twice.
-  const indexStatements: Array<{ description: string; sql: string }> = [];
-  const seenIndexColumnKeys = new Set<string>();
-  const recreateableIndexes: Array<{ name: string; columns: readonly string[] }> = [
-    ...contractTable.indexes.map((idx) => ({
-      name: idx.name ?? defaultIndexName(tableName, idx.columns),
-      columns: idx.columns,
-    })),
-    ...contractTable.foreignKeys
-      .filter((fk) => fk.index !== false)
-      .map((fk) => ({
-        name: defaultIndexName(tableName, fk.columns),
-        columns: fk.columns,
-      })),
-  ];
-  for (const idx of recreateableIndexes) {
-    const key = idx.columns.join(',');
-    if (seenIndexColumnKeys.has(key)) continue;
-    seenIndexColumnKeys.add(key);
-    indexStatements.push({
-      description: `recreate index "${idx.name}" on "${tableName}"`,
-      sql: buildCreateIndexSql(tableName, idx.name, idx.columns),
-    });
-  }
+  const indexStatements = indexes.map((idx) => ({
+    description: `recreate index "${idx.name}" on "${tableName}"`,
+    sql: buildCreateIndexSql(tableName, idx.name, idx.columns),
+  }));
 
   return {
     id: `recreateTable.${tableName}`,
@@ -141,7 +141,7 @@ export function recreateTable(args: RecreateTableArgs): Op {
     execute: [
       step(
         `create new table "${tempName}" with desired schema`,
-        buildCreateTableSql(tempName, contractTable, codecHooks, storageTypes),
+        renderCreateTableSql(tempName, contractTable),
       ),
       step(
         `copy data from "${tableName}" to "${tempName}"`,
@@ -163,60 +163,63 @@ export function recreateTable(args: RecreateTableArgs): Op {
         `verify temp table "${tempName}" is gone`,
         `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tempName)}'`,
       ),
-      ...buildIssuePostchecks(tableName, issues, contractTable),
+      ...buildIssuePostchecks(tableName, issues, contractTable.columns),
     ],
   };
 }
 
+/**
+ * Per-issue postchecks verifying the recreated table's column shape. Reads
+ * expectations from the flat `SqliteColumnSpec`s embedded in the spec —
+ * `typeSql` is the upper-cased native type and `defaultSql` is the
+ * pre-rendered DEFAULT clause.
+ */
 function buildIssuePostchecks(
   tableName: string,
   issues: readonly SchemaIssue[],
-  contractTable: StorageTable,
+  columns: readonly SqliteColumnSpec[],
 ): Array<{ description: string; sql: string }> {
   const checks: Array<{ description: string; sql: string }> = [];
   const t = esc(tableName);
+  const byName = new Map(columns.map((c) => [c.name, c]));
 
   for (const issue of issues) {
     if (issue.kind === 'enum_values_changed') continue;
-    if (issue.column) {
-      const c = esc(issue.column);
-      if (issue.kind === 'nullability_mismatch') {
-        const wantNotNull = issue.expected !== 'true';
+    if (!issue.column) continue;
+    const c = esc(issue.column);
+    if (issue.kind === 'nullability_mismatch') {
+      const wantNotNull = issue.expected !== 'true';
+      checks.push({
+        description: `verify "${issue.column}" nullability on "${tableName}"`,
+        sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${wantNotNull ? 1 : 0}`,
+      });
+    }
+    if (issue.kind === 'default_mismatch' || issue.kind === 'default_missing') {
+      const spec = byName.get(issue.column);
+      const expectedRaw = spec?.defaultSql.startsWith('DEFAULT ')
+        ? spec.defaultSql.slice('DEFAULT '.length)
+        : null;
+      if (expectedRaw) {
         checks.push({
-          description: `verify "${issue.column}" nullability on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${wantNotNull ? 1 : 0}`,
+          description: `verify "${issue.column}" default on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${esc(expectedRaw)}'`,
         });
       }
-      if (issue.kind === 'default_mismatch' || issue.kind === 'default_missing') {
-        const contractColumn = contractTable.columns[issue.column];
-        const rendered = contractColumn
-          ? buildColumnDefaultSql(contractColumn.default, contractColumn)
-          : '';
-        const expectedRaw = rendered.startsWith('DEFAULT ')
-          ? rendered.slice('DEFAULT '.length)
-          : null;
-        if (expectedRaw) {
-          checks.push({
-            description: `verify "${issue.column}" default on "${tableName}"`,
-            sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${esc(expectedRaw)}'`,
-          });
-        }
-      }
-      if (issue.kind === 'type_mismatch') {
-        const contractColumn = contractTable.columns[issue.column];
-        if (contractColumn) {
-          checks.push({
-            description: `verify "${issue.column}" type on "${tableName}"`,
-            sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${esc(contractColumn.nativeType.toLowerCase())}'`,
-          });
-        }
-      }
-      if (issue.kind === 'extra_default') {
+    }
+    if (issue.kind === 'type_mismatch') {
+      const spec = byName.get(issue.column);
+      if (spec) {
         checks.push({
-          description: `verify "${issue.column}" has no default on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,
+          description: `verify "${issue.column}" type on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${esc(spec.typeSql.toLowerCase())}'`,
         });
       }
+    }
+    if (issue.kind === 'extra_default') {
+      checks.push({
+        description: `verify "${issue.column}" has no default on "${tableName}"`,
+        sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value IS NULL`,
+      });
     }
   }
   return checks;

@@ -2811,6 +2811,9 @@ importers:
 
   packages/3-targets/3-targets/sqlite:
     dependencies:
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../../1-framework/3-tooling/cli
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/contract
@@ -2848,9 +2851,6 @@ importers:
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
     devDependencies:
-      '@prisma-next/adapter-sqlite':
-        specifier: workspace:*
-        version: link:../../6-adapters/sqlite
       '@prisma-next/driver-sqlite':
         specifier: workspace:*
         version: link:../../7-drivers/sqlite
@@ -2999,6 +2999,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../../2-sql/1-core/schema-ir
+      '@prisma-next/target-sqlite':
+        specifier: workspace:*
+        version: link:../../3-targets/sqlite
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
@@ -3006,6 +3009,9 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
+      '@prisma-next/driver-sqlite':
+        specifier: workspace:*
+        version: link:../../7-drivers/sqlite
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -3015,6 +3021,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      pathe:
+        specifier: ^2.0.3
+        version: 2.0.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)

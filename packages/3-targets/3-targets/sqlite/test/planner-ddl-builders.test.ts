@@ -1,18 +1,13 @@
 import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
-  buildAddColumnSql,
   buildColumnDefaultSql,
   buildColumnTypeSql,
   buildCreateIndexSql,
-  buildCreateTableSql,
   buildDropIndexSql,
-  buildRenameColumnSql,
+  isInlineAutoincrementPrimaryKey,
   renderDefaultLiteral,
 } from '../src/core/migrations/planner-ddl-builders';
-
-const emptyCodecHooks = new Map();
-const emptyStorageTypes = {};
 
 function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
   return {
@@ -33,82 +28,24 @@ function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
   };
 }
 
-describe('buildCreateTableSql', () => {
-  it('generates CREATE TABLE with columns', () => {
-    const table = makeTable({
-      columns: {
-        id: makeColumn({ nativeType: 'integer', nullable: false }),
-        name: makeColumn({ nativeType: 'text', nullable: false }),
-        bio: makeColumn({ nativeType: 'text', nullable: true }),
-      },
-      primaryKey: { columns: ['id'] },
-    });
-    const sql = buildCreateTableSql('users', table, emptyCodecHooks, emptyStorageTypes);
-    expect(sql).toContain('CREATE TABLE "users"');
-    expect(sql).toContain('"id" INTEGER');
-    expect(sql).toContain('"name" TEXT NOT NULL');
-    expect(sql).toContain('"bio" TEXT');
-    expect(sql).toContain('PRIMARY KEY ("id")');
-  });
-
-  it('generates INTEGER PRIMARY KEY AUTOINCREMENT for autoincrement column', () => {
-    const table = makeTable({
-      columns: {
-        id: makeColumn({
-          nativeType: 'integer',
-          nullable: false,
-          default: { kind: 'function', expression: 'autoincrement()' },
-        }),
-      },
-      primaryKey: { columns: ['id'] },
-    });
-    const sql = buildCreateTableSql('t', table, emptyCodecHooks, emptyStorageTypes);
-    expect(sql).toContain('"id" INTEGER PRIMARY KEY AUTOINCREMENT');
-    // Should NOT have a separate PRIMARY KEY constraint
-    expect(sql).not.toMatch(/PRIMARY KEY \("id"\)/);
-  });
-
-  it('includes inline UNIQUE constraints', () => {
-    const table = makeTable({
-      columns: {
-        email: makeColumn({ nativeType: 'text', nullable: false }),
-      },
-      uniques: [{ columns: ['email'], name: 'uq_email' }],
-    });
-    const sql = buildCreateTableSql('users', table, emptyCodecHooks, emptyStorageTypes);
-    expect(sql).toContain('CONSTRAINT "uq_email" UNIQUE ("email")');
-  });
-
-  it('includes inline FOREIGN KEY constraints', () => {
-    const table = makeTable({
-      columns: {
-        author_id: makeColumn({ nativeType: 'integer', nullable: false }),
-      },
-      foreignKeys: [
-        {
-          columns: ['author_id'],
-          references: { table: 'authors', columns: ['id'] },
-          onDelete: 'cascade',
-          constraint: true,
-          index: true,
-        },
-      ],
-    });
-    const sql = buildCreateTableSql('posts', table, emptyCodecHooks, emptyStorageTypes);
-    expect(sql).toContain(
-      'FOREIGN KEY ("author_id") REFERENCES "authors" ("id") ON DELETE CASCADE',
-    );
-  });
-});
-
 describe('buildColumnTypeSql', () => {
   it('uppercases native type', () => {
-    expect(buildColumnTypeSql(makeColumn({ nativeType: 'text' }), emptyCodecHooks)).toBe('TEXT');
-    expect(buildColumnTypeSql(makeColumn({ nativeType: 'integer' }), emptyCodecHooks)).toBe(
-      'INTEGER',
-    );
-    expect(buildColumnTypeSql(makeColumn({ nativeType: 'real' }), emptyCodecHooks)).toBe('REAL');
-    expect(buildColumnTypeSql(makeColumn({ nativeType: 'blob' }), emptyCodecHooks)).toBe('BLOB');
+    expect(buildColumnTypeSql(makeColumn({ nativeType: 'text' }))).toBe('TEXT');
+    expect(buildColumnTypeSql(makeColumn({ nativeType: 'integer' }))).toBe('INTEGER');
+    expect(buildColumnTypeSql(makeColumn({ nativeType: 'real' }))).toBe('REAL');
+    expect(buildColumnTypeSql(makeColumn({ nativeType: 'blob' }))).toBe('BLOB');
+  });
+
+  it('resolves typeRef against storageTypes', () => {
+    const column = makeColumn({ nativeType: 'unused', typeRef: 'my_type' });
+    const sql = buildColumnTypeSql(column, {
+      my_type: { codecId: 'sqlite/text@1', nativeType: 'text', typeParams: {} },
+    });
+    expect(sql).toBe('TEXT');
+  });
+
+  it('rejects unsafe native types', () => {
+    expect(() => buildColumnTypeSql(makeColumn({ nativeType: 'TEXT; DROP' }))).toThrow(/Unsafe/);
   });
 });
 
@@ -149,6 +86,12 @@ describe('buildColumnDefaultSql', () => {
       'DEFAULT (random())',
     );
   });
+
+  it('rejects unsafe default expressions', () => {
+    expect(() =>
+      buildColumnDefaultSql({ kind: 'function', expression: 'foo(); DROP TABLE' }),
+    ).toThrow(/Unsafe/);
+  });
 });
 
 describe('renderDefaultLiteral', () => {
@@ -159,51 +102,6 @@ describe('renderDefaultLiteral', () => {
 
   it('renders JSON objects', () => {
     expect(renderDefaultLiteral({ key: 'val' })).toBe('\'{"key":"val"}\'');
-  });
-});
-
-describe('buildAddColumnSql', () => {
-  it('generates ALTER TABLE ADD COLUMN', () => {
-    const sql = buildAddColumnSql(
-      'users',
-      'age',
-      makeColumn({ nativeType: 'integer', nullable: true }),
-      emptyCodecHooks,
-    );
-    expect(sql).toBe('ALTER TABLE "users" ADD COLUMN "age" INTEGER');
-  });
-
-  it('includes NOT NULL', () => {
-    const sql = buildAddColumnSql(
-      'users',
-      'name',
-      makeColumn({ nativeType: 'text', nullable: false }),
-      emptyCodecHooks,
-    );
-    expect(sql).toContain('NOT NULL');
-  });
-
-  it('includes default', () => {
-    const sql = buildAddColumnSql(
-      'users',
-      'role',
-      makeColumn({
-        nativeType: 'text',
-        nullable: false,
-        default: { kind: 'literal', value: 'user' },
-      }),
-      emptyCodecHooks,
-    );
-    expect(sql).toContain("DEFAULT 'user'");
-    expect(sql).toContain('NOT NULL');
-  });
-});
-
-describe('buildRenameColumnSql', () => {
-  it('generates ALTER TABLE RENAME COLUMN', () => {
-    expect(buildRenameColumnSql('users', 'old_name', 'new_name')).toBe(
-      'ALTER TABLE "users" RENAME COLUMN "old_name" TO "new_name"',
-    );
   });
 });
 
@@ -230,5 +128,61 @@ describe('buildCreateIndexSql', () => {
 describe('buildDropIndexSql', () => {
   it('generates DROP INDEX IF EXISTS', () => {
     expect(buildDropIndexSql('idx_users_email')).toBe('DROP INDEX IF EXISTS "idx_users_email"');
+  });
+});
+
+describe('isInlineAutoincrementPrimaryKey', () => {
+  it('is true for sole-column PK with autoincrement() default', () => {
+    const table = makeTable({
+      columns: {
+        id: makeColumn({
+          nativeType: 'integer',
+          nullable: false,
+          default: { kind: 'function', expression: 'autoincrement()' },
+        }),
+      },
+      primaryKey: { columns: ['id'] },
+    });
+    expect(isInlineAutoincrementPrimaryKey(table, 'id')).toBe(true);
+  });
+
+  it('is false when the column is not in the primary key', () => {
+    const table = makeTable({
+      columns: {
+        id: makeColumn({ nativeType: 'integer', nullable: false }),
+        seq: makeColumn({
+          nativeType: 'integer',
+          nullable: false,
+          default: { kind: 'function', expression: 'autoincrement()' },
+        }),
+      },
+      primaryKey: { columns: ['id'] },
+    });
+    expect(isInlineAutoincrementPrimaryKey(table, 'seq')).toBe(false);
+  });
+
+  it('is false for composite primary keys', () => {
+    const table = makeTable({
+      columns: {
+        a: makeColumn({
+          nativeType: 'integer',
+          nullable: false,
+          default: { kind: 'function', expression: 'autoincrement()' },
+        }),
+        b: makeColumn({ nativeType: 'integer', nullable: false }),
+      },
+      primaryKey: { columns: ['a', 'b'] },
+    });
+    expect(isInlineAutoincrementPrimaryKey(table, 'a')).toBe(false);
+  });
+
+  it('is false when default is not autoincrement()', () => {
+    const table = makeTable({
+      columns: {
+        id: makeColumn({ nativeType: 'integer', nullable: false }),
+      },
+      primaryKey: { columns: ['id'] },
+    });
+    expect(isInlineAutoincrementPrimaryKey(table, 'id')).toBe(false);
   });
 });
