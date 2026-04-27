@@ -47,7 +47,12 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { createExecutionContext, createRuntime, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  budgets,
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
 
 const contract = validateContract<Contract>(contractJson);
 const stack = createSqlExecutionStack({
