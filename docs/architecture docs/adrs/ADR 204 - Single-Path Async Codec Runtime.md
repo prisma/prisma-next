@@ -165,7 +165,7 @@ A synchronous fast-path for sustained-throughput workloads is a future, **additi
 - Predicates `isSyncEncoder(codec)` / `isSyncDecoder(codec)` that the runtime can call to take a faster, fully-sync encode/decode path that skips the `Promise.all` allocation and microtask hop.
 - The runtime gains a sync fast-path arm; the existing async path remains, unchanged, for codecs that opt in to async or that don't opt in to sync.
 
-For this opt-in to land cleanly, the design today must **not** introduce any of the following walk-back constraints (preserved verbatim from `spec.md` § NFR #5):
+For this opt-in to land cleanly, the design today must **not** introduce any of the following walk-back constraints:
 
 1. A sync/async marker on the public `Codec` interface (no `runtime`, `kind`, or equivalent field).
 2. Multiple factory variants (`codecSync` / `codecAsync`) — there is **one** factory, `codec()`, today; `codecSync()` is the future additive opt-in.
@@ -175,7 +175,7 @@ For this opt-in to land cleanly, the design today must **not** introduce any of 
 6. Documentation framing the author surface as "codec functions return Promises" (instead: "you may write sync or async; the factory accepts both").
 7. Public guarantees that depend on async-ness (e.g., "errors arrive via promise rejection" instead of "errors are wrapped in the standard envelope").
 
-Each of these would force the future `codecSync()` opt-in to be either a breaking change or a parallel, divergent code path. The single-path always-await design avoids all seven by keeping the sync/async distinction **invisible** at the public boundary.
+Each of these would force the future `codecSync()` opt-in to be either a breaking change or a parallel, divergent code path. The single-path always-await design avoids all seven by keeping the sync/async distinction **invisible** at the public boundary. This list is the canonical statement of those constraints; downstream specs and plans defer to it.
 
 ## Trade-offs
 
