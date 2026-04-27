@@ -6,17 +6,14 @@ export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual
  * A codec is the contract between an application value and its on-wire and
  * on-contract-disk representations.
  *
- * Author one JS type at the app boundary; the codec translates that type
- * to the database driver's wire format and back, and to the JSON-safe form
- * used in contract artifacts. Most codecs use one JS type for both writes
- * and reads, so `TInput` and `TOutput` collapse to the same type. When a
- * richer return type makes sense (e.g. write `string`, read `Date`), pass
- * distinct types to `encode`'s parameter and `decode`'s return — the codec
- * then carries an asymmetric input / output shape.
+ * The author's mental model is two JS-side types — `TInput` (the
+ * application JS type) and `TWire` (the database driver wire format) —
+ * plus `JsonValue` for build-time contract artifacts. The codec translates
+ * `TInput` to `TWire` on writes and back on reads, and to/from `JsonValue`
+ * during contract emission and loading.
  *
- * Four representations participate:
- * - **Input** (`TInput`): the JS type accepted on writes.
- * - **Output** (`TOutput`): the JS type produced on reads (defaults to `TInput`).
+ * Three representations participate:
+ * - **Input** (`TInput`): the JS type at the application boundary.
  * - **Wire** (`TWire`): the format exchanged with the database driver.
  * - **JSON** (`JsonValue`): a JSON-safe form used in contract artifacts.
  *
@@ -39,7 +36,6 @@ export interface Codec<
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TInput = unknown,
-  TOutput = TInput,
 > {
   /** Unique codec identifier in `namespace/name@version` format (e.g. `pg/timestamptz@1`). */
   readonly id: Id;
@@ -49,8 +45,8 @@ export interface Codec<
   readonly traits?: TTraits;
   /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. */
   encode(value: TInput): Promise<TWire>;
-  /** Converts a wire value from the database driver into the JS output type. Always Promise-returning at the boundary. */
-  decode(wire: TWire): Promise<TOutput>;
+  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. */
+  decode(wire: TWire): Promise<TInput>;
   /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
   /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `validateContract`. */

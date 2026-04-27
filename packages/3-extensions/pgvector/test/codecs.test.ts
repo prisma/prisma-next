@@ -6,8 +6,8 @@ import { codecDefinitions } from '../src/core/codecs';
 // `codec()` factory in `relational-core` lifts both methods to
 // `Promise`-returning at the boundary. The tests below cast through the
 // Promise-returning shape and `await` every call so unit-level coverage
-// stays aligned with the m1 codec contract:
-//   `Codec<Id, TTraits, TWire, TInput, TOutput>` — encode/decode return Promise.
+// stays aligned with the codec contract:
+//   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
 type AsyncVectorCodec = {
   readonly encode: (value: number[]) => Promise<string>;
   readonly decode: (wire: string) => Promise<number[]>;

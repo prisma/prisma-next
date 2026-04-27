@@ -1,11 +1,6 @@
-import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
+import type { Codec as BaseCodec } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
-import type {
-  MongoCodec,
-  MongoCodecInput,
-  MongoCodecOutput,
-  MongoCodecTraits,
-} from '../src/codecs';
+import type { MongoCodec, MongoCodecInput, MongoCodecTraits } from '../src/codecs';
 import { mongoCodec } from '../src/codecs';
 
 const equalityOnlyCodec = mongoCodec({
@@ -57,51 +52,27 @@ test('MongoCodecTraits is never for codec without traits', () => {
   expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
 });
 
-// MongoCodec is a structural alias of `BaseCodec` — five generics in the
-// same order, with `TOutput` defaulting to `TInput`. Confirm the alias
-// remains identical at the type level so authors can hold a `BaseCodec`
-// reference where a `MongoCodec` is expected.
-test('MongoCodec is structurally identical to BaseCodec (5 generics, same order)', () => {
-  expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string, Date>>().toEqualTypeOf<
-    BaseCodec<'id/x@1', readonly ['equality'], number, string, Date>
+// MongoCodec is a structural alias of `BaseCodec` — same four generics in
+// the same order. Confirm the alias remains identical at the type level so
+// authors can hold a `BaseCodec` reference where a `MongoCodec` is expected.
+test('MongoCodec is structurally identical to BaseCodec (4 generics, same order)', () => {
+  expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string>>().toEqualTypeOf<
+    BaseCodec<'id/x@1', readonly ['equality'], number, string>
   >();
 });
 
-test('MongoCodec defaults TOutput to TInput when TOutput is omitted', () => {
-  expectTypeOf<MongoCodec<'id/y@1', readonly CodecTrait[], number, string>>().toEqualTypeOf<
-    MongoCodec<'id/y@1', readonly CodecTrait[], number, string, string>
-  >();
-});
-
-// Asymmetric `TInput` ≠ `TOutput` must be expressible: the factory accepts
-// distinct types in `encode`'s input and `decode`'s output positions, and
-// the resulting codec must surface them on the method signatures (e.g.
-// write `string`, read `Date`).
-test('mongoCodec factory accepts encode TInput → TWire and decode TWire → TOutput where TInput ≠ TOutput', () => {
-  const asymmetric = mongoCodec({
-    typeId: 'demo/asymmetric@1',
-    targetTypes: ['number'],
-    encode: (value: string) => Number(value),
-    decode: (wire: number) => new Date(wire),
-  });
-
-  expectTypeOf<Parameters<typeof asymmetric.encode>[0]>().toEqualTypeOf<string>();
-  expectTypeOf<ReturnType<typeof asymmetric.encode>>().toExtend<Promise<number>>();
-  expectTypeOf<Parameters<typeof asymmetric.decode>[0]>().toEqualTypeOf<number>();
-  expectTypeOf<ReturnType<typeof asymmetric.decode>>().toExtend<Promise<Date>>();
-});
-
-// `MongoCodecInput<T>` / `MongoCodecOutput<T>` surface the canonical
-// (symmetric) JS type for a Mongo codec — i.e. the input/output type when
-// `TInput = TOutput`, which is the case used by built-in codecs.
-test('MongoCodecInput / MongoCodecOutput extract the canonical JS type for symmetric codecs', () => {
-  const symmetric = mongoCodec({
-    typeId: 'demo/symmetric@1',
+// `MongoCodecInput<T>` surfaces the JS application type of a Mongo codec
+// — used both as `encode`'s input and as `decode`'s output, since the codec
+// translates one JS application type to/from one wire format.
+test('MongoCodecInput extracts the JS application type used for both write input and read output', () => {
+  const text = mongoCodec({
+    typeId: 'demo/text@1',
     targetTypes: ['string'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });
 
-  expectTypeOf<MongoCodecInput<typeof symmetric>>().toEqualTypeOf<string>();
-  expectTypeOf<MongoCodecOutput<typeof symmetric>>().toEqualTypeOf<string>();
+  expectTypeOf<MongoCodecInput<typeof text>>().toEqualTypeOf<string>();
+  expectTypeOf<Parameters<typeof text.encode>[0]>().toEqualTypeOf<string>();
+  expectTypeOf<ReturnType<typeof text.decode>>().toExtend<Promise<string>>();
 });

@@ -59,10 +59,9 @@ export interface Codec<
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TInput = unknown,
-  TOutput = TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TInput, TOutput> {
+> extends BaseCodec<Id, TTraits, TWire, TInput> {
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -200,14 +199,13 @@ export function codec<
   const TTraits extends readonly CodecTrait[],
   TWire,
   TInput,
-  TOutput = TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
   encode?: (value: TInput) => TWire | Promise<TWire>;
-  decode: (wire: TWire) => TOutput | Promise<TOutput>;
+  decode: (wire: TWire) => TInput | Promise<TInput>;
   encodeJson?: (value: TInput) => JsonValue;
   decodeJson?: (json: JsonValue) => TInput;
   meta?: CodecMeta;
@@ -215,7 +213,7 @@ export function codec<
   init?: (params: TParams) => THelper;
   traits?: TTraits;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TInput, TOutput, TParams, THelper> {
+}): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
   const userEncode =
     config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
@@ -245,8 +243,6 @@ export type CodecId<T> =
   T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
 export type CodecInput<T> =
   T extends Codec<string, readonly CodecTrait[], unknown, infer In> ? In : never;
-export type CodecOutput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, unknown, infer Out> ? Out : never;
 export type CodecTraits<T> =
   T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
 
@@ -258,7 +254,7 @@ export type ExtractCodecTypes<
 > = {
   readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id> ? Id : never]: {
     readonly input: CodecInput<ScalarNames[K]>;
-    readonly output: CodecOutput<ScalarNames[K]>;
+    readonly output: CodecInput<ScalarNames[K]>;
     readonly traits: CodecTraits<ScalarNames[K]>;
   };
 };
@@ -299,8 +295,8 @@ export interface CodecDefBuilder<
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
-      readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly output: CodecInput<ScalarNames[K]>;
+      readonly jsType: CodecInput<ScalarNames[K]>;
     };
   };
 
@@ -339,7 +335,7 @@ class CodecDefBuilderImpl<
       const codecImplTyped = codecImpl as Codec<string>;
       codecTypes[codecImplTyped.id] = {
         input: undefined as unknown as CodecInput<typeof codecImplTyped>,
-        output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
+        output: undefined as unknown as CodecInput<typeof codecImplTyped>,
         traits: undefined as unknown as CodecTraits<typeof codecImplTyped>,
       };
     }
@@ -384,8 +380,8 @@ class CodecDefBuilderImpl<
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
-      readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly output: CodecInput<ScalarNames[K]>;
+      readonly jsType: CodecInput<ScalarNames[K]>;
     };
   } {
     const result: Record<
@@ -407,8 +403,8 @@ class CodecDefBuilderImpl<
         scalar: scalarName,
         codec: codec,
         input: undefined as unknown as CodecInput<typeof codec>,
-        output: undefined as unknown as CodecOutput<typeof codec>,
-        jsType: undefined as unknown as CodecOutput<typeof codec>,
+        output: undefined as unknown as CodecInput<typeof codec>,
+        jsType: undefined as unknown as CodecInput<typeof codec>,
       };
     }
 
@@ -418,8 +414,8 @@ class CodecDefBuilderImpl<
         readonly scalar: K;
         readonly codec: ScalarNames[K];
         readonly input: CodecInput<ScalarNames[K]>;
-        readonly output: CodecOutput<ScalarNames[K]>;
-        readonly jsType: CodecOutput<ScalarNames[K]>;
+        readonly output: CodecInput<ScalarNames[K]>;
+        readonly jsType: CodecInput<ScalarNames[K]>;
       };
     };
   }

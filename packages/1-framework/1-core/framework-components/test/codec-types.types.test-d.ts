@@ -56,18 +56,20 @@ test('Codec carries no async marker (no runtime/kind/TRuntime fields)', () => {
   expectTypeOf<CodecKeys>().toEqualTypeOf<ExpectedKeys>();
 });
 
-test('Codec input/output may differ via TInput/TOutput', () => {
-  type StringToNumberCodec = Codec<'demo/in-out@1', readonly CodecTrait[], string, string, number>;
-  expectTypeOf<ReturnType<StringToNumberCodec['encode']>>().toExtend<Promise<string>>();
-  expectTypeOf<ReturnType<StringToNumberCodec['decode']>>().toExtend<Promise<number>>();
-  expectTypeOf<Parameters<StringToNumberCodec['encode']>[0]>().toEqualTypeOf<string>();
-  expectTypeOf<Parameters<StringToNumberCodec['decode']>[0]>().toEqualTypeOf<string>();
-  expectTypeOf<Parameters<StringToNumberCodec['encodeJson']>[0]>().toEqualTypeOf<string>();
-  expectTypeOf<ReturnType<StringToNumberCodec['decodeJson']>>().toEqualTypeOf<string>();
+test('Codec carries four generics: encode TInput → TWire, decode TWire → TInput', () => {
+  type StringTextCodec = Codec<'demo/text@1', readonly CodecTrait[], string, string>;
+  expectTypeOf<Parameters<StringTextCodec['encode']>[0]>().toEqualTypeOf<string>();
+  expectTypeOf<ReturnType<StringTextCodec['encode']>>().toExtend<Promise<string>>();
+  expectTypeOf<Parameters<StringTextCodec['decode']>[0]>().toEqualTypeOf<string>();
+  expectTypeOf<ReturnType<StringTextCodec['decode']>>().toExtend<Promise<string>>();
+  expectTypeOf<Parameters<StringTextCodec['encodeJson']>[0]>().toEqualTypeOf<string>();
+  expectTypeOf<ReturnType<StringTextCodec['decodeJson']>>().toEqualTypeOf<string>();
 });
 
-test('TOutput defaults to TInput when omitted', () => {
-  type FourArgCodec = Codec<'demo/identity@1', readonly CodecTrait[], string, number>;
-  expectTypeOf<ReturnType<FourArgCodec['decode']>>().toExtend<Promise<number>>();
-  expectTypeOf<Parameters<FourArgCodec['encode']>[0]>().toEqualTypeOf<number>();
+test('TInput drives both write input and read output (no asymmetric output)', () => {
+  type WireSeparateFromInput = Codec<'demo/distinct-wire@1', readonly CodecTrait[], number, string>;
+  expectTypeOf<Parameters<WireSeparateFromInput['encode']>[0]>().toEqualTypeOf<string>();
+  expectTypeOf<ReturnType<WireSeparateFromInput['encode']>>().toExtend<Promise<number>>();
+  expectTypeOf<Parameters<WireSeparateFromInput['decode']>[0]>().toEqualTypeOf<number>();
+  expectTypeOf<ReturnType<WireSeparateFromInput['decode']>>().toExtend<Promise<string>>();
 });

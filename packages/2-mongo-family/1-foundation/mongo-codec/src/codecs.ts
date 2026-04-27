@@ -19,8 +19,7 @@ export type MongoCodec<
   TTraits extends readonly MongoCodecTrait[] = readonly MongoCodecTrait[],
   TWire = unknown,
   TInput = unknown,
-  TOutput = TInput,
-> = BaseCodec<Id, TTraits, TWire, TInput, TOutput>;
+> = BaseCodec<Id, TTraits, TWire, TInput>;
 
 /**
  * Construct a Mongo codec from author functions.
@@ -34,28 +33,22 @@ export type MongoCodec<
  * `TWire` are interchangeable for that codec). `decode` is always
  * required. `encodeJson` and `decodeJson` default to identity when
  * omitted.
- *
- * Most Mongo codecs use a single JS type for both writes (`TInput`) and
- * reads (`TOutput`). When you want a richer return type than you wrote
- * (e.g. write `string`, read `Date`), pass distinct types to `encode`'s
- * parameter and `decode`'s return.
  */
 export function mongoCodec<
   Id extends string,
   const TTraits extends readonly MongoCodecTrait[] = readonly [],
   TWire = unknown,
   TInput = unknown,
-  TOutput = TInput,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
   traits?: TTraits;
   encode?: (value: TInput) => TWire | Promise<TWire>;
-  decode: (wire: TWire) => TOutput | Promise<TOutput>;
+  decode: (wire: TWire) => TInput | Promise<TInput>;
   encodeJson?: (value: TInput) => JsonValue;
   decodeJson?: (json: JsonValue) => TInput;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): MongoCodec<Id, TTraits, TWire, TInput, TOutput> {
+}): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   const userEncode =
     config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
@@ -75,15 +68,9 @@ export function mongoCodec<
   };
 }
 
-/** Extract the JS input type accepted by a Mongo codec's `encode`. */
+/** Extract the JS application type carried by a Mongo codec — used both as `encode` input and as `decode` output. */
 export type MongoCodecInput<T> =
   T extends MongoCodec<string, readonly MongoCodecTrait[], unknown, infer TInput> ? TInput : never;
-
-/** Extract the JS output type produced by a Mongo codec's `decode`. */
-export type MongoCodecOutput<T> =
-  T extends MongoCodec<string, readonly MongoCodecTrait[], unknown, unknown, infer TOutput>
-    ? TOutput
-    : never;
 
 export type MongoCodecTraits<T> =
   T extends MongoCodec<string, infer TTraits> ? TTraits[number] & MongoCodecTrait : never;
