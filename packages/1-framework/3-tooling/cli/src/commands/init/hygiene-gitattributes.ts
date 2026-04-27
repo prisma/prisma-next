@@ -47,8 +47,9 @@ export function requiredGitattributesLines(
   schemaDir: string,
   _target: TargetId,
 ): readonly string[] {
-  const dir = schemaDir.replace(/\/+$/, '');
-  return ARTEFACT_FILENAMES.map((file) => `${dir}/${file} ${ATTRIBUTE}`);
+  const dir = schemaDir === '.' ? '' : schemaDir.replace(/\/+$/, '');
+  const prefix = dir === '' ? '' : `${dir}/`;
+  return ARTEFACT_FILENAMES.map((file) => `${prefix}${file} ${ATTRIBUTE}`);
 }
 
 /**

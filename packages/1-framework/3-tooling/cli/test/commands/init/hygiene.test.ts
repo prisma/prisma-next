@@ -61,6 +61,12 @@ describe('mergeGitignore (FR3.3)', () => {
     const result = mergeGitignore('node_modules/');
     expect(result).toBe('node_modules/\ndist/\n.env\n');
   });
+
+  it('does not produce a leading blank line when the existing file is empty', () => {
+    const result = mergeGitignore('');
+    expect(result).toBe(`${REQUIRED_GITIGNORE_ENTRIES.join('\n')}\n`);
+    expect(result?.startsWith('\n')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -93,6 +99,13 @@ describe('requiredGitattributesLines (FR3.4)', () => {
     const lines = requiredGitattributesLines('prisma/', 'postgres');
     expect(lines).toContain('prisma/contract.json linguist-generated');
     expect(lines.every((line) => !line.startsWith('prisma//'))).toBe(true);
+  });
+
+  it('emits root-relative paths (no leading "./") when schemaDir is "."', () => {
+    const lines = requiredGitattributesLines('.', 'postgres');
+    expect(lines).toContain('contract.json linguist-generated');
+    expect(lines).toContain('contract.d.ts linguist-generated');
+    expect(lines.every((line) => !line.startsWith('./'))).toBe(true);
   });
 });
 
