@@ -38,8 +38,7 @@
   },
   "files": [
     "dist",
-    "src",
-    "test"
+    "src"
   ],
   "exports": {
     ".": "./dist/index.mjs",
