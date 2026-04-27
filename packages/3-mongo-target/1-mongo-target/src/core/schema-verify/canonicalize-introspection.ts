@@ -165,13 +165,23 @@ function canonicalizeLiveIndex(
   // Text-index server defaults: when the contract did not set
   // `weights`/`default_language`/`language_override`, MongoDB applies
   // `weights = {<field>: 1, ...}` (uniform), `'english'`, and `'language'`
-  // respectively. Strip them from live so the lookup key matches a contract
-  // that authored none of those.
-  const weights = expectedIndex?.weights === undefined ? undefined : liveIndex.weights;
+  // respectively. Strip them from live *only* when the live value matches
+  // those defaults — preserving non-default live values lets the verifier
+  // surface drift when the live index is tampered (e.g. weights tuned
+  // out-of-band, custom `default_language`/`language_override`) even though
+  // the contract authored neither.
+  const weights =
+    expectedIndex?.weights === undefined && hasDefaultTextWeights(projectedKeys, liveIndex.weights)
+      ? undefined
+      : liveIndex.weights;
   const default_language =
-    expectedIndex?.default_language === undefined ? undefined : liveIndex.default_language;
+    expectedIndex?.default_language === undefined && liveIndex.default_language === 'english'
+      ? undefined
+      : liveIndex.default_language;
   const language_override =
-    expectedIndex?.language_override === undefined ? undefined : liveIndex.language_override;
+    expectedIndex?.language_override === undefined && liveIndex.language_override === 'language'
+      ? undefined
+      : liveIndex.language_override;
 
   return new MongoSchemaIndexCtor({
     keys: projectedKeys,
@@ -257,6 +267,29 @@ function projectTextIndexKeys(liveIndex: MongoSchemaIndex): ReadonlyArray<{
     projectedKeys.push(key);
   }
   return projectedKeys;
+}
+
+/**
+ * MongoDB's server-default `weights` for an authored-without-weights text
+ * index assigns `1` to every text-direction field. Returns `true` only when
+ * `liveWeights` is exactly that uniform shape (every projected text-direction
+ * key weighted at `1`) so the canonicalizer leaves non-default weights —
+ * including out-of-band relevance tweaks — visible to the verifier.
+ *
+ * `projectTextIndexKeys` derives text-direction keys from the live weights
+ * map, so the count is guaranteed to match; we only have to check the value
+ * shape.
+ */
+function hasDefaultTextWeights(
+  projectedKeys: ReadonlyArray<{
+    readonly field: string;
+    readonly direction: 'text' | 1 | -1 | '2dsphere' | '2d' | 'hashed';
+  }>,
+  liveWeights: MongoSchemaIndex['weights'],
+): boolean {
+  if (liveWeights === undefined) return false;
+  const textFields = projectedKeys.filter((k) => k.direction === 'text').map((k) => k.field);
+  return textFields.every((field) => liveWeights[field] === 1);
 }
 
 function canonicalizeLiveOptions(

@@ -463,6 +463,127 @@ describe('verifyMongoSchema', () => {
         expect(result.schema.issues).toEqual([]);
         expect(result.ok).toBe(true);
       });
+
+      it('surfaces drift when live weights are non-uniform but the contract authored none', () => {
+        // The canonicalizer only strips `weights` from live when the contract
+        // omits them *and* the live weights match MongoDB's server default
+        // (every projected text key weighted at 1). A tampered live index
+        // with non-uniform weights — e.g. a relevance boost applied
+        // out-of-band — must surface as drift so verify can fail.
+        const contract = buildContract({
+          articles: {
+            indexes: [
+              {
+                keys: [
+                  { field: 'title', direction: 'text' },
+                  { field: 'body', direction: 'text' },
+                ],
+              },
+            ],
+          },
+        });
+        const liveSchema = ir([
+          coll('articles', {
+            indexes: [
+              new MongoSchemaIndex({
+                keys: [
+                  { field: '_fts', direction: 'text' },
+                  { field: '_ftsx', direction: 1 },
+                ],
+                weights: { title: 5, body: 1 },
+                default_language: 'english',
+                language_override: 'language',
+              }),
+            ],
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+      });
+
+      it('surfaces drift when live default_language is non-default but the contract authored none', () => {
+        const contract = buildContract({
+          articles: {
+            indexes: [
+              {
+                keys: [{ field: 'body', direction: 'text' }],
+                weights: { body: 1 },
+              },
+            ],
+          },
+        });
+        const liveSchema = ir([
+          coll('articles', {
+            indexes: [
+              new MongoSchemaIndex({
+                keys: [
+                  { field: '_fts', direction: 'text' },
+                  { field: '_ftsx', direction: 1 },
+                ],
+                weights: { body: 1 },
+                default_language: 'spanish',
+                language_override: 'language',
+              }),
+            ],
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+      });
+
+      it('surfaces drift when live language_override is non-default but the contract authored none', () => {
+        const contract = buildContract({
+          articles: {
+            indexes: [
+              {
+                keys: [{ field: 'body', direction: 'text' }],
+                weights: { body: 1 },
+              },
+            ],
+          },
+        });
+        const liveSchema = ir([
+          coll('articles', {
+            indexes: [
+              new MongoSchemaIndex({
+                keys: [
+                  { field: '_fts', direction: 'text' },
+                  { field: '_ftsx', direction: 1 },
+                ],
+                weights: { body: 1 },
+                default_language: 'english',
+                language_override: 'idioma',
+              }),
+            ],
+          }),
+        ]);
+
+        const result = verifyMongoSchema({
+          contract,
+          schema: liveSchema,
+          strict: true,
+          frameworkComponents: [],
+        });
+
+        expect(result.ok).toBe(false);
+        expect(result.schema.counts.fail).toBeGreaterThan(0);
+      });
     });
 
     describe('index collation', () => {
