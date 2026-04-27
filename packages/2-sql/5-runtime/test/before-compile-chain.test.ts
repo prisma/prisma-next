@@ -32,6 +32,7 @@ function createContext(): SqlMiddlewareContext & {
       error: vi.fn(),
       debug,
     },
+    identityKey: () => 'mock-key',
   };
 }
 

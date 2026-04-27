@@ -42,6 +42,8 @@ class MongoRuntimeImpl
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
+      // Stubbed in task 1.0; real implementation lands in 1.0c.
+      identityKey: () => 'identity-key-not-implemented',
     };
 
     super({ middleware, ctx });

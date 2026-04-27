@@ -25,6 +25,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      identityKey: () => 'mock-key',
     };
 
     await middleware.beforeExecute!(plan, ctx);
@@ -45,6 +46,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      identityKey: () => 'mock-key',
     };
     const result = { rowCount: 5, latencyMs: 42, completed: true };
 
@@ -69,6 +71,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info, warn: vi.fn(), error: vi.fn() },
+      identityKey: () => 'mock-key',
     };
 
     await middleware.beforeExecute!(plan, ctx);
@@ -92,6 +95,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn, error: vi.fn() },
+      identityKey: () => 'mock-key',
     };
 
     await expect(middleware.beforeExecute!(plan, ctx)).resolves.toBeUndefined();

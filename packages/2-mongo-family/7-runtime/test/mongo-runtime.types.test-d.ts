@@ -24,4 +24,5 @@ test('MongoMiddlewareContext extends RuntimeMiddlewareContext', () => {
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('mode');
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('log');
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('now');
+  expectTypeOf<MongoMiddlewareContext>().toHaveProperty('identityKey');
 });
