@@ -141,6 +141,42 @@ _(none authorized)_
 
 _(none yet)_
 
+## CodeRabbit-iteration decisions
+
+> Decisions made during the post-PR `github-review-iteration` run on 2026-04-27 against PR #380. Only items where reasonable people might disagree with the call are recorded here; trivial accept/reject decisions are visible in the PR thread replies.
+
+### 2026-04-27 — A01: descriptor `MongoContract` cast (CodeRabbit option 2 over option 1)
+
+**What surfaced:** CodeRabbit flagged `mongo-target-descriptor.ts:50-58` where `runnerOptions.destinationContract` is cast to `MongoContract`. It offered two options: (1) re-validate at the descriptor via `family.validateContract(...)` for defense-in-depth, or (2) strengthen the comment to reference the upstream validation site.
+
+**Why this would have been a user-facing decision:** The spec § "Decisions made during shaping" #2 explicitly says "Validation is the family instance's job (`MongoFamilyInstance.schemaVerify` validates before delegating). The runner already has a typed `MongoContract` after R6." Picking option 1 would defy that decision; picking option 2 needs the rationale documented because CodeRabbit explicitly recommended it as the second-best option.
+
+**Decision:** Option 2 (strengthen the comment to reference `migration-apply.ts:132`). Rationale: re-validating at the descriptor doubles validation work the CLI already does at the only public entry point and crosses the "validation is the family instance's job" boundary that the spec deliberately drew. The reviewer's actual concern — implicit cross-layer guarantees — is fully addressed by naming the upstream validators in the comment.
+
+**Reversibility:** If a future reviewer prefers option 1, the change is one extra `family.validateContract(...)` call before the cast. Localized to one function.
+
+### 2026-04-27 — A03 / A05: declined the test-file split refactor
+
+**What surfaced:** CodeRabbit flagged two test files for exceeding the 500-line cap from `.cursor/rules/test-file-organization.mdc`: the new `schema-verify.test.ts` (1089 lines) and the pre-existing `migration-m2-vocabulary.test.ts` (758 lines).
+
+**Why this would have been a user-facing decision:** The 500-line cap is a documented project rule. Declining it on a brand-new 1089-line file is a judgement call about where the project actually draws the line in practice.
+
+**Decision:** Decline the split in this PR. Rationale: (a) the rule is `alwaysApply: false` and many existing files exceed it (e.g. `control-adapter.test.ts` at 1653, `interpreter.test.ts` at 1518, `mongo-planner.test.ts` at 1428 — 20+ files between 800-1653 lines); (b) the PR's internal R1-R4 review process did not flag size; (c) the F2 canonicalization sub-suite alone is ~720 lines so even a clean three-way split would still produce a >500-line file without further refactoring; (d) splitting requires extracting shared helpers to a new `test-utils` module, which is a sizeable refactor orthogonal to TML-2285; (e) for `migration-m2-vocabulary.test.ts` the PR's diff was +13 lines (commit `981f82406`) — the size violation pre-existed.
+
+**Where it lives now:** Recorded as `wont_address` decisions in `wip/reviews/prisma_prisma-next_pr-380/review-actions.json` (A03, A05). Reply text on each thread explains the calibration.
+
+**Reversibility:** Trivial. Both tests are still single files; a follow-up PR can split them once a shared `test-utils` helper module is designed.
+
+### 2026-04-27 — A06b: declined adding a per-hook timeout helper to the integration test
+
+**What surfaced:** CodeRabbit nitpick on `mongo-runner.schema-verify.integration.test.ts:27-46` recommended wrapping the `beforeAll` replSet startup in `timeouts.databaseOperation` (5000ms).
+
+**Why this would have been a user-facing decision:** The project rule `use-timeouts-helper-in-tests.mdc` says always use the timeouts helper, so on its face the suggestion is project-aligned.
+
+**Decision:** Not actionable. Two reasons: (a) `packages/3-mongo-target/2-mongo-adapter/vitest.config.ts` already sets `hookTimeout: timeouts.spinUpMongoMemoryServer` (60000ms) globally for the package, which the `beforeAll` inherits, so a per-hook timeout would be redundant; (b) the constant CodeRabbit suggested (`timeouts.databaseOperation`, 5000ms) is also wrong for replSet startup — the dedicated constant `timeouts.spinUpMongoMemoryServer` (60000ms) exists exactly for this case and is the one already in effect via the vitest config.
+
+**Reversibility:** N/A — no code change made.
+
 ---
 
 ## Decision-entry template
