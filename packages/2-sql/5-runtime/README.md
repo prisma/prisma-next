@@ -68,7 +68,7 @@ const runtime = createRuntime({
   context,
   driver,
   verify: { mode: 'onFirstUse', requireMarker: false },
-  plugins: [budgets()],
+  middleware: [budgets()],
 });
 
 for await (const row of runtime.execute(plan)) {
@@ -119,31 +119,32 @@ for await (const row of runtime.execute(plan)) {
 
 - `lowerSqlPlan` - SQL plan lowering via adapter
 
-### Plugins
+### Middleware
 
-- `budgets` - **AST-first budget plugin** (canonical in SQL domain), inspects `plan.ast` when present for row estimation
-- `lints` - **AST-first lint plugin** (canonical in SQL domain), inspects `plan.ast` when present
-- `BudgetsOptions`, `LintsOptions` - Plugin option types
-- `AfterExecuteResult` - Plugin hook result type (re-exported from `@prisma-next/framework-components/runtime`)
+- `budgets` - **AST-first budget middleware** (canonical in SQL domain), inspects `plan.ast` when present for row estimation
+- `lints` - **AST-first lint middleware** (canonical in SQL domain), inspects `plan.ast` when present
+- `SqlMiddleware`, `SqlMiddlewareContext` - SQL-family middleware interface and per-execution context
+- `BudgetsOptions`, `LintsOptions` - Middleware option types
+- `AfterExecuteResult` - Middleware `afterExecute` hook result type (re-exported from `@prisma-next/framework-components/runtime`)
 - `Log` - Log entry type (re-exported from `@prisma-next/framework-components/runtime`)
 
-#### Lints plugin (SQL domain)
+#### Lints middleware (SQL domain)
 
-The `lints` plugin operates on `plan.ast` when it is a SQL `QueryAst`:
+The `lints` middleware operates on `plan.ast` when it is a SQL `QueryAst`:
 
 - **DELETE without WHERE** — blocks execution (configurable severity)
 - **UPDATE without WHERE** — blocks execution (configurable severity)
 - **Unbounded SELECT** — warns/errors when `limit` is missing
 - **SELECT \* intent** — warns/errors when `selectAllIntent` is present
 
-When `plan.ast` is missing, the plugin falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
+When `plan.ast` is missing, the middleware falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
 
 ```typescript
 import { createRuntime, lints } from '@prisma-next/sql-runtime';
 
 const runtime = createRuntime({
   // ...
-  plugins: [lints({ severities: { noLimit: 'error' } })],
+  middleware: [lints({ severities: { noLimit: 'error' } })],
 });
 ```
 
