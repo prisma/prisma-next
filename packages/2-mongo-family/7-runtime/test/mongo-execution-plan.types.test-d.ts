@@ -49,7 +49,7 @@ test('Plan command field accepts any wire command shape', () => {
     command: new InsertOneWireCommand('users', { name: 'alice' }),
     meta,
   };
-  expectTypeOf(plan.command).toMatchTypeOf<{
+  expectTypeOf(plan.command).toExtend<{
     readonly collection: string;
     readonly kind: string;
   }>();
