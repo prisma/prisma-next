@@ -22,7 +22,7 @@ import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
-import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
+import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
 
 const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack]);
@@ -40,6 +40,50 @@ const profileSchema = {
   expression: '{ name: string; age: number }',
 };
 
+const UserBase = model('User', {
+  fields: {
+    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    email: field.column(varcharColumn(255)).unique({ name: 'user_email_key' }),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
+    updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
+    profile: field.column(jsonb()).optional(),
+  },
+});
+
+const PostBase = model('Post', {
+  fields: {
+    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    userId: field.column(int4Column),
+    title: field.column(textColumn),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
+    updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
+    published: field.column(boolColumn),
+    meta: field.column(json()).optional(),
+  },
+});
+
+const Comment = model('Comment', {
+  fields: {
+    id: field.column(int4Column).defaultSql('autoincrement()').id(),
+    postId: field.column(int4Column),
+    content: field.column(textColumn),
+    createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
+    updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
+  },
+  relations: {
+    post: rel.belongsTo(PostBase, { from: 'postId', to: 'id' }),
+  },
+}).sql({ table: 'comment' });
+
+const Post = PostBase.relations({
+  author: rel.belongsTo(UserBase, { from: 'userId', to: 'id' }),
+  comments: rel.hasMany(() => Comment, { by: 'postId' }),
+}).sql({ table: 'post' });
+
+const User = UserBase.relations({
+  posts: rel.hasMany(() => Post, { by: 'userId' }),
+}).sql({ table: 'user' });
+
 export const contract = defineContract({
   family: sqlFamily,
   target: postgresPack,
@@ -54,37 +98,9 @@ export const contract = defineContract({
     },
   },
   models: {
-    User: model('User', {
-      fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
-        email: field.column(varcharColumn(255)).unique({ name: 'user_email_key' }),
-        createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
-        updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
-        profile: field.column(jsonb()).optional(),
-      },
-    }).sql({ table: 'user' }),
-
-    Post: model('Post', {
-      fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
-        userId: field.column(int4Column),
-        title: field.column(textColumn),
-        createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
-        updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
-        published: field.column(boolColumn),
-        meta: field.column(json()).optional(),
-      },
-    }).sql({ table: 'post' }),
-
-    Comment: model('Comment', {
-      fields: {
-        id: field.column(int4Column).defaultSql('autoincrement()').id(),
-        postId: field.column(int4Column),
-        content: field.column(textColumn),
-        createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
-        updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
-      },
-    }).sql({ table: 'comment' }),
+    User,
+    Post,
+    Comment,
 
     ParamTypes: model('ParamTypes', {
       fields: {

@@ -4,6 +4,7 @@ import {
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
+  errorMigrationTargetMismatch,
   errorUnfilledPlaceholder,
   placeholder,
 } from '../src/migration';
@@ -109,5 +110,25 @@ describe('Migration Errors', () => {
     expect(error.why).toContain('sha256:bbb');
     expect(error.fix).toContain('createExecutionContext');
     expect(error.toEnvelope().code).toBe('PN-MIG-2005');
+  });
+
+  it('errorMigrationTargetMismatch names both target ids', () => {
+    const error = errorMigrationTargetMismatch({
+      migrationTargetId: 'postgres',
+      configTargetId: 'mongo',
+    });
+    expect(error).toMatchObject({
+      code: '2006',
+      domain: 'MIG',
+      message: 'Migration target does not match config target',
+      meta: {
+        migrationTargetId: 'postgres',
+        configTargetId: 'mongo',
+      },
+    });
+    expect(error.why).toContain('"postgres"');
+    expect(error.why).toContain('"mongo"');
+    expect(error.fix).toContain('--config');
+    expect(error.toEnvelope().code).toBe('PN-MIG-2006');
   });
 });

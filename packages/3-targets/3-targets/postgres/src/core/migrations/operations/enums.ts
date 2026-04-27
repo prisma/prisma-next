@@ -1,4 +1,4 @@
-import { escapeLiteral, qualifyName, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { escapeLiteral, qualifyName, quoteIdentifier } from '../../sql-utils';
 import { type Op, step, targetDetails } from './shared';
 
 function enumTypeExistsCheck(schemaName: string, nativeType: string, exists = true): string {

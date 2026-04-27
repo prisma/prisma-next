@@ -1,14 +1,7 @@
-import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { promisify } from 'node:util';
-import { join, resolve } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { Migration } from '../src/migration-base';
-
-const execFileAsync = promisify(execFile);
-const packageRoot = resolve(import.meta.dirname, '..');
-const repoRoot = resolve(packageRoot, '../../../..');
+import type { ControlStack } from '@prisma-next/framework-components/control';
+import { describe, expect, it } from 'vitest';
+import { buildMigrationArtifacts, Migration } from '../src/migration-base';
+import type { MigrationManifest } from '../src/types';
 
 describe('Migration', () => {
   describe('operations + describe() contract', () => {
@@ -53,69 +46,104 @@ describe('Migration', () => {
       expect(m.origin).toEqual({ storageHash: 'hashFrom' });
       expect(m.destination).toEqual({ storageHash: 'hashTo' });
     });
+
+    it('returns a null origin when from is empty (origin-less plan)', () => {
+      class InitialMigration extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: '', to: 'sha256:to' };
+        }
+      }
+
+      expect(new InitialMigration().origin).toBeNull();
+    });
+  });
+
+  describe('constructor accepts and stores a ControlStack', () => {
+    /**
+     * The constructor injection contract is that a subclass (e.g.
+     * `PostgresMigration`) can read `this.stack` to materialize whatever it
+     * needs (typically a control adapter). The base class itself stores the
+     * argument verbatim; this test exercises that storage directly via a
+     * subclass that exposes the protected field, independent of any concrete
+     * target's stack-consumption logic.
+     */
+    it('stores the injected stack on the protected `stack` field', () => {
+      const stub = { sentinel: true } as unknown as ControlStack<'sql', 'test'>;
+
+      class StackProbe extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: 'a', to: 'b' };
+        }
+        public readStack(): unknown {
+          return this.stack;
+        }
+      }
+
+      expect(new StackProbe(stub).readStack()).toBe(stub);
+    });
+
+    it('leaves `stack` undefined when constructed without an argument', () => {
+      class StackProbe extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: 'a', to: 'b' };
+        }
+        public readStack(): unknown {
+          return this.stack;
+        }
+      }
+
+      expect(new StackProbe().readStack()).toBeUndefined();
+    });
   });
 });
 
-describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
-  let tmpDir: string;
-
-  beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'migration-run-'));
-  });
-
-  afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
-  });
-
-  const migrationBasePath = join(packageRoot, 'src/migration-base.ts').replace(/\\/g, '/');
-
-  function migrationScript(opsReturn: string, meta = '{ from: "abc", to: "def" }'): string {
-    return [
-      `import { Migration } from '${migrationBasePath}';`,
-      '',
-      'class M extends Migration {',
-      "  readonly targetId = 'test';",
-      '  get operations() {',
-      `    return ${opsReturn};`,
-      '  }',
-      '  describe() {',
-      `    return ${meta};`,
-      '  }',
-      '}',
-      'export default M;',
-      '',
-      'Migration.run(import.meta.url, M);',
-    ].join('\n');
-  }
-
-  async function runMigration(
-    filename: string,
-    args: string[] = [],
-  ): Promise<{ stdout: string; stderr: string; exitCode: number }> {
-    const filePath = join(tmpDir, filename);
-    const tsxPath = join(repoRoot, 'node_modules/.bin/tsx');
-    try {
-      const result = await execFileAsync(tsxPath, [filePath, ...args], { cwd: tmpDir });
-      return { stdout: result.stdout, stderr: result.stderr, exitCode: 0 };
-    } catch (error) {
-      const e = error as { stdout: string; stderr: string; code: number };
-      return { stdout: e.stdout || '', stderr: e.stderr || '', exitCode: e.code || 1 };
+/**
+ * Direct unit tests for `buildMigrationArtifacts` — the pure
+ * `Migration` → in-memory artifact conversion. File I/O (reading
+ * existing `migration.json`, writing the rendered artifacts to disk,
+ * dry-run stdout output) lives in `@prisma-next/cli` and is exercised
+ * there.
+ */
+describe('buildMigrationArtifacts', () => {
+  function makeMigration(
+    operations: unknown,
+    meta: { readonly from: string; readonly to: string; readonly labels?: readonly string[] } = {
+      from: 'abc',
+      to: 'def',
+    },
+  ): Migration {
+    class M extends Migration {
+      readonly targetId = 'test';
+      override get operations() {
+        return operations as never;
+      }
+      override describe() {
+        return meta;
+      }
     }
+    return new M();
   }
 
-  it('writes ops.json and migration.json when run as entrypoint', async () => {
-    const script = migrationScript('[{ id: "op1", label: "Test op" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
+  it('produces ops.json + migration.json strings with synthesized manifest fields', () => {
+    const { opsJson, manifest, manifestJson } = buildMigrationArtifacts(
+      makeMigration([{ id: 'op1', label: 'Test op' }]),
+      null,
+    );
 
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('ops.json + migration.json');
+    expect(JSON.parse(opsJson)).toEqual([{ id: 'op1', label: 'Test op' }]);
 
-    const opsJson = await readFile(join(tmpDir, 'ops.json'), 'utf-8');
-    const ops = JSON.parse(opsJson);
-    expect(ops).toEqual([{ id: 'op1', label: 'Test op' }]);
-
-    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.from).toBe('abc');
     expect(manifest.to).toBe('def');
     expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
@@ -124,42 +152,35 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(manifest.fromContract).toBeNull();
     expect(manifest.toContract).toEqual({ storage: { storageHash: 'def' } });
-    expect(manifest.hints).toMatchObject({
-      used: [],
-      applied: [],
-      planningStrategy: 'class-based',
-    });
+    expect(manifest.hints).toMatchObject({ used: [], applied: [] });
+
+    expect(JSON.parse(manifestJson)).toEqual(manifest);
   });
 
-  it('preserves contract bookends and hints from an existing manifest when re-emitting', async () => {
-    const existingManifest = {
+  it('preserves contract bookends, hints, labels, and createdAt from an existing manifest', () => {
+    const existingManifest: Partial<MigrationManifest> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      migrationId: null,
       kind: 'regular',
-      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
-      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
+      fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' } as never,
+      toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' } as never,
       hints: {
         used: ['idx_a'],
         applied: ['additive_only'],
         plannerVersion: '2.0.0',
-        planningStrategy: 'descriptors',
-      },
+      } as never,
       labels: ['scaffolded'],
       createdAt: '2026-01-15T10:00:00.000Z',
     };
-    await writeFile(join(tmpDir, 'migration.json'), JSON.stringify(existingManifest, null, 2));
 
-    const script = migrationScript(
-      '[{ id: "op1", label: "Edited op", operationClass: "additive" }]',
-      '{ from: "sha256:from", to: "sha256:to" }',
+    const { manifest } = buildMigrationArtifacts(
+      makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
+        from: 'sha256:from',
+        to: 'sha256:to',
+      }),
+      existingManifest,
     );
-    await writeFile(join(tmpDir, 'migration.ts'), script);
 
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).toBe(0);
-
-    const manifest = JSON.parse(await readFile(join(tmpDir, 'migration.json'), 'utf-8'));
     expect(manifest.fromContract).toEqual(existingManifest.fromContract);
     expect(manifest.toContract).toEqual(existingManifest.toContract);
     expect(manifest.hints).toEqual(existingManifest.hints);
@@ -168,88 +189,48 @@ describe('Migration.run() subprocess', { timeout: 15_000 }, () => {
     expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it('prints operations with --dry-run and does not write ops.json', async () => {
-    const script = migrationScript('[{ id: "op1", label: "Dry run op" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
+  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting an older manifest', () => {
+    const existingManifest: Partial<MigrationManifest> = {
+      from: 'sha256:from',
+      to: 'sha256:to',
+      kind: 'regular',
+      fromContract: { storage: { storageHash: 'sha256:from' } } as never,
+      toContract: { storage: { storageHash: 'sha256:to' } } as never,
+      hints: {
+        used: ['idx_a'],
+        applied: ['additive_only'],
+        plannerVersion: '2.0.0',
+        planningStrategy: 'legacy-strategy',
+      } as never,
+      labels: [],
+      createdAt: '2026-01-15T10:00:00.000Z',
+    };
 
-    const result = await runMigration('migration.ts', ['--dry-run']);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('op1');
-    expect(result.stdout).toContain('Dry run op');
-
-    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
-    expect(opsExists).toBeNull();
-  });
-
-  it('prints usage with --help', async () => {
-    const script = migrationScript('[]');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts', ['--help']);
-    expect(result.exitCode).toBe(0);
-    expect(result.stdout).toContain('--dry-run');
-    expect(result.stdout).toContain('--help');
-  });
-
-  it('is a no-op when the file is imported', async () => {
-    const migrationFile = migrationScript('[{ id: "op1" }]');
-    await writeFile(join(tmpDir, 'migration.ts'), migrationFile);
-
-    const importerScript = [
-      `import M from '${join(tmpDir, 'migration.ts').replace(/\\/g, '/')}';`,
-      'const m = new M();',
-      'const ops = m.operations;',
-      'console.log(JSON.stringify(ops));',
-    ].join('\n');
-    await writeFile(join(tmpDir, 'importer.ts'), importerScript);
-
-    const result = await runMigration('importer.ts');
-    expect(result.exitCode).toBe(0);
-
-    const opsExists = await readFile(join(tmpDir, 'ops.json'), 'utf-8').catch(() => null);
-    expect(opsExists).toBeNull();
-
-    const importedOps = JSON.parse(result.stdout.trim());
-    expect(importedOps).toEqual([{ id: 'op1' }]);
-  });
-
-  it('exits with error when operations is not an array', async () => {
-    const script = migrationScript('"not an array"');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stderr).toContain('operations');
-  });
-
-  it('rejects invalid describe() return with clear error', async () => {
-    const script = migrationScript('[{ id: "op1" }]', '{ bad: true }');
-    await writeFile(join(tmpDir, 'migration.ts'), script);
-
-    const result = await runMigration('migration.ts');
-    expect(result.exitCode).not.toBe(0);
-    expect(result.stderr).toContain('describe()');
-    expect(result.stderr).toContain('invalid');
-  });
-
-  it('includes migration.json content in --dry-run output', async () => {
-    const script = migrationScript(
-      '[{ id: "op1" }]',
-      '{ from: "abc", to: "def", labels: ["test"] }',
+    const { manifest } = buildMigrationArtifacts(
+      makeMigration([{ id: 'op1', label: 'Op', operationClass: 'additive' }], {
+        from: 'sha256:from',
+        to: 'sha256:to',
+      }),
+      existingManifest,
     );
-    await writeFile(join(tmpDir, 'migration.ts'), script);
 
-    const result = await runMigration('migration.ts', ['--dry-run']);
-    expect(result.exitCode).toBe(0);
+    expect(manifest.hints).toEqual({
+      used: ['idx_a'],
+      applied: ['additive_only'],
+      plannerVersion: '2.0.0',
+    });
+    expect(manifest.hints).not.toHaveProperty('planningStrategy');
+  });
 
-    const output = result.stdout;
-    expect(output).toContain('"from"');
-    expect(output).toContain('"to"');
-    expect(output).toContain('"op1"');
-
-    const manifestExists = await readFile(join(tmpDir, 'migration.json'), 'utf-8').catch(
-      () => null,
+  it('throws when operations is not an array', () => {
+    expect(() => buildMigrationArtifacts(makeMigration('not an array'), null)).toThrow(
+      /operations/,
     );
-    expect(manifestExists).toBeNull();
+  });
+
+  it('throws a clear error when describe() returns invalid metadata', () => {
+    expect(() =>
+      buildMigrationArtifacts(makeMigration([{ id: 'op1' }], { bad: true } as never), null),
+    ).toThrow(/describe\(\).*invalid/);
   });
 });

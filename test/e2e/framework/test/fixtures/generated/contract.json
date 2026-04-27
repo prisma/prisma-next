@@ -51,7 +51,20 @@
           }
         }
       },
-      "relations": {},
+      "relations": {
+        "post": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "postId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "Post"
+        }
+      },
       "storage": {
         "fields": {
           "content": {
@@ -467,7 +480,32 @@
           }
         }
       },
-      "relations": {},
+      "relations": {
+        "author": {
+          "cardinality": "N:1",
+          "on": {
+            "localFields": [
+              "userId"
+            ],
+            "targetFields": [
+              "id"
+            ]
+          },
+          "to": "User"
+        },
+        "comments": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "postId"
+            ]
+          },
+          "to": "Comment"
+        }
+      },
       "storage": {
         "fields": {
           "createdAt": {
@@ -536,7 +574,20 @@
           }
         }
       },
-      "relations": {},
+      "relations": {
+        "posts": {
+          "cardinality": "1:N",
+          "on": {
+            "localFields": [
+              "id"
+            ],
+            "targetFields": [
+              "userId"
+            ]
+          },
+          "to": "Post"
+        }
+      },
       "storage": {
         "fields": {
           "createdAt": {

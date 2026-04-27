@@ -4,12 +4,7 @@ import { hasMigrations } from '@prisma-next/framework-components/control';
 import type { PathDecision } from '@prisma-next/migration-tools/dag';
 import { reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type {
-  AttestedMigrationBundle,
-  DraftMigrationBundle,
-  MigrationGraph,
-} from '@prisma-next/migration-tools/types';
-import { isAttested, isDraft } from '@prisma-next/migration-tools/types';
+import type { MigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -150,32 +145,33 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
 }
 
 /**
- * Reads the migrations directory, filters to attested bundles, and builds
- * the migration graph. Throws on I/O or graph errors — callers handle
- * error mapping.
+ * Reads the migrations directory and builds the migration graph from all
+ * bundles. Throws on I/O or graph errors — callers handle error mapping.
+ *
+ * Every on-disk bundle is content-addressed (`migrationId` is always a
+ * string); there is no draft state to filter out.
  */
 export async function loadMigrationBundles(migrationsDir: string): Promise<{
-  bundles: readonly AttestedMigrationBundle[];
+  bundles: readonly MigrationBundle[];
   graph: MigrationGraph;
 }> {
-  const allBundles = await readMigrationsDir(migrationsDir);
-  const bundles = allBundles.filter(isAttested);
+  const bundles = await readMigrationsDir(migrationsDir);
   const graph = reconstructGraph(bundles);
   return { bundles, graph };
 }
 
 export interface MigrationBundleSet {
-  readonly attested: readonly AttestedMigrationBundle[];
-  readonly drafts: readonly DraftMigrationBundle[];
+  readonly bundles: readonly MigrationBundle[];
   readonly graph: MigrationGraph;
 }
 
+/**
+ * Alias of `loadMigrationBundles` retained for naming-clarity in commands
+ * that previously needed both attested and draft splits. With the
+ * collapse of the draft state, both helpers do the same thing.
+ */
 export async function loadAllBundles(migrationsDir: string): Promise<MigrationBundleSet> {
-  const all = await readMigrationsDir(migrationsDir);
-  const attested = all.filter(isAttested);
-  const drafts = all.filter(isDraft);
-  const graph = reconstructGraph(attested);
-  return { attested, drafts, graph };
+  return loadMigrationBundles(migrationsDir);
 }
 
 /**

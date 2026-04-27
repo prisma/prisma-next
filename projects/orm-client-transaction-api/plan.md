@@ -33,10 +33,10 @@ Wire `tx.orm` so ORM collections inside the transaction use the transaction's co
 
 **Tasks:**
 
-- [ ] **2.1** Add `tx.orm` to `TransactionContext`. Create an ORM client (`orm()`) bound to the transaction's `RuntimeQueryable`. The key: the `RuntimeQueryable` passed to `orm()` must route `execute()` through the transaction scope and must NOT expose `connection()` or `transaction()` — when `withMutationScope` checks `typeof runtime.transaction === 'function'`, it must get `false` (or the method must be absent) so it uses the scope directly rather than starting a nested transaction.
-- [ ] **2.2** Verify that `withMutationScope` in `mutation-executor.ts` correctly falls through to `acquireRuntimeScope` when the runtime has no `transaction` method — and that `acquireRuntimeScope` returns the transaction-scoped execute. Read the code paths and add a targeted unit test confirming nested creates within a transaction reuse the transaction scope.
-- [ ] **2.3** Integration test: ORM `.create()` with nested relation mutations inside `db.transaction()` — verify all rows are created atomically and a throw rolls back everything including nested creates.
-- [ ] **2.4** Integration test: ORM reads inside `transaction` see writes made earlier in the same transaction (read-your-own-writes within tx).
+- [x] **2.1** Add `tx.orm` to `TransactionContext`. Create an ORM client (`orm()`) bound to the transaction's `RuntimeQueryable`. The key: the `RuntimeQueryable` passed to `orm()` must route `execute()` through the transaction scope and must NOT expose `connection()` or `transaction()` — when `withMutationScope` checks `typeof runtime.transaction === 'function'`, it must get `false` (or the method must be absent) so it uses the scope directly rather than starting a nested transaction.
+- [x] **2.2** Verify that `withMutationScope` in `mutation-executor.ts` correctly falls through to `acquireRuntimeScope` when the runtime has no `transaction` method — and that `acquireRuntimeScope` returns the transaction-scoped execute. Read the code paths and add a targeted unit test confirming nested creates within a transaction reuse the transaction scope.
+- [x] **2.3** Integration test: ORM `.create()` with nested relation mutations inside `db.transaction()` — verify all rows are created atomically and a throw rolls back everything including nested creates.
+- [x] **2.4** Integration test: ORM reads inside `transaction` see writes made earlier in the same transaction (read-your-own-writes within tx).
 
 ### Milestone 3: Type safety and edge cases
 

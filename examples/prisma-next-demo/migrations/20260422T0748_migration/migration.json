@@ -1,8 +1,9 @@
 {
   "from": "sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69",
   "to": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
-  "migrationId": "sha256:c14df5e0d70bb63f2640f0eea1e10e4ddf060bb450f1d095a10707d656ba8dd7",
   "kind": "regular",
+  "labels": [],
+  "createdAt": "2026-04-22T07:48:11.647Z",
   "fromContract": {
     "schemaVersion": "1",
     "targetFamily": "sql",
@@ -1418,9 +1419,7 @@
   "hints": {
     "used": [],
     "applied": [],
-    "plannerVersion": "2.0.0",
-    "planningStrategy": "class-based"
+    "plannerVersion": "2.0.0"
   },
-  "labels": [],
-  "createdAt": "2026-04-22T07:48:11.647Z"
+  "migrationId": "sha256:c14df5e0d70bb63f2640f0eea1e10e4ddf060bb450f1d095a10707d656ba8dd7"
 }

@@ -48,7 +48,6 @@
     "./control": "./dist/control.mjs",
     "./control-adapter": "./dist/control-adapter.mjs",
     "./migration": "./dist/migration.mjs",
-    "./operation-descriptors": "./dist/operation-descriptors.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",

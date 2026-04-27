@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { attestMigration } from '@prisma-next/migration-tools/attestation';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -14,7 +14,7 @@ import {
 } from '@prisma-next/migration-tools/io';
 import { readRefs, resolveRef, writeRefs } from '@prisma-next/migration-tools/refs';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -53,10 +53,9 @@ async function writeAttestedMigration(
 ): Promise<{ dirName: string; migrationId: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
   const packageDir = join(migrationsDir, dirName);
-  const manifest: MigrationManifest = {
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: opts.from,
     to: opts.to,
-    migrationId: null,
     kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
@@ -64,13 +63,13 @@ async function writeAttestedMigration(
       used: [],
       applied: ['additive_only'],
       plannerVersion: '1.0.0',
-      planningStrategy: 'additive',
     },
     labels: [],
     createdAt: opts.timestamp.toISOString(),
   };
+  const migrationId = computeMigrationId(baseManifest, opts.ops);
+  const manifest: MigrationManifest = { ...baseManifest, migrationId };
   await writeMigrationPackage(packageDir, manifest, opts.ops);
-  const migrationId = await attestMigration(packageDir);
   return { dirName, migrationId };
 }
 
@@ -161,7 +160,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     expect(productionHash).toBe(HASH_B);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
+    const attested = packages;
     const graph = reconstructGraph(attested);
 
     const pathToStaging = findPath(graph, EMPTY_CONTRACT_HASH, stagingHash);
@@ -256,7 +255,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     const refHash = resolveRef(refs, 'production');
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
+    const attested = packages;
     const graph = reconstructGraph(attested);
 
     const markerHash = HASH_B;
@@ -345,7 +344,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
+    const attested = packages;
     const graph = reconstructGraph(attested);
 
     const refsPath = join(migrationsDir, 'refs.json');
@@ -424,7 +423,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
 
     const refs = await readRefs(refsPath);
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
+    const attested = packages;
     const graph = reconstructGraph(attested);
 
     const stagingPath = findPath(graph, EMPTY_CONTRACT_HASH, resolveRef(refs, 'staging'));

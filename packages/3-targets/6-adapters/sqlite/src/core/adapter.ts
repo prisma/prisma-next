@@ -72,7 +72,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     return [];
   }
 
-  lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>) {
+  lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
     const collectedParamRefs = ast.collectParamRefs();
     const params: unknown[] = [];
     for (const ref of collectedParamRefs) {
@@ -99,10 +99,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
         throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
     }
 
-    return Object.freeze({
-      profileId: this.profile.id,
-      body: Object.freeze({ sql, params }),
-    });
+    return Object.freeze({ sql, params });
   }
 }
 

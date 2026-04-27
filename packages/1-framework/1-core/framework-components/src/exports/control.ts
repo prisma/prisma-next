@@ -32,7 +32,6 @@ export type {
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
-  OperationDescriptor,
   OpFactoryCall,
   SerializedQueryPlan,
   TargetMigrationsCapability,

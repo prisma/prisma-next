@@ -251,7 +251,7 @@ describe('sql-target-family-hook', () => {
         types: {
           codecTypes: {
             import: {
-              package: '@prisma-next/adapter-postgres/codec-types',
+              package: '@prisma-next/target-postgres/codec-types',
               named: 'CodecTypes',
               alias: 'PgTypes',
             },
@@ -292,7 +292,7 @@ describe('sql-target-family-hook', () => {
     const operationTypeImports = extractOperationTypeImports(descriptors);
     expect(codecTypeImports).toEqual([
       {
-        package: '@prisma-next/adapter-postgres/codec-types',
+        package: '@prisma-next/target-postgres/codec-types',
         named: 'CodecTypes',
         alias: 'PgTypes',
       },

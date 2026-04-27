@@ -359,6 +359,28 @@ export function errorTargetMigrationNotSupported(options?: {
 }
 
 /**
+ * The migration-file CLI received `--config` without a path argument (either
+ * a bare trailing `--config`, or `--config` followed by another flag like
+ * `--config --dry-run`). Surfacing this as a structured error fails fast
+ * rather than silently consuming the next flag as the config path or
+ * falling back to default discovery against the wrong project.
+ */
+export function errorMigrationCliInvalidConfigArg(options?: {
+  readonly nextToken?: string;
+}): CliStructuredError {
+  const why =
+    options?.nextToken !== undefined
+      ? `\`--config\` was followed by another flag (\`${options.nextToken}\`) instead of a path argument.`
+      : '`--config` was passed without a following path argument.';
+  return new CliStructuredError('4012', '--config flag requires a path argument', {
+    domain: 'CLI',
+    why,
+    fix: 'Pass a config path: `--config <path>` or `--config=<path>`.',
+    meta: options?.nextToken !== undefined ? { nextToken: options.nextToken } : {},
+  });
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(

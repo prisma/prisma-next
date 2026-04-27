@@ -3,7 +3,7 @@
  *
  * Drives a contract change that retypes an existing column from
  * `text` to `int4`. That transition is unsafe (not in
- * `SAFE_WIDENINGS`), so the Postgres class-flow planner's
+ * `SAFE_WIDENINGS`), so the Postgres planner's
  * `typeChangeCallStrategy` matches it and emits
  * `DataTransformCall(placeholder slots) → alterColumnType`. The
  * planner-emitted `migration.ts` therefore has two `placeholder("…")`
@@ -13,7 +13,7 @@
  * `migration apply` and asserts the post-apply column has switched
  * to `int4` with the expected integer values.
  *
- * Phase 2 acceptance: covers `migrationPlanCallStrategies` end-to-end
+ * Phase 2 acceptance: covers `postgresPlannerStrategies` (data-safe path) end-to-end
  * for the unsafe type-change case (plan.md AC R2.2 #2).
  */
 
@@ -27,6 +27,7 @@ import {
   runMigrationApply,
   runMigrationEmit,
   runMigrationPlan,
+  runMigrationPlanAndEmit,
   setupJourney,
   sql,
   swapContract,
@@ -58,7 +59,7 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-typechange-text');
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, `emit base: ${emit0.stderr}`).toBe(0);
-        const plan0 = await runMigrationPlan(ctx, ['--name', 'initial']);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, `plan initial: ${plan0.stderr}`).toBe(0);
         const apply0 = await runMigrationApply(ctx);
         expect(apply0.exitCode, `apply initial: ${apply0.stderr}`).toBe(0);
@@ -92,7 +93,13 @@ withTempDir(({ createTempDir }) => {
         const manifestBefore = JSON.parse(
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
-        expect(manifestBefore.migrationId).toBeNull();
+        // The package is fully attested even when the planner could not
+        // lower any calls because of placeholders: `ops.json` is `[]` and
+        // `migrationId` is the content-address over `(manifest, [])`.
+        // The author re-emits after filling in placeholders to rewrite
+        // both `ops.json` and `migrationId`.
+        expect(manifestBefore.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
         const dbSetupBlock = [
           `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,

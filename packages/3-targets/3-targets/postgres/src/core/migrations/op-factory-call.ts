@@ -1,5 +1,5 @@
 /**
- * Postgres class-flow IR: one concrete `*Call` class per pure factory under
+ * Postgres migration IR: one concrete `*Call` class per pure factory under
  * `operations/`, plus a shared `PostgresOpFactoryCallNode` abstract base.
  *
  * Every call class carries the literal arguments its backing factory would
@@ -676,7 +676,7 @@ export class RenameTypeCall extends PostgresOpFactoryCallNode {
  * Wraps an already-materialized `SqlMigrationPlanOperation` — typically one
  * produced by a SQL-family method, a codec control hook, or a component
  * `databaseDependencies.init` declaration — so the planner can carry it
- * alongside class-flow IR nodes without reverse-engineering it into a
+ * alongside IR nodes without reverse-engineering it into a
  * structured call class. Doubles as the user-facing escape hatch for raw
  * migrations: authors can pass a full op shape to `rawSql({...})`.
  *
@@ -793,7 +793,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     return [
-      `dataTransform(endContract, ${jsonToTsSource(this.label)}, {`,
+      `this.dataTransform(endContract, ${jsonToTsSource(this.label)}, {`,
       `  check: () => placeholder(${jsonToTsSource(this.checkSlot)}),`,
       `  run: () => placeholder(${jsonToTsSource(this.runSlot)}),`,
       '})',
@@ -802,10 +802,6 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
-      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
-      // `placeholder` is re-exported from `@prisma-next/target-postgres/migration`
-      // so the user's migration.ts only depends on a single migration-authoring
-      // entrypoint.
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
       {
         moduleSpecifier: './end-contract.json',

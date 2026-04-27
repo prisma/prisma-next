@@ -69,8 +69,8 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract });
-    expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
-    expect(lowered.body.sql).toContain('AS "distance"');
+    expect(lowered.sql).toContain('"user"."vector" <=> $1::vector');
+    expect(lowered.sql).toContain('AS "distance"');
   });
 
   it('lowers function operations with multiple arguments', () => {
@@ -94,7 +94,7 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract });
-    expect(lowered.body.sql).toContain(
+    expect(lowered.sql).toContain(
       'cosine_similarity("user"."vector", "user"."otherVector", $1::vector, 42)',
     );
   });
@@ -112,8 +112,8 @@ describe('Operation lowering', () => {
 
     const lowered = adapter.lower(ast, { contract });
 
-    expect(lowered.body.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
-    expect(lowered.body.sql).toContain('ORDER BY "user"."vector" <=> $3::vector ASC');
+    expect(lowered.sql).toContain('WHERE ("user"."vector" <=> $1::vector) = $2');
+    expect(lowered.sql).toContain('ORDER BY "user"."vector" <=> $3::vector ASC');
   });
 
   it('lowers operations with literal arguments', () => {
@@ -133,6 +133,51 @@ describe('Operation lowering', () => {
     ]);
 
     const lowered = adapter.lower(ast, { contract, params: [] });
-    expect(lowered.body.sql).toContain(`contains("user"."email", 'test''value')`);
+    expect(lowered.sql).toContain(`contains("user"."email", 'test''value')`);
+  });
+
+  it('does not re-substitute tokens that appear inside an already-rendered argument', () => {
+    // Regression: the previous implementation called `String.prototype.replace`
+    // for `{{self}}` first and then for each `{{argN}}` against the running
+    // result, so a literal containing `{{arg1}}` rendered into the SQL got
+    // corrupted on the second pass. The single-pass callback must preserve it.
+    const operationExpr = new OperationExpr({
+      method: 'echo',
+      self: LiteralExpr.of('{{arg1}}'),
+      args: [LiteralExpr.of('replacement')],
+      returns: { codecId: 'pg/text@1', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'echo({{self}}, {{arg0}})',
+      },
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('echoed', operationExpr),
+    ]);
+
+    const lowered = adapter.lower(ast, { contract, params: [] });
+    expect(lowered.sql).toContain(`echo('{{arg1}}', 'replacement')`);
+  });
+
+  it('throws when the lowering template references an argument that the descriptor does not provide', () => {
+    const operationExpr = new OperationExpr({
+      method: 'partial',
+      self: ColumnRef.of('user', 'email'),
+      args: [LiteralExpr.of('only-arg-0')],
+      returns: { codecId: 'core/bool', nullable: false },
+      lowering: {
+        targetFamily: 'sql',
+        strategy: 'function',
+        template: 'partial({{self}}, {{arg0}}, {{arg1}})',
+      },
+    });
+    const ast = SelectAst.from(TableSource.named('user')).withProjection([
+      ProjectionItem.of('result', operationExpr),
+    ]);
+
+    expect(() => adapter.lower(ast, { contract, params: [] })).toThrow(
+      /Operation lowering template for "partial" referenced missing argument \{\{arg1\}\}; template has 1 arg\(s\)/,
+    );
   });
 });

@@ -1,9 +1,6 @@
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
-import {
-  formatMigrationApplyCommandOutput,
-  formatMigrationEmitCommandOutput,
-} from '../src/utils/formatters/migrations';
+import { formatMigrationApplyCommandOutput } from '../src/utils/formatters/migrations';
 import { parseGlobalFlags } from '../src/utils/global-flags';
 
 describe('formatMigrationApplyCommandOutput', () => {
@@ -58,21 +55,5 @@ describe('formatMigrationApplyCommandOutput', () => {
     );
 
     expect(stripAnsi(output)).toContain('Total time: 42ms');
-  });
-});
-
-describe('formatMigrationEmitCommandOutput', () => {
-  it('formats emit success output', () => {
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const output = formatMigrationEmitCommandOutput({ migrationId: 'sha256:edge' }, flags);
-
-    const stripped = stripAnsi(output);
-    expect(stripped).toContain('Emitted ops.json and attested migration');
-    expect(stripped).toContain('migrationId: sha256:edge');
-  });
-
-  it('returns empty output in quiet mode', () => {
-    const flags = parseGlobalFlags({ quiet: true, 'no-color': true });
-    expect(formatMigrationEmitCommandOutput({ migrationId: 'sha256:edge' }, flags)).toBe('');
   });
 });

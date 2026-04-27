@@ -136,10 +136,6 @@ export interface MigrationApplyCommandOutputResult {
   };
 }
 
-export interface MigrationEmitCommandOutputResult {
-  readonly migrationId: string;
-}
-
 export function formatMigrationApplyCommandOutput(
   result: MigrationApplyCommandOutputResult,
   flags: GlobalFlags,
@@ -182,31 +178,12 @@ export function formatMigrationApplyCommandOutput(
   return lines.join('\n');
 }
 
-export function formatMigrationEmitCommandOutput(
-  result: MigrationEmitCommandOutputResult,
-  flags: GlobalFlags,
-): string {
-  if (flags.quiet) {
-    return '';
-  }
-
-  const lines: string[] = [];
-  const useColor = flags.color !== false;
-  const formatGreen = createColorFormatter(useColor, green);
-  const formatDimText = (text: string) => formatDim(useColor, text);
-
-  lines.push(`${formatGreen('✔')} Emitted ops.json and attested migration`);
-  lines.push(formatDimText(`  migrationId: ${result.migrationId}`));
-
-  return lines.join('\n');
-}
-
 interface MigrationShowResult {
   readonly dirName: string;
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string | null;
+  readonly migrationId: string;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -234,11 +211,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   lines.push(`${formatDimText(`  kind: ${result.kind}`)}`);
   lines.push(`${formatDimText(`  from: ${result.from}`)}`);
   lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
-  if (result.migrationId) {
-    lines.push(`${formatDimText(`  migrationId: ${result.migrationId}`)}`);
-  } else {
-    lines.push(`${formatYellow('  migrationId: (draft — not yet attested)')}`);
-  }
+  lines.push(`${formatDimText(`  migrationId: ${result.migrationId}`)}`);
   lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);
 
   lines.push('');

@@ -4,31 +4,40 @@
  * Covers the gap that no Postgres-shaped journey test exercises for MongoDB:
  *
  *  1. `migration plan --target mongo` from the empty contract baseline:
- *     scaffolds a class-flow `migration.ts`, copies `end-contract.json` /
+ *     scaffolds a `migration.ts`, copies `end-contract.json` /
  *     `end-contract.d.ts` next to it, and emits attested `ops.json` with the
- *     expected `createIndex` operation(s). Asserts that `migration plan`
- *     invokes the inline emit step on Mongo (i.e. the rendered
- *     `migration.ts` is round-trip executable: it gets imported by
- *     `mongoEmit`, instantiated, and its `operations` getter is read).
+ *     expected `createIndex` operation(s). Asserts the rendered
+ *     `migration.ts` is round-trip executable: running it via `tsx`
+ *     instantiates the migration class, reads its `operations` getter, and
+ *     self-emits `ops.json` + attested `migration.json`.
  *
  *  2. `migration new --target mongo` after a contract change: scaffolds an
  *     empty `Migration` subclass stub for hand-authoring (with the contract
  *     bookends populated in `describe()`) and copies the contract artifacts
  *     into the migration directory.
  *
- *  3. End-to-end class-flow with a real MongoDB instance via
+ *  3. End-to-end with a real MongoDB instance via
  *     `MongoMemoryReplSet`: plan + apply the initial DDL, seed data,
  *     hand-author a `dataTransform` + additive `createIndex` migration,
- *     emit it, apply it, and verify both the structural change and the
- *     data transformation took effect against the live database.
+ *     self-emit it by running `node migration.ts`, apply it, and verify both
+ *     the structural change and the data transformation took effect against
+ *     the live database.
  */
 
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
+import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
-import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { timeouts } from '@prisma-next/test-utils';
@@ -41,6 +50,9 @@ import {
   getExitCode,
   setupCommandMocks,
 } from '../utils/cli-test-helpers';
+
+const execFileAsync = promisify(execFile);
+const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
 
 interface JourneyCtx {
   testDir: string;
@@ -127,7 +139,26 @@ async function migrationNew(ctx: JourneyCtx, args: readonly string[] = []): Prom
 }
 
 async function migrationEmit(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
-  return runCli(createMigrationEmitCommand(), ctx.testDir, ['--config', ctx.configPath, ...args]);
+  const rest = [...args];
+  const dirIdx = rest.indexOf('--dir');
+  if (dirIdx < 0 || dirIdx === rest.length - 1) {
+    throw new Error('migrationEmit requires --dir <migration-dir>');
+  }
+  const dirArg = rest[dirIdx + 1]!;
+  rest.splice(dirIdx, 2);
+
+  const migrationTs = isAbsolute(dirArg)
+    ? join(dirArg, 'migration.ts')
+    : join(ctx.testDir, dirArg, 'migration.ts');
+  try {
+    const { stdout, stderr } = await execFileAsync(TSX_BIN, [migrationTs, ...rest], {
+      cwd: ctx.testDir,
+    });
+    return { exitCode: 0, stdout, stderr };
+  } catch (error) {
+    const e = error as { stdout?: string; stderr?: string; code?: number };
+    return { exitCode: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+  }
 }
 
 async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Promise<RunResult> {
@@ -135,12 +166,20 @@ async function migrationApply(ctx: JourneyCtx, args: readonly string[] = []): Pr
 }
 
 function getLatestMigrationDir(ctx: JourneyCtx): string {
-  const dirs = readdirSync(join(ctx.testDir, 'migrations'))
-    .filter((d) => !d.startsWith('.'))
-    .sort();
-  const latest = dirs[dirs.length - 1];
-  if (!latest) throw new Error('No migration directory found');
-  return join(ctx.testDir, 'migrations', latest);
+  const migrationsDir = join(ctx.testDir, 'migrations');
+  const dirs = readdirSync(migrationsDir).filter((d) => !d.startsWith('.'));
+  if (dirs.length === 0) throw new Error('No migration directory found');
+  let newest = dirs[0]!;
+  let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
+  for (let i = 1; i < dirs.length; i++) {
+    const dir = dirs[i]!;
+    const mtime = statSync(join(migrationsDir, dir)).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newest = dir;
+    }
+  }
+  return join(migrationsDir, newest);
 }
 
 /**
@@ -178,7 +217,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     created.clear();
   });
 
-  it('migration plan --target mongo scaffolds class-flow migration.ts, copies contract files, and emits attested ops.json', async () => {
+  it('migration plan --target mongo scaffolds migration.ts, copies contract files, and emits attested ops.json', async () => {
     const ctx = setupMongoJourney(undefined);
     created.add(ctx.testDir);
 
@@ -196,8 +235,9 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     );
     expect(migrationTs).toContain('@prisma-next/target-mongo/migration');
     expect(migrationTs).toContain('createIndex');
+    // Prettier rewrites double-quoted literals to single-quoted on disk.
     expect(migrationTs).toContain("'users'");
-    expect(migrationTs).toContain('Migration.run(import.meta.url');
+    expect(migrationTs).toContain('MigrationCLI.run(import.meta.url');
 
     expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
@@ -205,6 +245,11 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(readFileSync(join(migrationDir, 'end-contract.d.ts'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.d.ts'), 'utf-8'),
     );
+
+    // Plan leaves a draft migration; self-emit via `tsx migration.ts` to
+    // produce `ops.json` and the attested `migration.json`.
+    const emit = await migrationEmit(ctx, ['--dir', `migrations/${basename(migrationDir)}`]);
+    expect(emit.exitCode, `migration emit: ${emit.stdout}\n${emit.stderr}`).toBe(0);
 
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8')) as ReadonlyArray<{
       id: string;
@@ -263,9 +308,14 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     const ops = JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationId: string | null;
+      migrationId: string;
     };
-    expect(manifest.migrationId).toBeNull();
+    // `migration new` always writes a fully attested package; the
+    // `migrationId` is the content-address over `(manifest, [])` since
+    // the scaffolded `migration.ts` carries no operations yet. The
+    // developer fills in operations and re-runs `node migration.ts` to
+    // rewrite both `ops.json` and `migrationId`.
+    expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 });
 
@@ -316,6 +366,15 @@ describe(
       const plan0 = await migrationPlan(ctx, ['--name', 'initial']);
       expect(plan0.exitCode, `migration plan initial: ${plan0.stdout}\n${plan0.stderr}`).toBe(0);
 
+      const emitInit = await migrationEmit(ctx, [
+        '--dir',
+        `migrations/${basename(getLatestMigrationDir(ctx))}`,
+      ]);
+      expect(
+        emitInit.exitCode,
+        `migration emit initial: ${emitInit.stdout}\n${emitInit.stderr}`,
+      ).toBe(0);
+
       const apply0 = await migrationApply(ctx);
       expect(apply0.exitCode, `migration apply initial: ${apply0.stdout}\n${apply0.stderr}`).toBe(
         0,
@@ -351,7 +410,8 @@ describe(
       // The check finds documents whose `name` contains an uppercase letter;
       // after the transform all names are lower-case so the check is
       // satisfied, enabling idempotency-skip on re-apply (tested below).
-      const handAuthored = `import { Migration } from '@prisma-next/family-mongo/migration';
+      const handAuthored = `import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, dataTransform } from '@prisma-next/target-mongo/migration';
 import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-query-ast/execution';
 
@@ -399,7 +459,7 @@ class M extends Migration {
 }
 
 export default M;
-Migration.run(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);
 `;
       writeFileSync(migrationTsPath, handAuthored);
 

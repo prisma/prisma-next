@@ -22,7 +22,7 @@ describe('pgvector extension pack integration', () => {
     expect(codecTypeImports.length).toBe(14);
     // Adapter codec types come first
     expect(codecTypeImports[0]).toEqual({
-      package: '@prisma-next/adapter-postgres/codec-types',
+      package: '@prisma-next/target-postgres/codec-types',
       named: 'CodecTypes',
       alias: 'PgTypes',
     });

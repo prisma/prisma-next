@@ -9,7 +9,7 @@ import {
   errorInvalidSlug,
   errorMissingFile,
 } from './errors';
-import type { BaseMigrationBundle, MigrationManifest, MigrationOps } from './types';
+import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
 
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
@@ -23,13 +23,12 @@ const MigrationHintsSchema = type({
   used: 'string[]',
   applied: 'string[]',
   plannerVersion: 'string',
-  planningStrategy: 'string',
 });
 
 const MigrationManifestSchema = type({
   from: 'string',
   to: 'string',
-  migrationId: 'string | null',
+  migrationId: 'string',
   kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',
@@ -110,7 +109,7 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
-export async function readMigrationPackage(dir: string): Promise<BaseMigrationBundle> {
+export async function readMigrationPackage(dir: string): Promise<MigrationBundle> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);
 
@@ -178,7 +177,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly BaseMigrationBundle[]> {
+): Promise<readonly MigrationBundle[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -189,7 +188,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: BaseMigrationBundle[] = [];
+  const packages: MigrationBundle[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);

@@ -2,8 +2,7 @@
  * `migration new` — scaffolds a migration package with a `migration.ts` file
  * for manual authoring.
  *
- * Both descriptor-flow (Postgres) and class-flow (Mongo) targets go through
- * the same path here: the planner's `emptyMigration(context)` returns a
+ * The planner's `emptyMigration(context)` returns a
  * `MigrationPlanWithAuthoringSurface`, whose `renderTypeScript()` produces
  * the target-appropriate empty stub. The CLI writes the returned source
  * verbatim.
@@ -13,6 +12,7 @@ import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import {
@@ -23,7 +23,7 @@ import {
 } from '@prisma-next/migration-tools/io';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative, resolve } from 'pathe';
@@ -121,13 +121,12 @@ async function executeMigrationNewCommand(
 
   try {
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
 
-    if (attested.length > 0) {
-      const graph = reconstructGraph(attested);
+    if (packages.length > 0) {
+      const graph = reconstructGraph(packages);
 
       if (options.from) {
-        const match = attested.find((p) => p.manifest.to.startsWith(options.from!));
+        const match = packages.find((p) => p.manifest.to.startsWith(options.from!));
         if (!match) {
           return notOk(
             errorRuntime('Starting contract not found', {
@@ -143,7 +142,7 @@ async function executeMigrationNewCommand(
         const latestMigration = findLatestMigration(graph);
         if (latestMigration) {
           fromHash = latestMigration.to;
-          const leafPkg = attested.find(
+          const leafPkg = packages.find(
             (p) => p.manifest.migrationId === latestMigration.migrationId,
           );
           if (leafPkg) {
@@ -180,10 +179,13 @@ async function executeMigrationNewCommand(
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const manifest: MigrationManifest = {
+  // `migration new` scaffolds an empty `migration.ts` for the user to
+  // fill, so we attest over `ops: []`. Re-running self-emit after the
+  // user adds operations will produce a different `migrationId` (over
+  // the real ops). This is intentional — there is no on-disk draft.
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: fromHash,
     to: toStorageHash,
-    migrationId: null,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,
@@ -191,10 +193,13 @@ async function executeMigrationNewCommand(
       used: [],
       applied: [],
       plannerVersion: '1.0.0',
-      planningStrategy: 'manual',
     },
     labels: [],
     createdAt: timestamp.toISOString(),
+  };
+  const manifest: MigrationManifest = {
+    ...baseManifest,
+    migrationId: computeMigrationId(baseManifest, []),
   };
 
   const migrations = getTargetMigrations(config.target);
@@ -265,8 +270,8 @@ export function createMigrationNewCommand(): Command {
     command,
     'Scaffold a new migration for manual authoring',
     'Creates a migration package with a migration.ts file for manual authoring.\n' +
-      'Write operation descriptors and data transforms in migration.ts, then run\n' +
-      '`migration emit` to resolve and attest the package.',
+      'Write the migration body in migration.ts, then run the file with Node\n' +
+      '(`node migration.ts`) to self-emit ops.json and attest the package.',
   );
   setCommandExamples(command, [
     'prisma-next migration new --name split-name',
@@ -300,7 +305,7 @@ export function createMigrationNewCommand(): Command {
           ui.output(`  from: ${value.from}`);
           ui.output(`  to:   ${value.to}`);
           ui.output(
-            `\nEdit migration.ts, then run \`prisma-next migration emit --dir "${value.dir}"\` to attest.`,
+            `\nEdit migration.ts, then run it directly (\`node "${value.dir}/migration.ts"\`) to self-emit and attest.`,
           );
         }
       });

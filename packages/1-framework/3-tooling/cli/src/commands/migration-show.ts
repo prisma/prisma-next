@@ -2,7 +2,7 @@ import type { MigrationPlanOperation } from '@prisma-next/framework-components/c
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationBundle } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
+import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -31,7 +31,7 @@ export interface MigrationShowResult {
   readonly dirPath: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string | null;
+  readonly migrationId: string;
   readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
@@ -52,8 +52,7 @@ export function resolveByHashPrefix(
   prefix: string,
 ): Result<MigrationBundle, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
-  const attested = packages.filter((p) => typeof p.manifest.migrationId === 'string');
-  const matches = attested.filter((p) => p.manifest.migrationId!.startsWith(normalizedPrefix));
+  const matches = packages.filter((p) => p.manifest.migrationId.startsWith(normalizedPrefix));
 
   if (matches.length === 1) {
     return ok(matches[0]!);
@@ -62,7 +61,7 @@ export function resolveByHashPrefix(
   if (matches.length === 0) {
     return notOk(
       errorRuntime('No migration found matching prefix', {
-        why: `No attested migration has a migrationId starting with "${normalizedPrefix}"`,
+        why: `No migration has a migrationId starting with "${normalizedPrefix}"`,
         fix: 'Run `prisma-next migration show` (no argument) to see the latest migration, or check the migrations directory for available packages.',
       }),
     );
@@ -132,16 +131,7 @@ async function executeMigrationShowCommand(
         if (!resolved.ok) return resolved;
         pkg = resolved.value;
       } else {
-        const attested = allPackages.filter(isAttested);
-        if (attested.length === 0) {
-          return notOk(
-            errorRuntime('No attested migrations found', {
-              why: `All migrations in ${migrationsRelative} are drafts (migrationId: null)`,
-              fix: 'Run `prisma-next migration emit --dir <path>` to attest a draft migration.',
-            }),
-          );
-        }
-        const graph = reconstructGraph(attested);
+        const graph = reconstructGraph(allPackages);
         const latestMigration = findLatestMigration(graph);
         if (!latestMigration) {
           return notOk(
@@ -151,7 +141,7 @@ async function executeMigrationShowCommand(
             }),
           );
         }
-        const leafPkg = attested.find(
+        const leafPkg = allPackages.find(
           (p) => p.manifest.migrationId === latestMigration.migrationId,
         );
         if (!leafPkg) {

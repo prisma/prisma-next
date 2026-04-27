@@ -1,4 +1,5 @@
 import type { CodecRegistry } from './codec-types';
+import type { LoweredStatement } from './types';
 
 export type AdapterTarget = string;
 
@@ -25,23 +26,24 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   readMarkerStatement(): MarkerStatement;
 }
 
-export interface LoweredPayload<TBody = unknown> {
-  readonly profileId?: string;
-  readonly body: TBody;
-  readonly annotations?: Record<string, unknown>;
-}
-
 export interface LowererContext<TContract = unknown> {
   readonly contract: TContract;
   readonly params?: readonly unknown[];
 }
 
-export type Lowerer<Ast = unknown, TContract = unknown, TBody = unknown> = (
+export type Lowerer<Ast = unknown, TContract = unknown, TBody = LoweredStatement> = (
   ast: Ast,
   context: LowererContext<TContract>,
-) => LoweredPayload<TBody>;
+) => TBody;
 
-export interface Adapter<Ast = unknown, TContract = unknown, TBody = unknown> {
+/**
+ * Lowers a query AST into a target-specific executable body (typically
+ * `LoweredStatement` for SQL adapters). The `lower` method returns the body
+ * directly; per-statement metadata, when needed, lives on the body itself
+ * (e.g. `LoweredStatement.annotations`). Adapter-level metadata such as the
+ * profile id is reachable via `profile.id` for callers that genuinely need it.
+ */
+export interface Adapter<Ast = unknown, TContract = unknown, TBody = LoweredStatement> {
   readonly profile: AdapterProfile;
-  lower(ast: Ast, context: LowererContext<TContract>): LoweredPayload<TBody>;
+  lower(ast: Ast, context: LowererContext<TContract>): TBody;
 }

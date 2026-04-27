@@ -95,16 +95,6 @@ export interface MigrationOperationPolicy {
 // ============================================================================
 
 /**
- * Minimal shape for operation descriptors at the framework level.
- * Targets produce richer types; this captures just enough for the
- * framework to scaffold migration.ts files and pass descriptors through.
- */
-export interface OperationDescriptor {
-  readonly kind: string;
-  readonly [key: string]: unknown;
-}
-
-/**
  * A single migration operation for display purposes.
  * Contains only the fields needed for CLI output (tree view, JSON envelope).
  */
@@ -122,8 +112,7 @@ export interface MigrationPlanOperation {
 // ============================================================================
 
 /**
- * Framework-level contract for a single factory call in a target's class-flow
- * planner IR.
+ * Framework-level contract for a single factory call in a target's planner IR.
  *
  * @see ADR 195
  */
@@ -172,14 +161,8 @@ export interface MigrationPlan {
  *  - hand the plan to the runner for execution (via `MigrationPlan`), and
  *  - materialize the plan as an editable source file via `renderTypeScript()`.
  *
- * User-authored migrations (class-flow `Migration` subclasses) satisfy
- * `MigrationPlan` but not this interface: they are already the source.
- *
- * Descriptor-flow targets (e.g. Postgres) that do not materialize their
- * planner plans back to TypeScript provide a throwing stub so that
- * `MigrationPlannerSuccessResult.plan` has a uniform type at the framework
- * level. In practice the CLI only calls `renderTypeScript()` in the
- * class-flow branch of `migration plan`.
+ * User-authored migrations (`Migration` subclasses) satisfy `MigrationPlan`
+ * but not this interface: they are already the source.
  */
 export interface MigrationPlanWithAuthoringSurface extends MigrationPlan {
   /**
@@ -210,10 +193,7 @@ export interface MigrationPlannerConflict {
  * Successful planner result with the migration plan.
  *
  * The plan is typed as `MigrationPlanWithAuthoringSurface` so the CLI can
- * uniformly ask any plan to render itself to TypeScript. Targets whose
- * planners do not support that (descriptor-flow targets like Postgres)
- * supply a throwing `renderTypeScript()` stub — the CLI only calls it in
- * the class-flow branch of `migration plan`.
+ * uniformly ask any plan to render itself to TypeScript.
  */
 export interface MigrationPlannerSuccessResult {
   readonly kind: 'success';
@@ -311,17 +291,17 @@ export interface MigrationPlanner<
     readonly policy: MigrationOperationPolicy;
     /**
      * Storage hash of the "from" contract (the state the planner assumes the
-     * database starts at). Class-flow planners use this to populate
-     * `describe()` on the produced plan so the rendered `migration.ts` has
-     * correct `from`/`to` metadata.
+     * database starts at). Planners use this to populate `describe()` on the
+     * produced plan so the rendered `migration.ts` has correct `from`/`to`
+     * metadata.
      */
     readonly fromHash: string;
     /**
      * The "from" contract (the state the planner assumes the database starts
-     * at). Class-flow planners pass this to data-safety strategies so they
-     * can compare `from` and `to` column shapes (e.g. to detect unsafe type
-     * changes). `db update` / `db init` reconcile against the live schema and
-     * have no "from" contract; only `migration plan` provides one.
+     * at). Planners pass this to data-safety strategies so they can compare
+     * `from` and `to` column shapes (e.g. to detect unsafe type changes).
+     * `db update` / `db init` reconcile against the live schema and have no
+     * "from" contract; only `migration plan` provides one.
      */
     readonly fromContract?: unknown;
     /**
@@ -337,10 +317,9 @@ export interface MigrationPlanner<
   /**
    * Produce an empty migration with the target's authoring conventions.
    *
-   * Used by `migration new` to scaffold a fresh `migration.ts` without the
-   * CLI needing to know whether the target uses descriptor-flow or class-flow
-   * authoring. The returned plan has no operations; its `renderTypeScript()`
-   * yields a stub the user can edit.
+   * Used by `migration new` to scaffold a fresh `migration.ts`. The
+   * returned plan has no operations; its `renderTypeScript()` yields a
+   * stub the user can edit.
    */
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface;
 }
@@ -416,92 +395,6 @@ export interface TargetMigrationsCapability<
     contract: Contract | null,
     frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>,
   ): unknown;
-
-  /**
-   * Plans a migration using the descriptor-based planner.
-   * Returns operation descriptors that the caller scaffolds into a
-   * `migration.ts` file. Whether the resulting migration can be emitted
-   * end-to-end is determined at emit time (via `placeholder()` errors
-   * thrown for unfilled slots), not by the planner.
-   */
-  planWithDescriptors?(context: {
-    readonly fromContract: Contract | null;
-    readonly toContract: Contract;
-    readonly frameworkComponents?: ReadonlyArray<
-      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-    >;
-  }):
-    | {
-        readonly ok: true;
-        readonly descriptors: readonly OperationDescriptor[];
-      }
-    | {
-        readonly ok: false;
-        readonly conflicts: readonly MigrationPlannerConflict[];
-      };
-
-  /**
-   * Resolves operation descriptors into target-specific migration plan operations
-   * with SQL/DDL, prechecks, and postchecks. Called by `migration emit` to
-   * serialize migration.ts into ops.json.
-   */
-  resolveDescriptors?(
-    descriptors: readonly OperationDescriptor[],
-    context: {
-      readonly fromContract: Contract | null;
-      readonly toContract: Contract;
-      readonly schemaName?: string;
-      readonly frameworkComponents?: ReadonlyArray<
-        TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-      >;
-    },
-  ): readonly MigrationPlanOperation[];
-
-  /**
-   * Optional: render a descriptor list back to a populated `migration.ts`
-   * source string.
-   *
-   * Descriptor-flow targets (e.g. Postgres) implement this so that
-   * `migration plan` can hand the user an editable authoring surface that
-   * already captures the planner's decisions. Class-flow targets do not
-   * implement it — their planner already returns a renderable plan via
-   * `MigrationPlannerSuccessResult.plan.renderTypeScript()`.
-   */
-  renderDescriptorTypeScript?(
-    descriptors: readonly OperationDescriptor[],
-    context: MigrationScaffoldContext,
-  ): string;
-
-  /**
-   * Optional: in-process emit capability for class-flow migration files.
-   *
-   * Targets that author `migration.ts` as an executable class (rather than
-   * an array of descriptors) implement `emit` to produce `ops.json` from
-   * the source file directly. The framework dispatches to `emit` whenever
-   * `resolveDescriptors` is not present on the target.
-   *
-   * The capability runs in the same Node process as the CLI:
-   *  - The target dynamically imports `<dir>/migration.ts`, locates the
-   *    authored class on the module's default export, and invokes whatever
-   *    runtime machinery it needs to obtain the operations list.
-   *  - Structured errors thrown during evaluation (notably
-   *    `errorUnfilledPlaceholder` with code `PN-MIG-2001`) propagate as
-   *    real JS exceptions so the CLI's normal error envelope can render
-   *    them with full structured metadata. No subprocess is spawned.
-   *  - The target is responsible for calling `writeMigrationOps(dir, ops)`
-   *    so that `ops.json` ends up on disk before `emit` returns. The
-   *    framework's `emitMigration` helper is the single owner of
-   *    `attestMigration(dir)` — the target MUST NOT call
-   *    `attestMigration` itself.
-   *  - The returned `MigrationPlanOperation[]` is the display-oriented
-   *    shape the CLI uses for output (id, label, operationClass).
-   */
-  emit?(options: {
-    readonly dir: string;
-    readonly frameworkComponents: ReadonlyArray<
-      TargetBoundComponentDescriptor<TFamilyId, TTargetId>
-    >;
-  }): Promise<readonly MigrationPlanOperation[]>;
 }
 
 // ============================================================================
@@ -513,8 +406,7 @@ export interface TargetMigrationsCapability<
  *
  * Kept minimal: only the paths a target might need to compute relative imports
  * (e.g. the contract `.d.ts` import for typed-contract builders). Passed to
- * `MigrationPlanner.emptyMigration(context)` and to
- * `TargetMigrationsCapability.renderDescriptorTypeScript(descriptors, context)`.
+ * `MigrationPlanner.emptyMigration(context)`.
  */
 export interface MigrationScaffoldContext {
   /** Absolute path to the migration package directory. Used by targets to compute relative imports. */
@@ -522,9 +414,9 @@ export interface MigrationScaffoldContext {
   /** Absolute path to the contract.json file, if one exists. Used by targets that emit typed-contract imports. */
   readonly contractJsonPath?: string;
   /**
-   * Storage hash of the "from" contract. Class-flow targets (e.g. Mongo) use
-   * this to populate `describe()` on the rendered empty migration so that
-   * `migration.json` generated at emit time has correct identity metadata.
+   * Storage hash of the "from" contract. Targets use this to populate
+   * `describe()` on the rendered empty migration so that identity metadata
+   * is correctly populated.
    */
   readonly fromHash: string;
   /**

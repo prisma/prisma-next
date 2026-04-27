@@ -25,7 +25,6 @@
     "arktype": "^2.0.0"
   },
   "devDependencies": {
-    "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/operations": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

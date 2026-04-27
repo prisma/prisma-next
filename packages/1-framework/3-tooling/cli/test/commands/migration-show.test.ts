@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { attestMigration } from '@prisma-next/migration-tools/attestation';
+import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import {
   formatMigrationDirName,
@@ -40,20 +40,24 @@ function createOp(
   return op as unknown as MigrationPlanOperation;
 }
 
+/**
+ * Build a draft (un-attested) base manifest. The actual on-disk manifest
+ * is attested inside `setupMigrationDir`, where the `migrationId` is
+ * computed once we know the full ops list.
+ */
 function createManifest(
   from: string,
   to: string,
   toContract: Contract,
   fromContract: Contract | null = null,
-): MigrationManifest {
+): Omit<MigrationManifest, 'migrationId'> {
   return {
     from,
     to,
-    migrationId: null,
     kind: 'regular',
     fromContract,
     toContract,
-    hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+    hints: { used: [], applied: [], plannerVersion: '1.0.0' },
     labels: [],
     createdAt: new Date().toISOString(),
   };
@@ -62,15 +66,18 @@ function createManifest(
 async function setupMigrationDir(
   migrationsDir: string,
   name: string,
-  manifest: MigrationManifest,
+  baseManifest: Omit<MigrationManifest, 'migrationId'>,
   ops: MigrationPlanOperation[],
   dateOffset = 0,
 ): Promise<string> {
   const date = new Date(2026, 0, 1 + dateOffset, 10, 0);
   const dirName = formatMigrationDirName(date, name);
   const packageDir = join(migrationsDir, dirName);
+  const manifest: MigrationManifest = {
+    ...baseManifest,
+    migrationId: computeMigrationId(baseManifest, ops),
+  };
   await writeMigrationPackage(packageDir, manifest, ops);
-  await attestMigration(packageDir);
   return packageDir;
 }
 
@@ -149,7 +156,7 @@ describe('resolveByHashPrefix', () => {
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
-          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           createdAt: new Date().toISOString(),
         },
@@ -177,7 +184,7 @@ describe('resolveByHashPrefix', () => {
           kind: 'regular',
           fromContract: null,
           toContract: contract,
-          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           createdAt: new Date().toISOString(),
         },
@@ -193,7 +200,7 @@ describe('resolveByHashPrefix', () => {
           kind: 'regular',
           fromContract: contract,
           toContract: contract,
-          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           createdAt: new Date().toISOString(),
         },
@@ -220,7 +227,7 @@ describe('resolveByHashPrefix', () => {
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
-          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           createdAt: new Date().toISOString(),
         },
@@ -235,19 +242,23 @@ describe('resolveByHashPrefix', () => {
     }
   });
 
-  it('skips draft migrations (migrationId: null)', () => {
+  it('returns no match when prefix matches nothing', () => {
+    // After the draft state was collapsed, every package has a real
+    // `migrationId` — there is no longer a "skip draft" branch. The
+    // prefix lookup simply returns no-match if nothing in the chain
+    // shares the requested prefix.
     const packages: MigrationPackage[] = [
       {
-        dirName: '20260101_100000_draft',
-        dirPath: '/tmp/draft',
+        dirName: '20260101_100000_only',
+        dirPath: '/tmp/only',
         manifest: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          migrationId: null,
+          migrationId: 'sha256:abc999000000',
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
-          hints: { used: [], applied: [], plannerVersion: '1.0.0', planningStrategy: 'diff' },
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
           labels: [],
           createdAt: new Date().toISOString(),
         },
@@ -255,7 +266,7 @@ describe('resolveByHashPrefix', () => {
       },
     ];
 
-    const result = resolveByHashPrefix(packages, 'sha256:');
+    const result = resolveByHashPrefix(packages, 'sha256:zzz');
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.failure.message).toContain('No migration found');
@@ -405,29 +416,6 @@ describe('formatMigrationShowOutput', () => {
     expect(stripped).toContain('CREATE TABLE "user" (id int4 NOT NULL);');
   });
 
-  it('shows draft indicator when migrationId is null', () => {
-    const flags = parseGlobalFlags({ 'no-color': true });
-    const output = formatMigrationShowOutput(
-      {
-        dirName: '20260101_100000_test',
-        dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
-        to: 'sha256:hash-a',
-        migrationId: null,
-        kind: 'regular',
-        createdAt: '2026-01-01T10:00:00.000Z',
-        operations: [],
-        sql: [],
-        summary: '0 operation(s)',
-      },
-      flags,
-    );
-    const stripped = stripAnsi(output);
-
-    expect(stripped).toContain('draft');
-    expect(stripped).toContain('not yet attested');
-  });
-
   it('returns empty string in quiet mode', () => {
     const flags = parseGlobalFlags({ quiet: true });
     const output = formatMigrationShowOutput(
@@ -436,7 +424,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: null,
+        migrationId: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],

@@ -1,6 +1,6 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks, SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { quoteIdentifier } from '../sql-utils';
 import { buildAddColumnSql } from './planner-ddl-builders';
 import {
   columnExistsCheck,

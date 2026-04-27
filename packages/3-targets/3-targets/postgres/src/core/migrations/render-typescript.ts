@@ -1,5 +1,5 @@
 /**
- * Polymorphic TypeScript emitter for the Postgres class-flow IR.
+ * Polymorphic TypeScript emitter for the Postgres migration IR.
  *
  * Each `PostgresOpFactoryCall` renders itself via `renderTypeScript()` and
  * declares its own `importRequirements()`; this file just composes the module
@@ -21,17 +21,27 @@ export interface RenderMigrationMeta {
 }
 
 /**
- * Always-present base import — the rendered scaffold always extends the
- * target-owned `Migration` (i.e. `PostgresMigration`) re-exported from
- * `@prisma-next/target-postgres/migration`. That re-export fixes the
- * `SqlMigration` generic to `PostgresPlanTargetDetails` and the abstract
- * `targetId` to `'postgres'`, so user-authored migrations don't need to
- * thread target-details or redeclare `targetId`.
+ * Always-present base imports for the rendered scaffold. Both come from
+ * `@prisma-next/target-postgres/migration` so an authored Postgres
+ * `migration.ts` only needs a single dependency for its base class and
+ * its CLI entrypoint:
+ *
+ * - `Migration` — the target-owned re-export fixes the `SqlMigration`
+ *   generic to `PostgresPlanTargetDetails` and the abstract `targetId`
+ *   to `'postgres'`, so user-authored migrations don't need to thread
+ *   target-details or redeclare `targetId`.
+ * - `MigrationCLI` — the migration-file CLI entrypoint, re-exported from
+ *   `@prisma-next/cli/migration-cli`. Loads `prisma-next.config.ts`,
+ *   assembles a `ControlStack`, and instantiates the migration class.
+ *   The migration file owns this dependency directly: pulling CLI
+ *   machinery in at script run time is acceptable because the script's
+ *   whole purpose is to be invoked from the project that owns the
+ *   config.
  */
-const BASE_IMPORT: ImportRequirement = {
-  moduleSpecifier: '@prisma-next/target-postgres/migration',
-  symbol: 'Migration',
-};
+const BASE_IMPORTS: readonly ImportRequirement[] = [
+  { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'Migration' },
+  { moduleSpecifier: '@prisma-next/target-postgres/migration', symbol: 'MigrationCLI' },
+];
 
 export function renderCallsToTypeScript(
   calls: ReadonlyArray<PostgresOpFactoryCall>,
@@ -53,13 +63,13 @@ export function renderCallsToTypeScript(
     '  }',
     '}',
     '',
-    'Migration.run(import.meta.url, M);',
+    'MigrationCLI.run(import.meta.url, M);',
     '',
   ].join('\n');
 }
 
 function buildImports(calls: ReadonlyArray<PostgresOpFactoryCall>): string {
-  const requirements: ImportRequirement[] = [BASE_IMPORT];
+  const requirements: ImportRequirement[] = [...BASE_IMPORTS];
   for (const call of calls) {
     for (const req of call.importRequirements()) {
       requirements.push(req);

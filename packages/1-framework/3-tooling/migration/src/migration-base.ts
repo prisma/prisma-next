@@ -1,15 +1,15 @@
-import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  ControlStack,
   MigrationPlan,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import { dirname, join } from 'pathe';
 import { computeMigrationId } from './attestation';
-import type { MigrationManifest, MigrationOps } from './types';
+import type { MigrationHints, MigrationManifest, MigrationOps } from './types';
 
 export interface MigrationMeta {
   readonly from: string;
@@ -26,7 +26,7 @@ const MigrationMetaSchema = type({
 });
 
 /**
- * Base class for class-flow migrations.
+ * Base class for migrations.
  *
  * A `Migration` subclass is itself a `MigrationPlan`: CLI commands and the
  * runner can consume it directly via `targetId`, `operations`, `origin`, and
@@ -34,10 +34,28 @@ const MigrationMetaSchema = type({
  * every migration must implement — `migration.json` is required for a
  * migration to be valid.
  */
-export abstract class Migration<TOperation extends MigrationPlanOperation = MigrationPlanOperation>
-  implements MigrationPlan
+export abstract class Migration<
+  TOperation extends MigrationPlanOperation = MigrationPlanOperation,
+  TFamilyId extends string = string,
+  TTargetId extends string = string,
+> implements MigrationPlan
 {
   abstract readonly targetId: string;
+
+  /**
+   * Assembled `ControlStack` injected by the orchestrator (`runMigration`).
+   *
+   * Subclasses (e.g. `PostgresMigration`) read the stack to materialize their
+   * adapter once per instance. Optional at the abstract level so unit tests can
+   * construct `Migration` instances purely for `operations` / `describe`
+   * assertions without needing a real stack; concrete subclasses that need the
+   * stack at runtime should narrow the parameter to required.
+   */
+  protected readonly stack: ControlStack<TFamilyId, TTargetId> | undefined;
+
+  constructor(stack?: ControlStack<TFamilyId, TTargetId>) {
+    this.stack = stack;
+  }
 
   /**
    * Ordered list of operations this migration performs.
@@ -66,52 +84,28 @@ export abstract class Migration<TOperation extends MigrationPlanOperation = Migr
   get destination(): { readonly storageHash: string } {
     return { storageHash: this.describe().to };
   }
+}
 
-  /**
-   * Entrypoint guard for migration files. When called at module scope,
-   * detects whether the file is being run directly (e.g. `node migration.ts`)
-   * and if so, serializes the migration plan to `ops.json` and
-   * `migration.json` in the same directory. When the file is imported by
-   * another module, this is a no-op.
-   *
-   * Usage (at module scope, after the class definition):
-   *
-   *     class MyMigration extends Migration { ... }
-   *     export default MyMigration;
-   *     Migration.run(import.meta.url, MyMigration);
-   */
-  static run(importMetaUrl: string, MigrationClass: new () => Migration): void {
-    if (!importMetaUrl) return;
-
-    const metaFilename = fileURLToPath(importMetaUrl);
-    const argv1 = process.argv[1];
-    if (!argv1) return;
-
-    let isEntrypoint: boolean;
-    try {
-      isEntrypoint = realpathSync(metaFilename) === realpathSync(argv1);
-    } catch {
-      return;
-    }
-    if (!isEntrypoint) return;
-
-    const args = process.argv.slice(2);
-
-    if (args.includes('--help')) {
-      printHelp();
-      return;
-    }
-
-    const dryRun = args.includes('--dry-run');
-    const migrationDir = dirname(metaFilename);
-
-    try {
-      serializeMigration(MigrationClass, migrationDir, dryRun);
-    } catch (err) {
-      process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-      process.exitCode = 1;
-    }
+/**
+ * Returns true when `import.meta.url` resolves to the same file that was
+ * invoked as the node entrypoint (`process.argv[1]`). Used by
+ * `MigrationCLI.run` (in `@prisma-next/cli/migration-cli`) to no-op when
+ * the migration module is being imported (e.g. by another script) rather
+ * than executed directly.
+ */
+export function isDirectEntrypoint(importMetaUrl: string): boolean {
+  const metaFilename = fileURLToPath(importMetaUrl);
+  const argv1 = process.argv[1];
+  if (!argv1) return false;
+  try {
+    return realpathSync(metaFilename) === realpathSync(argv1);
+  } catch {
+    return false;
   }
+}
+
+export function printMigrationHelp(): void {
+  printHelp();
 }
 
 function printHelp(): void {
@@ -128,10 +122,25 @@ function printHelp(): void {
 }
 
 /**
- * Build the attested manifest written by `Migration.run()`.
+ * In-memory artifacts produced from a `Migration` instance: the
+ * serialized `ops.json` body, the `migration.json` manifest object, and
+ * its serialized form. Returned by `buildMigrationArtifacts` so callers
+ * (today: `MigrationCLI.run` in `@prisma-next/cli/migration-cli`) can
+ * decide how to persist them — write to disk, print in dry-run, ship
+ * over the wire — without coupling artifact construction to file I/O.
+ */
+export interface MigrationArtifacts {
+  readonly opsJson: string;
+  readonly manifest: MigrationManifest;
+  readonly manifestJson: string;
+}
+
+/**
+ * Build the attested manifest from `describe()`-derived metadata, the
+ * operations list, and the previously-scaffolded manifest (if any).
  *
- * When a `migration.json` already exists in the directory (the common case:
- * the package was scaffolded by `migration plan`), preserve the contract
+ * When a `migration.json` already exists for this package (the common
+ * case: it was scaffolded by `migration plan`), preserve the contract
  * bookends, hints, labels, and `createdAt` set there — those fields are
  * owned by the CLI scaffolder, not the authored class. Only the
  * `describe()`-derived fields (`from`, `to`, `kind`) and the operations
@@ -140,19 +149,15 @@ function printHelp(): void {
  * schema-conformant manifest so the resulting package can still be read,
  * verified, and applied.
  *
- * In both cases the `migrationId` is recomputed against the current
- * manifest + ops so the on-disk artifacts are always fully attested — no
- * draft (`migrationId: null`) ever leaves this function.
+ * The `migrationId` is recomputed against the current manifest + ops so
+ * the on-disk artifacts are always fully attested.
  */
 function buildAttestedManifest(
-  migrationDir: string,
   meta: MigrationMeta,
   ops: MigrationOps,
+  existing: Partial<MigrationManifest> | null,
 ): MigrationManifest {
-  const existing = readExistingManifest(join(migrationDir, 'migration.json'));
-
-  const baseManifest: MigrationManifest = {
-    migrationId: null,
+  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
     from: meta.from,
     to: meta.to,
     kind: meta.kind ?? 'regular',
@@ -165,12 +170,7 @@ function buildAttestedManifest(
     // (everything else is stripped by `computeMigrationId`), and a real
     // contract bookend would only be available after `migration plan`.
     toContract: existing?.toContract ?? ({ storage: { storageHash: meta.to } } as Contract),
-    hints: existing?.hints ?? {
-      used: [],
-      applied: [],
-      plannerVersion: '2.0.0',
-      planningStrategy: 'class-based',
-    },
+    hints: normalizeHints(existing?.hints),
     ...ifDefined('authorship', existing?.authorship),
   };
 
@@ -178,34 +178,38 @@ function buildAttestedManifest(
   return { ...baseManifest, migrationId };
 }
 
-function readExistingManifest(manifestPath: string): Partial<MigrationManifest> | null {
-  let raw: string;
-  try {
-    raw = readFileSync(manifestPath, 'utf-8');
-  } catch {
-    return null;
-  }
-  try {
-    return JSON.parse(raw) as Partial<MigrationManifest>;
-  } catch {
-    return null;
-  }
+/**
+ * Project `existing.hints` down to the known `MigrationHints` shape, dropping
+ * any legacy keys that may linger in manifests scaffolded by older CLI
+ * versions (e.g. `planningStrategy`). Picking fields explicitly instead of
+ * spreading keeps refreshed `migration.json` files schema-clean regardless
+ * of what was on disk before.
+ */
+function normalizeHints(existing: MigrationHints | undefined): MigrationHints {
+  return {
+    used: existing?.used ?? [],
+    applied: existing?.applied ?? [],
+    plannerVersion: existing?.plannerVersion ?? '2.0.0',
+  };
 }
 
-function serializeMigration(
-  MigrationClass: new () => Migration,
-  migrationDir: string,
-  dryRun: boolean,
-): void {
-  const instance = new MigrationClass();
-
+/**
+ * Pure conversion from a `Migration` instance (plus the previously
+ * scaffolded manifest, when one exists on disk) to the in-memory
+ * artifacts that downstream tooling persists. Owns metadata validation,
+ * manifest synthesis/preservation, hint normalization, and the
+ * content-addressed `migrationId` computation, but performs no file I/O
+ * — callers handle reads (to source `existing`) and writes (to persist
+ * `opsJson` / `manifestJson`).
+ */
+export function buildMigrationArtifacts(
+  instance: Migration,
+  existing: Partial<MigrationManifest> | null,
+): MigrationArtifacts {
   const ops = instance.operations;
-
   if (!Array.isArray(ops)) {
     throw new Error('operations must be an array');
   }
-
-  const serializedOps = JSON.stringify(ops, null, 2);
 
   const rawMeta: unknown = instance.describe();
   const parsed = MigrationMetaSchema(rawMeta);
@@ -213,17 +217,11 @@ function serializeMigration(
     throw new Error(`describe() returned invalid metadata: ${parsed.summary}`);
   }
 
-  const manifest = buildAttestedManifest(migrationDir, parsed, ops);
+  const manifest = buildAttestedManifest(parsed, ops, existing);
 
-  if (dryRun) {
-    process.stdout.write(`--- migration.json ---\n${JSON.stringify(manifest, null, 2)}\n`);
-    process.stdout.write('--- ops.json ---\n');
-    process.stdout.write(`${serializedOps}\n`);
-    return;
-  }
-
-  writeFileSync(join(migrationDir, 'ops.json'), serializedOps);
-  writeFileSync(join(migrationDir, 'migration.json'), JSON.stringify(manifest, null, 2));
-
-  process.stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
+  return {
+    opsJson: JSON.stringify(ops, null, 2),
+    manifest,
+    manifestJson: JSON.stringify(manifest, null, 2),
+  };
 }

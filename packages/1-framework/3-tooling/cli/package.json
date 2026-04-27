@@ -111,10 +111,6 @@
       "types": "./dist/commands/migration-status.d.mts",
       "import": "./dist/commands/migration-status.mjs"
     },
-    "./commands/migration-emit": {
-      "types": "./dist/commands/migration-emit.d.mts",
-      "import": "./dist/commands/migration-emit.mjs"
-    },
     "./commands/migration-apply": {
       "types": "./dist/commands/migration-apply.d.mts",
       "import": "./dist/commands/migration-apply.mjs"
@@ -126,6 +122,10 @@
     "./config-loader": {
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"
+    },
+    "./migration-cli": {
+      "types": "./dist/migration-cli.d.mts",
+      "import": "./dist/migration-cli.mjs"
     },
     "./control-api": {
       "types": "./dist/exports/control-api.d.mts",

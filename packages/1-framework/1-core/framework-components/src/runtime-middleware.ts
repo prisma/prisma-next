@@ -6,6 +6,7 @@ export interface RuntimeLog {
   info(event: unknown): void;
   warn(event: unknown): void;
   error(event: unknown): void;
+  debug?(event: unknown): void;
 }
 
 export interface RuntimeMiddlewareContext {

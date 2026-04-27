@@ -232,15 +232,21 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     expect(pkg.manifest.authorship).toEqual({ author: 'test', email: 'test@example.com' });
   });
 
-  it('accepts manifest with migrationId: null (draft)', async () => {
-    const dir = join(tmpDir, '20260225T1430_draft');
-    const manifest = createTestManifest({ migrationId: null });
+  it('rejects manifest with migrationId: null (legacy draft)', async () => {
+    const dir = join(tmpDir, '20260225T1430_legacy_draft');
+    // Construct a legacy-shaped manifest by hand — `createTestManifest`
+    // no longer accepts `null` as a valid `migrationId` since the schema
+    // was tightened, so we build the JSON directly.
+    const baseManifest = createTestManifest();
+    const legacyJson = JSON.stringify({ ...baseManifest, migrationId: null });
     await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, 'migration.json'), JSON.stringify(manifest));
+    await writeFile(join(dir, 'migration.json'), legacyJson);
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
 
-    const pkg = await readMigrationPackage(dir);
-    expect(pkg.manifest.migrationId).toBeNull();
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
   });
 
   it('errors when writing to existing directory with code MIGRATION.DIR_EXISTS', async () => {

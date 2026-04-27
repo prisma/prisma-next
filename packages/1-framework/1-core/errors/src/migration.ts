@@ -69,8 +69,8 @@ export function errorDataTransformContractMismatch(options: {
 
 /**
  * `migration.ts` was expected at the given package directory but could not be
- * located. Thrown by `emitMigration` (and, as a belt-and-suspenders, by
- * class-flow `emit` capabilities) when the file is missing.
+ * located. Thrown when consumers attempt to read a migration package that is
+ * missing its source file.
  */
 export function errorMigrationFileMissing(dir: string): CliStructuredError {
   return new CliStructuredError('2002', 'migration.ts not found', {
@@ -109,9 +109,31 @@ export function errorMigrationInvalidDefaultExport(
 }
 
 /**
- * A class-flow `Migration.operations` getter returned a value that is not an
- * array. Used by class-flow emit capabilities after instantiating the
- * authored migration.
+ * The migration class declares one `targetId` but the loaded
+ * `prisma-next.config.ts` declares another. Thrown by `MigrationCLI.run`
+ * when a migration script is invoked against a config whose target
+ * descriptor disagrees with the migration's own `targetId`. Distinct from generic
+ * config-validation errors because the mismatch is between two valid
+ * artifacts (the script and the config), not a malformed input.
+ */
+export function errorMigrationTargetMismatch(options: {
+  readonly migrationTargetId: string;
+  readonly configTargetId: string;
+}): CliStructuredError {
+  return new CliStructuredError('2006', 'Migration target does not match config target', {
+    domain: 'MIG',
+    why: `This migration is for target "${options.migrationTargetId}" but the loaded prisma-next.config.ts declares target "${options.configTargetId}". The migration script can only be run against a config that targets the same database.`,
+    fix: "Switch to a config whose `target` matches the migration's target, or pass `--config <path>` to point at the right config file.",
+    meta: {
+      migrationTargetId: options.migrationTargetId,
+      configTargetId: options.configTargetId,
+    },
+  });
+}
+
+/**
+ * A `Migration.operations` getter returned a value that is not an array. Used
+ * by emit capabilities after instantiating the authored migration.
  */
 export function errorMigrationPlanNotArray(
   dir: string,
@@ -129,44 +151,4 @@ export function errorMigrationPlanNotArray(
       ...(actualValueDescription !== undefined ? { actualValue: actualValueDescription } : {}),
     },
   });
-}
-
-/**
- * A target's migrations capability registers neither `resolveDescriptors`
- * (descriptor flow) nor `emit` (class flow). Surfaced by the strategy
- * selector when it is unable to choose a flow for the target. This is an
- * internal wiring error: every migration-supporting target must implement
- * exactly one of the two flows.
- */
-export function errorTargetHasIncompleteMigrationCapabilities(options: {
-  readonly targetId: string;
-}): CliStructuredError {
-  return new CliStructuredError('2011', 'Target migrations capability is incomplete', {
-    domain: 'MIG',
-    why: `Target "${options.targetId}" registers a migrations capability but implements neither \`resolveDescriptors\` (descriptor flow) nor \`emit\` (class flow); the CLI cannot choose an authoring strategy.`,
-    fix: 'This is an internal wiring error. Report it — the target descriptor must implement exactly one of the two migration flows.',
-    meta: { targetId: options.targetId },
-  });
-}
-
-/**
- * A migration plan was asked to render itself back to TypeScript but the
- * target does not support authoring-surface rendering. Thrown by Postgres's
- * descriptor-flow plan when `renderTypeScript()` is invoked (the CLI only
- * calls it in the class-flow branch of `migration plan`, so this acts as a
- * safety rail rather than a user-visible error in normal use).
- */
-export function errorPlanDoesNotSupportAuthoringSurface(options: {
-  readonly targetId: string;
-}): CliStructuredError {
-  return new CliStructuredError(
-    '2010',
-    'Migration plan does not support TypeScript authoring surface',
-    {
-      domain: 'MIG',
-      why: `Target "${options.targetId}" produced a descriptor-flow plan; descriptor-flow plans cannot be rendered back to TypeScript via renderTypeScript().`,
-      fix: 'This is an internal wiring error. Report it — the CLI should route descriptor-flow targets through renderDescriptorTypeScript, not renderTypeScript.',
-      meta: { targetId: options.targetId },
-    },
-  );
 }

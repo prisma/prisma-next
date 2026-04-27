@@ -84,10 +84,10 @@ await db.transaction(async (tx) => {
 ## Core API
 
 - [x] `db.transaction(callback)` is callable on `PostgresClient` and returns `Promise<T>` where `T` is the callback's return value.
-- [ ] The callback receives a context object with `orm`, `sql`, and `execute` properties.
-- [ ] `tx.orm` has the same collection types and API as `db.orm`.
+- [x] The callback receives a context object with `orm`, `sql`, and `execute` properties.
 - [x] `tx.sql` has the same table proxy types as `db.sql`.
 - [x] `tx.execute(plan)` executes a query plan against the transaction's connection.
+- [x] `tx.orm` has the same collection types and API as `db.orm`.
 
 ## Lifecycle
 
@@ -103,8 +103,8 @@ await db.transaction(async (tx) => {
 
 ## ORM integration
 
-- [ ] ORM operations inside `transaction` (including nested mutation patterns like `create` with relation callbacks) execute on the transaction's connection, not a new one.
-- [ ] ORM reads inside `transaction` see writes made earlier in the same transaction.
+- [x] ORM operations inside `transaction` (including nested mutation patterns like `create` with relation callbacks) execute on the transaction's connection, not a new one.
+- [x] ORM reads inside `transaction` see writes made earlier in the same transaction.
 
 ## Type safety
 

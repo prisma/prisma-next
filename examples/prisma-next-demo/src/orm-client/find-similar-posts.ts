@@ -1,6 +1,6 @@
-import type { Char } from '@prisma-next/adapter-postgres/codec-types';
 import type { ModelAccessor } from '@prisma-next/sql-orm-client';
 import type { Runtime } from '@prisma-next/sql-runtime';
+import type { Char } from '@prisma-next/target-postgres/codec-types';
 import type { Contract } from '../prisma/contract';
 import { createOrmClient } from './client';
 

@@ -1,36 +1,42 @@
 /**
- * User-facing `dataTransform` factory for the Postgres class-flow authoring
- * surface. Invoked directly inside a `migration.ts` file:
+ * User-facing `dataTransform` factory for the Postgres migration authoring
+ * surface. Invoked directly inside a `migration.ts` file via the
+ * `PostgresMigration` instance method (`this.dataTransform(...)`), which
+ * supplies the control adapter from the migration's injected stack:
  *
  * ```ts
  * import endContract from './end-contract.json' with { type: 'json' };
- * import { dataTransform } from '@prisma-next/target-postgres/migration';
  *
- * dataTransform(endContract, 'backfill emails', {
- *   check: () => db.users.count().where(({ email }) => email.isNull()),
- *   run:   () => db.users.update({ email: '' }).where(({ email }) => email.isNull()),
- * });
+ * class M extends Migration {
+ *   override get operations() {
+ *     return [
+ *       this.dataTransform(endContract, 'backfill emails', {
+ *         check: () => db.users.count().where(({ email }) => email.isNull()),
+ *         run:   () => db.users.update({ email: '' }).where(({ email }) => email.isNull()),
+ *       }),
+ *     ];
+ *   }
+ * }
  * ```
  *
  * The factory accepts lazy closures (`() => SqlQueryPlan | Buildable`),
  * invokes each one, asserts that its `meta.storageHash` matches the
  * `contract` it was handed (→ `PN-MIG-2005` on mismatch), and lowers the
- * plan via the Postgres adapter to a serialized `{sql, params}` payload
- * for `ops.json`. See
- * `projects/postgres-class-flow-migrations/specs/dataTransform-class-flow-design.md`
- * for the full design rationale.
+ * plan via the supplied control adapter to a serialized `{sql, params}`
+ * payload for `ops.json`. The free factory remains usable standalone
+ * (tests, ad-hoc tooling, non-class contexts) by passing the adapter
+ * explicitly as the fourth argument.
  */
 
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import type { Contract } from '@prisma-next/contract/types';
 import { errorDataTransformContractMismatch } from '@prisma-next/errors/migration';
+import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type {
   DataTransformOperation,
   SerializedQueryPlan,
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import { lowerSqlPlan } from '@prisma-next/sql-runtime';
 
 interface Buildable<R = unknown> {
   build(): SqlQueryPlan<R>;
@@ -49,21 +55,19 @@ export interface DataTransformOptions {
   readonly run: DataTransformClosure | readonly DataTransformClosure[];
 }
 
-/** Single shared adapter for apply/CLI; sufficient for single-threaded migration execution. */
-let adapterSingleton: ReturnType<typeof createPostgresAdapter> | null = null;
-function getAdapter(): ReturnType<typeof createPostgresAdapter> {
-  if (adapterSingleton === null) {
-    adapterSingleton = createPostgresAdapter();
-  }
-  return adapterSingleton;
-}
+/**
+ * Concrete Postgres flavor of `DataTransformOperation`, re-exported so the
+ * `PostgresMigration.dataTransform` instance method can name it without
+ * leaking the framework-components symbol into call sites.
+ */
+export type PostgresDataTransformOperation = DataTransformOperation;
 
 export function dataTransform<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   name: string,
   options: DataTransformOptions,
+  adapter: SqlControlAdapter<'postgres'>,
 ): DataTransformOperation {
-  const adapter = getAdapter();
   const runClosures: readonly DataTransformClosure[] = Array.isArray(options.run)
     ? options.run
     : [options.run as DataTransformClosure];
@@ -81,13 +85,13 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
 function invokeAndLower(
   closure: DataTransformClosure,
   contract: Contract<SqlStorage>,
-  adapter: ReturnType<typeof createPostgresAdapter>,
+  adapter: SqlControlAdapter<'postgres'>,
   name: string,
 ): SerializedQueryPlan {
   const result = closure();
   const plan = isBuildable(result) ? result.build() : result;
   assertContractMatches(plan, contract, name);
-  const lowered = lowerSqlPlan(adapter, contract, plan);
+  const lowered = adapter.lower(plan.ast, { contract });
   return { sql: lowered.sql, params: lowered.params };
 }
 

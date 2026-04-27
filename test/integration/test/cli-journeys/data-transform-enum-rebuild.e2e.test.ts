@@ -17,7 +17,7 @@
  * the post-apply enum has only the surviving values and the doomed
  * row was remapped.
  *
- * Phase 2 acceptance: covers `migrationPlanCallStrategies` end-to-end
+ * Phase 2 acceptance: covers `postgresPlannerStrategies` (data-safe path) end-to-end
  * for the enum-rebuild case (plan.md AC R2.2 #4).
  */
 
@@ -31,6 +31,7 @@ import {
   runMigrationApply,
   runMigrationEmit,
   runMigrationPlan,
+  runMigrationPlanAndEmit,
   setupJourney,
   sql,
   swapContract,
@@ -57,7 +58,7 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-status-enum');
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, `emit base: ${emit0.stderr}`).toBe(0);
-        const plan0 = await runMigrationPlan(ctx, ['--name', 'initial']);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(plan0.exitCode, `plan initial: ${plan0.stderr}`).toBe(0);
         const apply0 = await runMigrationApply(ctx);
         expect(apply0.exitCode, `apply initial: ${apply0.stderr}`).toBe(0);
@@ -99,7 +100,13 @@ withTempDir(({ createTempDir }) => {
         const manifestBefore = JSON.parse(
           readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
         );
-        expect(manifestBefore.migrationId).toBeNull();
+        // The package is fully attested even when the planner could not
+        // lower any calls because of placeholders: `ops.json` is `[]` and
+        // `migrationId` is the content-address over `(manifest, [])`.
+        // The author re-emits after filling in placeholders to rewrite
+        // both `ops.json` and `migrationId`.
+        expect(manifestBefore.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
+        expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
         const dbSetupBlock = [
           `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';`,

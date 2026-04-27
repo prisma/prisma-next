@@ -5,13 +5,22 @@ export interface MigrationHints {
   readonly used: readonly string[];
   readonly applied: readonly string[];
   readonly plannerVersion: string;
-  readonly planningStrategy: string;
 }
 
 /**
- * Shared fields for all migration manifests (draft and attested).
+ * On-disk migration manifest. Every migration is content-addressed: the
+ * `migrationId` is a hash over the manifest envelope plus the operations
+ * list, computed at write time. There is no draft state — a migration
+ * directory either exists with a fully attested manifest or it does not.
+ *
+ * When the planner cannot lower an operation because of an unfilled
+ * `placeholder(...)` slot, the migration is still written with
+ * `migrationId` hashed over `ops: []`. Re-running self-emit after the
+ * user fills the placeholder produces a *different* `migrationId`
+ * (committed to the real ops); this is intentional.
  */
-interface MigrationManifestBase {
+export interface MigrationManifest {
+  readonly migrationId: string;
   readonly from: string;
   readonly to: string;
   readonly kind: 'regular' | 'baseline';
@@ -24,37 +33,12 @@ interface MigrationManifestBase {
   readonly createdAt: string;
 }
 
-/**
- * A draft migration that has been planned but not yet attested.
- * Draft migrations have `migrationId: null` and are excluded from
- * graph reconstruction and apply.
- */
-export interface DraftMigrationManifest extends MigrationManifestBase {
-  readonly migrationId: null;
-}
-
-/**
- * An attested migration with a content-addressed migrationId.
- * Only attested migrations participate in the migration graph.
- */
-export interface AttestedMigrationManifest extends MigrationManifestBase {
-  readonly migrationId: string;
-}
-
-/**
- * Union of draft and attested manifests. This is what the on-disk
- * format represents — `migrationId` is `null` for drafts, a string
- * for attested migrations.
- */
-export type MigrationManifest = DraftMigrationManifest | AttestedMigrationManifest;
-
 export type MigrationOps = readonly MigrationPlanOperation[];
 
 /**
  * An on-disk migration directory containing a manifest and operations.
- * The manifest may be draft or attested.
  */
-export interface BaseMigrationBundle {
+export interface MigrationBundle {
   readonly dirName: string;
   readonly dirPath: string;
   readonly manifest: MigrationManifest;
@@ -62,20 +46,8 @@ export interface BaseMigrationBundle {
 }
 
 /**
- * A bundle known to be attested (migrationId is a string).
- * Use this after filtering bundles to attested-only.
- */
-export interface AttestedMigrationBundle extends BaseMigrationBundle {
-  readonly manifest: AttestedMigrationManifest;
-}
-
-export interface DraftMigrationBundle extends BaseMigrationBundle {
-  readonly manifest: DraftMigrationManifest;
-}
-
-/**
- * An entry in the migration graph. Only attested migrations appear in the
- * graph, so `migrationId` is always a string.
+ * An entry in the migration graph. All on-disk migrations are attested,
+ * so `migrationId` is always a string.
  */
 export interface MigrationChainEntry {
   readonly from: string;
@@ -91,16 +63,4 @@ export interface MigrationGraph {
   readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
   readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
   readonly migrationById: ReadonlyMap<string, MigrationChainEntry>;
-}
-
-/**
- * Type guard that narrows a MigrationBundle to an AttestedMigrationBundle.
- * Use with `.filter(isAttested)` to get a typed array of attested bundles.
- */
-export function isAttested(bundle: BaseMigrationBundle): bundle is AttestedMigrationBundle {
-  return typeof bundle.manifest.migrationId === 'string';
-}
-
-export function isDraft(bundle: BaseMigrationBundle): bundle is DraftMigrationBundle {
-  return bundle.manifest.migrationId === null;
 }

@@ -15,7 +15,6 @@ import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 import { createPostgresMigrationPlanner } from '../core/migrations/planner';
 import { renderDefaultLiteral } from '../core/migrations/planner-ddl-builders';
 import type { PostgresPlanTargetDetails } from '../core/migrations/planner-target-details';
-import { postgresEmit } from '../core/migrations/postgres-emit';
 import { createPostgresMigrationRunner } from '../core/migrations/runner';
 
 function buildNativeTypeExpander(
@@ -70,7 +69,6 @@ const postgresTargetDescriptor: SqlControlTargetDescriptor<'postgres', PostgresP
           frameworkComponents: frameworkComponents ?? [],
         });
       },
-      emit: postgresEmit,
     },
     create(): ControlTargetInstance<'sql', 'postgres'> {
       return {

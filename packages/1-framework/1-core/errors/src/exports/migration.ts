@@ -3,8 +3,7 @@ export {
   errorMigrationFileMissing,
   errorMigrationInvalidDefaultExport,
   errorMigrationPlanNotArray,
-  errorPlanDoesNotSupportAuthoringSurface,
-  errorTargetHasIncompleteMigrationCapabilities,
+  errorMigrationTargetMismatch,
   errorUnfilledPlaceholder,
   placeholder,
 } from '../migration';
