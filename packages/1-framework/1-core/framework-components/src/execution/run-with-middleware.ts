@@ -54,7 +54,7 @@ export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
       for (const mw of middleware) {
         if (mw.afterExecute) {
           try {
-            await mw.afterExecute(exec, { rowCount, latencyMs, completed }, ctx);
+            await mw.afterExecute(exec, { rowCount, latencyMs, completed, source: 'driver' }, ctx);
           } catch {
             // Swallow afterExecute errors during the error path so they do not
             // mask the original driver error.
@@ -68,7 +68,7 @@ export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
     const latencyMs = Date.now() - startedAt;
     for (const mw of middleware) {
       if (mw.afterExecute) {
-        await mw.afterExecute(exec, { rowCount, latencyMs, completed }, ctx);
+        await mw.afterExecute(exec, { rowCount, latencyMs, completed, source: 'driver' }, ctx);
       }
     }
   };
