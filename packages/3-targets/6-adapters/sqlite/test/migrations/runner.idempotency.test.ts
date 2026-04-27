@@ -57,7 +57,12 @@ describe('SqliteMigrationRunner - Idempotency', () => {
           operationClass: 'additive',
           target: { id: 'sqlite', details: { schema: 'main', objectType: 'table', name: 'user' } },
           precheck: [],
-          execute: [{ description: 'explode', sql: 'SELECT 1/0' }],
+          execute: [
+            {
+              description: 'explode',
+              sql: "SELECT raise(FAIL, 'must not execute')",
+            },
+          ],
           postcheck: [],
         },
       ],
@@ -110,8 +115,18 @@ describe('SqliteMigrationRunner - Idempotency', () => {
           summary: 'Skipped because postcheck is already satisfied',
           operationClass: 'additive',
           target: { id: 'sqlite', details: { schema: 'main', objectType: 'table', name: 'user' } },
-          precheck: [{ description: 'would fail if evaluated', sql: 'SELECT 0' }],
-          execute: [{ description: 'would fail if executed', sql: 'SELECT 1/0' }],
+          precheck: [
+            {
+              description: 'would fail if evaluated',
+              sql: "SELECT raise(FAIL, 'must not run precheck')",
+            },
+          ],
+          execute: [
+            {
+              description: 'would fail if executed',
+              sql: "SELECT raise(FAIL, 'must not run execute')",
+            },
+          ],
           postcheck: [
             {
               description: 'user table exists',

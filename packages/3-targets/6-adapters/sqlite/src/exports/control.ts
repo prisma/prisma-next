@@ -23,10 +23,10 @@ const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
 export default sqliteAdapterDescriptor;
 
 // `parseSqliteDefault`, `normalizeSqliteNativeType`, `quoteIdentifier`,
-// `escapeLiteral`, and `SqlEscapeError` live target-side now (mirroring
-// Postgres's one-way adapter→target edge). Re-exported here to preserve the
-// public surface that the e2e harness, demos, and downstream consumers
-// already depend on.
+// `escapeLiteral`, and `SqlEscapeError` live target-side (one-way
+// `adapter → target` edge, matching Postgres). Re-exported from the
+// adapter so consumers — both internal and downstream — see the same
+// adapter-shaped surface across SQL targets.
 export { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
 export { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 export {
@@ -34,4 +34,12 @@ export {
   quoteIdentifier,
   SqlEscapeError,
 } from '@prisma-next/target-sqlite/sql-utils';
+
+// `SqlControlAdapterDescriptor` is declared in two places in the codebase
+// (`family-sql/control-adapter` and `family-sql/migrations/types`); the
+// migrations-side declaration narrows `create()`'s return type to the base
+// `ControlAdapterInstance`, hiding `introspect`/`readMarker`. Until that's
+// reconciled upstream, downstream consumers (e2e harness, integration
+// tests) need direct access to the concrete class. Mirrors how Postgres'
+// own package tests import `PostgresControlAdapter` directly.
 export { SqliteControlAdapter } from '../core/control-adapter';

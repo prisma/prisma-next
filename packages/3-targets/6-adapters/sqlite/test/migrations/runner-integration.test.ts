@@ -7,7 +7,7 @@ import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-c
 // because the adapter is the package that pulls everything together.
 import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
-import { SqliteControlAdapter } from '../../src/exports/control';
+import { SqliteControlAdapter } from '../../src/core/control-adapter';
 
 function createMemoryDriver() {
   const db = new DatabaseSync(':memory:');

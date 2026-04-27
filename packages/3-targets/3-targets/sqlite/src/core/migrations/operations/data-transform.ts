@@ -27,9 +27,12 @@ export interface DataTransformOptions {
    */
   readonly description: string;
   /**
-   * Lazy producer of the SQL string to execute. Lazy so planner-emitted
-   * stubs can embed `() => placeholder(...)` without throwing at
-   * module-load time — only when the op is enumerated for execution.
+   * Producer of the SQL string to execute. Invoked eagerly by
+   * `dataTransform(...)`, mirroring the Postgres factory — by the time the
+   * user calls this factory in `migration.ts`, the SQL is expected to be
+   * ready. Planner-emitted stubs that need to defer until the user fills
+   * in the SQL go through `DataTransformCall.renderTypeScript()` instead;
+   * this factory is only for the post-fill, runnable form.
    */
   readonly run: () => string;
 }

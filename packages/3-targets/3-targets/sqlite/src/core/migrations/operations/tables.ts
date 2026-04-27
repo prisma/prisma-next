@@ -1,5 +1,6 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
+import { stripOuterParens } from '../../default-normalizer';
 import { quoteIdentifier } from '../../sql-utils';
 import { buildCreateIndexSql } from '../planner-ddl-builders';
 import { buildTargetDetails } from '../planner-target-details';
@@ -122,6 +123,20 @@ export function recreateTable(args: RecreateTableArgs): Op {
     sql: buildCreateIndexSql(tableName, idx.name, idx.columns),
   }));
 
+  // If the contract retains no columns from the live table, an `INSERT INTO
+  // tmp () SELECT FROM old` is invalid SQL — and would also be a no-op since
+  // there's nothing to copy. Skip the copy step in that case; the new
+  // (empty) table replaces the old one directly.
+  const copyStep =
+    sharedColumns.length > 0
+      ? [
+          step(
+            `copy data from "${tableName}" to "${tempName}"`,
+            `INSERT INTO ${quoteIdentifier(tempName)} (${columnList}) SELECT ${columnList} FROM ${quoteIdentifier(tableName)}`,
+          ),
+        ]
+      : [];
+
   return {
     id: `recreateTable.${tableName}`,
     label: `Recreate table ${tableName}`,
@@ -143,10 +158,7 @@ export function recreateTable(args: RecreateTableArgs): Op {
         `create new table "${tempName}" with desired schema`,
         renderCreateTableSql(tempName, contractTable),
       ),
-      step(
-        `copy data from "${tableName}" to "${tempName}"`,
-        `INSERT INTO ${quoteIdentifier(tempName)} (${columnList}) SELECT ${columnList} FROM ${quoteIdentifier(tableName)}`,
-      ),
+      ...copyStep,
       step(`drop old table "${tableName}"`, `DROP TABLE ${quoteIdentifier(tableName)}`),
       step(
         `rename "${tempName}" to "${tableName}"`,
@@ -188,16 +200,28 @@ function buildIssuePostchecks(
     if (!issue.column) continue;
     const c = esc(issue.column);
     if (issue.kind === 'nullability_mismatch') {
-      const wantNotNull = issue.expected !== 'true';
-      checks.push({
-        description: `verify "${issue.column}" nullability on "${tableName}"`,
-        sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${wantNotNull ? 1 : 0}`,
-      });
+      // `expected` carries the contract's nullable flag as a string. We only
+      // emit a postcheck when the value is recognized — anything else
+      // (case-folded, numeric coding, etc.) is left to the structural
+      // verifier so a typo here can't silently invert the meaning.
+      let wantNotNull: boolean | undefined;
+      if (issue.expected === 'false') wantNotNull = true;
+      else if (issue.expected === 'true') wantNotNull = false;
+      if (wantNotNull !== undefined) {
+        checks.push({
+          description: `verify "${issue.column}" nullability on "${tableName}"`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND "notnull" = ${wantNotNull ? 1 : 0}`,
+        });
+      }
     }
     if (issue.kind === 'default_mismatch' || issue.kind === 'default_missing') {
       const spec = byName.get(issue.column);
       const expectedRaw = spec?.defaultSql.startsWith('DEFAULT ')
-        ? spec.defaultSql.slice('DEFAULT '.length)
+        ? // SQLite's pragma_table_info.dflt_value strips outer parens for
+          // expression defaults (per the SQLite docs), so `(datetime('now'))`
+          // is stored as `datetime('now')`. Strip them here so the postcheck
+          // matches.
+          stripOuterParens(spec.defaultSql.slice('DEFAULT '.length))
         : null;
       if (expectedRaw) {
         checks.push({

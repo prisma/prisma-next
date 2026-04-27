@@ -3,11 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { integerColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
-import sqliteAdapterDescriptor, {
-  normalizeSqliteNativeType,
-  parseSqliteDefault,
-  SqliteControlAdapter,
-} from '@prisma-next/adapter-sqlite/control';
+import sqliteAdapterDescriptor, { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import type { Contract } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, {
@@ -22,6 +18,8 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { field } from '@prisma-next/sql-contract-ts/contract-builder';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
+import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
 
 const familyInstance = sqlFamilyDescriptor.create(
@@ -87,6 +85,14 @@ export interface MigrationResult {
   readonly driver: Driver;
   readonly schema: SqlSchemaIR;
   readonly operationsExecuted: number;
+  /**
+   * Operation IDs that the destination plan emitted. Useful when a test
+   * needs to verify that a *specific* operation kind (e.g. recreate-table)
+   * actually fired, since identical-shaped contracts on either side can
+   * still pass schema-level assertions even if the planner suppressed the
+   * operation that the test was meant to exercise.
+   */
+  readonly plannedOperationIds: readonly string[];
 }
 
 function formatFailure(f: SqlMigrationRunnerFailure): string {
@@ -182,6 +188,7 @@ export async function applyMigration(
       driver,
       schema: { ...freshSchema, tables: userTables },
       operationsExecuted: runResult.value.operationsExecuted,
+      plannedOperationIds: planResult.plan.operations.map((op) => op.id),
     });
   } finally {
     testDb.cleanup();

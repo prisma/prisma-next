@@ -130,7 +130,9 @@ function resolveColumnTypeMetadata(
   }
   const referencedType = storageTypes[column.typeRef];
   if (!referencedType) {
-    return column;
+    throw new Error(
+      `Storage type "${column.typeRef}" referenced by column is not defined in storage.types.`,
+    );
   }
   return {
     codecId: referencedType.codecId,
