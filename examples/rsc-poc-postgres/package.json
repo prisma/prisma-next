@@ -1,0 +1,58 @@
+{
+  "name": "rsc-poc-postgres",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "emit": "prisma-next contract emit",
+    "emit:check": "pnpm emit && git diff --exit-code src/prisma/contract.json src/prisma/contract.d.ts",
+    "db:init": "prisma-next db init",
+    "db:drop": "tsx scripts/drop-db.ts",
+    "seed": "tsx scripts/seed.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "stress:baseline": "k6 run scripts/stress.k6.js -e SCENARIO=baseline",
+    "stress:spike": "k6 run scripts/stress.k6.js -e SCENARIO=spike",
+    "stress:pool-pressure": "k6 run scripts/stress.k6.js -e SCENARIO=pool_pressure",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-postgres": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
+    "@prisma-next/family-sql": "workspace:*",
+    "@prisma-next/middleware-telemetry": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
+    "@prisma-next/sql-contract": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
+    "@prisma-next/sql-orm-client": "workspace:*",
+    "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
+    "arktype": "^2.1.29",
+    "dotenv": "^16.4.5",
+    "next": "^16.1.7",
+    "pg": "catalog:",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/emitter": "workspace:*",
+    "@prisma-next/sql-contract-emitter": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
