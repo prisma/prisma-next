@@ -156,4 +156,30 @@ describe('runCheck', () => {
     expect(runCheck({ argv: [], io })).toBe(1);
     expect(rm).toHaveBeenCalledTimes(1);
   });
+
+  it('emits structured JSON when --json is passed', () => {
+    const stdoutWrite = vi.fn();
+    const { io, rm } = makeIo({
+      listPublishablePackageDirs: () => ['packages/foo'],
+      readdirSync: () => ['scope-foo-1.0.0.tgz'],
+      readPackageJson: () => ({ name: '@scope/foo', version: '1.0.0' }),
+      readPackedManifest: () => ({
+        dependencies: { bad: 'workspace:*' },
+      }),
+      stdoutWrite,
+    });
+
+    expect(runCheck({ argv: ['--json'], io })).toBe(1);
+    expect(stdoutWrite).toHaveBeenCalledTimes(1);
+
+    const payload = JSON.parse(stdoutWrite.mock.calls[0][0]);
+    expect(payload.ok).toBe(false);
+    expect(payload.offenders).toHaveLength(1);
+    expect(payload.offenders[0]).toMatchObject({
+      pkg: '@scope/foo',
+      tarball: 'scope-foo-1.0.0.tgz',
+      leaks: [{ field: 'dependencies', name: 'bad', spec: 'workspace:*' }],
+    });
+    expect(rm).toHaveBeenCalledTimes(1);
+  });
 });
