@@ -107,7 +107,7 @@ The ORM covers the common cases. When you genuinely need something it can't expr
 - **Don't restructure `db.ts`.** It's scaffolded by init and works as-is. `db` connects lazily on the first query — there is no `db.connect(...)` step.
 - **Root accessors are emitter-driven.** Use the lowercased plural collection name (e.g. `db.orm.users`, `db.orm.posts`) — not the PascalCase model name. Re-run `{{pkgRun}} contract emit` if a new model's accessor isn't appearing on `db.orm`.
 - **Connection string** is `DATABASE_URL` in `.env`. If the user reports connection errors, check this value and the `.env` file.
-- **Transactions and change streams** require a MongoDB **replica set**. The Mongo facade does not yet expose `db.transaction(...)` — for now, use the `mongoClient` escape hatch above to drive transactions/sessions directly. See the quick reference for dev-environment options and the linked roadmap ticket.
+- **Transactions and change streams** require a MongoDB **replica set**. The Mongo facade does not yet expose `db.transaction(...)` — for now, use the `mongoClient` escape hatch above to drive transactions/sessions directly. See the quick reference for dev-environment options; the typed transaction API is tracked under [TML-2313](https://linear.app/prisma-company/issue/TML-2313/mongo-dev-replica-set-story-is-missing-transactions-change-streams).
 - **Don't reach for `db.runtime()`** as an escape hatch. It returns the internal executor (`MongoRuntime`), not a `mongodb` `MongoClient` or `Db`. Use `db.query` for raw aggregations and the `mongoClient` binding for direct driver control.
 
 ## Workflow for common tasks
