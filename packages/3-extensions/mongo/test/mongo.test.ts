@@ -225,14 +225,24 @@ describe('mongo() facade', () => {
     ).toThrow(/dbName/);
   });
 
-  it('throws for { url, dbName: "   " } (whitespace-only dbName)', () => {
+  it('throws for { url, dbName: "   " } (whitespace-only dbName) — URL without path', () => {
     expect(() =>
       mongo({
         contract: fakeContract,
         url: 'mongodb://localhost:27017',
         dbName: '   ',
       }),
-    ).toThrow('Mongo URL must include a database name');
+    ).toThrow('Mongo binding via { url, dbName } requires a non-empty dbName');
+  });
+
+  it('throws for { url: "mongodb://host/mydb", dbName: "   " } (whitespace-only dbName must not silently fall back to URL path)', () => {
+    expect(() =>
+      mongo({
+        contract: fakeContract,
+        url: 'mongodb://localhost:27017/mydb',
+        dbName: '   ',
+      }),
+    ).toThrow('Mongo binding via { url, dbName } requires a non-empty dbName');
   });
 
   it('throws for { uri, dbName: "   " } (whitespace-only dbName)', () => {
