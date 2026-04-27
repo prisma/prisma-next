@@ -7,6 +7,7 @@ export type { RuntimeErrorEnvelope } from '../runtime-error';
 export { runtimeError } from '../runtime-error';
 export type {
   AfterExecuteResult,
+  InterceptResult,
   RuntimeExecutor,
   RuntimeLog,
   RuntimeMiddleware,

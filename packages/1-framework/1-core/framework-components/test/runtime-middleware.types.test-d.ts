@@ -2,6 +2,7 @@ import type { PlanMeta } from '@prisma-next/contract/types';
 import { assertType, expectTypeOf, test } from 'vitest';
 import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
 import type {
+  InterceptResult,
   RuntimeExecutor,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
@@ -53,9 +54,82 @@ test('RuntimeMiddleware default plan parameter sees only QueryPlan fields', () =
       assertType<number>(result.rowCount);
       assertType<number>(result.latencyMs);
       assertType<boolean>(result.completed);
+      assertType<'driver' | 'middleware'>(result.source);
     },
   };
   void middleware;
+});
+
+test('RuntimeMiddleware.intercept is optional', () => {
+  // No `intercept` field — perfectly valid.
+  const observer: RuntimeMiddleware = {
+    name: 'observer',
+    async beforeExecute() {},
+  };
+  void observer;
+});
+
+test('RuntimeMiddleware.intercept receives the plan and context, returns Promise<InterceptResult | undefined>', () => {
+  const interceptor: RuntimeMiddleware = {
+    name: 'interceptor',
+    async intercept(plan, ctx) {
+      assertType<PlanMeta>(plan.meta);
+      assertType<RuntimeMiddlewareContext>(ctx);
+      return undefined;
+    },
+  };
+  void interceptor;
+
+  // The hook's return type is exactly `Promise<InterceptResult | undefined>`.
+  type InterceptHook = NonNullable<RuntimeMiddleware['intercept']>;
+  expectTypeOf<ReturnType<InterceptHook>>().toEqualTypeOf<Promise<InterceptResult | undefined>>();
+});
+
+test('RuntimeMiddleware.intercept narrows the plan parameter alongside other hooks', () => {
+  interface SqlExec extends ExecutionPlan {
+    readonly sql: string;
+    readonly params: readonly unknown[];
+  }
+  const middleware: RuntimeMiddleware<SqlExec> = {
+    name: 'sql-interceptor',
+    async intercept(plan) {
+      assertType<string>(plan.sql);
+      assertType<readonly unknown[]>(plan.params);
+      return undefined;
+    },
+  };
+  void middleware;
+});
+
+test('InterceptResult.rows accepts Iterable, AsyncIterable, and arrays', () => {
+  // Array (which is also Iterable) — common case for cached rows.
+  const fromArray: InterceptResult = {
+    rows: [{ id: 1 }, { id: 2 }],
+  };
+  void fromArray;
+
+  // Sync generator (Iterable).
+  function* syncGen(): Generator<Record<string, unknown>, void, unknown> {
+    yield { id: 1 };
+  }
+  const fromSyncGen: InterceptResult = {
+    rows: syncGen(),
+  };
+  void fromSyncGen;
+
+  // Async generator (AsyncIterable).
+  async function* asyncGen(): AsyncGenerator<Record<string, unknown>, void, unknown> {
+    yield { id: 1 };
+  }
+  const fromAsyncGen: InterceptResult = {
+    rows: asyncGen(),
+  };
+  void fromAsyncGen;
+});
+
+test('InterceptResult rejects rows whose elements are not Record<string, unknown>', () => {
+  // @ts-expect-error - row elements must be Record<string, unknown>
+  const _bad: InterceptResult = { rows: [1, 2, 3] };
 });
 
 test('RuntimeMiddleware narrowed to a SQL plan sees the SQL fields', () => {
