@@ -46,7 +46,7 @@ Port the Prisma Data Platform Management API's read endpoints to Prisma Next, ru
 
 Tasks:
 
-1. **Author the PDP contract in PSL** — model the Management API's schema in Prisma Next PSL, emit the contract, and verify the output is correct against the live database.
+1. **Author the PDP contract in PSL** — model the Management API's schema in Prisma Next PSL, emit the contract, and verify the output is correct against the live database. Produce a PSL parity audit as a side-effect, classifying each gap encountered as `greenfield-blocker`, `defer-to-june`, or `worked-around-for-EA`. The audit is the input to WS5.
 2. **Port read API endpoints** — replace Prisma 7 queries with Prisma Next ORM queries for all `get` and `list` operations. Use the SQL DSL as an escape hatch where the ORM can't express the query.
 3. **Define the facade surface** — based on what you actually needed to import, define the public API for `@prisma-next/postgres`. Document what's exposed and what's internal.
 
@@ -82,7 +82,7 @@ Validate that an external, large-scale Next.js application can adopt Prisma Next
 
 Tasks:
 
-1. **Contract authoring** — author a contract for Cal.com's schema (or a representative subset). Note any schema features that can't be expressed.
+1. **Contract authoring** — author a contract for Cal.com's schema (or a representative subset). Note any schema features that can't be expressed; greenfield-shaped gaps feed WS5, brownfield-shaped gaps (P7→PN syntax) feed the June milestone draft.
 2. **Side-by-side setup** — configure PN alongside P7 in the Cal.com codebase. Verify the two can coexist without conflicts.
 3. **Basic query port** — port a small number of queries to PN. Exercise both ORM and SQL DSL.
 4. **Document the adoption path** — write up what worked, what didn't, and what a Cal.com developer would need to know. Hand off to DevRel.
@@ -250,7 +250,60 @@ Checkpoint: `migration plan`, `migration apply`, and `migration status` work cor
 
 ---
 
-## WS5: CLI + error consistency
+## WS5: PSL authoring for greenfield
+
+**People**: queued (picked up when an earlier workstream completes; gated on WS1 M1 audit)
+
+PSL is the primary authoring surface for the EA audience. A greenfield user picking up Prisma Next will write a `schema.prisma` for their domain — orgs, users, memberships, posts, tags, audit columns — and expect the language to handle the patterns they already know from any modern ORM. Today the SQL PSL provider has gaps that turn common greenfield patterns into roadblocks (native scalar arrays, composite primary keys, `@updatedAt`, inline `@db.X`).
+
+**Scope is greenfield only.** This workstream does not own P7→PN upgrade syntax (`@ignore`, `@@schema`, implicit many-to-many, views, `Unsupported(...)` round-trip) — those are June concerns once the EA story is real. The acceptance test is "a typical SaaS skeleton authors cleanly in PSL without workarounds."
+
+**Key risks**:
+
+- Some gaps (native scalar arrays, composite PKs) require contract-IR and codec changes that ripple through emit, migrate, and ORM, not just the PSL layer. The work is wider than its name suggests.
+- The list of "common greenfield patterns" can grow without bound. Without a tight bound, this workstream becomes "make PSL match Prisma 7" — exactly the June work we're deferring.
+- Some changes (inline `@db.X`) interact with the printer's named-type strategy and risk producing inconsistent contracts on a `infer → edit → emit` round-trip.
+
+#### Milestone 1: Greenfield gap inventory (gate)
+
+The scout (WS1 M1) authors the Management API contract and produces the parity audit. This workstream picks up the `greenfield-blocker` set, prioritizes it against representative greenfield schemas, and cuts the list to what fits the available capacity.
+
+Tasks:
+
+1. **Reconcile the audit with greenfield exemplars** — cross-reference scout findings with at least two reference schemas: a SaaS skeleton (orgs, users, memberships, posts, tags, audit timestamps) and one public starter (e.g. T3-shaped Next.js app).
+2. **Classify and cut** — confirm each item is greenfield-shaped and not P7-upgrade-shaped. Items that don't fit get explicitly listed in the June milestone doc rather than implicitly deferred.
+3. **Document the in-scope set** — produce a short, ticket-backed plan covering at most two weeks of one engineer.
+
+Checkpoint: A scoped, prioritized backlog of greenfield-blocker PSL gaps exists. Items deferred to June are explicitly captured in the June milestone draft.
+
+#### Milestone 2: High-frequency authoring fixes
+
+The non-negotiables for greenfield SaaS authoring. Each of these is something a competent backend engineer expects to "just work" on day one.
+
+Tasks:
+
+1. **Native scalar arrays** — `String[]`, `Int[]`, etc. lower to native Postgres arrays (`text[]`, `int4[]`) with their own codecs, not JSON. Mongo arrays already work natively. (TML-1909.)
+2. **Composite primary keys (`@@id`)** — accept `@@id([col1, col2])` in the interpreter. Closes the printer↔interpreter asymmetry that breaks `contract infer` round-trip on any junction table.
+3. **`@updatedAt`** — register as a built-in execution default that updates on every mutation. Wire through both SQL and Mongo ORM mutation paths.
+4. **Inline `@db.X`** — accept native-type attributes directly on model fields (`email String @db.VarChar(255)`), or — if the named-type architecture makes that disruptive — emit an actionable diagnostic that produces a one-step fix-it suggestion pointing to the `types {}` alias.
+
+Checkpoint: A SaaS skeleton schema (orgs, users, memberships with composite PK, posts with `tags String[]`, audit `createdAt`/`updatedAt` columns, `@db.Text` descriptions, `@db.VarChar` slugs) authors cleanly in PSL, emits a working contract, migrates onto a fresh Postgres database without manual edits, and round-trips through `contract infer` back to an equivalent PSL source.
+
+#### Milestone 3: Authoring ergonomics
+
+The remaining items the scout flagged that affect "first 30 minutes of use" but don't require the same depth of refactor.
+
+Tasks:
+
+1. **Diagnostic quality on rejected constructs** — every `PSL_UNSUPPORTED_*` diagnostic carries an explicit hint: what's not supported, why, and the recommended workaround (or "deferred to June, see <link>").
+2. **Test-backed parity inventory** — replace ad-hoc product docs with a parity matrix derived from the diagnostic registry plus integration test fixtures, so it can't drift unnoticed. Owner can be DevRel later, but the source of truth is the codebase.
+3. **TS-authoring spillover** — items the scout flags in TS authoring that overlap with the PSL gaps fixed in M2 are filed and addressed where they share a contract-IR change; otherwise queued for June.
+
+Checkpoint: A first-time user opens the docs, sees the supported PSL surface and known limitations, authors a contract, and recovers gracefully from any limitation diagnostic.
+
+---
+
+## WS6: CLI + error consistency
 
 **People**: queued (picked up when an earlier workstream completes)
 
@@ -300,29 +353,20 @@ Checkpoint: A CI/CD pipeline runs migration plan, preflight, and apply using the
 
 ---
 
-## WS6: Developer workflow commands
+## WS7: Developer workflow commands
 
 **People**: queued (picked up when an earlier workstream completes)
 
-Not everyone uses migrations, especially during early development. `db update` ("just make my dev database match my schema") and `db init` ("set up a fresh database") are the non-migration workflow for day-to-day development. `contract infer` ("generate a contract from an existing database") is the onboarding path for existing projects. These commands are how developers get started and iterate quickly — they need to work reliably across all targets.
+Not everyone uses migrations, especially during early development. `db update` ("just make my dev database match my schema") and `db init` ("set up a fresh database") are the non-migration workflow for day-to-day development. These commands are how greenfield developers get started and iterate quickly — they need to work reliably across all targets.
+
+`contract infer` (introspect an existing database into a contract) already ships for SQL targets. Its greenfield round-trip parity (the patterns WS5 makes authorable must also be inferable cleanly so `db init → contract infer` produces an equivalent contract) is owned by WS5 as part of printer↔interpreter symmetry. Brownfield-specific pattern coverage (e.g. `@ignore` for unrepresentable columns, `@@schema`, implicit many-to-many inference, views, `Unsupported(...)` placeholders) is deferred to June.
 
 **Key risks**:
 
-- `contract infer` may produce incomplete or incorrect contracts for complex schemas, creating a bad first impression
 - `db update` may fail on schema changes that the migration planner handles, confusing users about which tool to use when
+- `db init` correctness is critical: a wrong fresh-database setup destroys trust before the user runs a single query
 
-#### Milestone 1: `contract infer` coverage
-
-`contract infer` is the onboarding path for existing projects. It needs to handle the schema patterns users actually have.
-
-Tasks:
-
-1. **Broaden pattern support** — handle common schema patterns (relations, enums, indexes, constraints) across Postgres and SQLite.
-2. **Verify output quality** — the inferred contract should be usable as-is for basic queries without manual editing.
-
-Checkpoint: `contract infer` produces a usable contract from a representative Postgres and SQLite database. The inferred contract is complete enough to run basic ORM queries without manual corrections.
-
-#### Milestone 2: `db update` and `db init` reliability
+#### Milestone 1: `db update` and `db init` reliability
 
 `db update` is the fast iteration tool for development. `db init` sets up a fresh database from a contract. Both must work reliably across all targets.
 
