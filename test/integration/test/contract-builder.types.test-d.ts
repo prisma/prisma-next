@@ -1,4 +1,3 @@
-import type { JsonValue } from '@prisma-next/adapter-postgres/codec-types';
 import {
   int4Column,
   jsonb,
@@ -14,6 +13,7 @@ import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
+import type { JsonValue } from '@prisma-next/target-postgres/codec-types';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { type as arktype } from 'arktype';
 import { expectTypeOf, test } from 'vitest';

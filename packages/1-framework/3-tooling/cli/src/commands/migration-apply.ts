@@ -112,7 +112,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -149,8 +149,8 @@ async function executeMigrationApplyCommand(
   if (options.ref) {
     refName = options.ref;
     try {
-      const refs = await readRefs(refsPath);
-      destinationHash = resolveRef(refs, refName);
+      const refs = await readRefs(refsDir);
+      destinationHash = resolveRef(refs, refName).hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));

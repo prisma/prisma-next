@@ -21,20 +21,29 @@ export interface RuntimeTelemetryEvent {
   readonly durationMs?: number;
 }
 
-export interface RuntimeCoreOptions<TContract = unknown, TDriver = unknown> {
+export interface RuntimeCoreOptions<
+  TContract = unknown,
+  TDriver = unknown,
+  TMiddleware extends Middleware<TContract> = Middleware<TContract>,
+> {
   readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   readonly driver: TDriver;
   readonly verify: RuntimeVerifyOptions;
-  readonly middleware?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly TMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }
 
-export interface RuntimeCore<TContract = unknown, TDriver = unknown>
-  extends RuntimeQueryable,
+export interface RuntimeCore<
+  TContract = unknown,
+  TDriver = unknown,
+  TMiddleware extends Middleware<TContract> = Middleware<TContract>,
+> extends RuntimeQueryable,
     RuntimeExecutor<ExecutionPlan> {
   readonly _typeContract?: TContract;
   readonly _typeDriver?: TDriver;
+  readonly middleware: readonly TMiddleware[];
+  readonly middlewareContext: MiddlewareContext<TContract>;
   connection(): Promise<RuntimeConnection>;
   telemetry(): RuntimeTelemetryEvent | null;
   close(): Promise<void>;
@@ -116,24 +125,27 @@ interface DriverWithClose<_TDriver> {
   close(): Promise<void>;
 }
 
-class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
-  implements RuntimeCore<TContract, TDriver>
+class RuntimeCoreImpl<
+  TContract = unknown,
+  TDriver = unknown,
+  TMiddleware extends Middleware<TContract> = Middleware<TContract>,
+> implements RuntimeCore<TContract, TDriver, TMiddleware>
 {
   readonly _typeContract?: TContract;
   readonly _typeDriver?: TDriver;
+  readonly middleware: readonly TMiddleware[];
+  readonly middlewareContext: MiddlewareContext<TContract>;
   private readonly contract: TContract;
   private readonly familyAdapter: RuntimeFamilyAdapter<TContract>;
   private readonly driver: TDriver;
-  private readonly middleware: readonly Middleware<TContract>[];
   private readonly mode: 'strict' | 'permissive';
   private readonly verify: RuntimeVerifyOptions;
-  private readonly middlewareContext: MiddlewareContext<TContract>;
 
   private verified: boolean;
   private startupVerified: boolean;
   private _telemetry: RuntimeTelemetryEvent | null;
 
-  constructor(options: RuntimeCoreOptions<TContract, TDriver>) {
+  constructor(options: RuntimeCoreOptions<TContract, TDriver, TMiddleware>) {
     const { familyAdapter, driver } = options;
     this.contract = familyAdapter.contract;
     this.familyAdapter = familyAdapter;
@@ -371,8 +383,12 @@ class RuntimeCoreImpl<TContract = unknown, TDriver = unknown>
   }
 }
 
-export function createRuntimeCore<TContract = unknown, TDriver = unknown>(
-  options: RuntimeCoreOptions<TContract, TDriver>,
-): RuntimeCore<TContract, TDriver> {
+export function createRuntimeCore<
+  TContract = unknown,
+  TDriver = unknown,
+  TMiddleware extends Middleware<TContract> = Middleware<TContract>,
+>(
+  options: RuntimeCoreOptions<TContract, TDriver, TMiddleware>,
+): RuntimeCore<TContract, TDriver, TMiddleware> {
   return new RuntimeCoreImpl(options);
 }

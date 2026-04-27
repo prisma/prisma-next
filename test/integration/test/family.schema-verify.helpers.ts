@@ -15,9 +15,9 @@ import postgres from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import { beforeAll } from 'vitest';
 
-export type { CodecTypes } from '@prisma-next/adapter-postgres/codec-types';
 // Re-export common imports for test files
 export { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
+export type { CodecTypes } from '@prisma-next/target-postgres/codec-types';
 export { postgresAdapter, postgresDriver, sql, postgres };
 export { validateContract };
 export type { Contract, SqlStorage };

@@ -237,7 +237,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     expect(migrationTs).toContain('createIndex');
     // Prettier rewrites double-quoted literals to single-quoted on disk.
     expect(migrationTs).toContain("'users'");
-    expect(migrationTs).toContain('Migration.run(import.meta.url');
+    expect(migrationTs).toContain('MigrationCLI.run(import.meta.url');
 
     expect(readFileSync(join(migrationDir, 'end-contract.json'), 'utf-8')).toBe(
       readFileSync(join(ctx.outputDir, 'contract.json'), 'utf-8'),
@@ -410,7 +410,8 @@ describe(
       // The check finds documents whose `name` contains an uppercase letter;
       // after the transform all names are lower-case so the check is
       // satisfied, enabling idempotency-skip on re-apply (tested below).
-      const handAuthored = `import { Migration } from '@prisma-next/family-mongo/migration';
+      const handAuthored = `import { MigrationCLI } from '@prisma-next/cli/migration-cli';
+import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, dataTransform } from '@prisma-next/target-mongo/migration';
 import { RawUpdateManyCommand, RawAggregateCommand } from '@prisma-next/mongo-query-ast/execution';
 
@@ -458,7 +459,7 @@ class M extends Migration {
 }
 
 export default M;
-Migration.run(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);
 `;
       writeFileSync(migrationTsPath, handAuthored);
 

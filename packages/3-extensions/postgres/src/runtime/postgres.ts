@@ -10,10 +10,10 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import { orm as ormBuilder } from '@prisma-next/sql-orm-client';
 import type {
   ExecutionContext,
-  Middleware,
   Runtime,
   RuntimeVerifyOptions,
   SqlExecutionStackWithDriver,
+  SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
   TransactionContext,
 } from '@prisma-next/sql-runtime';
@@ -51,9 +51,9 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>> {
   transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
 }
 
-export interface PostgresOptionsBase<TContract extends Contract<SqlStorage>> {
+export interface PostgresOptionsBase {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
-  readonly middleware?: readonly Middleware<TContract>[];
+  readonly middleware?: readonly SqlMiddleware[];
   readonly verify?: RuntimeVerifyOptions;
   readonly poolOptions?: {
     readonly connectionTimeoutMillis?: number;
@@ -69,16 +69,17 @@ export interface PostgresBindingOptions {
 
 export type PostgresOptionsWithContract<TContract extends Contract<SqlStorage>> =
   PostgresBindingOptions &
-    PostgresOptionsBase<TContract> & {
+    PostgresOptionsBase & {
       readonly contract: TContract;
       readonly contractJson?: never;
     };
 
 export type PostgresOptionsWithContractJson<TContract extends Contract<SqlStorage>> =
   PostgresBindingOptions &
-    PostgresOptionsBase<TContract> & {
+    PostgresOptionsBase & {
       readonly contractJson: unknown;
       readonly contract?: never;
+      readonly _contract?: TContract;
     };
 
 export type PostgresOptions<TContract extends Contract<SqlStorage>> =

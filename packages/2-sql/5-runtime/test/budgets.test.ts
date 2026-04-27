@@ -1,5 +1,6 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { AfterExecuteResult, MiddlewareContext } from '@prisma-next/runtime-executor';
+import type { Contract, ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { AfterExecuteResult } from '@prisma-next/runtime-executor';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
   ColumnRef,
@@ -11,15 +12,14 @@ import {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { budgets } from '../src/middleware/budgets';
+import type { SqlMiddlewareContext } from '../src/middleware/sql-middleware';
 
 const userTable = TableSource.named('user');
 const idCol = ColumnRef.of('user', 'id');
 
-function createMiddlewareContext(
-  overrides?: Partial<MiddlewareContext<unknown>>,
-): MiddlewareContext<unknown> {
+function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): SqlMiddlewareContext {
   return {
-    contract: {},
+    contract: {} as Contract<SqlStorage>,
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {

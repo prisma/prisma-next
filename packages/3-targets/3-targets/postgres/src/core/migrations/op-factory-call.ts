@@ -793,7 +793,7 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   renderTypeScript(): string {
     return [
-      `dataTransform(endContract, ${jsonToTsSource(this.label)}, {`,
+      `this.dataTransform(endContract, ${jsonToTsSource(this.label)}, {`,
       `  check: () => placeholder(${jsonToTsSource(this.checkSlot)}),`,
       `  run: () => placeholder(${jsonToTsSource(this.runSlot)}),`,
       '})',
@@ -802,10 +802,6 @@ export class DataTransformCall extends PostgresOpFactoryCallNode {
 
   override importRequirements(): readonly ImportRequirement[] {
     return [
-      { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: this.factoryName },
-      // `placeholder` is re-exported from `@prisma-next/target-postgres/migration`
-      // so the user's migration.ts only depends on a single migration-authoring
-      // entrypoint.
       { moduleSpecifier: TARGET_MIGRATION_MODULE, symbol: 'placeholder' },
       {
         moduleSpecifier: './end-contract.json',

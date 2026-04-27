@@ -4,6 +4,7 @@ import {
   createIndex,
   createTable,
   Migration,
+  MigrationCLI,
   rawSql,
 } from '@prisma-next/target-postgres/migration';
 
@@ -152,4 +153,4 @@ export default class M extends Migration {
   }
 }
 
-Migration.run(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);

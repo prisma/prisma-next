@@ -123,6 +123,10 @@
       "types": "./dist/config-loader.d.mts",
       "import": "./dist/config-loader.mjs"
     },
+    "./migration-cli": {
+      "types": "./dist/migration-cli.d.mts",
+      "import": "./dist/migration-cli.mjs"
+    },
     "./control-api": {
       "types": "./dist/exports/control-api.d.mts",
       "import": "./dist/exports/control-api.mjs"

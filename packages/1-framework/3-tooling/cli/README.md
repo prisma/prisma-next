@@ -1061,12 +1061,7 @@ run `migration.ts` directly with Node to produce `ops.json` and attest
 node migrations/<dir>/migration.ts
 ```
 
-The scaffolded `migration.ts` calls `Migration.run(import.meta.url, ...)`
-when invoked as the entrypoint, which serializes operations to
-`ops.json` and writes the content-addressed `migrationId` into
-`migration.json`. If `migration.ts` contains unfilled `placeholder()`
-slots, the script exits with `PN-MIG-2001` and reports the slot to
-fill in.
+The scaffolded `migration.ts` calls `MigrationCLI.run(import.meta.url, ...)` from `@prisma-next/cli/migration-cli` when invoked as the entrypoint. (Postgres scaffolds re-export `MigrationCLI` through `@prisma-next/target-postgres/migration` so a Postgres `migration.ts` only needs the single facade import; Mongo scaffolds still pull from `@prisma-next/cli/migration-cli` directly.) The CLI entrypoint loads `prisma-next.config.ts`, assembles a `ControlStack`, instantiates the migration with that stack (so `dataTransform` and other adapter-aware helpers can materialize a real adapter), and serializes operations to `ops.json` while writing the content-addressed `migrationId` into `migration.json`. If `migration.ts` contains unfilled `placeholder()` slots, the script exits with `PN-MIG-2001` and reports the slot to fill in.
 
 ### `prisma-next migration ref`
 

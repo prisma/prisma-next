@@ -132,7 +132,7 @@ export function createTestAdapterDescriptor(
     codecs: () => codecRegistry,
     parameterizedCodecs: () => [],
     mutationDefaultGenerators: createTestMutationDefaultGenerators,
-    create(): SqlRuntimeAdapterInstance<'postgres'> {
+    create(_stack): SqlRuntimeAdapterInstance<'postgres'> {
       return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
     },
   };
@@ -256,10 +256,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
-      return {
-        profileId: this.profile.id,
-        body: Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] }),
-      };
+      return Object.freeze({ sql: sqlText, params: ctx.params ? [...ctx.params] : [] });
     },
   };
 }

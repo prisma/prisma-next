@@ -30,21 +30,26 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "ajv": "^8.18.0",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/errors": "workspace:*",
+    "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "pathe": "^2.0.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },
   "exports": {
     "./adapter": "./dist/adapter.mjs",
-    "./codec-types": "./dist/codec-types.mjs",
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./operation-types": "./dist/operation-types.mjs",

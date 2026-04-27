@@ -9,8 +9,8 @@ import { instantiateExecutionStack } from '@prisma-next/framework-components/exe
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Log,
-  Middleware,
   Runtime,
+  SqlMiddleware,
   SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
 import {
@@ -28,7 +28,7 @@ export interface CreateTestRuntimeOptions {
     requireMarker?: boolean;
   };
   readonly extensionPacks?: readonly SqlRuntimeExtensionDescriptor<'postgres'>[];
-  readonly middleware?: readonly Middleware[];
+  readonly middleware?: readonly SqlMiddleware[];
   readonly mode?: 'strict' | 'permissive';
   readonly log?: Log;
 }

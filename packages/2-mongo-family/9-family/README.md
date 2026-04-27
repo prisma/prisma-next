@@ -99,15 +99,16 @@ The current `contract.ts` slice supports roots and collections, typed reference 
 ### Migration authoring
 
 ```typescript
+import { MigrationCLI } from "@prisma-next/cli/migration-cli"
 import { Migration, createIndex, createCollection }
   from "@prisma-next/family-mongo/migration"
 
 class AddUsersCollection extends Migration {
-  describe() {
+  override describe() {
     return { from: "abc123", to: "def456", labels: ["add-users"] }
   }
 
-  plan() {
+  override get operations() {
     return [
       createCollection("users", {
         validator: { $jsonSchema: { required: ["email"] } },
@@ -119,7 +120,7 @@ class AddUsersCollection extends Migration {
 }
 
 export default AddUsersCollection;
-Migration.run(import.meta.url, AddUsersCollection)
+MigrationCLI.run(import.meta.url, AddUsersCollection);
 ```
 
 Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-run` to preview without writing.

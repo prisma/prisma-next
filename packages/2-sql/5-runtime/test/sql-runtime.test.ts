@@ -10,13 +10,22 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Codec,
   CodecRegistry,
-  SelectAst,
   SqlDriver,
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  codec,
+  createCodecRegistry,
+  LiteralExpr,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import { timeouts } from '@prisma-next/test-utils';
+import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
+import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
   SqlRuntimeAdapterDescriptor,
   SqlRuntimeAdapterInstance,
@@ -89,10 +98,7 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       },
     },
     lower(ast: SelectAst) {
-      return {
-        profileId: 'test-profile',
-        body: Object.freeze({ sql: JSON.stringify(ast), params: [] }),
-      };
+      return Object.freeze({ sql: JSON.stringify(ast), params: [] });
     },
   };
 }
@@ -396,17 +402,166 @@ describe('createRuntime', () => {
 
   it('rejects a Mongo middleware with a clear error', () => {
     const { stackInstance, context, driver } = createTestSetup();
+    // Simulate a caller bypassing the SqlMiddleware type constraint (e.g. dynamically-loaded
+    // middleware). Static typing already rejects familyId: 'mongo'; this tests the runtime guard.
+    const mongoMiddleware = { name: 'mongo-mw', familyId: 'mongo' } as unknown as SqlMiddleware;
     expect(() =>
       createRuntime({
         stackInstance,
         context,
         driver,
         verify: { mode: 'onFirstUse', requireMarker: false },
-        middleware: [{ name: 'mongo-mw', familyId: 'mongo' }],
+        middleware: [mongoMiddleware],
       }),
     ).toThrow(
       "Middleware 'mongo-mw' requires family 'mongo' but the runtime is configured for family 'sql'",
     );
+  });
+
+  it('invokes beforeCompile and lowers the rewritten AST', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const debug = vi.fn();
+    const softDeletePredicate = BinaryExpr.eq(
+      ColumnRef.of('users', 'deleted_at'),
+      LiteralExpr.of(null),
+    );
+    const softDelete: SqlMiddleware = {
+      name: 'softDelete',
+      familyId: 'sql',
+      async beforeCompile(draft) {
+        if (draft.ast.kind !== 'select') return;
+        return { ...draft, ast: draft.ast.withWhere(softDeletePredicate) };
+      },
+    };
+
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      middleware: [softDelete],
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug },
+    });
+
+    const queryPlan: SqlQueryPlan = {
+      ast: SelectAst.from(TableSource.named('users')).withProjection([]),
+      params: [],
+      meta: {
+        target: 'postgres',
+        storageHash: testContract.storage.storageHash,
+        lane: 'dsl',
+        paramDescriptors: [],
+      },
+    };
+
+    await runtime.execute(queryPlan).toArray();
+
+    expect(driver.__spies.rootExecute).toHaveBeenCalledTimes(1);
+    const request = driver.__spies.rootExecute.mock.calls[0]?.[0] as SqlExecuteRequest;
+    expect(request.sql).toContain('deleted_at');
+    expect(debug).toHaveBeenCalledWith({
+      event: 'middleware.rewrite',
+      middleware: 'softDelete',
+      lane: 'dsl',
+    });
+  });
+
+  it('invokes adapter.lower exactly once per execute regardless of chain length', async () => {
+    const adapter = createStubAdapter();
+    const lowerSpy = vi.spyOn(adapter, 'lower');
+    const driver = createMockDriver();
+
+    const targetDescriptor = createTestTargetDescriptor();
+    const adapterDescriptor = createTestAdapterDescriptor(adapter);
+    const stack = createSqlExecutionStack({
+      target: targetDescriptor,
+      adapter: adapterDescriptor,
+      extensionPacks: [],
+    });
+    const stackInstance = instantiateExecutionStack(stack) as ExecutionStackInstance<
+      'sql',
+      'postgres',
+      SqlRuntimeAdapterInstance<'postgres'>,
+      RuntimeDriverInstance<'sql', 'postgres'>,
+      RuntimeExtensionInstance<'sql', 'postgres'>
+    >;
+    const context = createExecutionContext({
+      contract: testContract,
+      stack: { target: targetDescriptor, adapter: adapterDescriptor, extensionPacks: [] },
+    });
+
+    const rewriteA: SqlMiddleware = {
+      name: 'rewriteA',
+      familyId: 'sql',
+      async beforeCompile(draft) {
+        if (draft.ast.kind !== 'select') return undefined;
+        return {
+          ...draft,
+          ast: draft.ast.withWhere(BinaryExpr.eq(ColumnRef.of('users', 'a'), LiteralExpr.of(1))),
+        };
+      },
+    };
+    const rewriteB: SqlMiddleware = {
+      name: 'rewriteB',
+      familyId: 'sql',
+      async beforeCompile(draft) {
+        if (draft.ast.kind !== 'select') return undefined;
+        return {
+          ...draft,
+          ast: draft.ast.withWhere(BinaryExpr.eq(ColumnRef.of('users', 'b'), LiteralExpr.of(2))),
+        };
+      },
+    };
+
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      middleware: [rewriteA, rewriteB],
+    });
+
+    const queryPlan: SqlQueryPlan = {
+      ast: SelectAst.from(TableSource.named('users')).withProjection([]),
+      params: [],
+      meta: {
+        target: 'postgres',
+        storageHash: testContract.storage.storageHash,
+        lane: 'dsl',
+        paramDescriptors: [],
+      },
+    };
+
+    await runtime.execute(queryPlan).toArray();
+
+    expect(lowerSpy).toHaveBeenCalledTimes(1);
+    const loweredAst = lowerSpy.mock.calls[0]?.[0] as SelectAst;
+    expect(loweredAst.where?.kind).toBe('binary');
+  });
+
+  it('skips beforeCompile for raw execution plans with no AST', async () => {
+    const { stackInstance, context, driver } = createTestSetup();
+    const debug = vi.fn();
+    const beforeCompile = vi.fn();
+    const observer: SqlMiddleware = {
+      name: 'observer',
+      familyId: 'sql',
+      beforeCompile,
+    };
+
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+      middleware: [observer],
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug },
+    });
+
+    await runtime.execute(createRawExecutionPlan()).toArray();
+
+    expect(beforeCompile).not.toHaveBeenCalled();
+    expect(debug).not.toHaveBeenCalled();
   });
 
   it(

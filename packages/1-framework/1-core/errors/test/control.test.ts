@@ -11,6 +11,7 @@ import {
   errorFamilyReadMarkerSqlRequired,
   errorFileNotFound,
   errorJsonFormatNotSupported,
+  errorMigrationCliInvalidConfigArg,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,
@@ -367,6 +368,23 @@ describe('Config Errors', () => {
   it('errorConfigValidation with custom why', () => {
     const error = errorConfigValidation('family', { why: 'Custom reason' });
     expect(error.why).toBe('Custom reason');
+  });
+
+  it('errorMigrationCliInvalidConfigArg creates correct error for missing path', () => {
+    const error = errorMigrationCliInvalidConfigArg();
+    expect(error.code).toBe('4012');
+    expect(error.domain).toBe('CLI');
+    expect(error.message).toBe('--config flag requires a path argument');
+    expect(error.why).toContain('without a following path argument');
+    expect(error.fix).toContain('--config <path>');
+    expect(error.meta).toEqual({});
+  });
+
+  it('errorMigrationCliInvalidConfigArg surfaces the swallowed flag in why/meta', () => {
+    const error = errorMigrationCliInvalidConfigArg({ nextToken: '--dry-run' });
+    expect(error.code).toBe('4012');
+    expect(error.why).toContain('--dry-run');
+    expect(error.meta).toEqual({ nextToken: '--dry-run' });
   });
 });
 

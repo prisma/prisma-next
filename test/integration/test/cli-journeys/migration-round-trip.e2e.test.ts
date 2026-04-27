@@ -119,7 +119,7 @@ withTempDir(({ createTempDir }) => {
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
-import { Migration, addColumn, dataTransform, setNotNull } from '@prisma-next/target-postgres/migration';
+import { Migration, MigrationCLI, addColumn, setNotNull } from '@prisma-next/target-postgres/migration';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import endContract from './end-contract.json' with { type: 'json' };
 
@@ -138,7 +138,7 @@ export default class M extends Migration {
   override get operations() {
     return [
       addColumn('public', 'user', { name: 'name', typeSql: 'text', defaultSql: null, nullable: true }),
-      dataTransform(endContract, 'backfill-user-name', {
+      this.dataTransform(endContract, 'backfill-user-name', {
         check: () => db.user.select('id').where((f, fns) => fns.eq(f.name, null)).limit(1),
         run: () => db.user.update({ name: '${BACKFILLED_NAME}' }).where((f, fns) => fns.eq(f.name, null)),
       }),
@@ -147,7 +147,7 @@ export default class M extends Migration {
   }
 }
 
-Migration.run(import.meta.url, M);
+MigrationCLI.run(import.meta.url, M);
 `;
         writeFileSync(migrationTsPath, migrationTs);
 

@@ -85,7 +85,7 @@ export function resolveMigrationPaths(
   configPath: string;
   migrationsDir: string;
   migrationsRelative: string;
-  refsPath: string;
+  refsDir: string;
 } {
   const configPath = configOption
     ? relative(process.cwd(), resolve(configOption))
@@ -95,8 +95,8 @@ export function resolveMigrationPaths(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
-  const refsPath = resolve(migrationsDir, 'refs.json');
-  return { configPath, migrationsDir, migrationsRelative, refsPath };
+  const refsDir = resolve(migrationsDir, 'refs');
+  return { configPath, migrationsDir, migrationsRelative, refsDir };
 }
 
 /**

@@ -1,7 +1,13 @@
 import type {
   ControlAdapterInstance,
   ControlDriverInstance,
+  ControlStack,
 } from '@prisma-next/framework-components/control';
+import type {
+  AnyQueryAst,
+  LoweredStatement,
+  LowererContext,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultNormalizer, NativeTypeNormalizer } from './schema-verify/verify-sql-schema';
 
@@ -44,6 +50,17 @@ export interface SqlControlAdapter<TTarget extends string = string>
    * before comparison with contract native types during schema verification.
    */
   readonly normalizeNativeType?: NativeTypeNormalizer;
+
+  /**
+   * Lower a SQL query AST into a target-flavored `{ sql, params }` payload.
+   *
+   * Migration tooling (e.g. the `dataTransform` operation) needs to materialize
+   * SQL at emit/plan time without instantiating the runtime adapter. The control
+   * adapter's `lower` is byte-equivalent to the runtime adapter's `lower` for the
+   * same AST and contract, ensuring planned SQL matches what the runtime would
+   * emit.
+   */
+  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement;
 }
 
 /**
@@ -55,6 +72,9 @@ export interface SqlControlAdapter<TTarget extends string = string>
 export interface SqlControlAdapterDescriptor<TTarget extends string = string> {
   /**
    * Creates a SQL control adapter instance for control-plane operations.
+   *
+   * Receives the assembled `ControlStack` so adapters can read aggregated
+   * metadata (codec lookup, extension contributions) when materializing.
    */
-  create(): SqlControlAdapter<TTarget>;
+  create(stack: ControlStack<'sql', TTarget>): SqlControlAdapter<TTarget>;
 }

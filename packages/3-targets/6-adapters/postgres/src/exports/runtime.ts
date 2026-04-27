@@ -8,10 +8,10 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterDescriptor,
 } from '@prisma-next/sql-runtime';
+import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
+import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 import { type as arktype } from 'arktype';
 import { createPostgresAdapter } from '../core/adapter';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
-import { codecDefinitions } from '../core/codecs';
 import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import {
   compileJsonSchemaValidator,
@@ -81,7 +81,7 @@ const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', 
     parameterizedCodecs: () => parameterizedCodecDescriptors,
     queryOperations: () => postgresQueryOperations,
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
-    create(): SqlRuntimeAdapter {
+    create(_stack): SqlRuntimeAdapter {
       return createPostgresAdapter();
     },
   };

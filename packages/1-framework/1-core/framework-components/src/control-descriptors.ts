@@ -45,7 +45,14 @@ export interface ControlAdapterDescriptor<
     TTargetId
   >,
 > extends AdapterDescriptor<TFamilyId, TTargetId> {
-  create(): TAdapterInstance;
+  /**
+   * Construct a control adapter instance for this stack.
+   *
+   * The `stack` argument mirrors `ControlFamilyDescriptor.create(stack)`:
+   * adapter implementations may inspect `stack.codecLookup`, extension packs,
+   * or other assembled metadata when constructing the instance.
+   */
+  create(stack: ControlStack<TFamilyId, TTargetId>): TAdapterInstance;
 }
 
 export interface ControlDriverDescriptor<

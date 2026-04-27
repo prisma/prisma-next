@@ -19,6 +19,7 @@ export default defineConfig({
     'src/commands/migration-show.ts',
     'src/commands/migration-status.ts',
     'src/config-loader.ts',
+    'src/migration-cli.ts',
     'src/exports/control-api.ts',
   ],
   copy: [{ from: 'src/commands/init/templates/*.md' }],
