@@ -83,13 +83,39 @@ A single milestone — small, cohesive, only fully validatable end-to-end agains
 
 ### Build / hygiene
 
-- [ ] **1.14 Run `pnpm lint:deps`, `pnpm typecheck`, `pnpm test:packages`.** Fix any layering / type / test failures introduced by the change. Refresh `dist/*.d.mts` for `@prisma-next/family-mongo` (touched exports) and `@prisma-next/target-mongo` (touched runner options) via `pnpm build`.
+- [ ] **1.14 Run the full validation gate suite.** Run `pnpm lint:deps`, `pnpm lint`, `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:examples`. Fix any layering / lint / type / test failures introduced by the change. Refresh `dist/*.d.mts` for `@prisma-next/family-mongo` (touched exports) and `@prisma-next/target-mongo` (touched runner options) via `pnpm build`. _Gate expanded twice during the loop: R1 added `test:integration` + `test:examples` after surfacing two correctness regressions invisible to `test:packages` alone; R3 added `pnpm lint` after surfacing a biome lint failure invisible to the other gates. See `orchestrator-notes.md` § "Validation-gate gap surfaced" and § "Lint gate gap surfaced (R3)"._
 
 - [ ] **1.15 Update package READMEs / DEVELOPING.md if necessary.** If the `@prisma-next/family-mongo` README documents exported entry points, add `./schema-verify`. Otherwise skip — no user-facing surface change.
 
 ### Follow-ups
 
 - [x] **1.16 File a Linear follow-up for hoisting `family.introspect + verify` into a framework-shared runner SPI.** Filed as [TML-2319](https://linear.app/prisma-company/issue/TML-2319/hoist-post-apply-schema-verify-into-framework-runner-spi). Out of scope here.
+
+### Round 2: correctness fixes (added 2026-04-26 after R1)
+
+R1 reviewer surfaced two `must-fix` correctness findings invisible to the original validation gates. Both are in scope for this PR (see [`orchestrator-notes.md`](orchestrator-notes.md) for the F2 scope decision). The implementer addresses these alongside re-running the expanded gates from 1.14.
+
+- [ ] **1.17 Fix F1: synthetic-contract test fixtures crash the verifier.** The fixture sites that pass `{}` (or otherwise unstructured stand-ins) as `destinationContract` cause `contractToMongoSchemaIR` ([`packages/3-mongo-target/1-mongo-target/src/core/contract-to-schema.ts`](../../packages/3-mongo-target/1-mongo-target/src/core/contract-to-schema.ts)) to read `contract.storage.collections` and `TypeError` before the `strictVerification: false` flag is consulted. Make those fixtures pass a minimally well-formed `MongoContract` shape — `{ storage: { storageHash: 'sha256:authoring-test', collections: {} } } as unknown as MongoContract` — at the three known sites the reviewer reproduced:
+   - `test/integration/test/mongo/migration-authoring-e2e.test.ts`
+   - `examples/mongo-demo/test/manual-migration.test.ts`
+   - `examples/retail-store/test/manual-migration.test.ts`
+   
+   Each cast must carry an inline justification comment per AGENTS.md § Typesafety. Add a unit-level regression test in `packages/3-mongo-target/1-mongo-target/test/schema-verify.test.ts` that exercises `verifyMongoSchema` with `strict: false` and a contract whose `storage.collections` is empty `{}` — must succeed without throwing. Prefer this concrete-paths-from-the-reviewer order; if there are additional fixtures `rg 'destinationContract' test/ examples/` surfaces, fix them too.
+
+- [ ] **1.18 Fix F2: canonicalization asymmetry between contract IR and introspected schema.** Five Mongo feature families round-trip non-deterministically because `contractToMongoSchemaIR` and `introspectSchema` disagree on the canonical IR shape for server-applied defaults. Without this fix, a fresh `migration apply` immediately fails `SCHEMA_VERIFY_FAILED` for any contract that uses these features, inverting spec [R1](spec.md#requirements). Normalize the introspected output (preferred over enriching the contract IR) in [`packages/3-mongo-target/2-mongo-adapter/src/core/introspect-schema.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/core/introspect-schema.ts) — or via a co-located normalizer module if cleaner — to:
+   1. **Text indexes** — project the introspected key shape (server expands `{ field: 'text' }` to `_fts/_ftsx` weighted vectors) back to the contract-side `{ field: 'text' }` form.
+   2. **Collation** — drop server-only collation fields (`version`, `caseFirst: 'off'`, etc.) that the contract does not declare.
+   3. **Timeseries** — drop `bucketMaxSpanSeconds` (server-applied derived value) when the contract does not declare it.
+   4. **Clustered indexes** — drop `key` / `unique` / `v` from the introspected clusteredIndex spec when the contract specifies only `unique` semantics.
+   5. **`changeStreamPreAndPostImages`** — treat introspected `{ enabled: false }` as equivalent to `undefined`/absent on the contract side.
+   
+   Add regression coverage in `packages/3-mongo-target/1-mongo-target/test/schema-verify.test.ts` (or a focused canonicalization-test file) for each feature family — feed an introspection-shaped IR and a contract-shaped IR that should match post-normalization, assert `verifyMongoSchema` returns `ok`. Then re-run T1.11–T1.13 integration tests + `pnpm test:integration` + `pnpm test:examples` to confirm the affected fixtures now pass.
+
+### Round 4: lint hygiene (added 2026-04-26 after R3)
+
+R3 reviewer surfaced one `should-fix` finding when triaging the implementer's biome-warning observation. The plan's T1.14 gates were missing `pnpm lint`; with that gate now added, F4 must close before SATISFIED.
+
+- [ ] **1.19 Fix F4: pre-existing biome `noNonNullAssertion` in `sortTextKeys` fails `pnpm lint`.** The R2 commit (`85df12f2a`) introduced a `sortedText[textIdx++]!` non-null assertion in `sortTextKeys` at [`packages/3-mongo-target/1-mongo-target/src/core/schema-verify/canonicalize-introspection.ts:145`](../../packages/3-mongo-target/1-mongo-target/src/core/schema-verify/canonicalize-introspection.ts) (lines may have shifted slightly post-R3 cleanup). The package-level `lint` task runs `biome check . --error-on-warnings`, so this currently exits non-zero under `pnpm lint` / `pnpm --filter @prisma-next/target-mongo lint`. AGENTS.md § Typesafety prohibits suppressing biome lints. Refactor to remove the non-null assertion: replace the post-increment-with-`!` pattern with an explicit early-throw guard (or equivalent algorithmic restructure inside `sortTextKeys`). The exact patch is suggested in [`reviews/code-review.md` § F4](reviews/code-review.md). The 11 baseline + 13 F2-regression cases in `schema-verify.test.ts` must remain green after the refactor (functionally equivalent inside the established invariant). Validation: `pnpm --filter @prisma-next/target-mongo lint` exits 0 with zero diagnostics, and the full T1.14 suite (now including `pnpm lint`) passes.
 
 ## Test Coverage
 
@@ -109,7 +135,10 @@ A single milestone — small, cohesive, only fully validatable end-to-end agains
 | Tampered DB → fail; correction → succeeds idempotently | Integration | 1.12 | Two runs: fail, fix, re-run |
 | Strict opt-out lets extra structure through | Integration | 1.13 | |
 | CLI parity (`migration apply` surfaces `SCHEMA_VERIFY_FAILED`) | Manual | Verified during close-out | The failure envelope flows through existing CLI rendering — no Mongo-specific path |
-| `pnpm lint:deps`, `pnpm typecheck`, `pnpm test:packages` pass | CI | 1.14 | |
+| `pnpm lint:deps`, `pnpm lint`, `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:examples` pass | CI | 1.14 | Expanded R1 + R3 |
+| Synthetic-contract test fixtures opt-out of verification cleanly (no `TypeError`) | Unit + Integration | 1.17 | F1 from R1 |
+| Real-contract round-trip canonicalization for text / collation / timeseries / clusteredIndex / `changeStreamPreAndPostImages` | Unit + Integration | 1.18 | F2 from R1 |
+| `pnpm lint` (biome `--error-on-warnings`) green on `target-mongo` | CI | 1.19 | F4 from R3 |
 
 ## Decisions made during shaping
 
