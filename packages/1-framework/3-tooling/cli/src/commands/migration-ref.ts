@@ -11,7 +11,12 @@ import {
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { loadConfig } from '../config-loader';
-import { CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  CliStructuredError,
+  errorRuntime,
+  errorUnexpected,
+  mapMigrationToolsError,
+} from '../utils/cli-errors';
 import {
   addGlobalOptions,
   resolveMigrationPaths,
@@ -49,11 +54,7 @@ interface RefListResult {
 
 function mapError(error: unknown): CliStructuredError {
   if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code },
-    });
+    return mapMigrationToolsError(error);
   }
   return errorUnexpected(error instanceof Error ? error.message : String(error));
 }
