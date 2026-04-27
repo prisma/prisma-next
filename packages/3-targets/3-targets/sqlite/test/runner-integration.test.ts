@@ -1,6 +1,7 @@
 import { DatabaseSync } from 'node:sqlite';
 import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
-import type { StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
+import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import { createSqliteMigrationPlanner } from '../src/core/migrations/planner';
 
@@ -28,29 +29,34 @@ function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
     nullable: true,
     codecId: 'sqlite/text@1',
     ...overrides,
-  } as StorageColumn;
+  };
 }
 
 function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
   return {
     columns: {},
-    primaryKey: undefined,
     foreignKeys: [],
     uniques: [],
     indexes: [],
     ...overrides,
-  } as unknown as StorageTable;
+  };
 }
 
-function makeContract(tables: Record<string, StorageTable>) {
+function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage> {
   return {
+    target: 'sqlite',
+    targetFamily: 'sql',
+    profileHash: profileHash('sha256:test'),
     storage: {
       tables,
-      storageHash: 'test-hash-' + Date.now(),
-      types: {},
+      storageHash: coreHash(`sha256:test-${Date.now()}`),
     },
-    profileHash: 'profile-hash',
-  } as never;
+    roots: {},
+    models: {},
+    capabilities: {},
+    extensionPacks: {},
+    meta: {},
+  };
 }
 
 const emptySchema = { tables: {}, dependencies: [] };

@@ -3,6 +3,18 @@ export interface SqlStatement {
   readonly params: readonly unknown[];
 }
 
+export const MARKER_TABLE_NAME = '_prisma_marker';
+export const LEDGER_TABLE_NAME = '_prisma_ledger';
+
+/**
+ * Control tables the runner creates/manages. The planner must not drop these
+ * when reconciling "extra" tables against the contract.
+ */
+export const CONTROL_TABLE_NAMES: ReadonlySet<string> = new Set([
+  MARKER_TABLE_NAME,
+  LEDGER_TABLE_NAME,
+]);
+
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_marker (
     id INTEGER PRIMARY KEY CHECK (id = 1),
