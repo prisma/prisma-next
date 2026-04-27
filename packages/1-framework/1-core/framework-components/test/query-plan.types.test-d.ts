@@ -90,5 +90,5 @@ test('ResultType extracts Row from a QueryPlan-shaped value', () => {
 
 test('ResultType returns never for objects without _row', () => {
   type Row = ResultType<{ meta: PlanMeta }>;
-  expectTypeOf<Row>().toEqualTypeOf<never>();
+  expectTypeOf<Row>().toEqualTypeOf(undefined as never);
 });
