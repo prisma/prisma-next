@@ -34,6 +34,19 @@ export interface AfterExecuteResult {
   readonly rowCount: number;
   readonly latencyMs: number;
   readonly completed: boolean;
+  /**
+   * Indicates where the rows observed during this execution came from.
+   *
+   * - `'driver'` — the default. Rows came from the underlying driver via
+   *   `runDriver` / `runWithMiddleware`'s normal path.
+   * - `'middleware'` — a `RuntimeMiddleware.intercept` hook short-circuited
+   *   execution and supplied the rows directly. The driver was not invoked.
+   *
+   * Observers (telemetry, lints, budgets) that need to distinguish between
+   * driver-served and middleware-served executions read this field.
+   * Observers that don't care can ignore it.
+   */
+  readonly source: 'driver' | 'middleware';
 }
 
 /**

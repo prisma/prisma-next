@@ -218,7 +218,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createMiddlewareContext({ mode: 'permissive' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await mw.afterExecute?.(plan, result, ctx);
         expect(ctx.log.warn).toHaveBeenCalledWith(
@@ -234,7 +239,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createMiddlewareContext({ mode: 'strict' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await expect(mw.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
           code: 'BUDGET.TIME_EXCEEDED',
@@ -250,7 +260,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createMiddlewareContext({ mode: 'strict' });
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 200,
+          completed: true,
+          source: 'driver',
+        };
 
         await expect(mw.afterExecute?.(plan, result, ctx)).rejects.toMatchObject({
           code: 'BUDGET.TIME_EXCEEDED',
@@ -266,7 +281,12 @@ describe('budgets middleware', () => {
         const mw = budgets({ maxLatencyMs: 1000 });
         const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
         const ctx = createMiddlewareContext();
-        const result: AfterExecuteResult = { rowCount: 1, latencyMs: 50, completed: true };
+        const result: AfterExecuteResult = {
+          rowCount: 1,
+          latencyMs: 50,
+          completed: true,
+          source: 'driver',
+        };
 
         await mw.afterExecute?.(plan, result, ctx);
         expect(ctx.log.warn).not.toHaveBeenCalled();

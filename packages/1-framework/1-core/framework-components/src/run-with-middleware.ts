@@ -10,12 +10,19 @@ import type { RuntimeMiddleware, RuntimeMiddlewareContext } from './runtime-midd
  *  2. For each row yielded by `runDriver()`: for each middleware in registration
  *     order: `onRow(row, exec, ctx)`; then yield the row to the consumer.
  *  3. On successful completion: for each middleware in registration order:
- *     `afterExecute(exec, { rowCount, latencyMs, completed: true }, ctx)`.
+ *     `afterExecute(exec, { rowCount, latencyMs, completed: true,
+ *     source: 'driver' }, ctx)`.
  *  4. On any error thrown by the driver loop: for each middleware in
  *     registration order: `afterExecute(exec, { rowCount, latencyMs,
- *     completed: false }, ctx)`. Errors thrown by `afterExecute` during the
- *     error path are swallowed so they do not mask the original driver error.
- *     The original error is then rethrown.
+ *     completed: false, source: 'driver' }, ctx)`. Errors thrown by
+ *     `afterExecute` during the error path are swallowed so they do not
+ *     mask the original driver error. The original error is then rethrown.
+ *
+ * The `source: 'driver'` tag on `AfterExecuteResult` indicates that rows
+ * came from the underlying driver via `runDriver()`. Once a
+ * `RuntimeMiddleware.intercept` hook is wired in, a hit path will report
+ * `source: 'middleware'` instead; today every `runWithMiddleware`
+ * invocation goes through the driver path.
  *
  * This helper is the single canonical implementation of the middleware
  * orchestration loop; family runtimes should not reimplement it.
@@ -54,7 +61,7 @@ export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
       for (const mw of middleware) {
         if (mw.afterExecute) {
           try {
-            await mw.afterExecute(exec, { rowCount, latencyMs, completed }, ctx);
+            await mw.afterExecute(exec, { rowCount, latencyMs, completed, source: 'driver' }, ctx);
           } catch {
             // Swallow afterExecute errors during the error path so they do not
             // mask the original driver error.
@@ -68,7 +75,7 @@ export function runWithMiddleware<TExec extends ExecutionPlan, Row>(
     const latencyMs = Date.now() - startedAt;
     for (const mw of middleware) {
       if (mw.afterExecute) {
-        await mw.afterExecute(exec, { rowCount, latencyMs, completed }, ctx);
+        await mw.afterExecute(exec, { rowCount, latencyMs, completed, source: 'driver' }, ctx);
       }
     }
   };
