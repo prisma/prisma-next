@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@clack/prompts', () => ({
   intro: vi.fn(),
@@ -1654,7 +1654,10 @@ describe('deriveCanPrompt (F14, action-handler bridge)', () => {
   // biome-ignore lint/suspicious/noExplicitAny: dynamic import shape is widened by vitest's compiler
   let deriveCanPrompt: (opts: any) => boolean;
 
-  beforeEach(async () => {
+  // `beforeAll` rather than `beforeEach`: `import()` caches the module, so
+  // repeating it is wasted work — and on CI's cold transform, the first call
+  // can exceed Vitest's 200ms hook timeout. One import per suite is enough.
+  beforeAll(async () => {
     ({ deriveCanPrompt } = await import('../../../src/commands/init/index'));
   });
 
