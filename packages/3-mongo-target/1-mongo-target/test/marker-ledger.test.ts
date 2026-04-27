@@ -125,7 +125,7 @@ describe('updateMarker', () => {
     expect(marker?.storageHash).toBe('sha256:v1');
   });
 
-  it('writes the caller-supplied invariants (already-unioned) to the doc', async () => {
+  it('writes the caller-supplied invariants to the doc', async () => {
     await initMarker(db, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
