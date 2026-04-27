@@ -1,0 +1,144 @@
+# Supabase services config for the supabase-todos PoC example.
+#
+# Authored manually — not via `supabase init` — so the file is reviewable
+# in the PR. Restricted to the services we actually exercise from the
+# example (auth, realtime, db). Storage, edge_runtime, analytics, MFA,
+# and OAuth providers are deliberately disabled to keep `supabase start`
+# fast and the local stack predictable.
+#
+# IMPORTANT: app-schema migrations and seeds are PN-driven, not Supabase-
+# driven. There are intentionally no `supabase/migrations/*.sql` files and
+# no `seed.sql`:
+#   - DDL (including RLS policies) is authored in PN migration files
+#     under `migrations/<ts>_*/migration.ts` and applied via
+#     `pnpm --filter supabase-todos migrate:up` against the local
+#     service-role URL.
+#   - Fixture data is loaded via `pnpm --filter supabase-todos seed`
+#     using `@supabase/supabase-js` admin APIs.
+# `supabase start` only brings up the Supabase services and their
+# internal schemas (`auth.*`, `realtime.*`, `storage.*`, ...).
+#
+# For full reference docs, see:
+#   https://supabase.com/docs/guides/local-development/cli/config
+
+project_id = "supabase-todos"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[api.tls]
+enabled = false
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 17
+
+[db.pooler]
+# Enabled so the example can demonstrate the realistic Supabase
+# transaction-mode pooler path (Supavisor) used by `createSupabaseRuntime`
+# in M2 — every per-request RLS scope acquires from the pooler.
+enabled = true
+port = 54329
+pool_mode = "transaction"
+default_pool_size = 20
+max_client_conn = 100
+
+[db.migrations]
+# Disabled: the example does not author SQL under supabase/migrations.
+# All app-schema migrations are PN-driven; see header comment above.
+enabled = false
+schema_paths = []
+
+[db.seed]
+# Disabled: the example does not seed via SQL files. `pnpm seed` runs a
+# TypeScript script that creates users via the Supabase admin API and
+# inserts fixture rows through PN.
+enabled = false
+sql_paths = []
+
+[realtime]
+# Required for R-FE-4 (two-tab realtime). Postgres logical replication
+# is enabled by default when `supabase start` boots Postgres.
+enabled = true
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1"
+openai_api_key = "env(OPENAI_API_KEY)"
+
+[inbucket]
+# Local email testing UI. Useful to confirm sign-up emails during
+# development of the SPA in M4.
+enabled = true
+port = 54324
+
+[storage]
+# Not exercised by the PoC; disable to keep `supabase start` lighter.
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+enable_signup = true
+enable_anonymous_sign_ins = false
+enable_manual_linking = false
+minimum_password_length = 6
+password_requirements = ""
+
+[auth.rate_limit]
+email_sent = 2
+sms_sent = 30
+anonymous_users = 30
+token_refresh = 150
+sign_in_sign_ups = 30
+token_verifications = 30
+web3 = 30
+
+[auth.email]
+# Email confirmations off for local development convenience — the PoC
+# seed script creates users via the admin API, and the SPA uses
+# password-based sign-in only.
+enable_signup = true
+double_confirm_changes = false
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "1s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+max_frequency = "5s"
+
+[auth.mfa]
+max_enrolled_factors = 10
+
+[auth.mfa.totp]
+enroll_enabled = false
+verify_enabled = false
+
+[auth.mfa.phone]
+enroll_enabled = false
+verify_enabled = false
+otp_length = 6
+max_frequency = "5s"
+
+[edge_runtime]
+# Not exercised by the PoC; the Hono server runs in Node, not as an
+# edge function.
+enabled = false
+
+[analytics]
+# Not exercised by the PoC.
+enabled = false
