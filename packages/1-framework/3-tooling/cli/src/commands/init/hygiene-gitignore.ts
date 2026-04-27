@@ -43,6 +43,6 @@ export function mergeGitignore(existing: string | undefined): string | null {
     return null;
   }
 
-  const trailingNewline = existing.endsWith('\n') ? '' : '\n';
-  return `${existing}${trailingNewline}${missing.join('\n')}\n`;
+  const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n';
+  return `${existing}${separator}${missing.join('\n')}\n`;
 }
