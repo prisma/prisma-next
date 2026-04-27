@@ -88,6 +88,8 @@ createRlsPolicy({
 
 If you only set `using` and leave `withCheck` unset, Postgres **defaults `WITH CHECK` to `USING`** — but in this case you should still write both explicitly so the intent is unambiguous to the next reader. The pattern "only `using` set" is a code-review smell on `UPDATE` policies.
 
+Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) — both `using` and `withCheck` set explicitly, expressions identical because there's no ownership transfer permitted.
+
 > _TODO: populate during M4 — link to the example test that covers the asymmetric-policy case once it's written._
 
 ---
@@ -104,6 +106,8 @@ Always set `to`. Common values for Supabase-style apps:
 | A specific custom tenant role | `['tenant_admin']` |
 
 Don't use `to: undefined` (which renders as `PUBLIC`). It applies to every role, including roles that don't exist yet, which makes the policy's blast radius unauditable.
+
+Worked example in the PoC: `public_messages_select_public` in [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) targets `['anon', 'authenticated']` for a public read; the paired `public_messages_insert_own` targets `['authenticated']` only and `withCheck`s `(author_id = (auth.uid())::text)`. Two roles for the read, one for the write — that's the standard "publicly readable, authored-by-account" shape.
 
 ---
 
@@ -132,6 +136,23 @@ The `examples/supabase-todos/` server is set up this way: see [`src/server/db.ts
 | `withCheck` on `INSERT` | `NULL` (treated as not-true) | Insert fails loudly. Good — prevents anon from creating "user-owned" rows. |
 
 If you want anon to be able to read public rows, write a separate `SELECT` policy with `to: ['anon', 'authenticated']` and a predicate that doesn't depend on `auth.uid()` (e.g. `using: 'true'` for fully-public, or `using: '(visibility = ''public'')'` for conditional).
+
+### Casting `auth.uid()` when storage types don't natively match
+
+`auth.uid()` returns Postgres `uuid`. If the column it's compared against is **not** `uuid` — most commonly because the contract was authored with `field.uuid()`, which lowers to `character(36)` (FL-03) — the comparison needs an explicit cast. **Cast on the function side, once per query:**
+
+```ts
+using: '(user_id = (auth.uid())::text)',
+withCheck: '(user_id = (auth.uid())::text)',
+```
+
+Why this direction:
+
+- `auth.uid()::text` is evaluated once per query; per-row casts (`user_id::uuid`) defeat any index on `user_id` and run the cast for every row touched.
+- `char(N)` ↔ `text` comparison is a standard implicit coercion in Postgres (the column is auto-coerced to `text`), so no per-row work is added on the column side.
+- Postgres normalizes the predicate to `((user_id)::text = (auth.uid())::text)` in `pg_policies.qual` — that's the rewriter, not extra runtime cost.
+
+If the column is already `uuid` in storage, omit the cast. Use the cast pattern only as a bridge while the contract keeps `char(36)`. See FL-03 for context and the option of authoring a custom `ColumnTypeDescriptor` to declare `uuid` in the contract directly.
 
 ---
 
@@ -217,7 +238,7 @@ MigrationCLI.run(import.meta.url, M);
 
 Run with `pnpm --filter <example> migrate:up`. Use the **service-role** URL for `migrate:up` (RLS bypass needed to `ALTER TABLE … ENABLE ROW LEVEL SECURITY`).
 
-Working reference: [`examples/supabase-todos/migrations/<ts>_initial/migration.ts`](../../../examples/supabase-todos/migrations/) (after PoC M1 lands).
+Working reference: [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) — three `createTable`s, three `enableRowLevelSecurity`s, eight `createRlsPolicy`s. The docblock at the top of that file documents the two intentional non-features (no `alterColumnType` to native `uuid`, no FK to `auth.users`) and cross-links FL-02 and FL-03.
 
 ---
 
@@ -225,11 +246,12 @@ Working reference: [`examples/supabase-todos/migrations/<ts>_initial/migration.t
 
 These are recorded in [`framework-limitations.md`](../../framework-limitations.md). The skill's advice is shaped by them; if any are closed in follow-up work, **edit this skill** to remove the workaround.
 
-- **No contract-level RLS metadata.** Policies aren't expressed in `schema.psl` / the TS DSL contract. The migration is hand-edited to add `enableRowLevelSecurity` / `createRlsPolicy` calls. (Sketch 3.)
-- **`OperationClass` is closed.** The `target.details.objectType` of policy ops falls back to `'dependency'`, losing semantic precision in planner output. (Sketch 3.) See FL-04.
+- **No contract-level RLS metadata** (FL-01). Policies aren't expressed in `schema.psl` / the TS DSL contract. The migration hand-authors `enableRowLevelSecurity` / `createRlsPolicy` calls. (Sketch 3.)
+- **`OperationClass` is closed** (FL-04). The `target.details.objectType` of policy ops falls back to `'dependency'`, losing semantic precision in planner output. (Sketch 3.)
+- **No cross-schema FK in the contract DSL — major** (FL-02). The contract has no way to express `REFERENCES auth.users(id) ON DELETE CASCADE`. A `rawSql` FK can be authored in a migration, but the apply-time schema verifier rejects it as `extra_foreign_key` and rolls the apply back. **The PoC therefore omits the FK entirely** and relies on application-side conventions (seed inserts the auth user first; `INSERT` policies' `withCheck` enforces `author = auth.uid()`). **A real Supabase-on-PN production app cannot ship without this gap closed** — it would lose `ON DELETE CASCADE` cleanup and DB-level guarantees that user-owning columns reference real users.
+- **`field.uuid()` is `char(36)`, not pg `uuid`** (FL-03). The portable `field.uuid()` callback helper lowers to `sql/char@1` with `length: 36`. The contract therefore declares `character(36)`, and the apply-time verifier enforces that — `alterColumnType` to native `uuid` is rejected as `type_mismatch`. Two options: (a) keep `char(36)` end-to-end and bridge to `auth.uid()` (which is `uuid`) by casting on the function side in policy bodies (`(<col> = (auth.uid())::text)` — see § 6); or (b) use the structural DSL with a custom `ColumnTypeDescriptor` of `{ codecId: 'pg/uuid@1', nativeType: 'uuid' }` so the contract itself declares `uuid`. The PoC takes option (a) so the contract stays target-portable.
 - **No first-class scoped-session SPI.** Per-request RLS context is threaded via a userspace runtime factory (this PoC's `createSupabaseRuntime`). (Sketch 1.)
 - **No subscription lane.** Realtime change streams against RLS-protected tables go through `supabase-js` directly, not PN. (Sketch 2.)
-- **`field.uuid()` is `char(36)`, not pg `uuid`.** The portable `field.uuid()` callback helper lowers to `sql/char@1` with `length: 36`. That column type cannot be the foreign-key target / source of a real Postgres `uuid` column (e.g. `auth.users.id`). For Supabase apps you have two options: (a) use the structural DSL with a custom `ColumnTypeDescriptor` of `{ codecId: 'pg/uuid@1', nativeType: 'uuid' }` — `@prisma-next/adapter-postgres/column-types` does not export a `uuidColumn` today, so you write the descriptor inline; or (b) accept `char(36)` from the helper and `ALTER COLUMN ... TYPE uuid USING ...::uuid` in the migration before adding the cross-schema FK. The PoC takes option (b) so that the contract stays portable; the migration (T1.6) carries the alter. See FL-03.
 
 ---
 
