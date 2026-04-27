@@ -76,5 +76,8 @@
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-targets/3-targets/postgres"
+  },
+  "prismaNext": {
+    "minServerVersion": "14"
   }
 }

@@ -23,6 +23,90 @@ export function starterSchema(target: TargetId, authoring: AuthoringId): string 
   return target === 'mongo' ? starterSchemaPslMongo() : starterSchemaPslPostgres();
 }
 
+/**
+ * Renders a short authoring-appropriate schema sample (FR5.1) for embedding
+ * in `prisma-next.md`. Returns a complete fenced markdown code block.
+ *
+ * The sample intentionally shows just one model: it's illustrative, not
+ * a substitute for the full scaffolded contract file. The TS samples use
+ * the same outer shape as `starterSchemaTs*` (FR5.3) so a user reading
+ * the doc and the file side-by-side sees the same structure.
+ */
+export function schemaSample(target: TargetId, authoring: AuthoringId): string {
+  if (authoring === 'typescript') {
+    return target === 'mongo' ? schemaSampleTsMongo() : schemaSampleTsPostgres();
+  }
+  return target === 'mongo' ? schemaSamplePslMongo() : schemaSamplePslPostgres();
+}
+
+function schemaSamplePslPostgres(): string {
+  return `\`\`\`prisma
+model User {
+  id    Int     @id @default(autoincrement())
+  email String  @unique
+  name  String?
+}
+\`\`\``;
+}
+
+function schemaSamplePslMongo(): string {
+  return `\`\`\`prisma
+model User {
+  id    ObjectId @id @map("_id")
+  email String   @unique
+  name  String?
+  @@map("users")
+}
+\`\`\``;
+}
+
+function schemaSampleTsPostgres(): string {
+  return `\`\`\`typescript
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgresPack from '@prisma-next/target-postgres/pack';
+
+export const contract = defineContract(
+  { family: sqlFamily, target: postgresPack },
+  ({ field, model }) => ({
+    models: {
+      User: model('User', {
+        fields: {
+          id: field.id.uuidv7(),
+          email: field.text().unique(),
+          name: field.text().optional(),
+        },
+      }),
+    },
+  }),
+);
+\`\`\``;
+}
+
+function schemaSampleTsMongo(): string {
+  return `\`\`\`typescript
+import mongoFamily from '@prisma-next/family-mongo/pack';
+import { defineContract } from '@prisma-next/mongo-contract-ts/contract-builder';
+import mongoTarget from '@prisma-next/target-mongo/pack';
+
+export const contract = defineContract(
+  { family: mongoFamily, target: mongoTarget },
+  ({ field, model }) => ({
+    models: {
+      User: model('User', {
+        collection: 'users',
+        fields: {
+          _id: field.objectId(),
+          email: field.string(),
+          name: field.string().optional(),
+        },
+      }),
+    },
+  }),
+);
+\`\`\``;
+}
+
 function starterSchemaPslPostgres(): string {
   return `model User {
   id        Int      @id @default(autoincrement())
@@ -79,8 +163,9 @@ export const contract = defineContract(
           name: field.text().optional(),
           createdAt: field.createdAt(),
         },
-      }).relations({
-        posts: rel.hasMany('Post', { by: 'authorId' }),
+        relations: {
+          posts: rel.hasMany('Post', { by: 'authorId' }),
+        },
       }),
 
       Post: model('Post', {
@@ -91,8 +176,9 @@ export const contract = defineContract(
           authorId: field.uuid(),
           createdAt: field.createdAt(),
         },
-      }).relations({
-        author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),
+        relations: {
+          author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),
+        },
       }),
     },
   }),
@@ -102,36 +188,40 @@ export const contract = defineContract(
 
 function starterSchemaTsMongo(): string {
   return `import mongoFamily from '@prisma-next/family-mongo/pack';
-import { defineContract, field, model, rel } from '@prisma-next/mongo-contract-ts/contract-builder';
+import { defineContract } from '@prisma-next/mongo-contract-ts/contract-builder';
 import mongoTarget from '@prisma-next/target-mongo/pack';
 
-const User = model('User', {
-  collection: 'users',
-  fields: {
-    _id: field.objectId(),
-    email: field.string(),
-    name: field.string().optional(),
-  },
-});
+export const contract = defineContract(
+  { family: mongoFamily, target: mongoTarget },
+  ({ field, model, rel }) => ({
+    models: {
+      User: model('User', {
+        collection: 'users',
+        fields: {
+          _id: field.objectId(),
+          email: field.string(),
+          name: field.string().optional(),
+        },
+        relations: {
+          posts: rel.hasMany('Post', { from: '_id', to: 'authorId' }),
+        },
+      }),
 
-const Post = model('Post', {
-  collection: 'posts',
-  fields: {
-    _id: field.objectId(),
-    title: field.string(),
-    content: field.string().optional(),
-    authorId: field.objectId(),
-  },
-  relations: {
-    author: rel.belongsTo(User, { from: 'authorId', to: User.ref('_id') }),
-  },
-});
-
-export const contract = defineContract({
-  family: mongoFamily,
-  target: mongoTarget,
-  models: { User, Post },
-});
+      Post: model('Post', {
+        collection: 'posts',
+        fields: {
+          _id: field.objectId(),
+          title: field.string(),
+          content: field.string().optional(),
+          authorId: field.objectId(),
+        },
+        relations: {
+          author: rel.belongsTo('User', { from: 'authorId', to: '_id' }),
+        },
+      }),
+    },
+  }),
+);
 `;
 }
 
@@ -163,6 +253,9 @@ export const db = postgres<Contract>({ contractJson });
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-export const db = mongo<Contract>({ contractJson });
+export const db = mongo<Contract>({
+  contractJson,
+  url: process.env['DATABASE_URL']!,
+});
 `;
 }

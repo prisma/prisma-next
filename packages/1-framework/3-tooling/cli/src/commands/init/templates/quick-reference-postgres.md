@@ -4,19 +4,13 @@ Prisma Next lets you query your database in simple, easy-to-read TypeScript. Def
 
 This project is set up for PostgreSQL. Prisma Next also supports other databases.
 
+{{requirements}}
+
 ## Your data contract
 
 Your data contract is the heart of your application. It lives at [`{{schemaPath}}`]({{schemaPath}}) and describes your models:
 
-```prisma
-model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  posts     Post[]
-  createdAt DateTime @default(now())
-}
-```
+{{schemaSample}}
 
 Every model you define in your contract can be queried from your app. Your editor will autocomplete the query methods and show you what type each model field is:
 
@@ -89,3 +83,11 @@ You can customize how your environment variables are loaded by changing or remov
 1. Edit [`{{schemaPath}}`]({{schemaPath}}) to add or change models.
 2. Run `{{pkgRun}} contract emit` to regenerate the contract.
 3. Query your models — your IDE will autocomplete everything.
+
+## Monorepo notes (pnpm workspaces)
+
+If this project lives inside a pnpm workspace, a few things are worth knowing:
+
+- **Catalogs.** When the workspace's `pnpm-workspace.yaml` defines a `catalogs` entry for `prisma-next` or `@prisma-next/postgres`, pnpm uses the catalog version everywhere — `init` does too. If you wanted the published `latest` instead, update or remove the catalog entry, then re-run `pnpm install`.
+- **`pnpm dlx`.** `pnpm dlx prisma-next@latest init …` works in any directory. Inside a workspace, pnpm still resolves dependencies through the workspace's catalog/overrides rather than the registry; expect the installed Prisma Next packages to reflect the workspace's catalog rather than `latest`.
+- **`pnpm` → `npm` fallback.** If `pnpm` ever fails to install Prisma Next with a `workspace:*` or `catalog:` resolution error (a leak in a published artefact), `init` falls back to `npm install` and surfaces a warning. Once the offending package republishes a clean version you can switch back with `pnpm install`.

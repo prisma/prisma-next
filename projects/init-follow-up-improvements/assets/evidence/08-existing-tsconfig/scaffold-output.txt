@@ -1,0 +1,19 @@
+scaffold: baseDir=/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/08-existing-tsconfig target=postgres authoring=psl schemaPath=prisma/contract.prisma
+wrote prisma/contract.prisma
+wrote prisma-next.config.ts
+wrote prisma/db.ts
+wrote prisma-next.md
+wrote .agents/skills/prisma-next/SKILL.md
+<anonymous_script>:2
+  // Strict mode for type safety
+  ^
+
+SyntaxError: Expected property name or '}' in JSON at position 4 (line 2 column 3)
+    at JSON.parse (<anonymous>)
+    at mergeTsConfig (/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/packages/1-framework/3-tooling/cli/src/commands/init/templates/tsconfig.ts:26:23)
+    at <anonymous> (/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/scaffold.ts:63:31)
+    at ModuleJob.run (node:internal/modules/esm/module_job:413:25)
+    at async onImport.tracePromise.__proto__ (node:internal/modules/esm/loader:660:26)
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5)
+
+Node.js v24.13.0
