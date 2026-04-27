@@ -1,8 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
-import type { PathDecision } from '@prisma-next/migration-tools/dag';
-import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import type { PathDecision } from '@prisma-next/migration-tools/graph';
+import { reconstructGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';

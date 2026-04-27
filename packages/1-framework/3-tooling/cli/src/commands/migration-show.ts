@@ -1,5 +1,5 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { MigrationBundle } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';

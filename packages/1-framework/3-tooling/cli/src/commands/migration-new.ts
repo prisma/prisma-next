@@ -14,7 +14,7 @@ import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/graph';
 import {
   copyFilesWithRename,
   formatMigrationDirName,

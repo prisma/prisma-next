@@ -6,7 +6,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLeaf, findPath, reconstructGraph } from '@prisma-next/migration-tools/graph';
 import {
   formatMigrationDirName,
   readMigrationsDir,

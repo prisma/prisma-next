@@ -4,7 +4,7 @@ import {
   findPath,
   findPathWithDecision,
   findReachableLeaves,
-} from '@prisma-next/migration-tools/dag';
+} from '@prisma-next/migration-tools/graph';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type {

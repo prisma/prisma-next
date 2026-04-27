@@ -5,7 +5,7 @@ import { createContract, createSqlContract } from '@prisma-next/contract/testing
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/graph';
 import {
   formatMigrationDirName,
   readMigrationPackage,

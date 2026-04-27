@@ -69,7 +69,7 @@ graph TD
 | `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationEdge`, `MigrationHints` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
 | `./attestation` | `computeMigrationId`, `verifyMigration`, `verifyMigrationBundle` |
-| `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
+| `./graph` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
 | `./constants` | `EMPTY_CONTRACT_HASH` |
 
 ## On-Disk Format
