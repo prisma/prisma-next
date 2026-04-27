@@ -85,8 +85,8 @@ export function mongoCodec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: async (value) => userEncode(value),
-    decode: async (wire) => userDecode(wire),
+    encode: (value) => Promise.resolve(userEncode(value)),
+    decode: (wire) => Promise.resolve(userDecode(wire)),
     encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
