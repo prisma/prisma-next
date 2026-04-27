@@ -3,6 +3,12 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../src/resolve-value';
 
+interface RuntimeErrorShape extends Error {
+  code?: string;
+  details?: Record<string, unknown>;
+  cause?: unknown;
+}
+
 const uppercaseCodec = mongoCodec({
   typeId: 'test/uppercase@1',
   targetTypes: ['string'],
@@ -173,6 +179,92 @@ describe('resolveValue', () => {
       const input = { x: 1, y: [2, 3], z: { nested: 'leaf' } };
       const result = await resolveValue(input);
       expect(result).toEqual(input);
+    });
+  });
+
+  describe('error envelope (RUNTIME.ENCODE_FAILED)', () => {
+    it('wraps codec.encode failures in RUNTIME.ENCODE_FAILED with cause and codec id', async () => {
+      const failingCodec = mongoCodec({
+        typeId: 'test/failing@1',
+        targetTypes: ['string'],
+        decode: (w: string) => w,
+        encode: async (_v: string) => {
+          throw new Error('kms-key-resolution-failed');
+        },
+      });
+      const registry = createMongoCodecRegistry();
+      registry.register(failingCodec);
+
+      const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
+      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      expect(rejection).toBeInstanceOf(Error);
+      const err = rejection as RuntimeErrorShape;
+      expect(err.code).toBe('RUNTIME.ENCODE_FAILED');
+      expect(err.message).toContain('test/failing@1');
+      expect(err.message).toContain('kms-key-resolution-failed');
+      expect(err.details?.['codec']).toBe('test/failing@1');
+      expect((err.cause as Error | undefined)?.message).toBe('kms-key-resolution-failed');
+    });
+
+    it('uses MongoParamRef.name as the envelope label when available', async () => {
+      const failingCodec = mongoCodec({
+        typeId: 'test/failing@1',
+        targetTypes: ['string'],
+        decode: (w: string) => w,
+        encode: async (_v: string) => {
+          throw new Error('boom');
+        },
+      });
+      const registry = createMongoCodecRegistry();
+      registry.register(failingCodec);
+
+      const ref = new MongoParamRef('plaintext', {
+        codecId: 'test/failing@1',
+        name: 'user.email',
+      });
+      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const err = rejection as RuntimeErrorShape;
+      expect(err.details?.['label']).toBe('user.email');
+      expect(err.message).toContain('user.email');
+    });
+
+    it('falls back to codec id as the envelope label when MongoParamRef has no name', async () => {
+      const failingCodec = mongoCodec({
+        typeId: 'test/failing@1',
+        targetTypes: ['string'],
+        decode: (w: string) => w,
+        encode: async (_v: string) => {
+          throw new Error('boom');
+        },
+      });
+      const registry = createMongoCodecRegistry();
+      registry.register(failingCodec);
+
+      const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
+      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const err = rejection as RuntimeErrorShape;
+      expect(err.details?.['label']).toBe('test/failing@1');
+    });
+
+    it('preserves an existing RUNTIME.ENCODE_FAILED envelope without re-wrapping', async () => {
+      const innerCodec = mongoCodec({
+        typeId: 'test/already-wrapped@1',
+        targetTypes: ['string'],
+        decode: (w: string) => w,
+        encode: async (_v: string) => {
+          const err = new Error('original') as RuntimeErrorShape;
+          err.code = 'RUNTIME.ENCODE_FAILED';
+          throw err;
+        },
+      });
+      const registry = createMongoCodecRegistry();
+      registry.register(innerCodec);
+
+      const ref = new MongoParamRef('x', { codecId: 'test/already-wrapped@1' });
+      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const err = rejection as RuntimeErrorShape;
+      expect(err.code).toBe('RUNTIME.ENCODE_FAILED');
+      expect(err.message).toBe('original');
     });
   });
 });

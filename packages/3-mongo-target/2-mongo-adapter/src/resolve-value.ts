@@ -1,3 +1,4 @@
+import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -10,6 +11,11 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
  *
  * Object/array nodes dispatch their child resolutions concurrently via
  * `Promise.all` so independent leaves encode in parallel.
+ *
+ * Codec encode failures are wrapped in a `RUNTIME.ENCODE_FAILED` envelope
+ * (mirroring SQL's `wrapEncodeFailure` shape) with `{ label, codec }` details
+ * and the original error attached on `cause`. An already-wrapped envelope is
+ * re-thrown verbatim so nested resolvers don't double-wrap.
  */
 export async function resolveValue(
   value: MongoValue,
@@ -18,7 +24,13 @@ export async function resolveValue(
   if (value instanceof MongoParamRef) {
     if (value.codecId && codecs) {
       const codec = codecs.get(value.codecId);
-      if (codec?.encode) return codec.encode(value.value);
+      if (codec?.encode) {
+        try {
+          return await codec.encode(value.value);
+        } catch (error) {
+          wrapEncodeFailure(error, value, codec.id);
+        }
+      }
     }
     return value.value;
   }
@@ -41,4 +53,31 @@ export async function resolveValue(
     }
   }
   return result;
+}
+
+function paramRefLabel(ref: MongoParamRef, codecId: string): string {
+  return ref.name ?? codecId;
+}
+
+function isAlreadyEncodeFailure(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    (error as Error & { code?: unknown }).code === 'RUNTIME.ENCODE_FAILED'
+  );
+}
+
+function wrapEncodeFailure(error: unknown, ref: MongoParamRef, codecId: string): never {
+  if (isAlreadyEncodeFailure(error)) {
+    throw error;
+  }
+  const label = paramRefLabel(ref, codecId);
+  const message = error instanceof Error ? error.message : String(error);
+  const wrapped = runtimeError(
+    'RUNTIME.ENCODE_FAILED',
+    `Failed to encode parameter ${label} with codec '${codecId}': ${message}`,
+    { label, codec: codecId },
+  );
+  wrapped.cause = error;
+  throw wrapped;
 }
