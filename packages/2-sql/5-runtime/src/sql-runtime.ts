@@ -161,6 +161,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         warn: () => {},
         error: () => {},
       },
+      // Stubbed in task 1.0; real implementation lands in 1.0b.
+      identityKey: () => 'identity-key-not-implemented',
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });

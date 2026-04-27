@@ -73,11 +73,14 @@ test('RuntimeMiddleware narrowed to a SQL plan sees the SQL fields', () => {
   void middleware;
 });
 
-test('RuntimeMiddlewareContext has contract, mode, log, now', () => {
+test('RuntimeMiddlewareContext has contract, mode, log, now, identityKey', () => {
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('contract');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('mode');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('log');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('now');
+  expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('identityKey');
+  expectTypeOf<RuntimeMiddlewareContext['identityKey']>().toBeFunction();
+  expectTypeOf<RuntimeMiddlewareContext['identityKey']>().returns.toBeString();
 });
 
 test('RuntimeMiddleware familyId and targetId are optional', () => {
