@@ -216,4 +216,95 @@ describe('cross-family middleware proof', () => {
     expect(events[2]).toMatchObject({ target: 'mongo', lane: 'orm' });
     expect(events[3]).toMatchObject({ target: 'mongo', completed: true });
   });
+
+  it('same intercept middleware short-circuits queries in both SQL and Mongo runtimes', async () => {
+    // A generic interceptor with no familyId. The same instance is registered
+    // on both runtimes and short-circuits execution in each. Demonstrates
+    // that the intercept hook is family-agnostic by construction: both
+    // SqlRuntimeImpl and MongoRuntimeImpl inherit it from runWithMiddleware
+    // via RuntimeCore, so no per-family wiring is needed.
+    const { middleware: telemetry, events } = collectingTelemetry();
+
+    const interceptCalls: string[] = [];
+    const intercepted: RuntimeMiddleware & {
+      readonly familyId?: undefined;
+      readonly targetId?: undefined;
+    } = {
+      name: 'mock-interceptor',
+      async intercept(plan) {
+        interceptCalls.push(plan.meta.target);
+        return { rows: [{ intercepted: true }] };
+      },
+    };
+
+    const sqlDriverRows: Record<string, unknown>[] = [{ id: 'should-not-appear' }];
+    const sqlRuntime = new MockSqlRuntime([intercepted, telemetry], sqlCtx, sqlDriverRows);
+
+    const mongoDriver = createMockMongoDriver([{ _id: 'should-not-appear' }]);
+    const mongoRuntime = createMongoRuntime({
+      adapter: createMockMongoAdapter(),
+      driver: mongoDriver,
+      contract: {},
+      targetId: 'mongo',
+      middleware: [intercepted, telemetry],
+    });
+
+    const sqlPlan: MockSqlPlan = {
+      sql: 'SELECT 1',
+      params: [],
+      meta: {
+        target: 'postgres',
+        storageHash: 'sha256:sql-hash',
+        lane: 'sql',
+        paramDescriptors: [],
+      },
+    };
+
+    const sqlOut: unknown[] = [];
+    for await (const row of sqlRuntime.execute(sqlPlan)) {
+      sqlOut.push(row);
+    }
+
+    const mongoPlan = createMongoPlan({
+      target: 'mongo',
+      targetFamily: 'mongo',
+      storageHash: 'sha256:mongo-hash',
+      lane: 'orm',
+      paramDescriptors: [],
+    });
+
+    const mongoOut: unknown[] = [];
+    for await (const row of mongoRuntime.execute(mongoPlan)) {
+      mongoOut.push(row);
+    }
+
+    // The same intercepted rows came out of both runtimes.
+    expect(sqlOut).toEqual([{ intercepted: true }]);
+    expect(mongoOut).toEqual([{ intercepted: true }]);
+
+    // The interceptor was invoked once per family.
+    expect(interceptCalls).toEqual(['postgres', 'mongo']);
+
+    // The Mongo driver was never invoked (the SQL mock does not expose its
+    // driver as a spy, but we verify above that sqlOut does not contain any
+    // of sqlDriverRows).
+    expect(mongoDriver.execute).not.toHaveBeenCalled();
+
+    // Telemetry observed only afterExecute for each run (beforeExecute is
+    // suppressed on the intercepted hit path) and saw source: 'middleware'
+    // in both cases.
+    expect(events).toHaveLength(2);
+    expect(events[0]).toMatchObject({
+      phase: 'afterExecute',
+      target: 'postgres',
+      completed: true,
+      source: 'middleware',
+    });
+    expect(events[1]).toMatchObject({
+      phase: 'afterExecute',
+      target: 'mongo',
+      completed: true,
+      source: 'middleware',
+    });
+  });
 });
