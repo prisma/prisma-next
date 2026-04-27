@@ -1,0 +1,9 @@
+=== Scenario 01: blank dir, no package.json ===
+total 8
+drwxr-xr-x@ 3 wmadden  staff  96 Apr 26 05:55 .
+drwxr-xr-x@ 3 wmadden  staff  96 Apr 26 05:55 ..
+-rw-r--r--@ 1 wmadden  staff  48 Apr 26 05:55 init-output.txt
+--- running prisma-next init ---
+┌  prisma-next init
+│
+■  No package.json or deno.json found. Initialize your project first (e.g. npm init or deno init), then re-run prisma-next init.

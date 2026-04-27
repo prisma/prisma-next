@@ -1,0 +1,14 @@
+=== Scenario 06a: stdin closed (simulates CI) ===
+  "packageManager": "pnpm@10.27.0"
+}
+--- running prisma-next init </dev/null ---
+┌  prisma-next init
+[?25l│
+◆  What database are you using?
+│  ● PostgreSQL
+│  ○ MongoDB
+└
+EXIT=0
+
+=== Scenario 06b: --yes flag (does not exist) ===
+error: unknown option '--yes'

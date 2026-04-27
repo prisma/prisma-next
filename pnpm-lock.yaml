@@ -775,6 +775,9 @@ importers:
       esbuild:
         specifier: ^0.25.11
         version: 0.25.11
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       package-manager-detector:
         specifier: ^1.6.0
         version: 1.6.0
@@ -958,6 +961,9 @@ importers:
       esbuild:
         specifier: ^0.25.11
         version: 0.25.11
+      jsonc-parser:
+        specifier: ^3.3.1
+        version: 3.3.1
       package-manager-detector:
         specifier: ^1.6.0
         version: 1.6.0
@@ -2146,6 +2152,9 @@ importers:
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
+      mongodb:
+        specifier: 'catalog:'
+        version: 6.21.0
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
@@ -2159,6 +2168,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../0-config/tsdown
+      mongodb-memory-server:
+        specifier: 'catalog:'
+        version: 10.4.3
       tsdown:
         specifier: 'catalog:'
         version: 0.18.4(typescript@5.9.3)
@@ -3369,6 +3381,12 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../../../../packages/1-framework/0-foundation/utils
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.10.4
+      dotenv:
+        specifier: ^16.4.5
+        version: 16.6.1
       pg:
         specifier: 'catalog:'
         version: 8.16.3
@@ -5876,6 +5894,9 @@ packages:
     resolution: {integrity: sha512-XmOWe7eyHYH14cLdVPoyg+GOH3rYX++KpzrylJwSW98t3Nk+U8XOl8FWKOgwtzdb8lXGf6zYwDUzeHMWfxasyg==}
     engines: {node: '>=6'}
     hasBin: true
+
+  jsonc-parser@3.3.1:
+    resolution: {integrity: sha512-HUgH65KyejrUFPvHFPbqOY0rsFip3Bo5wb4ngvdi1EpCYWUQDC5V+Y7mZws+DLkr4M//zQJoanu1SP+87Dv1oQ==}
 
   jsonify@0.0.1:
     resolution: {integrity: sha512-2/Ki0GcmuqSrgFyelQq9M05y7PS0mEwuIzrf3f1fPqkVDVRvZrPZtVSMHxdgo8Aq0sxAOb/cr2aqqA3LeWHVPg==}
@@ -9010,6 +9031,8 @@ snapshots:
       object-keys: 1.1.1
 
   json5@2.2.3: {}
+
+  jsonc-parser@3.3.1: {}
 
   jsonify@0.0.1: {}
 
