@@ -48,7 +48,12 @@ describe('telemetry middleware', () => {
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
       identityKey: () => 'mock-key',
     };
-    const result = { rowCount: 5, latencyMs: 42, completed: true };
+    const result = {
+      rowCount: 5,
+      latencyMs: 42,
+      completed: true,
+      source: 'driver' as const,
+    };
 
     await middleware.afterExecute!(plan, result, ctx);
 
@@ -60,6 +65,38 @@ describe('telemetry middleware', () => {
       rowCount: 5,
       latencyMs: 42,
       completed: true,
+      source: 'driver',
+    });
+  });
+
+  it('round-trips source: "middleware" on intercepted afterExecute events', async () => {
+    const onEvent = vi.fn();
+    const middleware = createTelemetryMiddleware({ onEvent });
+    const ctx = {
+      contract: {},
+      mode: 'strict' as const,
+      now: Date.now,
+      log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+      identityKey: () => 'mock-key',
+    };
+    const result = {
+      rowCount: 3,
+      latencyMs: 1,
+      completed: true,
+      source: 'middleware' as const,
+    };
+
+    await middleware.afterExecute!(plan, result, ctx);
+
+    expect(onEvent).toHaveBeenCalledWith({
+      phase: 'afterExecute',
+      lane: 'sql',
+      target: 'postgres',
+      storageHash: 'sha256:test',
+      rowCount: 3,
+      latencyMs: 1,
+      completed: true,
+      source: 'middleware',
     });
   });
 

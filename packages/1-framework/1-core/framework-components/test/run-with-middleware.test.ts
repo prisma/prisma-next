@@ -81,7 +81,7 @@ describe('runWithMiddleware', () => {
 
     expect(out).toEqual(rows);
     expect(events).toEqual(['beforeExecute', 'onRow:1', 'onRow:2', 'afterExecute']);
-    expect(observedResult).toMatchObject({ rowCount: 2, completed: true });
+    expect(observedResult).toMatchObject({ rowCount: 2, completed: true, source: 'driver' });
     expect(observedResult?.latencyMs).toBeGreaterThanOrEqual(0);
   });
 

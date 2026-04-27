@@ -13,6 +13,13 @@ export interface TelemetryEvent {
   readonly rowCount?: number;
   readonly latencyMs?: number;
   readonly completed?: boolean;
+  /**
+   * Where the rows came from. Only set on `afterExecute` events; `'driver'`
+   * means the underlying driver served the query, `'middleware'` means a
+   * `RuntimeMiddleware.intercept` hook short-circuited execution and
+   * supplied the rows directly. Mirrors `AfterExecuteResult.source`.
+   */
+  readonly source?: 'driver' | 'middleware';
 }
 
 export interface TelemetryMiddlewareOptions {
@@ -61,6 +68,7 @@ export function createTelemetryMiddleware(
           rowCount: result.rowCount,
           latencyMs: result.latencyMs,
           completed: result.completed,
+          source: result.source,
         },
         ctx,
       );
