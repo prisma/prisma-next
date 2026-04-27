@@ -1,0 +1,67 @@
+import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { timeouts } from '@prisma-next/test-utils';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  loadConfig: vi.fn(),
+}));
+
+vi.mock('../../src/config-loader', () => ({
+  loadConfig: mocks.loadConfig,
+}));
+
+const HASH_A = `sha256:${'a'.repeat(64)}`;
+
+describe('migration-ref MigrationToolsError envelope mapping', () => {
+  let tempDir: string;
+  let configPath: string;
+
+  beforeEach(async () => {
+    tempDir = join(
+      tmpdir(),
+      `migration-ref-mapping-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    );
+    const migrationsDir = join(tempDir, 'migrations');
+    const refsDir = join(migrationsDir, 'refs');
+    await mkdir(refsDir, { recursive: true });
+    await writeFile(
+      join(refsDir, 'staging.json'),
+      `${JSON.stringify({ hash: HASH_A, invariants: [] }, null, 2)}\n`,
+      'utf-8',
+    );
+    configPath = join(tempDir, 'prisma-next.config.ts');
+    mocks.loadConfig.mockResolvedValue({
+      migrations: { dir: 'migrations' },
+    });
+  });
+
+  afterEach(async () => {
+    mocks.loadConfig.mockReset();
+    await rm(tempDir, { recursive: true, force: true });
+  });
+
+  it(
+    'forwards MigrationToolsError details into the CliStructuredError meta payload',
+    async () => {
+      const { executeRefGetCommand } = await import('../../src/commands/migration-ref');
+
+      const result = await executeRefGetCommand('does-not-exist', { config: configPath });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      const envelope = result.failure.toEnvelope();
+      expect(envelope.meta).toMatchObject({
+        code: 'MIGRATION.UNKNOWN_REF',
+        refName: 'does-not-exist',
+      });
+      expect(envelope.meta).toHaveProperty('filePath');
+      expect(envelope.summary).toContain('does-not-exist');
+      expect(envelope.why).toContain('does-not-exist');
+      expect(envelope.fix).toBeTypeOf('string');
+    },
+    timeouts.typeScriptCompilation,
+  );
+});
