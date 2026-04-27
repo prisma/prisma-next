@@ -68,8 +68,10 @@ export function mongoCodec<
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
-  const userEncode =
-    config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
+  // The synchronous identity default is only safe when the author has
+  // declared "the input is already the wire value" (i.e. TInput == TWire);
+  // it returns the value directly, never a Promise.
+  const userEncode = config.encode ?? ((value: TInput) => value as unknown as TWire);
   const userDecode = config.decode;
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;

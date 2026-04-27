@@ -638,7 +638,6 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       const result = await encodeParams(plan, registry);
       const wire = result[0];
       expect(typeof wire).toBe('string');
-      expect(typeof (wire as { then?: unknown } | null | undefined)?.then).toBe('undefined');
       expect(wire).not.toBe('Alice');
       await expect(decryptSecret(wire as string, seed)).resolves.toBe('Alice');
     },
@@ -664,7 +663,6 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       });
 
       const result = await decodeRow({ secret: wire }, plan, registry);
-      expect(typeof (result['secret'] as { then?: unknown } | null)?.then).toBe('undefined');
       expect(result['secret']).toBe('top-secret');
     },
   );

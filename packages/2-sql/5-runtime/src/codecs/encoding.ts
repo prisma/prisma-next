@@ -59,10 +59,6 @@ export async function encodeParam(
     return value;
   }
 
-  if (!codec.encode) {
-    return value;
-  }
-
   try {
     return await codec.encode(value);
   } catch (error) {

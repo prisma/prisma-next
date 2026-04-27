@@ -1,5 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { runtimeError } from '@prisma-next/framework-components/runtime';
+import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
@@ -88,11 +88,7 @@ function previewWireValue(wireValue: unknown): string {
 }
 
 function isJsonSchemaValidationError(error: unknown): boolean {
-  return (
-    error instanceof Error &&
-    'code' in error &&
-    (error as Error & { code: string }).code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED'
-  );
+  return isRuntimeError(error) && error.code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED';
 }
 
 function wrapDecodeFailure(

@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
 
@@ -877,6 +877,19 @@ describe('validateContract', () => {
         emptyCodecLookup,
       );
       expect(result.target).toBe('postgres');
+    });
+
+    it('binds to a synchronous return type symbol-for-symbol', () => {
+      // Symmetric to the Mongo-side createMongoAdapter regression: assert the
+      // return type of validateContract directly so a future drift to
+      // Promise-shaped output fails the test-file typecheck rather than
+      // surfacing only at downstream call sites.
+      expectTypeOf<ReturnType<typeof validateContract<Contract<SqlStorage>>>>().toEqualTypeOf<
+        Contract<SqlStorage>
+      >();
+      expectTypeOf<ReturnType<typeof validateContract<Contract<SqlStorage>>>>().not.toEqualTypeOf<
+        Promise<Contract<SqlStorage>>
+      >();
     });
   });
 });
