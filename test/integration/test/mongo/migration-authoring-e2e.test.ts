@@ -85,8 +85,14 @@ describe(
             destination: { storageHash: 'authoring-test' },
             operations: serialized,
           },
-
-          destinationContract: {} as unknown as MongoContract,
+          // Synthetic-contract opt-out (paired with `strictVerification: false`):
+          // these tests exercise the runner against hand-rolled migration ops,
+          // not a real authored contract. Supply the minimum well-formed shape
+          // `contractToMongoSchemaIR` reads (`storage.collections`) so the
+          // verifier degrades to an empty-expected diff rather than crashing.
+          destinationContract: {
+            storage: { storageHash: 'sha256:authoring-test', collections: {} },
+          } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
           strictVerification: false,
@@ -329,8 +335,10 @@ describe(
               destination: { storageHash: 'authoring-test-v2' },
               operations: serialized2,
             },
-
-            destinationContract: {} as unknown as MongoContract,
+            // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
+            destinationContract: {
+              storage: { storageHash: 'sha256:authoring-test-v2', collections: {} },
+            } as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
             strictVerification: false,
@@ -368,8 +376,10 @@ describe(
               destination: { storageHash: 'authoring-test-v3' },
               operations: serialized3,
             },
-
-            destinationContract: {} as unknown as MongoContract,
+            // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
+            destinationContract: {
+              storage: { storageHash: 'sha256:authoring-test-v3', collections: {} },
+            } as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
             strictVerification: false,
