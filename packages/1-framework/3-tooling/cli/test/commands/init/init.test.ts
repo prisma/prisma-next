@@ -1655,11 +1655,12 @@ describe('deriveCanPrompt (F14, action-handler bridge)', () => {
   let deriveCanPrompt: (opts: any) => boolean;
 
   // `beforeAll` rather than `beforeEach`: `import()` caches the module, so
-  // repeating it is wasted work — and on CI's cold transform, the first call
-  // can exceed Vitest's 200ms hook timeout. One import per suite is enough.
+  // repeating it is wasted work. The explicit `30_000ms` timeout is for CI's
+  // cold transform of `init/index` — the first call has been observed
+  // exceeding Vitest's default 200ms hook timeout.
   beforeAll(async () => {
     ({ deriveCanPrompt } = await import('../../../src/commands/init/index'));
-  });
+  }, 30_000);
 
   it('returns false when stdin is closed even though stdout is a TTY (the canonical CI/agent shape)', () => {
     expect(
