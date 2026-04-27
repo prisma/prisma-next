@@ -488,7 +488,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
 
   lines.push('');
   lines.push(
-    `Next: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)} to emit ops.json and attest migrationHash before running ${green_('prisma-next migration apply')}.`,
+    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
   );
 
   if (result.sql && result.sql.length > 0) {
