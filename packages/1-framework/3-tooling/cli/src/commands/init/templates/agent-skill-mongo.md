@@ -82,8 +82,8 @@ The ORM covers the common cases. When you genuinely need something it can't expr
    ```typescript
    import { MongoClient } from 'mongodb';
    import mongo from '@prisma-next/mongo/runtime';
-   import type { Contract } from '{{schemaDir}}/contract.d';
-   import contractJson from '{{schemaDir}}/contract.json' with { type: 'json' };
+   import type { Contract } from './contract.d';
+   import contractJson from './contract.json' with { type: 'json' };
 
    const client = new MongoClient(process.env['DATABASE_URL']!);
    await client.connect();
