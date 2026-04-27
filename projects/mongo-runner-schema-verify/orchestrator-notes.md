@@ -167,6 +167,23 @@ _(none yet)_
 
 **Reversibility:** Trivial. Both tests are still single files; a follow-up PR can split them once a shared `test-utils` helper module is designed.
 
+### 2026-04-27 — A10: F2 false-negative in text-index canonicalization (Spec R1 regression caught post-PR)
+
+**What surfaced:** While the orchestrator was fixing a Coverage CI gap on the previous A02 commit, CodeRabbit posted a fresh `🔴 Critical` finding on `canonicalize-introspection.ts:165-174` (the text-index server-default stripping introduced by R2's F2 fix). The current code strips `weights`/`default_language`/`language_override` from the live index whenever the contract omits them — *unconditionally*, regardless of whether the live value is actually MongoDB's server default. CodeRabbit's reproduction: a tampered live `weights: {title: 5, body: 1}` (non-uniform), `default_language: 'spanish'`, or `language_override: 'idioma'` would canonicalize to the same shape as a default-shaped index, the schema diff would be empty, and `migration apply` would advance the marker/ledger over drift the verifier was supposed to catch.
+
+**Why this would have been a user-facing decision:** This inverts the spec R1 guarantee ("a successful `migration apply` against MongoDB guarantees the live schema satisfies the destination contract") for the three text-index fields, which is exactly what F2 was supposed to fix. The R2 implementer's note (in the earlier R2 sub-agent disagreement entry above) explicitly defended stripping `weights` "as the same pattern as the existing collation/timeseries/clusteredIndex rules" — but the existing rules use `stripUnspecifiedFields`, which only copies through fields the live counterpart *also* has, whereas the text-index strips drop fields outright. The pattern was applied in shape but not in semantics, and the regression slipped past R2/R3/R4 because every existing F2 acceptance test asserted *positive* (non-drift) cases.
+
+**Decision:** Fix in this PR. Rationale:
+- Filing as a follow-up would ship a known correctness regression to the only PR that introduces the verify step, defeating the spec R1 guarantee for any user who relies on text-index drift detection.
+- The fix is bounded: gate each strip on the live value matching MongoDB's actual default (`hasDefaultTextWeights` helper for `weights`, equality check for `default_language === 'english'` and `language_override === 'language'`).
+- Three regression tests in the existing `text indexes` describe block cover the three tampered-live shapes and assert `result.ok === false` with at least one failed schema check, locking the guarantee in.
+
+**Where it lives now:** Commit `e5d74a816`. `review-actions.json` records A10 as `done`. Reply posted to thread `PRRT_kwDOQM0QJc59vnKl` with 👍 + resolve.
+
+**Reversibility:** Trivial. The helper and gates are localized to one function (`canonicalizeLiveIndex`); reverting restores the previous (buggy) behavior. The regression tests would need to invert their assertions if reverted.
+
+**Process note:** This finding plus the Coverage CI gap (commit `30311e568`) on A02 were both caught only because a fresh CodeRabbit pass ran after the PR went green. The internal R1-R4 review gates didn't catch the F2 false-negative because the F2 acceptance suite only exercised happy-path canonicalization. Future test additions for canonicalizers that *strip* fields should include "tampered-live with non-default value" cases by default.
+
 ### 2026-04-27 — A06b: declined adding a per-hook timeout helper to the integration test
 
 **What surfaced:** CodeRabbit nitpick on `mongo-runner.schema-verify.integration.test.ts:27-46` recommended wrapping the `beforeAll` replSet startup in `timeouts.databaseOperation` (5000ms).
