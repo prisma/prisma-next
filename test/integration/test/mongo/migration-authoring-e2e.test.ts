@@ -79,10 +79,11 @@ describe(
             makeFamily(),
           ),
         );
+        const destinationHash = 'sha256:authoring-test';
         const result = await runner.execute({
           plan: {
             targetId: 'mongo',
-            destination: { storageHash: 'authoring-test' },
+            destination: { storageHash: destinationHash },
             operations: serialized,
           },
           // Synthetic-contract opt-out (paired with `strictVerification: false`):
@@ -91,7 +92,7 @@ describe(
           // `contractToMongoSchemaIR` reads (`storage.collections`) so the
           // verifier degrades to an empty-expected diff rather than crashing.
           destinationContract: {
-            storage: { storageHash: 'sha256:authoring-test', collections: {} },
+            storage: { storageHash: destinationHash, collections: {} },
           } as unknown as MongoContract,
           policy: ALL_POLICY,
           frameworkComponents: [],
@@ -328,16 +329,17 @@ describe(
               makeFamily(),
             ),
           );
+          const destinationHashV2 = 'sha256:authoring-test-v2';
           const result2 = await runner.execute({
             plan: {
               targetId: 'mongo',
-              origin: { storageHash: 'authoring-test' },
-              destination: { storageHash: 'authoring-test-v2' },
+              origin: { storageHash: 'sha256:authoring-test' },
+              destination: { storageHash: destinationHashV2 },
               operations: serialized2,
             },
             // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
             destinationContract: {
-              storage: { storageHash: 'sha256:authoring-test-v2', collections: {} },
+              storage: { storageHash: destinationHashV2, collections: {} },
             } as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
@@ -369,16 +371,17 @@ describe(
               makeFamily(),
             ),
           );
+          const destinationHashV3 = 'sha256:authoring-test-v3';
           const result3 = await runner.execute({
             plan: {
               targetId: 'mongo',
-              origin: { storageHash: 'authoring-test-v2' },
-              destination: { storageHash: 'authoring-test-v3' },
+              origin: { storageHash: 'sha256:authoring-test-v2' },
+              destination: { storageHash: destinationHashV3 },
               operations: serialized3,
             },
             // Synthetic-contract opt-out: see comment at the top-level `runOps` call.
             destinationContract: {
-              storage: { storageHash: 'sha256:authoring-test-v3', collections: {} },
+              storage: { storageHash: destinationHashV3, collections: {} },
             } as unknown as MongoContract,
             policy: ALL_POLICY,
             frameworkComponents: [],
