@@ -1,4 +1,5 @@
 import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
@@ -28,7 +29,7 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import { createMongoAdapter } from '../src/mongo-adapter';
 
 const stubMeta = {
@@ -463,10 +464,13 @@ describe('createMongoAdapter (sync construction regression)', () => {
     expect(typeof thenable.then).toBe('undefined');
   });
 
-  it('binds to a synchronous type at the call site', () => {
-    // Type-level regression: this must compile without `await`. If
-    // createMongoAdapter becomes Promise-returning, this assignment fails.
-    const adapter = createMongoAdapter();
-    expect(adapter.lower).toBeTypeOf('function');
+  it('binds to a synchronous MongoAdapter type at the call site', () => {
+    // Compile-time guard: createMongoAdapter must return MongoAdapter directly,
+    // never a Promise. If it ever becomes Promise-returning, this fails to
+    // compile (caught by the test-file typecheck pass).
+    expectTypeOf<ReturnType<typeof createMongoAdapter>>().toEqualTypeOf<MongoAdapter>();
+    expectTypeOf<ReturnType<typeof createMongoAdapter>>().not.toEqualTypeOf<
+      Promise<MongoAdapter>
+    >();
   });
 });
