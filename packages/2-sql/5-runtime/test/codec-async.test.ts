@@ -215,14 +215,27 @@ describe('encodeParams — async, concurrent dispatch', () => {
         typeId: 'test/sync@1',
         targetTypes: ['text'],
         encode: () => {
-          throw new Error('codec must not be invoked for null');
+          throw new Error('codec must not be invoked for null/undefined');
         },
         decode: (wire: string) => wire,
       }),
     );
 
-    const result = await encodeParam(null, { codecId: 'test/sync@1', source: 'dsl' }, 0, registry);
-    expect(result).toBeNull();
+    const fromNull = await encodeParam(
+      null,
+      { codecId: 'test/sync@1', source: 'dsl' },
+      0,
+      registry,
+    );
+    expect(fromNull).toBeNull();
+
+    const fromUndefined = await encodeParam(
+      undefined,
+      { codecId: 'test/sync@1', source: 'dsl' },
+      0,
+      registry,
+    );
+    expect(fromUndefined).toBeNull();
   });
 
   it('passes through values when no codec matches the descriptor', async () => {
