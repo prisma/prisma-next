@@ -93,7 +93,6 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
           executedOperations = applyResult.value.executedOperations;
         }
 
-        // Verify resulting schema matches contract
         const schemaIR = await this.family.introspect({
           driver,
           contract: options.destinationContract,

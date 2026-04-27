@@ -1,6 +1,12 @@
-import type { ColumnDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type {
+  AnyQueryAst,
+  LoweredStatement,
+  LowererContext,
+} from '@prisma-next/sql-relational-core/ast';
 import type {
   PrimaryKey,
   SqlColumnIR,
@@ -12,6 +18,8 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { renderLoweredSql } from './adapter';
+import type { SqliteContract } from './types';
 
 // PRAGMA result row types
 type PragmaTableInfoRow = {
@@ -62,14 +70,75 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
   readonly normalizeDefault = parseSqliteDefault;
   readonly normalizeNativeType = normalizeSqliteNativeType;
 
+  /**
+   * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
+   *
+   * Delegates to the shared `renderLoweredSql` renderer so the control adapter
+   * emits byte-identical SQL to `SqliteAdapterImpl.lower()` for the same AST
+   * and contract. Used at migration plan/emit time (e.g. by `dataTransform`)
+   * without instantiating the runtime adapter.
+   */
+  lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
+    return renderLoweredSql(ast, context.contract as SqliteContract);
+  }
+
+  /**
+   * Reads the contract marker from `_prisma_marker`. Probes `sqlite_master`
+   * first so a fresh database (no marker table) returns `null` instead of a
+   * "no such table" error.
+   */
+  async readMarker(
+    driver: ControlDriverInstance<'sql', 'sqlite'>,
+  ): Promise<ContractMarkerRecord | null> {
+    const exists = await driver.query(
+      `SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?`,
+      ['_prisma_marker'],
+    );
+    if (exists.rows.length === 0) {
+      return null;
+    }
+
+    const result = await driver.query<{
+      core_hash: string;
+      profile_hash: string;
+      contract_json: unknown | null;
+      canonical_version: number | null;
+      updated_at: Date | string;
+      app_tag: string | null;
+      meta: unknown | null;
+    }>(
+      `SELECT
+         core_hash,
+         profile_hash,
+         contract_json,
+         canonical_version,
+         updated_at,
+         app_tag,
+         meta
+       FROM _prisma_marker
+       WHERE id = ?`,
+      [1],
+    );
+
+    const row = result.rows[0];
+    if (!row) return null;
+    return parseContractMarkerRow(row);
+  }
+
   async introspect(
     driver: ControlDriverInstance<'sql', 'sqlite'>,
     _contract?: unknown,
   ): Promise<SqlSchemaIR> {
+    // Filter out runner-managed control tables (`_prisma_marker`,
+    // `_prisma_ledger`) — they're an implementation detail of the migration
+    // runner, not part of the user-authored contract, so they must not
+    // appear in introspection output (otherwise strict schema verification
+    // flags them as `extra_table`).
     const tablesResult = await driver.query<{ name: string }>(
       `SELECT name FROM sqlite_master
        WHERE type = 'table'
          AND name NOT LIKE 'sqlite_%'
+         AND name NOT IN ('_prisma_marker', '_prisma_ledger')
        ORDER BY name`,
     );
 

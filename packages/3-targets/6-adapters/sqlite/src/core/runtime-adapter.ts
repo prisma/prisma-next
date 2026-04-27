@@ -1,4 +1,7 @@
+import type { GeneratedValueSpec } from '@prisma-next/contract/types';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
+import { builtinGeneratorIds } from '@prisma-next/ids';
+import { generateId } from '@prisma-next/ids/runtime';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
@@ -17,6 +20,16 @@ function createSqliteCodecRegistry(): CodecRegistry {
   return registry;
 }
 
+function createSqliteMutationDefaultGenerators() {
+  return builtinGeneratorIds.map((id) => ({
+    id,
+    generate: (params?: Record<string, unknown>) => {
+      const spec: GeneratedValueSpec = params ? { id, params } : { id };
+      return generateId(spec);
+    },
+  }));
+}
+
 const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
   'sqlite',
   SqliteRuntimeAdapterInstance
@@ -24,7 +37,7 @@ const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
   ...sqliteAdapterDescriptorMeta,
   codecs: createSqliteCodecRegistry,
   parameterizedCodecs: () => [],
-  mutationDefaultGenerators: () => [],
+  mutationDefaultGenerators: createSqliteMutationDefaultGenerators,
   create(_stack): SqliteRuntimeAdapterInstance {
     return createSqliteAdapter();
   },
