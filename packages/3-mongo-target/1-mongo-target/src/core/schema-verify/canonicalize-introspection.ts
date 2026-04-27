@@ -209,10 +209,11 @@ function findExpectedIndexCounterpart(
 /**
  * MongoDB expands a contract-shaped text index like
  * `[{title: 'text'}, {body: 'text'}]` into its internal weighted vector
- * representation `[{_fts: 'text'}, {_ftsx: 1}]`, recording the original
- * field names + per-field weights in the `weights` document. We project
- * back to the contract-shaped key list using `weights`, relying on
- * MongoDB preserving its insertion order for that document.
+ * representation `[{_fts: 'text'}, {_ftsx: 1}]`. We project back to
+ * contract-shaped keys via `weights`, iterating in whatever order MongoDB
+ * returns them (alphabetical, in practice). `sortTextKeys` is applied
+ * downstream to canonicalize the order on both sides, so this projection
+ * does not depend on a specific iteration order.
  */
 function projectTextIndexKeys(liveIndex: MongoSchemaIndex): ReadonlyArray<{
   readonly field: string;
@@ -247,7 +248,7 @@ function canonicalizeLiveOptions(
   // Timeseries: drop `bucketMaxSpanSeconds` (and any other server-applied
   // extras) when the contract did not specify them.
   const timeseries = liveOptions.timeseries
-    ? (stripUnspecifiedFieldsLoose(
+    ? (stripUnspecifiedFields(
         liveOptions.timeseries as Record<string, unknown>,
         expectedOptions?.timeseries as Record<string, unknown> | undefined,
       ) as MongoSchemaCollectionOptions['timeseries'])
@@ -256,7 +257,7 @@ function canonicalizeLiveOptions(
   // ClusteredIndex: drop `key`, `unique`, `v` and any other server-applied
   // extras when the contract did not specify them.
   const clusteredIndex = liveOptions.clusteredIndex
-    ? (stripUnspecifiedFieldsLoose(
+    ? (stripUnspecifiedFields(
         liveOptions.clusteredIndex as Record<string, unknown>,
         expectedOptions?.clusteredIndex as Record<string, unknown> | undefined,
       ) as MongoSchemaCollectionOptions['clusteredIndex'])
@@ -324,25 +325,6 @@ function isDisabledChangeStream(value: { enabled: boolean } | undefined): boolea
  * the entire live block).
  */
 function stripUnspecifiedFields(
-  live: Record<string, unknown>,
-  expected: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (expected === undefined) return undefined;
-  const out: Record<string, unknown> = {};
-  for (const key of Object.keys(expected)) {
-    if (key in live) out[key] = live[key];
-  }
-  return out;
-}
-
-/**
- * Same as `stripUnspecifiedFields` but, when the contract specifies the
- * block at all, preserves any keys the *contract* specified (so a
- * mismatch on a contract-set field is still detected). For loose-typed
- * sub-objects like `timeseries` and `clusteredIndex` whose IR shape is
- * narrower than what introspection actually returns.
- */
-function stripUnspecifiedFieldsLoose(
   live: Record<string, unknown>,
   expected: Record<string, unknown> | undefined,
 ): Record<string, unknown> | undefined {
