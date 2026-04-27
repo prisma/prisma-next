@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
   ExtractQueryOperationTypes,
@@ -17,9 +16,8 @@ import {
   OrderByItem,
   ParamRef,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
-import type { ComputeColumnJsType } from '@prisma-next/sql-relational-core/types';
+import type { ComputeColumnJsType, RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import type { RowSelection } from './collection-internal-types';
 
 // ---------------------------------------------------------------------------
@@ -116,10 +114,6 @@ export type DefaultCollectionTypeState = {
 // ---------------------------------------------------------------------------
 // CollectionContext — bundles lane context + runtime
 // ---------------------------------------------------------------------------
-
-export type SqlOrmPlan = SqlExecutionPlan | SqlQueryPlan;
-
-export type RuntimeScope = Pick<RuntimeExecutor<SqlOrmPlan>, 'execute'>;
 
 export interface RuntimeConnection extends RuntimeScope {
   release?(): Promise<void>;

@@ -1,7 +1,8 @@
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { describe, expect, it } from 'vitest';
 import { dispatchCollectionRows, stitchIncludes } from '../src/collection-dispatch';
-import type { IncludeExpr, RuntimeScope } from '../src/types';
+import type { IncludeExpr } from '../src/types';
 import { emptyState } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
