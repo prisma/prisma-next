@@ -214,9 +214,9 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  */
 export function codec<
   Id extends string,
-  const TTraits extends readonly CodecTrait[],
-  TWire,
-  TInput,
+  const TTraits extends readonly CodecTrait[] = readonly [],
+  TWire = unknown,
+  TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
 >(
