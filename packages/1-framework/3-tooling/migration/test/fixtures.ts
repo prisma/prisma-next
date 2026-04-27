@@ -48,7 +48,7 @@ export function createTestMetadata(
  */
 export function createAttestedPackage(
   dirName: string,
-  metadataOverrides: Partial<MigrationMetadata> = {},
+  metadataOverrides: Omit<Partial<MigrationMetadata>, 'migrationHash'> = {},
   ops: MigrationOps = createTestOps(),
 ): MigrationPackage {
   return {
@@ -84,7 +84,7 @@ export function createTestOps(): readonly MigrationPlanOperation[] {
  */
 export async function writeTestPackage(
   dir: string,
-  metadataOverrides: Partial<MigrationMetadata> = {},
+  metadataOverrides: Omit<Partial<MigrationMetadata>, 'migrationHash'> = {},
   ops: MigrationOps = createTestOps(),
 ): Promise<{ metadata: MigrationMetadata; ops: MigrationOps }> {
   const metadata = createTestMetadata(metadataOverrides, ops);
