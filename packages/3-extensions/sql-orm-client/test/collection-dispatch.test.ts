@@ -426,16 +426,19 @@ describe('collection-dispatch', () => {
   // ---------------------------------------------------------------------------
   it.skip('dispatchCollectionRows() single-query include decodes async child fields and validates decoded values', async () => {
     // Translated from PR #375. Activates when child-row codec decoding is
-    // added to the single-query include path; assertions express the
+    // added to the single-query include path; assertions will express the
     // single-path always-await contract (plain decoded values, no Promises).
-    expect(true).toBe(true);
   });
 
   it.skip('dispatchCollectionRows() single-query include preserves JSON schema validation failures for async child decodes', async () => {
-    expect(true).toBe(true);
+    // Activates with the orm-include-aggregate-codec-dispatch follow-up;
+    // will assert that JSON schema validation failures on async child cells
+    // are reported via the runtime envelope (RUNTIME.VALIDATION_FAILED).
   });
 
   it.skip('dispatchCollectionRows() single-query include wraps async child decode failures with codec context', async () => {
-    expect(true).toBe(true);
+    // Activates with the orm-include-aggregate-codec-dispatch follow-up;
+    // will assert that decode rejections on child cells are wrapped with
+    // codec id + lane context (RUNTIME.DECODE_FAILED).
   });
 });
