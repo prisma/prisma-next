@@ -1,11 +1,10 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import {
   ColumnRef,
   ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it, vi } from 'vitest';
 import { executeQueryPlan } from '../src/execute-query-plan';
 
@@ -36,7 +35,7 @@ describe('execute query plan', () => {
   it('also forwards already-lowered execution plans', () => {
     const execute = vi.fn();
     const executor = { execute };
-    const plan: ExecutionPlan<{ id: number }> = {
+    const plan: SqlExecutionPlan<{ id: number }> = {
       sql: 'select 1',
       params: [],
       meta: {

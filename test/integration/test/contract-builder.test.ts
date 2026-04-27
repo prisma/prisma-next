@@ -5,12 +5,12 @@ import {
 } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
+import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { ExtractCodecTypes } from '@prisma-next/sql-contract/types';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import { SelectAst } from '@prisma-next/sql-relational-core/ast';
-import type { ResultType } from '@prisma-next/sql-relational-core/types';
 import { createStubAdapter, createTestContext } from '@prisma-next/sql-runtime/test/utils';
 import postgresPack from '@prisma-next/target-postgres/pack';
 import { describe, expect, expectTypeOf, it } from 'vitest';

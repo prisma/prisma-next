@@ -1018,43 +1018,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/1-framework/4-runtime/runtime-executor:
-    dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../0-foundation/contract
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../1-core/framework-components
-      '@prisma-next/operations':
-        specifier: workspace:*
-        version: link:../../1-core/operations
-      arktype:
-        specifier: ^2.1.25
-        version: 2.1.29
-    devDependencies:
-      '@prisma-next/test-utils':
-        specifier: workspace:*
-        version: link:../../../../test/utils
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      '@prisma/dev':
-        specifier: 'catalog:'
-        version: 0.19.1(typescript@5.9.3)
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
-
   packages/2-mongo-family/1-foundation/mongo-codec:
     dependencies:
       '@prisma-next/contract':
@@ -1452,6 +1415,9 @@ importers:
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../4-query/query-ast
+      '@prisma-next/mongo-wire':
+        specifier: workspace:*
+        version: link:../6-transport/mongo-wire
     devDependencies:
       '@prisma-next/adapter-mongo':
         specifier: workspace:*
@@ -1477,9 +1443,6 @@ importers:
       '@prisma-next/mongo-value':
         specifier: workspace:*
         version: link:../1-foundation/mongo-value
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/target-mongo':
         specifier: workspace:*
         version: link:../../3-mongo-target/1-mongo-target
@@ -1966,9 +1929,6 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../1-core/contract
@@ -2027,9 +1987,6 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../1-core/contract
@@ -2345,12 +2302,12 @@ importers:
       '@prisma-next/contract':
         specifier: workspace:*
         version: link:../../1-framework/0-foundation/contract
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-framework/1-core/framework-components
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../1-framework/4-runtime/runtime-executor
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../../2-sql/1-core/contract
@@ -2382,9 +2339,6 @@ importers:
       '@prisma-next/family-sql':
         specifier: workspace:*
         version: link:../../2-sql/9-family
-      '@prisma-next/framework-components':
-        specifier: workspace:*
-        version: link:../../1-framework/1-core/framework-components
       '@prisma-next/ids':
         specifier: workspace:*
         version: link:../../1-framework/2-authoring/ids
@@ -3231,9 +3185,6 @@ importers:
       '@prisma-next/mongo-lowering':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/6-transport/mongo-lowering
-      '@prisma-next/runtime-executor':
-        specifier: workspace:*
-        version: link:../../packages/1-framework/4-runtime/runtime-executor
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../utils

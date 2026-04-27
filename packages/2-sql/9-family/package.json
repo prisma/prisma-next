@@ -18,7 +18,6 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/operations": "workspace:*",
-    "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

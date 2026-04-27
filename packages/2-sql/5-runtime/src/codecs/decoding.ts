@@ -1,11 +1,11 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
 
 function resolveRowCodec(
   alias: string,
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
 ): Codec | null {
   const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
@@ -35,7 +35,7 @@ type ColumnRefIndex = Map<string, { table: string; column: string }>;
  * Builds a lookup index from column name → { table, column } ref.
  * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
  */
-function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
+function buildColumnRefIndex(plan: SqlExecutionPlan): ColumnRefIndex | null {
   const columns = plan.meta.refs?.columns;
   if (!columns) return null;
 
@@ -64,7 +64,7 @@ function parseProjectionRef(value: string): { table: string; column: string } | 
 
 function resolveColumnRefForAlias(
   alias: string,
-  projection: ExecutionPlan['meta']['projection'],
+  projection: SqlExecutionPlan['meta']['projection'],
   fallbackColumnRefIndex: ColumnRefIndex | null,
 ): { table: string; column: string } | undefined {
   if (projection && !Array.isArray(projection)) {
@@ -80,7 +80,7 @@ function resolveColumnRefForAlias(
 
 export function decodeRow(
   row: Record<string, unknown>,
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   registry: CodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Record<string, unknown> {

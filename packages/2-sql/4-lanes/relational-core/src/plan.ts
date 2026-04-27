@@ -1,23 +1,24 @@
-import type { ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
+import type { ParamDescriptor } from '@prisma-next/contract/types';
+import type { QueryPlan } from '@prisma-next/framework-components/runtime';
 import type { StorageColumn } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst } from './ast/types';
 
 /**
  * SQL query plan produced by lanes before lowering.
  *
- * Lanes build ASTs and metadata but do not perform SQL lowering.
- * The `sql` field is absent - lowering happens in the runtime executor.
+ * Lanes build ASTs and metadata but do not perform SQL lowering. The `sql`
+ * field is absent — `RuntimeCore` (the runtime base class in
+ * `@prisma-next/framework-components/runtime`) drives lowering via the
+ * SQL adapter and produces a `SqlExecutionPlan`.
  *
- * Structurally aligns with ExecutionPlan<Row, AnyQueryAst> (without sql field) to maintain
- * compatibility with ExecutionPlan/Plan-based utilities.
- * The generic parameter `_Row` is preserved for type extraction via ResultType.
+ * Extends the framework-level `QueryPlan<Row>` marker (`meta + _row`) and
+ * adds SQL-specific fields (`ast`, `params`). The phantom `_row` property
+ * (inherited from `QueryPlan`) is what `ResultType<P>` inspects to recover
+ * the row type.
  */
-export interface SqlQueryPlan<_Row = unknown>
-  extends Pick<ExecutionPlan<_Row, AnyQueryAst>, 'params' | 'meta'> {
+export interface SqlQueryPlan<Row = unknown> extends QueryPlan<Row> {
   readonly ast: AnyQueryAst;
-  // Phantom property to preserve generic parameter for type extraction
-  // This allows ResultType to extract _Row for SqlQueryPlan values.
-  readonly _Row?: _Row;
+  readonly params: readonly unknown[];
 }
 
 /**

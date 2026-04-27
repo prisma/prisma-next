@@ -141,8 +141,9 @@ Runtime execution is modeled as an `AsyncIterable` that throws on error. This is
 Guardrails (budgets/lints) may block execution by throwing a structured runtime error (a failure) in strict mode.
 
 See:
-- `packages/1-framework/4-runtime/runtime-executor/src/runtime-core.ts`
-- `packages/1-framework/4-runtime/runtime-executor/src/plugins/budgets.ts`
+- `packages/1-framework/1-core/framework-components/src/runtime-core.ts`
+- `packages/2-sql/5-runtime/src/middleware/budgets.ts`
+- `packages/2-sql/5-runtime/src/middleware/lints.ts`
 
 ## Guidelines
 

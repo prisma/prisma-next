@@ -57,7 +57,6 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
-    "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@types/pg": "catalog:",

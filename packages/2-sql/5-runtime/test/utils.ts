@@ -1,15 +1,16 @@
-import type { Contract, ExecutionPlan, ResultType } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
 } from '@prisma-next/framework-components/execution';
+import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
 import type { SqlStatement } from '../src/exports';
@@ -43,7 +44,7 @@ function createTestMutationDefaultGenerators() {
  * The return type is inferred from the plan's type parameter.
  */
 export async function executePlanAndCollect<
-  P extends ExecutionPlan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
+  P extends SqlExecutionPlan<ResultType<P>> | SqlQueryPlan<ResultType<P>>,
 >(runtime: ReturnType<typeof createRuntime>, plan: P): Promise<ResultType<P>[]> {
   type Row = ResultType<P>;
   return collectAsync<Row>(runtime.execute<Row>(plan));
@@ -55,7 +56,7 @@ export async function executePlanAndCollect<
  */
 export async function drainPlanExecution(
   runtime: ReturnType<typeof createRuntime>,
-  plan: ExecutionPlan | SqlQueryPlan<unknown>,
+  plan: SqlExecutionPlan | SqlQueryPlan<unknown>,
 ): Promise<void> {
   return drainAsyncIterable(runtime.execute(plan));
 }

@@ -1,7 +1,8 @@
-import type { Contract, ExecutionPlan } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AdapterProfile } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { SqlFamilyAdapter } from '../src/sql-family-adapter';
 
@@ -50,7 +51,7 @@ describe('SqlFamilyAdapter', () => {
 
   it('validates plan with matching target and hash', () => {
     const adapter = new SqlFamilyAdapter(testContract, testProfile);
-    const plan: ExecutionPlan = {
+    const plan: SqlExecutionPlan = {
       meta: {
         target: 'postgres',
         storageHash: 'sha256:test-hash',
@@ -67,7 +68,7 @@ describe('SqlFamilyAdapter', () => {
 
   it('throws on plan target mismatch', () => {
     const adapter = new SqlFamilyAdapter(testContract, testProfile);
-    const plan: ExecutionPlan = {
+    const plan: SqlExecutionPlan = {
       meta: {
         target: 'mysql', // Wrong target
         storageHash: 'sha256:test-hash',
@@ -85,7 +86,7 @@ describe('SqlFamilyAdapter', () => {
 
   it('throws on plan storageHash mismatch', () => {
     const adapter = new SqlFamilyAdapter(testContract, testProfile);
-    const plan: ExecutionPlan = {
+    const plan: SqlExecutionPlan = {
       meta: {
         target: 'postgres',
         storageHash: 'sha256:different-hash', // Wrong hash

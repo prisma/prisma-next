@@ -22,7 +22,7 @@ This package provides a generic, target-neutral operation registry. It's part of
 - **Depended on by**:
   - `@prisma-next/sql-operations` (extends with SQL-specific lowering specs)
   - `@prisma-next/sql-relational-core` (imports `ParamSpec` for AST and type definitions)
-  - `@prisma-next/runtime-executor` (uses for operation registry creation)
+  - `@prisma-next/sql-runtime`, `@prisma-next/framework-components`, and other packages that build on the operation registry
 
 ## Architecture
 
