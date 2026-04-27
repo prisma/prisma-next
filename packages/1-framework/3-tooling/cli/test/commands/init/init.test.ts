@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -1232,15 +1233,15 @@ describe('runInit (non-interactive, FR1)', () => {
   // under `--strict-probe`.
 
   it('does not invoke the probe when --probe-db is not set (FR8.3 / NFR9 offline-by-default)', async () => {
-    const probePostgres = vi.fn();
-    const probeMongo = vi.fn();
+    const probePostgres = vi.fn<NonNullable<ProbeOverrides['probePostgres']>>();
+    const probeMongo = vi.fn<NonNullable<ProbeOverrides['probeMongo']>>();
 
     const exit = await runInitTest(tmpDir, {
       options: { target: 'postgres', authoring: 'psl', install: false },
       flags: noninteractiveFlags(),
       probeOverrides: {
-        probePostgres: probePostgres as never,
-        probeMongo: probeMongo as never,
+        probePostgres,
+        probeMongo,
       },
     });
 
@@ -1297,11 +1298,11 @@ describe('runInit (non-interactive, FR1)', () => {
     const previousUrl = process.env['DATABASE_URL'];
     delete process.env['DATABASE_URL'];
     try {
-      const probePostgres = vi.fn();
+      const probePostgres = vi.fn<NonNullable<ProbeOverrides['probePostgres']>>();
       const exit = await runInitTest(tmpDir, {
         options: { target: 'postgres', authoring: 'psl', probeDb: true, install: false },
         flags: noninteractiveFlags(),
-        probeOverrides: { probePostgres: probePostgres as never },
+        probeOverrides: { probePostgres },
       });
 
       expect(exit).toBe(INIT_EXIT_OK);
@@ -1706,16 +1707,19 @@ describe('redactSecrets (F09)', () => {
 describe('deriveCanPrompt (F14, action-handler bridge)', () => {
   // Lazy import to avoid the static side-effect of pulling Commander into
   // every test file.
-  // biome-ignore lint/suspicious/noExplicitAny: dynamic import shape is widened by vitest's compiler
-  let deriveCanPrompt: (opts: any) => boolean;
+  let deriveCanPrompt: (opts: {
+    readonly flagsInteractive: boolean | undefined;
+    readonly optionInteractive: boolean | undefined;
+    readonly stdinIsTTY: boolean;
+  }) => boolean;
 
   // `beforeAll` rather than `beforeEach`: `import()` caches the module, so
-  // repeating it is wasted work. The explicit `30_000ms` timeout is for CI's
-  // cold transform of `init/index` — the first call has been observed
+  // repeating it is wasted work. The explicit timeout covers CI's cold
+  // transform of `init/index` — the first call has been observed
   // exceeding Vitest's default 200ms hook timeout.
   beforeAll(async () => {
     ({ deriveCanPrompt } = await import('../../../src/commands/init/index'));
-  }, 30_000);
+  }, timeouts.coldTransformImport);
 
   it('returns false when stdin is closed even though stdout is a TTY (the canonical CI/agent shape)', () => {
     expect(
