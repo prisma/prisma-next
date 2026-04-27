@@ -12,6 +12,7 @@ export interface WriteMarkerInput {
   readonly canonicalVersion?: number;
   readonly appTag?: string;
   readonly meta?: Record<string, unknown>;
+  readonly invariants?: readonly string[];
 }
 
 export const ensureSchemaStatement: SqlStatement = {
@@ -28,7 +29,8 @@ export const ensureTableStatement: SqlStatement = {
     canonical_version int,
     updated_at timestamptz not null default now(),
     app_tag text,
-    meta jsonb not null default '{}'
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
   )`,
   params: [],
 };
@@ -42,7 +44,8 @@ export function readContractMarker(): MarkerStatement {
       canonical_version,
       updated_at,
       app_tag,
-      meta
+      meta,
+      invariants
     from prisma_contract.marker
     where id = $1`,
     params: [1],
@@ -63,6 +66,7 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
     input.canonicalVersion ?? null,
     input.appTag ?? null,
     JSON.stringify(input.meta ?? {}),
+    input.invariants ?? [],
   ];
 
   const insert: SqlStatement = {
@@ -74,7 +78,8 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
         canonical_version,
         updated_at,
         app_tag,
-        meta
+        meta,
+        invariants
       ) values (
         $1,
         $2,
@@ -83,7 +88,8 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
         $5,
         now(),
         $6,
-        $7::jsonb
+        $7::jsonb,
+        $8::text[]
       )`,
     params: baseParams,
   };
@@ -96,7 +102,8 @@ export function writeContractMarker(input: WriteMarkerInput): WriteContractMarke
         canonical_version = $5,
         updated_at = now(),
         app_tag = $6,
-        meta = $7::jsonb
+        meta = $7::jsonb,
+        invariants = $8::text[]
       where id = $1`,
     params: baseParams,
   };
