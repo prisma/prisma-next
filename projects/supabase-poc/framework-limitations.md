@@ -56,7 +56,8 @@ Limitations encountered while authoring the contract or expressing Supabase-spec
 
 | ID | Issue | Impact | Workaround in app | Status |
 |---|---|---|---|---|
-| FL-XX | _(populate during M1, M3, M4)_ | | | |
+| FL-01 | The SQL contract DSL has no surface for declaring RLS metadata on a model (`enableRowLevelSecurity`, role allowlists, policies). Authors can only express column types, primary keys, FKs, indexes, etc. | RLS is invisible to the contract: the emitted `contract.json` / `contract.d.ts` make no statement about whether a table is RLS-protected, and the planner therefore cannot emit `ENABLE ROW LEVEL SECURITY` / `CREATE POLICY` from contract metadata. RLS is bolted on after-the-fact in migration files. Lints like "this query touches an RLS-protected table — did you scope to a session?" are not expressible. | The contract declares column shapes only; RLS is authored in the migration file via in-example `enableRowLevelSecurity` / `createRlsPolicy` factories (T1.5/T1.6). See also Sketch 3. | Open — surfaced in 1.3 (contract authoring); planner-side facet to be detailed in 1.6. |
+| FL-02 | The contract DSL has no way to express a foreign key to a column in another schema (e.g. `auth.users.id` in Supabase). `rel.belongsTo` / `constraints.foreignKey` reference local-contract models only. | The `profiles.id` → `auth.users.id` and `todos.user_id` → `auth.users.id` references that are central to the Supabase data model cannot be expressed in the contract. The contract treats those columns as plain `uuid` columns with no referential metadata. | The `user_id` / `id` columns are typed as `field.uuid()`; the actual `REFERENCES auth.users(id) ON DELETE CASCADE` constraint is created in the migration file via raw SQL (T1.6). | Open — surfaced in 1.3. |
 
 ---
 
