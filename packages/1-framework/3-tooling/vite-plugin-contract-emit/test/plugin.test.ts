@@ -29,6 +29,12 @@ vi.mock('pathe', async () => {
 
 const mockedExecuteContractEmit = vi.mocked(executeContractEmit);
 const mockedLoadConfig = vi.mocked(loadConfig);
+const successfulEmitResult = {
+  storageHash: 'abc123',
+  profileHash: 'def456',
+  publication: 'written' as const,
+  files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+} satisfies Awaited<ReturnType<typeof executeContractEmit>>;
 
 type LoadedConfig = Awaited<ReturnType<typeof loadConfig>>;
 type SourceInputs = NonNullable<LoadedConfig['contract']>['source']['inputs'];
@@ -42,6 +48,22 @@ interface MockModuleNode {
 const unusedContractLoad: NonNullable<LoadedConfig['contract']>['source']['load'] = async () => {
   throw new Error('unused in tests');
 };
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks(turns = 8): Promise<void> {
+  for (let index = 0; index < turns; index += 1) {
+    await Promise.resolve();
+  }
+}
 
 function toAbsolutePath(path: string): string {
   return resolve('/project', path);
@@ -152,7 +174,7 @@ describe('prismaVitePlugin', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockedExecuteContractEmit.mockReset();
-    mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult());
+    mockedExecuteContractEmit.mockResolvedValue(successfulEmitResult);
     mockedLoadConfig.mockReset();
     mockedLoadConfig.mockResolvedValue(createLoadedConfig());
   });
@@ -754,13 +776,7 @@ describe('prismaVitePlugin', () => {
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
     });
 
-    it('keeps only the latest overlapping emit result', async () => {
-      mockedLoadConfig.mockResolvedValue(
-        createLoadedConfig({
-          inputs: undefined,
-        }),
-      );
-
+    it('waits for an in-flight emit before starting the queued re-emit', async () => {
       const plugin = prismaVitePlugin('prisma-next.config.ts', {
         logLevel: 'silent',
         debounceMs: 100,
@@ -780,38 +796,80 @@ describe('prismaVitePlugin', () => {
       await configureServer(mockServer);
 
       mockedExecuteContractEmit.mockReset();
-      mockServer.ws.send.mockClear();
 
-      const firstEmit = Promise.withResolvers<ReturnType<typeof createContractEmitResult>>();
-      const secondEmit = Promise.withResolvers<ReturnType<typeof createContractEmitResult>>();
-
-      mockedExecuteContractEmit
-        .mockImplementationOnce(() => firstEmit.promise)
-        .mockImplementationOnce(() => secondEmit.promise);
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      let firstSignal: AbortSignal | undefined;
+      mockedExecuteContractEmit.mockImplementationOnce(async ({ signal }) => {
+        firstSignal = signal;
+        return firstEmit.promise;
+      });
+      mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
 
       const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
 
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(100);
 
-      const firstSignal = mockedExecuteContractEmit.mock.calls[0]?.[0].signal;
-      expect(firstSignal).toBeDefined();
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
       expect(firstSignal?.aborted).toBe(false);
 
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+      expect(firstSignal?.aborted).toBe(false);
+    });
+
+    it('coalesces multiple queued changes while an emit is in flight', async () => {
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'silent',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockReset();
+
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
+      mockedExecuteContractEmit.mockResolvedValueOnce(successfulEmitResult);
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(100);
 
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
-      expect(firstSignal?.aborted).toBe(true);
-
-      firstEmit.resolve(createContractEmitResult());
-      secondEmit.resolve(createContractEmitResult());
-
-      await eventually(() => {
-        expect(mockServer.ws.send).toHaveBeenCalledTimes(1);
-      });
-      expect(mockServer.ws.send).toHaveBeenCalledWith({ type: 'full-reload' });
     });
+
   });
 
   describe('error handling', () => {

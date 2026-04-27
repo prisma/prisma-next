@@ -24,8 +24,8 @@ const MODULE_GRAPH_EXTENSIONS = new Set([
  * Creates a Vite plugin that automatically emits Prisma Next contract artifacts.
  *
  * The plugin resolves watched files from contract source provider metadata,
- * re-emitting contract artifacts on changes with debounce and "last change wins"
- * semantics.
+ * re-emitting contract artifacts on changes with debounce while serializing
+ * overlapping emits into a single follow-up run.
  *
  * @param configPath - Path to prisma-next.config.ts (relative or absolute). Defaults to 'prisma-next.config.ts'
  * @param options - Optional plugin configuration
@@ -60,9 +60,11 @@ export function prismaVitePlugin(
   // events even when those files are excluded from watchedFiles.
   const ignoredOutputFiles = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-  let currentAbortController: AbortController | null = null;
+  let lifecycleAbortController = new AbortController();
   let server: ViteDevServer | null = null;
-  let emitRequestId = 0;
+  let isEmitInFlight = false;
+  let hasQueuedEmit = false;
+  let queuedEmitNeedsWatchedFileRefresh = false;
   let didWarnConfigWatchFallback = false;
 
   function log(message: string, level: 'info' | 'debug' = 'info') {
@@ -103,14 +105,7 @@ export function prismaVitePlugin(
   }: {
     refreshWatchedFiles?: boolean;
   } = {}): Promise<ContractEmitResult | null> {
-    const requestId = ++emitRequestId;
-
-    // Cancel any in-flight emit
-    if (currentAbortController) {
-      currentAbortController.abort();
-    }
-    currentAbortController = new AbortController();
-    const signal = currentAbortController.signal;
+    const signal = lifecycleAbortController.signal;
 
     try {
       if (server && refreshWatchedFiles) {
@@ -121,12 +116,6 @@ export function prismaVitePlugin(
         configPath: absoluteConfigPath,
         signal,
       });
-
-      // Check if this emit is still the latest request
-      if (requestId !== emitRequestId) {
-        log('Emit superseded by newer request', 'debug');
-        return null;
-      }
 
       if (result.publication === 'superseded') {
         log('Emit publication superseded before artifacts were written', 'debug');
@@ -146,11 +135,6 @@ export function prismaVitePlugin(
       // Ignore cancellation - check signal first, then error name
       if (signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
         log('Emit cancelled', 'debug');
-        return null;
-      }
-
-      // Check if this emit is still the latest request
-      if (requestId !== emitRequestId) {
         return null;
       }
 
@@ -174,13 +158,53 @@ export function prismaVitePlugin(
     }
   }
 
+  async function drainQueuedEmits(): Promise<void> {
+    if (isEmitInFlight || lifecycleAbortController.signal.aborted) {
+      return;
+    }
+
+    isEmitInFlight = true;
+
+    try {
+      while (hasQueuedEmit && !lifecycleAbortController.signal.aborted) {
+        const refreshWatchedFiles = queuedEmitNeedsWatchedFileRefresh;
+        hasQueuedEmit = false;
+        queuedEmitNeedsWatchedFileRefresh = false;
+
+        await emitContract({ refreshWatchedFiles });
+      }
+    } finally {
+      isEmitInFlight = false;
+    }
+  }
+
+  function requestEmit({
+    refreshWatchedFiles = true,
+  }: {
+    refreshWatchedFiles?: boolean;
+  } = {}): Promise<void> {
+    if (lifecycleAbortController.signal.aborted) {
+      return Promise.resolve();
+    }
+
+    hasQueuedEmit = true;
+    queuedEmitNeedsWatchedFileRefresh ||= refreshWatchedFiles;
+
+    if (isEmitInFlight) {
+      log('Queued follow-up emit while another emit is running', 'debug');
+      return Promise.resolve();
+    }
+
+    return drainQueuedEmits();
+  }
+
   function scheduleEmit() {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
     }
     debounceTimer = setTimeout(() => {
       debounceTimer = null;
-      void emitContract();
+      void requestEmit();
     }, debounceMs);
   }
 
@@ -357,20 +381,23 @@ export function prismaVitePlugin(
 
     async configureServer(viteServer) {
       server = viteServer;
+      lifecycleAbortController = new AbortController();
+      isEmitInFlight = false;
+      hasQueuedEmit = false;
+      queuedEmitNeedsWatchedFileRefresh = false;
       const onTrackedWatcherEvent = (file: string) => {
         handleTrackedFileChange(file);
       };
 
-      // Register close hook to clean up timers and abort in-flight work
+      // Register close hook to clean up timers and abort in-flight work.
       const cleanup = () => {
         if (debounceTimer) {
           clearTimeout(debounceTimer);
           debounceTimer = null;
         }
-        if (currentAbortController) {
-          currentAbortController.abort();
-          currentAbortController = null;
-        }
+        hasQueuedEmit = false;
+        queuedEmitNeedsWatchedFileRefresh = false;
+        lifecycleAbortController.abort();
         viteServer.watcher.off?.('change', onTrackedWatcherEvent);
         viteServer.watcher.off?.('add', onTrackedWatcherEvent);
         viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
@@ -424,7 +451,7 @@ export function prismaVitePlugin(
       }
 
       // Initial emit on server start
-      await emitContract({ refreshWatchedFiles: false });
+      await requestEmit({ refreshWatchedFiles: false });
     },
 
     handleHotUpdate(ctx) {

@@ -11,7 +11,7 @@ This plugin integrates with Vite's dev server to automatically emit contract art
 - **Emit on startup**: Emits contract artifacts when the Vite dev server starts
 - **Config graph + resolved inputs**: Re-emits from the config module graph plus loader-finalized `contract.source.inputs`
 - **Debounce**: Configurable debounce prevents rapid re-emission during rapid edits
-- **Last-change-wins**: Overlapping emit requests are cancelled to avoid stale results
+- **Serialized re-emits**: Overlapping change bursts are coalesced into one follow-up emit instead of cancelling the emit already in flight
 - **Ordered pair publication**: Emits stage temp artifacts, rename `contract.d.ts` before `contract.json`, and attempts to restore the last good pair if publication fails
 - **Config-only fallback warning**: Falls back to watching the config path and warns when loader-resolved inputs cannot be determined
 - **Error overlay**: Emission failures are surfaced via Vite's error overlay
@@ -70,7 +70,7 @@ interface PrismaVitePluginOptions {
 6. **Fallback on load failure**: If resolved inputs cannot be loaded, it watches only the config path and warns that coverage is partial
 7. **Publish staged artifacts**: Emits write temp files beside the output paths, rename `contract.d.ts` first, then rename `contract.json`, and attempts to roll back to the previous pair if publication fails
 8. **Initial emit**: The contract is emitted immediately on server start
-9. **Hot updates**: When any watched file changes, a debounced re-emit is triggered
+9. **Queued hot updates**: When any watched file changes, a debounced re-emit is requested; if another emit is already running, the plugin runs one follow-up emit after the current one settles
 
 ## Architecture
 
