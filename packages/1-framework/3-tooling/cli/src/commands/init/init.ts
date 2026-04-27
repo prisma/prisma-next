@@ -417,12 +417,21 @@ export async function runInit(
   // downstream consumers.
   const validated = InitOutputSchema(output);
   if (validated instanceof Error || (validated as { problems?: unknown }).problems !== undefined) {
-    throw new CliStructuredError('5009', 'Init produced an invalid output document', {
-      domain: 'CLI',
-      why: `The success document failed schema validation: ${String(validated)}`,
-      fix: 'This is a bug in prisma-next. Please report it with the full `-v` output.',
-      docsUrl: 'https://prisma-next.dev/docs/cli/init',
-    });
+    // Route through `emitError` rather than throwing: the bare throw
+    // bypassed `--json` envelope formatting and `exitCodeForError`, so a
+    // 5009 regression would surface as an uncaught exception in
+    // commander instead of the documented `INTERNAL_ERROR` envelope on
+    // the right channel.
+    return emitError(
+      ui,
+      flags,
+      new CliStructuredError('5009', 'Init produced an invalid output document', {
+        domain: 'CLI',
+        why: `The success document failed schema validation: ${String(validated)}`,
+        fix: 'This is a bug in prisma-next. Please report it with the full `-v` output.',
+        docsUrl: 'https://prisma-next.dev/docs/cli/init',
+      }),
+    );
   }
 
   if (flags.json) {
