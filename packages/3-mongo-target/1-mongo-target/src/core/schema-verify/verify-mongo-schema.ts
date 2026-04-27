@@ -9,6 +9,7 @@ import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { contractToMongoSchemaIR } from '../contract-to-schema';
 import { diffMongoSchemas } from '../schema-diff';
+import { canonicalizeSchemasForVerification } from './canonicalize-introspection';
 
 export interface VerifyMongoSchemaOptions {
   readonly contract: MongoContract;
@@ -28,7 +29,13 @@ export function verifyMongoSchema(options: VerifyMongoSchemaOptions): VerifyData
   const startTime = Date.now();
 
   const expectedIR = contractToMongoSchemaIR(contract);
-  const { root, issues, counts } = diffMongoSchemas(schema, expectedIR, strict);
+  // Strip server-applied defaults (and authored equivalents) before diffing so
+  // the verifier compares like-with-like — see `canonicalize-introspection.ts`.
+  const { live: canonicalLive, expected: canonicalExpected } = canonicalizeSchemasForVerification(
+    schema,
+    expectedIR,
+  );
+  const { root, issues, counts } = diffMongoSchemas(canonicalLive, canonicalExpected, strict);
 
   const ok = counts.fail === 0;
   const profileHash = typeof contract.profileHash === 'string' ? contract.profileHash : '';
