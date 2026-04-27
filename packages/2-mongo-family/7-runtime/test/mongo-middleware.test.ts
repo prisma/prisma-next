@@ -292,6 +292,35 @@ describe('MongoRuntime middleware lifecycle', () => {
 
     expect(logWorks).toBe(true);
   });
+
+  it('exposes a working identityKey on the middleware context', async () => {
+    const observedKeys: string[] = [];
+    const middleware: MongoMiddleware = {
+      name: 'identity-key-tester',
+      async beforeExecute(plan, ctx) {
+        observedKeys.push(ctx.identityKey(plan));
+      },
+    };
+
+    const runtime = createMongoRuntime({
+      adapter: createMockAdapter(),
+      driver: createMockDriver([]),
+      contract: {},
+      targetId: 'mongo',
+      middleware: [middleware],
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(observedKeys).toHaveLength(2);
+    expect(observedKeys[0]).toMatch(/^blake2b512:[0-9a-f]{128}$/);
+    expect(observedKeys[0]).toBe(observedKeys[1]);
+  });
 });
 
 describe('MongoRuntime middleware compatibility validation', () => {
