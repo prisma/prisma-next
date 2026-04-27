@@ -169,7 +169,7 @@ Clean Architecture layers for Prisma Next:
 - **Authoring** – PSL/TS authoring surfaces plus shared descriptor types that produce contracts.
 - **Targets** – family-specific contract types and emitter hooks.
 - **Lanes** – query DSLs/ORMs that produce AST plans.
-- **Runtime** – per-family runtime implementations that extend `RuntimeCore` from `@prisma-next/framework-components` (core layer).
+- **Runtime** – per-family runtime implementations that extend `RuntimeCore` from `@prisma-next/framework-components/runtime` (core layer).
 - **Adapters** – database adapters/drivers and optional compat layers.
 
 Dependencies flow downward (toward core); lateral dependencies within the same layer are permitted. Example: `@prisma-next/sql-lane` and `@prisma-next/sql-orm-lane` both live in the Lanes layer, so they may share helpers via `@prisma-next/sql-relational-core`, but neither may depend on Runtime or Adapters. Optional compat packages live at the edge alongside adapters; they can depend on inner layers but do not form a separate layer.
@@ -206,7 +206,7 @@ graph LR
   style Adapters fill:#e0f2f1,stroke:#004d40,stroke-width:2px
 ```
 
-The runtime ring is a single layer: `RuntimeCore` (the abstract base) lives in `@prisma-next/framework-components` (core layer) and is extended directly by family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`). See [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
+The runtime ring is a single layer: `RuntimeCore` (the abstract base) lives on `@prisma-next/framework-components/runtime` (core layer) and is extended directly by family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`). See [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
 
 ### Dependency Rules
 
@@ -279,7 +279,7 @@ Lanes consume targets and relational-core helpers to produce AST plans. Packages
 
 ### Runtime Layer
 
-Per-family runtime implementations that extend the abstract `RuntimeCore` from `@prisma-next/framework-components` (core layer). There is no separate target-agnostic runtime package; the kernel collapsed into `framework-components` per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
+Per-family runtime implementations that extend the abstract `RuntimeCore` from `@prisma-next/framework-components/runtime` (core layer). There is no separate target-agnostic runtime package; the kernel collapsed into `framework-components` per [ADR 204](../adrs/ADR%20204%20-%20Single-tier%20runtime.md).
 
 **SQL Domain (Runtime Plane):**
 - `packages/2-sql/5-runtime/` → `@prisma-next/sql-runtime` – SQL family runtime that extends `RuntimeCore` from `@prisma-next/framework-components/runtime` with SQL adapters (future document runtimes will mirror this)
