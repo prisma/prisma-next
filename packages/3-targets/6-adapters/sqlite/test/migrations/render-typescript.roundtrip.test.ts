@@ -106,7 +106,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
   it(
     'renders TS that re-parses to operations matching renderOps(calls) exactly',
-    { timeout: timeouts.typeScriptCompilation },
+    { timeout: timeouts.coldTransformImport },
     async () => {
       const calls = [
         new CreateTableCall('user', {
@@ -154,7 +154,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
   it(
     'renders an empty calls list whose executed scaffold emits []',
-    { timeout: timeouts.typeScriptCompilation },
+    { timeout: timeouts.coldTransformImport },
     async () => {
       const migration = new TypeScriptRenderableSqliteMigration([], META);
 
@@ -173,7 +173,7 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
 
   it(
     'preserves RecreateTableCall through the render → execute round-trip',
-    { timeout: timeouts.typeScriptCompilation },
+    { timeout: timeouts.coldTransformImport },
     async () => {
       const calls = [
         new RecreateTableCall({
