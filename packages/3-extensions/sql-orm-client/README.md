@@ -20,10 +20,20 @@ This package depends on:
 
 - `@prisma-next/sql-contract` for contract shape and mappings
 - `@prisma-next/contract` for `ExecutionPlan` metadata
-- `@prisma-next/framework-components` for `AsyncIterableResult` (imported from `@prisma-next/framework-components/runtime`)
+- `@prisma-next/framework-components` for `AsyncIterableResult` and the canonical `RuntimeExecutor<TPlan>` interface (imported from `@prisma-next/framework-components/runtime`)
 - `@prisma-next/sql-relational-core` for SQL AST and plan types
 
 This package should not depend on target adapters or drivers directly; execution is delegated to the runtime queryable interface.
+
+## Runtime surface
+
+`RuntimeQueryable` is the SQL-domain wrapper this client uses to talk to a runtime. It extends the canonical `RuntimeExecutor<SqlExecutionPlan | SqlQueryPlan>` execute surface (one structural source of truth for the `execute<Row>(plan)` shape across families) and adds the optional SQL-domain primitives the ORM needs for nested-mutation orchestration:
+
+- `execute<Row>(plan)` — borrowed from `RuntimeExecutor` via `Pick`, accepts both AST-level `SqlQueryPlan` and pre-lowered `SqlExecutionPlan`.
+- `connection?()` — opt-in connection acquisition for grouped multi-statement work.
+- `transaction?()` — opt-in transaction acquisition for atomic mutation scopes.
+
+The optional methods are SQL-specific orchestration capabilities and are intentionally absent from the cross-family `RuntimeExecutor` contract. Runtimes that don't expose them are still valid `RuntimeQueryable`s and are used for single-statement execution.
 
 ## Architecture
 
