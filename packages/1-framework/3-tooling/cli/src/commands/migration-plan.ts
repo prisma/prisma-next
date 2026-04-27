@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLatestMigration } from '@prisma-next/migration-tools/dag';
+import { findLatestMigration } from '@prisma-next/migration-tools/graph';
 import {
   copyFilesWithRename,
   formatMigrationDirName,

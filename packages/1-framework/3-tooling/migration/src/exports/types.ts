@@ -2,7 +2,7 @@ export { MigrationToolsError } from '../errors';
 export type {
   MigrationBundle,
   MigrationBundle as MigrationPackage,
-  MigrationChainEntry,
+  MigrationEdge,
   MigrationGraph,
   MigrationHints,
   MigrationManifest,

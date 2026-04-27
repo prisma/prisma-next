@@ -39,9 +39,9 @@ vi.mock('../../src/utils/command-helpers', async () => {
   };
 });
 
-vi.mock('@prisma-next/migration-tools/dag', async () => {
-  const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/dag')>(
-    '@prisma-next/migration-tools/dag',
+vi.mock('@prisma-next/migration-tools/graph', async () => {
+  const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/graph')>(
+    '@prisma-next/migration-tools/graph',
   );
   return { ...actual, findLatestMigration: mocks.findLatestMigration };
 });
@@ -144,7 +144,7 @@ describe('migration plan command', () => {
     vi.doUnmock('node:fs/promises');
     vi.doUnmock('../../src/config-loader');
     vi.doUnmock('../../src/utils/command-helpers');
-    vi.doUnmock('@prisma-next/migration-tools/dag');
+    vi.doUnmock('@prisma-next/migration-tools/graph');
     vi.doUnmock('@prisma-next/migration-tools/io');
     vi.doUnmock('@prisma-next/migration-tools/migration-ts');
     vi.doUnmock('../../src/utils/framework-components');

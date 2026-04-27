@@ -8,7 +8,7 @@ import {
   errorSameSourceAndTarget,
 } from './errors';
 import { bfs } from './graph-ops';
-import type { MigrationBundle, MigrationChainEntry, MigrationGraph } from './types';
+import type { MigrationBundle, MigrationEdge, MigrationGraph } from './types';
 
 /** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
@@ -20,11 +20,7 @@ function reverseNeighbours(graph: MigrationGraph, node: string) {
   return (graph.reverseChain.get(node) ?? []).map((edge) => ({ next: edge.from, edge }));
 }
 
-function appendEdge(
-  map: Map<string, MigrationChainEntry[]>,
-  key: string,
-  entry: MigrationChainEntry,
-): void {
+function appendEdge(map: Map<string, MigrationEdge[]>, key: string, entry: MigrationEdge): void {
   const bucket = map.get(key);
   if (bucket) bucket.push(entry);
   else map.set(key, [entry]);
@@ -32,9 +28,9 @@ function appendEdge(
 
 export function reconstructGraph(packages: readonly MigrationBundle[]): MigrationGraph {
   const nodes = new Set<string>();
-  const forwardChain = new Map<string, MigrationChainEntry[]>();
-  const reverseChain = new Map<string, MigrationChainEntry[]>();
-  const migrationById = new Map<string, MigrationChainEntry>();
+  const forwardChain = new Map<string, MigrationEdge[]>();
+  const reverseChain = new Map<string, MigrationEdge[]>();
+  const migrationById = new Map<string, MigrationEdge>();
 
   for (const pkg of packages) {
     const { from, to } = pkg.manifest;
@@ -46,7 +42,7 @@ export function reconstructGraph(packages: readonly MigrationBundle[]): Migratio
     nodes.add(from);
     nodes.add(to);
 
-    const migration: MigrationChainEntry = {
+    const migration: MigrationEdge = {
       from,
       to,
       migrationId: pkg.manifest.migrationId,
@@ -84,7 +80,7 @@ function labelPriority(labels: readonly string[]): number {
   return best;
 }
 
-function compareTieBreak(a: MigrationChainEntry, b: MigrationChainEntry): number {
+function compareTieBreak(a: MigrationEdge, b: MigrationEdge): number {
   const lp = labelPriority(a.labels) - labelPriority(b.labels);
   if (lp !== 0) return lp;
   const ca = a.createdAt.localeCompare(b.createdAt);
@@ -94,14 +90,14 @@ function compareTieBreak(a: MigrationChainEntry, b: MigrationChainEntry): number
   return a.migrationId.localeCompare(b.migrationId);
 }
 
-function sortedNeighbors(edges: readonly MigrationChainEntry[]): readonly MigrationChainEntry[] {
+function sortedNeighbors(edges: readonly MigrationEdge[]): readonly MigrationEdge[] {
   return [...edges].sort(compareTieBreak);
 }
 
 /** Ordering adapter for `bfs` — sorts `{next, edge}` pairs by tie-break. */
 function bfsOrdering(
-  items: readonly { next: string; edge: MigrationChainEntry }[],
-): readonly { next: string; edge: MigrationChainEntry }[] {
+  items: readonly { next: string; edge: MigrationEdge }[],
+): readonly { next: string; edge: MigrationEdge }[] {
   return items.slice().sort((a, b) => compareTieBreak(a.edge, b.edge));
 }
 
@@ -117,16 +113,16 @@ export function findPath(
   graph: MigrationGraph,
   fromHash: string,
   toHash: string,
-): readonly MigrationChainEntry[] | null {
+): readonly MigrationEdge[] | null {
   if (fromHash === toHash) return [];
 
-  const parents = new Map<string, { parent: string; edge: MigrationChainEntry }>();
+  const parents = new Map<string, { parent: string; edge: MigrationEdge }>();
   for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n), bfsOrdering)) {
     if (step.parent !== null && step.incomingEdge !== null) {
       parents.set(step.node, { parent: step.parent, edge: step.incomingEdge });
     }
     if (step.node === toHash) {
-      const path: MigrationChainEntry[] = [];
+      const path: MigrationEdge[] = [];
       let cur = toHash;
       let p = parents.get(cur);
       while (p) {
@@ -155,7 +151,7 @@ function collectNodesReachingTarget(graph: MigrationGraph, toHash: string): Set<
 }
 
 export interface PathDecision {
-  readonly selectedPath: readonly MigrationChainEntry[];
+  readonly selectedPath: readonly MigrationEdge[];
   readonly fromHash: string;
   readonly toHash: string;
   readonly alternativeCount: number;
@@ -319,7 +315,7 @@ export function findLeaf(graph: MigrationGraph): string | null {
  * to the single target. Returns null for an empty graph.
  * Throws AMBIGUOUS_TARGET if the graph has multiple branch tips.
  */
-export function findLatestMigration(graph: MigrationGraph): MigrationChainEntry | null {
+export function findLatestMigration(graph: MigrationGraph): MigrationEdge | null {
   const leafHash = findLeaf(graph);
   if (leafHash === null) return null;
 
@@ -343,7 +339,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   // Iterative three-color DFS. A frame is (node, outgoing edges, next-index).
   interface Frame {
     node: string;
-    outgoing: readonly MigrationChainEntry[];
+    outgoing: readonly MigrationEdge[];
     index: number;
   }
   const stack: Frame[] = [];
@@ -389,7 +385,7 @@ export function detectCycles(graph: MigrationGraph): readonly string[][] {
   return cycles;
 }
 
-export function detectOrphans(graph: MigrationGraph): readonly MigrationChainEntry[] {
+export function detectOrphans(graph: MigrationGraph): readonly MigrationEdge[] {
   if (graph.nodes.size === 0) return [];
 
   const reachable = new Set<string>();
@@ -415,7 +411,7 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationChainEnt
     reachable.add(step.node);
   }
 
-  const orphans: MigrationChainEntry[] = [];
+  const orphans: MigrationEdge[] = [];
   for (const [from, migrations] of graph.forwardChain) {
     if (!reachable.has(from)) {
       orphans.push(...migrations);

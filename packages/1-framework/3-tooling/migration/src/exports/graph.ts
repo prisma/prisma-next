@@ -1,4 +1,4 @@
-export type { PathDecision } from '../dag';
+export type { PathDecision } from '../graph';
 export {
   detectCycles,
   detectOrphans,
@@ -8,4 +8,4 @@ export {
   findPathWithDecision,
   findReachableLeaves,
   reconstructGraph,
-} from '../dag';
+} from '../graph';

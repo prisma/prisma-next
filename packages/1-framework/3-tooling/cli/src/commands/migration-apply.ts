@@ -1,6 +1,6 @@
 import { verifyMigrationBundle } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import { findPathWithDecision } from '@prisma-next/migration-tools/graph';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import type { MigrationBundle } from '@prisma-next/migration-tools/types';
 import { MigrationToolsError } from '@prisma-next/migration-tools/types';

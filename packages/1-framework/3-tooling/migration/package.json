@@ -49,9 +49,9 @@
       "types": "./dist/exports/attestation.d.mts",
       "import": "./dist/exports/attestation.mjs"
     },
-    "./dag": {
-      "types": "./dist/exports/dag.d.mts",
-      "import": "./dist/exports/dag.mjs"
+    "./graph": {
+      "types": "./dist/exports/graph.d.mts",
+      "import": "./dist/exports/graph.mjs"
     },
     "./refs": {
       "types": "./dist/exports/refs.d.mts",

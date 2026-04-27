@@ -6,7 +6,7 @@ Performance baseline for the graph-based migration system's core algorithms. Add
 
 The `MigrationGraph` data structure and its operations, exported from `@prisma-next/migration-tools/dag`, measured directly. The CLI rendering pipeline (which layers on top) is reviewed below by inspection — no separate benchmark run — in the "Rendering pipeline outlook" section. End-to-end `migration status` / `apply` wall-clock (which is IO-dominated) is **not** covered.
 
-**Isolation verdict:** the graph layer is cleanly isolated from migration-specific concerns. Algorithms in [packages/1-framework/3-tooling/migration/src/dag.ts](../../../packages/1-framework/3-tooling/migration/src/dag.ts) operate on strings + opaque edge payloads. The only migration-specific touches are:
+**Isolation verdict:** the graph layer is cleanly isolated from migration-specific concerns. Algorithms in [packages/1-framework/3-tooling/migration/src/graph.ts](../../../packages/1-framework/3-tooling/migration/src/graph.ts) operate on strings + opaque edge payloads. The only migration-specific touches are:
 1. `sortedNeighbors` uses label priority `main / default / feature` for deterministic tie-breaking.
 2. `findLeaf` / `detectOrphans` special-case `EMPTY_CONTRACT_HASH` as the canonical root.
 3. `reconstructGraph` accepts `AttestedMigrationBundle[]` but only reads manifest metadata.
@@ -73,7 +73,7 @@ Each call visits a fraction of the graph (target near the root is cheap, far is 
 | merge-heavy (spine=1000,k=3,every=10) | 1,000 | **1,067** | **0.937** | **1.409** |
 | merge-heavy (spine=1000,k=5,every=100) | 1,000 | 523 | 1.912 | 3.422 |
 
-Previously the alternative-neighbor scan called `findPath(e.to, toHash)` once per outgoing edge along the selected path, making the whole operation O(|path| · (V + E)). Now a single reverse BFS from `toHash` (helper `collectNodesReachingTarget` in [dag.ts](../../../packages/1-framework/3-tooling/migration/src/dag.ts)) builds a `Set<string>` of nodes that reach the target; the per-edge check collapses to O(1) set membership.
+Previously the alternative-neighbor scan called `findPath(e.to, toHash)` once per outgoing edge along the selected path, making the whole operation O(|path| · (V + E)). Now a single reverse BFS from `toHash` (helper `collectNodesReachingTarget` in [graph.ts](../../../packages/1-framework/3-tooling/migration/src/graph.ts)) builds a `Set<string>` of nodes that reach the target; the per-edge check collapses to O(1) set membership.
 
 Improvement vs baseline on the same benchmark shapes:
 
@@ -106,7 +106,7 @@ Roughly linear in |V|+|E|. The `wide-tree(b=5,d=6)` case is the worst absolute n
 | ambiguous-leaves | **throw** | 100 | 1,281 | 0.780 | 1.322 |
 | ambiguous-leaves | **throw** | 1,000 | **13.0** | **76.67** | **79.18** |
 
-**Noted.** The error path is 15,000× slower than the happy path at 1k spine. `findDivergencePoint` builds ancestor sets for each leaf, then calls `findPath` per common ancestor (see `src/dag.ts`). With K unmerged branches sharing the spine, this is O(K · V + C · (V+E)) where C is the number of common ancestors. Only relevant when producing the `AMBIGUOUS_TARGET` diagnostic — infrequent.
+**Noted.** The error path is 15,000× slower than the happy path at 1k spine. `findDivergencePoint` builds ancestor sets for each leaf, then calls `findPath` per common ancestor (see `src/graph.ts`). With K unmerged branches sharing the spine, this is O(K · V + C · (V+E)) where C is the number of common ancestors. Only relevant when producing the `AMBIGUOUS_TARGET` diagnostic — infrequent.
 
 ### `findLatestMigration`
 
@@ -131,9 +131,9 @@ Equivalent cost to `findLeaf` + `findPath`. Roughly 2× `findPath` alone, as exp
 | pathological-cycle | 1,000 | 6,822 | 0.147 | 0.231 |
 | merge-heavy (spine=1000) | 1,000 | 1,502 | 0.666 | 1.048 |
 
-Previous recursive DFS in `src/dag.ts` threw `RangeError: Maximum call stack size exceeded` at ~5,000 linear nodes — a correctness bug, not just perf. Rewritten as iterative DFS with an explicit frame stack (three-color algorithm preserved). `linear(10000)` now runs at 2.6 ms/op; previously-working shapes show 0.97–1.00× throughput vs recursive (zero regression).
+Previous recursive DFS in `src/graph.ts` threw `RangeError: Maximum call stack size exceeded` at ~5,000 linear nodes — a correctness bug, not just perf. Rewritten as iterative DFS with an explicit frame stack (three-color algorithm preserved). `linear(10000)` now runs at 2.6 ms/op; previously-working shapes show 0.97–1.00× throughput vs recursive (zero regression).
 
-Regression test in `test/dag.test.ts` runs `detectCycles` against a 20,000-node linear graph and asserts it does not throw.
+Regression test in `test/graph.test.ts` runs `detectCycles` against a 20,000-node linear graph and asserts it does not throw.
 
 ### `detectOrphans`
 
