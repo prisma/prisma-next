@@ -345,7 +345,7 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -357,7 +357,7 @@ async function executeMigrationStatusCommand(
   let activeRefHash: string | undefined;
   let allRefs: Refs = {};
   try {
-    allRefs = await readRefs(refsPath);
+    allRefs = await readRefs(refsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(
@@ -373,30 +373,25 @@ async function executeMigrationStatusCommand(
 
   if (options.ref) {
     activeRefName = options.ref;
-    const refHash = allRefs[activeRefName];
-    if (refHash) {
-      activeRefHash = refHash;
-    } else {
-      try {
-        activeRefHash = resolveRef(allRefs, activeRefName);
-      } catch (error) {
-        if (MigrationToolsError.is(error)) {
-          return notOk(
-            errorRuntime(error.message, {
-              why: error.why,
-              fix: error.fix,
-              meta: { code: error.code },
-            }),
-          );
-        }
-        throw error;
+    try {
+      activeRefHash = resolveRef(allRefs, activeRefName).hash;
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(
+          errorRuntime(error.message, {
+            why: error.why,
+            fix: error.fix,
+            meta: { code: error.code },
+          }),
+        );
       }
+      throw error;
     }
   }
 
-  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
+  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, entry]) => ({
     name,
-    hash,
+    hash: entry.hash,
     active: name === activeRefName,
   }));
 
