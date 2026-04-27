@@ -145,7 +145,10 @@ describe('SqliteMigrationRunner - Error Scenarios', () => {
           label: 'Create test_table but postcheck fails',
           summary: 'Execute runs, but postcheck returns false',
           operationClass: 'additive',
-          target: { id: 'sqlite', details: { objectType: 'table', name: 'test_table' } },
+          target: {
+            id: 'sqlite',
+            details: { schema: 'main', objectType: 'table', name: 'test_table' },
+          },
           precheck: [],
           execute: [
             {
@@ -195,7 +198,7 @@ describe('SqliteMigrationRunner - Error Scenarios', () => {
           label: 'Insert into nonexistent table',
           summary: 'SQL references a table that does not exist',
           operationClass: 'additive',
-          target: { id: 'sqlite', details: { objectType: 'table', name: 'user' } },
+          target: { id: 'sqlite', details: { schema: 'main', objectType: 'table', name: 'user' } },
           precheck: [],
           execute: [
             {
@@ -276,7 +279,10 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
           label: 'Destructive operation',
           summary: 'Should be rejected by additive-only policy',
           operationClass: 'destructive',
-          target: { id: 'sqlite', details: { objectType: 'table', name: 'something' } },
+          target: {
+            id: 'sqlite',
+            details: { schema: 'main', objectType: 'table', name: 'something' },
+          },
           precheck: [],
           execute: [{ description: 'drop table', sql: 'DROP TABLE IF EXISTS "something"' }],
           postcheck: [],

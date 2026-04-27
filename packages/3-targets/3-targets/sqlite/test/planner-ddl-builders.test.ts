@@ -20,18 +20,17 @@ function makeColumn(overrides: Partial<StorageColumn> = {}): StorageColumn {
     nullable: true,
     codecId: 'sqlite/text@1',
     ...overrides,
-  } as StorageColumn;
+  };
 }
 
 function makeTable(overrides: Partial<StorageTable> = {}): StorageTable {
   return {
     columns: {},
-    primaryKey: undefined,
     foreignKeys: [],
     uniques: [],
     indexes: [],
     ...overrides,
-  } as unknown as StorageTable;
+  };
 }
 
 describe('buildCreateTableSql', () => {

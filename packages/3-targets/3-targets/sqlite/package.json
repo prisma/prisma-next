@@ -15,13 +15,16 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/errors": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-errors": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/ts-render": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
@@ -40,6 +43,7 @@
   ],
   "exports": {
     "./control": "./dist/control.mjs",
+    "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"

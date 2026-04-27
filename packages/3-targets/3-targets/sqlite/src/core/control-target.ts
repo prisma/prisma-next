@@ -30,8 +30,8 @@ const sqliteControlTargetDescriptor: SqlControlTargetDescriptor<'sqlite', Sqlite
   {
     ...sqliteTargetDescriptorMeta,
     migrations: {
-      createPlanner(_family: SqlControlFamilyInstance) {
-        return createSqliteMigrationPlanner() as MigrationPlanner<'sql', 'sqlite'>;
+      createPlanner(_family: SqlControlFamilyInstance): MigrationPlanner<'sql', 'sqlite'> {
+        return createSqliteMigrationPlanner();
       },
       createRunner(family) {
         return createSqliteMigrationRunner(family) as MigrationRunner<'sql', 'sqlite'>;
