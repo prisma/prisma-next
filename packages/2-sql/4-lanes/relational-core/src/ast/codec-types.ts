@@ -46,13 +46,13 @@ export interface CodecMeta {
 }
 
 /**
- * SQL codec interface — extends the framework base with SQL-specific fields.
+ * SQL codec — extends the framework codec base with SQL-specific metadata:
+ * driver-native type info (`meta.db.sql.<dialect>.nativeType`) and an
+ * optional parameterized-codec descriptor (`paramsSchema` + `init`) for
+ * codecs that require type-parameter validation (e.g. `pg/vector@1`).
  *
- * Query-time methods (`encode`, `decode`) are Promise-returning at the boundary;
- * authors may write them as sync or async, and the `codec()` factory lifts sync
- * functions transparently. Build-time methods (`encodeJson`, `decodeJson`,
- * `renderOutputType`) stay synchronous so `validateContract` and client
- * construction remain sync.
+ * See `Codec` in `@prisma-next/framework-components/codec` for the codec
+ * contract that this interface extends.
  */
 export interface Codec<
   Id extends string = string,
@@ -183,18 +183,17 @@ class CodecRegistryImpl implements CodecRegistry {
 }
 
 /**
- * Codec factory — constructs a codec from sync or async author functions.
+ * Construct a SQL codec from author functions and optional metadata.
  *
- * Query-time methods (`encode`, `decode`) accept either `T => U` or
- * `T => Promise<U>` author functions; sync functions are lifted to
- * Promise-shaped methods via `async (x) => fn(x)`. The factory installs
- * an identity default for `encode` when omitted (codecs that omit `encode`
- * are declaring "the input value is already the wire value", so `TInput`
- * and `TWire` are interchangeable for that codec).
+ * Author `encode` and `decode` as sync or async functions; the factory
+ * produces a {@link Codec} whose query-time methods follow the boundary
+ * contract documented on `Codec`.
  *
- * Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType`) are
- * passed through synchronously; identity defaults are installed for
- * `encodeJson` / `decodeJson` when omitted.
+ * `encode` is optional — when omitted, an identity default is installed
+ * (declaring "the input value already is the wire value", so `TInput` and
+ * `TWire` are interchangeable for that codec). `decode` is always
+ * required. `encodeJson` and `decodeJson` default to identity when
+ * omitted.
  */
 export function codec<
   Id extends string,
