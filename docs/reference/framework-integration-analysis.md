@@ -18,7 +18,7 @@ Prisma Next's architecture changes the integration surface:
 - **Streaming by default**: All queries return `AsyncIterableResult<Row>` (also `PromiseLike` for `await`). No `Promise<Row[]>` API.
 - **No shared global state**: Each instantiation of the stack (driver → runtime → ORM client) is fully independent. Users can create separate stacks per tenant, per request, or per anything — resource allocation tradeoffs are theirs.
 - **End-to-end type safety without codegen**: The contract type parameter pattern flows concrete, narrowed types through every query — `db.users.select('id', 'email').all()` resolves to `{ id: number; email: string }[]`. Framework-level inference (SvelteKit `PageData`, Nuxt `useAsyncData`, tRPC) propagates these types to the client automatically. See [Architectural advantages: Type safety](#typescript-type-safety).
-- **Invisible contract emit via build tool plugins**: The entire emit pipeline is pure TypeScript — unlike Prisma ORM's Rust binary, which made build tool integration impractical. A working Vite plugin already exists; equivalent plugins for other build systems are equally straightforward. See [Build tool integration](#build-tool-integration-invisible-contract-emit).
+- **Invisible contract emit via build tool plugins**: The entire emit pipeline is pure TypeScript — unlike Prisma ORM's Rust binary, which made build tool integration impractical. A working Vite plugin already exists and is validated on Vite 7 and Vite 8; equivalent plugins for other build systems are equally straightforward. See [Build tool integration](#build-tool-integration-invisible-contract-emit).
 
 These changes solve several Prisma ORM pain points outright (see [Appendix B](#appendix-b-prisma-orm-pain-points-comparison)), but introduce new integration challenges around connection management, concurrent statefulness, and streaming composition.
 
@@ -219,7 +219,7 @@ In Prisma ORM, the query engine was a Rust binary invoked via a child process. B
 
 ### Proof of concept: Vite plugin
 
-`@prisma-next/vite-plugin-contract-emit` (in this repo) is a working implementation. It watches the config file and its transitive dependencies via Vite's module graph, debounces changes, cancels superseded emits, surfaces errors in Vite's error overlay, and triggers HMR on success. The entire implementation is ~295 lines. Usage:
+`@prisma-next/vite-plugin-contract-emit` (in this repo) is a working implementation. It watches the config file and its transitive dependencies via Vite's module graph, debounces changes, cancels superseded emits, surfaces errors in Vite's error overlay, and triggers HMR on success. The repo's support promise is intentionally narrow: the package is validated on Vite 7 and Vite 8 via the same HMR integration suite, and there is no separate Vite-8-specific code path today. Usage:
 
 ```typescript
 import { prismaVitePlugin } from '@prisma-next/vite-plugin-contract-emit';
@@ -234,7 +234,7 @@ Equivalent plugins for the remaining build systems:
 
 | Build tool | Frameworks served | Effort estimate |
 |---|---|---|
-| **Vite** | Nuxt, SvelteKit, Remix, Astro, Hono | **Done** (`@prisma-next/vite-plugin-contract-emit`) |
+| **Vite** | Nuxt, SvelteKit, Remix, Astro, Hono | **Done for Vite 7/8** (`@prisma-next/vite-plugin-contract-emit`) |
 | **Webpack / Turbopack** | Next.js | Medium — Next.js is the highest-priority framework; Turbopack plugin API is still maturing |
 | **esbuild** | Cloudflare Workers (Wrangler) | Low — esbuild plugin API is simple |
 | **Bun bundler** | Elysia | Low — Bun plugins follow a similar model |

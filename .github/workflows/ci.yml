@@ -185,6 +185,23 @@ jobs:
       - name: Run Integration tests
         run: pnpm test:integration
 
+  test-vite-support:
+    name: Vite Support Matrix
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TEST_TIMEOUT_MULTIPLIER: 2
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: jdx/mise-action@1648a7812b9aeae629881980618f079932869151 # v4.0.1
+        with:
+          cache: true
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Run Vite plugin support suite
+        run: pnpm test:vite-plugin
+
   coverage:
     name: Coverage
     needs: build

@@ -57,7 +57,6 @@ export function finalizeConfig(config: PrismaNextConfig, configDir: string): Pri
   if (!config.contract) {
     return config;
   }
-
   const contract = normalizeContractConfig(config.contract);
   const source = finalizeContractSource(contract.source, configDir);
   const output = resolve(configDir, contract.output);

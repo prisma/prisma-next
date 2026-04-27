@@ -6,6 +6,13 @@ Vite plugin for automatic Prisma Next contract artifact emission during developm
 
 This plugin integrates with Vite's dev server to automatically emit contract artifacts (`contract.json` and `contract.d.ts`) when you start the server and whenever your contract authoring files change.
 
+## Support Matrix
+
+- Supported Vite majors: 7 and 8
+- Peer dependency range: `^7.0.0 || ^8.0.0`
+- Validation: the repo runs `test/integration/test/vite-plugin.hmr.e2e.test.ts` against both majors
+- Compatibility note: the current implementation uses the same `configureServer` and `handleHotUpdate` flow on Vite 7 and Vite 8; there is no Vite-8-specific code path today, so the support matrix exists to catch future hook or overlay regressions early
+
 ## Features
 
 - **Emit on startup**: Emits contract artifacts when the Vite dev server starts
@@ -17,6 +24,8 @@ This plugin integrates with Vite's dev server to automatically emit contract art
 - **Console logging**: Compact success/error messages with optional debug output
 
 ## Installation
+
+Install the plugin alongside Vite 7 or Vite 8.
 
 ```bash
 pnpm add -D @prisma-next/vite-plugin-contract-emit vite
@@ -94,7 +103,7 @@ graph TD
 ## Dependencies
 
 - **@prisma-next/cli**: Uses the control-api `executeContractEmit` operation
-- **vite**: Peer dependency (>=5.0.0)
+- **vite**: Peer dependency (`^7.0.0 || ^8.0.0`)
 
 ## Example
 
