@@ -37,12 +37,15 @@ const user = await db.orm.users
   .first();
 // Returns { _id: ObjectId; email: string; ... } | null
 
-// Find multiple records
-const users = await db.orm.users
+// Find multiple records — \`.all()\` returns an AsyncIterableResult, consume
+// either as an async iterable (below) or by \`await\`ing it to materialise an Array.
+for await (const user of db.orm.users
   .select('_id', 'email')
   .take(10)
-  .all();
-// Returns Array<{ _id: ObjectId; email: string }>
+  .all()) {
+  // Each \`user\` is { _id: ObjectId; email: string }
+}
+// Returns AsyncIterableResult<{ _id: ObjectId; email: string }>
 
 // Filter, order, limit
 const recentPosts = await db.orm.posts
@@ -349,12 +352,15 @@ const user = await db.orm.users
   .first();
 // Returns { _id: ObjectId; email: string; ... } | null
 
-// Find multiple records
-const users = await db.orm.users
+// Find multiple records — \`.all()\` returns an AsyncIterableResult, consume
+// either as an async iterable (below) or by \`await\`ing it to materialise an Array.
+for await (const user of db.orm.users
   .select('_id', 'email')
   .take(10)
-  .all();
-// Returns Array<{ _id: ObjectId; email: string }>
+  .all()) {
+  // Each \`user\` is { _id: ObjectId; email: string }
+}
+// Returns AsyncIterableResult<{ _id: ObjectId; email: string }>
 
 // Filter, order, limit
 const recentPosts = await db.orm.posts

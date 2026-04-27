@@ -155,7 +155,7 @@ function isCliErrorDomain(value: unknown): value is CliErrorDomain {
 //   still belonging to the `CLI` domain — consumers branch on the full
 //   `PN-CLI-5007` form, so the prefix is purely an authoring guide.
 //
-// See [`docs/CLI Style Guide.md` § Errors](../../../../../../docs/CLI%20Style%20Guide.md#errors)
+// See [`docs/CLI Style Guide.md` § Errors](../../../../../docs/CLI%20Style%20Guide.md#errors)
 // and the per-command error file for the live reservation list.
 
 // ============================================================================
