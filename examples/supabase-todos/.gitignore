@@ -1,0 +1,3 @@
+# Supabase CLI runtime artifacts (per-machine)
+supabase/.branches/
+supabase/.temp/
