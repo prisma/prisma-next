@@ -105,7 +105,7 @@ function canonicalizeTextIndexKeyOrder(index: MongoSchemaIndex): MongoSchemaInde
   if (!hasTextKey) return index;
   return new MongoSchemaIndexCtor({
     keys: sortTextKeys(index.keys),
-    ...(index.unique !== undefined ? { unique: index.unique } : {}),
+    unique: index.unique,
     ...(index.sparse !== undefined ? { sparse: index.sparse } : {}),
     ...(index.expireAfterSeconds !== undefined
       ? { expireAfterSeconds: index.expireAfterSeconds }
@@ -145,6 +145,7 @@ function sortTextKeys(
   return keys.map((k) => {
     if (k.direction !== 'text') return k;
     const next = sortedText[textIdx++];
+    /* v8 ignore next 3 -- @preserve invariant guard: textIdx is always < sortedText.length here because we only consume sortedText for text-direction entries and sortedText is built from the same filter. */
     if (next === undefined) {
       throw new Error('sortTextKeys: text-key counts mismatched');
     }
@@ -174,7 +175,7 @@ function canonicalizeLiveIndex(
 
   return new MongoSchemaIndexCtor({
     keys: projectedKeys,
-    ...(liveIndex.unique !== undefined ? { unique: liveIndex.unique } : {}),
+    unique: liveIndex.unique,
     ...(liveIndex.sparse !== undefined ? { sparse: liveIndex.sparse } : {}),
     ...(liveIndex.expireAfterSeconds !== undefined
       ? { expireAfterSeconds: liveIndex.expireAfterSeconds }
