@@ -98,20 +98,6 @@ function createContractEmitResult(publication: 'written' | 'superseded' = 'writt
   };
 }
 
-async function eventually(assertion: () => void): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    try {
-      assertion();
-      return;
-    } catch (error) {
-      lastError = error;
-      await Promise.resolve();
-    }
-  }
-  throw lastError;
-}
-
 function applyModuleGraph(
   server: ReturnType<typeof createMockServer>,
   definitions: Record<string, { file?: string; imports?: readonly string[] }>,
