@@ -1,5 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { RuntimeExecutor } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
   ExtractQueryOperationTypes,
@@ -117,11 +117,9 @@ export type DefaultCollectionTypeState = {
 // CollectionContext — bundles lane context + runtime
 // ---------------------------------------------------------------------------
 
-export interface RuntimeScope {
-  execute<Row = Record<string, unknown>>(
-    plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>,
-  ): AsyncIterableResult<Row>;
-}
+export type SqlOrmPlan = SqlExecutionPlan | SqlQueryPlan;
+
+export type RuntimeScope = Pick<RuntimeExecutor<SqlOrmPlan>, 'execute'>;
 
 export interface RuntimeConnection extends RuntimeScope {
   release?(): Promise<void>;

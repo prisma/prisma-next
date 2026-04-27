@@ -174,10 +174,12 @@ export function createMockRuntime(): MockRuntime {
     setNextResults(results: Record<string, unknown>[][]) {
       nextResult = [...results];
     },
-    execute<Row>(plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(
+      plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
+    ): AsyncIterableResult<Row> {
       const rows = (nextResult.shift() ?? []) as Row[];
       executions.push({
-        plan: plan as SqlExecutionPlan | SqlQueryPlan<unknown>,
+        plan,
         rows: rows as Record<string, unknown>[],
       });
       const gen = async function* (): AsyncGenerator<Row, void, unknown> {

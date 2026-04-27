@@ -121,7 +121,9 @@ export async function createPgIntegrationRuntime(
     async close() {
       await realRuntime.close();
     },
-    execute<Row>(plan: SqlExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(
+      plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
+    ): AsyncIterableResult<Row> {
       executions.push(toLoweredPlan(plan));
       return realRuntime.execute(plan);
     },
