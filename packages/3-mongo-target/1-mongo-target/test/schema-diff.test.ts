@@ -277,4 +277,59 @@ describe('diffMongoSchemas', () => {
       ]);
     });
   });
+
+  describe('index lookup-key composition', () => {
+    // Locks in the truthy branches of `buildIndexLookupKey` for the optional
+    // index fields so that two indexes with identical sparse/TTL/partial-filter/
+    // wildcard-projection settings match by their composed lookup key.
+    it('matches indexes that share sparse, TTL, partial filter and wildcard projection', () => {
+      const richIndex = new MongoSchemaIndex({
+        keys: [{ field: 'createdAt', direction: 1 }],
+        unique: true,
+        sparse: true,
+        expireAfterSeconds: 3600,
+        partialFilterExpression: { archived: false },
+        wildcardProjection: { 'meta.$**': 1 },
+      });
+      const schema = ir({ events: coll('events', { indexes: [richIndex] }) });
+
+      const result = diffMongoSchemas(schema, schema, true);
+
+      expect(result.counts.fail).toBe(0);
+      expect(result.issues).toEqual([]);
+    });
+
+    it('treats indexes that differ only in sparse/TTL/partial/wildcard as distinct', () => {
+      const live = ir({
+        events: coll('events', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'createdAt', direction: 1 }],
+              sparse: true,
+              expireAfterSeconds: 60,
+              partialFilterExpression: { archived: false },
+              wildcardProjection: { 'meta.$**': 1 },
+            }),
+          ],
+        }),
+      });
+      const expected = ir({
+        events: coll('events', {
+          indexes: [new MongoSchemaIndex({ keys: [{ field: 'createdAt', direction: 1 }] })],
+        }),
+      });
+
+      const result = diffMongoSchemas(live, expected, true);
+
+      // Different lookup keys → expected index is missing and live index is
+      // extra. Both reach `fail` under strict mode.
+      expect(result.counts.fail).toBeGreaterThanOrEqual(1);
+      expect(result.issues).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ kind: 'index_mismatch', table: 'events' }),
+          expect.objectContaining({ kind: 'extra_index', table: 'events' }),
+        ]),
+      );
+    });
+  });
 });

@@ -739,6 +739,309 @@ describe('verifyMongoSchema', () => {
     });
   });
 
+  describe('introspection canonicalization (additional coverage)', () => {
+    // These tests pin down branches in the introspection canonicalizer that
+    // the F2 regression suite leaves untested: optional index/options fields
+    // beyond text-index defaults, contract/live counterparts that differ in
+    // shape, and edge-cases in `stripUnspecifiedFields` and
+    // `findExpectedIndexCounterpart`.
+
+    it('matches live indexes that carry sparse/TTL/partial/wildcard against equivalent contract indexes', () => {
+      const contract = buildContract({
+        events: {
+          indexes: [
+            {
+              keys: [{ field: 'createdAt', direction: 1 }],
+              unique: true,
+              sparse: true,
+              expireAfterSeconds: 3600,
+              partialFilterExpression: { archived: false },
+              wildcardProjection: { 'meta.$**': 1 },
+            },
+          ],
+        },
+      });
+      const liveSchema = ir([
+        coll('events', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'createdAt', direction: 1 }],
+              unique: true,
+              sparse: true,
+              expireAfterSeconds: 3600,
+              partialFilterExpression: { archived: false },
+              wildcardProjection: { 'meta.$**': 1 },
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      expect(result.schema.issues).toEqual([]);
+      expect(result.ok).toBe(true);
+    });
+
+    it('preserves contract text-index option spreads (unique/sparse/TTL/partial/wildcard/collation)', () => {
+      // The text-side canonicalizer (`canonicalizeTextIndexKeyOrder`) carries
+      // every optional index field through. Authoring a contract text index
+      // with the full set of optional fields exercises each conditional
+      // spread on the contract side.
+      const contract = buildContract({
+        articles: {
+          indexes: [
+            {
+              keys: [
+                { field: 'title', direction: 'text' },
+                { field: 'body', direction: 'text' },
+              ],
+              unique: false,
+              sparse: true,
+              expireAfterSeconds: 86_400,
+              partialFilterExpression: { published: true },
+              wildcardProjection: { tags: 1 },
+              collation: { locale: 'en' },
+              weights: { title: 10, body: 5 },
+              default_language: 'english',
+              language_override: 'idioma',
+            },
+          ],
+        },
+      });
+      const liveSchema = ir([
+        coll('articles', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [
+                { field: '_fts', direction: 'text' },
+                { field: '_ftsx', direction: 1 },
+              ],
+              unique: false,
+              sparse: true,
+              expireAfterSeconds: 86_400,
+              partialFilterExpression: { published: true },
+              wildcardProjection: { tags: 1 },
+              collation: { locale: 'en' },
+              weights: { title: 10, body: 5 },
+              default_language: 'english',
+              language_override: 'idioma',
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      expect(result.schema.issues).toEqual([]);
+      expect(result.ok).toBe(true);
+    });
+
+    it('matches a capped collection authored on both sides', () => {
+      // The schema-diff `options` tests already cover capped semantics, but
+      // they invoke `diffMongoSchemas` directly. Routing capped through
+      // `verifyMongoSchema` exercises both `canonicalizeLiveOptions` and
+      // `canonicalizeExpectedOptions` capped spreads.
+      const contract = buildContract({
+        logs: {
+          indexes: [],
+          options: { capped: { size: 1024, max: 100 } },
+        },
+      });
+      const liveSchema = ir([
+        coll('logs', {
+          options: new MongoSchemaCollectionOptions({ capped: { size: 1024, max: 100 } }),
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      expect(result.schema.issues).toEqual([]);
+      expect(result.ok).toBe(true);
+    });
+
+    it('strips live index/options collation when no expected counterpart authors the field', () => {
+      // `stripUnspecifiedFields` returns `undefined` when its `expected`
+      // argument is undefined — i.e. the contract neither named the field
+      // nor authored anything in that block. Exercise this by having live
+      // collation present while the contract is silent about it.
+      const contract = buildContract({ posts: { indexes: [] } });
+      const liveSchema = ir([
+        coll('posts', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'title', direction: 1 }],
+              collation: { locale: 'en', strength: 2 },
+            }),
+          ],
+          options: new MongoSchemaCollectionOptions({
+            collation: { locale: 'en', strength: 2 },
+          }),
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: false,
+        frameworkComponents: [],
+      });
+
+      // Without strict mode, the extra index/options surface as warnings.
+      // We only care that canonicalization runs to completion (no throw)
+      // and that the no-match path through `findExpectedIndexCounterpart`
+      // does not crash on absent expected indexes.
+      expect(result.ok).toBe(true);
+      expect(result.schema.counts.warn).toBeGreaterThan(0);
+    });
+
+    it('keeps the scalar prefix of a compound text index in place', () => {
+      // A compound text index mixes scalar keys (e.g. `{category: 1}`) with
+      // a text block. `sortTextKeys` walks the keys in order and only
+      // replaces the text-direction entries — so contracts that author
+      // their scalar keys as a *prefix* (mongo's `projectTextIndexKeys`
+      // emits `[...scalars, ...textKeys]`) round-trip cleanly. This pins
+      // the prefix-only layout and exercises both branches of the
+      // text/non-text ternary inside `sortTextKeys`.
+      const contract = buildContract({
+        articles: {
+          indexes: [
+            {
+              keys: [
+                { field: 'category', direction: 1 },
+                { field: 'priority', direction: -1 },
+                { field: 'title', direction: 'text' },
+                { field: 'body', direction: 'text' },
+              ],
+              weights: { title: 5, body: 1 },
+            },
+          ],
+        },
+      });
+      const liveSchema = ir([
+        coll('articles', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [
+                { field: 'category', direction: 1 },
+                { field: 'priority', direction: -1 },
+                { field: '_fts', direction: 'text' },
+                { field: '_ftsx', direction: 1 },
+              ],
+              weights: { title: 5, body: 1 },
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      expect(result.schema.issues).toEqual([]);
+      expect(result.ok).toBe(true);
+    });
+
+    it('drops contract-named collation fields that the live counterpart does not provide', () => {
+      // `stripUnspecifiedFields` iterates over the *expected* keys and only
+      // copies the value through when the live block also has that key.
+      // Contracts that author a richer collation than the introspected one
+      // exercise the "key not in live" branch — the resulting canonical
+      // collation is a strict subset of what the contract requested, which
+      // surfaces as drift (the test only requires that the canonicalizer
+      // walks this branch without crashing).
+      const contract = buildContract({
+        users: {
+          indexes: [
+            {
+              keys: [{ field: 'name', direction: 1 }],
+              collation: { locale: 'en', strength: 2, caseLevel: true },
+            },
+          ],
+        },
+      });
+      const liveSchema = ir([
+        coll('users', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [{ field: 'name', direction: 1 }],
+              collation: { locale: 'en', strength: 2 },
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      // Live's collation lacks `caseLevel`; after stripping, the canonical
+      // live collation is `{locale, strength}` which doesn't match the
+      // contract's three-field collation, so verification surfaces drift.
+      expect(result.ok).toBe(false);
+      expect(result.schema.counts.fail).toBeGreaterThan(0);
+    });
+
+    it('returns live keys unchanged for a live _fts index that has no weights map', () => {
+      // The contract gets to author `weights`. If the introspected index
+      // happens to have `_fts/_ftsx` but no `weights` map (a degenerate
+      // shape that `listIndexes` shouldn't normally return, but the
+      // canonicalizer handles), `projectTextIndexKeys` falls through to
+      // `liveIndex.keys`, which then doesn't match the contract-shaped key
+      // list and surfaces as drift.
+      const contract = buildContract({
+        articles: {
+          indexes: [{ keys: [{ field: 'title', direction: 'text' }] }],
+        },
+      });
+      const liveSchema = ir([
+        coll('articles', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [
+                { field: '_fts', direction: 'text' },
+                { field: '_ftsx', direction: 1 },
+              ],
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      // The contract expects `{title: 'text'}`; without `weights` we cannot
+      // project the live index back to that shape, so the contract index
+      // shows as missing and the live `_fts` index as extra.
+      expect(result.ok).toBe(false);
+      expect(result.schema.counts.fail).toBeGreaterThan(0);
+    });
+  });
+
   describe('synthetic-contract opt-out (F1 regression)', () => {
     // Locks in the minimum well-formed shape that synthetic-contract test
     // fixtures must use when they pair with `strictVerification: false` to
