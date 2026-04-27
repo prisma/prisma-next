@@ -22,8 +22,8 @@ import {
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
-import { timeouts } from '@prisma-next/test-utils';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
