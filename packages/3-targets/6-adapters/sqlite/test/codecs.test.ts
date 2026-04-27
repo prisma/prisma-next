@@ -1,4 +1,3 @@
-import { describe, expect, it } from 'vitest';
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
@@ -8,8 +7,9 @@ import {
   SQLITE_JSON_CODEC_ID,
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
-} from '../src/core/codec-ids';
-import { codecDefinitions } from '../src/core/codecs';
+} from '@prisma-next/target-sqlite/codec-ids';
+import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
+import { describe, expect, it } from 'vitest';
 
 describe('SQLite codecs', () => {
   describe('text codec', () => {

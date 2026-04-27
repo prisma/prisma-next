@@ -31,13 +31,16 @@
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
+    "@prisma-next/target-sqlite": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
+    "@prisma-next/driver-sqlite": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "pathe": "^2.0.3",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

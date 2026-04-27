@@ -80,8 +80,8 @@ function createSchema<TContract extends Contract<SqlStorage>>(
   contract: TContract,
 ): void {
   db.exec(`
-    CREATE TABLE prisma_contract_marker (
-      id INTEGER PRIMARY KEY,
+    CREATE TABLE _prisma_marker (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
       core_hash TEXT NOT NULL,
       profile_hash TEXT NOT NULL,
       contract_json TEXT,
@@ -91,9 +91,11 @@ function createSchema<TContract extends Contract<SqlStorage>>(
       meta TEXT NOT NULL DEFAULT '{}'
     )
   `);
-  db.prepare(
-    'INSERT INTO prisma_contract_marker (id, core_hash, profile_hash) VALUES (?, ?, ?)',
-  ).run(1, contract.storage.storageHash, contract.profileHash ?? contract.storage.storageHash);
+  db.prepare('INSERT INTO _prisma_marker (id, core_hash, profile_hash) VALUES (?, ?, ?)').run(
+    1,
+    contract.storage.storageHash,
+    contract.profileHash ?? contract.storage.storageHash,
+  );
 
   db.exec(`
     CREATE TABLE users (
