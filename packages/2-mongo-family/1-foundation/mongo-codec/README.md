@@ -4,10 +4,10 @@ Codec interface and registry for MongoDB value serialization.
 
 ## Responsibilities
 
-- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput, TOutput = TInput>` — declares how a JS value translates to and from the BSON-shaped wire format the Mongo driver exchanges, plus the JSON-safe form stored in contract artifacts. Carries trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`) for operator gating.
+- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput>` — declares how a JS value translates to and from the BSON-shaped wire format the Mongo driver exchanges, plus the JSON-safe form stored in contract artifacts. Carries trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`) for operator gating. Same four generics as the framework `Codec` base.
 - **Codec factory**: `mongoCodec()` — creates frozen codec instances from a config object. `encode` is optional (identity default when omitted); `encode`/`decode` may be authored as sync or async functions and are lifted to Promise-returning query-time methods automatically. Build-time methods (`encodeJson`, `decodeJson`) are synchronous and default to identity when omitted.
 - **Codec registry**: `MongoCodecRegistry` and `createMongoCodecRegistry()` — a map-based container that stores and retrieves codecs by ID, with duplicate-ID protection
-- **Type-level helpers**: `MongoCodecInput<T>`, `MongoCodecOutput<T>`, and `MongoCodecTraits<T>` for extracting input/output JS types and traits from codec types
+- **Type-level helpers**: `MongoCodecInput<T>` and `MongoCodecTraits<T>` for extracting the input JS type and traits from codec types
 
 ## Examples
 

@@ -30,7 +30,7 @@ Concretely:
 
 1. **Public `Codec` interface (uniform).**
    - `encode(value: TInput): Promise<TWire>` — query-time, required, Promise-returning.
-   - `decode(wire: TWire): Promise<TOutput>` — query-time, required, Promise-returning.
+   - `decode(wire: TWire): Promise<TInput>` — query-time, required, Promise-returning.
    - `encodeJson(value: TInput): JsonValue` — build-time, required, synchronous.
    - `decodeJson(json: JsonValue): TInput` — build-time, required, synchronous.
    - `renderOutputType?(typeParams): string | undefined` — build-time, optional, synchronous.
@@ -60,7 +60,6 @@ interface Codec<
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TInput = unknown,
-  TOutput = TInput,
 > {
   readonly id: Id;
   readonly targetTypes: readonly string[];
@@ -68,7 +67,7 @@ interface Codec<
 
   // Query-time (per-row): always Promise-returning at the public boundary.
   encode(value: TInput): Promise<TWire>;
-  decode(wire: TWire): Promise<TOutput>;
+  decode(wire: TWire): Promise<TInput>;
 
   // Build-time (per-contract-load): synchronous.
   encodeJson(value: TInput): JsonValue;
@@ -77,7 +76,7 @@ interface Codec<
 }
 ```
 
-The interface uses the same five generics across SQL and Mongo. There is no `TRuntime`. There is no `kind` discriminant. There is no conditional return type.
+The interface uses the same four generics across SQL and Mongo (`Id`, `TTraits`, `TWire`, `TInput`). `decode` returns `Promise<TInput>`: a codec's decoded value is the same JS-side type its `encode` accepts, so a single round-trip type variable `TInput` is sufficient. There is no `TOutput`. There is no `TRuntime`. There is no `kind` discriminant. There is no conditional return type.
 
 ### `codec()` / `mongoCodec()` factories
 
@@ -141,7 +140,7 @@ async function decodeField(wire, codec, schema) {
 
 Mongo gets the same `Codec` shape and the same encode-side always-await pattern:
 
-- `MongoCodec` is structurally identical to the SQL `Codec` (same five generics, same Promise-returning query-time methods, same synchronous build-time methods).
+- `MongoCodec` is structurally identical to the SQL `Codec` (same four generics, same Promise-returning query-time methods, same synchronous build-time methods).
 - `mongoCodec()` is the cross-family analog of `codec()` and lifts sync authoring identically.
 - `resolveValue` is `async` and dispatches codec-encoded leaves concurrently via `Promise.all` when a value tree carries multiple of them.
 - `MongoAdapter.lower()` is `async`; `MongoAdapter` in `mongo-lowering` reflects this.
@@ -213,5 +212,5 @@ Concretely, in this ADR:
 - [ADR 030 — Result decoding & codecs registry](./ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md). The async-runtime-related sections of ADR 030 (decode boundary, codec async semantics, runtime invocation pattern) are superseded by this ADR; ADR 030 carries a "Superseded by" pointer for those sections. The codec **registry** model (precedence rules, registry metadata, error mapping codes) in ADR 030 is unchanged and remains in force.
 - [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). Defines the stable codes (`RUNTIME.ENCODE_FAILED`, `RUNTIME.DECODE_FAILED`) and envelope shape used here.
 - [ADR 184 — Codec-owned value serialization](./ADR%20184%20-%20Codec-owned%20value%20serialization.md). Defines the build-time `encodeJson` / `decodeJson` seam (kept synchronous here).
-- [ADR 131 — Codec typing separation](./ADR%20131%20-%20Codec%20typing%20separation.md). Defines the five-generic `Codec` shape; the generics are unchanged, and the query-time method return shape is updated to `Promise<...>` here.
+- [ADR 131 — Codec typing separation](./ADR%20131%20-%20Codec%20typing%20separation.md). Defines the codec generic shape (`Id`, `TTraits`, `TWire`, `TInput`); the generics are unchanged here, and the query-time method return shape is updated to `Promise<...>`.
 - [V8 fast-async revamp (2018)](https://v8.dev/blog/fast-async). Grounding for the resolved-await microtask-tick claim.

@@ -29,7 +29,7 @@ import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 
 The base `Codec` interface lands on the seam between **query-time** methods (per-row, IO-relevant) and **build-time** methods (per-contract-load):
 
-- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TOutput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`codec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
+- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`codec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
 - Build-time: `encodeJson`, `decodeJson`, and the optional `renderOutputType` are **synchronous** so `validateContract` and client construction stay synchronous.
 
 There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
