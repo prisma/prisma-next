@@ -369,16 +369,22 @@ function isDisabledChangeStream(value: { enabled: boolean } | undefined): boolea
 
 /**
  * Returns a copy of `live` containing only the keys that `expected` defines.
- * Used for fields whose comparison should be limited to what the contract
- * actually authored (server-applied defaults are stripped). Returns
- * `undefined` if `expected` is `undefined` (contract said nothing → strip
- * the entire live block).
+ * Used for option families whose individual sub-fields are server-extended
+ * with platform defaults (collation, timeseries, clusteredIndex), so the
+ * verifier should compare only what the contract actually authored.
+ *
+ * When `expected` is `undefined` — i.e. the contract authored nothing for
+ * this whole option family but the live IR has it — we return `live`
+ * unchanged so the verifier still sees the entire live block and can
+ * surface it as drift. (Returning `undefined` here would silently strip a
+ * server-attached collation/timeseries/clusteredIndex that the contract
+ * never asked for, hiding real drift.)
  */
 function stripUnspecifiedFields(
   live: Record<string, unknown>,
   expected: Record<string, unknown> | undefined,
-): Record<string, unknown> | undefined {
-  if (expected === undefined) return undefined;
+): Record<string, unknown> {
+  if (expected === undefined) return live;
   const out: Record<string, unknown> = {};
   for (const key of Object.keys(expected)) {
     if (Object.hasOwn(live, key)) out[key] = live[key];
