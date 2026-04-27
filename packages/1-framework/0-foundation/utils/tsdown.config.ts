@@ -5,6 +5,7 @@ export default defineConfig({
     'src/exports/array-equal.ts',
     'src/exports/assertions.ts',
     'src/exports/abortable.ts',
+    'src/exports/canonical-stringify.ts',
     'src/exports/defined.ts',
     'src/exports/result.ts',
     'src/exports/redact-db-url.ts',
