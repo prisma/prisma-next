@@ -870,6 +870,55 @@ describe('prismaVitePlugin', () => {
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
     });
 
+    it('defers full reload while a newer queued emit is still pending', async () => {
+      const plugin = prismaVitePlugin('prisma-next.config.ts', {
+        logLevel: 'silent',
+        debounceMs: 100,
+      });
+      const mockServer = createMockServer();
+
+      applyModuleGraph(mockServer, {
+        '/project/prisma-next.config.ts': {},
+      });
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      mockedExecuteContractEmit.mockReset();
+      mockServer.ws.send.mockClear();
+
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
+      mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
+
+      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+      expect(mockServer.ws.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          err: expect.objectContaining({
+            message: expect.stringContaining('latest source invalid'),
+          }),
+        }),
+      );
+      expect(mockServer.ws.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'full-reload' }),
+      );
+    });
   });
 
   describe('error handling', () => {

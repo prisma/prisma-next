@@ -126,8 +126,10 @@ export function prismaVitePlugin(
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 
-      if (server) {
+      if (server && !hasQueuedEmit) {
         server.ws.send({ type: 'full-reload' });
+      } else if (hasQueuedEmit) {
+        log('Skipped full reload because a newer emit is queued', 'debug');
       }
 
       return result;
