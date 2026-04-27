@@ -40,7 +40,6 @@ test('SqlQueryPlan-shaped plan is assignable to QueryPlan<Row>', () => {
     readonly ast: unknown;
     readonly params: readonly unknown[];
     readonly meta: PlanMeta;
-    readonly _Row?: { id: number };
     readonly _row?: { id: number };
   }
   const queryPlan: SqlQueryPlanShape = {
