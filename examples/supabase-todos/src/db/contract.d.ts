@@ -27,7 +27,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:e2543eb4049f92947955b845e95fbcbf98a6ccbbbd0d66165d42a652f38613f5'>;
+  StorageHashBase<'sha256:fe91b8eca8cca26d430660e7659b53f9db1dfb6601a0b74b111460b6bf53940c'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:c6c3cea5c2b12ac00338b4b921ca0f7d8586d278e3bd3ca07b857198ab4c6563'>;
 export type ProfileHash =
@@ -107,12 +107,12 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
-          readonly displayName: {
+          readonly display_name: {
             readonly nativeType: 'text';
             readonly codecId: 'pg/text@1';
             readonly nullable: true;
           };
-          readonly createdAt: {
+          readonly created_at: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
@@ -132,7 +132,7 @@ type ContractBase = ContractType<
             readonly nullable: false;
             readonly typeParams: { readonly length: 36 };
           };
-          readonly authorId: {
+          readonly author_id: {
             readonly nativeType: 'character';
             readonly codecId: 'sql/char@1';
             readonly nullable: false;
@@ -143,7 +143,7 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/text@1';
             readonly nullable: false;
           };
-          readonly createdAt: {
+          readonly created_at: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
@@ -163,7 +163,7 @@ type ContractBase = ContractType<
             readonly nullable: false;
             readonly typeParams: { readonly length: 36 };
           };
-          readonly userId: {
+          readonly user_id: {
             readonly nativeType: 'character';
             readonly codecId: 'sql/char@1';
             readonly nullable: false;
@@ -179,7 +179,7 @@ type ContractBase = ContractType<
             readonly codecId: 'pg/bool@1';
             readonly nullable: false;
           };
-          readonly createdAt: {
+          readonly created_at: {
             readonly nativeType: 'timestamptz';
             readonly codecId: 'pg/timestamptz@1';
             readonly nullable: false;
@@ -225,8 +225,8 @@ type ContractBase = ContractType<
         readonly fields: {
           readonly id: { readonly column: 'id' };
           readonly email: { readonly column: 'email' };
-          readonly displayName: { readonly column: 'displayName' };
-          readonly createdAt: { readonly column: 'createdAt' };
+          readonly displayName: { readonly column: 'display_name' };
+          readonly createdAt: { readonly column: 'created_at' };
         };
       };
     };
@@ -262,9 +262,9 @@ type ContractBase = ContractType<
         readonly table: 'public_messages';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly authorId: { readonly column: 'authorId' };
+          readonly authorId: { readonly column: 'author_id' };
           readonly body: { readonly column: 'body' };
-          readonly createdAt: { readonly column: 'createdAt' };
+          readonly createdAt: { readonly column: 'created_at' };
         };
       };
     };
@@ -304,10 +304,10 @@ type ContractBase = ContractType<
         readonly table: 'todos';
         readonly fields: {
           readonly id: { readonly column: 'id' };
-          readonly userId: { readonly column: 'userId' };
+          readonly userId: { readonly column: 'user_id' };
           readonly title: { readonly column: 'title' };
           readonly completed: { readonly column: 'completed' };
-          readonly createdAt: { readonly column: 'createdAt' };
+          readonly createdAt: { readonly column: 'created_at' };
         };
       };
     };

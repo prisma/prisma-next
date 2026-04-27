@@ -47,10 +47,10 @@
       "storage": {
         "fields": {
           "createdAt": {
-            "column": "createdAt"
+            "column": "created_at"
           },
           "displayName": {
-            "column": "displayName"
+            "column": "display_name"
           },
           "email": {
             "column": "email"
@@ -103,13 +103,13 @@
       "storage": {
         "fields": {
           "authorId": {
-            "column": "authorId"
+            "column": "author_id"
           },
           "body": {
             "column": "body"
           },
           "createdAt": {
-            "column": "createdAt"
+            "column": "created_at"
           },
           "id": {
             "column": "id"
@@ -169,7 +169,7 @@
             "column": "completed"
           },
           "createdAt": {
-            "column": "createdAt"
+            "column": "created_at"
           },
           "id": {
             "column": "id"
@@ -178,7 +178,7 @@
             "column": "title"
           },
           "userId": {
-            "column": "userId"
+            "column": "user_id"
           }
         },
         "table": "todos"
@@ -186,11 +186,11 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:e2543eb4049f92947955b845e95fbcbf98a6ccbbbd0d66165d42a652f38613f5",
+    "storageHash": "sha256:fe91b8eca8cca26d430660e7659b53f9db1dfb6601a0b74b111460b6bf53940c",
     "tables": {
       "profiles": {
         "columns": {
-          "createdAt": {
+          "created_at": {
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
@@ -199,7 +199,7 @@
             "nativeType": "timestamptz",
             "nullable": false
           },
-          "displayName": {
+          "display_name": {
             "codecId": "pg/text@1",
             "nativeType": "text",
             "nullable": true
@@ -229,7 +229,7 @@
       },
       "public_messages": {
         "columns": {
-          "authorId": {
+          "author_id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
             "nullable": false,
@@ -242,7 +242,7 @@
             "nativeType": "text",
             "nullable": false
           },
-          "createdAt": {
+          "created_at": {
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
@@ -276,7 +276,7 @@
             "nativeType": "bool",
             "nullable": false
           },
-          "createdAt": {
+          "created_at": {
             "codecId": "pg/timestamptz@1",
             "default": {
               "expression": "now()",
@@ -298,7 +298,7 @@
             "nativeType": "text",
             "nullable": false
           },
-          "userId": {
+          "user_id": {
             "codecId": "sql/char@1",
             "nativeType": "character",
             "nullable": false,

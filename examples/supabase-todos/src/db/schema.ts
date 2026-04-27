@@ -27,6 +27,12 @@ export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
+    // Storage convention: snake_case columns, explicit table names. Field
+    // names stay camelCase on the TS side; the lane lowers `userId` →
+    // `user_id` etc. at emit time so RLS policy SQL written against
+    // Supabase conventions (`(user_id = auth.uid())`) matches the on-disk
+    // column names.
+    naming: { columns: 'snake_case' },
     capabilities: {
       postgres: {
         lateral: true,
