@@ -197,6 +197,23 @@ The single-path interface has **fewer** generic parameters than the rejected per
 
 Codec authors write either sync or async query-time functions, with no annotations. The factory accepts both forms. The constructed value is always the same shape. No author has to think about "is my codec sync or async" at the type level, and no consumer has to handle two cases.
 
+## Risks & mitigations
+
+### Cleartext leakage via error envelopes
+
+The expanded encrypting-codec surface means encode/decode failures can carry plaintext into `error.message`, `details.errors`, or other envelope fields. The redaction policy (cause routing, bounded `wirePreview`, validator-message redaction trigger) is preserved unchanged from the prior runtime, but trait-gated redaction (e.g. omitting `wirePreview` and scrubbing `cause` for codecs that carry the `secret` trait) is **not** spelled in this ADR. Tracked as a follow-up; see [TML-2329](https://linear.app/prisma-company/issue/TML-2329). The existing `it.skip` in the JSON-Schema validation tests pins the redaction-trigger seam.
+
+### `Promise.all` codec dispatch is unbounded
+
+The runtime encodes parameters and decodes cells via `Promise.all`. For sync-lifted codecs this is cheap (the lifted majority case). For codecs whose body performs IO — KMS-backed envelope encryption, network-backed key derivation, remote redaction policy lookups — every codec call becomes a real concurrent request, and `Promise.all` issues them all at once with no rate limit and no cooperative cancellation. A query that touches N rows × M codec'd cells can therefore burst N × M concurrent KMS calls.
+
+This is **acceptable but not safe at scale**. The standard-library `Promise.all` also propagates the first rejection without cancelling already-dispatched bodies; their results are discarded but the IO still runs to completion. Mitigations are intentionally deferred:
+
+- **Concurrency control (rate limit, batched dispatch).** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The likely landing is a per-codec-or-per-trait dispatcher that bounds in-flight requests and lifts the public `Promise.all` shape into a configurable scheduler.
+- **`AbortSignal` plumbing.** Tracked under the same ticket. The natural seam is plumbing an `AbortSignal` through the runtime context onto each codec call so the scheduler can cancel pending bodies on the first rejection or on user-initiated cancellation.
+
+The single-path always-await design does not preclude either mitigation; both can land additively without changing the codec author surface.
+
 ## Cross-family scope notes
 
 Mongo decode is **out of scope** for this work. Today, the Mongo runtime does not decode rows: documents pass through from the driver directly, and `decodeRow`-like machinery does not exist on the Mongo side. Adding a Mongo decode path is a substantial piece of orthogonal work that needs its own shaping (projection-aware document walker, async dispatch model, result-shape decisions) and is intentionally not bundled here.
