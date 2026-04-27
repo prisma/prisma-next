@@ -24,6 +24,7 @@ import {
   withTransaction,
 } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { type Client, Pool } from 'pg';
 import {
   type PostgresBinding,
@@ -200,7 +201,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       context,
       driver,
       verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-      ...(options.middleware ? { middleware: options.middleware } : {}),
+      ...ifDefined('middleware', options.middleware),
     });
 
     return runtimeInstance;
