@@ -87,6 +87,11 @@ export function mergeGitattributes(
     return null;
   }
 
-  const trailingNewline = existing.endsWith('\n') ? '' : '\n';
-  return `${existing}${trailingNewline}${missing.join('\n')}\n`;
+  // Mirrors `mergeGitignore`: a zero-byte existing file would otherwise
+  // gain a leading blank line, because `''.endsWith('\n')` is false. The
+  // empty-file case is uncommon (most projects either don't have a
+  // `.gitattributes` or have one with content), but symmetric handling
+  // keeps the two mergers' invariants identical.
+  const separator = existing.length === 0 || existing.endsWith('\n') ? '' : '\n';
+  return `${existing}${separator}${missing.join('\n')}\n`;
 }
