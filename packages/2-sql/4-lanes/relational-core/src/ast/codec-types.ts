@@ -255,8 +255,20 @@ export function codec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: (value) => Promise.resolve(userEncode(value)),
-    decode: (wire) => Promise.resolve(userDecode(wire)),
+    encode: (value) => {
+      try {
+        return Promise.resolve(userEncode(value));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    decode: (wire) => {
+      try {
+        return Promise.resolve(userDecode(wire));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
     encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
