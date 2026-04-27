@@ -39,6 +39,15 @@ export interface ExecutionPlan<Row = unknown> extends QueryPlan<Row> {}
  * `ExecutionPlan<Row>`, `SqlQueryPlan<Row>`, `SqlExecutionPlan<Row>`,
  * `MongoQueryPlan<Row>`, and `MongoExecutionPlan<Row>`.
  *
+ * The `_row` property must be present in the plan's static type for the
+ * conditional to bind `R`; objects whose type lacks `_row` resolve to
+ * `never`. Without the `keyof` guard, `extends { _row?: infer R }` would
+ * silently match any object and infer `unknown`.
+ *
  * Example: `type Row = ResultType<typeof plan>`.
  */
-export type ResultType<P> = P extends { readonly _row?: infer R } ? R : never;
+export type ResultType<P> = '_row' extends keyof P
+  ? P extends { readonly _row?: infer R }
+    ? R
+    : never
+  : never;
