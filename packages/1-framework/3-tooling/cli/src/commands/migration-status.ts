@@ -373,24 +373,19 @@ async function executeMigrationStatusCommand(
 
   if (options.ref) {
     activeRefName = options.ref;
-    const refEntry = allRefs[activeRefName];
-    if (refEntry) {
-      activeRefHash = refEntry.hash;
-    } else {
-      try {
-        activeRefHash = resolveRef(allRefs, activeRefName).hash;
-      } catch (error) {
-        if (MigrationToolsError.is(error)) {
-          return notOk(
-            errorRuntime(error.message, {
-              why: error.why,
-              fix: error.fix,
-              meta: { code: error.code },
-            }),
-          );
-        }
-        throw error;
+    try {
+      activeRefHash = resolveRef(allRefs, activeRefName).hash;
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(
+          errorRuntime(error.message, {
+            why: error.why,
+            fix: error.fix,
+            meta: { code: error.code },
+          }),
+        );
       }
+      throw error;
     }
   }
 
