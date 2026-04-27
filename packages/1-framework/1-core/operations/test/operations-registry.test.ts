@@ -6,17 +6,15 @@ import {
 } from '../src/index';
 
 describe('OperationRegistry', () => {
+  const noopImpl = () => undefined;
+
   const descriptor = (
     method: string,
     overrides?: Partial<OperationEntry>,
   ): OperationDescriptor => ({
     method,
-
-    args: [
-      { codecId: 'pg/vector@1', nullable: false },
-      { codecId: 'pg/vector@1', nullable: false },
-    ],
-    returns: { codecId: 'core/float8', nullable: false },
+    self: { codecId: 'pg/vector@1' },
+    impl: noopImpl,
     ...overrides,
   });
 
@@ -31,11 +29,8 @@ describe('OperationRegistry', () => {
 
     const entries = registry.entries();
     expect(entries['cosineDistance']).toEqual({
-      args: [
-        { codecId: 'pg/vector@1', nullable: false },
-        { codecId: 'pg/vector@1', nullable: false },
-      ],
-      returns: { codecId: 'core/float8', nullable: false },
+      self: { codecId: 'pg/vector@1' },
+      impl: noopImpl,
     });
   });
 
@@ -57,39 +52,64 @@ describe('OperationRegistry', () => {
     );
   });
 
-  it('throws when an arg has neither codecId nor traits', () => {
+  it('throws when self has neither codecId nor traits', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register(
-        descriptor('bad', {
-          args: [{ nullable: false }],
-        }),
-      ),
-    ).toThrow('Operation "bad" arg[0] has neither codecId nor traits');
+      registry.register({
+        method: 'bad',
+        // @ts-expect-error — SelfSpec requires codecId or traits
+        self: {},
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self has neither codecId nor traits');
   });
 
-  it('throws when an arg has both codecId and traits', () => {
+  it('throws when self has an empty traits array', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
-      registry.register(
-        descriptor('bad', {
-          args: [{ codecId: 'pg/text@1', traits: ['textual'], nullable: false }],
-        }),
-      ),
-    ).toThrow('Operation "bad" arg[0] has both codecId and traits');
+      registry.register({
+        method: 'bad',
+        self: { traits: [] },
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self has neither codecId nor traits');
   });
 
-  it('accepts trait-only arg', () => {
+  it('throws when self has both codecId and traits', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register({
+        method: 'bad',
+        // @ts-expect-error — SelfSpec disallows both codecId and traits
+        self: { codecId: 'pg/text@1', traits: ['textual'] },
+        impl: noopImpl,
+      }),
+    ).toThrow('Operation "bad" self has both codecId and traits');
+  });
+
+  it('accepts trait-only self', () => {
     const registry = createOperationRegistry();
 
     expect(() =>
       registry.register(
         descriptor('fine', {
-          args: [{ traits: ['textual'], nullable: false }],
+          self: { traits: ['textual'] },
         }),
       ),
+    ).not.toThrow();
+  });
+
+  it('accepts self-less operation', () => {
+    const registry = createOperationRegistry();
+
+    expect(() =>
+      registry.register({
+        method: 'builtin',
+        impl: noopImpl,
+      }),
     ).not.toThrow();
   });
 
@@ -117,8 +137,8 @@ describe('OperationRegistry', () => {
     const registry = createOperationRegistry<CustomEntry>();
     registry.register({
       method: 'custom',
-      args: [],
-      returns: { codecId: 'core/int4', nullable: false },
+      self: { codecId: 'core/int4' },
+      impl: noopImpl,
       extra: 'metadata',
     });
 

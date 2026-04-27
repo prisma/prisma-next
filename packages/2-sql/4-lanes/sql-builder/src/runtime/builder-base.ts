@@ -31,7 +31,6 @@ import type {
   ScopeField,
   ScopeTable,
 } from '../scope';
-import type { ExpressionImpl } from './expression-impl';
 import { createFieldProxy } from './field-proxy';
 import { createAggregateFunctions, createFunctions } from './functions';
 
@@ -272,7 +271,7 @@ export function resolveSelectArgs(
     const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const result = exprFn(createFieldProxy(scope), fns);
     projections.push(ProjectionItem.of(alias, result.buildAst()));
-    newRowFields[alias] = (result as ExpressionImpl).field;
+    newRowFields[alias] = result.returnType;
     return { projections, newRowFields };
   }
 
@@ -285,7 +284,7 @@ export function resolveSelectArgs(
     const record = callbackFn(createFieldProxy(scope), fns);
     for (const [key, expr] of Object.entries(record)) {
       projections.push(ProjectionItem.of(key, expr.buildAst()));
-      newRowFields[key] = (expr as ExpressionImpl).field;
+      newRowFields[key] = expr.returnType;
     }
     return { projections, newRowFields };
   }

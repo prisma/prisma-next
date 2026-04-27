@@ -78,13 +78,7 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
   const operations = [
     {
       method: 'example',
-      args: [] as const,
-      returns: { codecId: 'pg/text@1', nullable: false },
-      lowering: {
-        targetFamily: 'sql' as const,
-        strategy: 'function' as const,
-        template: 'example({args})',
-      },
+      impl: () => undefined as never,
     },
   ];
 

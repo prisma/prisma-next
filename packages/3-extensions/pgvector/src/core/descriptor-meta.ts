@@ -1,38 +1,60 @@
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import {
+  buildOperation,
+  type CodecExpression,
+  type Expression,
+  toExpr,
+} from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
 import { pgvectorAuthoringTypes } from './authoring';
 import { codecDefinitions } from './codecs';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
-export const pgvectorQueryOperations: readonly SqlOperationDescriptor[] = [
-  {
-    method: 'cosineDistance',
-    args: [
-      { codecId: pgvectorTypeId, nullable: false },
-      { codecId: pgvectorTypeId, nullable: false },
-    ],
-    returns: { codecId: 'pg/float8@1', nullable: false },
-    lowering: {
-      targetFamily: 'sql',
-      strategy: 'function',
-      template: '{{self}} <=> {{arg0}}',
+type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
+
+export function pgvectorQueryOperations<
+  CT extends CodecTypesBase,
+>(): readonly SqlOperationDescriptor[] {
+  return [
+    {
+      method: 'cosineDistance',
+      self: { codecId: pgvectorTypeId },
+      impl: (
+        self: CodecExpression<'pg/vector@1', boolean, CT>,
+        other: CodecExpression<'pg/vector@1', boolean, CT>,
+      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> =>
+        buildOperation({
+          method: 'cosineDistance',
+          args: [toExpr(self, pgvectorTypeId), toExpr(other, pgvectorTypeId)],
+          returns: { codecId: 'pg/float8@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '{{self}} <=> {{arg0}}',
+          },
+        }),
     },
-  },
-  {
-    method: 'cosineSimilarity',
-    args: [
-      { codecId: pgvectorTypeId, nullable: false },
-      { codecId: pgvectorTypeId, nullable: false },
-    ],
-    returns: { codecId: 'pg/float8@1', nullable: false },
-    lowering: {
-      targetFamily: 'sql',
-      strategy: 'function',
-      template: '1 - ({{self}} <=> {{arg0}})',
+    {
+      method: 'cosineSimilarity',
+      self: { codecId: pgvectorTypeId },
+      impl: (
+        self: CodecExpression<'pg/vector@1', boolean, CT>,
+        other: CodecExpression<'pg/vector@1', boolean, CT>,
+      ): Expression<{ codecId: 'pg/float8@1'; nullable: false }> =>
+        buildOperation({
+          method: 'cosineSimilarity',
+          args: [toExpr(self, pgvectorTypeId), toExpr(other, pgvectorTypeId)],
+          returns: { codecId: 'pg/float8@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '1 - ({{self}} <=> {{arg0}})',
+          },
+        }),
     },
-  },
-];
+  ];
+}
 
 const pgvectorPackMetaBase = {
   kind: 'extension',
