@@ -165,14 +165,21 @@ export async function deleteRef(refsDir: string, name: string): Promise<void> {
     throw error;
   }
 
-  // Clean empty parent directories up to refsDir
+  // Clean empty parent directories up to refsDir. Stop walking on the expected
+  // "directory has siblings" signal (ENOTEMPTY on Linux, EEXIST on some BSDs)
+  // and on ENOENT (concurrent removal). Anything else (EACCES, EIO, …) is a
+  // real failure and propagates.
   let dir = dirname(filePath);
   while (dir !== refsDir && dir.startsWith(refsDir)) {
     try {
       await rmdir(dir);
       dir = dirname(dir);
-    } catch {
-      break;
+    } catch (error) {
+      const code = error instanceof Error ? (error as { code?: string }).code : undefined;
+      if (code === 'ENOTEMPTY' || code === 'EEXIST' || code === 'ENOENT') {
+        break;
+      }
+      throw error;
     }
   }
 }
