@@ -29,6 +29,18 @@ describe('compareVersionPrefix (FR8.3)', () => {
     expect(compareVersionPrefix('14.10', '14.2')).toBeGreaterThan(0);
     expect(compareVersionPrefix('7.0', '6.0')).toBeGreaterThan(0);
   });
+
+  it('treats a missing trailing component as 0 in both directions (prefix-length mismatch)', () => {
+    // The previous implementation iterated over `Math.min(...)` and so
+    // silently accepted "14" against a configured minimum of "14.1";
+    // we now extend the shorter prefix with zeroes so the user sees
+    // the upgrade requirement.
+    expect(compareVersionPrefix('14', '14.1')).toBeLessThan(0);
+    expect(compareVersionPrefix('14.1', '14')).toBeGreaterThan(0);
+    expect(compareVersionPrefix('14', '14')).toBe(0);
+    expect(compareVersionPrefix('6', '6.0.1')).toBeLessThan(0);
+    expect(compareVersionPrefix('6.0.1', '6')).toBeGreaterThan(0);
+  });
 });
 
 describe('parsePostgresVersion (FR8.3)', () => {
