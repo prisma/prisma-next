@@ -81,6 +81,8 @@ Given a spec, generate the full plan:
    - Delete `projects/{project}/` (everything under it is transient)
    - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 
+   The close-out task **must not** include manually closing the Linear ticket. Linear’s GitHub integration auto-transitions the linked issue to the team’s completed state when the close-out PR merges, provided the PR references the issue identifier (e.g. `(TML-XXXX)` in the title or `Refs: TML-XXXX` in the body) or the branch name carries it. Manual closure is redundant and risks landing the issue in the wrong completed state (e.g. `Done` instead of `Ready to be merged`). See `.agents/rules/drive-project-workflow.mdc` § "Keep Linear up to date during execution" for the full policy.
+
 7. **Write the plan file** using the template below, saved to the `projects/{project}/` layout described above.
 
 8. Proceed to **Refinement**.
@@ -164,7 +166,7 @@ Linear is an observability mechanism for execution health. If the plan changes a
 
 - Update the Linear project using `save_project` (use `id` to update) to reflect the latest summary and to link to the current spec/plan paths.
 - Update milestones using `save_milestone` (use `id` to update) if milestone names/descriptions/order change.
-- Update issues using `update_issue` as tasks change (title/description/milestone/project), and move issue `state` as work progresses.
+- Update issues using `update_issue` as tasks change (title/description/milestone/project). Move issues into in-progress / in-review states during execution if it helps visibility, but **don’t manually transition issues to a completed state** — that happens automatically when the linked PR merges, provided the PR or branch references the issue identifier.
 
 ## Plan Template
 

@@ -49,6 +49,11 @@ Keep Linear up to date throughout execution:
 - Linear is an observability mechanism for the health of the project and the maker’s lane.
 - If tickets aren’t moving, it’s a signal to an engineering manager that the maker may be blocked.
 - The agent is expected to update Linear projects/milestones/issues to reflect progress and plan changes (create/update/re-sequence as needed).
+- **Don’t manually close/complete issues at project close-out.** Linear’s GitHub integration auto-transitions a linked issue to the team’s completed state when its PR merges, *provided the PR is linked to the issue*. Ensure the link exists by either:
+  - putting the issue identifier in the PR title or description (e.g. `(TML-2242)` or `Refs: TML-2242`), or
+  - using a branch name that contains the identifier (e.g. `tml-2242-…`).
+  Manually transitioning issues to a completed state is redundant, can land them in the wrong state (e.g. `Done` while the PR is still open and the team’s convention is `Ready to be merged`), and creates noise in the Linear activity log.
+- In-progress / in-review state transitions during execution are fine and useful for visibility — only the *completed* transition should be left to the merge integration.
 
 ## Keep project artifacts under `projects/<project>/`
 
