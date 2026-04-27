@@ -104,8 +104,16 @@ export async function readRefs(refsDir: string): Promise<Refs> {
     let raw: string;
     try {
       raw = await readFile(filePath, 'utf-8');
-    } catch {
-      continue;
+    } catch (error) {
+      // Tolerate the TOCTOU race between `readdir` and `readFile` (ENOENT) and
+      // benign EISDIR if a directory happens to end in `.json`. Anything else
+      // (EACCES, EIO, EMFILE, …) is a real failure and propagates so the CLI
+      // surfaces it rather than silently dropping the ref.
+      const code = error instanceof Error ? (error as { code?: string }).code : undefined;
+      if (code === 'ENOENT' || code === 'EISDIR') {
+        continue;
+      }
+      throw error;
     }
 
     let parsed: unknown;
