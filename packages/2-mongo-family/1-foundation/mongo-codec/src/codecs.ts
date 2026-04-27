@@ -42,6 +42,11 @@ export type MongoCodec<
  *
  * Authors may write `encode` / `decode` as sync or async; the factory
  * lifts uniformly to Promise-returning methods via `async (x) => fn(x)`.
+ * `encode` is optional — when omitted, an identity default is installed
+ * (codecs that omit `encode` are declaring "the input value is already
+ * the wire value", so `TInput` and `TWire` are interchangeable for that
+ * codec). This matches the SQL `codec()` factory and ADR 204 § 2.
+ *
  * Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType`)
  * pass through synchronously; identity defaults are installed for the
  * JSON methods when omitted.
@@ -63,14 +68,15 @@ export function mongoCodec<
   typeId: Id;
   targetTypes: readonly string[];
   traits?: TTraits;
-  encode: (value: TInput) => TWire | Promise<TWire>;
+  encode?: (value: TInput) => TWire | Promise<TWire>;
   decode: (wire: TWire) => TOutput | Promise<TOutput>;
   encodeJson?: (value: TInput) => JsonValue;
   decodeJson?: (json: JsonValue) => TInput;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }): MongoCodec<Id, TTraits, TWire, TInput, TOutput> {
   const identity = (v: unknown) => v;
-  const userEncode = config.encode;
+  const userEncode =
+    config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
   const userDecode = config.decode;
   return {
     id: config.typeId,

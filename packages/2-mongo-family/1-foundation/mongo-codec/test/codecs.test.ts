@@ -55,6 +55,17 @@ describe('mongoCodec()', () => {
     expect(await codec.decode('a')).toBe('decoded:a');
     expect(await codec.encode('b')).toBe('encoded:b');
   });
+
+  it('uses an identity default when encode is omitted', async () => {
+    const codec = mongoCodec({
+      typeId: 'test/identity-encode@1',
+      targetTypes: ['string'],
+      decode: (wire: string) => wire.toUpperCase(),
+    });
+
+    expect(await codec.encode('hello')).toBe('hello');
+    expect(await codec.decode('hello')).toBe('HELLO');
+  });
 });
 
 describe('MongoCodecRegistry', () => {
