@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { findLeaks, isLeak } from './check-publish-deps.mjs';
+import { describe, expect, it, vi } from 'vitest';
+import { findLeaks, isLeak, runCheck } from './check-publish-deps.mjs';
 
 describe('isLeak', () => {
   it('flags workspace:* specifiers', () => {
@@ -98,5 +98,62 @@ describe('findLeaks', () => {
       },
     });
     expect(leaks.map((l) => l.name)).toEqual(['first', 'second']);
+  });
+});
+
+describe('runCheck', () => {
+  function makeIo(overrides = {}) {
+    const rm = vi.fn();
+    return {
+      rm,
+      io: {
+        listPublishablePackageDirs: () => [],
+        mkdtemp: () => '/tmp/pn-publish-check-fake',
+        rm,
+        readdirSync: () => [],
+        readPackageJson: () => ({ name: '@scope/x', version: '1.0.0' }),
+        readPackedManifest: () => ({}),
+        packAll: () => 0,
+        stdoutWrite: () => {},
+        stderrWrite: () => {},
+        ...overrides,
+      },
+    };
+  }
+
+  it('removes the tmpdir even when packAll fails (acceptance: failure-path cleanup)', () => {
+    const { io, rm } = makeIo({ packAll: () => 2 });
+    const exit = runCheck({ argv: [], io });
+    expect(exit).toBe(2);
+    expect(rm).toHaveBeenCalledWith('/tmp/pn-publish-check-fake');
+  });
+
+  it('removes the tmpdir even when scanning throws (defence in depth)', () => {
+    const { io, rm } = makeIo({
+      readdirSync: () => {
+        throw new Error('scan exploded');
+      },
+    });
+    expect(() => runCheck({ argv: [], io })).toThrow('scan exploded');
+    expect(rm).toHaveBeenCalledWith('/tmp/pn-publish-check-fake');
+  });
+
+  it('returns 0 and removes the tmpdir on a clean run', () => {
+    const { io, rm } = makeIo();
+    expect(runCheck({ argv: [], io })).toBe(0);
+    expect(rm).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns 1 when offenders are found and still removes the tmpdir', () => {
+    const { io, rm } = makeIo({
+      listPublishablePackageDirs: () => ['packages/foo'],
+      readdirSync: () => ['scope-foo-1.0.0.tgz'],
+      readPackageJson: () => ({ name: '@scope/foo', version: '1.0.0' }),
+      readPackedManifest: () => ({
+        dependencies: { bad: 'workspace:*' },
+      }),
+    });
+    expect(runCheck({ argv: [], io })).toBe(1);
+    expect(rm).toHaveBeenCalledTimes(1);
   });
 });

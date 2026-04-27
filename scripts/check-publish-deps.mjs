@@ -85,7 +85,15 @@ function listPublishablePackageDirs() {
     .map((p) => p.replace(/^\.\//, ''));
 }
 
-function packAll(destDir) {
+/**
+ * Packs every workspace package into `destDir`. Returns 0 on success and
+ * a non-zero exit code on failure so the caller can release any temp
+ * resources (notably the tmpdir used as `destDir`) before exiting.
+ *
+ * @param {string} destDir
+ * @returns {number}
+ */
+export function packAll(destDir) {
   // Pack every workspace package in one shot. We over-pack (private
   // packages get tarballs too) but that's cheap and lets us avoid the
   // per-package invocation overhead. The gate filters down to publishables
@@ -99,8 +107,9 @@ function packAll(destDir) {
   );
   if (result.status !== 0) {
     process.stderr.write(`\npnpm -r pack failed with exit code ${result.status}\n`);
-    process.exit(result.status ?? 1);
+    return result.status ?? 1;
   }
+  return 0;
 }
 
 function tarballNameFor(pkgName, version) {
@@ -110,31 +119,72 @@ function tarballNameFor(pkgName, version) {
   return `${pkgName.replace(/^@/, '').replace(/\//g, '-')}-${version}.tgz`;
 }
 
-function main() {
-  const args = new Set(process.argv.slice(2));
+const DEFAULT_IO = {
+  packAll,
+  listPublishablePackageDirs,
+  readPackedManifest,
+  readPackageJson: (dir) => JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8')),
+  readdirSync,
+  mkdtemp: () => mkdtempSync(join(tmpdir(), 'pn-publish-check-')),
+  rm: (path) => rmSync(path, { recursive: true, force: true }),
+  stdoutWrite: (s) => process.stdout.write(s),
+  stderrWrite: (s) => process.stderr.write(s),
+};
+
+/**
+ * Runs the publish-deps gate. Pure with respect to its `io` seam — the
+ * default uses `pnpm pack`, the workspace fs, and `process.{stdout,stderr}`,
+ * but tests can stub each leg to exercise the failure-path cleanup
+ * without packing real tarballs.
+ *
+ * Always returns a numeric exit code; the caller is responsible for the
+ * single `process.exit(...)` so finally-blocks (here, tmpdir cleanup)
+ * always run.
+ *
+ * @param {object} [options]
+ * @param {string[]} [options.argv]
+ * @param {Partial<typeof DEFAULT_IO>} [options.io]
+ * @returns {number}
+ */
+export function runCheck({ argv = process.argv.slice(2), io = {} } = {}) {
+  const {
+    packAll: pack,
+    listPublishablePackageDirs: listDirs,
+    readPackedManifest: readPacked,
+    readPackageJson,
+    readdirSync: readDir,
+    mkdtemp,
+    rm,
+    stdoutWrite,
+    stderrWrite,
+  } = { ...DEFAULT_IO, ...io };
+  const args = new Set(argv);
   const json = args.has('--json');
 
-  const dirs = listPublishablePackageDirs();
-  const dest = mkdtempSync(join(tmpdir(), 'pn-publish-check-'));
+  const dirs = listDirs();
+  const dest = mkdtemp();
 
   try {
-    process.stderr.write(
+    stderrWrite(
       `Packing ${dirs.length} publishable packages (and any private workspace siblings) → ${dest}\n`,
     );
-    packAll(dest);
+    const packExitCode = pack(dest);
+    if (packExitCode !== 0) {
+      return packExitCode;
+    }
 
-    const tarballs = new Set(readdirSync(dest).filter((f) => f.endsWith('.tgz')));
+    const tarballs = new Set(readDir(dest).filter((f) => f.endsWith('.tgz')));
     /** @type {Array<{ pkg: string; tarball: string; leaks: ReturnType<typeof findLeaks> }>} */
     const offenders = [];
 
     for (const dir of dirs) {
-      const sourcePkg = JSON.parse(readFileSync(join(dir, 'package.json'), 'utf-8'));
+      const sourcePkg = readPackageJson(dir);
       const tarballName = tarballNameFor(sourcePkg.name, sourcePkg.version);
       if (!tarballs.has(tarballName)) {
-        process.stderr.write(`warn: tarball not found for ${sourcePkg.name} (${tarballName})\n`);
+        stderrWrite(`warn: tarball not found for ${sourcePkg.name} (${tarballName})\n`);
         continue;
       }
-      const packed = readPackedManifest(join(dest, tarballName));
+      const packed = readPacked(join(dest, tarballName));
       const leaks = findLeaks(packed);
       if (leaks.length > 0) {
         offenders.push({ pkg: sourcePkg.name, tarball: tarballName, leaks });
@@ -142,38 +192,40 @@ function main() {
     }
 
     if (json) {
-      process.stdout.write(
-        `${JSON.stringify({ ok: offenders.length === 0, offenders }, null, 2)}\n`,
-      );
+      stdoutWrite(`${JSON.stringify({ ok: offenders.length === 0, offenders }, null, 2)}\n`);
     } else if (offenders.length === 0) {
-      process.stderr.write(
+      stderrWrite(
         `\nOK — no workspace:* / catalog: leaks in ${dirs.length} publishable packages.\n`,
       );
     } else {
-      process.stderr.write(
+      stderrWrite(
         `\nFAIL — ${offenders.length} publishable package(s) leak workspace:* / catalog: into the published tarball:\n`,
       );
       for (const o of offenders) {
-        process.stderr.write(`\n  ${o.pkg}\n`);
+        stderrWrite(`\n  ${o.pkg}\n`);
         for (const l of o.leaks) {
-          process.stderr.write(`    ${l.field}.${l.name} = ${l.spec}\n`);
+          stderrWrite(`    ${l.field}.${l.name} = ${l.spec}\n`);
         }
       }
-      process.stderr.write(
+      stderrWrite(
         '\nPublish via `pnpm publish` (which rewrites these specifiers) rather than `npm publish`,\n' +
           'or convert the offending dependency to a real version range.\n',
       );
     }
 
-    process.exit(offenders.length === 0 ? 0 : 1);
+    return offenders.length === 0 ? 0 : 1;
   } finally {
-    rmSync(dest, { recursive: true, force: true });
+    rm(dest);
   }
+}
+
+export function main() {
+  return runCheck();
 }
 
 // Only run `main` when invoked directly. Importing the module from a unit
 // test (or any other tool) gets you the pure helpers (`findLeaks`,
 // `isLeak`) without packing every workspace tarball.
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
-  main();
+  process.exit(main());
 }
