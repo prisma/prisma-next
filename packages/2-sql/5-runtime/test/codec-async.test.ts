@@ -248,6 +248,79 @@ describe('encodeParams — async, concurrent dispatch', () => {
     );
     expect(result).toBe('raw');
   });
+
+  it('throws RUNTIME.MISSING_PARAM_DESCRIPTOR when params has more entries than paramDescriptors', async () => {
+    const registry = createCodecRegistry();
+    const plan = createTestPlan({
+      params: ['a', 'b', 'c'],
+      meta: {
+        target: 'postgres',
+        storageHash: coreHash('sha256:test'),
+        lane: 'dsl',
+        paramDescriptors: [
+          { codecId: 'test/none@1', source: 'dsl' },
+          { codecId: 'test/none@1', source: 'dsl' },
+        ],
+      },
+    });
+
+    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
+      code: 'RUNTIME.MISSING_PARAM_DESCRIPTOR',
+      category: 'RUNTIME',
+      severity: 'error',
+      details: {
+        paramIndex: 2,
+        paramCount: 3,
+        descriptorCount: 2,
+      },
+    });
+  });
+
+  it('throws RUNTIME.MISSING_PARAM_DESCRIPTOR for the first missing index even if earlier descriptors exist', async () => {
+    const registry = createCodecRegistry();
+    const plan = createTestPlan({
+      params: ['a', 'b'],
+      meta: {
+        target: 'postgres',
+        storageHash: coreHash('sha256:test'),
+        lane: 'dsl',
+        paramDescriptors: [{ codecId: 'test/none@1', source: 'dsl' }],
+      },
+    });
+
+    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
+      code: 'RUNTIME.MISSING_PARAM_DESCRIPTOR',
+      details: { paramIndex: 1, paramCount: 2, descriptorCount: 1 },
+    });
+  });
+
+  it('encodes a fully-described plan through encodeParam without throwing', async () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/passthrough@1',
+        targetTypes: ['text'],
+        encode: (value: string) => `wire:${value}`,
+        decode: (wire: string) => wire,
+      }),
+    );
+
+    const plan = createTestPlan({
+      params: ['x', 'y'],
+      meta: {
+        target: 'postgres',
+        storageHash: coreHash('sha256:test'),
+        lane: 'dsl',
+        paramDescriptors: [
+          { codecId: 'test/passthrough@1', source: 'dsl' },
+          { codecId: 'test/passthrough@1', source: 'dsl' },
+        ],
+      },
+    });
+
+    const encoded = await encodeParams(plan, registry);
+    expect(encoded).toEqual(['wire:x', 'wire:y']);
+  });
 });
 
 // =============================================================================

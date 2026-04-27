@@ -83,16 +83,23 @@ export async function encodeParams(
     return plan.params;
   }
 
-  const tasks: Promise<unknown>[] = new Array(plan.params.length);
-  for (let i = 0; i < plan.params.length; i++) {
+  const descriptorCount = plan.meta.paramDescriptors.length;
+  const paramCount = plan.params.length;
+
+  const tasks: Promise<unknown>[] = new Array(paramCount);
+  for (let i = 0; i < paramCount; i++) {
     const paramValue = plan.params[i];
     const paramDescriptor = plan.meta.paramDescriptors[i];
 
-    if (paramDescriptor) {
-      tasks[i] = encodeParam(paramValue, paramDescriptor, i, registry);
-    } else {
-      tasks[i] = Promise.resolve(paramValue);
+    if (!paramDescriptor) {
+      throw runtimeError(
+        'RUNTIME.MISSING_PARAM_DESCRIPTOR',
+        `Missing paramDescriptor for parameter at index ${i} (plan has ${paramCount} params, ${descriptorCount} descriptors). The planner must emit one descriptor per param; this is a contract violation.`,
+        { paramIndex: i, paramCount, descriptorCount },
+      );
     }
+
+    tasks[i] = encodeParam(paramValue, paramDescriptor, i, registry);
   }
 
   const encoded = await Promise.all(tasks);
