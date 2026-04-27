@@ -2,24 +2,17 @@
  * SQLite migration IR: one concrete `*Call` class per pure factory under
  * `operations/`, plus a shared `SqliteOpFactoryCallNode` abstract base.
  *
- * Each call class carries the literal arguments its backing factory receives,
- * computes a human-readable `label` in its constructor, and implements:
- *
- * - `toOp()` — converts the IR node to a runtime `SqlMigrationPlanOperation`
- *   by delegating to the matching pure factory under `operations/`.
- * - `renderTypeScript()` / `importRequirements()` — inherited from
- *   `TsExpression`. Used by `renderCallsToTypeScript` to emit the call as
- *   a TypeScript expression inside the scaffolded `migration.ts`.
- *
- * RecreateTableCall's TS rendering carries through non-serializable context
- * (codec hooks, storage types). For this phase we only need `toOp()` to
- * preserve byte-for-byte behavior with the current planner; full TS-render
- * parity is deferred.
+ * Each call class carries fully-resolved literal arguments (flat
+ * `SqliteColumnSpec` / `SqliteTableSpec` etc.) — codec / `typeRef` / default
+ * expansion happens upstream in the issue-planner / strategies, mirroring
+ * the Postgres `ColumnSpec` pattern. As a result, `toOp()` and
+ * `renderTypeScript()` both pass the same flat data through; the rendered
+ * TypeScript scaffold is fully self-contained and does not need access to a
+ * `storageTypes` map at runtime.
  */
 
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import type {
-  CodecControlHooks,
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
@@ -27,15 +20,10 @@ import type {
   OpFactoryCall as FrameworkOpFactoryCall,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import type {
-  StorageColumn,
-  StorageTable,
-  StorageTypeInstance,
-} from '@prisma-next/sql-contract/types';
-import type { SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { addColumn, dropColumn } from './operations/columns';
 import { createIndex, dropIndex } from './operations/indexes';
+import type { SqliteColumnSpec, SqliteIndexSpec, SqliteTableSpec } from './operations/shared';
 import { createTable, dropTable, recreateTable } from './operations/tables';
 import type { SqlitePlanTargetDetails } from './planner-target-details';
 
@@ -66,32 +54,23 @@ export class CreateTableCall extends SqliteOpFactoryCallNode {
   readonly factoryName = 'createTable' as const;
   readonly operationClass = 'additive' as const;
   readonly tableName: string;
-  readonly table: StorageTable;
-  readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly spec: SqliteTableSpec;
   readonly label: string;
 
-  constructor(
-    tableName: string,
-    table: StorageTable,
-    codecHooks: Map<string, CodecControlHooks>,
-    storageTypes: Record<string, StorageTypeInstance>,
-  ) {
+  constructor(tableName: string, spec: SqliteTableSpec) {
     super();
     this.tableName = tableName;
-    this.table = table;
-    this.codecHooks = codecHooks;
-    this.storageTypes = storageTypes;
+    this.spec = spec;
     this.label = `Create table ${tableName}`;
     this.freeze();
   }
 
   toOp(): Op {
-    return createTable(this.tableName, this.table, this.codecHooks, this.storageTypes);
+    return createTable(this.tableName, this.spec);
   }
 
   renderTypeScript(): string {
-    return `createTable(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.table)})`;
+    return `createTable(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.spec)})`;
   }
 }
 
@@ -121,30 +100,27 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
   readonly factoryName = 'recreateTable' as const;
   readonly operationClass: MigrationOperationClass;
   readonly tableName: string;
-  readonly contractTable: StorageTable;
-  readonly schemaTable: SqlTableIR;
+  readonly contractTable: SqliteTableSpec;
+  readonly schemaColumnNames: readonly string[];
+  readonly indexes: readonly SqliteIndexSpec[];
   readonly issues: readonly SchemaIssue[];
-  readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly storageTypes: Record<string, StorageTypeInstance>;
   readonly label: string;
 
   constructor(args: {
     tableName: string;
-    contractTable: StorageTable;
-    schemaTable: SqlTableIR;
+    contractTable: SqliteTableSpec;
+    schemaColumnNames: readonly string[];
+    indexes: readonly SqliteIndexSpec[];
     issues: readonly SchemaIssue[];
     operationClass: MigrationOperationClass;
-    codecHooks: Map<string, CodecControlHooks>;
-    storageTypes: Record<string, StorageTypeInstance>;
   }) {
     super();
     this.tableName = args.tableName;
     this.contractTable = args.contractTable;
-    this.schemaTable = args.schemaTable;
+    this.schemaColumnNames = args.schemaColumnNames;
+    this.indexes = args.indexes;
     this.issues = args.issues;
     this.operationClass = args.operationClass;
-    this.codecHooks = args.codecHooks;
-    this.storageTypes = args.storageTypes;
     this.label = `Recreate table ${args.tableName}`;
     this.freeze();
   }
@@ -153,19 +129,23 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     return recreateTable({
       tableName: this.tableName,
       contractTable: this.contractTable,
-      schemaTable: this.schemaTable,
+      schemaColumnNames: this.schemaColumnNames,
+      indexes: this.indexes,
       issues: this.issues,
       operationClass: this.operationClass,
-      codecHooks: this.codecHooks,
-      storageTypes: this.storageTypes,
     });
   }
 
   renderTypeScript(): string {
-    // Stubbed: recreateTable depends on live schema state + codec hooks that
-    // aren't serializable into a static authoring file. Full TS-render parity
-    // is a follow-up.
-    return `recreateTable(${jsonToTsSource({ tableName: this.tableName })})`;
+    const args = {
+      tableName: this.tableName,
+      contractTable: this.contractTable,
+      schemaColumnNames: this.schemaColumnNames,
+      indexes: this.indexes,
+      issues: this.issues,
+      operationClass: this.operationClass,
+    };
+    return `recreateTable(${jsonToTsSource(args)})`;
   }
 }
 
@@ -178,40 +158,24 @@ export class AddColumnCall extends SqliteOpFactoryCallNode {
   readonly operationClass = 'additive' as const;
   readonly tableName: string;
   readonly columnName: string;
-  readonly column: StorageColumn;
-  readonly codecHooks: Map<string, CodecControlHooks>;
-  readonly storageTypes: Record<string, StorageTypeInstance>;
+  readonly column: SqliteColumnSpec;
   readonly label: string;
 
-  constructor(
-    tableName: string,
-    columnName: string,
-    column: StorageColumn,
-    codecHooks: Map<string, CodecControlHooks>,
-    storageTypes: Record<string, StorageTypeInstance>,
-  ) {
+  constructor(tableName: string, column: SqliteColumnSpec) {
     super();
     this.tableName = tableName;
-    this.columnName = columnName;
+    this.columnName = column.name;
     this.column = column;
-    this.codecHooks = codecHooks;
-    this.storageTypes = storageTypes;
-    this.label = `Add column ${columnName} on ${tableName}`;
+    this.label = `Add column ${column.name} on ${tableName}`;
     this.freeze();
   }
 
   toOp(): Op {
-    return addColumn(
-      this.tableName,
-      this.columnName,
-      this.column,
-      this.codecHooks,
-      this.storageTypes,
-    );
+    return addColumn(this.tableName, this.column);
   }
 
   renderTypeScript(): string {
-    return `addColumn(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.columnName)}, ${jsonToTsSource(this.column)})`;
+    return `addColumn(${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.column)})`;
   }
 }
 

@@ -20,7 +20,7 @@ import {
   SQLITE_JSON_CODEC_ID,
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
-} from './codec-ids';
+} from '@prisma-next/target-sqlite/codec-ids';
 
 type LoweredDefaultResult = ReturnType<DefaultFunctionLoweringHandler>;
 type ParsedDefaultFunctionCall = Parameters<DefaultFunctionLoweringHandler>[0]['call'];

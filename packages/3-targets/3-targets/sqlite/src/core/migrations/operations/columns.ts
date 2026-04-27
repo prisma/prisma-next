@@ -1,39 +1,33 @@
-import { quoteIdentifier } from '@prisma-next/adapter-sqlite/control';
-import type { CodecControlHooks } from '@prisma-next/family-sql/control';
-import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import { buildAddColumnSql } from '../planner-ddl-builders';
+import { quoteIdentifier } from '../../sql-utils';
 import { buildTargetDetails } from '../planner-target-details';
-import { esc, type Op, step } from './shared';
+import { esc, type Op, type SqliteColumnSpec, step } from './shared';
 
-export function addColumn(
-  tableName: string,
-  columnName: string,
-  column: StorageColumn,
-  codecHooks: Map<string, CodecControlHooks>,
-  storageTypes: Record<string, StorageTypeInstance>,
-): Op {
+export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
+  const parts = [
+    `ALTER TABLE ${quoteIdentifier(tableName)}`,
+    `ADD COLUMN ${quoteIdentifier(column.name)} ${column.typeSql}`,
+    column.defaultSql,
+    column.nullable ? '' : 'NOT NULL',
+  ].filter(Boolean);
+  const addSql = parts.join(' ');
+
   return {
-    id: `column.${tableName}.${columnName}`,
-    label: `Add column ${columnName} on ${tableName}`,
-    summary: `Adds column ${columnName} on ${tableName}`,
+    id: `column.${tableName}.${column.name}`,
+    label: `Add column ${column.name} on ${tableName}`,
+    summary: `Adds column ${column.name} on ${tableName}`,
     operationClass: 'additive',
-    target: { id: 'sqlite', details: buildTargetDetails('column', columnName, tableName) },
+    target: { id: 'sqlite', details: buildTargetDetails('column', column.name, tableName) },
     precheck: [
       step(
-        `ensure column "${columnName}" is missing`,
-        `SELECT COUNT(*) = 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(columnName)}'`,
+        `ensure column "${column.name}" is missing`,
+        `SELECT COUNT(*) = 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(column.name)}'`,
       ),
     ],
-    execute: [
-      step(
-        `add column "${columnName}"`,
-        buildAddColumnSql(tableName, columnName, column, codecHooks, storageTypes),
-      ),
-    ],
+    execute: [step(`add column "${column.name}"`, addSql)],
     postcheck: [
       step(
-        `verify column "${columnName}" exists`,
-        `SELECT COUNT(*) > 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(columnName)}'`,
+        `verify column "${column.name}" exists`,
+        `SELECT COUNT(*) > 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(column.name)}'`,
       ),
     ],
   };

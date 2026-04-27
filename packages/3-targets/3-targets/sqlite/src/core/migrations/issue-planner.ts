@@ -17,7 +17,12 @@ import type {
 } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -31,6 +36,17 @@ import {
   DropTableCall,
   type SqliteOpFactoryCall,
 } from './op-factory-call';
+import type {
+  SqliteColumnSpec,
+  SqliteForeignKeySpec,
+  SqliteTableSpec,
+  SqliteUniqueSpec,
+} from './operations/shared';
+import {
+  buildColumnDefaultSql,
+  buildColumnTypeSql,
+  isInlineAutoincrementPrimaryKey,
+} from './planner-ddl-builders';
 import {
   type CallMigrationStrategy,
   type StrategyContext,
@@ -180,6 +196,66 @@ function isMissing(issue: SchemaIssue): boolean {
 }
 
 // ============================================================================
+// StorageTable / StorageColumn → flat SqliteTableSpec
+// ============================================================================
+
+/**
+ * Resolves codec / `typeRef` / default rendering into a flat
+ * `SqliteColumnSpec`. Mirrors Postgres's `toColumnSpec`. Once a column is
+ * flattened, downstream Calls and operation factories never see
+ * `StorageColumn` again — they deal in pre-rendered SQL fragments.
+ */
+export function toColumnSpec(
+  name: string,
+  column: StorageColumn,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+  inlineAutoincrementPrimaryKey = false,
+): SqliteColumnSpec {
+  const typeSql = buildColumnTypeSql(column, storageTypes as Record<string, StorageTypeInstance>);
+  const defaultSql = buildColumnDefaultSql(column.default);
+  return {
+    name,
+    typeSql,
+    defaultSql,
+    nullable: column.nullable,
+    ...(inlineAutoincrementPrimaryKey ? { inlineAutoincrementPrimaryKey: true } : {}),
+  };
+}
+
+/**
+ * Flattens a `StorageTable` into a `SqliteTableSpec` ready for
+ * `CreateTableCall` / `RecreateTableCall`. Sole-column AUTOINCREMENT
+ * primary keys are detected here and marked on the column spec so the
+ * renderer emits `INTEGER PRIMARY KEY AUTOINCREMENT` inline.
+ */
+export function toTableSpec(
+  table: StorageTable,
+  storageTypes: Readonly<Record<string, StorageTypeInstance>>,
+): SqliteTableSpec {
+  const columns: SqliteColumnSpec[] = Object.entries(table.columns).map(([name, column]) =>
+    toColumnSpec(name, column, storageTypes, isInlineAutoincrementPrimaryKey(table, name)),
+  );
+  const uniques: SqliteUniqueSpec[] = table.uniques.map((u) => ({
+    columns: u.columns,
+    ...(u.name !== undefined ? { name: u.name } : {}),
+  }));
+  const foreignKeys: SqliteForeignKeySpec[] = table.foreignKeys.map((fk) => ({
+    columns: fk.columns,
+    references: { table: fk.references.table, columns: fk.references.columns },
+    constraint: fk.constraint !== false,
+    ...(fk.name !== undefined ? { name: fk.name } : {}),
+    ...(fk.onDelete !== undefined ? { onDelete: fk.onDelete } : {}),
+    ...(fk.onUpdate !== undefined ? { onUpdate: fk.onUpdate } : {}),
+  }));
+  return {
+    columns,
+    ...(table.primaryKey ? { primaryKey: { columns: table.primaryKey.columns } } : {}),
+    uniques,
+    foreignKeys,
+  };
+}
+
+// ============================================================================
 // Issue planner
 // ============================================================================
 
@@ -231,11 +307,8 @@ function mapIssueToCall(
           ),
         );
       }
-      const codecHooks = ctx.codecHooks as Map<string, CodecControlHooks>;
-      const storageTypes = ctx.storageTypes as Record<string, StorageTypeInstance>;
-      const calls: SqliteOpFactoryCall[] = [
-        new CreateTableCall(issue.table, contractTable, codecHooks, storageTypes),
-      ];
+      const tableSpec = toTableSpec(contractTable, ctx.storageTypes);
+      const calls: SqliteOpFactoryCall[] = [new CreateTableCall(issue.table, tableSpec)];
       const declaredIndexColumnKeys = new Set<string>();
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? defaultIndexName(issue.table, index.columns);
@@ -266,15 +339,14 @@ function mapIssueToCall(
           ),
         );
       }
-      return ok([
-        new AddColumnCall(
-          issue.table,
-          issue.column,
-          column,
-          ctx.codecHooks as Map<string, CodecControlHooks>,
-          ctx.storageTypes as Record<string, StorageTypeInstance>,
-        ),
-      ]);
+      const contractTable = ctx.toContract.storage.tables[issue.table];
+      const columnSpec = toColumnSpec(
+        issue.column,
+        column,
+        ctx.storageTypes,
+        contractTable ? isInlineAutoincrementPrimaryKey(contractTable, issue.column) : false,
+      );
+      return ok([new AddColumnCall(issue.table, columnSpec)]);
     }
 
     case 'index_mismatch': {
@@ -338,6 +410,13 @@ function mapIssueToCall(
       }
       return ok([new DropIndexCall(issue.table, issue.indexOrConstraint)]);
     }
+
+    // SQLite has no enum types (capability `sql.enums: false`). The verifier
+    // should never emit `enum_values_changed` against a SQLite schema, but if
+    // it does we explicitly drop the issue rather than letting it fall into
+    // the `default` branch with a generic "unsupported operation" message.
+    case 'enum_values_changed':
+      return ok([]);
 
     // Everything below is absorbed by recreateTableStrategy. If it falls
     // through here, policy or context didn't allow the recreate — surface as

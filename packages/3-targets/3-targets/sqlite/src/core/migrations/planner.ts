@@ -1,4 +1,3 @@
-import { normalizeSqliteNativeType, parseSqliteDefault } from '@prisma-next/adapter-sqlite/control';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlanner,
@@ -13,6 +12,8 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import { parseSqliteDefault } from '../default-normalizer';
+import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
 import {
   type SqliteMigrationDestinationInfo,
@@ -95,14 +96,14 @@ export class SqliteMigrationPlanner
         : {}),
     };
 
-    return Object.freeze({
+    return {
       kind: 'success' as const,
       plan: new TypeScriptRenderableSqliteMigration(
         result.value.calls,
         { from: fromHash, to: options.contract.storage.storageHash },
         destination,
       ),
-    });
+    };
   }
 
   private ensureAdditivePolicy(policy: MigrationOperationPolicy): SqlPlannerFailureResult | null {
