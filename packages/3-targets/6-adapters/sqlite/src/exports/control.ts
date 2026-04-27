@@ -7,7 +7,6 @@ import {
   createSqliteScalarTypeDescriptors,
 } from '../core/control-mutation-defaults';
 import { sqliteAdapterDescriptorMeta } from '../core/descriptor-meta';
-import { escapeLiteral, quoteIdentifier, SqlEscapeError } from '../core/sql-utils';
 
 const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
   ...sqliteAdapterDescriptorMeta,
@@ -23,9 +22,16 @@ const sqliteAdapterDescriptor: SqlControlAdapterDescriptor<'sqlite'> = {
 
 export default sqliteAdapterDescriptor;
 
+// `parseSqliteDefault`, `normalizeSqliteNativeType`, `quoteIdentifier`,
+// `escapeLiteral`, and `SqlEscapeError` live target-side now (mirroring
+// Postgres's one-way adapter→target edge). Re-exported here to preserve the
+// public surface that the e2e harness, demos, and downstream consumers
+// already depend on.
+export { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
+export { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 export {
-  normalizeSqliteNativeType,
-  parseSqliteDefault,
-  SqliteControlAdapter,
-} from '../core/control-adapter';
-export { escapeLiteral, quoteIdentifier, SqlEscapeError };
+  escapeLiteral,
+  quoteIdentifier,
+  SqlEscapeError,
+} from '@prisma-next/target-sqlite/sql-utils';
+export { SqliteControlAdapter } from '../core/control-adapter';

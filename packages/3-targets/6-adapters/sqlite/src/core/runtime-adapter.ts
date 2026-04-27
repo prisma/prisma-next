@@ -5,8 +5,8 @@ import { generateId } from '@prisma-next/ids/runtime';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
+import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
 import { createSqliteAdapter } from './adapter';
-import { codecDefinitions } from './codecs';
 import { sqliteAdapterDescriptorMeta } from './descriptor-meta';
 
 export type SqliteRuntimeAdapterInstance = RuntimeAdapterInstance<'sql', 'sqlite'> &

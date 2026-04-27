@@ -1,4 +1,4 @@
-import type { CodecTypes } from '@prisma-next/adapter-sqlite/codec-types';
+import type { CodecTypes } from './codecs';
 
 const sqliteTargetDescriptorMetaBase = {
   kind: 'target',

@@ -1,4 +1,4 @@
-import type { ColumnDefault, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
@@ -17,6 +17,8 @@ import type {
   SqlTableIR,
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
+import { parseSqliteDefault } from '@prisma-next/target-sqlite/default-normalizer';
+import { normalizeSqliteNativeType } from '@prisma-next/target-sqlite/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './adapter';
 import type { SqliteContract } from './types';
@@ -270,59 +272,4 @@ function mapSqliteReferentialAction(rule: string): SqlReferentialAction | undefi
   }
   if (mapped === 'noAction') return undefined;
   return mapped;
-}
-
-const NULL_PATTERN = /^NULL$/i;
-const INTEGER_PATTERN = /^-?\d+$/;
-const REAL_PATTERN = /^-?\d+\.\d+(?:[eE][+-]?\d+)?$/;
-const HEX_PATTERN = /^-?0[xX][\dA-Fa-f]+$/;
-const STRING_LITERAL_PATTERN = /^'((?:[^']|'')*)'$/;
-
-function isNumericLiteral(value: string): boolean {
-  return INTEGER_PATTERN.test(value) || REAL_PATTERN.test(value) || HEX_PATTERN.test(value);
-}
-
-export function parseSqliteDefault(
-  rawDefault: string,
-  nativeType?: string,
-): ColumnDefault | undefined {
-  let trimmed = rawDefault.trim();
-
-  // Strip outer parentheses that SQLite adds around expressions
-  while (trimmed.startsWith('(') && trimmed.endsWith(')')) {
-    trimmed = trimmed.slice(1, -1).trim();
-  }
-
-  const lower = trimmed.toLowerCase();
-
-  // CURRENT_TIMESTAMP and datetime('now')/datetime("now") are the SQLite forms of now()
-  if (lower === 'current_timestamp' || lower === "datetime('now')" || lower === 'datetime("now")') {
-    return { kind: 'function', expression: 'now()' };
-  }
-
-  if (NULL_PATTERN.test(trimmed)) {
-    return { kind: 'literal', value: null };
-  }
-
-  // SQLite integer is always 64-bit — can exceed JS safe integer range.
-  // Use nativeType to pick strategy: integer → always string, real → always number.
-  if (isNumericLiteral(trimmed)) {
-    if (nativeType?.toLowerCase() === 'integer') {
-      return { kind: 'literal', value: trimmed };
-    }
-    return { kind: 'literal', value: Number(trimmed) };
-  }
-
-  const stringMatch = trimmed.match(STRING_LITERAL_PATTERN);
-  if (stringMatch?.[1] !== undefined) {
-    const unescaped = stringMatch[1].replace(/''/g, "'");
-    return { kind: 'literal', value: unescaped };
-  }
-
-  // Unrecognized expression — preserve as function
-  return { kind: 'function', expression: trimmed };
-}
-
-export function normalizeSqliteNativeType(nativeType: string): string {
-  return nativeType.trim().toLowerCase();
 }

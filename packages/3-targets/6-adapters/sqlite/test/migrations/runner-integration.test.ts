@@ -1,9 +1,13 @@
 import { DatabaseSync } from 'node:sqlite';
-import { SqliteControlAdapter } from '@prisma-next/adapter-sqlite/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageColumn, StorageTable } from '@prisma-next/sql-contract/types';
+// `createSqliteMigrationPlanner` is target-side; reach into the target source
+// directly rather than through a `target-sqlite` subpath export — this test is
+// integration-flavoured (full target↔adapter↔driver wiring) and lives here
+// because the adapter is the package that pulls everything together.
+import { createSqliteMigrationPlanner } from '@prisma-next/target-sqlite/planner';
 import { describe, expect, it } from 'vitest';
-import { createSqliteMigrationPlanner } from '../src/core/migrations/planner';
+import { SqliteControlAdapter } from '../../src/exports/control';
 
 function createMemoryDriver() {
   const db = new DatabaseSync(':memory:');

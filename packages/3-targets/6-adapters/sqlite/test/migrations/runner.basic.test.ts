@@ -1,6 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { SqlitePlanTargetDetails } from '../../src/core/migrations/planner-target-details';
 import {
   contract,
   createMigrationPlan,

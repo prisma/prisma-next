@@ -22,8 +22,11 @@ import type {
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
+import { toTableSpec } from './issue-planner';
 import { DataTransformCall, RecreateTableCall, type SqliteOpFactoryCall } from './op-factory-call';
+import type { SqliteIndexSpec } from './operations/shared';
 
 export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
@@ -112,15 +115,41 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
     const operationClass: MigrationOperationClass = entry.hasDestructive
       ? 'destructive'
       : 'widening';
+
+    // Flatten the contract table to a self-contained spec — the Call holds
+    // pre-rendered SQL fragments only, no `StorageColumn` or `storageTypes`.
+    const tableSpec = toTableSpec(contractTable, ctx.storageTypes);
+
+    const seenIndexColumnKeys = new Set<string>();
+    const indexes: SqliteIndexSpec[] = [];
+    for (const idx of contractTable.indexes) {
+      const key = idx.columns.join(',');
+      if (seenIndexColumnKeys.has(key)) continue;
+      seenIndexColumnKeys.add(key);
+      indexes.push({
+        name: idx.name ?? defaultIndexName(tableName, idx.columns),
+        columns: idx.columns,
+      });
+    }
+    for (const fk of contractTable.foreignKeys) {
+      if (fk.index === false) continue;
+      const key = fk.columns.join(',');
+      if (seenIndexColumnKeys.has(key)) continue;
+      seenIndexColumnKeys.add(key);
+      indexes.push({
+        name: defaultIndexName(tableName, fk.columns),
+        columns: fk.columns,
+      });
+    }
+
     calls.push(
       new RecreateTableCall({
         tableName,
-        contractTable,
-        schemaTable,
+        contractTable: tableSpec,
+        schemaColumnNames: Object.keys(schemaTable.columns),
+        indexes,
         issues: entry.issues,
         operationClass,
-        codecHooks: ctx.codecHooks as Map<string, CodecControlHooks>,
-        storageTypes: ctx.storageTypes as Record<string, StorageTypeInstance>,
       }),
     );
   }

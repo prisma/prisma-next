@@ -2,7 +2,6 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import sqliteAdapterDescriptor from '@prisma-next/adapter-sqlite/control';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import sqliteDriverDescriptor from '@prisma-next/driver-sqlite/control';
 import sqlFamilyDescriptor, {
@@ -12,9 +11,10 @@ import sqlFamilyDescriptor, {
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
-import type { SqlitePlanTargetDetails } from '../../../src/core/migrations/planner-target-details';
-import type { SqlStatement } from '../../../src/core/migrations/statement-builders';
-import sqliteTargetDescriptor from '../../../src/exports/control';
+import sqliteTargetDescriptor from '@prisma-next/target-sqlite/control';
+import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
+import type { SqlStatement } from '@prisma-next/target-sqlite/statement-builders';
+import sqliteAdapterDescriptor from '../../../src/exports/control';
 
 export const contract: Contract<SqlStorage> = {
   target: 'sqlite',
