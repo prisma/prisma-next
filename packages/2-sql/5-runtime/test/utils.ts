@@ -236,6 +236,13 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       targetTypes: ['timestamptz'],
       encode: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
       decode: (wire: string | Date) => (wire instanceof Date ? wire : new Date(wire)),
+      // string | Date includes Date which is not assignable to JsonValue, so
+      // the JSON round-trip pair must be supplied explicitly.
+      encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+      decodeJson: (json) => {
+        if (typeof json !== 'string') throw new Error('expected ISO date string');
+        return new Date(json);
+      },
     }),
   );
 

@@ -391,4 +391,42 @@ describe('collection-dispatch', () => {
 
     expect(parentRows[0]?.mapped['author']).toBeNull();
   });
+
+  // ---------------------------------------------------------------------------
+  // Single-query include child-row codec decoding — DEFERRED follow-up.
+  //
+  // The three `it.skip` blocks below are placeholders for the case where the
+  // single-query include strategy (lateral / correlated jsonb_agg payload)
+  // routes embedded child rows through the codec registry and surfaces
+  // decoded values (or wrapped failures) on each child cell. The titles
+  // describe what each case would assert under the single-path always-await
+  // runtime; the bodies are stubbed and not carried over verbatim from any
+  // historical implementation.
+  //
+  // The deferral is structural: the current `dispatchCollectionRows`
+  // single-query path (packages/3-extensions/sql-orm-client/src/
+  // collection-dispatch.ts) only JSON.parses the include payload and
+  // applies field-name mapping; it does not invoke codec query-time methods
+  // on child cells (`rg 'codec\.(encode|decode)' packages/3-extensions/
+  // sql-orm-client/src` returns zero matches). Adding child-row codec
+  // decoding to the single-query include path is a separate piece of ORM
+  // work, orthogonal to the codec async-shape decision tracked in ADR 204.
+  // ---------------------------------------------------------------------------
+  it.skip('dispatchCollectionRows() single-query include decodes async child fields and validates decoded values', async () => {
+    // Activates when child-row codec decoding is added to the single-query
+    // include path; assertions will express the single-path always-await
+    // contract (plain decoded values, no Promises).
+  });
+
+  it.skip('dispatchCollectionRows() single-query include preserves JSON schema validation failures for async child decodes', async () => {
+    // Activates with the orm-include-aggregate-codec-dispatch follow-up;
+    // will assert that JSON schema validation failures on async child cells
+    // are reported via the runtime envelope (RUNTIME.VALIDATION_FAILED).
+  });
+
+  it.skip('dispatchCollectionRows() single-query include wraps async child decode failures with codec context', async () => {
+    // Activates with the orm-include-aggregate-codec-dispatch follow-up;
+    // will assert that decode rejections on child cells are wrapped with
+    // codec id + lane context (RUNTIME.DECODE_FAILED).
+  });
 });

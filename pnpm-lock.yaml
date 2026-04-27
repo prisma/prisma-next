@@ -1063,6 +1063,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../../1-framework/1-core/framework-components
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../../1-framework/0-foundation/utils
     devDependencies:
       '@prisma-next/test-utils':
         specifier: workspace:*
@@ -3152,6 +3155,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/migration
+      '@prisma-next/mongo-codec':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-codec
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/1-foundation/mongo-contract
@@ -3173,6 +3179,9 @@ importers:
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/7-runtime
+      '@prisma-next/mongo-value':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/1-foundation/mongo-value
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/operations

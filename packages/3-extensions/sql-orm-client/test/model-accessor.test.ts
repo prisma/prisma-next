@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -394,8 +395,8 @@ describe('createModelAccessor', () => {
             typeId: id,
             targetTypes: [],
             traits,
-            encode: (v: unknown) => v,
-            decode: (v: unknown) => v,
+            encode: (v: JsonValue) => v,
+            decode: (v: JsonValue) => v,
           }),
         );
       }
@@ -544,8 +545,8 @@ describe('createModelAccessor', () => {
             typeId: id,
             targetTypes: [],
             traits,
-            encode: (v: unknown) => v,
-            decode: (v: unknown) => v,
+            encode: (v: JsonValue) => v,
+            decode: (v: JsonValue) => v,
           }),
         );
       }

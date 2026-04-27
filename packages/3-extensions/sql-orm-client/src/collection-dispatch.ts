@@ -1,3 +1,19 @@
+/**
+ * Collection row dispatch.
+ *
+ * Per-row decoding is performed upstream in `sql-runtime`'s row-yielding async
+ * generator (it `await`s `decodeRow` once per row before yielding). This file
+ * never calls codec query-time methods directly; it consumes plain decoded
+ * cells through `executeQueryPlan` → `scope.execute(plan)` →
+ * `AsyncIterableResult<Row>`. Every `for await` / `.toArray()` consumer below
+ * therefore sees plain `T` values, not `Promise<T>`.
+ *
+ * See `packages/2-sql/5-runtime/src/codecs/decoding.ts` for the decode-once-
+ * per-row contract; this file is the consumer side of that contract. See also
+ * ADR 030 (codecs registry & decode boundary) and the m3 coverage in
+ * `test/integration/codec-async.test.ts` and `test/codec-async.types.test-d.ts`.
+ */
+
 import type { Contract } from '@prisma-next/contract/types';
 import { AsyncIterableResult } from '@prisma-next/runtime-executor';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';

@@ -658,4 +658,25 @@ describe('validateMongoContract()', () => {
       expect(result.contract.roots).toEqual({ items: 'Item' });
     });
   });
+
+  // Regression: validateMongoContract must remain synchronous (it consumes
+  // only build-time codec methods). If the signature ever drifts to Promise,
+  // the type-level assertion below fails and `await` becomes required at
+  // every call site.
+  describe('synchronous return (regression)', () => {
+    it('returns a non-Promise value at runtime', () => {
+      const result = validateMongoContract(makeValidContractJson());
+      expect(result).toBeDefined();
+      const thenable = result as unknown as { then?: unknown };
+      expect(typeof thenable.then).toBe('undefined');
+    });
+
+    it('binds to a synchronous type at the call site', () => {
+      // Type-level regression: this must compile without `await`. If
+      // validateMongoContract becomes Promise-returning, this assignment
+      // fails to compile.
+      const result = validateMongoContract(makeValidContractJson());
+      expect(result.contract).toBeDefined();
+    });
+  });
 });

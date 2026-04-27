@@ -5,6 +5,7 @@ import {
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
+  ParamRef,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -199,6 +200,135 @@ describe('runBeforeCompileChain', () => {
 
       expect(result).toBe(draft);
       expect(ctx.log.debug).not.toHaveBeenCalled();
+    },
+    timeouts.default,
+  );
+
+  it(
+    're-derives paramDescriptors from the rewritten ast when params are introduced',
+    async () => {
+      const draft = createDraft();
+      const ctx = createContext();
+      const idEqOne = BinaryExpr.eq(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(1, { name: 'mw_user_id', codecId: 'pg/int4@1' }),
+      );
+      const mw: SqlMiddleware = {
+        name: 'onlyAlice',
+        familyId: 'sql',
+        async beforeCompile(d) {
+          if (d.ast.kind !== 'select') return;
+          return { ...d, ast: d.ast.withWhere(idEqOne) };
+        },
+      };
+
+      const result = await runBeforeCompileChain([mw], draft, ctx);
+
+      expect(result.meta.paramDescriptors).toEqual([
+        { index: 1, name: 'mw_user_id', source: 'dsl', codecId: 'pg/int4@1' },
+      ]);
+    },
+    timeouts.default,
+  );
+
+  it(
+    're-derives paramDescriptors across chained rewrites that each add a param',
+    async () => {
+      const draft = createDraft();
+      const ctx = createContext();
+      const gte2 = BinaryExpr.gte(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(2, { name: 'mw_gte', codecId: 'pg/int4@1' }),
+      );
+      const lte3 = BinaryExpr.lte(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(3, { name: 'mw_lte', codecId: 'pg/int4@1' }),
+      );
+      const lower: SqlMiddleware = {
+        name: 'lower',
+        familyId: 'sql',
+        async beforeCompile(d) {
+          if (d.ast.kind !== 'select') return;
+          return { ...d, ast: d.ast.withWhere(gte2) };
+        },
+      };
+      const upper: SqlMiddleware = {
+        name: 'upper',
+        familyId: 'sql',
+        async beforeCompile(d) {
+          if (d.ast.kind !== 'select') return;
+          const cur = (d.ast as SelectAst).where;
+          const combined = cur ? AndExpr.of([cur, lte3]) : lte3;
+          return { ...d, ast: d.ast.withWhere(combined) };
+        },
+      };
+
+      const result = await runBeforeCompileChain([lower, upper], draft, ctx);
+
+      expect(result.meta.paramDescriptors).toEqual([
+        { index: 1, name: 'mw_gte', source: 'dsl', codecId: 'pg/int4@1' },
+        { index: 2, name: 'mw_lte', source: 'dsl', codecId: 'pg/int4@1' },
+      ]);
+    },
+    timeouts.default,
+  );
+
+  it(
+    'preserves paramDescriptors when no middleware rewrites the ast',
+    async () => {
+      const draft = createDraft();
+      const ctx = createContext();
+      const noop: SqlMiddleware = {
+        name: 'noop',
+        familyId: 'sql',
+        async beforeCompile() {
+          return undefined;
+        },
+      };
+
+      const result = await runBeforeCompileChain([noop], draft, ctx);
+
+      expect(result.meta).toBe(draft.meta);
+    },
+    timeouts.default,
+  );
+
+  it(
+    'preserves other meta fields (lane, target, projectionTypes) when re-deriving descriptors',
+    async () => {
+      const baseDraft = createDraft();
+      const draft: DraftPlan = {
+        ast: baseDraft.ast,
+        meta: {
+          target: 'postgres',
+          storageHash: 'sha256:test',
+          lane: 'orm-client',
+          paramDescriptors: [],
+          projectionTypes: { id: 'pg/int4@1' },
+        },
+      };
+      const ctx = createContext();
+      const pred = BinaryExpr.eq(
+        ColumnRef.of('users', 'id'),
+        ParamRef.of(7, { codecId: 'pg/int4@1' }),
+      );
+      const mw: SqlMiddleware = {
+        name: 'add-where',
+        familyId: 'sql',
+        async beforeCompile(d) {
+          if (d.ast.kind !== 'select') return;
+          return { ...d, ast: d.ast.withWhere(pred) };
+        },
+      };
+
+      const result = await runBeforeCompileChain([mw], draft, ctx);
+
+      expect(result.meta.lane).toBe('orm-client');
+      expect(result.meta.target).toBe('postgres');
+      expect(result.meta.projectionTypes).toEqual({ id: 'pg/int4@1' });
+      expect(result.meta.paramDescriptors).toEqual([
+        { index: 1, source: 'dsl', codecId: 'pg/int4@1' },
+      ]);
     },
     timeouts.default,
   );

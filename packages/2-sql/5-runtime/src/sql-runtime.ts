@@ -191,7 +191,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     );
 
     const planToLower: SqlQueryPlan<Row> =
-      rewrittenDraft.ast === plan.ast ? plan : { ...plan, ast: rewrittenDraft.ast };
+      rewrittenDraft.ast === plan.ast
+        ? plan
+        : { ...plan, ast: rewrittenDraft.ast, meta: rewrittenDraft.meta };
 
     return lowerSqlPlan(this.adapter, this.contract, planToLower);
   }
@@ -206,7 +208,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
       const executablePlan = await self.toExecutionPlan(plan);
-      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
+      const encodedParams = await encodeParams(executablePlan, self.codecRegistry);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
@@ -215,7 +217,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       const coreIterator = queryable.execute(planWithEncodedParams);
 
       for await (const rawRow of coreIterator) {
-        const decodedRow = decodeRow(
+        const decodedRow = await decodeRow(
           rawRow as Record<string, unknown>,
           executablePlan,
           self.codecRegistry,

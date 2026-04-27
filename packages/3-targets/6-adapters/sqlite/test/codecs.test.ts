@@ -19,12 +19,12 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_TEXT_CODEC_ID);
     });
 
-    it('round-trips strings', () => {
-      expect(codec.decode(codec.encode!('hello'))).toBe('hello');
+    it('round-trips strings', async () => {
+      expect(await codec.decode(await codec.encode!('hello'))).toBe('hello');
     });
 
-    it('handles empty string', () => {
-      expect(codec.decode(codec.encode!(''))).toBe('');
+    it('handles empty string', async () => {
+      expect(await codec.decode(await codec.encode!(''))).toBe('');
     });
   });
 
@@ -35,10 +35,10 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_INTEGER_CODEC_ID);
     });
 
-    it('round-trips numbers', () => {
-      expect(codec.decode(codec.encode!(42))).toBe(42);
-      expect(codec.decode(codec.encode!(0))).toBe(0);
-      expect(codec.decode(codec.encode!(-1))).toBe(-1);
+    it('round-trips numbers', async () => {
+      expect(await codec.decode(await codec.encode!(42))).toBe(42);
+      expect(await codec.decode(await codec.encode!(0))).toBe(0);
+      expect(await codec.decode(await codec.encode!(-1))).toBe(-1);
     });
   });
 
@@ -49,9 +49,9 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_REAL_CODEC_ID);
     });
 
-    it('round-trips floats', () => {
-      expect(codec.decode(codec.encode!(3.14))).toBeCloseTo(3.14);
-      expect(codec.decode(codec.encode!(0.0))).toBe(0);
+    it('round-trips floats', async () => {
+      expect(await codec.decode(await codec.encode!(3.14))).toBeCloseTo(3.14);
+      expect(await codec.decode(await codec.encode!(0.0))).toBe(0);
     });
   });
 
@@ -62,14 +62,14 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_BLOB_CODEC_ID);
     });
 
-    it('round-trips Uint8Array', () => {
+    it('round-trips Uint8Array', async () => {
       const input = new Uint8Array([1, 2, 3, 4]);
-      expect(codec.decode(codec.encode!(input))).toEqual(input);
+      expect(await codec.decode(await codec.encode!(input))).toEqual(input);
     });
 
-    it('handles empty Uint8Array', () => {
+    it('handles empty Uint8Array', async () => {
       const input = new Uint8Array([]);
-      expect(codec.decode(codec.encode!(input))).toEqual(input);
+      expect(await codec.decode(await codec.encode!(input))).toEqual(input);
     });
   });
 
@@ -80,24 +80,24 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_BOOLEAN_CODEC_ID);
     });
 
-    it('encodes true as 1', () => {
-      expect(codec.encode!(true)).toBe(1);
+    it('encodes true as 1', async () => {
+      expect(await codec.encode!(true)).toBe(1);
     });
 
-    it('encodes false as 0', () => {
-      expect(codec.encode!(false)).toBe(0);
+    it('encodes false as 0', async () => {
+      expect(await codec.encode!(false)).toBe(0);
     });
 
-    it('decodes 1 as true', () => {
-      expect(codec.decode(1)).toBe(true);
+    it('decodes 1 as true', async () => {
+      expect(await codec.decode(1)).toBe(true);
     });
 
-    it('decodes 0 as false', () => {
-      expect(codec.decode(0)).toBe(false);
+    it('decodes 0 as false', async () => {
+      expect(await codec.decode(0)).toBe(false);
     });
 
-    it('decodes nonzero as true', () => {
-      expect(codec.decode(42)).toBe(true);
+    it('decodes nonzero as true', async () => {
+      expect(await codec.decode(42)).toBe(true);
     });
   });
 
@@ -108,26 +108,26 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_DATETIME_CODEC_ID);
     });
 
-    it('encodes Date to ISO8601 string', () => {
+    it('encodes Date to ISO8601 string', async () => {
       const date = new Date('2024-01-15T10:30:00.000Z');
-      expect(codec.encode!(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await codec.encode!(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes ISO8601 string to Date', () => {
-      const result = codec.decode('2024-01-15T10:30:00.000Z');
+    it('decodes ISO8601 string to Date', async () => {
+      const result = await codec.decode('2024-01-15T10:30:00.000Z');
       expect(result).toBeInstanceOf(Date);
       expect(result.toISOString()).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('round-trips dates', () => {
+    it('round-trips dates', async () => {
       const date = new Date('2024-06-15T23:59:59.999Z');
-      const wire = codec.encode!(date);
-      const decoded = codec.decode(wire);
+      const wire = await codec.encode!(date);
+      const decoded = await codec.decode(wire);
       expect(decoded.getTime()).toBe(date.getTime());
     });
 
-    it('handles date without timezone (treated as UTC by Date constructor)', () => {
-      const result = codec.decode('2024-01-15T10:30:00');
+    it('handles date without timezone (treated as UTC by Date constructor)', async () => {
+      const result = await codec.decode('2024-01-15T10:30:00');
       expect(result).toBeInstanceOf(Date);
     });
   });
@@ -139,33 +139,33 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_JSON_CODEC_ID);
     });
 
-    it('encodes object to JSON string', () => {
+    it('encodes object to JSON string', async () => {
       const value = { name: 'alice', age: 30 };
-      expect(codec.encode!(value)).toBe('{"name":"alice","age":30}');
+      expect(await codec.encode!(value)).toBe('{"name":"alice","age":30}');
     });
 
-    it('decodes JSON string to object', () => {
-      expect(codec.decode('{"name":"alice"}')).toEqual({ name: 'alice' });
+    it('decodes JSON string to object', async () => {
+      expect(await codec.decode('{"name":"alice"}')).toEqual({ name: 'alice' });
     });
 
-    it('round-trips nested objects', () => {
+    it('round-trips nested objects', async () => {
       const value = { a: { b: { c: [1, 2, 3] } } };
-      expect(codec.decode(codec.encode!(value))).toEqual(value);
+      expect(await codec.decode(await codec.encode!(value))).toEqual(value);
     });
 
-    it('round-trips arrays', () => {
+    it('round-trips arrays', async () => {
       const value = [1, 'two', true, null];
-      expect(codec.decode(codec.encode!(value))).toEqual(value);
+      expect(await codec.decode(await codec.encode!(value))).toEqual(value);
     });
 
-    it('round-trips null', () => {
-      expect(codec.decode(codec.encode!(null))).toBeNull();
+    it('round-trips null', async () => {
+      expect(await codec.decode(await codec.encode!(null))).toBeNull();
     });
 
-    it('handles already-parsed objects from wire', () => {
+    it('handles already-parsed objects from wire', async () => {
       const parsed = { key: 'value' };
       // SQLite may return already-parsed JSON objects from the wire
-      expect(codec.decode(parsed as unknown as string)).toEqual(parsed);
+      expect(await codec.decode(parsed as unknown as string)).toEqual(parsed);
     });
   });
 
@@ -176,21 +176,21 @@ describe('SQLite codecs', () => {
       expect(codec.id).toBe(SQLITE_BIGINT_CODEC_ID);
     });
 
-    it('encodes bigint', () => {
-      expect(codec.encode!(42n)).toBe(42n);
+    it('encodes bigint', async () => {
+      expect(await codec.encode!(42n)).toBe(42n);
     });
 
-    it('decodes number to bigint', () => {
-      expect(codec.decode(42)).toBe(42n);
+    it('decodes number to bigint', async () => {
+      expect(await codec.decode(42)).toBe(42n);
     });
 
-    it('decodes bigint to bigint', () => {
-      expect(codec.decode(42n)).toBe(42n);
+    it('decodes bigint to bigint', async () => {
+      expect(await codec.decode(42n)).toBe(42n);
     });
 
-    it('handles large integers', () => {
+    it('handles large integers', async () => {
       const large = 9007199254740993n;
-      expect(codec.decode(codec.encode!(large))).toBe(large);
+      expect(await codec.decode(await codec.encode!(large))).toBe(large);
     });
   });
 

@@ -8,6 +8,7 @@ import {
 } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
+  Codec,
   CodecRegistry,
   SqlDriver,
   SqlExecuteRequest,
@@ -22,6 +23,7 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import type { SqlMiddleware } from '../src/middleware/sql-middleware';
 import type {
@@ -31,6 +33,9 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
+import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
+
+const runtimeSecretSeed = 'sql-runtime-secret';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -57,7 +62,7 @@ interface DriverMockSpies {
 
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
-function createStubCodecs(): CodecRegistry {
+function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
   const registry = createCodecRegistry();
   registry.register(
     codec({
@@ -67,11 +72,14 @@ function createStubCodecs(): CodecRegistry {
       decode: (w: number) => w,
     }),
   );
+  for (const extraCodec of extraCodecs) {
+    registry.register(extraCodec);
+  }
   return registry;
 }
 
-function createStubAdapter() {
-  const codecs = createStubCodecs();
+function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
+  const codecs = createStubCodecs(extraCodecs);
   return {
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
@@ -187,8 +195,8 @@ function createTestAdapterDescriptor(
   };
 }
 
-function createTestSetup() {
-  const adapter = createStubAdapter();
+function createTestSetup(options?: { extraCodecs?: readonly Codec<string>[] }) {
+  const adapter = createStubAdapter(options?.extraCodecs ?? []);
   const driver = createMockDriver();
 
   const targetDescriptor = createTestTargetDescriptor();
@@ -216,16 +224,21 @@ function createTestSetup() {
   return { stackInstance, context, driver };
 }
 
-function createRawExecutionPlan<Row = Record<string, unknown>>(): ExecutionPlan<Row> {
+function createRawExecutionPlan<Row = Record<string, unknown>>(
+  overrides?: Partial<ExecutionPlan<Row>>,
+): ExecutionPlan<Row> {
+  const metaOverrides = overrides?.meta;
   return {
     sql: 'select 1',
     params: [],
+    ...overrides,
     meta: {
       target: testContract.target,
       targetFamily: testContract.targetFamily,
       storageHash: testContract.storage.storageHash,
       lane: 'raw',
       paramDescriptors: [],
+      ...metaOverrides,
     },
   };
 }
@@ -549,6 +562,100 @@ describe('createRuntime', () => {
 
     expect(beforeCompile).not.toHaveBeenCalled();
     expect(debug).not.toHaveBeenCalled();
+  });
+
+  it(
+    'awaits async parameter encoding before driver execution',
+    { timeout: timeouts.databaseOperation },
+    async () => {
+      const asyncSecretCodec = createAsyncSecretCodec({
+        typeId: 'test/async-secret@1',
+        seed: runtimeSecretSeed,
+      });
+      const { stackInstance, context, driver } = createTestSetup({
+        extraCodecs: [asyncSecretCodec],
+      });
+      const runtime = createRuntime({
+        stackInstance,
+        context,
+        driver,
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      });
+
+      const plan = createRawExecutionPlan({
+        params: ['Alice'],
+        meta: {
+          target: testContract.target,
+          targetFamily: testContract.targetFamily,
+          storageHash: testContract.storage.storageHash,
+          lane: 'raw',
+          paramDescriptors: [
+            {
+              name: 'secret',
+              codecId: 'test/async-secret@1',
+              source: 'dsl' as const,
+            },
+          ],
+        },
+      });
+
+      await runtime.execute(plan).toArray();
+
+      expect(driver.__spies.rootExecute).toHaveBeenCalledOnce();
+      const sentRequest = driver.__spies.rootExecute.mock.calls[0]?.[0] as
+        | { params?: readonly unknown[] }
+        | undefined;
+      const sentSecret = sentRequest?.params?.[0];
+      expect(typeof sentSecret).toBe('string');
+      expect(sentSecret).not.toBe('Alice');
+      await expect(decryptSecret(sentSecret as string, runtimeSecretSeed)).resolves.toBe('Alice');
+    },
+  );
+
+  it('wraps async parameter encoding failures before the driver runs', async () => {
+    const failingCodec = codec({
+      typeId: 'test/failing-secret@1',
+      targetTypes: ['text'],
+      encode: async (_value: string) => {
+        throw new Error('encrypt failed');
+      },
+      decode: (wire: string) => wire,
+    });
+    const { stackInstance, context, driver } = createTestSetup({
+      extraCodecs: [failingCodec],
+    });
+    const runtime = createRuntime({
+      stackInstance,
+      context,
+      driver,
+      verify: { mode: 'onFirstUse', requireMarker: false },
+    });
+
+    const plan = createRawExecutionPlan({
+      params: ['Alice'],
+      meta: {
+        target: testContract.target,
+        targetFamily: testContract.targetFamily,
+        storageHash: testContract.storage.storageHash,
+        lane: 'raw',
+        paramDescriptors: [
+          {
+            name: 'secret',
+            codecId: 'test/failing-secret@1',
+            source: 'dsl' as const,
+          },
+        ],
+      },
+    });
+
+    await expect(runtime.execute(plan).toArray()).rejects.toMatchObject({
+      code: 'RUNTIME.ENCODE_FAILED',
+      details: expect.objectContaining({
+        label: 'secret',
+        codec: 'test/failing-secret@1',
+      }),
+    });
+    expect(driver.__spies.rootExecute).not.toHaveBeenCalled();
   });
 });
 

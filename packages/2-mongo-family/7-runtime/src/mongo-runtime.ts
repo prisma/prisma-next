@@ -71,7 +71,7 @@ class MongoRuntimeImpl implements MongoRuntime {
           }
         }
 
-        const wireCommand = adapter.lower(plan);
+        const wireCommand = await adapter.lower(plan);
 
         for await (const row of driver.execute<Row>(wireCommand)) {
           for (const mw of middleware) {

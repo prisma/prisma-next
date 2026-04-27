@@ -1,6 +1,7 @@
 import { createContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
@@ -63,7 +64,7 @@ vi.mock('pg', () => {
 });
 
 import { Client, Pool } from 'pg';
-import postgres from '../src/runtime/postgres';
+import postgres, { type PostgresClient } from '../src/runtime/postgres';
 
 const contract = createContract<SqlStorage>();
 
@@ -107,6 +108,36 @@ describe('postgres', () => {
         return fn(mockTxCtx);
       },
     );
+  });
+
+  // Regression: postgres({...}) must remain synchronous (it only consumes
+  // build-time codec methods via validateContract / type maps). If construction
+  // becomes Promise-returning, this assignment loses its synchronous type and
+  // every call site needs `await postgres(...)`.
+  it('returns a synchronous client (sync regression)', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const thenable = db as unknown as { then?: unknown };
+    expect(typeof thenable.then).toBe('undefined');
+    expect(db.sql).toBeDefined();
+  });
+
+  it('binds to a synchronous PostgresClient at the call site', () => {
+    // Symmetric to the Mongo-side createMongoAdapter regression: assert the
+    // return type of postgres({...}) directly so a future drift to
+    // Promise-shaped construction fails the test-file typecheck rather than
+    // surfacing only when call sites silently lose `.sql` / `.orm`.
+    type CallShape = (options: {
+      contract: Contract<SqlStorage>;
+      url: string;
+    }) => PostgresClient<Contract<SqlStorage>>;
+    expectTypeOf<ReturnType<CallShape>>().toEqualTypeOf<PostgresClient<Contract<SqlStorage>>>();
+    expectTypeOf<ReturnType<CallShape>>().not.toEqualTypeOf<
+      Promise<PostgresClient<Contract<SqlStorage>>>
+    >();
   });
 
   it('sql is constructed eagerly without runtime; runtime and pool are deferred until runtime() is accessed', () => {

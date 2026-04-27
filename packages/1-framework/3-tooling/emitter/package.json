@@ -5,8 +5,7 @@
   "sideEffects": false,
   "files": [
     "dist",
-    "src",
-    "test"
+    "src"
   ],
   "scripts": {
     "build": "tsdown",

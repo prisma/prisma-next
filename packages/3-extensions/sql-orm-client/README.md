@@ -49,8 +49,28 @@ const posts = await db.Post
   .all();
 ```
 
+## Codec Roundtrip
+
+The runtime always awaits codec query-time methods, but rows yielded to user code carry **plain field values** — no `Promise`-typed fields ever reach `.first()` / `.all()` / streaming consumers, regardless of whether a column's codec is sync or async. This is true for both one-shot and streaming usage:
+
+```ts
+// Even if `secretCodec.decode` is async, `posts[0].secret` is a plain string here.
+const posts = await db.Post.where((p) => p.userId.eq(userId)).all();
+posts[0].secret.length;
+
+// Same for streaming via AsyncIterableResult.
+for await (const post of db.Post.where(...).stream()) {
+  post.secret.length;
+}
+```
+
+Read and write surfaces share **one** field type-map. `MutationUpdateInput`, `CreateInput`, `UniqueConstraintCriterion`, `ShorthandWhereFilter`, and `DefaultModelInputRow` accept plain `T` regardless of how the corresponding codec was authored.
+
+See [ADR 204 — Single-Path Async Codec Runtime](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
+
 ## Related Docs
 
 - [Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [ADR 164 - Repository Layer](../../../docs/architecture%20docs/adrs/ADR%20164%20-%20Repository%20Layer.md)
+- [ADR 204 - Single-Path Async Codec Runtime](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md)
 - [Query Lanes Subsystem](../../../docs/architecture%20docs/subsystems/3.%20Query%20Lanes.md)
