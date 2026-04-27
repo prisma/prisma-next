@@ -94,6 +94,14 @@ export function resolveMongoBinding(options: MongoBindingInput): MongoBinding {
 
   if (options.url !== undefined) {
     const parsed = validateMongoUrl(options.url);
+    // An explicit, whitespace-only `dbName` is a user-error we'd rather
+    // surface loudly: silently falling back to the URL path would mask
+    // a typo or empty-template-string bug. Treat it the same as the
+    // `{ uri, dbName }` and `{ mongoClient, dbName }` paths, where an
+    // empty trimmed dbName is already a fast failure.
+    if (options.dbName !== undefined && options.dbName.trim().length === 0) {
+      throw new Error('Mongo binding via { url, dbName } requires a non-empty dbName');
+    }
     const explicitDbName = options.dbName?.trim();
     const dbName =
       explicitDbName !== undefined && explicitDbName.length > 0
@@ -164,5 +172,10 @@ export function resolveOptionalMongoBinding(options: MongoBindingFields): MongoB
       dbName: options.dbName ?? '',
     });
   }
-  return undefined;
+  // Unreachable: the `providedCount === 1` guard above plus the four
+  // branch checks cover every shape of `MongoBindingFields`. A bare
+  // `return undefined` here would silently mask a future
+  // `MongoBindingFields` extension that adds a fifth input, so we
+  // surface it as an invariant rather than a missing binding.
+  throw new Error('Invariant violation: expected one mongo binding branch');
 }
