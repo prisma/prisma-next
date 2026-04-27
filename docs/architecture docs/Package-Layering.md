@@ -529,5 +529,4 @@ The numbered prefixes ensure:
 ## References
 
 - [ADR 140 - Package Layering & Target-Family Namespacing](../adrs/ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md)
-- [Brief 12 - Package Layering](../../briefs/12-Package-Layering.md)
 - [ADR 005 - Thin Core, Fat Targets](../adrs/ADR%20005%20-%20Thin%20Core,%20Fat%20Targets.md)

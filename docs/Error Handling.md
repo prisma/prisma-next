@@ -143,6 +143,7 @@ Guardrails (budgets/lints) may block execution by throwing a structured runtime 
 See:
 - `packages/1-framework/1-core/framework-components/src/runtime-core.ts`
 - `packages/2-sql/5-runtime/src/middleware/budgets.ts`
+- `packages/2-sql/5-runtime/src/middleware/lints.ts`
 
 ## Guidelines
 

@@ -6,9 +6,10 @@ import type { AnyQueryAst } from './ast/types';
 /**
  * SQL query plan produced by lanes before lowering.
  *
- * Lanes build ASTs and metadata but do not perform SQL lowering.
- * The `sql` field is absent — lowering happens in the runtime executor and
- * produces a `SqlExecutionPlan`.
+ * Lanes build ASTs and metadata but do not perform SQL lowering. The `sql`
+ * field is absent — `RuntimeCore` (the runtime base class in
+ * `@prisma-next/framework-components/runtime`) drives lowering via the
+ * SQL adapter and produces a `SqlExecutionPlan`.
  *
  * Extends the framework-level `QueryPlan<Row>` marker (`meta + _row`) and
  * adds SQL-specific fields (`ast`, `params`). The `_Row` phantom property
