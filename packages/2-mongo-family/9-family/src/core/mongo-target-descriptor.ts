@@ -48,10 +48,13 @@ export const mongoTargetDescriptor: MigratableTargetDescriptor<
           );
           const { driver: _, ...runnerOptions } = options;
           // The framework `MigrationRunner` interface types `destinationContract`
-          // as `unknown`; the Mongo runner narrows to `MongoContract`. The CLI
-          // and the family-level facade only ever pass a validated MongoContract
-          // here, so the cast preserves the framework signature without
-          // weakening the runner's typed surface.
+          // as `unknown`; the Mongo runner narrows to `MongoContract`. Validation
+          // happens upstream — `migration apply` calls
+          // `familyInstance.validateContract(migration.toContract)` before
+          // routing the contract here (see
+          // `packages/1-framework/3-tooling/cli/src/control-api/operations/migration-apply.ts`),
+          // so this cast simply preserves the framework signature without
+          // weakening the runner's typed surface or duplicating validation.
           return new MongoMigrationRunner(cachedDeps).execute({
             ...runnerOptions,
             destinationContract: runnerOptions.destinationContract as MongoContract,
