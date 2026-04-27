@@ -238,11 +238,27 @@ function projectTextIndexKeys(liveIndex: MongoSchemaIndex): ReadonlyArray<{
     direction: 'text' as const,
   }));
 
-  // Carry through any non-`_fts/_ftsx` keys that come before/after the
-  // weighted block (compound text indexes can mix scalar prefixes/suffixes
-  // with text fields). The internal `_fts` / `_ftsx` pair is replaced.
-  const scalarKeys = liveIndex.keys.filter((k) => k.field !== '_fts' && k.field !== '_ftsx');
-  return [...scalarKeys, ...textKeys];
+  // Splice the projected text fields into the original `_fts/_ftsx` slot so
+  // compound text indexes that mix scalar prefixes *and* suffixes — e.g.
+  // `[prefix, _fts, _ftsx, suffix]` — keep their original layout. Flattening
+  // scalars first would yield `[prefix, suffix, ...text]`, which `sortTextKeys`
+  // (downstream) cannot recover because it only reorders text-direction
+  // entries within their existing positions.
+  type IndexKey = (typeof liveIndex.keys)[number];
+  const projectedKeys: IndexKey[] = [];
+  let insertedTextBlock = false;
+  for (const key of liveIndex.keys) {
+    if (key.field === '_fts') {
+      if (!insertedTextBlock) {
+        projectedKeys.push(...textKeys);
+        insertedTextBlock = true;
+      }
+      continue;
+    }
+    if (key.field === '_ftsx') continue;
+    projectedKeys.push(key);
+  }
+  return projectedKeys;
 }
 
 function canonicalizeLiveOptions(

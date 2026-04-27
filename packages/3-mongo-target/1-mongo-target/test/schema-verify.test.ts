@@ -959,6 +959,56 @@ describe('verifyMongoSchema', () => {
       expect(result.ok).toBe(true);
     });
 
+    it('keeps both scalar prefix and suffix of a compound text index in place', () => {
+      // Compound text indexes can interleave scalars on both sides of the
+      // text block, e.g. `[category, _fts, _ftsx, priority]` from MongoDB's
+      // introspected layout. Splice projected text keys back into the
+      // original `_fts/_ftsx` slot so the contract-authored shape
+      // `[category, ...textFields, priority]` round-trips. Flattening
+      // scalars first would yield `[category, priority, ...textFields]`,
+      // which `sortTextKeys` cannot recover.
+      const contract = buildContract({
+        articles: {
+          indexes: [
+            {
+              keys: [
+                { field: 'category', direction: 1 },
+                { field: 'title', direction: 'text' },
+                { field: 'body', direction: 'text' },
+                { field: 'priority', direction: -1 },
+              ],
+              weights: { title: 5, body: 1 },
+            },
+          ],
+        },
+      });
+      const liveSchema = ir([
+        coll('articles', {
+          indexes: [
+            new MongoSchemaIndex({
+              keys: [
+                { field: 'category', direction: 1 },
+                { field: '_fts', direction: 'text' },
+                { field: '_ftsx', direction: 1 },
+                { field: 'priority', direction: -1 },
+              ],
+              weights: { title: 5, body: 1 },
+            }),
+          ],
+        }),
+      ]);
+
+      const result = verifyMongoSchema({
+        contract,
+        schema: liveSchema,
+        strict: true,
+        frameworkComponents: [],
+      });
+
+      expect(result.schema.issues).toEqual([]);
+      expect(result.ok).toBe(true);
+    });
+
     it('drops contract-named collation fields that the live counterpart does not provide', () => {
       // `stripUnspecifiedFields` iterates over the *expected* keys and only
       // copies the value through when the live block also has that key.
