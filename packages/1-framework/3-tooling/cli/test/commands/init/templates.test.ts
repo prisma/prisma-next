@@ -232,7 +232,7 @@ describe('templates', () => {
     // version on the user-facing quick reference, so a freshly-init'd
     // project does not silently lie about which servers it supports.
     describe('Requirements section (FR8.2)', () => {
-      it('postgres: documents the minimum PostgreSQL version', () => {
+      it('postgres: documents the minimum PostgreSQL version and only the postgres verify command', () => {
         const md = quickReferenceMd(
           'postgres',
           'psl',
@@ -243,14 +243,20 @@ describe('templates', () => {
         expect(md).toMatch(/## Requirements/);
         expect(md).toMatch(/PostgreSQL \d+ or newer/);
         expect(md).toContain('SELECT version()');
+        // Postgres scaffolds shouldn't ship Mongo's verify command.
+        expect(md).not.toContain('buildInfo');
+        expect(md).not.toContain('db.runCommand');
       });
 
-      it('mongo: documents the minimum MongoDB version', () => {
+      it('mongo: documents the minimum MongoDB version and only the mongo verify command', () => {
         const md = quickReferenceMd('mongo', 'psl', 'prisma/contract.prisma', 'pnpm prisma-next');
 
         expect(md).toMatch(/## Requirements/);
         expect(md).toMatch(/MongoDB \d/);
         expect(md).toContain('buildInfo');
+        expect(md).toContain('db.runCommand');
+        // Mongo scaffolds shouldn't ship Postgres' verify command.
+        expect(md).not.toContain('SELECT version()');
       });
 
       it('mentions the --probe-db opt-in so users know init does not connect by default', () => {

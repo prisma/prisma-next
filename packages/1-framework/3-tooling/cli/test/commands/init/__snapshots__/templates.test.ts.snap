@@ -176,7 +176,7 @@ This project is set up for MongoDB. Prisma Next also supports other databases.
 
 ## Requirements
 
-- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`db.runCommand({ buildInfo: 1 })\` against your server to verify.
 - The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
@@ -491,7 +491,7 @@ This project is set up for MongoDB. Prisma Next also supports other databases.
 
 ## Requirements
 
-- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- **MongoDB 6.0 or newer.** Older servers are not supported. Run \`db.runCommand({ buildInfo: 1 })\` against your server to verify.
 - The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
@@ -803,7 +803,7 @@ This project is set up for PostgreSQL. Prisma Next also supports other databases
 
 ## Requirements
 
-- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` against your server to verify.
 - The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
@@ -1061,7 +1061,7 @@ This project is set up for PostgreSQL. Prisma Next also supports other databases
 
 ## Requirements
 
-- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.
+- **PostgreSQL 14 or newer.** Older servers are not supported. Run \`SELECT version()\` against your server to verify.
 - The CLI never connects to your database without explicit consent. Pass \`--probe-db\` to \`prisma-next init\` if you want \`init\` to verify the server version itself.
 
 ## Your data contract
