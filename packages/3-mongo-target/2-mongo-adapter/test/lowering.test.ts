@@ -1,3 +1,4 @@
+import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
 import {
   MongoAddFieldsStage,
   MongoAggAccumulator,
@@ -125,6 +126,72 @@ describe('lowerFilter', () => {
     const param = MongoParamRef.of(42);
     const filter = MongoFieldFilter.of('data', '$elemMatch', { value: param });
     expect(await lowerFilter(filter)).toEqual({ data: { $elemMatch: { value: 42 } } });
+  });
+
+  it('encodes MongoParamRef field-filter values via the codec registry when provided', async () => {
+    const registry = createMongoCodecRegistry();
+    registry.register(
+      mongoCodec({
+        typeId: 'test/uppercase@1',
+        targetTypes: ['string'],
+        decode: (wire: string) => wire,
+        encode: (value: string) => value.toUpperCase(),
+      }),
+    );
+
+    const param = MongoParamRef.of('alice', { codecId: 'test/uppercase@1' });
+    const filter = MongoFieldFilter.eq('email', param);
+
+    expect(await lowerFilter(filter, registry)).toEqual({ email: { $eq: 'ALICE' } });
+  });
+
+  it('forwards the codec registry through composite filters', async () => {
+    const registry = createMongoCodecRegistry();
+    registry.register(
+      mongoCodec({
+        typeId: 'test/uppercase@1',
+        targetTypes: ['string'],
+        decode: (wire: string) => wire,
+        encode: (value: string) => value.toUpperCase(),
+      }),
+    );
+
+    const filter = MongoAndExpr.of([
+      MongoFieldFilter.eq('a', MongoParamRef.of('a', { codecId: 'test/uppercase@1' })),
+      MongoOrExpr.of([
+        MongoFieldFilter.eq('b', MongoParamRef.of('b', { codecId: 'test/uppercase@1' })),
+        new MongoNotExpr(
+          MongoFieldFilter.eq('c', MongoParamRef.of('c', { codecId: 'test/uppercase@1' })),
+        ),
+      ]),
+    ]);
+
+    expect(await lowerFilter(filter, registry)).toEqual({
+      $and: [{ a: { $eq: 'A' } }, { $or: [{ b: { $eq: 'B' } }, { $nor: [{ c: { $eq: 'C' } }] }] }],
+    });
+  });
+
+  it('passes the registry through $match in a pipeline', async () => {
+    const registry = createMongoCodecRegistry();
+    registry.register(
+      mongoCodec({
+        typeId: 'test/uppercase@1',
+        targetTypes: ['string'],
+        decode: (wire: string) => wire,
+        encode: (value: string) => value.toUpperCase(),
+      }),
+    );
+
+    const matchStage = new MongoMatchStage(
+      MongoFieldFilter.eq('email', MongoParamRef.of('alice', { codecId: 'test/uppercase@1' })),
+    );
+
+    expect(await lowerStage(matchStage, registry)).toEqual({
+      $match: { email: { $eq: 'ALICE' } },
+    });
+    expect(await lowerPipeline([matchStage], registry)).toEqual([
+      { $match: { email: { $eq: 'ALICE' } } },
+    ]);
   });
 
   it('lowers MongoExprFilter to $expr with aggregation expression', async () => {

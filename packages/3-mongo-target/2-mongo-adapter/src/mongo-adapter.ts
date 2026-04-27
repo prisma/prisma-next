@@ -49,7 +49,7 @@ class MongoAdapterImpl implements MongoAdapter {
 
   async #lowerUpdate(update: MongoUpdateSpec): Promise<Document | ReadonlyArray<Document>> {
     if (isUpdatePipeline(update)) {
-      return Promise.all(update.map((stage) => lowerStage(stage)));
+      return Promise.all(update.map((stage) => lowerStage(stage, this.#codecs)));
     }
     return this.#resolveDocument(update);
   }
@@ -64,7 +64,7 @@ class MongoAdapterImpl implements MongoAdapter {
         );
       case 'updateOne': {
         const [filter, update] = await Promise.all([
-          lowerFilter(command.filter),
+          lowerFilter(command.filter, this.#codecs),
           this.#lowerUpdate(command.update),
         ]);
         return new UpdateOneWireCommand(command.collection, filter, update, command.upsert);
@@ -76,18 +76,24 @@ class MongoAdapterImpl implements MongoAdapter {
         );
       case 'updateMany': {
         const [filter, update] = await Promise.all([
-          lowerFilter(command.filter),
+          lowerFilter(command.filter, this.#codecs),
           this.#lowerUpdate(command.update),
         ]);
         return new UpdateManyWireCommand(command.collection, filter, update, command.upsert);
       }
       case 'deleteOne':
-        return new DeleteOneWireCommand(command.collection, await lowerFilter(command.filter));
+        return new DeleteOneWireCommand(
+          command.collection,
+          await lowerFilter(command.filter, this.#codecs),
+        );
       case 'deleteMany':
-        return new DeleteManyWireCommand(command.collection, await lowerFilter(command.filter));
+        return new DeleteManyWireCommand(
+          command.collection,
+          await lowerFilter(command.filter, this.#codecs),
+        );
       case 'findOneAndUpdate': {
         const [filter, update] = await Promise.all([
-          lowerFilter(command.filter),
+          lowerFilter(command.filter, this.#codecs),
           this.#lowerUpdate(command.update),
         ]);
         return new FindOneAndUpdateWireCommand(
@@ -102,11 +108,14 @@ class MongoAdapterImpl implements MongoAdapter {
       case 'findOneAndDelete':
         return new FindOneAndDeleteWireCommand(
           command.collection,
-          await lowerFilter(command.filter),
+          await lowerFilter(command.filter, this.#codecs),
           command.sort,
         );
       case 'aggregate':
-        return new AggregateWireCommand(command.collection, await lowerPipeline(command.pipeline));
+        return new AggregateWireCommand(
+          command.collection,
+          await lowerPipeline(command.pipeline, this.#codecs),
+        );
       case 'rawAggregate':
         return new AggregateWireCommand(command.collection, command.pipeline);
       case 'rawInsertOne':

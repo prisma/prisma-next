@@ -430,6 +430,25 @@ describe('MongoAdapter with codec registry', () => {
     const wire = narrowWire(await adapterWithCodecs.lower(plan('users', command)), 'insertMany');
     expect(wire.documents).toEqual([{ name: 'ALICE' }, { name: 'BOB' }]);
   });
+
+  it('encodes MongoParamRef with codecId inside filter values', async () => {
+    const command = new DeleteOneCommand(
+      'users',
+      MongoFieldFilter.eq('email', new MongoParamRef('alice', { codecId: 'test/uppercase@1' })),
+    );
+    const wire = narrowWire(await adapterWithCodecs.lower(plan('users', command)), 'deleteOne');
+    expect(wire.filter).toEqual({ email: { $eq: 'ALICE' } });
+  });
+
+  it('encodes MongoParamRef with codecId inside aggregate pipeline $match', async () => {
+    const command = new AggregateCommand('users', [
+      new MongoMatchStage(
+        MongoFieldFilter.eq('email', new MongoParamRef('alice', { codecId: 'test/uppercase@1' })),
+      ),
+    ]);
+    const wire = narrowWire(await adapterWithCodecs.lower(plan('users', command)), 'aggregate');
+    expect(wire.pipeline).toEqual([{ $match: { email: { $eq: 'ALICE' } } }]);
+  });
 });
 
 // T4.10 — regression: createMongoAdapter() must remain synchronous.
