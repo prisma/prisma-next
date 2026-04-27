@@ -4,8 +4,8 @@ Codec interface and registry for MongoDB value serialization.
 
 ## Responsibilities
 
-- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput, TOutput = TInput>` — defines encode/decode between wire (BSON) and JS representations, with trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`). The 5-generic shape is structurally identical to the SQL family's `Codec`, so a single codec definition can be registered in both family registries (cross-family parity).
-- **Codec factory**: `mongoCodec()` — creates frozen codec instances from a config object. Accepts `encode` and `decode` author functions in **either sync or async form**; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Build-time methods (`encodeJson`, `decodeJson`) are synchronous.
+- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput, TOutput = TInput>` — declares how a JS value translates to and from the BSON-shaped wire format the Mongo driver exchanges, plus the JSON-safe form stored in contract artifacts. Carries trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`) for operator gating.
+- **Codec factory**: `mongoCodec()` — creates frozen codec instances from a config object. `encode` is optional (identity default when omitted); `encode`/`decode` may be authored as sync or async functions and are lifted to Promise-returning query-time methods automatically. Build-time methods (`encodeJson`, `decodeJson`) are synchronous and default to identity when omitted.
 - **Codec registry**: `MongoCodecRegistry` and `createMongoCodecRegistry()` — a map-based container that stores and retrieves codecs by ID, with duplicate-ID protection
 - **Type-level helpers**: `MongoCodecInput<T>`, `MongoCodecOutput<T>`, and `MongoCodecTraits<T>` for extracting input/output JS types and traits from codec types
 
@@ -33,7 +33,7 @@ const secretCodec = mongoCodec({
 });
 ```
 
-A single `mongoCodec({...})` value is structurally usable in both Mongo and SQL runtimes (same five-generic shape, same Promise-returning query-time methods, same synchronous build-time methods). See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the cross-family parity story and the full design.
+See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the codec runtime's async boundary contract.
 
 ## Dependencies
 

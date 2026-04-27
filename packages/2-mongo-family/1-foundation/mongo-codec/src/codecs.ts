@@ -5,27 +5,14 @@ import { ifDefined } from '@prisma-next/utils/defined';
 export type MongoCodecTrait = CodecTrait;
 
 /**
- * Mongo codec interface — alias of the framework base codec.
+ * A codec for the Mongo target. Translates between an application value
+ * and the BSON-shaped wire form the Mongo driver exchanges, and between
+ * an application value and the JSON form stored in contract artifacts.
  *
- * Mirrors the SQL family's `Codec` shape so a single codec definition can
- * be registered in both SQL and Mongo registries (cross-family parity is
- * the project AC; see `projects/codec-async-single-path/spec.md`). The
- * generic list is identical to `BaseCodec`'s — `<Id, TTraits, TWire,
- * TInput, TOutput = TInput>` — so the Mongo surface is structurally
- * interchangeable with the SQL one. The asymmetric `TInput ≠ TOutput`
- * case (e.g. write `string`, read `Date`) is therefore expressible on
- * the Mongo side too.
- *
- * Query-time methods (`encode`, `decode`) are Promise-returning at the
- * boundary; the `mongoCodec()` factory accepts sync or async author
- * functions and lifts sync ones to Promise-shaped methods. Build-time
- * methods (`encodeJson`, `decodeJson`, `renderOutputType`) stay
- * synchronous so `validateMongoContract` and client construction remain
- * synchronous.
- *
- * Mongo-specific extensions (e.g. parameterized codecs, target hints) are
- * not currently needed; this alias keeps the Mongo surface in lockstep
- * with the framework base. Any divergence should be added here.
+ * Same shape as the framework codec base — see `Codec` in
+ * `@prisma-next/framework-components/codec` for the contract. The alias
+ * exists so Mongo-specific metadata can be added here in future without
+ * touching the framework base.
  */
 export type MongoCodec<
   Id extends string = string,
@@ -36,27 +23,22 @@ export type MongoCodec<
 > = BaseCodec<Id, TTraits, TWire, TInput, TOutput>;
 
 /**
- * Mongo codec factory — mirrors the unified `codec()` factory in
- * `@prisma-next/sql-relational-core/ast` so a single codec definition can
- * be reused across SQL and Mongo registries.
+ * Construct a Mongo codec from author functions.
  *
- * Authors may write `encode` / `decode` as sync or async; the factory
- * lifts uniformly to Promise-returning methods via `async (x) => fn(x)`.
+ * Author `encode` and `decode` as sync or async functions; the factory
+ * produces a {@link MongoCodec} whose query-time methods follow the
+ * boundary contract documented on the framework {@link BaseCodec}.
+ *
  * `encode` is optional — when omitted, an identity default is installed
- * (codecs that omit `encode` are declaring "the input value is already
- * the wire value", so `TInput` and `TWire` are interchangeable for that
- * codec). This matches the SQL `codec()` factory and ADR 204 § 2.
+ * (declaring "the input value already is the wire value", so `TInput` and
+ * `TWire` are interchangeable for that codec). `decode` is always
+ * required. `encodeJson` and `decodeJson` default to identity when
+ * omitted.
  *
- * Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType`)
- * pass through synchronously; identity defaults are installed for the
- * JSON methods when omitted.
- *
- * `TInput` is the JS type accepted on writes; `TOutput` is the JS type
- * produced on reads (defaults to `TInput`). The asymmetric form is
- * expressible by passing distinct types to `encode`'s parameter and
- * `decode`'s return. The author-provided `encodeJson` (when omitted,
- * identity) maps `TInput → JsonValue`; `decodeJson` returns the input
- * type so `validateContract` round-trips author-provided JSON forms.
+ * Most Mongo codecs use a single JS type for both writes (`TInput`) and
+ * reads (`TOutput`). When you want a richer return type than you wrote
+ * (e.g. write `string`, read `Date`), pass distinct types to `encode`'s
+ * parameter and `decode`'s return.
  */
 export function mongoCodec<
   Id extends string,

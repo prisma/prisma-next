@@ -57,11 +57,10 @@ test('MongoCodecTraits is never for codec without traits', () => {
   expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
 });
 
-// Cross-family parity (m4): MongoCodec must be structurally identical to
-// BaseCodec — i.e. five generics in the same order, with TOutput defaulting
-// to TInput. The SQL family's Codec exposes the same shape (extends BaseCodec
-// with the same generics plus SQL-only metadata), so a single codec value
-// can be registered in both family registries.
+// MongoCodec is a structural alias of `BaseCodec` — five generics in the
+// same order, with `TOutput` defaulting to `TInput`. Confirm the alias
+// remains identical at the type level so authors can hold a `BaseCodec`
+// reference where a `MongoCodec` is expected.
 test('MongoCodec is structurally identical to BaseCodec (5 generics, same order)', () => {
   expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string, Date>>().toEqualTypeOf<
     BaseCodec<'id/x@1', readonly ['equality'], number, string, Date>
@@ -74,11 +73,10 @@ test('MongoCodec defaults TOutput to TInput when TOutput is omitted', () => {
   >();
 });
 
-// Asymmetric TInput ≠ TOutput is now expressible (the pre-m4 4-generic shape
-// collapsed both into a single TJs slot, so the asymmetric case was
-// structurally impossible). The factory must accept distinct types in
-// `encode`'s input and `decode`'s output positions, and the resulting codec
-// must surface them on the method signatures.
+// Asymmetric `TInput` ≠ `TOutput` must be expressible: the factory accepts
+// distinct types in `encode`'s input and `decode`'s output positions, and
+// the resulting codec must surface them on the method signatures (e.g.
+// write `string`, read `Date`).
 test('mongoCodec factory accepts encode TInput → TWire and decode TWire → TOutput where TInput ≠ TOutput', () => {
   const asymmetric = mongoCodec({
     typeId: 'demo/asymmetric@1',
@@ -93,12 +91,9 @@ test('mongoCodec factory accepts encode TInput → TWire and decode TWire → TO
   expectTypeOf<ReturnType<typeof asymmetric.decode>>().toExtend<Promise<Date>>();
 });
 
-// Extractor parity with SQL's `CodecInput<T>` / `CodecOutput<T>`: surface the
-// canonical (symmetric) JS type for a Mongo codec. The extractors mirror
-// SQL's structural pattern (positional `infer` on the BaseCodec generics)
-// and therefore behave identically on the canonical case where TInput =
-// TOutput, which is the case used everywhere in the cross-family parity
-// fixtures and built-in codec set.
+// `MongoCodecInput<T>` / `MongoCodecOutput<T>` surface the canonical
+// (symmetric) JS type for a Mongo codec — i.e. the input/output type when
+// `TInput = TOutput`, which is the case used by built-in codecs.
 test('MongoCodecInput / MongoCodecOutput extract the canonical JS type for symmetric codecs', () => {
   const symmetric = mongoCodec({
     typeId: 'demo/symmetric@1',
