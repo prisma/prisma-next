@@ -23,6 +23,40 @@ These come from repo conventions ([`AGENTS.md`](../../AGENTS.md), [`.cursor/rule
 - **Commit-as-you-go.** Small, focused commits with intent-driven messages. Don't batch.
 - **Vitest.** Unit + integration tests live under `examples/supabase-todos/test/`. Integration tests assume `supabase start` is running locally; they are not run in CI.
 
+## Phases and validation gates
+
+The plan executes in **12 phases**. Each phase is one implement→review cycle in the orchestration loop. Phase IDs are stable references and are how the orchestrator addresses each round.
+
+### Default validation gates
+
+Every phase that touches the example runs these gates as a prerequisite for SATISFIED. The implementer runs them before declaring done; the reviewer treats them as the bar.
+
+- `pnpm --filter supabase-todos typecheck`
+- `pnpm --filter supabase-todos test` (or a scoped invocation when the round only touches a subset)
+- `pnpm lint:deps`
+- `git diff origin/main -- packages/` returns empty (enforces R-NF-1 / R-NF-2)
+
+Phases that don't touch the example (e.g. `phase-close` after the example is migrated) run only the gates relevant to their scope; named explicitly per phase below.
+
+### Phase index
+
+| Phase | Tasks | One-line outcome | Phase-specific gates (in addition to default) |
+|---|---|---|---|
+| `phase-1a` | 1.1–1.3 | Example scaffolded; Supabase services config committed; PN contract emits cleanly. | `pnpm --filter supabase-todos contract:emit` succeeds; `supabase status` shows the local stack up. |
+| `phase-1b` | 1.4–1.5 | RLS migration factories exist with passing tests-first vitest spec. | `pnpm --filter supabase-todos test test/migrations/rls-ops.test.ts` green; integration leg requires `supabase start`. |
+| `phase-1c` | 1.6–1.7 | Initial PN migration applies; seed script populates fixtures. | `pnpm --filter supabase-todos migrate:up` succeeds; `pnpm --filter supabase-todos seed` idempotent (re-run leaves no duplicates). |
+| `phase-1d` | 1.8–1.9 | Admin (service-role) runtime exists; vitest smoke tests pass. | `pnpm --filter supabase-todos test test/runtime/admin.test.ts` green. |
+| `phase-1e` | 1.10–1.11 | Example `README.md` covers the M1 sequence; agent skill seeded with valid frontmatter and all eleven section headers. | Skill frontmatter parses (e.g. via `js-yaml`); `README.md` step list runs end-to-end on a fresh checkout. |
+| `phase-2` | 2.1–2.4 | `createSupabaseRuntime` in transaction mode; integration tests prove RLS isolation, parallel-scope safety, error handling. | `pnpm --filter supabase-todos test test/runtime/factory.test.ts` green; type test in 2.3 compiles. |
+| `phase-3` | 3.1–3.3 | *(stretch)* Connection-scope mode; same matrix passes against direct URL. | Parameterized integration matrix green for both modes. |
+| `phase-4a` | 4.1–4.4 | Hono JWT-verification middleware + per-request scoped-runtime middleware; both vitest-tested. | `pnpm --filter supabase-todos test test/server/middleware/` green. |
+| `phase-4b` | 4.5–4.8 | Todos JSON API + public messages endpoint; integration tests with two real users prove handlers don't filter manually. | `pnpm --filter supabase-todos test test/server/routes/` green. |
+| `phase-4c` | 4.9–4.13 | Vite SPA: auth, todos page, realtime, public board; example `README.md` updated with `pnpm dev` step and two-tab demo procedure. | `pnpm --filter supabase-todos dev` boots without runtime errors; manual two-tab procedure documented in README. |
+| `phase-5` | 5.1–5.6 | `framework-limitations.md` review-ready (every workaround `FL-NN`-tagged); three design sketches written; skill finalised; spec acceptance pass. | All `FL-NN` cross-links resolve; SKILL.md frontmatter still validates; spec checkboxes either ticked or have a documented `FL-NN`. |
+| `phase-close` | C.1–C.5 | Skill migrated to `.claude/skills/`; repo-wide refs to `projects/supabase-poc/` stripped; project directory removed. | `rg 'projects/supabase-poc' . -g '!wip/'` returns empty; SKILL.md frontmatter validates at the new path; `git mv` history preserved. |
+
+The orchestrator may revise this index between rounds (adding sub-phases, splitting a phase that grows too large) but only with a recorded plan amendment. See [`reviews/code-review.md` § Orchestrator notes](reviews/code-review.md#orchestrator-notes) for any such amendments.
+
 ## Milestones
 
 ### Milestone 1 — Local stack + schema + RLS authoring + plain PN roundtrip
