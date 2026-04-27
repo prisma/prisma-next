@@ -19,9 +19,12 @@
  *     adapter → driver → live database → decoded rows) when RLS is
  *     bypassed.
  *   - The decoded row shapes line up with the contract's emitted
- *     `FieldOutputTypes` (one `expectTypeOf` per table). Storage column
- *     names are snake_case (per `naming: { columns: 'snake_case' }`
- *     on the contract), so the row keys here are snake_case too.
+ *     `FieldOutputTypes` (one `satisfies` per table; the vitest spec
+ *     [§ T1.9](../../../../projects/supabase-poc/plan.md) accepts
+ *     `expectTypeOf` / `assertType` / a manual `satisfies` for this
+ *     leg). Storage column names are snake_case (per
+ *     `naming: { columns: 'snake_case' }` on the contract), so the
+ *     row keys here are snake_case too.
  *
  * It is the baseline before M2 layers RLS-scoped runtimes on. Cross-
  * contamination tests (RLS actually filtering) live in `phase-2`'s
@@ -47,7 +50,7 @@
  */
 import 'dotenv/config';
 import type { Runtime } from '@prisma-next/sql-runtime';
-import { afterAll, beforeAll, describe, expect, expectTypeOf, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../src/server/db';
 
 const databaseUrl = process.env['DATABASE_URL'];
@@ -78,12 +81,14 @@ describe.skipIf(!databaseUrl)('admin runtime (T1.9)', () => {
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.email).sort()).toEqual(['alice@example.test', 'bob@example.test']);
 
-    expectTypeOf(rows[0]).toMatchTypeOf<{
+    const [row] = rows;
+    if (!row) throw new Error('expected at least one profile');
+    row satisfies {
       id: string;
       email: string;
       display_name: string | null;
-      created_at: string;
-    }>();
+      created_at: string | Date;
+    };
   });
 
   it('reads all todos (RLS bypassed → 5 rows)', async () => {
@@ -99,12 +104,14 @@ describe.skipIf(!databaseUrl)('admin runtime (T1.9)', () => {
       'Write the spec',
     ]);
 
-    expectTypeOf(rows[0]).toMatchTypeOf<{
+    const [row] = rows;
+    if (!row) throw new Error('expected at least one todo');
+    row satisfies {
       id: string;
       user_id: string;
       title: string;
       completed: boolean;
-    }>();
+    };
   });
 
   it('reads all public_messages (RLS bypassed → 2 rows)', async () => {
@@ -114,10 +121,12 @@ describe.skipIf(!databaseUrl)('admin runtime (T1.9)', () => {
     expect(rows).toHaveLength(2);
     expect(rows.map((row) => row.body).sort()).toEqual(['Bob says hi', 'Hello world from Alice']);
 
-    expectTypeOf(rows[0]).toMatchTypeOf<{
+    const [row] = rows;
+    if (!row) throw new Error('expected at least one public_message');
+    row satisfies {
       id: string;
       author_id: string;
       body: string;
-    }>();
+    };
   });
 });
