@@ -142,6 +142,12 @@ describe('mergeGitattributes (FR3.4)', () => {
     expect(result).toContain('*.lock binary');
     expect(result).toContain('prisma/contract.json linguist-generated');
   });
+
+  it('does not produce a leading blank line when the existing file is empty', () => {
+    const result = mergeGitattributes('', required);
+    expect(result).toBe(`${required.join('\n')}\n`);
+    expect(result?.startsWith('\n')).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
