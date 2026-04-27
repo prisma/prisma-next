@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import { createMongoCodecRegistry } from '../src/codec-registry';
 import { type MongoCodec, mongoCodec } from '../src/codecs';
@@ -70,11 +71,11 @@ describe('mongoCodec()', () => {
 
 describe('MongoCodecRegistry', () => {
   function makeCodec(id: string): MongoCodec<string> {
-    return mongoCodec({
+    return mongoCodec<string, readonly [], JsonValue, JsonValue>({
       typeId: id,
       targetTypes: ['test'],
-      decode: (wire: unknown) => wire,
-      encode: (value: unknown) => value,
+      decode: (wire: JsonValue) => wire,
+      encode: (value: JsonValue) => value,
     });
   }
 

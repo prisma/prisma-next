@@ -22,6 +22,23 @@ export type MongoCodec<
 > = BaseCodec<Id, TTraits, TWire, TInput>;
 
 /**
+ * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
+ * structurally assignable to `JsonValue` the identity defaults are
+ * sound and both fields are optional; otherwise both fields are
+ * required so an author cannot silently produce a non-JSON-safe
+ * contract artifact.
+ */
+type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
+  ? {
+      encodeJson?: (value: TInput) => JsonValue;
+      decodeJson?: (json: JsonValue) => TInput;
+    }
+  : {
+      encodeJson: (value: TInput) => JsonValue;
+      decodeJson: (json: JsonValue) => TInput;
+    };
+
+/**
  * Construct a Mongo codec from author functions.
  *
  * Author `encode` and `decode` as sync or async functions; the factory
@@ -31,28 +48,33 @@ export type MongoCodec<
  * `encode` is optional — when omitted, an identity default is installed
  * (declaring "the input value already is the wire value", so `TInput` and
  * `TWire` are interchangeable for that codec). `decode` is always
- * required. `encodeJson` and `decodeJson` default to identity when
- * omitted.
+ * required. `encodeJson` and `decodeJson` default to identity **only when
+ * `TInput` is assignable to `JsonValue`**; otherwise both are required so
+ * the contract artifact stays JSON-safe.
  */
 export function mongoCodec<
   Id extends string,
   const TTraits extends readonly MongoCodecTrait[] = readonly [],
   TWire = unknown,
   TInput = unknown,
->(config: {
-  typeId: Id;
-  targetTypes: readonly string[];
-  traits?: TTraits;
-  encode?: (value: TInput) => TWire | Promise<TWire>;
-  decode: (wire: TWire) => TInput | Promise<TInput>;
-  encodeJson?: (value: TInput) => JsonValue;
-  decodeJson?: (json: JsonValue) => TInput;
-  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): MongoCodec<Id, TTraits, TWire, TInput> {
+>(
+  config: {
+    typeId: Id;
+    targetTypes: readonly string[];
+    traits?: TTraits;
+    encode?: (value: TInput) => TWire | Promise<TWire>;
+    decode: (wire: TWire) => TInput | Promise<TInput>;
+    renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+  } & JsonRoundTripConfig<TInput>,
+): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   const userEncode =
     config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
   const userDecode = config.decode;
+  const widenedConfig = config as {
+    encodeJson?: (value: TInput) => JsonValue;
+    decodeJson?: (json: JsonValue) => TInput;
+  };
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
@@ -63,8 +85,8 @@ export function mongoCodec<
     ...ifDefined('renderOutputType', config.renderOutputType),
     encode: async (value) => userEncode(value),
     decode: async (wire) => userDecode(wire),
-    encodeJson: (config.encodeJson ?? identity) as (value: TInput) => JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TInput,
+    encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
+    decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
 }
 

@@ -46,6 +46,10 @@ const traitlessCodec = mongoCodec({
   targetTypes: ['blob'],
   decode: (w: Buffer) => w,
   encode: (v: Buffer) => v,
+  // Buffer is not assignable to JsonValue, so encodeJson/decodeJson are
+  // required (the conditional default identity is unsafe here).
+  encodeJson: (v: Buffer) => v.toString('base64'),
+  decodeJson: (j) => Buffer.from(j as string, 'base64'),
 });
 
 test('MongoCodecTraits is never for codec without traits', () => {

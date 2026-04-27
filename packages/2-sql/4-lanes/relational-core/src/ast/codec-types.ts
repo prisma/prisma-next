@@ -182,6 +182,23 @@ class CodecRegistryImpl implements CodecRegistry {
 }
 
 /**
+ * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
+ * structurally assignable to `JsonValue` the identity defaults are
+ * sound and both fields are optional; otherwise both fields are
+ * required so an author cannot silently produce a non-JSON-safe
+ * contract artifact.
+ */
+type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
+  ? {
+      encodeJson?: (value: TInput) => JsonValue;
+      decodeJson?: (json: JsonValue) => TInput;
+    }
+  : {
+      encodeJson: (value: TInput) => JsonValue;
+      decodeJson: (json: JsonValue) => TInput;
+    };
+
+/**
  * Construct a SQL codec from author functions and optional metadata.
  *
  * Author `encode` and `decode` as sync or async functions; the factory
@@ -191,8 +208,9 @@ class CodecRegistryImpl implements CodecRegistry {
  * `encode` is optional — when omitted, an identity default is installed
  * (declaring "the input value already is the wire value", so `TInput` and
  * `TWire` are interchangeable for that codec). `decode` is always
- * required. `encodeJson` and `decodeJson` default to identity when
- * omitted.
+ * required. `encodeJson` and `decodeJson` default to identity **only when
+ * `TInput` is assignable to `JsonValue`**; otherwise both are required
+ * so the contract artifact stays JSON-safe.
  */
 export function codec<
   Id extends string,
@@ -201,23 +219,29 @@ export function codec<
   TInput,
   TParams = Record<string, unknown>,
   THelper = unknown,
->(config: {
-  typeId: Id;
-  targetTypes: readonly string[];
-  encode?: (value: TInput) => TWire | Promise<TWire>;
-  decode: (wire: TWire) => TInput | Promise<TInput>;
-  encodeJson?: (value: TInput) => JsonValue;
-  decodeJson?: (json: JsonValue) => TInput;
-  meta?: CodecMeta;
-  paramsSchema?: Type<TParams>;
-  init?: (params: TParams) => THelper;
-  traits?: TTraits;
-  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
+>(
+  config: {
+    typeId: Id;
+    targetTypes: readonly string[];
+    encode?: (value: TInput) => TWire | Promise<TWire>;
+    decode: (wire: TWire) => TInput | Promise<TInput>;
+    meta?: CodecMeta;
+    paramsSchema?: Type<TParams>;
+    init?: (params: TParams) => THelper;
+    traits?: TTraits;
+    renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+  } & JsonRoundTripConfig<TInput>,
+): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
   const userEncode =
     config.encode ?? ((value: TInput) => value as unknown as TWire | Promise<TWire>);
   const userDecode = config.decode;
+  // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the
+  // boundary; widen back to the generic shape inside the factory body.
+  const widenedConfig = config as {
+    encodeJson?: (value: TInput) => JsonValue;
+    decodeJson?: (json: JsonValue) => TInput;
+  };
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
@@ -231,8 +255,8 @@ export function codec<
     ...ifDefined('renderOutputType', config.renderOutputType),
     encode: async (value) => userEncode(value),
     decode: async (wire) => userDecode(wire),
-    encodeJson: (config.encodeJson ?? identity) as (value: TInput) => JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TInput,
+    encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
+    decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
 }
 

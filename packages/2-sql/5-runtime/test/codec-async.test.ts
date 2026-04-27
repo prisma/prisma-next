@@ -1,4 +1,4 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
+import type { ExecutionPlan, JsonValue } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -331,11 +331,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   function buildJsonbRegistry(): CodecRegistry {
     const registry = createCodecRegistry();
     registry.register(
-      codec({
+      codec<'pg/jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/jsonb@1',
         targetTypes: ['jsonb'],
-        encode: (v: unknown) => JSON.stringify(v),
-        decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
+        encode: (v: JsonValue) => JSON.stringify(v),
+        decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
       }),
     );
     return registry;
@@ -571,14 +571,14 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const registry = createCodecRegistry();
     const buildCodec = (
       id: string,
-      encode: (value: unknown) => unknown,
-      decode: (wire: unknown) => unknown,
+      encode: (value: string) => string,
+      decode: (wire: string) => string | Promise<string>,
     ): Codec<string> =>
-      codec({
+      codec<string, readonly [], string, string>({
         typeId: id,
         targetTypes: ['text'],
-        encode: encode as (v: unknown) => unknown,
-        decode: decode as (w: unknown) => unknown,
+        encode,
+        decode,
       });
 
     registry.register(

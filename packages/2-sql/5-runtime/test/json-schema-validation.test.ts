@@ -1,4 +1,9 @@
-import type { Contract, ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
+import type {
+  Contract,
+  ExecutionPlan,
+  JsonValue,
+  ParamDescriptor,
+} from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -84,24 +89,19 @@ function createJoinMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
   return { get: (key) => validators.get(key), size: validators.size };
 }
 
+function jsonbCodec<Id extends string>(typeId: Id, targetType: string) {
+  return codec<Id, readonly [], string, JsonValue>({
+    typeId,
+    targetTypes: [targetType],
+    encode: (v: JsonValue) => JSON.stringify(v),
+    decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
+  });
+}
+
 function createTestCodecRegistry(): CodecRegistry {
   const registry = createCodecRegistry();
-  registry.register(
-    codec({
-      typeId: 'pg/jsonb@1',
-      targetTypes: ['jsonb'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
-  registry.register(
-    codec({
-      typeId: 'pg/json@1',
-      targetTypes: ['json'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
+  registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
+  registry.register(jsonbCodec('pg/json@1', 'json'));
   registry.register(
     codec({
       typeId: 'pg/int4@1',
@@ -185,22 +185,8 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
   ];
 
   const registry = createCodecRegistry();
-  registry.register(
-    codec({
-      typeId: 'pg/json@1',
-      targetTypes: ['json'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
-  registry.register(
-    codec({
-      typeId: 'pg/jsonb@1',
-      targetTypes: ['jsonb'],
-      encode: (v: unknown) => JSON.stringify(v),
-      decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-    }),
-  );
+  registry.register(jsonbCodec('pg/json@1', 'json'));
+  registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
 
   return {
     kind: 'extension' as const,
@@ -295,14 +281,7 @@ describe('JSON Schema validator registry', () => {
 
     it('omits validator registry when no init hooks are defined', () => {
       const registry = createCodecRegistry();
-      registry.register(
-        codec({
-          typeId: 'pg/jsonb@1',
-          targetTypes: ['jsonb'],
-          encode: (v: unknown) => JSON.stringify(v),
-          decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w),
-        }),
-      );
+      registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
 
       const noInitExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
@@ -570,11 +549,11 @@ describe('JSON Schema decoding validation', () => {
   it('runs JSON schema validation against the resolved value of an async decoder', async () => {
     const asyncRegistry = createCodecRegistry();
     asyncRegistry.register(
-      codec({
+      codec<'pg/async-jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/async-jsonb@1',
         targetTypes: ['jsonb'],
-        encode: async (v: unknown) => JSON.stringify(v),
-        decode: async (w: unknown) => (typeof w === 'string' ? JSON.parse(w) : w),
+        encode: async (v: JsonValue) => JSON.stringify(v),
+        decode: async (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
       }),
     );
 
