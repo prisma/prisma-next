@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { emit, getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -8,6 +8,11 @@ import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
+import {
+  issueContractArtifactGeneration,
+  publishContractArtifactPairSerialized,
+} from '../../utils/publish-contract-artifact-pair-serialized';
+import { validateContractDeps } from '../../utils/validate-contract-deps';
 import { enrichContract } from '../contract-enrichment';
 import type { ContractEmitOptions, ContractEmitResult } from '../types';
 
@@ -39,12 +44,22 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
  * 2. Resolves the contract source from config
  * 3. Creates a control plane stack and family instance
  * 4. Emits contract artifacts (JSON and DTS)
- * 5. Writes files to the paths specified in config
+ * 5. Publishes staged artifacts to the configured output paths
  *
- * Supports AbortSignal for cancellation, enabling "last change wins" behavior.
+ * Publication is serialized per output JSON path. Each emit stages temp files,
+ * renames `contract.d.ts` before `contract.json`, and attempts to restore the
+ * previous pair if publication fails after either path has been replaced.
+ *
+ * If a newer generation has already claimed the same output path by the time
+ * this request reaches publication, the operation returns successfully with
+ * `publication: 'superseded'` and leaves the on-disk artifacts unchanged.
+ *
+ * Callers that can overlap emits for the same output should cancel older work
+ * before starting newer work. The queue prevents stale overwrites, but a newer
+ * failed emit can still supersede an older successful emit that arrives later.
  *
  * @param options - Options including configPath and optional signal
- * @returns File paths and hashes of emitted artifacts
+ * @returns File paths and hashes for the emitted bytes, plus whether they were published
  * @throws If config loading fails, contract is invalid, or file I/O fails
  * @throws signal.reason if cancelled via AbortSignal (typically DOMException with name 'AbortError')
  */
@@ -89,6 +104,7 @@ export async function executeContractEmit(
     });
   }
   const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
+  const generation = issueContractArtifactGeneration(outputJsonPath);
 
   const stack = createControlStack(config);
 
@@ -159,26 +175,32 @@ export async function executeContractEmit(
   familyInstance.validateContract(enrichedIR);
   const emitResult = await unlessAborted(
     emit(enrichedIR, stack, config.family.emission, {
-      outputJsonPath: outputJsonPath,
+      outputJsonPath,
     }),
   );
 
-  // Create directory if needed and write files (both colocated)
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  await unlessAborted(writeFile(outputJsonPath, emitResult.contractJson, 'utf-8'));
-  await unlessAborted(writeFile(outputDtsPath, emitResult.contractDts, 'utf-8'));
+  const publication = await publishContractArtifactPairSerialized({
+    outputJsonPath,
+    outputDtsPath,
+    generation,
+    signal,
+    contractJson: emitResult.contractJson,
+    contractDts: emitResult.contractDts,
+  });
 
-  // Validate that contract.d.ts type imports are resolvable
-  const { validateContractDeps } = await import('../../utils/validate-contract-deps');
-  const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
-  if (depsValidation.warning) {
-    process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+  if (publication === 'written') {
+    const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
+    if (depsValidation.warning) {
+      process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
+    }
   }
 
   return {
     storageHash: emitResult.storageHash,
     ...ifDefined('executionHash', emitResult.executionHash),
     profileHash: emitResult.profileHash,
+    publication,
     files: {
       json: outputJsonPath,
       dts: outputDtsPath,

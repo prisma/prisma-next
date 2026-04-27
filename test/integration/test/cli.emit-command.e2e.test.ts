@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { timeouts } from '@prisma-next/test-utils';
@@ -92,6 +92,9 @@ withTempDir(({ createTempDir }) => {
         const contractDts = readFileSync(contractDtsPath, 'utf-8');
         expect(contractDts).toContain('export type Contract');
         expect(contractDts).toContain('CodecTypes');
+
+        // Verify temporary publication artifacts were cleaned up
+        expect(readdirSync(outputDir).filter((entry) => entry.endsWith('.tmp'))).toEqual([]);
 
         // Verify JSON output matches actual files
         expect(parsed.files.json).toBe(contractJsonPath);

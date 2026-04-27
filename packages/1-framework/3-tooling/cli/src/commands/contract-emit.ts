@@ -1,4 +1,4 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdir } from 'node:fs/promises';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { errorContractConfigMissing } from '@prisma-next/errors/control';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -27,8 +27,13 @@ import { formatStyledHeader, formatSuccessMessage } from '../utils/formatters/st
 import type { CommonCommandOptions } from '../utils/global-flags';
 import { type GlobalFlags, parseGlobalFlags } from '../utils/global-flags';
 import { createProgressAdapter } from '../utils/progress-adapter';
+import {
+  issueContractArtifactGeneration,
+  publishContractArtifactPairSerialized,
+} from '../utils/publish-contract-artifact-pair-serialized';
 import { handleResult } from '../utils/result-handler';
 import { TerminalUI } from '../utils/terminal-ui';
+import { validateContractDeps } from '../utils/validate-contract-deps';
 
 interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
@@ -147,6 +152,7 @@ async function executeContractEmitCommand(
     );
   }
   const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
+  const generation = issueContractArtifactGeneration(outputJsonPath);
 
   // Output header to stderr (decoration)
   if (!flags.json && !flags.quiet) {
@@ -192,16 +198,26 @@ async function executeContractEmitCommand(
       return notOk(mapEmitFailure(result.failure, { configPath }));
     }
 
-    // Create directories if needed
-    mkdirSync(dirname(outputJsonPath), { recursive: true });
-    mkdirSync(dirname(outputDtsPath), { recursive: true });
+    await mkdir(dirname(outputJsonPath), { recursive: true });
+    await mkdir(dirname(outputDtsPath), { recursive: true });
 
-    // Write the results to files
-    writeFileSync(outputJsonPath, result.value.contractJson, 'utf-8');
-    writeFileSync(outputDtsPath, result.value.contractDts, 'utf-8');
+    const publication = await publishContractArtifactPairSerialized({
+      outputJsonPath,
+      outputDtsPath,
+      generation,
+      contractJson: result.value.contractJson,
+      contractDts: result.value.contractDts,
+    });
+    if (publication === 'superseded') {
+      return notOk(
+        errorRuntime('Contract artifacts were superseded before publication', {
+          why: 'A newer emit claimed the same output path before this command could publish its artifacts.',
+          fix: 'Avoid overlapping emits for the same output path, or cancel the older emit before starting a newer one.',
+        }),
+      );
+    }
 
     // Validate that contract.d.ts type imports are resolvable
-    const { validateContractDeps } = await import('../utils/validate-contract-deps');
     const depsValidation = validateContractDeps(result.value.contractDts, dirname(outputDtsPath));
     if (depsValidation.warning) {
       ui.warn(depsValidation.warning);

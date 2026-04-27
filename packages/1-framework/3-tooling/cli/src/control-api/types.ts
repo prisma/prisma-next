@@ -514,16 +514,25 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
  * Options for the standalone executeContractEmit function.
  * Used by tooling (e.g., Vite plugin) that needs to emit contracts
  * without the full ControlClient infrastructure.
+ *
+ * Callers that may issue overlapping emits for the same output should pass a
+ * signal and cancel the older request before starting the newer one. Publication
+ * is serialized per output path, but a newer failed emit can still supersede an
+ * older successful emit that reaches the queue later.
  */
 export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
-  /** Optional AbortSignal for cancellation support */
+  /** Optional AbortSignal for cancelling in-flight emits before publication */
   readonly signal?: AbortSignal;
 }
 
 /**
  * Result from the standalone executeContractEmit function.
+ *
+ * The returned hashes always describe the emitted bytes for this request. When
+ * `publication` is `'superseded'`, those bytes were not written to disk because
+ * a newer generation claimed the output path before publication.
  */
 export interface ContractEmitResult {
   /** Hash of the storage contract (schema-level) */
@@ -532,6 +541,8 @@ export interface ContractEmitResult {
   readonly executionHash?: string;
   /** Hash of the profile (target+extensions) */
   readonly profileHash: string;
+  /** Whether this emit published artifacts or was superseded before publication */
+  readonly publication: 'written' | 'superseded';
   /** Paths to the emitted files */
   readonly files: {
     /** Path to the emitted contract.json file */
