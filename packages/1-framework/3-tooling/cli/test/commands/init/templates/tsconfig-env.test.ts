@@ -171,9 +171,29 @@ describe('envExampleContent (FR3.1)', () => {
 });
 
 describe('envFileContent (FR3.2)', () => {
-  it('matches envExampleContent so the user only needs to edit one placeholder', () => {
-    expect(envFileContent('postgres')).toBe(envExampleContent('postgres'));
-    expect(envFileContent('mongo')).toBe(envExampleContent('mongo'));
+  it('omits the example-only "Copy this file to `.env`…" intro', () => {
+    // The real `.env` is the destination of that copy, so the line
+    // would lie if it ended up in the scaffolded `.env` itself.
+    for (const target of ['postgres', 'mongo'] as const) {
+      expect(envFileContent(target)).not.toMatch(/Copy this file to/i);
+    }
+  });
+
+  it('keeps the same placeholder body as the example so a single edit boots the project', () => {
+    for (const target of ['postgres', 'mongo'] as const) {
+      const example = envExampleContent(target);
+      const real = envFileContent(target);
+      expect(real).toContain('DATABASE_URL=');
+      expect(real).toMatch(/Requires (PostgreSQL|MongoDB) >= /);
+      // The example file's body trails the intro, so the real file
+      // matches the suffix once the intro is removed.
+      expect(example).toContain(real.trim());
+    }
+  });
+
+  it('writes a target-specific connection-string placeholder', () => {
+    expect(envFileContent('postgres')).toContain('postgresql://');
+    expect(envFileContent('mongo')).toContain('mongodb://');
   });
 });
 

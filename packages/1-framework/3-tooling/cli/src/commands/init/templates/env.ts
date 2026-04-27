@@ -24,27 +24,18 @@ export const TARGET_LABEL: Record<TargetId, string> = {
 };
 
 /**
- * Renders the `.env.example` content for a given target (FR3.1):
- *
- * - Documents the `DATABASE_URL` placeholder in the target's native URL
- *   shape (Postgres: standard `postgresql://`, Mongo: `mongodb://` plus
- *   a `mydb` database segment so the lazy facade has a `dbName`).
- * - Carries a `# Requires <db> >= <version>` comment so a fresh user
- *   knows the minimum supported server before they first try to
- *   connect (FR8.2).
- *
- * The output is identical for both authoring styles — the env file is
- * orthogonal to PSL vs TS schema authoring.
+ * Renders the placeholder body shared by `.env` and `.env.example`:
+ * the target-specific connection-string requirement comments and the
+ * commented-shape `DATABASE_URL` line. The output is identical for both
+ * authoring styles — the env file is orthogonal to PSL vs TS schema
+ * authoring.
  */
-export function envExampleContent(target: TargetId): string {
+function envPlaceholderBody(target: TargetId): string {
   const label = TARGET_LABEL[target];
   const minVersion = MIN_SERVER_VERSION[target];
   const lines: string[] = [];
   lines.push(`# Connection string for ${label}.`);
   lines.push(`# Requires ${label} >= ${minVersion}.`);
-  lines.push(
-    '# Copy this file to `.env` and replace the placeholder with your real connection string.',
-  );
   lines.push('');
   if (target === 'postgres') {
     lines.push('DATABASE_URL="postgresql://user:password@localhost:5432/mydb"');
@@ -56,11 +47,34 @@ export function envExampleContent(target: TargetId): string {
 }
 
 /**
+ * Renders the `.env.example` content for a given target (FR3.1):
+ *
+ * - Carries a "Copy this file to `.env`…" intro that only makes sense
+ *   for the example file (the real `.env` is the destination of that
+ *   copy and so does not get the same intro).
+ * - Documents the `DATABASE_URL` placeholder in the target's native URL
+ *   shape (Postgres: standard `postgresql://`, Mongo: `mongodb://` plus
+ *   a `mydb` database segment so the lazy facade has a `dbName`).
+ * - Carries a `# Requires <db> >= <version>` comment so a fresh user
+ *   knows the minimum supported server before they first try to
+ *   connect (FR8.2).
+ */
+export function envExampleContent(target: TargetId): string {
+  const lines: string[] = [];
+  lines.push(
+    '# Copy this file to `.env` and replace the placeholder with your real connection string.',
+  );
+  lines.push(envPlaceholderBody(target));
+  return lines.join('\n');
+}
+
+/**
  * Renders the initial `.env` content for `--write-env` / interactive
- * opt-in (FR3.2). Same shape as `.env.example` so a user can edit a
- * single placeholder rather than hunting through comments. Writing this
+ * opt-in (FR3.2). Same placeholder body as `.env.example`, **without**
+ * the example file's "Copy this file to `.env`…" intro: the real `.env`
+ * is the destination of that copy, so the line would lie. Writing this
  * file is gitignored (FR3.3 ensures `.env` lands in `.gitignore`).
  */
 export function envFileContent(target: TargetId): string {
-  return envExampleContent(target);
+  return envPlaceholderBody(target);
 }
