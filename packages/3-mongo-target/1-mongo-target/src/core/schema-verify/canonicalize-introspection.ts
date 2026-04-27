@@ -26,6 +26,7 @@ import {
   MongoSchemaIndex as MongoSchemaIndexCtor,
   MongoSchemaIR as MongoSchemaIRCtor,
 } from '@prisma-next/mongo-schema-ir';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 export interface CanonicalizedSchemas {
   readonly live: MongoSchemaIR;
@@ -106,20 +107,14 @@ function canonicalizeTextIndexKeyOrder(index: MongoSchemaIndex): MongoSchemaInde
   return new MongoSchemaIndexCtor({
     keys: sortTextKeys(index.keys),
     unique: index.unique,
-    ...(index.sparse !== undefined ? { sparse: index.sparse } : {}),
-    ...(index.expireAfterSeconds !== undefined
-      ? { expireAfterSeconds: index.expireAfterSeconds }
-      : {}),
-    ...(index.partialFilterExpression
-      ? { partialFilterExpression: index.partialFilterExpression }
-      : {}),
-    ...(index.wildcardProjection ? { wildcardProjection: index.wildcardProjection } : {}),
-    ...(index.collation ? { collation: index.collation } : {}),
-    ...(index.weights ? { weights: index.weights } : {}),
-    ...(index.default_language !== undefined ? { default_language: index.default_language } : {}),
-    ...(index.language_override !== undefined
-      ? { language_override: index.language_override }
-      : {}),
+    ...ifDefined('sparse', index.sparse),
+    ...ifDefined('expireAfterSeconds', index.expireAfterSeconds),
+    ...ifDefined('partialFilterExpression', index.partialFilterExpression),
+    ...ifDefined('wildcardProjection', index.wildcardProjection),
+    ...ifDefined('collation', index.collation),
+    ...ifDefined('weights', index.weights),
+    ...ifDefined('default_language', index.default_language),
+    ...ifDefined('language_override', index.language_override),
   });
 }
 
