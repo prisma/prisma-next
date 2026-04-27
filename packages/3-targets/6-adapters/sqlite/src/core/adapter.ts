@@ -62,7 +62,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract_marker where id = ?',
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from _prisma_marker where id = ?',
         params: [1],
       }),
     });
@@ -73,34 +73,48 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {
-    const collectedParamRefs = ast.collectParamRefs();
-    const params: unknown[] = [];
-    for (const ref of collectedParamRefs) {
-      params.push(ref.value);
-    }
-
-    let sql: string;
-
-    const node = ast;
-    switch (node.kind) {
-      case 'select':
-        sql = renderSelect(node, context.contract);
-        break;
-      case 'insert':
-        sql = renderInsert(node);
-        break;
-      case 'update':
-        sql = renderUpdate(node, context.contract);
-        break;
-      case 'delete':
-        sql = renderDelete(node);
-        break;
-      default:
-        throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
-    }
-
-    return Object.freeze({ sql, params });
+    return renderLoweredSql(ast, context.contract);
   }
+}
+
+/**
+ * Lower a SQL query AST into a SQLite-flavored `{ sql, params }` payload.
+ *
+ * Shared between the runtime adapter (`SqliteAdapterImpl.lower`) and the
+ * control adapter (`SqliteControlAdapter.lower`) so both produce
+ * byte-identical SQL for the same AST and contract.
+ */
+export function renderLoweredSql(
+  ast: AnyQueryAst,
+  contract: SqliteContract,
+): SqliteLoweredStatement {
+  const collectedParamRefs = ast.collectParamRefs();
+  const params: unknown[] = [];
+  for (const ref of collectedParamRefs) {
+    params.push(ref.value);
+  }
+
+  let sql: string;
+
+  const node = ast;
+  switch (node.kind) {
+    case 'select':
+      sql = renderSelect(node, contract);
+      break;
+    case 'insert':
+      sql = renderInsert(node);
+      break;
+    case 'update':
+      sql = renderUpdate(node, contract);
+      break;
+    case 'delete':
+      sql = renderDelete(node);
+      break;
+    default:
+      throw new Error(`Unsupported AST node kind: ${(node as { kind: string }).kind}`);
+  }
+
+  return Object.freeze({ sql, params });
 }
 
 function renderSelect(ast: SelectAst, contract?: SqliteContract): string {

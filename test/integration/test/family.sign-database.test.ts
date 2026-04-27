@@ -4,7 +4,6 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
 import sql from '@prisma-next/family-sql/control';
 import sqlFamily from '@prisma-next/family-sql/pack';
-import { readMarker } from '@prisma-next/family-sql/verify';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { SignDatabaseResult } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
@@ -135,7 +134,7 @@ describe('family instance sign', () => {
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was written to database
-          const marker = await readMarker(driver);
+          const marker = await familyInstance.readMarker({ driver });
           expect(marker).not.toBeNull();
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
         } finally {
@@ -227,7 +226,7 @@ describe('family instance sign', () => {
           expect(result.timings.total).toBeGreaterThanOrEqual(0);
 
           // Verify marker was updated in database
-          const marker = await readMarker(driver);
+          const marker = await familyInstance.readMarker({ driver });
           expect(marker).not.toBeNull();
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
           expect(marker?.storageHash).not.toBe('sha256:old-hash');
@@ -299,7 +298,7 @@ describe('family instance sign', () => {
           expect(firstResult.marker.created).toBe(true);
 
           // Get the marker's updated_at timestamp
-          const markerAfterFirst = await readMarker(driver);
+          const markerAfterFirst = await familyInstance.readMarker({ driver });
           const firstUpdatedAt = markerAfterFirst?.updatedAt;
 
           // Second sign - should be idempotent
@@ -323,7 +322,7 @@ describe('family instance sign', () => {
           expect(secondResult.marker.previous).toBeUndefined();
 
           // Verify marker was not updated (updated_at should be the same)
-          const markerAfterSecond = await readMarker(driver);
+          const markerAfterSecond = await familyInstance.readMarker({ driver });
           expect(markerAfterSecond?.updatedAt).toEqual(firstUpdatedAt);
         } finally {
           await driver.close();

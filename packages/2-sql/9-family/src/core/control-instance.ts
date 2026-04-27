@@ -38,7 +38,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from './migrations/types';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
-import { collectSupportedCodecTypeIds, readMarker } from './verify';
+import { collectSupportedCodecTypeIds } from './verify';
 
 function extractCodecTypeIdsFromContract(contract: unknown): readonly string[] {
   const typeIds = new Set<string>();
@@ -217,7 +217,9 @@ function isSqlControlAdapter<TTargetId extends string>(
     typeof value === 'object' &&
     value !== null &&
     'introspect' in value &&
-    typeof (value as { introspect: unknown }).introspect === 'function'
+    typeof (value as { introspect: unknown }).introspect === 'function' &&
+    'readMarker' in value &&
+    typeof (value as { readMarker: unknown }).readMarker === 'function'
   );
 }
 
@@ -293,6 +295,20 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
+  // Family-instance methods accept `ControlDriverInstance<'sql', string>` —
+  // the family API isn't generic on the target id. Letting `isSqlControlAdapter`
+  // default its type parameter narrows the adapter to `SqlControlAdapter<string>`,
+  // which matches the family-level driver type without any cast at call sites.
+  const getControlAdapter = () => {
+    const controlAdapter = adapter.create(stack);
+    if (!isSqlControlAdapter(controlAdapter)) {
+      throw new Error(
+        'Adapter does not implement SqlControlAdapter (missing introspect or readMarker)',
+      );
+    }
+    return controlAdapter;
+  };
+
   return {
     familyId: 'sql',
     codecTypeImports,
@@ -326,7 +342,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const contractProfileHash = contract.profileHash;
       const contractTarget = contract.target;
 
-      const marker = await readMarker(driver);
+      const marker = await getControlAdapter().readMarker(driver);
 
       let missingCodecs: readonly string[] | undefined;
       let codecCoverageSkipped = false;
@@ -435,10 +451,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
 
-      const controlAdapter = adapter.create(stack);
-      if (!isSqlControlAdapter(controlAdapter)) {
-        throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
-      }
+      const controlAdapter = getControlAdapter();
       const schemaIR = await controlAdapter.introspect(driver, contractInput);
 
       return verifySqlSchema({
@@ -474,7 +487,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       await driver.query(ensureSchemaStatement.sql, ensureSchemaStatement.params);
       await driver.query(ensureTableStatement.sql, ensureTableStatement.params);
 
-      const existingMarker = await readMarker(driver);
+      const existingMarker = await getControlAdapter().readMarker(driver);
 
       let markerCreated = false;
       let markerUpdated = false;
@@ -551,19 +564,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async readMarker(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
     }): Promise<ContractMarkerRecord | null> {
-      return readMarker(options.driver);
+      return getControlAdapter().readMarker(options.driver);
     },
     async introspect(options: {
       readonly driver: ControlDriverInstance<'sql', string>;
       readonly contract?: unknown;
     }): Promise<SqlSchemaIR> {
-      const { driver, contract } = options;
-
-      const controlAdapter = adapter.create(stack);
-      if (!isSqlControlAdapter(controlAdapter)) {
-        throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
-      }
-      return controlAdapter.introspect(driver, contract);
+      return getControlAdapter().introspect(options.driver, options.contract);
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {

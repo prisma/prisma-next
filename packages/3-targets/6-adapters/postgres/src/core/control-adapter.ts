@@ -1,4 +1,6 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
@@ -54,6 +56,54 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    */
   lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
     return renderLoweredSql(ast, context.contract as PostgresContract);
+  }
+
+  /**
+   * Reads the contract marker from `prisma_contract.marker`. Probes
+   * `information_schema.tables` first so a fresh database (where the
+   * `prisma_contract` schema doesn't yet exist) returns `null` instead of a
+   * "relation does not exist" error — some Postgres wire-protocol clients
+   * (e.g. PGlite's TCP proxy) don't fully recover from extended-protocol
+   * parse errors, so we probe before reading.
+   */
+  async readMarker(
+    driver: ControlDriverInstance<'sql', 'postgres'>,
+  ): Promise<ContractMarkerRecord | null> {
+    const exists = await driver.query(
+      `select 1
+       from information_schema.tables
+       where table_schema = $1 and table_name = $2`,
+      ['prisma_contract', 'marker'],
+    );
+    if (exists.rows.length === 0) {
+      return null;
+    }
+
+    const result = await driver.query<{
+      core_hash: string;
+      profile_hash: string;
+      contract_json: unknown | null;
+      canonical_version: number | null;
+      updated_at: Date | string;
+      app_tag: string | null;
+      meta: unknown | null;
+    }>(
+      `select
+         core_hash,
+         profile_hash,
+         contract_json,
+         canonical_version,
+         updated_at,
+         app_tag,
+         meta
+       from prisma_contract.marker
+       where id = $1`,
+      [1],
+    );
+
+    const row = result.rows[0];
+    if (!row) return null;
+    return parseContractMarkerRow(row);
   }
 
   /**
