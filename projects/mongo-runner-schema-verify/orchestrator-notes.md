@@ -184,6 +184,43 @@ _(none yet)_
 
 **Process note:** This finding plus the Coverage CI gap (commit `30311e568`) on A02 were both caught only because a fresh CodeRabbit pass ran after the PR went green. The internal R1-R4 review gates didn't catch the F2 false-negative because the F2 acceptance suite only exercised happy-path canonicalization. Future test additions for canonicalizers that *strip* fields should include "tampered-live with non-default value" cases by default.
 
+### 2026-04-27 — A12: stripUnspecifiedFields hid drift when contract omitted whole option family (Spec R1 regression caught post-PR)
+
+**What surfaced:** A second `🔴 Critical` CodeRabbit finding landed after the A10 fix went green, on `canonicalize-introspection.ts:386` (`stripUnspecifiedFields` helper, R2 commit `85df12f2a`). When the contract authored *no* collation / timeseries / clusteredIndex but the live IR had one (introspected from MongoDB), `stripUnspecifiedFields(live, undefined)` returned `undefined`, so `canonicalizeLiveOptions` produced canonical IR with the entire option family dropped. The diff layer then matched empty-vs-empty and the verifier silently passed. This means `migration apply` would advance the marker over a live collection that was tampered with a server-attached collation, converted to a timeseries collection, or had a clusteredIndex grafted on out-of-band — the exact class of drift R1 was supposed to catch. CodeRabbit's reproduction: live `posts` collection with `collation: {locale: 'en', strength: 2}`, contract authored no collation → verifier reports OK.
+
+The same false-negative pattern as A10: an unconditional "strip when contract is silent" rule that strips real drift, not just server defaults. Different mechanism (`undefined` shortcut vs unconditional override), same correctness shape.
+
+**Why this would have been a user-facing decision:** Same as A10 — this inverts spec R1 ("a successful `migration apply` … guarantees the live schema satisfies the destination contract") for three more option families (collation, timeseries, clusteredIndex). The bug slipped past R1-R4 review for the same reason A10 did: every F2 acceptance test asserted positive (non-drift) cases. Filing as follow-up would ship a known regression in the only PR that introduces the verify step.
+
+**Decision:** Fix in this PR. Rationale:
+- Same R1-guarantee logic as A10. The verifier's job is to catch drift; a helper that hides drift is the bug, not a feature.
+- The fix is one-line: when `expected` is `undefined`, return `live` unchanged (so the diff layer sees the live block and surfaces it as drift). Per-field stripping for the case where `expected` is non-`undefined` is unchanged. Existing tests for "strips server-only fields when contract specified the family" still cover the happy path.
+- Two regression tests in the existing `collection options collation` and `clusteredIndex collection options` describe blocks cover the tampered shapes (live collation/clusteredIndex/timeseries, contract authored none) and assert `result.ok === false` with at least one failed schema check.
+
+**Where it lives now:** New commit on this iteration. `review-actions.json` records A12 as `done`. Reply posted to thread `PRRT_kwDOQM0QJc59v-GO` with 👍 + resolve.
+
+**Reversibility:** Trivial. The change is one branch in `stripUnspecifiedFields` (`return live` instead of `return undefined`). Reverting restores the previous (buggy) behavior. The three regression tests would need to invert their assertions if reverted.
+
+**Process note:** Two `🔴 Critical` post-merge findings (A10 + A12) on the same canonicalizer over a 12-hour window strongly suggest the F2 acceptance suite needs a uniform "tampered-live, contract-silent" axis: for every field the canonicalizer strips, add a test where the live value is non-default and the contract authored nothing, and assert the verifier *fails*. The narrow per-field tests in this PR cover the three text-index fields plus collation/timeseries/clusteredIndex; future canonicalizer fields should follow the pattern by default.
+
+### 2026-04-27 — A11: one-to-one index-counterpart matching (auto-resolved by bot; declined for this PR regardless)
+
+**What surfaced:** CodeRabbit `🟠 Major` finding on `canonicalize-introspection.ts:218` (`findExpectedIndexCounterpart`). The function picks the *first* expected index whose projected key signature matches the live index's. In the rare case where two indexes share the same key signature but differ in options (e.g. one with `unique: true`, one without; or two text indexes with different `weights`), every live index would normalize against the same expected counterpart, dropping the second match's authored options from comparison. CodeRabbit recommended a one-to-one greedy match (mark the picked counterpart as consumed; skip it on subsequent lookups), or include differentiating option families in the predicate.
+
+**Outcome:** CodeRabbit auto-resolved the thread (`PRRT_kwDOQM0QJc59v-GJ`) attributing the resolution to commits `e5d74a8..cd3619b3` — but those commits address A10 (text-index defaults) and A04a (`ifDefined` refactor); **they do not change `findExpectedIndexCounterpart`'s matching strategy**. The bot's auto-resolve is incorrect on the merits; the underlying issue is still present. Recording the orchestrator's deliberate call so the user can audit on return.
+
+**Why this would have been a user-facing decision:** A real (if narrow) edge case the current code does not handle, but with no concrete in-the-wild reproduction. The current code's docstring already calls it out ("Contracts very rarely contain duplicate-key indexes; if we have no counterpart we fall back to no normalization for that index"). Treating it as actionable would expand scope; declining it accepts a small theoretical false-negative for duplicate-signature indexes.
+
+**Decision:** Decline in this PR; if real-world contracts surface with duplicate-signature indexes, reopen as a focused follow-up. Rationale:
+- The contract authoring layer (PSL `@@index`/`@@unique`/`@@textIndex`) plus the canonicalization passes upstream do not produce duplicate key+direction signatures within one collection in any current authoring path. Hitting this edge case requires a handcrafted `MongoContract` IR.
+- The one-to-one match is a behaviour change that would need its own regression tests for the duplicate-signature case (and a believable test fixture). Out of scope for the post-PR CodeRabbit-iteration pass.
+- A10 + A12 already exposed that the canonicalizer hides drift in shapes the F2 acceptance suite never exercised; stacking a third refactor in the same area without the broader test-pattern overhaul (see A12 § Process note) risks introducing a fourth issue.
+- The thread is already resolved on GitHub (auto-resolved by the bot), so no thread reply or admin is needed; this note is the audit trail.
+
+**Where it lives now:** Recorded as `wont_address` in `wip/reviews/prisma_prisma-next_pr-380/review-actions.json` (A11). No thread reply was posted because the thread is already resolved. If a real-world contract surfaces with duplicate-signature indexes, reopen as a focused follow-up.
+
+**Reversibility:** Trivial. The current single-pass loop becomes a Set-tracked greedy loop in the future, with one new test fixture.
+
 ### 2026-04-27 — A06b: declined adding a per-hook timeout helper to the integration test
 
 **What surfaced:** CodeRabbit nitpick on `mongo-runner.schema-verify.integration.test.ts:27-46` recommended wrapping the `beforeAll` replSet startup in `timeouts.databaseOperation` (5000ms).
