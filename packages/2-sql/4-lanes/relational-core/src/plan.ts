@@ -12,14 +12,13 @@ import type { AnyQueryAst } from './ast/types';
  * SQL adapter and produces a `SqlExecutionPlan`.
  *
  * Extends the framework-level `QueryPlan<Row>` marker (`meta + _row`) and
- * adds SQL-specific fields (`ast`, `params`). The `_Row` phantom property
- * is retained alongside `_row` for backwards-compatible type extraction by
- * the SQL `ResultType` utility.
+ * adds SQL-specific fields (`ast`, `params`). The phantom `_row` property
+ * (inherited from `QueryPlan`) is what `ResultType<P>` inspects to recover
+ * the row type.
  */
 export interface SqlQueryPlan<Row = unknown> extends QueryPlan<Row> {
   readonly ast: AnyQueryAst;
   readonly params: readonly unknown[];
-  readonly _Row?: Row;
 }
 
 /**
