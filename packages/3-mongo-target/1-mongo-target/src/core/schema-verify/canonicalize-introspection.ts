@@ -142,7 +142,14 @@ function sortTextKeys(
   if (textEntries.length <= 1) return keys;
   const sortedText = [...textEntries].sort((a, b) => a.field.localeCompare(b.field));
   let textIdx = 0;
-  return keys.map((k) => (k.direction === 'text' ? sortedText[textIdx++]! : k));
+  return keys.map((k) => {
+    if (k.direction !== 'text') return k;
+    const next = sortedText[textIdx++];
+    if (next === undefined) {
+      throw new Error('sortTextKeys: text-key counts mismatched');
+    }
+    return next;
+  });
 }
 
 function canonicalizeLiveIndex(
