@@ -156,15 +156,21 @@ export async function probeServerVersion(
 /**
  * Compares two semver-prefix strings ("14", "14.2", "6.0", …) by
  * numeric components left-to-right. Returns a negative number when `a`
- * is older than `b`, zero when equal up to the shorter length, and a
+ * is older than `b`, zero when both versions agree on every numeric
+ * component (treating missing trailing components as `0`), and a
  * positive number when `a` is newer.
+ *
+ * The loop runs over the **longer** of the two prefixes so that
+ * `'14'` compares less than `'14.1'` — without that, the shorter
+ * prefix would be silently accepted whenever the configured minimum
+ * has a non-zero minor or patch.
  *
  * Exported for unit tests.
  */
 export function compareVersionPrefix(a: string, b: string): number {
   const aParts = parseNumericParts(a);
   const bParts = parseNumericParts(b);
-  const len = Math.min(aParts.length, bParts.length);
+  const len = Math.max(aParts.length, bParts.length);
   for (let i = 0; i < len; i += 1) {
     const aPart = aParts[i] ?? 0;
     const bPart = bParts[i] ?? 0;
