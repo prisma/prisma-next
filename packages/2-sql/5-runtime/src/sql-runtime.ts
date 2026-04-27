@@ -252,7 +252,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         await self.verifyMarker();
       }
 
-      if (self.verify.mode === 'onFirstUse') {
+      if (!self.verified && self.verify.mode === 'onFirstUse') {
         await self.verifyMarker();
       }
 
