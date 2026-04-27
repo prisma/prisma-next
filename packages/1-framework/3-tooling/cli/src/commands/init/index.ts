@@ -8,6 +8,7 @@ import { type CommonCommandOptions, parseGlobalFlags } from '../../utils/global-
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
+  INIT_EXIT_INTERNAL_ERROR,
   INIT_EXIT_OK,
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
@@ -47,6 +48,7 @@ export function createInitCommand(): Command {
       '\n' +
       'Exit codes (see CLI Style Guide § Exit Codes):\n' +
       `  ${INIT_EXIT_OK}   OK                    Init succeeded.\n` +
+      `  ${INIT_EXIT_INTERNAL_ERROR}   INTERNAL_ERROR        Unexpected bug in prisma-next (please report).\n` +
       `  ${INIT_EXIT_PRECONDITION}   PRECONDITION          Bad flags / missing prerequisite (e.g. no package.json).\n` +
       `  ${INIT_EXIT_USER_ABORTED}   USER_ABORTED          User cancelled an interactive prompt.\n` +
       `  ${INIT_EXIT_INSTALL_FAILED}   INSTALL_FAILED        Dependency installation failed (init-specific).\n` +

@@ -15,7 +15,12 @@
 export const INIT_EXIT_OK = 0;
 
 /**
- * Anything we did not anticipate. Maps to the generic "RUN" error domain.
+ * Anything we did not anticipate — a bug in prisma-next, not something
+ * the caller did wrong. Includes the structured error code `5009`
+ * (invalid output document) and any unrecognised internal error code,
+ * so callers can distinguish "tool is broken" from "your invocation
+ * was wrong" (`PRECONDITION = 2`). Maps to the generic "RUN" error
+ * domain.
  */
 export const INIT_EXIT_INTERNAL_ERROR = 1;
 

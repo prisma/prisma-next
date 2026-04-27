@@ -27,6 +27,7 @@ import {
 import {
   INIT_EXIT_EMIT_FAILED,
   INIT_EXIT_INSTALL_FAILED,
+  INIT_EXIT_INTERNAL_ERROR,
   INIT_EXIT_OK,
   INIT_EXIT_PRECONDITION,
   INIT_EXIT_USER_ABORTED,
@@ -455,14 +456,21 @@ function emitError(ui: TerminalUI, flags: GlobalFlags, error: CliStructuredError
 
 /**
  * Maps a structured init error to its documented exit code. Centralised so
- * a missing case here surfaces as a TypeScript error (via the exhaustive
- * default) rather than as a silent `INTERNAL_ERROR` fallback.
+ * the error → exit-code contract lives next to the codes themselves.
+ *
+ * `5009` (and the unknown-code default branch) routes to
+ * `INIT_EXIT_INTERNAL_ERROR` because those represent prisma-next bugs the
+ * user did not cause — surfacing them as `PRECONDITION` would mislead
+ * automation into thinking the caller mis-invoked the CLI.
  *
  * See [exit-codes.ts](./exit-codes.ts) for the canonical list and
  * [Style Guide § Exit Codes](../../../../../../../docs/CLI%20Style%20Guide.md#exit-codes)
  * for the reservation policy.
+ *
+ * Exported for unit tests so the mapping can be asserted without
+ * round-tripping a full `runInit` invocation.
  */
-function exitCodeForError(error: CliStructuredError): number {
+export function exitCodeForError(error: { readonly code: string }): number {
   switch (error.code) {
     case '5001': // missing manifest — precondition
     case '5002': // re-init needs --force — precondition
@@ -479,8 +487,13 @@ function exitCodeForError(error: CliStructuredError): number {
       return INIT_EXIT_INSTALL_FAILED;
     case '5008': // emit failed
       return INIT_EXIT_EMIT_FAILED;
+    case '5009': // invalid output document — internal bug in prisma-next
+      return INIT_EXIT_INTERNAL_ERROR;
     default:
-      return INIT_EXIT_PRECONDITION;
+      // Any unexpected code is treated as an internal bug rather than
+      // mis-routed to PRECONDITION. Adding a new code requires an
+      // explicit case above.
+      return INIT_EXIT_INTERNAL_ERROR;
   }
 }
 
