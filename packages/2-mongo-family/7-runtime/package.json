@@ -19,7 +19,8 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
-    "@prisma-next/mongo-wire": "workspace:*"
+    "@prisma-next/mongo-wire": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
