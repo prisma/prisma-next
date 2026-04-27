@@ -288,8 +288,6 @@ packages/
     3-tooling/
       cli/               # framework CLI (config-only, family-agnostic)
       emitter/           # contract emitter with family hooks
-    4-runtime/
-      runtime-executor/  # target-agnostic runtime kernel (verification, plugins, SPI)
   2-sql/                 # Domain 2: SQL family
     1-core/
       contract/          # SQL contract types (shared plane)
@@ -305,7 +303,7 @@ packages/
       sql-lane/          # relational DSL + raw lane
       orm-lane/          # ORM builder, includes, relation filters
       query-builder/     # query builder lane
-    5-runtime/           # SQL runtime implementing the runtime SPI
+    5-runtime/           # SQL runtime extending RuntimeCore from framework-components
   2-mongo-family/        # Domain 2: Mongo family
     1-foundation/
       mongo-contract/    # Mongo contract types + validation
@@ -322,7 +320,7 @@ packages/
     6-transport/
       mongo-lowering/    # lowering interfaces and transport contracts
       mongo-wire/        # wire commands and result types
-    7-runtime/           # Mongo runtime implementing the runtime SPI
+    7-runtime/           # Mongo runtime extending RuntimeCore from framework-components
     9-family/            # Mongo family descriptor and family pack
   3-mongo-target/        # Domain 3: Mongo target packages
     1-mongo-target/      # Mongo target pack
@@ -341,7 +339,7 @@ packages/
 
 `packages/3-targets/**` remains the canonical generic target domain for dialect-scoped target, adapter, and driver packages such as Postgres. `packages/3-mongo-target/**` is the Mongo-specific counterpart under the same broader target concept, and contributors should keep following the repo's `{domain}/{subdomain}` naming pattern when adding new package groups.
 
-Dependency direction is strictly one-way: `core → authoring → tooling → lanes → runtime-executor → family runtime → adapters`. Numbered prefixes reinforce the hierarchy: lower numbers can be imported by higher numbers, never the reverse. Enforce with Dependency Cruiser using data-driven configuration from `architecture.config.json`.
+Dependency direction is strictly one-way: `core → authoring → tooling → lanes → runtime → adapters`. Numbered prefixes reinforce the hierarchy: lower numbers can be imported by higher numbers, never the reverse. Enforce with Dependency Cruiser using data-driven configuration from `architecture.config.json`.
 
 ### Diagram — Thin core, fat targets
 
