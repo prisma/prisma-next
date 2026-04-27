@@ -94,7 +94,11 @@ export function resolveMongoBinding(options: MongoBindingInput): MongoBinding {
 
   if (options.url !== undefined) {
     const parsed = validateMongoUrl(options.url);
-    const dbName = options.dbName ?? extractDbNameFromUrl(parsed);
+    const explicitDbName = options.dbName?.trim();
+    const dbName =
+      explicitDbName !== undefined && explicitDbName.length > 0
+        ? explicitDbName
+        : extractDbNameFromUrl(parsed);
     if (dbName === undefined || dbName.length === 0) {
       throw new Error(
         'Mongo URL must include a database name in its path (e.g. mongodb://host:27017/mydb), or pass dbName explicitly',
@@ -105,20 +109,22 @@ export function resolveMongoBinding(options: MongoBindingInput): MongoBinding {
 
   if (options.uri !== undefined) {
     validateMongoUrl(options.uri);
-    if (options.dbName === undefined || options.dbName.length === 0) {
+    const dbName = options.dbName?.trim();
+    if (dbName === undefined || dbName.length === 0) {
       throw new Error('Mongo binding via { uri, dbName } requires a non-empty dbName');
     }
-    return { kind: 'url', url: options.uri.trim(), dbName: options.dbName };
+    return { kind: 'url', url: options.uri.trim(), dbName };
   }
 
   const mongoClient = options.mongoClient;
   if (mongoClient === undefined) {
     throw new Error('Invariant violation: expected mongo binding after validation');
   }
-  if (options.dbName === undefined || options.dbName.length === 0) {
+  const dbName = options.dbName?.trim();
+  if (dbName === undefined || dbName.length === 0) {
     throw new Error('Mongo binding via { mongoClient, dbName } requires a non-empty dbName');
   }
-  return { kind: 'mongoClient', client: mongoClient, dbName: options.dbName };
+  return { kind: 'mongoClient', client: mongoClient, dbName };
 }
 
 export function resolveOptionalMongoBinding(options: MongoBindingFields): MongoBinding | undefined {
@@ -131,6 +137,32 @@ export function resolveOptionalMongoBinding(options: MongoBindingFields): MongoB
   if (providedCount === 0) {
     return undefined;
   }
-
-  return resolveMongoBinding(options as MongoBindingInput);
+  // Defer the "exactly one" enforcement to `resolveMongoBinding`. We call it
+  // through a single branch per input field so the matching union member of
+  // `MongoBindingInput` is constructed explicitly — the previous
+  // `options as MongoBindingInput` cast hid drift between `MongoBindingFields`
+  // (any combination of optional inputs) and `MongoBindingInput` (exactly one).
+  if (providedCount !== 1) {
+    throw new Error('Provide one binding input: binding, url, uri+dbName, or mongoClient+dbName');
+  }
+  if (options.binding !== undefined) {
+    return resolveMongoBinding({ binding: options.binding });
+  }
+  if (options.url !== undefined) {
+    return resolveMongoBinding(
+      options.dbName !== undefined
+        ? { url: options.url, dbName: options.dbName }
+        : { url: options.url },
+    );
+  }
+  if (options.uri !== undefined) {
+    return resolveMongoBinding({ uri: options.uri, dbName: options.dbName ?? '' });
+  }
+  if (options.mongoClient !== undefined) {
+    return resolveMongoBinding({
+      mongoClient: options.mongoClient,
+      dbName: options.dbName ?? '',
+    });
+  }
+  return undefined;
 }

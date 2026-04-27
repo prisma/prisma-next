@@ -225,6 +225,50 @@ describe('mongo() facade', () => {
     ).toThrow(/dbName/);
   });
 
+  it('throws for { url, dbName: "   " } (whitespace-only dbName)', () => {
+    expect(() =>
+      mongo({
+        contract: fakeContract,
+        url: 'mongodb://localhost:27017',
+        dbName: '   ',
+      }),
+    ).toThrow('Mongo URL must include a database name');
+  });
+
+  it('throws for { uri, dbName: "   " } (whitespace-only dbName)', () => {
+    expect(() =>
+      mongo({
+        contract: fakeContract,
+        uri: 'mongodb://localhost:27017',
+        dbName: '   ',
+      }),
+    ).toThrow('Mongo binding via { uri, dbName } requires a non-empty dbName');
+  });
+
+  it('throws for { mongoClient, dbName: "   " } (whitespace-only dbName)', () => {
+    const fakeClient = { db: vi.fn() };
+    expect(() =>
+      mongo({
+        contract: fakeContract,
+        mongoClient: fakeClient as unknown as import('mongodb').MongoClient,
+        dbName: '   ',
+      }),
+    ).toThrow('Mongo binding via { mongoClient, dbName } requires a non-empty dbName');
+  });
+
+  it('trims a padded dbName before storing it on the binding', async () => {
+    const db = mongo({
+      contract: fakeContract,
+      uri: 'mongodb://localhost:27017',
+      dbName: '  padded_db  ',
+    });
+    await db.runtime();
+    expect(mocks.driverFromConnection).toHaveBeenCalledWith(
+      'mongodb://localhost:27017',
+      'padded_db',
+    );
+  });
+
   it('close() propagates to the underlying runtime when one was built', async () => {
     const db = mongo({ contract: fakeContract, url: 'mongodb://localhost:27017/mydb' });
 

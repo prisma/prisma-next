@@ -1,7 +1,10 @@
 import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { IncludedRow, NoIncludes } from '@prisma-next/mongo-orm';
 import { expectTypeOf, test } from 'vitest';
 import type { Contract } from '../../../2-mongo-family/1-foundation/mongo-contract/test/fixtures/orm-contract';
 import type { MongoClient } from '../src/runtime/mongo';
+
+type UserRow = IncludedRow<Contract, 'User', NoIncludes>;
 
 // Pin the type chain that `init`'s scaffold relies on. The headline trap was
 // `db.orm.X.where(...)` resolving to `never` against an emitted `Contract`
@@ -26,23 +29,13 @@ test('db.orm.users.where(...) returns a chainable collection (not never)', () =>
 test('db.orm.users.where(...).first() resolves to Promise<row | null>', () => {
   const promised = db.orm.users.where({ email: 'a@x' }).first();
   expectTypeOf(promised).not.toBeNever();
-  expectTypeOf(promised).resolves.toMatchTypeOf<{
-    readonly _id: string;
-    readonly name: string;
-    readonly email: string;
-  } | null>();
+  expectTypeOf(promised).resolves.toEqualTypeOf<UserRow | null>();
 });
 
 test('db.orm.users.all() yields rows via AsyncIterableResult', () => {
   const all = db.orm.users.all();
   expectTypeOf(all).not.toBeNever();
-  expectTypeOf(all).toMatchTypeOf<
-    AsyncIterableResult<{
-      readonly _id: string;
-      readonly name: string;
-      readonly email: string;
-    }>
-  >();
+  expectTypeOf(all).toEqualTypeOf<AsyncIterableResult<UserRow>>();
 });
 
 test('db.orm.tasks.variant("Bug").where(...) narrows to the variant', () => {
