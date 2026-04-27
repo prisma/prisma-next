@@ -39,14 +39,20 @@ export function quickReferenceMd(
  * version from `MIN_SERVER_VERSION` — itself mirrored from each
  * target package's `package.json#prismaNext.minServerVersion`
  * (FR8.1).
+ *
+ * The verification command is target-specific — Postgres scaffolds
+ * shouldn't ship Mongo's `db.runCommand` (and vice versa) just because
+ * we couldn't be bothered to branch.
  */
 function requirementsBlock(target: TargetId): string {
   const label = TARGET_LABEL[target];
   const minVersion = MIN_SERVER_VERSION[target];
+  const verifyCommand =
+    target === 'postgres' ? '`SELECT version()`' : '`db.runCommand({ buildInfo: 1 })`';
   return [
     '## Requirements',
     '',
-    `- **${label} ${minVersion} or newer.** Older servers are not supported. Run \`SELECT version()\` (Postgres) or \`db.runCommand({ buildInfo: 1 })\` (Mongo) against your server to verify.`,
+    `- **${label} ${minVersion} or newer.** Older servers are not supported. Run ${verifyCommand} against your server to verify.`,
     '- The CLI never connects to your database without explicit consent. Pass `--probe-db` to `prisma-next init` if you want `init` to verify the server version itself.',
   ].join('\n');
 }
