@@ -1,5 +1,5 @@
-import type { ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
-import type { MiddlewareContext } from '@prisma-next/runtime-executor';
+import type { Contract, ExecutionPlan, PlanMeta } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
   ColumnRef,
@@ -14,10 +14,11 @@ import {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { lints } from '../src/middleware/lints';
+import type { SqlMiddlewareContext } from '../src/middleware/sql-middleware';
 
-function createMiddlewareContext(): MiddlewareContext<unknown> {
+function createMiddlewareContext(): SqlMiddlewareContext {
   return {
-    contract: {},
+    contract: {} as Contract<SqlStorage>,
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {
