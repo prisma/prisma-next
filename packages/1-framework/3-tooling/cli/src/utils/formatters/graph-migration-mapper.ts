@@ -3,7 +3,7 @@
  */
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPath } from '@prisma-next/migration-tools/dag';
-import type { MigrationGraph } from '@prisma-next/migration-tools/types';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 import type { StatusRef } from '../migration-types';

@@ -10,7 +10,7 @@ type CreateMigrationPlanCommand =
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   readFile: vi.fn(),
-  loadAllBundles: vi.fn(),
+  loadAllMigrationPackages: vi.fn(),
   findLatestMigration: vi.fn(),
   writeMigrationPackage: vi.fn(),
   copyFilesWithRename: vi.fn(),
@@ -35,7 +35,7 @@ vi.mock('../../src/utils/command-helpers', async () => {
   );
   return {
     ...actual,
-    loadAllBundles: mocks.loadAllBundles,
+    loadAllMigrationPackages: mocks.loadAllMigrationPackages,
   };
 });
 
@@ -138,7 +138,7 @@ describe('migration plan command', () => {
   // The repo-wide vitest config uses `isolate: false`, so every `vi.mock(...)`
   // registered above leaks into the next test file in the same worker (which
   // breaks anything that does real fs I/O against `node:fs/promises.readFile`,
-  // `command-helpers.loadAllBundles`, or `migration-tools/io.writeMigrationPackage`).
+  // `command-helpers.loadAllMigrationPackages`, or `migration-tools/io.writeMigrationPackage`).
   // Use `doUnmock` (non-hoisted) here so subsequent files see the real modules.
   afterAll(() => {
     vi.doUnmock('node:fs/promises');
@@ -157,13 +157,13 @@ describe('migration plan command', () => {
     it('returns noOp envelope without dir when hashes match', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: SAME_HASH,
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
 
       const command = createMigrationPlanCommand();
@@ -194,13 +194,13 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -225,7 +225,7 @@ describe('migration plan command', () => {
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
         ],
       });
-      expect(result).not.toHaveProperty('migrationId');
+      expect(result).not.toHaveProperty('migrationHash');
     });
   });
 
@@ -276,13 +276,13 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -313,13 +313,13 @@ describe('migration plan command', () => {
       });
 
       mocks.readFile.mockResolvedValue(makeContractJson('sha256:new'));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: 'sha256:old',
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -338,7 +338,7 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [],
         graph: new Map(),
       });
@@ -365,10 +365,10 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
+      mocks.loadAllMigrationPackages.mockResolvedValue({
         bundles: [
           {
-            manifest: { migrationId: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
+            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
             dirPath: '/tmp/test/migrations/20260301T0900_prev',
             dirName: '20260301T0900_prev',
           },
@@ -377,7 +377,7 @@ describe('migration plan command', () => {
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);

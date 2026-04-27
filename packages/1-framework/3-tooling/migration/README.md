@@ -4,24 +4,32 @@
 > and is published only to support its runtime. Its API is unstable and may change
 > without notice. Do not depend on this package directly; install `prisma-next` instead.
 
-On-disk migration persistence, attestation, and history reconstruction for Prisma Next.
+On-disk migration persistence, hash verification, and history reconstruction for Prisma Next.
 
 ## Responsibilities
 
-- **Types**: Define the on-disk migration format (`MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`)
+- **Types**: Define the migration package shape (`MigrationMetadata`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`)
 - **I/O**: Read and write migration packages to/from disk (`migration.json` + `ops.json`)
-- **Attestation**: Compute and verify content-addressed migration IDs for tamper detection
+- **Hashing**: Compute and verify content-addressed migration hashes for tamper detection
 - **History reconstruction**: Reconstruct and navigate migration history (path finding, latest migration detection, cycle/orphan detection)
 
-## Attestation framing
+## Hash framing
 
-`computeMigrationId` in `attestation.ts` uses explicit framing:
+`computeMigrationHash` in `hash.ts` uses explicit framing:
 
-1. Canonicalize migration manifest metadata, ops, and embedded contracts.
-2. Hash each canonical part independently with SHA-256.
-3. Hash the canonical JSON tuple of those part hashes.
+1. Strip identity-affecting fields (`migrationHash`, `signature`, `fromContract`,
+   `toContract`, `hints`) from the metadata envelope, then canonicalize the
+   stripped envelope and the ops array.
+2. SHA-256 each canonical part independently.
+3. SHA-256 the canonical JSON tuple `[hash(metadata), hash(ops)]`.
 
-This avoids delimiter-ambiguity and ensures `migrationId` commits to the exact 4-part tuple.
+This avoids delimiter-ambiguity and pins `migrationHash` to a 2-tuple over
+the on-disk storage shape. Per [ADR 199 — Storage-only migration identity],
+contracts are anchored separately via storage-hash bookends inside the
+metadata envelope, and planner hints are advisory and must not affect
+identity.
+
+[ADR 199 — Storage-only migration identity]: ../../../docs/architecture%20docs/adrs/ADR%20199%20-%20Storage-only%20migration%20identity.md
 
 ## Ops validation boundary
 
@@ -36,14 +44,15 @@ Full semantic validation happens in target/family migration planners and runners
 
 ```mermaid
 graph TD
-    CLI["CLI commands<br/>(migration plan, apply, verify, show, status)"] --> IO["io.ts<br/>File I/O"]
-    CLI --> ATT["attestation.ts<br/>Migration attestation"]
+    CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
+    CLI --> HASH["hash.ts<br/>Migration hashing"]
     CLI --> GRAPH["dag.ts<br/>Graph operations"]
-    IO --> TYPES["types.ts<br/>MigrationManifest, etc."]
-    ATT --> IO
-    ATT --> CAN["canonicalize-json.ts"]
-    ATT --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
-    GRAPH --> TYPES
+    IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
+    IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
+    HASH --> IO
+    HASH --> CAN["canonicalize-json.ts"]
+    HASH --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
+    GRAPH --> GR["graph.ts<br/>MigrationGraph, MigrationChainEntry"]
     GRAPH --> ABS["@prisma-next/migration-tools/constants<br/>EMPTY_CONTRACT_HASH"]
 ```
 
@@ -51,7 +60,7 @@ graph TD
 
 | Package | Why |
 |---|---|
-| `@prisma-next/contract` | `Contract` type for embedded contracts in manifests |
+| `@prisma-next/contract` | `Contract` type for embedded contracts in metadata |
 | `@prisma-next/framework-components` | `MigrationPlanOperation` types (via `./control`) |
 | `@prisma-next/emitter` | `canonicalizeContract` |
 | `arktype` | Runtime shape validation for `migration.json` and `ops.json` |
@@ -66,10 +75,13 @@ graph TD
 
 | Subpath | Contents |
 |---|---|
-| `./types` | `MigrationManifest`, `MigrationOps`, `MigrationPackage`, `MigrationGraph`, `MigrationChainEntry`, `MigrationHints` |
+| `./metadata` | `MigrationMetadata`, `MigrationHints` |
+| `./package` | `MigrationPackage`, `MigrationOps` |
+| `./graph` | `MigrationGraph`, `MigrationChainEntry` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
-| `./attestation` | `computeMigrationId`, `verifyMigration`, `verifyMigrationBundle` |
+| `./hash` | `computeMigrationHash`, `verifyMigrationHash` |
 | `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
+| `./errors` | `MigrationToolsError` |
 | `./constants` | `EMPTY_CONTRACT_HASH` |
 
 ## On-Disk Format
@@ -79,7 +91,7 @@ Each migration is a directory containing two files:
 ```
 migrations/
   20260225T1430_add_users/
-    migration.json    # MigrationManifest
+    migration.json    # MigrationMetadata
     ops.json          # MigrationPlanOperation[]
 ```
 

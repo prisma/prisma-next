@@ -95,10 +95,10 @@ withTempDir(({ createTempDir }) => {
         );
         // The package is fully attested even when the planner could not
         // lower any calls because of placeholders: `ops.json` is `[]` and
-        // `migrationId` is the content-address over `(manifest, [])`.
+        // `migrationHash` is the content-address over `(manifest, [])`.
         // The author re-emits after filling in placeholders to rewrite
-        // both `ops.json` and `migrationId`.
-        expect(manifestBefore.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
+        // both `ops.json` and `migrationHash`.
+        expect(manifestBefore.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
         expect(JSON.parse(readFileSync(join(migrationDir, 'ops.json'), 'utf-8'))).toEqual([]);
 
         const dbSetupBlock = [

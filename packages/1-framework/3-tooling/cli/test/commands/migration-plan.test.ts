@@ -3,16 +3,16 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
@@ -26,15 +26,36 @@ function createTableOp(table: string): MigrationPlanOperation {
 }
 
 /**
- * Build an attested manifest by computing `migrationId` over the supplied
- * base manifest + ops. Mirrors the production `migration plan` flow which
+ * Build attested metadata by computing `migrationHash` over the supplied
+ * base metadata + ops. Mirrors the production `migration plan` flow which
  * always writes a fully-attested package.
  */
-function attestedManifest(
-  base: Omit<MigrationManifest, 'migrationId'>,
+function attestedMetadata(
+  base: Omit<MigrationMetadata, 'migrationHash'>,
   ops: readonly MigrationPlanOperation[],
-): MigrationManifest {
-  return { ...base, migrationId: computeMigrationId(base, ops) };
+): MigrationMetadata {
+  return { ...base, migrationHash: computeMigrationHash(base, ops) };
+}
+
+/**
+ * Canonical helper for writing a test migration package to disk. Always
+ * produces a *consistent* (attested) package: the `migrationHash` is computed
+ * over the exact `ops` passed to the writer, so the resulting package
+ * round-trips through `readMigrationPackage`'s integrity check.
+ *
+ * Mirrors the `writeTestPackage` helper in
+ * `migration-tools/test/fixtures.ts` and `migration-e2e.test.ts`. The
+ * cross-package consolidation into a published
+ * `@prisma-next/migration-tools/testing` subpath is queued as a follow-up.
+ */
+async function writeTestPackage(
+  dir: string,
+  base: Omit<MigrationMetadata, 'migrationHash'>,
+  ops: readonly MigrationPlanOperation[],
+): Promise<MigrationMetadata> {
+  const metadata = attestedMetadata(base, ops);
+  await writeMigrationPackage(dir, metadata, ops);
+  return metadata;
 }
 
 async function createTempDir(prefix: string): Promise<string> {
@@ -66,7 +87,11 @@ describe('migration plan — core flow', () => {
 
     const ops: MigrationPlanOperation[] = [createTableOp('user')];
 
-    const manifest = attestedManifest(
+    const dirName = formatMigrationDirName(new Date(), 'initial');
+    const packageDir = join(migrationsDir, dirName);
+
+    const metadata = await writeTestPackage(
+      packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:test-hash',
@@ -84,18 +109,13 @@ describe('migration plan — core flow', () => {
       ops,
     );
 
-    const dirName = formatMigrationDirName(new Date(), 'initial');
-    const packageDir = join(migrationsDir, dirName);
-
-    await writeMigrationPackage(packageDir, manifest, ops);
-
     const pkg = await readMigrationPackage(packageDir);
 
-    expect(pkg.manifest.from).toBe(EMPTY_CONTRACT_HASH);
-    expect(pkg.manifest.to).toBe('sha256:test-hash');
-    expect(pkg.manifest.migrationId).toBe(manifest.migrationId);
-    expect(pkg.manifest.kind).toBe('regular');
-    expect(pkg.manifest.fromContract).toBeNull();
+    expect(pkg.metadata.from).toBe(EMPTY_CONTRACT_HASH);
+    expect(pkg.metadata.to).toBe('sha256:test-hash');
+    expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
+    expect(pkg.metadata.kind).toBe('regular');
+    expect(pkg.metadata.fromContract).toBeNull();
     expect(pkg.ops).toHaveLength(1);
     expect(pkg.ops[0]!.id).toBe('table.user');
   });
@@ -106,7 +126,10 @@ describe('migration plan — core flow', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const contract = createContract();
-    const manifest = attestedManifest(
+    const dirName = formatMigrationDirName(new Date(), 'first');
+    const packageDir = join(migrationsDir, dirName);
+    await writeTestPackage(
+      packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:same-hash',
@@ -123,10 +146,6 @@ describe('migration plan — core flow', () => {
       },
       [],
     );
-
-    const dirName = formatMigrationDirName(new Date(), 'first');
-    const packageDir = join(migrationsDir, dirName);
-    await writeMigrationPackage(packageDir, manifest, []);
 
     // Read migrations and find leaf — leaf should be 'sha256:same-hash'
     const packages = await readMigrationsDir(migrationsDir);
@@ -173,25 +192,22 @@ describe('migration plan — core flow', () => {
       const dir1 = formatMigrationDirName(new Date(2026, 0, 1, 10, 0), 'add_user');
       const path1 = join(migrationsDir, dir1);
       const ops1 = [createTableOp('user')];
-      await writeMigrationPackage(
+      await writeTestPackage(
         path1,
-        attestedManifest(
-          {
-            from: EMPTY_CONTRACT_HASH,
-            to: 'sha256:hash-a',
-            kind: 'regular',
-            fromContract: null,
-            toContract: contractA,
-            hints: {
-              used: [],
-              applied: ['additive_only'],
-              plannerVersion: '1.0.0',
-            },
-            labels: [],
-            createdAt: new Date().toISOString(),
+        {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:hash-a',
+          kind: 'regular',
+          fromContract: null,
+          toContract: contractA,
+          hints: {
+            used: [],
+            applied: ['additive_only'],
+            plannerVersion: '1.0.0',
           },
-          ops1,
-        ),
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
         ops1,
       );
 
@@ -199,25 +215,22 @@ describe('migration plan — core flow', () => {
       const dir2 = formatMigrationDirName(new Date(2026, 0, 2, 10, 0), 'add_post');
       const path2 = join(migrationsDir, dir2);
       const ops2 = [createTableOp('post')];
-      await writeMigrationPackage(
+      await writeTestPackage(
         path2,
-        attestedManifest(
-          {
-            from: 'sha256:hash-a',
-            to: 'sha256:hash-b',
-            kind: 'regular',
-            fromContract: contractA,
-            toContract: contractB,
-            hints: {
-              used: [],
-              applied: ['additive_only'],
-              plannerVersion: '1.0.0',
-            },
-            labels: [],
-            createdAt: new Date().toISOString(),
+        {
+          from: 'sha256:hash-a',
+          to: 'sha256:hash-b',
+          kind: 'regular',
+          fromContract: contractA,
+          toContract: contractB,
+          hints: {
+            used: [],
+            applied: ['additive_only'],
+            plannerVersion: '1.0.0',
           },
-          ops2,
-        ),
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
         ops2,
       );
 
@@ -230,9 +243,9 @@ describe('migration plan — core flow', () => {
       expect(leaf).toBe('sha256:hash-b');
 
       // Verify chain: first migration's `to` === second migration's `from`
-      const pkg1 = packages.find((p) => p.manifest.to === 'sha256:hash-a')!;
-      const pkg2 = packages.find((p) => p.manifest.to === 'sha256:hash-b')!;
-      expect(pkg1.manifest.to).toBe(pkg2.manifest.from);
+      const pkg1 = packages.find((p) => p.metadata.to === 'sha256:hash-a')!;
+      const pkg2 = packages.find((p) => p.metadata.to === 'sha256:hash-b')!;
+      expect(pkg1.metadata.to).toBe(pkg2.metadata.from);
     },
     timeouts.databaseOperation,
   );
@@ -258,7 +271,10 @@ describe('--from hash lookup', () => {
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
 
-    const manifest = attestedManifest(
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeTestPackage(
+      packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:known-hash',
@@ -271,12 +287,9 @@ describe('--from hash lookup', () => {
       },
       [],
     );
-    const dirName = formatMigrationDirName(new Date(), 'test');
-    const packageDir = join(migrationsDir, dirName);
-    await writeMigrationPackage(packageDir, manifest, []);
 
     const packages = await readMigrationsDir(migrationsDir);
-    const found = packages.find((p) => p.manifest.to === 'sha256:nonexistent');
+    const found = packages.find((p) => p.metadata.to === 'sha256:nonexistent');
     expect(found).toBeUndefined();
   });
 
@@ -286,7 +299,10 @@ describe('--from hash lookup', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const contract = createContract();
-    const manifest = attestedManifest(
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeTestPackage(
+      packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:abcdef1234567890',
@@ -299,15 +315,12 @@ describe('--from hash lookup', () => {
       },
       [],
     );
-    const dirName = formatMigrationDirName(new Date(), 'test');
-    const packageDir = join(migrationsDir, dirName);
-    await writeMigrationPackage(packageDir, manifest, []);
 
     const packages = await readMigrationsDir(migrationsDir);
     const result = resolveBundleByPrefix(packages, 'abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.to).toBe('sha256:abcdef1234567890');
+      expect(result.value.metadata.to).toBe('sha256:abcdef1234567890');
     }
   });
 
@@ -317,7 +330,10 @@ describe('--from hash lookup', () => {
     await mkdir(migrationsDir, { recursive: true });
 
     const contract = createContract();
-    const manifest = attestedManifest(
+    const dirName = formatMigrationDirName(new Date(), 'test');
+    const packageDir = join(migrationsDir, dirName);
+    await writeTestPackage(
+      packageDir,
       {
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:abcdef1234567890',
@@ -330,15 +346,12 @@ describe('--from hash lookup', () => {
       },
       [],
     );
-    const dirName = formatMigrationDirName(new Date(), 'test');
-    const packageDir = join(migrationsDir, dirName);
-    await writeMigrationPackage(packageDir, manifest, []);
 
     const packages = await readMigrationsDir(migrationsDir);
     const result = resolveBundleByPrefix(packages, 'sha256:abcdef');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.to).toBe('sha256:abcdef1234567890');
+      expect(result.value.metadata.to).toBe('sha256:abcdef1234567890');
     }
   });
 
@@ -354,40 +367,34 @@ describe('--from hash lookup', () => {
 
       // Two migrations whose `to` hashes share a prefix
       const dir1 = formatMigrationDirName(new Date(2026, 0, 1), 'first');
-      await writeMigrationPackage(
+      await writeTestPackage(
         join(migrationsDir, dir1),
-        attestedManifest(
-          {
-            from: EMPTY_CONTRACT_HASH,
-            to: 'sha256:abc111',
-            kind: 'regular',
-            fromContract: null,
-            toContract: contractA,
-            hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-            labels: [],
-            createdAt: new Date().toISOString(),
-          },
-          [],
-        ),
+        {
+          from: EMPTY_CONTRACT_HASH,
+          to: 'sha256:abc111',
+          kind: 'regular',
+          fromContract: null,
+          toContract: contractA,
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
         [],
       );
 
       const dir2 = formatMigrationDirName(new Date(2026, 0, 2), 'second');
-      await writeMigrationPackage(
+      await writeTestPackage(
         join(migrationsDir, dir2),
-        attestedManifest(
-          {
-            from: 'sha256:abc111',
-            to: 'sha256:abc222',
-            kind: 'regular',
-            fromContract: contractA,
-            toContract: contractB,
-            hints: { used: [], applied: [], plannerVersion: '1.0.0' },
-            labels: [],
-            createdAt: new Date().toISOString(),
-          },
-          [],
-        ),
+        {
+          from: 'sha256:abc111',
+          to: 'sha256:abc222',
+          kind: 'regular',
+          fromContract: contractA,
+          toContract: contractB,
+          hints: { used: [], applied: [], plannerVersion: '1.0.0' },
+          labels: [],
+          createdAt: new Date().toISOString(),
+        },
         [],
       );
 

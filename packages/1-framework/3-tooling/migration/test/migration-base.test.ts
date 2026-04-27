@@ -1,7 +1,7 @@
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
+import type { MigrationMetadata } from '../src/metadata';
 import { buildMigrationArtifacts, Migration } from '../src/migration-base';
-import type { MigrationManifest } from '../src/types';
 
 describe('Migration', () => {
   describe('operations + describe() contract', () => {
@@ -136,29 +136,29 @@ describe('buildMigrationArtifacts', () => {
     return new M();
   }
 
-  it('produces ops.json + migration.json strings with synthesized manifest fields', () => {
-    const { opsJson, manifest, manifestJson } = buildMigrationArtifacts(
+  it('produces ops.json + migration.json strings with synthesized metadata fields', () => {
+    const { opsJson, metadata, metadataJson } = buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Test op' }]),
       null,
     );
 
     expect(JSON.parse(opsJson)).toEqual([{ id: 'op1', label: 'Test op' }]);
 
-    expect(manifest.from).toBe('abc');
-    expect(manifest.to).toBe('def');
-    expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(manifest.kind).toBe('regular');
-    expect(manifest.labels).toEqual([]);
-    expect(manifest.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-    expect(manifest.fromContract).toBeNull();
-    expect(manifest.toContract).toEqual({ storage: { storageHash: 'def' } });
-    expect(manifest.hints).toMatchObject({ used: [], applied: [] });
+    expect(metadata.from).toBe('abc');
+    expect(metadata.to).toBe('def');
+    expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(metadata.kind).toBe('regular');
+    expect(metadata.labels).toEqual([]);
+    expect(metadata.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(metadata.fromContract).toBeNull();
+    expect(metadata.toContract).toEqual({ storage: { storageHash: 'def' } });
+    expect(metadata.hints).toMatchObject({ used: [], applied: [] });
 
-    expect(JSON.parse(manifestJson)).toEqual(manifest);
+    expect(JSON.parse(metadataJson)).toEqual(metadata);
   });
 
-  it('preserves contract bookends, hints, labels, and createdAt from an existing manifest', () => {
-    const existingManifest: Partial<MigrationManifest> = {
+  it('preserves contract bookends, hints, labels, and createdAt from existing metadata', () => {
+    const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
       kind: 'regular',
@@ -173,24 +173,24 @@ describe('buildMigrationArtifacts', () => {
       createdAt: '2026-01-15T10:00:00.000Z',
     };
 
-    const { manifest } = buildMigrationArtifacts(
+    const { metadata } = buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Edited op', operationClass: 'additive' }], {
         from: 'sha256:from',
         to: 'sha256:to',
       }),
-      existingManifest,
+      existingMetadata,
     );
 
-    expect(manifest.fromContract).toEqual(existingManifest.fromContract);
-    expect(manifest.toContract).toEqual(existingManifest.toContract);
-    expect(manifest.hints).toEqual(existingManifest.hints);
-    expect(manifest.labels).toEqual(existingManifest.labels);
-    expect(manifest.createdAt).toBe(existingManifest.createdAt);
-    expect(manifest.migrationId).toMatch(/^sha256:[a-f0-9]{64}$/);
+    expect(metadata.fromContract).toEqual(existingMetadata.fromContract);
+    expect(metadata.toContract).toEqual(existingMetadata.toContract);
+    expect(metadata.hints).toEqual(existingMetadata.hints);
+    expect(metadata.labels).toEqual(existingMetadata.labels);
+    expect(metadata.createdAt).toBe(existingMetadata.createdAt);
+    expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
   });
 
-  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting an older manifest', () => {
-    const existingManifest: Partial<MigrationManifest> = {
+  it('drops legacy hint keys (e.g. planningStrategy) when re-emitting older metadata', () => {
+    const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
       kind: 'regular',
@@ -206,20 +206,20 @@ describe('buildMigrationArtifacts', () => {
       createdAt: '2026-01-15T10:00:00.000Z',
     };
 
-    const { manifest } = buildMigrationArtifacts(
+    const { metadata } = buildMigrationArtifacts(
       makeMigration([{ id: 'op1', label: 'Op', operationClass: 'additive' }], {
         from: 'sha256:from',
         to: 'sha256:to',
       }),
-      existingManifest,
+      existingMetadata,
     );
 
-    expect(manifest.hints).toEqual({
+    expect(metadata.hints).toEqual({
       used: ['idx_a'],
       applied: ['additive_only'],
       plannerVersion: '2.0.0',
     });
-    expect(manifest.hints).not.toHaveProperty('planningStrategy');
+    expect(metadata.hints).not.toHaveProperty('planningStrategy');
   });
 
   it('throws when operations is not an array', () => {

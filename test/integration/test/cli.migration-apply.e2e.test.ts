@@ -389,9 +389,9 @@ withTempDir(({ createTempDir }) => {
             // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations');
             const packages = await readMigrationsDir(migrationsDir);
-            const firstMigration = packages.find((p) => p.manifest.from === 'sha256:empty');
+            const firstMigration = packages.find((p) => p.metadata.from === 'sha256:empty');
             const secondMigration = packages.find(
-              (p) => p.manifest.to !== firstMigration?.manifest.to,
+              (p) => p.metadata.to !== firstMigration?.metadata.to,
             );
             expect(firstMigration).toBeDefined();
             expect(secondMigration).toBeDefined();
@@ -401,7 +401,7 @@ withTempDir(({ createTempDir }) => {
                 'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
                 [1],
               );
-              expect(marker.rows[0]?.core_hash).toBe(firstMigration!.manifest.to);
+              expect(marker.rows[0]?.core_hash).toBe(firstMigration!.metadata.to);
             });
 
             // Fix: deduplicate emails, then re-run apply; it should resume from marker.
@@ -415,7 +415,7 @@ withTempDir(({ createTempDir }) => {
               consoleOutput.join('\n').trim(),
             ) as MigrationApplyResult;
             expect(resumeResult.migrationsApplied).toBe(1);
-            expect(resumeResult.markerHash).toBe(secondMigration!.manifest.to);
+            expect(resumeResult.markerHash).toBe(secondMigration!.metadata.to);
           });
         },
         timeouts.spinUpPpgDev,

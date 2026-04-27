@@ -12,31 +12,33 @@ import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join, relative, resolve } from 'pathe';
+import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   getTargetMigrations,
+  resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
@@ -68,11 +70,7 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
 
-  const contractPath = config.contract?.output ?? 'contract.json';
-  const contractPathAbsolute = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    contractPath,
-  );
+  const contractPathAbsolute = resolveContractPath(config);
 
   let contractJsonContent: string;
   try {
@@ -126,7 +124,7 @@ async function executeMigrationNewCommand(
       const graph = reconstructGraph(packages);
 
       if (options.from) {
-        const match = packages.find((p) => p.manifest.to.startsWith(options.from!));
+        const match = packages.find((p) => p.metadata.to.startsWith(options.from!));
         if (!match) {
           return notOk(
             errorRuntime('Starting contract not found', {
@@ -135,18 +133,18 @@ async function executeMigrationNewCommand(
             }),
           );
         }
-        fromHash = match.manifest.to;
-        fromContract = match.manifest.toContract;
+        fromHash = match.metadata.to;
+        fromContract = match.metadata.toContract;
         fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
         if (latestMigration) {
           fromHash = latestMigration.to;
           const leafPkg = packages.find(
-            (p) => p.manifest.migrationId === latestMigration.migrationId,
+            (p) => p.metadata.migrationHash === latestMigration.migrationHash,
           );
           if (leafPkg) {
-            fromContract = leafPkg.manifest.toContract;
+            fromContract = leafPkg.metadata.toContract;
             fromContractSourceDir = leafPkg.dirPath;
           }
         }
@@ -154,13 +152,7 @@ async function executeMigrationNewCommand(
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     throw error;
   }
@@ -181,9 +173,9 @@ async function executeMigrationNewCommand(
 
   // `migration new` scaffolds an empty `migration.ts` for the user to
   // fill, so we attest over `ops: []`. Re-running self-emit after the
-  // user adds operations will produce a different `migrationId` (over
+  // user adds operations will produce a different `migrationHash` (over
   // the real ops). This is intentional — there is no on-disk draft.
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
     kind: 'regular',
@@ -197,9 +189,9 @@ async function executeMigrationNewCommand(
     labels: [],
     createdAt: timestamp.toISOString(),
   };
-  const manifest: MigrationManifest = {
-    ...baseManifest,
-    migrationId: computeMigrationId(baseManifest, []),
+  const metadata: MigrationMetadata = {
+    ...baseMetadata,
+    migrationHash: computeMigrationHash(baseMetadata, []),
   };
 
   const migrations = getTargetMigrations(config.target);
@@ -218,7 +210,7 @@ async function executeMigrationNewCommand(
       ...(config.extensionPacks ?? []),
     ]);
 
-    await writeMigrationPackage(packageDir, manifest, []);
+    await writeMigrationPackage(packageDir, metadata, []);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },

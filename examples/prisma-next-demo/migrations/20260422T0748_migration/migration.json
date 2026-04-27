@@ -1421,5 +1421,5 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationId": "sha256:c14df5e0d70bb63f2640f0eea1e10e4ddf060bb450f1d095a10707d656ba8dd7"
+  "migrationHash": "sha256:c14df5e0d70bb63f2640f0eea1e10e4ddf060bb450f1d095a10707d656ba8dd7"
 }

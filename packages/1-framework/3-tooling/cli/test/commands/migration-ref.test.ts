@@ -4,14 +4,16 @@ import { join } from 'node:path';
 import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
   deleteRef,
@@ -20,8 +22,6 @@ import {
   resolveRef,
   writeRef,
 } from '@prisma-next/migration-tools/refs';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 
@@ -61,10 +61,10 @@ async function writeAttestedMigration(
     timestamp: Date;
     slug: string;
   },
-): Promise<{ dirName: string; migrationId: string }> {
+): Promise<{ dirName: string; migrationHash: string }> {
   const dirName = formatMigrationDirName(opts.timestamp, opts.slug);
   const packageDir = join(migrationsDir, dirName);
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
     kind: 'regular',
@@ -78,10 +78,10 @@ async function writeAttestedMigration(
     labels: [],
     createdAt: opts.timestamp.toISOString(),
   };
-  const migrationId = computeMigrationId(baseManifest, opts.ops);
-  const manifest: MigrationManifest = { ...baseManifest, migrationId };
-  await writeMigrationPackage(packageDir, manifest, opts.ops);
-  return { dirName, migrationId };
+  const migrationHash = computeMigrationHash(baseMetadata, opts.ops);
+  const metadata: MigrationMetadata = { ...baseMetadata, migrationHash };
+  await writeMigrationPackage(packageDir, metadata, opts.ops);
+  return { dirName, migrationHash };
 }
 
 describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperation }, () => {

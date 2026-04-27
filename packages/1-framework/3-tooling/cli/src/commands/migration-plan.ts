@@ -5,16 +5,17 @@ import {
   createControlStack,
   type MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { findLatestMigration } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
-import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
@@ -29,11 +30,12 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   getTargetMigrations,
-  loadAllBundles,
+  loadAllMigrationPackages,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -74,22 +76,6 @@ export interface MigrationPlanResult {
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredError {
-  if (CliStructuredError.is(error)) {
-    return error;
-  }
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration plan: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 async function executeMigrationPlanCommand(
@@ -177,7 +163,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { bundles, graph } = await loadAllBundles(migrationsDir);
+    const { bundles, graph } = await loadAllMigrationPackages(migrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -195,16 +181,18 @@ async function executeMigrationPlanCommand(
               }),
         );
       }
-      fromHash = resolved.value.manifest.to;
-      fromContract = resolved.value.manifest.toContract;
+      fromHash = resolved.value.metadata.to;
+      fromContract = resolved.value.metadata.toContract;
       fromContractSourceDir = resolved.value.dirPath;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
+        const leafPkg = bundles.find(
+          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+        );
         if (leafPkg) {
-          fromContract = leafPkg.manifest.toContract;
+          fromContract = leafPkg.metadata.toContract;
           fromContractSourceDir = leafPkg.dirPath;
         }
       }
@@ -251,7 +239,7 @@ async function executeMigrationPlanCommand(
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
     kind: 'regular',
@@ -320,18 +308,18 @@ async function executeMigrationPlanCommand(
 
     const migrationTsContent = plannerResult.plan.renderTypeScript();
 
-    // Always-attest: compute migrationId over (manifest, ops). When
-    // placeholders blocked lowering, ops is `[]` and the id hashes over
-    // the empty list — re-emitting after the user fills the placeholder
-    // produces a different id (over the real ops). This is intentional;
+    // Always-attest: compute migrationHash over (metadata, ops). When
+    // placeholders blocked lowering, ops is `[]` and the hash is computed
+    // over the empty list — re-emitting after the user fills the placeholder
+    // produces a different hash (over the real ops). This is intentional;
     // there is no on-disk "draft" state.
     const opsForWrite = hasPlaceholders ? [] : plannedOps;
-    const manifest: MigrationManifest = {
-      ...baseManifest,
-      migrationId: computeMigrationId(baseManifest, opsForWrite),
+    const metadata: MigrationMetadata = {
+      ...baseMetadata,
+      migrationHash: computeMigrationHash(baseMetadata, opsForWrite),
     };
 
-    await writeMigrationPackage(packageDir, manifest, opsForWrite);
+    await writeMigrationPackage(packageDir, metadata, opsForWrite);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
@@ -382,7 +370,18 @@ async function executeMigrationPlanCommand(
     };
     return ok(result);
   } catch (error) {
-    return notOk(mapMigrationToolsError(error));
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return notOk(
+      errorUnexpected(message, {
+        why: `Unexpected error during migration plan: ${message}`,
+      }),
+    );
   }
 }
 
@@ -489,7 +488,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
 
   lines.push('');
   lines.push(
-    `Next: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)} to emit ops.json and attest migrationId before running ${green_('prisma-next migration apply')}.`,
+    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
   );
 
   if (result.sql && result.sql.length > 0) {
@@ -517,24 +516,24 @@ export type PrefixResolutionFailure =
   | { reason: 'not-found' };
 
 /**
- * Resolve a migration bundle by exact hash or prefix match.
+ * Resolve a migration package by exact hash or prefix match.
  *
  * Tries exact match first, then prefix match (auto-prepending `sha256:` when
- * the needle omits the scheme). Returns the matched bundle on success, or a
+ * the needle omits the scheme). Returns the matched package on success, or a
  * discriminated failure indicating whether the prefix was ambiguous or simply
  * not found.
  *
  * @internal Exported for testing only.
  */
-export function resolveBundleByPrefix<T extends { manifest: { to: string } }>(
+export function resolveBundleByPrefix<T extends { metadata: { to: string } }>(
   bundles: readonly T[],
   needle: string,
 ): Result<T, PrefixResolutionFailure> {
-  const exact = bundles.find((p) => p.manifest.to === needle);
+  const exact = bundles.find((p) => p.metadata.to === needle);
   if (exact) return ok(exact);
 
   const prefixWithScheme = needle.startsWith('sha256:') ? needle : `sha256:${needle}`;
-  const candidates = bundles.filter((p) => p.manifest.to.startsWith(prefixWithScheme));
+  const candidates = bundles.filter((p) => p.metadata.to.startsWith(prefixWithScheme));
 
   if (candidates.length === 1) return ok(candidates[0]!);
   if (candidates.length > 1) return notOk({ reason: 'ambiguous', count: candidates.length });
