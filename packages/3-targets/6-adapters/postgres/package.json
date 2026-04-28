@@ -31,6 +31,7 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
+    "@standard-schema/spec": "1.1.0",
     "ajv": "^8.18.0",
     "arktype": "^2.0.0"
   },
@@ -45,6 +46,7 @@
   "exports": {
     "./adapter": "./dist/adapter.mjs",
     "./codec-types": "./dist/codec-types.mjs",
+    "./codecs": "./dist/codecs.mjs",
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./operation-types": "./dist/operation-types.mjs",

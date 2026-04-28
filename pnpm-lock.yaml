@@ -2811,6 +2811,9 @@ importers:
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../../1-framework/0-foundation/utils
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
       ajv:
         specifier: ^8.18.0
         version: 8.18.0

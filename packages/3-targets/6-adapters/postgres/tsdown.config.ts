@@ -3,11 +3,12 @@ import { defineConfig } from '@prisma-next/tsdown';
 export default defineConfig({
   entry: [
     'src/exports/adapter.ts',
-    'src/exports/types.ts',
     'src/exports/codec-types.ts',
+    'src/exports/codecs.ts',
     'src/exports/column-types.ts',
     'src/exports/control.ts',
     'src/exports/operation-types.ts',
     'src/exports/runtime.ts',
+    'src/exports/types.ts',
   ],
 });
