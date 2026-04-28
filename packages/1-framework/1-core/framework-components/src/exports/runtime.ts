@@ -1,3 +1,11 @@
+export type {
+  AnnotationHandle,
+  AnnotationValue,
+  DefineAnnotationOptions,
+  OperationKind,
+  ValidAnnotations,
+} from '../annotations';
+export { assertAnnotationsApplicable, defineAnnotation } from '../annotations';
 export { AsyncIterableResult } from '../async-iterable-result';
 export type { ExecutionPlan, QueryPlan, ResultType } from '../query-plan';
 export { runWithMiddleware } from '../run-with-middleware';
