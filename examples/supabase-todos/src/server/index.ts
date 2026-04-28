@@ -15,12 +15,17 @@
  * [`middleware/scoped-runtime.ts`](./middleware/scoped-runtime.ts):
  *
  * ```ts
- * .use('/api/public/*', publicRoute())  // marks public; must be first
- * .use('*', jwtAuth)                    // verifies bearer (skipped on public)
- * .use('*', scopedRuntime)              // attaches RLS-scoped session
+ * .use('/api/public/*', publicRoute())          // marks public; must be first
+ * .use('/api/*', jwtAuth)                       // verifies bearer (skipped on public)
+ * .use('/api/*', scopedRuntime)                 // attaches RLS-scoped session
  * .route('/api/todos', todosRoutes)
  * .route('/api/public/messages', publicMessagesRoutes)
  * ```
+ *
+ * The `use()` middlewares are path-scoped to `/api/*` (not `*`) so
+ * routes outside the API tree — e.g. `/health` registered as a leaf
+ * route below — bypass JWT verification and the per-request anon
+ * envelope (FL-19) entirely.
  *
  * `publicRoute()` lands as a path-prefix middleware **before** the
  * global JWT middleware so it short-circuits past JWT verification on

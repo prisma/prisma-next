@@ -158,9 +158,10 @@ export function createScopedRuntimeMiddleware(
       } catch (endErr) {
         // Log instead of replacing the handler's error: the request's
         // observable failure mode is the handler error, not whatever
-        // happened tearing down the per-request connection state. The
-        // FL-NN entry on this would only fire if `end()` semantics
-        // ever evolved to require structured propagation.
+        // happened tearing down the per-request connection state.
+        // (No FL filed: this is application-shaped policy, not a
+        // framework gap. If `end()` semantics ever grow structured
+        // propagation, the policy here would tighten naturally.)
         log(endErr);
       }
     }

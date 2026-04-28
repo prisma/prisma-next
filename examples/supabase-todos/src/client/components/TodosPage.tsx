@@ -297,11 +297,37 @@ function byCreatedAtDesc(a: TodoView, b: TodoView): number {
  * placeholder, once as the realtime row) before the POST response
  * arrives and replaces the placeholder.
  *
+ * **Known limitation — two-tab same-title creation.** The title-keyed
+ * de-dupe is a heuristic, not an invariant. If the same user opens
+ * two tabs and creates a todo with the same title in both, the
+ * realtime push for Tab B's row can match Tab A's still-pending
+ * placeholder by title and replace it; Tab A's POST then resolves
+ * its placeholder-id (no longer in the list) into a no-op map, so
+ * Tab A's row drops out of the local view (still in the database;
+ * a refresh repairs it). Acceptable for the PoC: the workaround is
+ * "use different titles or accept the visual artifact." The
+ * fully-correct fix would be a client-id round-trip protocol — POST
+ * sends a placeholder id, the server stores it on the row, the
+ * broker echoes it back so the realtime push carries the original
+ * client id and the de-dupe becomes id-keyed instead of title-keyed.
+ * Out of scope for the PoC.
+ *
  * UPDATE: patch in place. Skip if we don't have the row (we may
  * have filtered it out, or the SPA was opened mid-stream).
  *
  * DELETE: remove if present. The payload's `old` carries the id
  * of the deleted row.
+ *
+ * **Safety note on DELETE id collisions.** The local list mixes
+ * server-generated UUIDs with optimistic placeholder ids of the
+ * form `optimistic-<uuid>` (see `clientId()`). The two namespaces
+ * cannot collide — `payload.old.id` is always a server UUID, and a
+ * placeholder id always has the literal `optimistic-` prefix — so
+ * a DELETE event for a server row can never accidentally remove an
+ * in-flight placeholder. If `clientId()` is ever changed to drop
+ * the prefix, re-evaluate this helper: the id-keyed filter at the
+ * end of the DELETE branch would no longer have that namespace
+ * separation.
  */
 function applyRealtime(
   payload: RealtimePostgresChangesPayload<ServerTodo>,

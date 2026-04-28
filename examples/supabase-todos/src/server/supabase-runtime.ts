@@ -45,7 +45,8 @@
  * - **`session.beginTransaction()` throws synchronously** with code
  *   `runtime/unsupported-scoped-tx` (R-FX-8). User-initiated transactions
  *   inside the per-plan transaction have subtle semantics we explicitly
- *   ruled out for the PoC (FL-NN); the throw is the bright line.
+ *   ruled out for the PoC; the throw is the bright line. Tracked as
+ *   [FL-21](../../../../projects/supabase-poc/framework-limitations.md).
  *
  * ## Public surface
  *
@@ -154,7 +155,7 @@ function unsupportedScopedTxError(): UnsupportedScopedTxError {
   const err = new Error(
     'createSupabaseRuntime: session.beginTransaction() is not supported in transaction-scope mode. ' +
       'Each plan already runs in its own implicit transaction with `SET LOCAL` for the request identity. ' +
-      'Nested user-initiated transactions are out of scope for the PoC; see framework-limitations.md.',
+      'Nested user-initiated transactions are out of scope for the PoC; see FL-21 in framework-limitations.md.',
   ) as UnsupportedScopedTxError;
   Object.assign(err, { code: 'runtime/unsupported-scoped-tx' as const });
   return err;

@@ -34,6 +34,14 @@
  * column the server fills in from the verified JWT — and the policy's
  * WITH CHECK rejects mismatched rows at the DB layer regardless.
  *
+ * ## Title trimming
+ *
+ * `body.title.trim()` (POST and PATCH) is deliberate: an all-whitespace
+ * title is rejected as `todos/invalid-body`, and intentional leading /
+ * trailing whitespace on a real title is dropped on the wire. Most
+ * APIs do this; called out so a future maintainer doesn't add a
+ * regression test that depends on byte-preserving titles.
+ *
  * ## SKILL.md note (per phase-4b discipline)
  *
  * "PN does not auto-populate insert columns from session GUCs" is a
