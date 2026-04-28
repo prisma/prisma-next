@@ -1,0 +1,178 @@
+/* Minimal SPA styling. Plain CSS, no preprocessor, no design system —
+   the goal of this example is to exercise the RLS / realtime
+   pipeline, not to ship a polished UI. */
+
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --panel-2: #334155;
+  --text: #e2e8f0;
+  --muted: #94a3b8;
+  --accent: #60a5fa;
+  --accent-2: #38bdf8;
+  --danger: #f87171;
+  --ok: #34d399;
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+  background: var(--panel-2);
+  border: 1px solid transparent;
+  color: var(--text);
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.95rem;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button.is-active {
+  background: var(--accent);
+  color: #0f172a;
+}
+
+input,
+textarea {
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--panel-2);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: inherit;
+  width: 100%;
+}
+
+code {
+  background: rgba(255, 255, 255, 0.07);
+  padding: 0 0.25em;
+  border-radius: 3px;
+  font-size: 0.9em;
+}
+
+.app-shell {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem 1rem 3rem;
+}
+
+.loading {
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.top-nav {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel);
+  border-radius: 10px;
+}
+
+.top-nav-brand {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.top-nav-tabs {
+  display: flex;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.top-nav-account {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.top-nav-email {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.app-main {
+  margin-top: 1.5rem;
+}
+
+.placeholder {
+  padding: 2rem;
+  text-align: center;
+  color: var(--muted);
+  background: var(--panel);
+  border-radius: 10px;
+  border: 1px dashed var(--panel-2);
+}
+
+.auth-card {
+  max-width: 420px;
+  margin: 2rem auto 0;
+  background: var(--panel);
+  padding: 1.5rem;
+  border-radius: 10px;
+}
+
+.auth-card h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.4rem;
+}
+
+.auth-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.auth-card form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.auth-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.auth-error {
+  color: var(--danger);
+  font-size: 0.9rem;
+}
+
+.auth-toggle {
+  display: block;
+  margin: 1rem auto 0;
+  background: transparent;
+  color: var(--accent-2);
+}
+
+.auth-toggle:hover {
+  text-decoration: underline;
+  border-color: transparent;
+}
