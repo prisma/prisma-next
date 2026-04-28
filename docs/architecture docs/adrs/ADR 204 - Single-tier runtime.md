@@ -1,114 +1,145 @@
 # ADR 204 — Single-tier runtime: collapse `runtime-executor` into `framework-components`
 
+## Status
+
+Accepted.
+
 ## Supersedes
 
-- [ADR 140 — Package Layering & Target-Family Namespacing](ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md), specifically the "Runtime Separation" section that introduced a two-tier runtime model (a target-agnostic `runtime-executor` package implementing the runtime SPI, and family runtimes composing it). The rest of ADR 140's package-layering, plane-boundary, and naming guidance is unchanged.
-
-## Context
-
-ADR 140 established a two-tier runtime model:
-
-- A target-agnostic kernel at `packages/1-framework/4-runtime/runtime-executor/` (`@prisma-next/runtime-executor`) owned plan verification, the middleware lifecycle, and the runtime SPI.
-- Family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`) implemented the SPI by **composing** an inner `runtime-executor` instance with family-specific lowering and driver code.
-
-In practice the two tiers carried close to no independent value:
-
-- The inner `runtime-executor` was always wrapped 1-to-1 by exactly one family runtime — there were no consumers of the SPI other than `*Runtime` classes that delegated to it.
-- The family runtime had to forward every public surface (`execute`, `close`, `connection`, `transaction`) to the inner instance, duplicating signatures and creating two places where lifecycle bugs could land.
-- The middleware orchestration loop existed in two parallel implementations: one in `runtime-executor` for the cross-family path, and one in each family runtime for SQL's `beforeCompile` chain. Drift between them was a recurring review concern.
-- The two-tier shape complicated cross-family work: any time we wanted a generic middleware to observe both SQL and Mongo queries, we had to plumb the same middleware-context shape through both tiers.
-
-The cross-family runtime unification project (TML-2242) reworked the runtime around three primitives that live entirely at the core layer:
-
-- `QueryPlan<Row>` and `ExecutionPlan<Row>` markers (pre- and post-lowering).
-- An abstract `RuntimeCore<TPlan, TExec, TMiddleware>` class whose concrete `execute()` defines the lifecycle template `runBeforeCompile → lower → runWithMiddleware(beforeExecute → driver loop → onRow → afterExecute)`.
-- A canonical `runWithMiddleware` orchestrator helper used by every family.
-
-With those in place, the inner `runtime-executor` package had no responsibilities left that could not be handed to the abstract base class, and the composition tier became pure forwarding.
+- [ADR 140 — Package Layering & Target-Family Namespacing](ADR%20140%20-%20Package%20Layering%20&%20Target-Family%20Namespacing.md), specifically the "Runtime Separation" section that introduced the two-tier runtime model. The rest of ADR 140's package-layering, plane-boundary, and naming guidance is unchanged.
 
 ## Decision
 
-Collapse the two-tier runtime model into a single tier:
+Every family runtime is a single class that **extends** an abstract `RuntimeCore` base, lives in its family package, and is the only runtime tier. The `RuntimeCore` base class, the `runWithMiddleware` orchestrator helper, and the runtime SPI types (`RuntimeExecutor`, `RuntimeMiddleware`, `RuntimeMiddlewareContext`, `AfterExecuteResult`, `QueryPlan`, `ExecutionPlan`) live in [`@prisma-next/framework-components`](../../../packages/1-framework/1-core/framework-components/) at the framework's **core layer**, exported via the `runtime` subpath.
 
-- Move the runtime SPI (`RuntimeExecutor`, `RuntimeMiddleware`, `RuntimeMiddlewareContext`, `AfterExecuteResult`), the abstract `RuntimeCore` base class, the canonical `runWithMiddleware` helper, and the `QueryPlan`/`ExecutionPlan` markers into [`@prisma-next/framework-components`](../../../packages/1-framework/1-core/framework-components/) (core layer).
-- Delete the `@prisma-next/runtime-executor` package and the `packages/1-framework/4-runtime/` directory entirely.
-- Each family runtime is a single class that **extends** `RuntimeCore`, binds the three generics to its concrete family types, and overrides the family-specific hooks (`lower`, `runDriver`, `close`; optionally `runBeforeCompile`).
+`RuntimeCore` belongs in the framework layer because what it owns is **behavior**, not plan shape: *when* hooks fire, *how* middleware wraps a driver loop, *which* lifecycle steps a family must implement. It never inspects the contents of a `QueryPlan` or `ExecutionPlan` — those are generic parameters each family narrows to its own concrete types. That's how a target-agnostic core layer can host a runtime base that SQL and Mongo both extend without either family's vocabulary leaking into the framework.
 
-Concretely:
+The previous target-agnostic `@prisma-next/runtime-executor` package and the `packages/1-framework/4-runtime/` directory are removed.
 
-- `SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>` overrides `runBeforeCompile` (to run the SQL `beforeCompile` middleware chain), `lower` (`lowerSqlPlan` + parameter encoding), `runDriver`, and `close`.
-- `MongoRuntimeImpl extends RuntimeCore<MongoQueryPlan, MongoExecutionPlan, MongoMiddleware>` overrides `lower` (adapter-driven), `runDriver`, and `close`. Mongo does not override `runBeforeCompile`; the base's identity default is sufficient.
+## What this looks like
 
-The runtime SPI now lives at the lowest consuming layer — the core layer of the framework domain — consistent with [ADR 185 — SPI types live at the lowest consuming layer](ADR%20185%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md).
+A family runtime, end-to-end, is now this shape:
 
-## Affected packages and dependency direction
+```ts
+import {
+  RuntimeCore,
+  runWithMiddleware,
+} from '@prisma-next/framework-components/runtime';
 
-| Before | After |
-|--------|-------|
-| `@prisma-next/runtime-executor` (framework, runtime layer) — owned SPI + plugin lifecycle | **Deleted.** Contents folded into `@prisma-next/framework-components`. |
-| `@prisma-next/framework-components` (framework, core layer) — component descriptors, control/execution/emission types | Adds the `runtime` entrypoint with `QueryPlan`, `ExecutionPlan`, `RuntimeMiddleware`, `RuntimeExecutor`, abstract `RuntimeCore`, and `runWithMiddleware`. |
-| `@prisma-next/sql-runtime` (SQL, runtime layer) — composed `runtime-executor` | Extends `RuntimeCore` directly via `SqlRuntimeImpl`. Imports the runtime SPI from `@prisma-next/framework-components/runtime`. |
-| `@prisma-next/mongo-runtime` (Mongo, runtime layer) — composed `runtime-executor` | Extends `RuntimeCore` directly via `MongoRuntimeImpl`. Imports the runtime SPI from `@prisma-next/framework-components/runtime`. |
+class SqlRuntimeImpl
+  extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>
+  implements Runtime
+{
+  constructor(options: RuntimeOptions) {
+    // build middleware list + ctx, then call super with them
+    super({ middleware, ctx });
+    // family-specific fields (driver, adapter, codecs, …)
+  }
 
-The dependency direction is unchanged in spirit but simpler in shape: family runtimes import the SPI from the core layer of the framework domain, the same way they already import other cross-family abstractions (`Contract`, `ExecutionContext`, `AsyncIterableResult`). There is no longer an intermediate `runtime-executor` package between the core layer and the family runtimes.
+  protected override async runBeforeCompile(plan: SqlQueryPlan): Promise<SqlQueryPlan> {
+    // SQL: run the beforeCompile chain over the plan's AST
+  }
 
-The enforcement chain in `architecture.config.json` and the layering docs collapses from `core → authoring → tooling → lanes → runtime-executor → family-runtime → adapters` to `core → authoring → tooling → lanes → runtime → adapters`.
+  protected override lower(plan: SqlQueryPlan): SqlExecutionPlan {
+    // SQL: lowerSqlPlan(adapter, contract, plan) + encode params
+  }
+
+  protected override runDriver(exec: SqlExecutionPlan): AsyncIterable<Record<string, unknown>> {
+    return this.driver.execute({ sql: exec.sql, params: exec.params });
+  }
+
+  override async close(): Promise<void> {
+    await this.driver.close();
+  }
+}
+```
+
+The public `execute(plan)` method is **inherited** from `RuntimeCore`. Its body is a fixed lifecycle template:
+
+```text
+execute(plan)
+  ├─ runBeforeCompile(plan)        ← family hook (SQL overrides; Mongo uses identity)
+  ├─ lower(plan)                   ← family hook (always overridden)
+  └─ runWithMiddleware(exec, …, () => runDriver(exec))
+       ├─ for each middleware: beforeExecute(exec, ctx)
+       ├─ for await (row of runDriver()) {
+       │     for each middleware: onRow(row, exec, ctx)
+       │     yield row
+       │   }
+       └─ for each middleware: afterExecute(exec, summary, ctx)
+```
+
+`MongoRuntimeImpl` is the same shape with two methods overridden (`lower`, `runDriver`) plus `close`. It does not override `runBeforeCompile`; the base provides an identity default.
+
+Adding a new family runtime — Cassandra, Document, anything else — is one constructor and at most three method overrides. No new package, no wrapping, no lifecycle reimplementation.
+
+## Background — the world this replaces
+
+ADR 140 set up a **two-tier** runtime: a target-agnostic kernel (`@prisma-next/runtime-executor`) owned the SPI and middleware lifecycle, and family runtimes implemented that SPI by **composing** an inner `runtime-executor` instance with their own lowering and driver code.
+
+In practice the two tiers carried very little independent value:
+
+- The inner kernel was always wrapped 1-to-1 by exactly one family runtime. There were no consumers of the SPI other than `*Runtime` classes that delegated to it.
+- Each family runtime forwarded every public method (`execute`, `close`, `connection`, `transaction`) to its inner instance. Two places to land a lifecycle bug; two places to keep in sync.
+- The middleware orchestration loop existed twice — once in `runtime-executor` for the cross-family path, once in each family for SQL's `beforeCompile` chain. Drift between them was a recurring review concern.
+- Plumbing a generic middleware to observe both SQL and Mongo required threading the same context shape through both tiers in each family.
+
+The cross-family runtime unification project ([TML-2242](https://linear.app/prisma-company/issue/TML-2242/)) introduced three primitives — `QueryPlan` / `ExecutionPlan` markers, the abstract `RuntimeCore<TPlan, TExec, TMiddleware>` class, and the `runWithMiddleware` helper — that, together, leave the inner kernel with no responsibilities the abstract base cannot own. At that point the composition tier becomes pure forwarding and is worth removing.
 
 ## Rationale
 
-1. **Single canonical lifecycle template.** Every family runtime sees the same `runBeforeCompile → lower → runWithMiddleware(beforeExecute → driver loop → onRow → afterExecute)` sequence because there is exactly one place that defines it: `RuntimeCore.execute`. Family runtimes pick which steps to override; they cannot accidentally diverge from the framework lifecycle.
-2. **Single canonical middleware orchestrator.** `runWithMiddleware` is the only place that iterates middleware around a driver loop. Error-path swallowing semantics (telemetry middleware seeing `completed: false` for failed executions even when an `afterExecute` hook itself throws) live in one file with one set of tests; we never need to keep two implementations in sync.
-3. **Family-agnostic middleware via shared abstract base.** A middleware typed against `RuntimeMiddleware<QueryPlan>` is observable from both SQL and Mongo runtimes by construction, with no plumbing required at the family boundary. The cross-family middleware SPI work that motivated TML-2242 is structurally enforced rather than maintained by convention.
-4. **No "wrap-and-forward" tier.** Every public method on a family runtime is either inherited from `RuntimeCore` (e.g., `execute`) or a family-specific override (`lower`, `runDriver`, `close`). There is no longer a forwarding layer between the SPI and the concrete family.
-5. **Lower onboarding cost for new families.** Adding a Document or Cassandra family runtime is one constructor and at most three method overrides — it does not require a new "wrap the executor" package.
+The change collapses three duplicated concerns into one site each:
 
-## Affected source
+- **One lifecycle template.** `RuntimeCore.execute` is the only place in the codebase that defines `runBeforeCompile → lower → runWithMiddleware(beforeExecute → driver loop → onRow → afterExecute)`. Family runtimes pick which steps to override; they cannot accidentally diverge from the framework lifecycle.
+- **One middleware orchestrator.** `runWithMiddleware` is the only place that iterates middleware around a driver loop. Subtle semantics — registration order, error-path swallowing of `afterExecute` throws so telemetry middleware still observes `completed: false` — live in one file, with one set of tests.
+- **One SPI surface.** `RuntimeExecutor`, `RuntimeMiddleware`, `RuntimeMiddlewareContext`, and the `QueryPlan` / `ExecutionPlan` markers live alongside the other framework primitives that family runtimes already import (`Contract`, `ExecutionContext`, `AsyncIterableResult`). Per [ADR 185](ADR%20185%20-%20SPI%20types%20live%20at%20the%20lowest%20consuming%20layer.md), the SPI is at the lowest layer that consumes it.
 
-- Removed: `packages/1-framework/4-runtime/runtime-executor/**` (entire directory; package gone from the workspace).
-- Added in [`@prisma-next/framework-components`](../../../packages/1-framework/1-core/framework-components/src/):
-  - [`query-plan.ts`](../../../packages/1-framework/1-core/framework-components/src/query-plan.ts) — `QueryPlan`, `ExecutionPlan`.
-  - [`runtime-middleware.ts`](../../../packages/1-framework/1-core/framework-components/src/runtime-middleware.ts) — `RuntimeMiddleware`, `RuntimeMiddlewareContext`, `RuntimeExecutor`, `AfterExecuteResult`.
-  - [`runtime-core.ts`](../../../packages/1-framework/1-core/framework-components/src/runtime-core.ts) — `RuntimeCore`.
-  - [`run-with-middleware.ts`](../../../packages/1-framework/1-core/framework-components/src/run-with-middleware.ts) — `runWithMiddleware`.
-  - [`exports/runtime.ts`](../../../packages/1-framework/1-core/framework-components/src/exports/runtime.ts) — public surface.
-- Updated:
-  - [`@prisma-next/sql-runtime`](../../../packages/2-sql/5-runtime/src/sql-runtime.ts) — `SqlRuntimeImpl extends RuntimeCore`.
-  - [`@prisma-next/mongo-runtime`](../../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts) — `MongoRuntimeImpl extends RuntimeCore`.
+A useful corollary of the abstract-base shape: any middleware typed against the framework SPI is observable from any family runtime by construction. Cross-family middleware no longer relies on convention — the type system enforces it.
 
-## Consequences
+## Affected packages
 
-### Positive
+| Package | Before | After |
+|---------|--------|-------|
+| `@prisma-next/runtime-executor` (framework, runtime layer) | Owned the runtime SPI + plugin lifecycle. | **Deleted.** Contents folded into `@prisma-next/framework-components`. |
+| `@prisma-next/framework-components` (framework, core layer) | Component descriptors; control / execution / emission types. | Adds a `runtime` subpath export with the SPI, abstract `RuntimeCore`, and `runWithMiddleware`. |
+| `@prisma-next/sql-runtime` (SQL, runtime layer) | Composed an inner `runtime-executor`. | `SqlRuntimeImpl extends RuntimeCore` directly. |
+| `@prisma-next/mongo-runtime` (Mongo, runtime layer) | Composed an inner `runtime-executor`. | `MongoRuntimeImpl extends RuntimeCore` directly. |
 
-- Single source of truth for the runtime lifecycle and middleware orchestration. Hooks added to `RuntimeCore` or `runWithMiddleware` reach every family at once.
-- Cross-family middleware is observable from any family runtime by construction, not by convention.
-- Removing one package (and one whole layer of the framework domain's directory tree) reduces both the cognitive surface and the dependency graph.
-- The abstract base + helper pattern is now the canonical extension point for new families.
+The dependency-direction enforcement chain in `architecture.config.json` collapses from
 
-### Trade-offs
+```text
+core → authoring → tooling → lanes → runtime-executor → family-runtime → adapters
+```
 
-- The "runtime SPI" is no longer in a layer named `runtime`. Readers used to ADR 140's two-tier model may look for it there first; the durable architecture docs now point to the core layer instead.
-- Family runtimes that want to override or wrap pre-/post-execution behavior do so by subclassing `RuntimeCore` rather than by composing an instance of it. The previous model permitted "wrap-and-forward" patterns that subclassing makes harder; in exchange, the lifecycle template is enforced rather than reimplemented.
+to
+
+```text
+core → authoring → tooling → lanes → runtime → adapters
+```
+
+Family runtimes import the SPI from the core layer of the framework domain — the same way they already import other cross-family abstractions.
+
+## Trade-offs
+
+- **The runtime SPI is no longer in a layer named `runtime`.** Readers used to ADR 140's two-tier model may look for it there first. The durable architecture docs ([Package-Layering](../Package-Layering.md), [subsystem doc 4](../subsystems/4.%20Runtime%20%26%20Middleware%20Framework.md)) now point at the core layer, but anyone with the old map will need to reorient.
+- **Composition gives way to subclassing.** Wrapping pre-/post-execution behavior was easy with the old composed-kernel pattern (instantiate the kernel, hold it as a field, intercept at the boundary). Now a family must subclass `RuntimeCore` to do equivalent work. The lifecycle template is enforced in exchange — but the cost is real for families that wanted maximal flexibility at the wrapper boundary.
 
 ## Alternatives considered
 
 ### Keep `runtime-executor` as a thin facade over `RuntimeCore`
 
-Leave the `@prisma-next/runtime-executor` package in place but reduce it to a re-export of `RuntimeCore`, `runWithMiddleware`, and the SPI types from `@prisma-next/framework-components`.
+Reduce `@prisma-next/runtime-executor` to a re-export of `RuntimeCore`, `runWithMiddleware`, and the SPI types from `@prisma-next/framework-components`. Preserves the "runtime SPI lives in a runtime-named package" mental model.
 
-This would have preserved the "runtime SPI lives in a runtime-named package" mental model but at the cost of an extra package, an extra tsconfig project, and an extra import path that consumers had to remember (was it `@prisma-next/runtime-executor` or `@prisma-next/framework-components/runtime`?). With every consumer already crossing into `framework-components` for adjacent SPIs (`Contract`, `ExecutionContext`, codecs), the facade added no clarity and one more thing to maintain. Rejected.
+Rejected: an extra package, an extra tsconfig project, and an extra import path with no boundary behind it. With every consumer already crossing into `framework-components` for adjacent SPIs, the facade adds no clarity and one more thing to maintain.
 
 ### Keep two-tier composition but unify the orchestrator
 
-Leave the composition tier in place but require both tiers to delegate middleware orchestration to a shared `runWithMiddleware` helper.
+Leave the composition tier in place; require both tiers to delegate middleware orchestration to a shared `runWithMiddleware` helper.
 
-This would have addressed the orchestrator-drift issue without addressing the wrap-and-forward problem or the cognitive cost of two runtime packages. It also leaves the family runtime owning its own `execute` method, which means the lifecycle template still has to be reimplemented per family. Rejected.
+Rejected: addresses the orchestrator-drift concern but leaves the wrap-and-forward layer and the cognitive cost of two runtime packages. Family runtimes still own their own `execute` method, so the lifecycle template is still reimplemented per family.
 
 ### Move the runtime SPI to its own core-layer package
 
-Introduce a new `@prisma-next/runtime-spi` package at the core layer dedicated to the runtime SPI, separate from `framework-components`.
+Introduce `@prisma-next/runtime-spi` at the core layer, separate from `framework-components`.
 
-This keeps the SPI isolated but creates yet another core-layer package with a thin surface. The SPI naturally co-locates with the other framework primitives (`Contract`, `ExecutionContext`, `AsyncIterableResult`) that family runtimes already import from `framework-components`. Splitting it out adds a package without adding a boundary anyone needs. Rejected.
-
-## Decision record
-
-Adopt a single-tier runtime model. The runtime SPI, abstract `RuntimeCore`, and canonical `runWithMiddleware` helper live in `@prisma-next/framework-components` (core layer). Family runtimes (`@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`) extend `RuntimeCore` directly. The `@prisma-next/runtime-executor` package and the `packages/1-framework/4-runtime/` directory are removed. The dependency-direction enforcement chain collapses from `core → authoring → tooling → lanes → runtime-executor → family-runtime → adapters` to `core → authoring → tooling → lanes → runtime → adapters`. Supersedes the "Runtime Separation" section of ADR 140.
+Rejected: keeps the SPI isolated but creates yet another core-layer package with a thin surface. The SPI naturally co-locates with the other framework primitives (`Contract`, `ExecutionContext`, `AsyncIterableResult`) family runtimes already import. Splitting it adds a package without adding a boundary anyone needs.
