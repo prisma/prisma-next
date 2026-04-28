@@ -213,6 +213,46 @@ export function errorDuplicateMigrationHash(migrationHash: string): MigrationToo
   );
 }
 
+export function errorInvalidInvariantId(invariantId: string): MigrationToolsError {
+  return new MigrationToolsError('MIGRATION.INVALID_INVARIANT_ID', 'Invalid invariantId', {
+    why: `invariantId ${JSON.stringify(invariantId)} is invalid. Ids must be non-empty and contain no whitespace or control characters (including Unicode whitespace like NBSP); other content (kebab-case, camelCase, namespaced, Unicode letters) is allowed.`,
+    fix: 'Pick an invariantId without spaces, tabs, newlines, or control characters — e.g. "backfill-user-phone", "users/backfill-phone", or "BackfillUserPhone".',
+    details: { invariantId },
+  });
+}
+
+export function errorDuplicateInvariantInEdge(invariantId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.DUPLICATE_INVARIANT_IN_EDGE',
+    'Duplicate invariantId on a single migration',
+    {
+      why: `invariantId "${invariantId}" is declared by more than one dataTransform on the same migration. The marker stores invariants as a set and the routing layer treats them as edge-level, so two ops cannot share a routing identity.`,
+      fix: 'Rename one of the conflicting dataTransform invariantIds, or drop invariantId on the op that does not need to be routing-visible.',
+      details: { invariantId },
+    },
+  );
+}
+
+export function errorProvidedInvariantsMismatch(
+  filePath: string,
+  stored: readonly string[],
+  derived: readonly string[],
+): MigrationToolsError {
+  const storedSet = new Set(stored);
+  const derivedSet = new Set(derived);
+  const missing = [...derivedSet].filter((id) => !storedSet.has(id));
+  const extra = [...storedSet].filter((id) => !derivedSet.has(id));
+  return new MigrationToolsError(
+    'MIGRATION.PROVIDED_INVARIANTS_MISMATCH',
+    'providedInvariants on migration.json disagrees with ops.json',
+    {
+      why: `migration.json at "${filePath}" stores providedInvariants ${JSON.stringify(stored)}, but the value derived from ops.json is ${JSON.stringify(derived)}. The manifest copy was likely hand-edited without re-emitting.`,
+      fix: reemitHint(dirname(filePath), 'or restore the directory from version control.'),
+      details: { filePath, stored, derived, difference: { missing, extra } },
+    },
+  );
+}
+
 export function errorMigrationHashMismatch(
   dir: string,
   storedHash: string,

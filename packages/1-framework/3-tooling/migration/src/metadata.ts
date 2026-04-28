@@ -30,6 +30,12 @@ export interface MigrationMetadata {
   readonly toContract: Contract;
   readonly hints: MigrationHints;
   readonly labels: readonly string[];
+  /**
+   * Sorted, deduplicated list of `invariantId`s declared by the
+   * migration's data-transform ops. Always present; an empty array
+   * means the migration has no routing-visible data transforms.
+   */
+  readonly providedInvariants: readonly string[];
   readonly authorship?: { readonly author?: string; readonly email?: string };
   readonly signature?: { readonly keyId: string; readonly value: string } | null;
   readonly createdAt: string;

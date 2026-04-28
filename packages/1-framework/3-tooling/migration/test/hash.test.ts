@@ -156,6 +156,13 @@ describe('computeMigrationHash', () => {
 
     expect(baseHash).not.toBe(boundaryShiftedHash);
   });
+
+  it('changes when providedInvariants changes', () => {
+    const ops = createTestOps();
+    const m1 = createTestMetadata({ providedInvariants: [] }, ops);
+    const m2 = createTestMetadata({ providedInvariants: ['phone-backfill'] }, ops);
+    expect(computeMigrationHash(m1, ops)).not.toBe(computeMigrationHash(m2, ops));
+  });
 });
 
 describe('verifyMigrationHash', () => {
@@ -173,6 +180,7 @@ describe('verifyMigrationHash', () => {
       toContract: createTestContract(),
       hints: { used: [], applied: [], plannerVersion: '0.0.1' },
       labels: [],
+      providedInvariants: [],
       createdAt: '2026-02-25T14:30:00.000Z',
     };
     const storedHash = computeMigrationHash(baseMetadata, ops);

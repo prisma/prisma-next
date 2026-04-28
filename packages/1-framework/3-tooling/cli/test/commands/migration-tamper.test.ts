@@ -121,6 +121,7 @@ async function setupTamperFixture(): Promise<TamperFixture> {
       toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
       labels: [],
+      providedInvariants: [],
       createdAt: CREATED_AT,
     },
     ORIGINAL_OPS,

@@ -2,6 +2,7 @@ import { createContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '../src/hash';
+import { deriveProvidedInvariants } from '../src/invariants';
 import { writeMigrationPackage } from '../src/io';
 import type { MigrationMetadata } from '../src/metadata';
 import type { MigrationOps, MigrationPackage } from '../src/package';
@@ -33,6 +34,10 @@ export function createTestMetadata(
       plannerVersion: '0.0.1',
     },
     labels: [],
+    // Auto-derive from ops by default so fixture-built packages
+    // round-trip through `readMigrationPackage`'s verify-time check.
+    // Tests that need a deliberate mismatch can override the field.
+    providedInvariants: deriveProvidedInvariants(ops),
     createdAt: '2026-02-25T14:30:00.000Z',
     ...overrides,
   };

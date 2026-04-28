@@ -9,6 +9,7 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
 import { computeMigrationHash } from './hash';
+import { deriveProvidedInvariants } from './invariants';
 import type { MigrationHints, MigrationMetadata } from './metadata';
 import type { MigrationOps } from './package';
 
@@ -166,6 +167,7 @@ function buildAttestedMetadata(
     to: meta.to,
     kind: meta.kind ?? 'regular',
     labels: meta.labels ?? existing?.labels ?? [],
+    providedInvariants: deriveProvidedInvariants(ops),
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     fromContract: existing?.fromContract ?? null,
     // When no scaffolded metadata exists we synthesize a minimal contract

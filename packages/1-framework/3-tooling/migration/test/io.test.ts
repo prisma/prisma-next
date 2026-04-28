@@ -325,6 +325,134 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
       return true;
     });
   });
+
+  it('throws MIGRATION.PROVIDED_INVARIANTS_MISMATCH when migration.json disagrees with ops.json', async () => {
+    const dir = join(tmpDir, '20260225T1430_invariants_mismatch');
+    // Build a self-consistent package whose manifest claims invariant
+    // "alpha" but whose ops actually declare "alpha" — then surgically
+    // overwrite the manifest's providedInvariants list with an extra,
+    // unbacked id, and reset the migrationHash to a *recomputed* hash
+    // over the tampered manifest so the providedInvariants check is the
+    // first error we hit (otherwise HASH_MISMATCH would fire first).
+    const ops = [
+      ...createTestOps(),
+      {
+        id: 'data.alpha',
+        label: 'Data: alpha',
+        operationClass: 'data' as const,
+        name: 'alpha',
+        invariantId: 'alpha',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    await writeTestPackage(dir, { providedInvariants: ['alpha'] }, ops);
+
+    const manifestPath = join(dir, 'migration.json');
+    const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
+    content.providedInvariants = ['alpha', 'phantom'];
+    // Recompute migrationHash over the tampered manifest so the
+    // PROVIDED_INVARIANTS_MISMATCH check is what surfaces, not the
+    // generic hash mismatch.
+    const { computeMigrationHash } = await import('../src/hash');
+    content.migrationHash = computeMigrationHash(content, ops);
+    await writeFile(manifestPath, JSON.stringify(content, null, 2));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.PROVIDED_INVARIANTS_MISMATCH');
+      const mte = e as MigrationToolsError;
+      expect(mte.details).toMatchObject({
+        stored: ['alpha', 'phantom'],
+        derived: ['alpha'],
+        difference: { extra: ['phantom'], missing: [] },
+      });
+      return true;
+    });
+  });
+
+  it('throws MIGRATION.INVALID_INVARIANT_ID when ops.json carries a malformed invariantId', async () => {
+    const dir = join(tmpDir, '20260225T1430_invalid_invariant_id');
+    const badId = 'has a space';
+    const ops = [
+      {
+        id: 'data.bad',
+        label: 'Data: bad',
+        operationClass: 'data' as const,
+        name: 'bad',
+        invariantId: badId,
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    // writeTestPackage would itself derive providedInvariants and throw,
+    // so build the manifest by hand with stored-providedInvariants set
+    // to match what the post-format-validation code *would* have
+    // produced if the id were valid — but the fail point we test is the
+    // verify-time format check, which fires before the comparison.
+    const metadata = createTestMetadata({ providedInvariants: [badId] }, []);
+    const { computeMigrationHash } = await import('../src/hash');
+    const migrationHash = computeMigrationHash({ ...metadata, providedInvariants: [badId] }, ops);
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, 'migration.json'),
+      JSON.stringify({ ...metadata, providedInvariants: [badId], migrationHash }, null, 2),
+    );
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(ops, null, 2));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_INVARIANT_ID');
+      const mte = e as MigrationToolsError;
+      expect(mte.details).toEqual({ invariantId: badId });
+      return true;
+    });
+  });
+
+  it('throws MIGRATION.DUPLICATE_INVARIANT_IN_EDGE when two ops share an invariantId in ops.json', async () => {
+    const dir = join(tmpDir, '20260225T1430_duplicate_invariant');
+    const ops = [
+      {
+        id: 'data.first',
+        label: 'Data: first',
+        operationClass: 'data' as const,
+        name: 'first',
+        invariantId: 'shared',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+      {
+        id: 'data.second',
+        label: 'Data: second',
+        operationClass: 'data' as const,
+        name: 'second',
+        invariantId: 'shared',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    const metadata = createTestMetadata({ providedInvariants: ['shared'] }, []);
+    const { computeMigrationHash } = await import('../src/hash');
+    const migrationHash = computeMigrationHash(
+      { ...metadata, providedInvariants: ['shared'] },
+      ops,
+    );
+    await mkdir(dir, { recursive: true });
+    await writeFile(
+      join(dir, 'migration.json'),
+      JSON.stringify({ ...metadata, providedInvariants: ['shared'], migrationHash }, null, 2),
+    );
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(ops, null, 2));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.DUPLICATE_INVARIANT_IN_EDGE');
+      const mte = e as MigrationToolsError;
+      expect(mte.details).toEqual({ invariantId: 'shared' });
+      return true;
+    });
+  });
 });
 
 describe('readMigrationsDir', () => {

@@ -233,4 +233,98 @@ describe('buildMigrationArtifacts', () => {
       buildMigrationArtifacts(makeMigration([{ id: 'op1' }], { bad: true } as never), null),
     ).toThrow(/describe\(\).*invalid/);
   });
+
+  it('derives providedInvariants from data ops with invariantId (sorted, deduped)', () => {
+    const ops = [
+      { id: 'add', label: 'Add', operationClass: 'additive' },
+      {
+        id: 'data.zebra',
+        label: 'Data: zebra',
+        operationClass: 'data',
+        name: 'zebra',
+        invariantId: 'zebra-invariant',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+      {
+        id: 'data.apple',
+        label: 'Data: apple',
+        operationClass: 'data',
+        name: 'apple',
+        invariantId: 'apple-invariant',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+
+    const { metadata } = buildMigrationArtifacts(makeMigration(ops), null);
+    expect(metadata.providedInvariants).toEqual(['apple-invariant', 'zebra-invariant']);
+  });
+
+  it('produces empty providedInvariants when no data ops declare invariantId', () => {
+    const ops = [
+      { id: 'add', label: 'Add', operationClass: 'additive' },
+      {
+        id: 'data.untracked',
+        label: 'Data: untracked',
+        operationClass: 'data',
+        name: 'untracked',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    const { metadata } = buildMigrationArtifacts(makeMigration(ops), null);
+    expect(metadata.providedInvariants).toEqual([]);
+  });
+
+  it('rejects a malformed invariantId at emit time', () => {
+    const ops = [
+      {
+        id: 'data.bad',
+        label: 'Data: bad',
+        operationClass: 'data',
+        name: 'bad',
+        invariantId: 'has a space',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({ code: 'MIGRATION.INVALID_INVARIANT_ID' }) as unknown as Error,
+    );
+  });
+
+  it('rejects duplicate invariantId across data ops at emit time', () => {
+    const ops = [
+      {
+        id: 'data.first',
+        label: 'Data: first',
+        operationClass: 'data',
+        name: 'first',
+        invariantId: 'shared',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+      {
+        id: 'data.second',
+        label: 'Data: second',
+        operationClass: 'data',
+        name: 'second',
+        invariantId: 'shared',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.DUPLICATE_INVARIANT_IN_EDGE',
+      }) as unknown as Error,
+    );
+  });
 });

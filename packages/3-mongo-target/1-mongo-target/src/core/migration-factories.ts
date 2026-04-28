@@ -50,6 +50,12 @@ const MATCH_ALL_FILTER: MongoFilterExpr = MongoExistsExpr.exists('_id');
 export function dataTransform(
   name: string,
   options: {
+    /**
+     * Optional opt-in routing identity. Presence opts the transform into
+     * invariant-aware routing; absence means it is path-dependent and
+     * not referenceable from refs.
+     */
+    invariantId?: string;
     check?: {
       source: () => MongoQueryPlan | Buildable;
       filter?: MongoFilterExpr;
@@ -81,6 +87,7 @@ export function dataTransform(
     label: `Data transform: ${name}`,
     operationClass: 'data',
     name,
+    ...(options.invariantId !== undefined ? { invariantId: options.invariantId } : {}),
     precheck,
     run,
     postcheck,

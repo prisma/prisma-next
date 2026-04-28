@@ -59,6 +59,7 @@ async function writeAttestedMigration(
       plannerVersion: '1.0.0',
     },
     labels: [],
+    providedInvariants: [],
     createdAt: opts.timestamp.toISOString(),
   };
   const migrationHash = computeMigrationHash(baseMetadata, opts.ops);
@@ -312,6 +313,7 @@ describe(
         toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
         labels: [],
+        providedInvariants: [],
         createdAt: new Date().toISOString(),
       };
       const invalidJson = JSON.stringify({ ...baseMetadata, migrationHash: null });

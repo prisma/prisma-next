@@ -76,6 +76,7 @@ async function writeAttestedMigration(
       plannerVersion: '1.0.0',
     },
     labels: [],
+    providedInvariants: [],
     createdAt: opts.timestamp.toISOString(),
   };
   const migrationHash = computeMigrationHash(baseMetadata, opts.ops);

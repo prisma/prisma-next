@@ -34,7 +34,16 @@ export interface MongoDataTransformCheck {
 
 export interface MongoDataTransformOperation extends MigrationPlanOperation {
   readonly operationClass: 'data';
+  /**
+   * Human-readable label for this data transform.
+   */
   readonly name: string;
+  /**
+   * Optional opt-in routing identity. Presence opts the transform into
+   * invariant-aware routing; absence means the transform is
+   * path-dependent and not referenceable from refs.
+   */
+  readonly invariantId?: string;
   readonly precheck: readonly MongoDataTransformCheck[];
   readonly run: readonly MongoQueryPlan[];
   readonly postcheck: readonly MongoDataTransformCheck[];

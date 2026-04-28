@@ -79,6 +79,33 @@ describe('reconstructGraph', () => {
     expect(graph.migrationByHash.size).toBe(2);
   });
 
+  it('propagates manifest providedInvariants onto MigrationEdge.invariants', () => {
+    const ops = createTestOps();
+    const metadata = createTestMetadata(
+      { from: E, to: 'H1', providedInvariants: ['phone-backfill', 'email-verified'] },
+      ops,
+    );
+    const migrationHash = computeMigrationHash(metadata, ops);
+    const packages: MigrationPackage[] = [
+      {
+        dirName: 'm1',
+        dirPath: '/migrations/m1',
+        metadata: { ...metadata, migrationHash },
+        ops,
+      },
+    ];
+    const graph = reconstructGraph(packages);
+    const edge = graph.migrationByHash.get(migrationHash);
+    expect(edge?.invariants).toEqual(['phone-backfill', 'email-verified']);
+  });
+
+  it('defaults MigrationEdge.invariants to an empty array when manifest declares none', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const [edge] = [...graph.migrationByHash.values()];
+    expect(edge?.invariants).toEqual([]);
+  });
+
   it('rejects same source and target with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
     try {
       reconstructGraph([pkg('H1', 'H1', 'm1')]);
@@ -308,6 +335,7 @@ describe('detectCycles', () => {
         dirName: `m${i}`,
         createdAt: new Date(i * 1000).toISOString(),
         labels: [],
+        invariants: [],
       };
       const fwd = forwardChain.get(prev);
       if (fwd) fwd.push(entry);

@@ -48,20 +48,21 @@ export interface SerializedQueryPlan {
  * serialized to JSON ASTs at verification time, and rendered to SQL
  * by the target adapter at apply time.
  *
- * The `name` serves as the invariant identity — it's recorded in the
- * ledger and used for invariant-aware routing via environment refs.
- *
  * In draft state (before verification), `check` and `run` are null.
  * After verification, they contain the serialized query ASTs.
  */
 export interface DataTransformOperation extends MigrationPlanOperation {
   readonly operationClass: 'data';
   /**
-   * The invariant name for this data transform.
-   * Recorded in the ledger on successful edge completion.
-   * Used by environment refs to declare required invariants.
+   * Human-readable label for this data transform.
    */
   readonly name: string;
+  /**
+   * Optional opt-in routing identity. Presence opts the transform into
+   * invariant-aware routing; absence means it is path-dependent and
+   * not referenceable from refs.
+   */
+  readonly invariantId?: string;
   /**
    * Path to the TypeScript source file that produced this operation.
    * Not part of edgeId computation — for traceability only.

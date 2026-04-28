@@ -8,6 +8,7 @@ import {
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
+import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
@@ -248,7 +249,7 @@ async function executeMigrationPlanCommand(
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,
     to: toStorageHash,
     kind: 'regular',
@@ -323,9 +324,13 @@ async function executeMigrationPlanCommand(
     // produces a different hash (over the real ops). This is intentional;
     // there is no on-disk "draft" state.
     const opsForWrite = hasPlaceholders ? [] : plannedOps;
-    const metadata: MigrationMetadata = {
+    const metadataWithInvariants: Omit<MigrationMetadata, 'migrationHash'> = {
       ...baseMetadata,
-      migrationHash: computeMigrationHash(baseMetadata, opsForWrite),
+      providedInvariants: deriveProvidedInvariants(opsForWrite),
+    };
+    const metadata: MigrationMetadata = {
+      ...metadataWithInvariants,
+      migrationHash: computeMigrationHash(metadataWithInvariants, opsForWrite),
     };
 
     await writeMigrationPackage(packageDir, metadata, opsForWrite);

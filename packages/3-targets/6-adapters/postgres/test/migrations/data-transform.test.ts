@@ -166,4 +166,26 @@ describe('dataTransform factory', () => {
       expect(ctx).toEqual({ contract });
     }
   });
+
+  it('forwards invariantId onto the op when supplied', () => {
+    lowerMock.mockReturnValue({ sql: 'X', params: [] });
+    const op = dataTransform(
+      makeContract(),
+      'backfill-emails',
+      { invariantId: 'backfill-user-email', run: () => makePlan() },
+      makeAdapter(),
+    );
+    expect(op.invariantId).toBe('backfill-user-email');
+  });
+
+  it('omits invariantId when not supplied', () => {
+    lowerMock.mockReturnValue({ sql: 'X', params: [] });
+    const op = dataTransform(
+      makeContract(),
+      'no-invariant',
+      { run: () => makePlan() },
+      makeAdapter(),
+    );
+    expect(op).not.toHaveProperty('invariantId');
+  });
 });

@@ -147,6 +147,23 @@ describe('dataTransform', () => {
     expect(op.postcheck).toHaveLength(0);
   });
 
+  it('forwards invariantId onto the op when supplied', () => {
+    const op = dataTransform('backfill-status', {
+      invariantId: 'backfill-user-status',
+      run: () => makeRunPlan(),
+    });
+
+    expect(op.invariantId).toBe('backfill-user-status');
+  });
+
+  it('omits invariantId when not supplied', () => {
+    const op = dataTransform('seed-defaults', {
+      run: () => makeRunPlan(),
+    });
+
+    expect(op).not.toHaveProperty('invariantId');
+  });
+
   it('resolves check source closure and calls .build() on Buildable', () => {
     const buildable = { build: () => makeCheckPlan() };
     const op = dataTransform('test', {

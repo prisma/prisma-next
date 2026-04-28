@@ -1,7 +1,15 @@
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 
 export function entry(from: string, to: string, dirName: string): MigrationEdge {
-  return { from, to, dirName, migrationHash: `mid_${dirName}`, createdAt: '', labels: [] };
+  return {
+    from,
+    to,
+    dirName,
+    migrationHash: `mid_${dirName}`,
+    createdAt: '',
+    labels: [],
+    invariants: [],
+  };
 }
 
 export function buildGraph(entries: MigrationEdge[]): MigrationGraph {

@@ -9,8 +9,10 @@ import {
   errorInvalidSlug,
   errorMigrationHashMismatch,
   errorMissingFile,
+  errorProvidedInvariantsMismatch,
 } from './errors';
 import { verifyMigrationHash } from './hash';
+import { deriveProvidedInvariants } from './invariants';
 import type { MigrationMetadata } from './metadata';
 import type { MigrationOps, MigrationPackage } from './package';
 
@@ -37,6 +39,7 @@ const MigrationMetadataSchema = type({
   toContract: 'object',
   hints: MigrationHintsSchema,
   labels: 'string[]',
+  providedInvariants: 'string[]',
   'authorship?': type({
     'author?': 'string',
     'email?': 'string',
@@ -52,6 +55,7 @@ const MigrationOpSchema = type({
   id: 'string',
   label: 'string',
   operationClass: "'additive' | 'widening' | 'destructive' | 'data'",
+  'invariantId?': 'string',
 });
 
 // Intentionally shallow: operation-specific payload validation is owned by planner/runner layers.
@@ -155,6 +159,17 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   validateMetadata(metadata, manifestPath);
   validateOps(ops, opsPath);
 
+  // Re-derive before the hash check so format/duplicate diagnostics
+  // fire with their dedicated codes rather than as a generic hash mismatch.
+  const derivedInvariants = deriveProvidedInvariants(ops);
+  if (!arraysEqual(metadata.providedInvariants, derivedInvariants)) {
+    throw errorProvidedInvariantsMismatch(
+      manifestPath,
+      metadata.providedInvariants,
+      derivedInvariants,
+    );
+  }
+
   const pkg: MigrationPackage = {
     dirName: basename(dir),
     dirPath: dir,
@@ -168,6 +183,14 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
   }
 
   return pkg;
+}
+
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 function validateMetadata(

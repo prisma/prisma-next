@@ -61,6 +61,10 @@
       "types": "./dist/exports/hash.d.mts",
       "import": "./dist/exports/hash.mjs"
     },
+    "./invariants": {
+      "types": "./dist/exports/invariants.d.mts",
+      "import": "./dist/exports/invariants.mjs"
+    },
     "./migration-graph": {
       "types": "./dist/exports/migration-graph.d.mts",
       "import": "./dist/exports/migration-graph.mjs"

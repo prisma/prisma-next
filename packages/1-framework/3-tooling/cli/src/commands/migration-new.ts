@@ -190,6 +190,7 @@ async function executeMigrationNewCommand(
       plannerVersion: '1.0.0',
     },
     labels: [],
+    providedInvariants: [],
     createdAt: timestamp.toISOString(),
   };
   const metadata: MigrationMetadata = {

@@ -50,6 +50,7 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
       dirName: pkg.dirName,
       createdAt: pkg.metadata.createdAt,
       labels: pkg.metadata.labels,
+      invariants: pkg.metadata.providedInvariants,
     };
 
     if (migrationByHash.has(migration.migrationHash)) {
