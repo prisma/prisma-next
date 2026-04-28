@@ -1,13 +1,28 @@
 /**
  * Seed script for the supabase-todos PoC.
  *
- * Idempotency
- * -----------
- * Safe to re-run. Each fixture has a deterministic primary key (auth-user
- * id is owned by Supabase Auth; todo / message ids are derived from a
- * stable UUIDv5 of their fixture label). Inserts use `upsert(..., {
- *   onConflict: 'id', ignoreDuplicates: true })` so a second run is a
- * no-op rather than a duplicate.
+ * Idempotency (NOT convergence)
+ * -----------------------------
+ * The seed is **idempotent** but **not convergent**. Each fixture has a
+ * deterministic primary key (auth-user id is owned by Supabase Auth; todo
+ * / message ids are derived from a stable UUIDv5 of their fixture label),
+ * and inserts use `upsert(..., { onConflict: 'id', ignoreDuplicates: true })`
+ * so a second run does not create duplicate rows. **However**, because
+ * the upsert is `ignoreDuplicates: true`, a row that has been mutated
+ * out-of-band (e.g. by a test that didn't clean up its writes) will *not*
+ * be repaired by re-running the seed — the existing-id branch is a no-op,
+ * so the drifted column values stay drifted.
+ *
+ * The supported recovery path for a drifted DB is `supabase db reset`
+ * from `examples/supabase-todos/`, then `pnpm migrate:up && pnpm seed`
+ * to repopulate from a clean baseline. Test suites that mutate seed
+ * rows (rather than transient per-test rows) are the usual culprit;
+ * write-heavy tests should create / mutate / delete transient rows
+ * inside `try/finally` blocks instead.
+ *
+ * (Profiles use `ignoreDuplicates: false`, so display-name / email
+ * changes *are* convergent for that table only — kept that way so a
+ * future fixture rename flows through naturally.)
  *
  * What it creates
  * ---------------

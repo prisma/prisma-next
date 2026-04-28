@@ -58,7 +58,11 @@
  * @see projects/supabase-poc/plan.md § Milestone 4 → 4.4
  */
 import type { MiddlewareHandler } from 'hono';
-import type { SupabaseRuntimeFactory, SupabaseSession } from '../supabase-runtime';
+import {
+  isRoleNotAllowedError,
+  type SupabaseRuntimeFactory,
+  type SupabaseSession,
+} from '../supabase-runtime';
 import type { JwtAuthEnv } from './jwt';
 
 /**
@@ -110,7 +114,35 @@ export function createScopedRuntimeMiddleware(
     options.logger ?? ((err: unknown) => console.error('[scoped-runtime] end() failed', err));
 
   return async (c, next) => {
-    const session = openSession(options.factory, c.var.jwt, c.var.public === true);
+    let session: SupabaseSession;
+    try {
+      session = openSession(options.factory, c.var.jwt, c.var.public === true);
+    } catch (err) {
+      // Map the factory's R-FX-5 allowlist rejection to a 403 — a
+      // forged-but-valid JWT carrying `role: 'admin'` (or any value
+      // outside `allowedRoles`) is an auth failure, not a server bug.
+      // The factory throws synchronously *before* opening any
+      // connection (cf. factory.test.ts § 'disallowed role throws
+      // synchronously and never touches the pool'), so the failure
+      // path here returns the response without any DB cleanup. Any
+      // other throw from `openSession()` (the programmer-error
+      // `middleware/jwt-not-attached` guard, an IDENT_PATTERN
+      // rejection from a misconfigured `allowedRoles`) is still a
+      // 500 — only the explicit R-FX-5 shape gets mapped, so an
+      // unrelated bug doesn't quietly become a 403.
+      if (isRoleNotAllowedError(err)) {
+        return c.json(
+          {
+            error: {
+              code: 'auth/role-not-allowed' as const,
+              message: `Role '${err.role}' is not allowed for this server.`,
+            },
+          },
+          403,
+        );
+      }
+      throw err;
+    }
     c.set('db', session);
 
     let handlerError: unknown;
@@ -136,6 +168,11 @@ export function createScopedRuntimeMiddleware(
     if (handlerThrew) {
       throw handlerError;
     }
+    // Explicit `return` so TS noImplicitReturns is satisfied — the
+    // role-not-allowed branch above returns a Response, so every
+    // path of the function must terminate with an explicit return /
+    // throw.
+    return;
   };
 }
 

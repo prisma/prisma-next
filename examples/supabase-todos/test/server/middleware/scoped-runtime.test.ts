@@ -342,12 +342,13 @@ describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware (T4.3)', () => {
   // `factory.authenticate({ role: 'admin' })` is called inside
   // `openSession`, the factory throws synchronously *before*
   // constructing the driver / runtime, so no DB query is issued. The
-  // throw propagates out of the middleware (it happens before the
-  // `try { await next() … }` block) and lands in Hono's `onError` as
-  // a 500. This test pins all three of those properties so a future
-  // refactor can't silently regress any of them; cross-references
-  // phase-4a code-review § Major 1.
-  it('JWT role outside allowedRoles is rejected at the factory boundary (defense in depth)', async () => {
+  // scoped-runtime middleware then maps the typed `RoleNotAllowedError`
+  // to a **403 `auth/role-not-allowed`** response — a forged-but-valid
+  // JWT is an auth failure, not a server bug, and shouldn't reach the
+  // client as a 500. Pins all three properties (status, body code, no
+  // DB roundtrip); cross-references phase-4a code-review § Major 1
+  // and phase-4b system-design-review § Minor 3.
+  it('JWT role outside allowedRoles maps to 403 auth/role-not-allowed (defense in depth)', async () => {
     const app = new Hono<ScopedRuntimeEnv>().get(
       '/me/admin-token',
       injectJwt({
@@ -357,22 +358,15 @@ describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware (T4.3)', () => {
       createScopedRuntimeMiddleware({ factory }),
       (c) => c.text('unreachable'),
     );
-    let caught: Error | undefined;
-    app.onError((err, c) => {
-      if (err instanceof Error) caught = err;
-      return c.json({ ok: false }, 500);
-    });
 
     const connectSpy = vi.spyOn(pool, 'connect');
     const callsBefore = connectSpy.mock.calls.length;
     try {
       const res = await app.request('/me/admin-token');
-      expect(res.status).toBe(500);
-      expect(caught).toBeInstanceOf(Error);
-      // The factory's role-rejection message names the rejected role
-      // and lists allowedRoles, per phase-2 R-FX-5.
-      expect((caught as Error).message).toMatch(/'admin'/);
-      expect((caught as Error).message).toMatch(/allowedRoles/);
+      expect(res.status).toBe(403);
+      const body = (await res.json()) as { error: { code: string; message: string } };
+      expect(body.error.code).toBe('auth/role-not-allowed');
+      expect(body.error.message).toMatch(/'admin'/);
       // No DB query went out — the synchronous throw lands before
       // any pool.connect() call (cf. factory.test.ts § 'disallowed role
       // throws synchronously and never touches the pool').

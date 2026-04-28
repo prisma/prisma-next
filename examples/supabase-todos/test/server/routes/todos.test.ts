@@ -130,6 +130,13 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
     // tests **only read** from these seeded rows; writes (PATCH/POST/
     // DELETE) operate on transient per-test rows so concurrent suites
     // (admin / factory / scoped-runtime) see a stable seed snapshot.
+    //
+    // If a fresh clone hits this `beforeAll` and the find-by-title
+    // throws, the DB has drifted out from under the seed. The seed is
+    // idempotent but not convergent (cf. scripts/seed.ts docblock):
+    // re-running `pnpm seed` won't repair drifted titles. Recovery is
+    // `supabase db reset` from `examples/supabase-todos/`, then
+    // `pnpm migrate:up && pnpm seed` to rebuild the baseline.
     const todoPlan = adminDb.sql.todos.select('id', 'user_id', 'title').build();
     const todos = await adminRuntime.execute(todoPlan);
     const aliceTodo = todos.find(
@@ -216,18 +223,29 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
       },
       body: JSON.stringify({ title }),
     });
-    expect(res.status).toBe(201);
-    const row = (await res.json()) as TodoRow;
-    expect(row.title).toBe(title);
-    expect(row.user_id).toBe(aliceAuthUserId);
-    expect(row.completed).toBe(false);
+    // Read the body before any assertions so the cleanup id is
+    // available regardless of which assertion fails. The 201 status
+    // is asserted *after* the row is captured.
+    const created = res.status === 201 ? ((await res.json()) as TodoRow) : null;
 
-    // Cleanup so a re-run doesn't accumulate fixtures.
-    const delPlan = adminDb.sql.todos
-      .delete()
-      .where((f, fns) => fns.eq(f.id, row.id))
-      .build();
-    await adminRuntime.execute(delPlan);
+    try {
+      expect(res.status).toBe(201);
+      if (!created) throw new Error('unreachable: status was 201 but body parse skipped');
+      expect(created.title).toBe(title);
+      expect(created.user_id).toBe(aliceAuthUserId);
+      expect(created.completed).toBe(false);
+    } finally {
+      // Always clean up via the admin runtime (RLS-bypass) so a
+      // failed assertion above does not leak a row that other
+      // suites' seed-fixture counts would then trip over.
+      if (created) {
+        const delPlan = adminDb.sql.todos
+          .delete()
+          .where((f, fns) => fns.eq(f.id, created.id))
+          .build();
+        await adminRuntime.execute(delPlan);
+      }
+    }
   });
 
   it('PATCH /api/todos/:id — alice updates her own todo', async () => {
@@ -315,7 +333,6 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
 
   it('DELETE /api/todos/:id — alice deleting her own freshly-created todo returns 204', async () => {
     const app = buildTodosApp({ factory, sql: adminDb.sql });
-    // Create a throwaway todo so the seed fixture set is preserved.
     const createRes = await app.request('/api/todos', {
       method: 'POST',
       headers: {
@@ -327,19 +344,32 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as TodoRow;
 
-    const delRes = await app.request(`/api/todos/${created.id}`, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${aliceToken}` },
-    });
-    expect(delRes.status).toBe(204);
+    try {
+      const delRes = await app.request(`/api/todos/${created.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${aliceToken}` },
+      });
+      expect(delRes.status).toBe(204);
 
-    // Confirm via admin runtime (RLS-bypassing) that it really is gone.
-    const verifyPlan = adminDb.sql.todos
-      .select('id')
-      .where((f, fns) => fns.eq(f.id, created.id))
-      .build();
-    const remaining = await adminRuntime.execute(verifyPlan);
-    expect(remaining).toEqual([]);
+      // Confirm via admin runtime (RLS-bypassing) that it really is gone.
+      const verifyPlan = adminDb.sql.todos
+        .select('id')
+        .where((f, fns) => fns.eq(f.id, created.id))
+        .build();
+      const remaining = await adminRuntime.execute(verifyPlan);
+      expect(remaining).toEqual([]);
+    } finally {
+      // Defense for the failure path: if the API DELETE didn't
+      // actually drop the row (e.g. handler regressed and returned
+      // 204 without executing the plan), the throwaway row would
+      // otherwise stick around and pollute future runs. Clean up
+      // via the admin runtime regardless of the assertions above.
+      const cleanupPlan = adminDb.sql.todos
+        .delete()
+        .where((f, fns) => fns.eq(f.id, created.id))
+        .build();
+      await adminRuntime.execute(cleanupPlan);
+    }
   });
 
   // R-FX-2 static-source pin: the handler **must not** filter by

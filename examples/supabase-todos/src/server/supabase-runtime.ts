@@ -160,6 +160,45 @@ function unsupportedScopedTxError(): UnsupportedScopedTxError {
   return err;
 }
 
+/**
+ * Typed error for the R-FX-5 allowlist rejection. The factory throws
+ * synchronously from `authenticate()` when the requested role is not in
+ * `allowedRoles`; the scoped-runtime middleware (T4.4) `instanceof`-
+ * checks this shape (or matches on `code`) to map the throw to a 403
+ * `auth/role-not-allowed` response rather than letting it propagate as
+ * a 500 ("server bug") to the client. Exposing a class — rather than
+ * making the middleware brittle-match on the message string — keeps
+ * the boundary explicit at the type level.
+ */
+export interface RoleNotAllowedError extends Error {
+  readonly code: 'auth/role-not-allowed';
+  readonly role: string;
+  readonly allowedRoles: readonly string[];
+}
+
+export function isRoleNotAllowedError(err: unknown): err is RoleNotAllowedError {
+  return (
+    err instanceof Error &&
+    (err as { code?: unknown }).code === 'auth/role-not-allowed' &&
+    typeof (err as { role?: unknown }).role === 'string' &&
+    Array.isArray((err as { allowedRoles?: unknown }).allowedRoles)
+  );
+}
+
+function roleNotAllowedError(role: string, allowedRoles: readonly string[]): RoleNotAllowedError {
+  const err = new Error(
+    `createSupabaseRuntime: role '${role}' is not in allowedRoles ` +
+      `[${allowedRoles.map((r) => `'${r}'`).join(', ')}]. ` +
+      'Reject the request before issuing any SQL.',
+  ) as RoleNotAllowedError;
+  Object.assign(err, {
+    code: 'auth/role-not-allowed' as const,
+    role,
+    allowedRoles,
+  });
+  return err;
+}
+
 /** Pre-validated session config — the bits that get baked into each `SET LOCAL`. */
 interface ScopedSessionConfig {
   readonly jwtClaimsJson: string;
@@ -476,12 +515,13 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
     authenticate({ jwtClaims, role }: AuthenticateOptions): SupabaseSession {
       // R-FX-5: synchronous validation. Throw before constructing any driver
       // / runtime so the spy-based test can prove the pool was never touched.
+      // The error is typed (`RoleNotAllowedError` w/ `code:
+      // 'auth/role-not-allowed'`) so the scoped-runtime middleware (T4.4) can
+      // map the throw to a 403 `auth/role-not-allowed` response — a
+      // forged-but-valid JWT carrying `role: 'admin'` is an auth failure, not
+      // a server bug, and shouldn't surface to the client as a 500.
       if (!allowedRoles.has(role)) {
-        throw new Error(
-          `createSupabaseRuntime: role '${role}' is not in allowedRoles ` +
-            `[${[...allowedRoles].map((r) => `'${r}'`).join(', ')}]. ` +
-            'Reject the request before issuing any SQL.',
-        );
+        throw roleNotAllowedError(role, [...allowedRoles]);
       }
       // Defensive: even though the role is in the allowlist, validate it as
       // a Postgres identifier before interpolating into `SET LOCAL ROLE`,
