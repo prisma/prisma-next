@@ -1,1 +1,1 @@
-export type { MigrationChainEntry, MigrationGraph } from '../graph';
+export type { MigrationEdge, MigrationGraph } from '../graph';

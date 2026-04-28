@@ -26,7 +26,7 @@ See **Slices and dependencies** below for the arc from today's structural routin
   - *Depends on:* nothing new (code-level independent of the P1 ref refactor, which motivates the need but is otherwise orthogonal).
   - *Enables:* M4's subtraction. Not user-visible until M4 lands.
 
-- **M2. Edges declare invariants.** `invariantId?: string` on `DataTransformOperation` is the opt-in routing key; `name` keeps its retry/ledger identity. `migration.json` grows `providedInvariants: readonly string[]`, the attestation-covered aggregate. `MigrationChainEntry.invariants` propagates from the manifest at graph-reconstruction time.
+- **M2. Edges declare invariants.** `invariantId?: string` on `DataTransformOperation` is the opt-in routing key; `name` keeps its retry/ledger identity. `migration.json` grows `providedInvariants: readonly string[]`, the attestation-covered aggregate. `MigrationEdge.invariants` propagates from the manifest at graph-reconstruction time.
   - *Depends on:* nothing new; orthogonal to M1.
   - *Enables:* M3.
 
@@ -252,7 +252,7 @@ The routing work assumes the new name throughout. Landing this rename first keep
 
 **Status:** not yet landed.
 
-## P3. Rename `MigrationChainEntry` → `MigrationEdge`
+## P3. Rename `MigrationEdge` → `MigrationEdge`
 
 The type is used exclusively as a graph edge: it has `from` and `to` endpoints, is stored in neighbour-indexed maps, is returned as edge lists from `findPath` / `detectOrphans`, and every local variable that holds one is already named `edge` / `edges` / `incomingEdge`. `ChainEntry` is legacy from the pre-graph linear-chain era and actively misleads readers. `MigrationEdge` matches the implementation vocabulary and contrasts cleanly with `graph.nodes` (the contract-hash set). Not `AppliedMigration` — the type represents attested (on-disk, content-addressed) migrations, not migrations that have been applied to a database. Not `MigrationPathNode` — this is an edge, not a node.
 
@@ -275,11 +275,11 @@ Because `migration.json` is part of the `edgeId` hash, tampering with `providedI
 
 **Upgrade impact (breaking).** Adding `providedInvariants` to the canonical `migration.json` form changes every existing migration's `edgeId` on re-verify. Consumers must re-run `migration verify` across their migrations directory; ledger rows that reference pre-upgrade `edgeId`s are no longer addressable by the new hash and must be re-applied against a fresh database (or the ledger manually updated). Acceptable because all consumers today are prerelease/internal.
 
-**F3. Invariants flow through edges.** `MigrationChainEntry` carries `invariants: readonly string[]`, populated at `reconstructGraph` time from `pkg.manifest.providedInvariants`. No re-derivation from ops; the manifest is the source of truth. An edge whose migration has no invariant-bearing data transforms has `invariants: []`.
+**F3. Invariants flow through edges.** `MigrationEdge` carries `invariants: readonly string[]`, populated at `reconstructGraph` time from `pkg.manifest.providedInvariants`. No re-derivation from ops; the manifest is the source of truth. An edge whose migration has no invariant-bearing data transforms has `invariants: []`.
 
-**F4. Invariant-aware shortest-path search.** A new pathfinder, `findPathWithInvariants(graph, from, to, required: ReadonlySet<string>): readonly MigrationChainEntry[] | null`, returns the shortest path from `from` to `to` that collectively covers every required invariant — every name in `required` must appear in at least one edge's `invariants` on the path. "Shortest" = fewest edges. When `required` is empty, the result is identical to today's `findPath`. `findPath` can be reimplemented as `findPathWithInvariants(graph, from, to, new Set())`; the spec treats them as equivalent in behaviour.
+**F4. Invariant-aware shortest-path search.** A new pathfinder, `findPathWithInvariants(graph, from, to, required: ReadonlySet<string>): readonly MigrationEdge[] | null`, returns the shortest path from `from` to `to` that collectively covers every required invariant — every name in `required` must appear in at least one edge's `invariants` on the path. "Shortest" = fewest edges. When `required` is empty, the result is identical to today's `findPath`. `findPath` can be reimplemented as `findPathWithInvariants(graph, from, to, new Set())`; the spec treats them as equivalent in behaviour.
 
-**F5. `findPathWithDecision` surfaces invariant state.** `PathDecision` carries `requiredInvariants: readonly string[]` (the caller-supplied ask) and `satisfiedInvariants: readonly string[]` (the required invariants that the selected path actually provides). Both fields are always present on the decision — empty arrays when no invariants were in play. Per-edge invariants live on each `MigrationChainEntry` in `selectedPath`, so consumers that want to know *which* edge provided a given invariant do a direct lookup on `selectedPath`. We do not add a redundant `providedBy` map.
+**F5. `findPathWithDecision` surfaces invariant state.** `PathDecision` carries `requiredInvariants: readonly string[]` (the caller-supplied ask) and `satisfiedInvariants: readonly string[]` (the required invariants that the selected path actually provides). Both fields are always present on the decision — empty arrays when no invariants were in play. Per-edge invariants live on each `MigrationEdge` in `selectedPath`, so consumers that want to know *which* edge provided a given invariant do a direct lookup on `selectedPath`. We do not add a redundant `providedBy` map.
 
 **F6. Hard error on unsatisfiable.** When `required` is non-empty, `from`→`to` is structurally reachable, and no satisfying path exists, the pathfinder returns `null` and callers raise `MIGRATION.NO_INVARIANT_PATH` with: `refName` (optional), `required: readonly string[]`, `missing: readonly string[]`, and `structuralPath` — the edges `findPath(graph, from, to)` would have returned, included for diagnostic context. Each edge in `structuralPath` carries its own `invariants` (same shape as `selectedPath` elsewhere), so consumers can compute what the structural path *does* provide without a separate field. If `from`→`to` is not structurally reachable at all, callers raise the pre-existing no-path error, not `NO_INVARIANT_PATH`.
 
@@ -415,8 +415,8 @@ Grouped by concern. Ordering/chunking decided separately from this spec.
 
 ## Edge-level invariants
 
-- [ ] `MigrationChainEntry.invariants` is `readonly string[]`, always defined, sorted ascending, deduplicated
-- [ ] `reconstructGraph` populates `MigrationChainEntry.invariants` directly from `pkg.manifest.providedInvariants` — no re-derivation from ops
+- [ ] `MigrationEdge.invariants` is `readonly string[]`, always defined, sorted ascending, deduplicated
+- [ ] `reconstructGraph` populates `MigrationEdge.invariants` directly from `pkg.manifest.providedInvariants` — no re-derivation from ops
 - [ ] Unit tests cover: manifest with no invariants → empty; manifest with one; manifest with multiple (sorted); graph built from mixed attested bundles (some with invariants, some without)
 
 ## Pathfinder primitive
@@ -502,7 +502,7 @@ Named test graphs to walk through before declaring the pathfinder shippable. The
 
 ## Security
 
-Invariant IDs are strings and flow from `migration.ts` → `ops.json` → `MigrationChainEntry`. Compared by equality only; no eval, no path resolution. No new attack surface.
+Invariant IDs are strings and flow from `migration.ts` → `ops.json` → `MigrationEdge`. Compared by equality only; no eval, no path resolution. No new attack surface.
 
 ## Cost
 
