@@ -315,7 +315,14 @@ describe('MongoMigrationRunner', () => {
     }
   });
 
-  it('returns MARKER_ORIGIN_MISMATCH when marker exists but plan has no origin', async () => {
+  it('proceeds when marker exists but plan has no origin (db update path)', async () => {
+    // The Mongo runner used to reject this combination with
+    // `MARKER_ORIGIN_MISMATCH`, which broke `db update` against any
+    // already-signed Mongo database. The runner now mirrors Postgres'
+    // permissive `ensureMarkerCompatibility`: when `plan.origin == null`,
+    // origin validation is skipped on the assumption that the caller
+    // (db update) has done its own correctness check via live-schema
+    // introspection. See `mongo-runner.ts ensureMarkerCompatibility`.
     await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
@@ -333,10 +340,7 @@ describe('MongoMigrationRunner', () => {
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
-    }
+    expect(result.ok).toBe(true);
   });
 
   it('returns MARKER_ORIGIN_MISMATCH when no marker but plan has origin', async () => {
@@ -460,6 +464,16 @@ describe('MongoMigrationRunner - invariants', () => {
     };
   }
 
+  function dbUpdatePlan(destinationHash: string): MigrationPlan {
+    // origin omitted = `db update` flow: runner skips origin validation,
+    // marker write still runs and merges invariants into the existing set.
+    return {
+      targetId: 'mongo',
+      operations: [],
+      destination: { storageHash: destinationHash },
+    };
+  }
+
   it('unions invariants across repeated applies, sorts ascending, and dedupes', async () => {
     const contract = makeContract(
       { users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] } },
@@ -505,7 +519,8 @@ describe('MongoMigrationRunner - invariants', () => {
     expect(third.ok).toBe(true);
     expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
 
-    // Apply with no invariants option preserves the existing set.
+    // Apply with no invariants option preserves the existing set
+    // (migration-apply path: origin=current marker hash).
     const fourth = await runner.execute({
       plan: emptyPlan('sha256:inv', 'sha256:inv'),
       destinationContract: contract,
@@ -514,6 +529,29 @@ describe('MongoMigrationRunner - invariants', () => {
     });
     expect(fourth.ok).toBe(true);
     expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+    // db-update flow (origin omitted): explicit invariants merge into the
+    // existing set the same way as the migration-apply path.
+    const fifth = await runner.execute({
+      plan: dbUpdatePlan('sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['epsilon'],
+    });
+    expect(fifth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'epsilon', 'gamma']);
+
+    // db-update flow with invariants omitted (the real `db update` caller's
+    // contract): preserves the existing set on the origin-skipped path.
+    const sixth = await runner.execute({
+      plan: dbUpdatePlan('sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+    expect(sixth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'epsilon', 'gamma']);
   });
 });
 

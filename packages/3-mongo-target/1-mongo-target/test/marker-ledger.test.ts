@@ -192,6 +192,39 @@ describe('updateMarker', () => {
     const marker = await readMarker(db);
     expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
+
+  it('preserves both writers invariants under interleaved updates (server-side merge)', async () => {
+    // Pins the design contract from spec §"Concurrency: server-side merge
+    // for invariants". With server-side merge each `findOneAndUpdate` runs
+    // its `$setUnion` against the doc's current value, so concurrent
+    // updates accumulate. With the pre-fix client-side union, both writers
+    // would have read the initial state, computed their union locally, and
+    // the second `$set` would have clobbered the first — this test would
+    // fail.
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: [],
+    });
+
+    const [updatedA, updatedB] = await Promise.all([
+      updateMarker(db, 'sha256:v1', {
+        storageHash: 'sha256:v1',
+        profileHash: 'sha256:p1',
+        invariants: ['alpha'],
+      }),
+      updateMarker(db, 'sha256:v1', {
+        storageHash: 'sha256:v1',
+        profileHash: 'sha256:p1',
+        invariants: ['beta'],
+      }),
+    ]);
+
+    expect(updatedA).toBe(true);
+    expect(updatedB).toBe(true);
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
+  });
 });
 
 describe('writeLedgerEntry', () => {

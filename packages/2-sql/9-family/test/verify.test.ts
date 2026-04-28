@@ -174,4 +174,29 @@ describe('marker parser', () => {
 
     expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');
   });
+
+  it('throws when invariants is missing (DDL guarantees the column is not null)', () => {
+    // The column ships `not null default '{}'` from the start; a row with
+    // no invariants field signals storage corruption or a schema downgrade,
+    // not a state we want to silently coerce to []. See spec F11 + the
+    // §"Schema evolution" section.
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+    };
+
+    expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');
+  });
+
+  it('throws when invariants is null (column is non-nullable)', () => {
+    // Same rationale as the missing-field case: a NULL would only appear
+    // under storage corruption.
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+      invariants: null,
+    };
+
+    expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');
+  });
 });

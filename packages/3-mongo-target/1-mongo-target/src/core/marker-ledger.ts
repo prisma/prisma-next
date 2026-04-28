@@ -4,7 +4,7 @@ import {
   RawFindOneAndUpdateCommand,
   RawInsertOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
-import type { Db, Document } from 'mongodb';
+import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
@@ -24,15 +24,16 @@ async function executeFindOneAndUpdate(
   db: Db,
   cmd: RawFindOneAndUpdateCommand,
 ): Promise<Document | null> {
-  const collection = db.collection(cmd.collection);
-  if (Array.isArray(cmd.update)) {
-    return collection.findOneAndUpdate(cmd.filter, cmd.update as Document[], {
+  // `cmd.update` is `Document | ReadonlyArray<Document>` per the AST. The
+  // MongoDB driver's `findOneAndUpdate` accepts the same shape under the
+  // type `UpdateFilter<T> | Document[]`. The driver's runtime path handles
+  // both forms identically — pipelines (array) and update docs (object).
+  // One cast to that union keeps the call single-arm.
+  return db
+    .collection(cmd.collection)
+    .findOneAndUpdate(cmd.filter, cmd.update as UpdateFilter<Document> | Document[], {
       upsert: cmd.upsert,
     });
-  }
-  return collection.findOneAndUpdate(cmd.filter, cmd.update as Record<string, unknown>, {
-    upsert: cmd.upsert,
-  });
 }
 
 export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {

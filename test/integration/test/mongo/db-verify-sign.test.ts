@@ -302,6 +302,41 @@ describe(
         expect(result.marker.updated).toBe(true);
         expect(result.marker.previous?.storageHash).toBe(baseContract.storage.storageHash);
       });
+
+      it('preserves existing invariants when re-signing with a new contract', async () => {
+        // Mirror of the Postgres regression test in family.sign-database.test.ts.
+        // Sign re-anchors the marker hashes; it must not clobber the
+        // applied-invariants set the migration runner has been accumulating.
+        // family-mongo's control-instance calls `updateMarker` without
+        // `invariants`, and `updateMarker`'s conditional `$set` keeps the
+        // field untouched when omitted — this test pins that contract.
+        await initMarker(db, {
+          storageHash: baseContract.storage.storageHash,
+          profileHash: baseContract.profileHash,
+          invariants: ['email-verified', 'phone-backfill'],
+        });
+
+        const updatedContract: MongoContract = {
+          ...baseContract,
+          storage: {
+            ...baseContract.storage,
+            storageHash: coreHash('sha256:updated-contract'),
+          },
+        };
+
+        const instance = createInstance();
+        const result = await instance.sign({
+          driver: makeDriver(),
+          contract: updatedContract,
+          contractPath: '/test/contract.json',
+        });
+        expect(result.ok).toBe(true);
+
+        const markerDoc = await db
+          .collection<{ invariants?: readonly string[] }>('_prisma_migrations')
+          .findOne({ _id: 'marker' as unknown as never });
+        expect(markerDoc?.invariants).toEqual(['email-verified', 'phone-backfill']);
+      });
     });
   },
 );

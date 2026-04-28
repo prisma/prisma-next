@@ -22,7 +22,7 @@ describe('writeContractMarker', () => {
     });
   });
 
-  describe('with explicit invariants (runner-side / explicit overwrite)', () => {
+  describe('with explicit invariants (sign-side / explicit overwrite)', () => {
     const sample = writeContractMarker({
       storageHash: 'sha256:hash',
       profileHash: 'sha256:profile',
