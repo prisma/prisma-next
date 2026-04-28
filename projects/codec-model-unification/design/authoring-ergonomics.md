@@ -2,43 +2,34 @@
 
 **Audience:** pack authors and reviewers concerned with the API surface this project ships. Companion to [codec-interface-and-brand.md](codec-interface-and-brand.md), which covers the underlying mechanism.
 
-**What this doc covers:** the `columnFor` helper, the `jsonCodec` helper, the `storage.types`/`typeRef` model, and three worked before/after examples. Concludes with a sketch of the pack-author guidance that ships at close-out.
+**What this doc covers:** the `columnFor` helper, the `jsonCodec` helper, the `storage.types`/`typeRef` model with worked examples, and the pack-author guidance that ships at close-out.
 
 ---
 
-## Background — fragmented state today
+## Decision
 
-Every parameterized codec exposes a hand-rolled column factory:
+Ship two helpers and codify the existing `storage.types` / `typeRef` IR concepts as the authoring story:
 
 ```typescript
-// pgvector
-export function vector<N extends number>(length: N): ColumnTypeDescriptor & {
-  readonly typeParams: { readonly length: N };
-} {
-  if (!Number.isInteger(length) || length <= 0) throw new Error('…');
-  return { codecId: 'pg/vector@1', nativeType: 'vector', typeParams: { length } } as const;
-}
+// One factory replaces every per-codec column factory.
+columnFor(textCodec)                              // → ColumnTypeDescriptor
+columnFor(pgVectorCodec)({ length: 1536 })        // → ColumnTypeDescriptor & { typeParams: { length: 1536 } }
 
-// hypothetical char(N)
-export function char<N extends number>(length: N): ColumnTypeDescriptor & {
-  readonly typeParams: { readonly length: N };
-} {
-  if (!Number.isInteger(length) || length <= 0) throw new Error('…');
-  return { codecId: 'pg/char@1', nativeType: 'char', typeParams: { length } } as const;
-}
+// JSON columns get schema-driven type inference for free.
+columnFor(jsonCodec)({ schema: ProductSettings }) // → ColumnTypeDescriptor with brand projecting InferOutput<ProductSettings>
 ```
 
-Two boilerplate layers per codec: validation and descriptor construction. The validation duplicates whatever the codec's `paramsSchema` should already enforce; the descriptor construction is identical line-for-line.
+`columnFor` is type-discriminated on whether the codec extends `ParameterizedCodec`. Pack authors expose their codec; users compose with `columnFor`. Existing per-codec factories (`vector(N)`, `char(N)`, `numeric(p, s)`) become thin re-exports of `columnFor(codec)` or vanish.
 
-JSON columns suffer the inverse problem: there's no first-class way to project a user's narrowed schema (Arktype / Zod / typebox) into the contract's output type. Pack authors fall back to telling users "type the column manually if you care."
+`jsonCodec(schema)` is a `ParameterizedCodec` whose `Brand` projects `StandardSchemaV1.InferOutput<S>` as the column output type. We don't write a JSON-Schema-to-TS converter; the user's schema library (Arktype, Zod, Valibot, …) already does it via Standard Schema.
 
-`storage.types` and `typeRef` are not new — they're already part of the contract IR — but they're under-documented and rarely used in the demo. Part of this project's job is to lift them into the authoring story.
+`storage.types` (named instances) and `typeRef` (column-level reference) become the authoring affordance for cross-column sharing. Unchanged at the IR level; surfaced more visibly in pack-author docs.
+
+This satisfies [AC-3](../spec.md#ac-3-columnfor-and-jsoncodec-ship-the-documented-surface) and underwrites [AC-2](../spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly) (JSON column case) and [AC-4](../spec.md#ac-4-existing-parameterized-codecs-migrated) (per-codec migrations are one-line).
 
 ---
 
 ## The `columnFor` helper
-
-A single helper that subsumes every per-codec factory.
 
 ### Signature
 
@@ -52,8 +43,8 @@ export function columnFor<C extends Codec>(
 
 Type-discriminated:
 
-- Parameterized codec → returns a function `(params) => descriptor`.
-- Non-parameterized codec → returns the descriptor directly.
+- Parameterized codec → `(params) => descriptor` (literal-preserving).
+- Non-parameterized codec → descriptor directly.
 
 ### Behavior
 
@@ -69,7 +60,7 @@ const textCol = columnFor(textCodec);
 //    ^? ColumnTypeDescriptor
 ```
 
-Validates inline `params` against `paramsSchema` at runtime; throws a structured error on failure. The literal type is preserved through inference.
+Inline `params` are validated against the codec's `paramsSchema` at runtime; throws a structured error on failure. Literal types are preserved through inference.
 
 ### What this replaces
 
@@ -82,24 +73,30 @@ Pack authors export the codec; users compose with `columnFor`. One helper, one m
 ### Why a single helper, not "factory per codec"
 
 - One reviewable cross-codec surface.
-- Pack authors no longer need to write a factory at all — they ship the codec, users get the helper for free.
+- Pack authors stop writing factories at all — they ship the codec, users get the helper for free.
 - Discoverability: `columnFor(myCodec)` is grep-friendly across schemas.
 - The type-discriminated return makes both modes (parameterized and non-) flow through the same call shape.
 
 ### Optional sugar
 
-Pack authors who want a named export can re-export `columnFor(pgVectorCodec)` as `vector`:
+Pack authors who want a named export can re-export `columnFor(codec)` under a friendly alias:
 
 ```typescript
 // pgvector exports
 export const vector = columnFor(pgVectorCodec);
 ```
 
-The repo enforces that `vector` is *just* a renamed `columnFor` call — no per-extension validation duplication.
+…or wrap to preserve a positional ergonomic:
+
+```typescript
+export const vector = <N extends number>(length: N) => columnFor(pgVectorCodec)({ length });
+```
+
+The repo enforces that named factories are *just* renamed `columnFor` calls — no duplicated validation.
 
 ---
 
-## JSON-codec helper
+## `jsonCodec` helper
 
 The JSON-with-schema case is special: the user supplies the schema, and the schema is *both* the runtime validator and the source of truth for the output type.
 
@@ -136,29 +133,28 @@ import { columnFor, jsonCodec } from '@prisma-next/postgres-core';
 const settingsSchema = type({ theme: "'light' | 'dark'", notifications: 'boolean' });
 
 const settingsCol = columnFor(jsonCodec)({ schema: settingsSchema });
-//    ^? ColumnTypeDescriptor & {
-//         typeParams: { schema: typeof settingsSchema };
-//       }
 // FieldOutputType resolves to { theme: 'light' | 'dark'; notifications: boolean }
 ```
 
 ### Why this approach
 
-- **Pack-author burden zero.** No JSON Schema → TS converter to maintain. The user's schema library already solves it.
+- **Pack-author burden zero.** No JSON-Schema → TS converter to maintain.
 - **Consistent runtime/type story.** The same schema validates wire payloads and types output.
-- **Standard Schema is the right interop layer.** Arktype, Zod (4+), Valibot, and others ship Standard Schema implementations. We don't pick a winner.
+- **Standard Schema is the right interop layer.** Arktype, Zod (4+), Valibot, and others ship Standard Schema implementations; we don't pick a winner.
 
 ### What it doesn't cover
 
-- Schemas that aren't Standard Schema. Users must adapt; the framework doesn't ship adapters.
-- Schemas whose `InferOutput` produces a recursive type that exceeds TS's depth limit. Out of scope; users hit a separate TS limit.
-- Streaming validation / async validation. Out of scope; the existing JSON codec validates synchronously.
+- Schemas that aren't Standard Schema. Users must adapt.
+- Schemas whose `InferOutput` produces a recursive type that exceeds TS's depth limit. Out of scope (a TS limitation users hit independently of this project).
+- Streaming or async validation. Out of scope (the existing JSON codec validates synchronously).
+
+For schemas Standard Schema can't render to a TS source string for the emit path, the pack author's `renderOutputType` returns `'unknown'`; the no-emit path keeps the precise inference. This trade-off lives in the pack-author guidance.
 
 ---
 
-## `storage.types` vs `typeRef`
+## `storage.types` and `typeRef`
 
-These are existing IR concepts; this project leans on them more visibly.
+Existing IR concepts; this project leans on them more visibly.
 
 ### `storage.types`
 
@@ -166,12 +162,12 @@ A registry on the contract of *named* parameterized type instances:
 
 ```typescript
 storage.types = {
-  Embedding1536: { codecId: 'pg/vector@1', nativeType: 'vector', typeParams: { length: 1536 } },
-  ProductSettings: { codecId: 'pg/json@1', nativeType: 'jsonb', typeParams: { schema: productSchema } },
+  Embedding1536:    { codecId: 'pg/vector@1', nativeType: 'vector', typeParams: { length: 1536 } },
+  ProductSettings:  { codecId: 'pg/json@1',   nativeType: 'jsonb',  typeParams: { schema: productSchema } },
 };
 ```
 
-Each entry is a `ColumnTypeDescriptor` with a name. The same descriptor a column would carry inline.
+Each entry is a `ColumnTypeDescriptor` with a name — the same shape a column would carry inline.
 
 ### `typeRef`
 
@@ -180,7 +176,7 @@ A column property that points to a `storage.types` entry by name instead of inli
 ```typescript
 storage.tables.Document = {
   columns: {
-    id: { codecId: 'pg/text@1', nativeType: 'text', primaryKey: true },
+    id:        { codecId: 'pg/text@1', nativeType: 'text', primaryKey: true },
     embedding: { typeRef: 'Embedding1536', nullable: true },
   },
 };
@@ -190,15 +186,16 @@ storage.tables.Document = {
 
 ### Why this matters here
 
-- `FieldOutputType` must follow `typeRef` through `storage.types` so a `typeRef` column resolves to the same brand-applied type as an inline-`typeParams` column would. The rewrite in [codec-interface-and-brand.md](codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype) does this.
-- `init(params, instanceMeta)` (FR8) is keyed on `storage.types` instances. A column with `typeRef: 'Embedding1536'` shares an instance with every other column referencing `Embedding1536`; its `instance.usedAt` lists them all.
-- The pack-author guidance steers users toward `storage.types` for shared types and inline `typeParams` for one-offs. See [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md) for the runtime trade-offs.
+- `FieldOutputType` follows `typeRef` through `storage.types` so a `typeRef` column resolves to the same brand-applied type as an inline-`typeParams` column would. Mechanism: [codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype](codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype).
+- `init(params, instanceMeta)` is keyed on `storage.types` instances. A column with `typeRef: 'Embedding1536'` shares an instance with every other column referencing `Embedding1536`; `instance.usedAt` lists them all.
+- Pack-author guidance steers users toward `storage.types` for shared types and inline `typeParams` for one-offs. Trade-offs: [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md).
 
-### Why we leave both forms
+### Why we keep both forms
 
-- Inline `typeParams` is the right ergonomic when a column's type isn't reused.
-- `storage.types` is the right ergonomic when (a) it is reused, or (b) the codec's `init` does work whose result should be shared (e.g. CipherStash deriving a key once per `(table, column)` set).
-- Forcing one over the other would be opinionated to no clear benefit.
+- Inline `typeParams`: right ergonomic when a column's type isn't reused.
+- `storage.types`: right ergonomic when the type *is* reused, or when the codec's `init` does work whose result should be shared (e.g. CipherStash deriving one key per `(table, column)` set).
+
+Forcing one over the other would be opinionated to no clear benefit.
 
 ---
 
@@ -207,7 +204,7 @@ storage.tables.Document = {
 ### Before
 
 ```typescript
-// pgvector codec
+// codec
 const pgVectorCodec = codec({
   typeId: 'pg/vector@1',
   targetTypes: ['vector'],
@@ -218,7 +215,7 @@ const pgVectorCodec = codec({
   meta: { /* … */ },
 });
 
-// pgvector exports
+// hand-rolled factory
 export function vector<N extends number>(length: N) {
   if (!Number.isInteger(length) || length <= 0) throw new Error('…');
   return { codecId: 'pg/vector@1', nativeType: 'vector', typeParams: { length } } as const;
@@ -227,22 +224,21 @@ export function vector<N extends number>(length: N) {
 // user schema
 const Document = {
   columns: {
-    id: { codecId: 'pg/text@1', nativeType: 'text' },
+    id:        { codecId: 'pg/text@1', nativeType: 'text' },
     embedding: vector(1536),
   },
 };
 ```
 
-In the no-emit path, `Document.embedding`'s field type resolves to `number[]` — that's the bug.
+In the no-emit path, `Document.embedding`'s field type resolves to `number[]` — the bug.
 
 ### After
 
 ```typescript
-// pgvector codec
+// codec + co-located brand
 export interface VectorBrand extends CodecBrand<{ length: number }> {
   readonly Input: { length: number };
-  readonly Output: this['Input'] extends { length: infer N extends number }
-    ? Vector<N> : never;
+  readonly Output: this['Input'] extends { length: infer N extends number } ? Vector<N> : never;
 }
 
 export const pgVectorCodec = parameterizedCodec({
@@ -257,27 +253,19 @@ export const pgVectorCodec = parameterizedCodec({
   meta: { /* … */ },
 });
 
-// pgvector exports
+// factory replaced with columnFor
 export const vector = columnFor(pgVectorCodec);
 
-// user schema (unchanged at the call site)
+// user schema
 const Document = {
   columns: {
-    id: { codecId: 'pg/text@1', nativeType: 'text' },
+    id:        { codecId: 'pg/text@1', nativeType: 'text' },
     embedding: vector({ length: 1536 }),
   },
 };
 ```
 
-`Document.embedding` now resolves to `Vector<1536>` in both the emit path (via `renderOutputType`) and the no-emit path (via `Apply<VectorBrand, { length: 1536 }>`). The user's call site is one method-call shape away from before; the migration is a single replace.
-
-If the user prefers the old positional `vector(1536)` ergonomic, the pack can wrap:
-
-```typescript
-export const vector = <N extends number>(length: N) => columnFor(pgVectorCodec)({ length });
-```
-
-…with the validation still flowing through `paramsSchema`.
+`Document.embedding` resolves to `Vector<1536>` in both the emit path (via `renderOutputType`) and the no-emit path (via `Apply<VectorBrand, { length: 1536 }>`). Migration is a single replace at the user's call site.
 
 ---
 
@@ -286,14 +274,12 @@ export const vector = <N extends number>(length: N) => columnFor(pgVectorCodec)(
 A pack author adds Postgres `char(N)` support.
 
 ```typescript
-// codec
+export type Char<N extends number = number> = string & { readonly __charLength?: N };
+
 export interface CharBrand extends CodecBrand<{ length: number }> {
   readonly Input: { length: number };
-  readonly Output: this['Input'] extends { length: infer N extends number }
-    ? Char<N> : never;
+  readonly Output: this['Input'] extends { length: infer N extends number } ? Char<N> : never;
 }
-
-export type Char<N extends number = number> = string & { readonly __charLength?: N };
 
 export const charCodec = parameterizedCodec({
   id: 'pg/char@1',
@@ -306,14 +292,12 @@ export const charCodec = parameterizedCodec({
   Brand: undefined as unknown as CharBrand,
 });
 
-// helper export
 export const char = columnFor(charCodec);
 
 // user schema
 const User = {
   columns: {
-    id: char({ length: 36 }),
-    // FieldOutputType resolves to Char<36>
+    id: char({ length: 36 }),  // FieldOutputType resolves to Char<36>
   },
 };
 ```
@@ -330,30 +314,25 @@ import { columnFor, jsonCodec } from '@prisma-next/postgres-core';
 
 const ProductSettings = type({
   visibility: "'public' | 'private'",
-  pricing: { currency: "'USD' | 'EUR'", amount: 'number' },
+  pricing:    { currency: "'USD' | 'EUR'", amount: 'number' },
 });
 
 const Product = {
   columns: {
-    id: { codecId: 'pg/text@1', nativeType: 'text' },
+    id:       { codecId: 'pg/text@1', nativeType: 'text' },
     settings: columnFor(jsonCodec)({ schema: ProductSettings }),
   },
 };
 
 // FieldOutputType resolves Product.settings to:
-// {
-//   visibility: 'public' | 'private';
-//   pricing: { currency: 'USD' | 'EUR'; amount: number };
-// }
+//   { visibility: 'public' | 'private'; pricing: { currency: 'USD' | 'EUR'; amount: number } }
 ```
 
 The same schema:
 
-- Validates wire payloads at runtime (the JSON codec already does this; M3.2 just threads the brand).
+- Validates wire payloads at runtime.
 - Types the column at the no-emit type level.
-- Drives the emitted `contract.d.ts` at the emit path (the `renderOutputType` for `jsonCodec` calls into the schema's TS-source serialization, if any; the user can override).
-
-For schemas Standard Schema can't render to a TS source string for the emit path, the pack author's `renderOutputType` returns `'unknown'` and the no-emit path remains the precise inference path. This trade-off lives in the pack-author guidance.
+- Drives the emitted `contract.d.ts` at the emit path (the `renderOutputType` for `jsonCodec` calls into the schema's TS-source serialization, if any).
 
 ---
 
@@ -362,22 +341,19 @@ For schemas Standard Schema can't render to a TS source string for the emit path
 The README section that ships in M6 (close-out) covers, in order:
 
 1. **Decide if your codec is parameterized.** No params? Plain `codec({…})`. Params? `parameterizedCodec({…})`.
-2. **Define the brand next to the codec.** Use the `this['Input']` HKT idiom; one cast.
+2. **Define the brand next to the codec** using the `this['Input']` HKT idiom; one cast.
 3. **Pick `paramsSchema`.** Any Standard Schema (Arktype recommended).
-4. **Implement `renderOutputType`.** A pure function from `params` to a TS source string for the emit path.
+4. **Implement `renderOutputType`.** Pure function from `params` to a TS source string for the emit path.
 5. **Export `columnFor(yourCodec)`** (optionally aliased) as your column-author surface.
 6. **For JSON-shaped columns**, prefer `jsonCodec` over rolling your own.
-7. **Cross-cutting**: when in doubt, use `storage.types` for shared types; inline `typeParams` for one-offs.
-
-A short section on `init`:
-
-8. **`init` is optional and runs once per `storage.types` instance.** Use it when your codec needs to derive per-instance state from `params` and the `(table, column)` context (e.g. an encryption key, a precompiled regex). Don't rely on the runtime contract until [TML-2330](https://linear.app/prisma-company/issue/TML-2330) lands; for now, `init` is a declared shape.
+7. **Cross-cutting**: use `storage.types` for shared types; inline `typeParams` for one-offs.
+8. **`init` is optional and runs once per `storage.types` instance.** Use it when your codec needs to derive per-instance state from `params` and the `(table, column)` context (encryption key, precompiled regex, …). Don't rely on the runtime contract until [TML-2330](https://linear.app/prisma-company/issue/TML-2330) lands; the signature is declared but the runtime side is deferred.
 
 ---
 
 ## Cross-references
 
-- Spec: [spec.md FR3, FR4](../spec.md#requirements).
+- Spec: [spec.md — Decision](../spec.md#decision), [How it works §4, §5](../spec.md#how-it-works), [AC-3](../spec.md#ac-3-columnfor-and-jsoncodec-ship-the-documented-surface).
 - Plan: [plan.md M3, M4](../plan.md#m3--columnfor-and-jsoncodec-authoring-helpers).
 - Mechanism details: [codec-interface-and-brand.md](codec-interface-and-brand.md).
 - Runtime contract for `init` and `storage.types`: [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md).

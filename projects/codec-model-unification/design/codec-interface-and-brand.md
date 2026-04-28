@@ -1,48 +1,23 @@
 # Design — Codec interface and brand
 
-**Audience:** framework maintainers and reviewers of the M1/M2 PRs.
+**Audience:** framework maintainers and reviewers of the M1 / M2 PRs.
 
-**What this doc covers:** the interface split (`Codec` vs `ParameterizedCodec`), the type-level brand mechanism (`CodecBrand` + `Apply`), the factory, the `init(params, instanceMeta)` signature, and the no-emit `FieldOutputType` rewrite. Companion docs:
+**What this doc covers:** the codec interface split (`Codec` vs `ParameterizedCodec`), the type-level brand mechanism (`CodecBrand` + `Apply`), the `parameterizedCodec({…})` factory, the `init(params, instanceMeta)` signature, and the no-emit `FieldOutputType` rewrite. Companion docs:
 
 - [authoring-ergonomics.md](authoring-ergonomics.md) — `columnFor`, `jsonCodec`, worked examples.
-- [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md) — runtime materialization contract; downstream extension fit.
+- [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md) — runtime materialization contract, downstream extension fit.
 
 ---
 
-## Background
+## Decision
 
-The codec interface today (after [ADR 186](../../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)) carries parameterization as a sprinkle of optional fields on the base `Codec`:
-
-```typescript
-interface Codec<Id, Traits, Wire, Js> {
-  // …non-parameterization fields…
-  readonly paramsSchema?: Type<Record<string, unknown>>;
-  readonly renderOutputType?: (params: Record<string, unknown>) => string;
-  readonly init?: (params: Record<string, unknown>) => unknown;
-}
-```
-
-This shape has three problems:
-
-1. **Optional everywhere.** Every consumer (the emitter, the validator, the runtime context builder) has to handle the case where `renderOutputType` exists, where it doesn't, where `init` exists, where it doesn't. The optionality is fictional — for any given codec the shape is fixed; the optionality is only there because the interface doesn't distinguish the two kinds of codec.
-
-2. **No type-level twin of `renderOutputType`.** The emit path resolves `vector(1536)` to `Vector<1536>` by calling `renderOutputType({ length: 1536 })` and pasting the resulting string into `contract.d.ts`. The no-emit path (no `pnpm emit` step, type-only) has no equivalent — `FieldOutputType` looks up `CodecTypes[id]['output']` (the codec's *base* output type) and ignores `typeParams` entirely. That's the [TML-2229](https://linear.app/prisma-company/issue/TML-2229) bug.
-
-3. **Fragmented authoring surface.** Each parameterized codec exposes a hand-rolled column factory (`vector(length)`, `char(length)`, `numeric(precision, scale)`) that does the same boilerplate. JSON columns have no first-class way to project a user's schema into a precise output type.
-
-The fix is small if we promote parameterization to a first-class shape on the codec.
-
----
-
-## Why split `Codec` and `ParameterizedCodec`
-
-### The split
+The codec interface splits into two:
 
 ```typescript
-export interface Codec<Id, Traits, Wire, Js> {
-  // …pure encode/decode/traits/meta — no parameterization fields…
-}
+// Pure encode/decode/traits. No parameterization fields.
+export interface Codec<Id, Traits, Wire, Js> { … }
 
+// Adds parameterization. All shown fields are required (init is optional).
 export interface ParameterizedCodec<
   Id, Traits, Wire, Js,
   Params,
@@ -54,36 +29,26 @@ export interface ParameterizedCodec<
   readonly Brand: Brand;
   readonly init?: (params: Params, instance: InstanceMeta) => Helper;
 }
-```
 
-### What it buys us
-
-- **Required fields on `ParameterizedCodec`.** A parameterized codec without a brand is a type error at the factory call site. The emitter and validator can stop checking for `undefined`.
-- **Empty by default.** Non-parameterized codecs (most of them — `text`, `int`, `boolean`, etc.) are described by `Codec` alone, no parameterization noise.
-- **Single point of evolution.** Future parameterization-related slots (richer `init`, runtime reuse, parameter-derived helpers) attach to `ParameterizedCodec` without touching base `Codec`.
-- **Mirrors emit/no-emit paths.** `renderOutputType` (runtime, emit path) and `Brand` (type level, no-emit path) live next to each other on the same interface — the symmetry is part of the API.
-
-### Why now (vs. inside the existing `Codec`)
-
-- The existing optional-fields shape *can* be made to work for the brand (`Brand?: CodecBrand` on base), but it inherits the "optional fictional" problem and forces `FieldOutputType` to handle the missing-brand case for codecs that fundamentally don't need one. The split is what makes the brand non-optional, and that's what makes the rewrite of `FieldOutputType` clean.
-- The interface is consumed by extension authors (CipherStash, others). A clear `Codec` vs `ParameterizedCodec` split reads as documentation: "your codec needs parameters? extend `ParameterizedCodec`; otherwise stay on `Codec`."
-
----
-
-## The brand mechanism
-
-The brand is a type-level function from `Params` to the codec's output type.
-
-### `CodecBrand`
-
-```typescript
 export interface CodecBrand<Params = unknown> {
   readonly Input: Params;
   readonly Output: unknown;
 }
+
+export type Apply<B extends CodecBrand, P> = (B & { readonly Input: P })['Output'];
 ```
 
-`Input` and `Output` are the brand's "argument" and "return" slots. Each parameterized codec defines a `CodecBrand` whose `Output` is a conditional type referencing `this['Input']`:
+A `parameterizedCodec({…})` factory enforces the requirements at the type level. The brand is co-located on each parameterized codec; no global declaration merging.
+
+The no-emit `FieldOutputType<Definition>` is rewritten to follow `typeRef` through `storage.types`, then apply `Apply<codec.Brand, column.typeParams>` when the codec is parameterized; falls through to the codec's base output otherwise. Nullability preserved.
+
+This satisfies [AC-1](../spec.md#ac-1-brand-mechanism-works-at-the-type-level), [AC-2](../spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly), [AC-5](../spec.md#ac-5-base-codec-is-clean), and [AC-6](../spec.md#ac-6-initparams-instancemeta-signature-is-locked).
+
+---
+
+## Brand mechanism
+
+The brand is a type-level function from `Params` to the codec's output type, defined next to the codec:
 
 ```typescript
 // pgvector
@@ -95,17 +60,18 @@ export interface VectorBrand extends CodecBrand<{ length: number }> {
 }
 ```
 
-### `Apply<B, P>`
+`Apply` evaluates the brand by overriding its `Input`:
 
 ```typescript
-export type Apply<B extends CodecBrand, P> = (B & { readonly Input: P })['Output'];
+type Result = Apply<VectorBrand, { length: 1536 }>;
+//   ^? Vector<1536>
 ```
 
-The `&` overrides `Input` with the caller-supplied `P`; `['Output']` triggers the brand's conditional type to fire with the new `Input`. This is the `this['Input']` HKT idiom — TypeScript gets close to higher-kinded types through `this`-conditional types.
+The mechanism is the `this['Input']` HKT idiom: TypeScript reaches close to higher-kinded types through `this`-conditional types. `&` overrides `Input`; `['Output']` triggers the brand's conditional with the new `Input`.
 
 ### Co-location
 
-Each parameterized codec defines the brand right next to itself:
+Each parameterized codec defines and carries its own brand:
 
 ```typescript
 // packages/3-extensions/pgvector/src/core/codecs.ts
@@ -118,27 +84,7 @@ export const pgVectorCodec = parameterizedCodec({
 });
 ```
 
-The `as unknown as VectorBrand` cast is the *only* cast in the migration. It's justified because `Brand` is a phantom field — it has no runtime value, only a type. Reviewers should reject any other use of this cast pattern in this project.
-
-### Why not global declaration merging
-
-Earlier sketches proposed a global `CodecOutputBrands` interface that codecs would augment via declaration merging:
-
-```typescript
-declare module '@prisma-next/framework-components' {
-  interface CodecOutputBrands {
-    'pg/vector@1': { /* brand */ };
-  }
-}
-```
-
-This was rejected. Reasons:
-
-- **Ambient global pollution.** Every codec in the workspace winds up in a single global namespace with order-dependent merging. Type errors point at the global, not the codec.
-- **Discovery surface mismatch.** The brand belongs to the codec, not the framework. Co-locating it makes the codec self-describing.
-- **Doesn't generalize.** Multiple codecs with the same `id` (versioned, vendored) are awkward; the codec object already carries the necessary identity.
-
-The `this['Input']` HKT pattern keeps everything local with no global reach.
+`Brand` is a phantom field (no runtime payload). The single `as unknown as VectorBrand` cast is the only cast in the migration; reviewers reject any other use.
 
 ---
 
@@ -167,14 +113,14 @@ export interface ParameterizedCodec<
 }
 ```
 
-### Notes on each field
+Field-by-field:
 
-- **`paramsSchema`** (FR3): the user-supplied Standard Schema. Replaces the existing `Type<TParams>` (arktype-only) typing. Arktype `Type` already implements Standard Schema, so existing schemas keep working.
-- **`renderOutputType`** (no longer optional): emit-path string for `contract.d.ts`. Used unchanged.
-- **`Brand`**: type-level twin of `renderOutputType`. Phantom field; no runtime payload.
-- **`init?`** (FR8 — signature only): see below.
+- **`paramsSchema`**: a Standard Schema. Replaces the existing arktype-only `Type<TParams>` (Arktype implements Standard Schema, so existing schemas keep working). Lets pack authors use any Standard-Schema-compliant library.
+- **`renderOutputType`**: emit-path string for `contract.d.ts`. No longer optional.
+- **`Brand`**: type-level twin of `renderOutputType`. Phantom; carries the brand's identity through TS inference.
+- **`init?`**: optional hook for codecs that need per-instance state. See [Init signature](#init-signature).
 
-The order of generics is chosen so that callers usually only need to specify `TParams` and `TBrand` explicitly when extending.
+Generic parameter ordering is chosen so callers usually only need to specify `TParams` and `TBrand` explicitly when extending.
 
 ---
 
@@ -199,25 +145,21 @@ export function parameterizedCodec<
 }): ParameterizedCodec<Id, TTraits, TWire, TJs, TParams, TBrand, THelper> { … }
 ```
 
-### What it enforces
+Enforces:
 
-- Omitting any of `paramsSchema`, `renderOutputType`, `Brand` is a compile error.
-- A `Brand` whose `Input` is not assignable from `Params` is a compile error.
+- Omitting any of `paramsSchema`, `renderOutputType`, `Brand` — compile error.
+- `Brand['Input']` not assignable from `Params` — compile error.
 - The factory is the only normal way to build a `ParameterizedCodec`.
 
 ### Where it lives
 
-Open question 2 in [spec.md](../spec.md#open-questions): default location is `@prisma-next/framework-components` so Mongo benefits without a parallel SQL/Mongo split. SQL or Mongo can wrap thinly if a domain-specific narrowing is needed (e.g. SQL adds a `meta` field).
+[Open question 2](../spec.md#open-questions): default location is `@prisma-next/framework-components` so Mongo benefits without a parallel SQL/Mongo split. SQL or Mongo can wrap thinly if a domain-specific narrowing is needed.
 
 ---
 
 ## Init signature
 
-### Why we're declaring it now
-
-The current `init?(params)` signature is broken for any codec that needs to know *which column it serves* — encryption codecs derive a key from `(table, column)`, audit codecs need the column path for log lines, etc. CipherStash G1 calls this out explicitly.
-
-The fix is to pass `instanceMeta`:
+The optional `init` hook accepts `(params, instance)`:
 
 ```typescript
 readonly init?: (
@@ -229,19 +171,13 @@ readonly init?: (
 ) => THelper;
 ```
 
-`name` is the `storage.types` instance name (e.g. `Embedding1536`). `usedAt` is the list of `(table, column)` pairs that share this instance — typically one, occasionally several when multiple columns reference the same `storage.types` entry.
+`name` is the `storage.types` instance name (e.g. `'Embedding1536'`). `usedAt` is the list of `(table, column)` pairs that reference the instance — typically one, occasionally several when multiple columns share a `storage.types` entry. Inline-`typeParams` columns produce anonymous instances with one-element `usedAt` lists; see [runtime-contract-and-compatibility.md#anonymous-vs-named-instances](runtime-contract-and-compatibility.md#anonymous-vs-named-instances).
 
-### Why "shape only"
+### Why declare it now (vs. leaving the existing `init?(params)` signature)
 
-Implementing the runtime side — calling `init` once per `StorageTypeInstance` at context-builder time and routing `encode`/`decode` through the named helper — is a follow-up ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)). See [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md). We declare the shape now because:
+Codecs that need column context — encryption codecs deriving keys from `(table, column)` (CipherStash G1), audit codecs needing column paths for log lines, regex codecs precompiling per-instance — can't function with `params` alone. Locking the right shape now is free; locking the wrong shape and migrating later is not.
 
-- It costs nothing extra to ship the right signature with the rest of the interface change.
-- Future runtime work consumes a stable surface; downstream extensions (CipherStash) can author against it before we wire the runtime.
-- A wrong signature here is the kind of mistake that causes a downstream rewrite later.
-
-### Anonymous instances
-
-Inline `typeParams` (no `typeRef`) raise the question: what's the `name`? Default in [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md) is to materialize an anonymous instance (`name = '<anon-${table}.${column}>'`). The `usedAt` list still has exactly one entry. Whichever way the runtime resolves it, the *signature* doesn't change.
+The runtime side (calling `init` once per `storage.types` instance, routing dispatch through the helper) is **out of scope** here — see [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md). We ship the signature only.
 
 ---
 
@@ -264,11 +200,7 @@ type FieldOutputType<Definition, ModelName, FieldName> =
     : unknown;
 ```
 
-Three issues:
-
-- Doesn't read `Col['typeParams']`.
-- Doesn't follow `Col['typeRef']` into `storage.types`.
-- Resolves to the codec's *base* output, regardless of params.
+Three issues: doesn't read `Col['typeParams']`, doesn't follow `Col['typeRef']`, resolves only to the codec's *base* output regardless of params.
 
 ### Rewritten implementation (sketch)
 
@@ -296,57 +228,72 @@ type FieldOutputType<Definition, ModelName, FieldName> =
     : unknown;
 ```
 
-Three things change:
+Three changes:
 
 1. **`ResolveColumn` follows `typeRef`** through `storage.types` and reattaches the column's `nullable` flag. Inline-`typeParams` columns pass through unchanged.
-2. **Brand check.** If the codec entry has a `Brand`, `Apply<Brand, typeParams>` resolves the precise type. Otherwise we fall through to the base output.
+2. **Brand check.** If the codec entry has a `Brand`, `Apply<Brand, typeParams>` resolves the precise type. Otherwise we fall through to the codec's base output.
 3. **Nullability** is applied uniformly via `ApplyNullable`.
 
-`CodecsFromDefinition<Definition>` is a new helper that exposes the full codec entries (not just the `CodecTypes` map of `{ output }`). `CodecBaseOutput<C>` is `C extends ParameterizedCodec ? ApplyToDefault : C['Js']` (the existing base output).
+`CodecsFromDefinition<Definition>` is a new helper exposing full codec entries (not just the `CodecTypes` map of `{ output }`). `CodecBaseOutput<C>` is `C['Js']` (the existing base output).
 
 ### Why this is small
 
 - No change to `ComputeColumnJsType`; it already delegates through `ExtractFieldOutputTypes<Contract>`.
-- No change to existing test fixtures in the no-parameterized case (the brand check fails through to the existing base-output fallback).
-- The synthetic test fixture in M2.1 lets us land the rewrite *before* any production codec gets a brand.
+- No change in the no-parameterized case (the brand check fails through to the existing base-output fallback).
+- The synthetic test fixture in M2 lets us land the rewrite *before* any production codec gets a brand.
+
+---
+
+## Why split `Codec` and `ParameterizedCodec` (vs. additive)
+
+The alternative is to add `Brand?: CodecBrand` next to the existing optional `paramsSchema?` / `renderOutputType?` / `init?` on the base `Codec`. Smaller diff, but:
+
+- **Optional everywhere.** Every consumer (emitter, validator, runtime context builder, type resolver) keeps handling `undefined` for codecs that fundamentally don't need parameterization.
+- **No documentation value.** The split reads as "your codec needs parameters? extend `ParameterizedCodec`; otherwise stay on `Codec`." Optional fields don't.
+- **Doesn't unblock cleanup.** [AC-5](../spec.md#ac-5-base-codec-is-clean) (remove parameterization fields from base) requires the split.
+
+We pick the split.
 
 ---
 
 ## Rejected alternatives
 
-### A1. Keep brand fields optional on base `Codec`
+### Keep brand fields optional on base `Codec`
 
-Considered. Rejected because:
+Discussed in [Why split `Codec` and `ParameterizedCodec`](#why-split-codec-and-parameterizedcodec-vs-additive). Smaller diff but forfeits cleanup and docs.
 
-- Forces every consumer to handle missing `Brand` even for codecs that fundamentally don't need it.
-- Doesn't deliver the documentation value of "your codec needs parameters? extend `ParameterizedCodec`."
-- Doesn't unblock removing the optional emit-path/init/params noise from base `Codec`.
+### Global `CodecOutputBrands` declaration merging
 
-### A2. Global `CodecOutputBrands` declaration merging
+Sketch:
 
-Discussed in [Why not global declaration merging](#why-not-global-declaration-merging). Rejected for global pollution, discovery mismatch, and version-handling brittleness.
+```typescript
+declare module '@prisma-next/framework-components' {
+  interface CodecOutputBrands {
+    'pg/vector@1': { /* brand */ };
+  }
+}
+```
 
-### A3. Compute brand from the codec's `output` type via TS conditional types alone
+Rejected:
 
-A "smart" `FieldOutputType` could try to narrow the codec's existing `output` type using `typeParams`. Rejected because:
+- **Ambient global pollution.** Every codec in the workspace lands in a single global namespace with order-dependent merging. Type errors point at the global, not the codec.
+- **Discovery surface mismatch.** The brand belongs to the codec, not the framework. Co-locating makes the codec self-describing.
+- **Doesn't generalize.** Multiple codecs with the same `id` (versioned, vendored) are awkward; the codec object already carries the necessary identity.
 
-- The existing `output` is the *base* type (e.g. `number[]`); there's no direct path from `(number[], { length: 1536 })` to `Vector<1536>` without somewhere encoding the relationship — which is exactly what `Brand` does.
-- Pushes the extension burden onto the framework; pack authors have no way to influence the result.
+### Compute brand from the codec's `output` type alone
 
-### A4. Move parameter awareness to per-extension factories without a brand
+Have a "smart" `FieldOutputType` narrow the codec's existing `output` (e.g. `number[]`) using `typeParams`. Rejected: there's no general path from `(number[], { length: 1536 })` to `Vector<1536>` without somewhere encoding the relationship — which is exactly what `Brand` does. Doesn't generalize to JSON-with-schema.
 
-The current per-codec factories (`vector(N)`) do produce literal-typed `typeParams`. We could just have `FieldOutputType` consult the column's `typeParams` and the codec's *factory's return type* somehow. Rejected because:
+### Per-extension factories carry parameter awareness without a brand
 
-- TS doesn't expose the factory's return type from the codec ID. The brand makes the relationship explicit and locatable.
-- Doesn't generalize to JSON-with-schema cleanly.
-- Doesn't unify `typeRef` and inline-`typeParams` resolution.
+Existing per-codec factories (`vector(N)`) preserve literal-typed `typeParams`. Have `FieldOutputType` consult both the column's `typeParams` and the codec's factory's return type. Rejected: TypeScript doesn't expose a factory's return type from a codec ID; doesn't unify `typeRef` and inline-`typeParams`; doesn't generalize.
 
 ---
 
 ## Cross-references
 
-- Spec: [spec.md FR1, FR2, FR3, FR5, FR7, FR8](../spec.md#requirements).
-- Plan: [plan.md M1, M2](../plan.md#m1--brand-mechanism--parameterizedcodec).
+- Spec: [spec.md — Decision](../spec.md#decision), [How it works §1, §2, §3, §6](../spec.md#how-it-works), [Acceptance criteria AC-1, AC-2, AC-5, AC-6](../spec.md#acceptance-criteria).
+- Plan: [plan.md M1, M2, M5](../plan.md#m1--codec-interface-split--brand-mechanism).
 - Authoring impact: [authoring-ergonomics.md](authoring-ergonomics.md).
 - Runtime impact + extension fit: [runtime-contract-and-compatibility.md](runtime-contract-and-compatibility.md).
 - ADR 186: [docs/architecture docs/adrs/ADR 186 - Codec-dispatched type rendering.md](../../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md).
