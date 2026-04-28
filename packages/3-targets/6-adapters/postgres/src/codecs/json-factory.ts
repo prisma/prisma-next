@@ -28,7 +28,9 @@ import type {
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { PG_JSON_CODEC_ID } from '../core/codec-ids';
+import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
+
+type JsonCodecId = typeof PG_JSON_CODEC_ID | typeof PG_JSONB_CODEC_ID;
 
 /**
  * The codec returned by `json(schema)(ctx)`. The `Js` slot carries the
@@ -37,6 +39,17 @@ import { PG_JSON_CODEC_ID } from '../core/codec-ids';
  */
 export type JsonCodec<S extends StandardSchemaV1> = Codec<
   typeof PG_JSON_CODEC_ID,
+  readonly ['equality'],
+  string,
+  StandardSchemaV1.InferOutput<S>
+>;
+
+/**
+ * The codec returned by `jsonb(schema)(ctx)`. Same shape as `JsonCodec<S>`
+ * but keyed under `pg/jsonb@1`.
+ */
+export type JsonbCodec<S extends StandardSchemaV1> = Codec<
+  typeof PG_JSONB_CODEC_ID,
   readonly ['equality'],
   string,
   StandardSchemaV1.InferOutput<S>
@@ -67,62 +80,74 @@ export type JsonCodec<S extends StandardSchemaV1> = Codec<
  * the runtime error envelope stays uniform with the existing JSON validator
  * registry path at `@prisma-next/sql-runtime`.
  */
-export function json<S extends StandardSchemaV1>(schema: S): (ctx: Ctx) => JsonCodec<S> {
-  return (_ctx) => {
-    type JsType = StandardSchemaV1.InferOutput<S>;
-    return {
-      id: PG_JSON_CODEC_ID,
-      targetTypes: ['json'] as const,
-      traits: ['equality'] as const,
-      encode(value: JsType): string {
-        return JSON.stringify(value);
-      },
-      decode(wire: string): JsType {
-        const parsed: unknown = JSON.parse(wire);
-        const result = schema['~standard'].validate(parsed);
-        if (result instanceof Promise) {
-          throw runtimeError(
-            'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-            `JSON schema validation failed: schema for codec '${PG_JSON_CODEC_ID}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
-            { codecId: PG_JSON_CODEC_ID },
-          );
-        }
-        if (result.issues) {
-          const issues = result.issues.map((issue) => issue.message).join('; ');
-          throw runtimeError(
-            'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-            `JSON schema validation failed for codec '${PG_JSON_CODEC_ID}' (decode): ${issues}`,
-            { codecId: PG_JSON_CODEC_ID, issues: result.issues },
-          );
-        }
-        // Standard Schema's `~standard.validate` is typed `(value: unknown) =>
-        // Result<unknown>` — the spec types `validate` against the unconstrained
-        // variant even when the schema's `S` is fully captured. At this call
-        // site `S` is captured from the factory's generic parameter, so
-        // `result.value` is structurally `StandardSchemaV1.InferOutput<S>` once
-        // the issues branch above is excluded.
-        return result.value as JsType;
-      },
-      encodeJson(value: JsType): JsonValue {
-        // The contract IR's JSON-side surface (`encodeJson`/`decodeJson`) is
-        // typed against `JsonValue` for serialization; the JS-side type `JsType`
-        // is whatever the user's schema produced. There is no general structural
-        // assertion that `JsType` is a `JsonValue` (a schema may emit `Date`,
-        // class instances, etc.) — the cast is a wire-level identity by
-        // contract: the caller of `encodeJson` agrees the value is JSON-safe.
-        return value as JsonValue;
-      },
-      decodeJson(jsonValue: JsonValue): JsType {
-        // Symmetric with `encodeJson`: the JSON-side input is contract-level
-        // JSON-safe data, and the schema-derived `JsType` is what the user code
-        // expects to consume. The JSON wire is structurally identical to the
-        // codec's JS form for json columns; runtime validation lives in
-        // `decode` (above), not on the contract-load path.
-        return jsonValue as JsType;
-      },
+function buildJsonHoCFactory<Id extends JsonCodecId>(codecId: Id, nativeType: 'json' | 'jsonb') {
+  return <S extends StandardSchemaV1>(
+    schema: S,
+  ): ((ctx: Ctx) => Codec<Id, readonly ['equality'], string, StandardSchemaV1.InferOutput<S>>) => {
+    return (_ctx) => {
+      type JsType = StandardSchemaV1.InferOutput<S>;
+      return {
+        id: codecId,
+        targetTypes: [nativeType] as const,
+        traits: ['equality'] as const,
+        encode(value: JsType): string {
+          return JSON.stringify(value);
+        },
+        decode(wire: string): JsType {
+          const parsed: unknown = JSON.parse(wire);
+          const result = schema['~standard'].validate(parsed);
+          if (result instanceof Promise) {
+            throw runtimeError(
+              'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+              `JSON schema validation failed: schema for codec '${codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
+              { codecId },
+            );
+          }
+          if (result.issues) {
+            const issues = result.issues.map((issue) => issue.message).join('; ');
+            throw runtimeError(
+              'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+              `JSON schema validation failed for codec '${codecId}' (decode): ${issues}`,
+              { codecId, issues: result.issues },
+            );
+          }
+          // Standard Schema's `~standard.validate` is typed `(value: unknown) =>
+          // Result<unknown>` — the spec types `validate` against the
+          // unconstrained variant even when `S` is fully captured. At this call
+          // site `S` is captured from the factory's generic, so `result.value`
+          // is structurally `StandardSchemaV1.InferOutput<S>` once the issues
+          // branch above is excluded.
+          return result.value as JsType;
+        },
+        encodeJson(value: JsType): JsonValue {
+          // The contract IR's JSON-side surface is typed against `JsonValue`;
+          // `JsType` may emit shapes that are not structurally `JsonValue`
+          // (Date, class instances, etc.). The cast is a wire-level identity
+          // by contract: the caller agrees the value is JSON-safe.
+          return value as JsonValue;
+        },
+        decodeJson(jsonValue: JsonValue): JsType {
+          // Symmetric with `encodeJson`. JSON wire is structurally identical
+          // to the codec's JS form for json columns; runtime validation lives
+          // in `decode` above, not on the contract-load path.
+          return jsonValue as JsType;
+        },
+      };
     };
   };
 }
+
+/**
+ * Curried higher-order codec factory for `pg/json@1` columns with a Standard
+ * Schema. See `design/authoring-ergonomics.md § JSON factory`.
+ */
+export const json = buildJsonHoCFactory(PG_JSON_CODEC_ID, 'json');
+
+/**
+ * Curried higher-order codec factory for `pg/jsonb@1` columns with a Standard
+ * Schema. M4 generalization of `json` for the binary JSON type.
+ */
+export const jsonb = buildJsonHoCFactory(PG_JSONB_CODEC_ID, 'jsonb');
 
 /**
  * Validator for the descriptor's params: the params object must carry a
@@ -198,4 +223,12 @@ export const pgJsonCodec: ParameterizedCodecDescriptor<{ readonly schema: Standa
   paramsSchema: jsonParamsSchema,
   renderOutputType: ({ schema }) => renderSchemaOutputType(schema),
   factory: ({ schema }) => json(schema),
+};
+
+/** M4 jsonb sister descriptor. Same shape as `pgJsonCodec` keyed under jsonb. */
+export const pgJsonbCodec: ParameterizedCodecDescriptor<{ readonly schema: StandardSchemaV1 }> = {
+  codecId: PG_JSONB_CODEC_ID,
+  paramsSchema: jsonParamsSchema,
+  renderOutputType: ({ schema }) => renderSchemaOutputType(schema),
+  factory: ({ schema }) => jsonb(schema),
 };
