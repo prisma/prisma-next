@@ -8,4 +8,5 @@
 - Run the demo:
   - `cd examples/prisma-next-demo`
   - follow [`examples/prisma-next-demo/README.md`](../../examples/prisma-next-demo/README.md)
+- Working in a Cursor cloud agent? See [Cursor Cloud Agents](./Cursor-Cloud-Agents.md).
 
