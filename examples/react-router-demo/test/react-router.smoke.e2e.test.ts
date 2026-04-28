@@ -10,8 +10,13 @@ const exampleDir = dirname(dirname(fileURLToPath(import.meta.url)));
 const schemaPath = join(exampleDir, 'prisma', 'schema.prisma');
 const contractJsonPath = join(exampleDir, 'src', 'prisma', 'contract.json');
 
-// Prisma Next's marker table plus our own model tables. Kept inline so the test
-// reads top-to-bottom without chasing a fixture file.
+// Bootstraps Prisma Next's marker table plus our own model tables via raw DDL
+// rather than going through the control client's `dbInit`. This smoke test's job
+// is to validate VP3 (auto-emit + serve through the framework runtime), not to
+// exercise the migration system — that is covered by the `db init` integration
+// tests in `test/integration/test/cli.db-init.e2e.test.ts`. Inlining the DDL keeps
+// this test readable top-to-bottom without a fixture file or a control-client
+// setup that would expand the scope and the flake surface beyond VP3.
 const TEST_SCHEMA_SQL = `
 create schema if not exists prisma_contract;
 create table if not exists prisma_contract.marker (

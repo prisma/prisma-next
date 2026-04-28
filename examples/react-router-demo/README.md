@@ -52,7 +52,7 @@ For the TypeScript path, start with `PRISMA_NEXT_CONTRACT_SOURCE=ts pnpm dev` an
 
 This example keeps a small module-local runtime cache in `app/lib/db.server.ts`. When Vite re-executes that module after a contract re-emit, the `import.meta.hot.dispose()` handler closes the old pool and clears the cached client so the next request rebuilds the runtime from the fresh `contract.json`.
 
-That is enough for this validation app, but it is still example-local and depends on Vite's module invalidation path. [APR-VP3-07](../../projects/vite-vp3-auto-emit/tickets/apr-vp3-07-hmr-safe-runtime-helper.md) replaces this with a hash-keyed dev helper that makes stale-runtime avoidance explicit and reusable.
+That is enough for this validation app, but it is still example-local and depends on Vite's module invalidation path. A future hash-keyed dev helper (tracked as APR-VP3-07 in Linear; not in this stack) will make stale-runtime avoidance explicit and reusable across frameworks.
 
 ## Scripts
 
