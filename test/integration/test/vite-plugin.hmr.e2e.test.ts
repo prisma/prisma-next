@@ -465,6 +465,68 @@ function runVitePluginHmrSuite(viteVersionLabel: string, createViteServer: Creat
         },
         timeouts.spinUpPpgDev + timeouts.typeScriptCompilation * 2,
       );
+
+      it(
+        'last edit wins when two saves arrive in rapid succession',
+        async () => {
+          const testSetup = setupTestDirectoryFromFixtures(createTempDir, pslFixtureSubdir);
+          const testDir = testSetup.testDir;
+          const outputDir = testSetup.outputDir;
+          const schemaPath = join(testDir, 'contract.prisma');
+          const contractJsonPath = join(outputDir, 'contract.json');
+
+          copyFixtureFiles(testDir, pslFixtureSubdir, [
+            'vite.config.ts',
+            'contract.prisma',
+            'contract-alt.prisma',
+          ]);
+
+          server = await createViteServer({
+            root: testDir,
+            logLevel: 'silent',
+            server: {
+              middlewareMode: true,
+            },
+          });
+
+          const initialEmitSuccess = await waitForFileChange(
+            contractJsonPath,
+            null,
+            timeouts.typeScriptCompilation,
+          );
+          expect(initialEmitSuccess).toBe(true);
+
+          const sendSpy = vi.spyOn(server.ws, 'send');
+
+          // First save: introduce `name`. Trigger the emit immediately.
+          replaceInFileOrThrow(
+            schemaPath,
+            '  email String\n\n  @@map("user")\n',
+            '  email String\n  name String?\n\n  @@map("user")\n',
+          );
+          server.watcher.emit('change', schemaPath);
+
+          // Second save: replace `name` with `nickname` before the first emit
+          // completes. The plugin must guarantee that the LAST edit wins on disk
+          // (whether via queue+coalesce or via cancel-and-restart — the
+          // user-visible invariant is the same).
+          replaceInFileOrThrow(
+            schemaPath,
+            '  email String\n  name String?\n\n  @@map("user")\n',
+            '  email String\n  nickname String?\n\n  @@map("user")\n',
+          );
+          server.watcher.emit('change', schemaPath);
+
+          await waitForWsMessageType(sendSpy, 'full-reload', timeouts.typeScriptCompilation);
+
+          const finalContract = JSON.parse(
+            await readJsonFileWhenReady(contractJsonPath, timeouts.typeScriptCompilation),
+          );
+          expect(finalContract.storage.tables.user.columns).toHaveProperty('nickname');
+          expect(finalContract.storage.tables.user.columns).not.toHaveProperty('name');
+        },
+        timeouts.spinUpPpgDev + timeouts.typeScriptCompilation,
+      );
     });
   });
 }
