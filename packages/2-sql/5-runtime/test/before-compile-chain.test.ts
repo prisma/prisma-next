@@ -33,6 +33,7 @@ function createContext(): SqlMiddlewareContext & {
       debug,
     },
     identityKey: () => 'mock-key',
+    scope: 'runtime' as const,
   };
 }
 

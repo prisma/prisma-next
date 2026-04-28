@@ -28,6 +28,7 @@ function createMiddlewareContext(): SqlMiddlewareContext {
       error: vi.fn(),
     },
     identityKey: () => 'mock-key',
+    scope: 'runtime' as const,
   };
 }
 

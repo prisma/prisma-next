@@ -162,6 +162,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         error: () => {},
       },
       identityKey: (exec) => computeSqlIdentityKey(exec as SqlExecutionPlan),
+      scope: 'runtime',
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });
@@ -238,10 +239,18 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private executeAgainstQueryable<Row>(
     plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
+    scope: 'runtime' | 'connection' | 'transaction' = 'runtime',
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated();
 
     const self = this;
+    // The middleware context for this execution is scope-narrowed: the
+    // top-level runtime path uses the constructor-time `'runtime'` ctx as-is;
+    // `connection.execute` and `transaction.execute` produce a derived ctx
+    // with the appropriate scope. Middleware that observe `ctx.scope`
+    // (e.g. the cache middleware, which only intercepts at `'runtime'`)
+    // see the right value without any out-of-band signaling.
+    const ctx: SqlMiddlewareContext = scope === 'runtime' ? this.sqlCtx : { ...this.sqlCtx, scope };
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       const exec: SqlExecutionPlan = isExecutionPlan(plan)
         ? Object.freeze({
@@ -272,7 +281,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
           exec,
           self.middleware,
-          self.ctx,
+          ctx,
           () =>
             queryable.execute<Record<string, unknown>>({
               sql: exec.sql,
@@ -322,7 +331,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       execute<Row>(
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverConn);
+        return self.executeAgainstQueryable<Row>(plan, driverConn, 'connection');
       },
     };
 
@@ -341,7 +350,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       execute<Row>(
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverTx);
+        return self.executeAgainstQueryable<Row>(plan, driverTx, 'transaction');
       },
     };
   }

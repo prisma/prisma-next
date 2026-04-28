@@ -29,6 +29,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
       error: vi.fn(),
     },
     identityKey: () => 'mock-key',
+    scope: 'runtime' as const,
     ...overrides,
   };
 }

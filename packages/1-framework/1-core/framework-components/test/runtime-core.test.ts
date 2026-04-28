@@ -91,6 +91,7 @@ const ctx: RuntimeMiddlewareContext = {
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
   identityKey: () => 'mock-key',
+  scope: 'runtime',
 };
 
 describe('RuntimeCore', () => {

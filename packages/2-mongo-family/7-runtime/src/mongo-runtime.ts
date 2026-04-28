@@ -44,6 +44,7 @@ class MongoRuntimeImpl
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
       identityKey: (exec) => computeMongoIdentityKey(exec as MongoExecutionPlan),
+      scope: 'runtime',
     };
 
     super({ middleware, ctx });
