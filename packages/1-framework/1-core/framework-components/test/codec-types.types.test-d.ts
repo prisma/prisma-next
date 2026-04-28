@@ -78,6 +78,54 @@ test('AC-1: descriptor factory typing matches the function', () => {
   >();
 });
 
+// AC-1.e (positive assignability): a typed factory function whose params and
+// resolved Codec match the descriptor's `P` is assignable to the descriptor's
+// `factory` slot — even though the slot's nominal return type erases the Codec's
+// `Js` parameter (intentional for registry-keyed dispatch). The Codec's `Js` slot
+// is preserved at the call site (M2's no-emit `FieldOutputType` reads it from the
+// column expression directly, not through the descriptor).
+test('AC-1.e: a typed factory function is assignable to descriptor.factory', () => {
+  type DescFactory = ParameterizedCodecDescriptor<{ readonly length: number }>['factory'];
+
+  function vectorFactory(params: { readonly length: number }) {
+    return vector(params.length);
+  }
+
+  expectTypeOf<typeof vectorFactory>().toExtend<DescFactory>();
+});
+
+// AC-1.e (negative): a factory whose params shape is wider than the descriptor's
+// `P` is not assignable. Excess-property contravariance means the descriptor will
+// pass `{ length: number }` but the candidate insists on `{ length: number; foo: string }`,
+// which the descriptor cannot supply.
+test('AC-1.e: a factory with wider params does NOT assign to descriptor.factory', () => {
+  type DescFactory = ParameterizedCodecDescriptor<{ readonly length: number }>['factory'];
+
+  function widerFactory(_params: { readonly length: number; readonly foo: string }) {
+    return vector(_params.length);
+  }
+
+  // @ts-expect-error widerFactory requires `foo`, which the descriptor's caller
+  // does not supply (params is contravariant).
+  const _assigned: DescFactory = widerFactory;
+  expectTypeOf<typeof widerFactory>().not.toExtend<DescFactory>();
+});
+
+// AC-1.e (negative): a factory whose inner function returns the wrong `Codec`
+// (e.g. a non-Codec value) does not assign — the descriptor's slot demands
+// `(ctx: Ctx) => Codec`.
+test('AC-1.e: a factory whose inner function returns a non-Codec does NOT assign', () => {
+  type DescFactory = ParameterizedCodecDescriptor<{ readonly length: number }>['factory'];
+
+  function wrongReturn(_params: { readonly length: number }) {
+    return (_ctx: Ctx) => ({ notACodec: true });
+  }
+
+  // @ts-expect-error inner return value lacks Codec's required fields.
+  const _assigned: DescFactory = wrongReturn;
+  expectTypeOf<typeof wrongReturn>().not.toExtend<DescFactory>();
+});
+
 test('Ctx shape locked at { name, usedAt }', () => {
   expectTypeOf<Ctx>().toEqualTypeOf<{
     readonly name: string;
