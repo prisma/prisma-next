@@ -41,7 +41,7 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     const { from, to } = pkg.metadata;
 
     if (from === to) {
-      throw errorSameSourceAndTarget(pkg.dirName, from);
+      throw errorSameSourceAndTarget(pkg.dirPath, from);
     }
 
     nodes.add(from);

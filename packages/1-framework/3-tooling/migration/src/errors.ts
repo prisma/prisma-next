@@ -1,4 +1,20 @@
-import { relative } from 'pathe';
+import { basename, dirname, relative } from 'pathe';
+
+/**
+ * Build the canonical "re-emit this package" remediation hint.
+ *
+ * Every on-disk migration package ships its own `migration.ts` author-time
+ * file. Running it regenerates `migration.json` and `ops.json` with the
+ * correct hash + metadata, so it is the right primitive whenever a single
+ * package's on-disk artifacts are missing, malformed, or otherwise corrupt.
+ * Pointing users at `migration plan` would emit a *new* package rather than
+ * heal the broken one.
+ */
+function reemitHint(dir: string, fallback?: string): string {
+  const relativeDir = relative(process.cwd(), dir);
+  const reemit = `Re-emit the package by running \`node "${relativeDir}/migration.ts"\``;
+  return fallback ? `${reemit}, ${fallback}` : `${reemit}.`;
+}
 
 /**
  * Structured error for migration tooling operations.
@@ -58,7 +74,10 @@ export function errorDirectoryExists(dir: string): MigrationToolsError {
 export function errorMissingFile(file: string, dir: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.FILE_MISSING', `Missing ${file}`, {
     why: `Expected "${file}" in "${dir}" but the file does not exist.`,
-    fix: 'Ensure the migration directory contains both migration.json and ops.json. If the directory is corrupt, delete it and re-run migration plan.',
+    fix: reemitHint(
+      dir,
+      'or delete the directory if the migration is unwanted and the source TypeScript is gone.',
+    ),
     details: { file, dir },
   });
 }
@@ -66,7 +85,7 @@ export function errorMissingFile(file: string, dir: string): MigrationToolsError
 export function errorInvalidJson(filePath: string, parseError: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_JSON', 'Invalid JSON in migration file', {
     why: `Failed to parse "${filePath}": ${parseError}`,
-    fix: 'Fix the JSON syntax error, or delete the migration directory and re-run migration plan.',
+    fix: reemitHint(dirname(filePath), 'or restore the directory from version control.'),
     details: { filePath, parseError },
   });
 }
@@ -74,7 +93,7 @@ export function errorInvalidJson(filePath: string, parseError: string): Migratio
 export function errorInvalidManifest(filePath: string, reason: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_MANIFEST', 'Invalid migration manifest', {
     why: `Migration manifest at "${filePath}" is invalid: ${reason}`,
-    fix: 'Ensure migration.json has all required fields (from, to, kind, toContract). If corrupt, delete and re-plan.',
+    fix: reemitHint(dirname(filePath), 'or restore the directory from version control.'),
     details: { filePath, reason },
   });
 }
@@ -95,13 +114,17 @@ export function errorInvalidDestName(destName: string): MigrationToolsError {
   });
 }
 
-export function errorSameSourceAndTarget(dirName: string, hash: string): MigrationToolsError {
+export function errorSameSourceAndTarget(dir: string, hash: string): MigrationToolsError {
+  const dirName = basename(dir);
   return new MigrationToolsError(
     'MIGRATION.SAME_SOURCE_AND_TARGET',
     'Migration has same source and target',
     {
       why: `Migration "${dirName}" has from === to === "${hash}". A migration must transition between two different contract states.`,
-      fix: 'Delete the invalid migration directory and re-run migration plan.',
+      fix: reemitHint(
+        dir,
+        'or delete the directory if the migration is unwanted and the source TypeScript is gone.',
+      ),
       details: { dirName, hash },
     },
   );
@@ -201,7 +224,7 @@ export function errorMigrationHashMismatch(
   const relativeDir = relative(process.cwd(), dir);
   return new MigrationToolsError('MIGRATION.HASH_MISMATCH', 'Migration package is corrupt', {
     why: `Stored migrationHash "${storedHash}" does not match the recomputed hash "${computedHash}" for "${relativeDir}". The migration.json or ops.json has been edited or partially written since emit.`,
-    fix: `Re-emit the package by running \`node "${relativeDir}/migration.ts"\`, or restore the directory from version control.`,
+    fix: reemitHint(dir, 'or restore the directory from version control.'),
     details: { dir, storedHash, computedHash },
   });
 }
