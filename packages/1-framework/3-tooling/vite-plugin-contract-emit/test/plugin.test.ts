@@ -156,6 +156,35 @@ function getWatcherHandler(
     | undefined;
 }
 
+async function configurePlugin({
+  options = { logLevel: 'silent', debounceMs: 100 },
+  moduleGraph = { '/project/prisma-next.config.ts': {} },
+}: {
+  options?: Parameters<typeof prismaVitePlugin>[1];
+  moduleGraph?: Record<string, { file?: string; imports?: readonly string[] }>;
+} = {}): Promise<{
+  readonly mockServer: ReturnType<typeof createMockServer>;
+  readonly handleHotUpdate: (ctx: { file: string }) => void;
+}> {
+  const plugin = prismaVitePlugin('prisma-next.config.ts', options);
+  const mockServer = createMockServer();
+
+  applyModuleGraph(mockServer, moduleGraph);
+
+  const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+  configResolved({ root: '/project' });
+
+  const configureServer = plugin.configureServer as unknown as (
+    server: ReturnType<typeof createMockServer>,
+  ) => Promise<void>;
+  await configureServer(mockServer);
+
+  return {
+    mockServer,
+    handleHotUpdate: plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void,
+  };
+}
+
 describe('prismaVitePlugin', () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -730,27 +759,8 @@ describe('prismaVitePlugin', () => {
         }),
       );
 
-      const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
-        debounceMs: 100,
-      });
-      const mockServer = createMockServer();
-
-      applyModuleGraph(mockServer, {
-        '/project/prisma-next.config.ts': {},
-      });
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
-
+      const { handleHotUpdate } = await configurePlugin();
       mockedExecuteContractEmit.mockClear();
-
-      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
 
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(50);
@@ -763,24 +773,7 @@ describe('prismaVitePlugin', () => {
     });
 
     it('waits for an in-flight emit before starting the queued re-emit', async () => {
-      const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
-        debounceMs: 100,
-      });
-      const mockServer = createMockServer();
-
-      applyModuleGraph(mockServer, {
-        '/project/prisma-next.config.ts': {},
-      });
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
-
+      const { handleHotUpdate } = await configurePlugin();
       mockedExecuteContractEmit.mockReset();
 
       const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
@@ -791,7 +784,6 @@ describe('prismaVitePlugin', () => {
       });
       mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
 
-      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(100);
 
@@ -812,31 +804,13 @@ describe('prismaVitePlugin', () => {
     });
 
     it('coalesces multiple queued changes while an emit is in flight', async () => {
-      const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
-        debounceMs: 100,
-      });
-      const mockServer = createMockServer();
-
-      applyModuleGraph(mockServer, {
-        '/project/prisma-next.config.ts': {},
-      });
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
-
+      const { handleHotUpdate } = await configurePlugin();
       mockedExecuteContractEmit.mockReset();
 
       const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
       mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
       mockedExecuteContractEmit.mockResolvedValueOnce(successfulEmitResult);
 
-      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(100);
 
@@ -857,24 +831,7 @@ describe('prismaVitePlugin', () => {
     });
 
     it('defers full reload while a newer queued emit is still pending', async () => {
-      const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
-        debounceMs: 100,
-      });
-      const mockServer = createMockServer();
-
-      applyModuleGraph(mockServer, {
-        '/project/prisma-next.config.ts': {},
-      });
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
-
+      const { handleHotUpdate, mockServer } = await configurePlugin();
       mockedExecuteContractEmit.mockReset();
       mockServer.ws.send.mockClear();
 
@@ -882,7 +839,6 @@ describe('prismaVitePlugin', () => {
       mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
       mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
 
-      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(100);
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
@@ -912,16 +868,7 @@ describe('prismaVitePlugin', () => {
       mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult('superseded'));
 
       const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'info' });
-      const mockServer = createMockServer();
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
+      const { mockServer } = await configurePlugin({ options: { logLevel: 'info' } });
 
       expect(mockServer.ws.send).not.toHaveBeenCalledWith({ type: 'full-reload' });
       expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Emitted contract'));

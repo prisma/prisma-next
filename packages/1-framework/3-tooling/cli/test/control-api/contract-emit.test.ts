@@ -146,16 +146,46 @@ describe('executeContractEmit', () => {
     vi.restoreAllMocks();
   });
 
-  async function withMockedConfig(
+  async function withMockedConfig<T>(
     config: Awaited<ReturnType<typeof configLoader.loadConfig>>,
-    run: () => Promise<void>,
-  ) {
+    run: () => Promise<T>,
+  ): Promise<T> {
     const loadConfigSpy = vi.spyOn(configLoader, 'loadConfig').mockResolvedValue(config);
     try {
-      await run();
+      return await run();
     } finally {
       loadConfigSpy.mockRestore();
     }
+  }
+
+  function createOutputPaths(): {
+    readonly outputJsonPath: string;
+    readonly outputDtsPath: string;
+  } {
+    return {
+      outputJsonPath: join(tmpDir, 'src/prisma/contract.json'),
+      outputDtsPath: join(tmpDir, 'src/prisma/contract.d.ts'),
+    };
+  }
+
+  async function withStartedOverlappingEmits<T>(
+    outputJsonPath: string,
+    run: (emits: {
+      readonly first: ReturnType<typeof executeContractEmit>;
+      readonly second: ReturnType<typeof executeContractEmit>;
+    }) => Promise<T>,
+  ): Promise<T> {
+    return await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(1);
+      });
+      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+      await eventually(() => {
+        expect(mockedEmit).toHaveBeenCalledTimes(2);
+      });
+      return await run({ first, second });
+    });
   }
 
   it('throws when configPath does not exist', async () => {
@@ -242,8 +272,7 @@ describe('executeContractEmit', () => {
   });
 
   it('keeps the newer generation on disk when an older emit finishes later', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const { outputJsonPath, outputDtsPath } = createOutputPaths();
     const firstEmit = Promise.withResolvers<EmitResult>();
     const secondEmit = Promise.withResolvers<EmitResult>();
 
@@ -251,20 +280,7 @@ describe('executeContractEmit', () => {
       .mockImplementationOnce(() => firstEmit.promise)
       .mockImplementationOnce(() => secondEmit.promise);
 
-    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      // Wait until the first call has issued its generation (reaching emit())
-      // before starting the second, otherwise parallel test load can swap the
-      // generation order between the two calls.
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(1);
-      });
-      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(2);
-      });
-
+    await withStartedOverlappingEmits(outputJsonPath, async ({ first, second }) => {
       secondEmit.resolve(createEmitResult('newer'));
       const secondResult = await second;
 
@@ -280,8 +296,7 @@ describe('executeContractEmit', () => {
   });
 
   it('keeps the last good artifacts when a newer request fails after superseding an older emit', async () => {
-    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
-    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
+    const { outputJsonPath, outputDtsPath } = createOutputPaths();
     const previousJson = JSON.stringify({ generation: 'previous' });
     const previousDts = "export type Generation = 'previous';\n";
     const firstEmit = Promise.withResolvers<EmitResult>();
@@ -304,18 +319,7 @@ describe('executeContractEmit', () => {
       return localFs.writeFile(...args);
     });
 
-    await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      // Same generation-order safeguard as in the previous test.
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(1);
-      });
-      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(2);
-      });
-
+    await withStartedOverlappingEmits(outputJsonPath, async ({ first, second }) => {
       await expect(second).rejects.toThrow('simulated newer generation write failure');
 
       firstEmit.resolve({

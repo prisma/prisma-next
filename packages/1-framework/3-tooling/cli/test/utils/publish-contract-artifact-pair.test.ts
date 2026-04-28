@@ -18,22 +18,37 @@ const PREVIOUS_DTS = "export type Generation = 'previous';\n";
 const NEXT_JSON = JSON.stringify({ generation: 'next' });
 const NEXT_DTS = "export type Generation = 'next';\n";
 
+interface ArtifactPaths {
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
+}
+
 describe('publishContractArtifactPair', () => {
   let tmpDir = '';
   let actualFs: FsPromisesModule;
   let mockedFs: FsPromisesModule;
   let publishContractArtifactPair: typeof import('../../src/utils/publish-contract-artifact-pair')['publishContractArtifactPair'];
 
-  async function seedPreviousArtifacts(): Promise<{
-    outputJsonPath: string;
-    outputDtsPath: string;
-  }> {
+  async function seedPreviousArtifacts(): Promise<ArtifactPaths> {
     const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
     const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
     await actualFs.mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
     await actualFs.writeFile(outputJsonPath, PREVIOUS_JSON, 'utf-8');
     await actualFs.writeFile(outputDtsPath, PREVIOUS_DTS, 'utf-8');
     return { outputJsonPath, outputDtsPath };
+  }
+
+  function publishNext(
+    paths: ArtifactPaths,
+    options: { readonly beforePublish?: () => Promise<boolean> | boolean } = {},
+  ): Promise<boolean> {
+    return publishContractArtifactPair({
+      ...paths,
+      contractJson: NEXT_JSON,
+      contractDts: NEXT_DTS,
+      publicationToken: 'publish',
+      ...options,
+    });
   }
 
   beforeEach(async () => {
@@ -81,13 +96,7 @@ describe('publishContractArtifactPair', () => {
       });
     });
 
-    await publishContractArtifactPair({
-      outputJsonPath,
-      outputDtsPath,
-      contractJson: NEXT_JSON,
-      contractDts: NEXT_DTS,
-      publicationToken: 'publish',
-    });
+    await publishNext({ outputJsonPath, outputDtsPath });
 
     expect(snapshots).toEqual([
       { json: PREVIOUS_JSON, dts: NEXT_DTS, to: outputDtsPath },
@@ -99,16 +108,9 @@ describe('publishContractArtifactPair', () => {
     const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
     const beforePublish = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
 
-    await expect(
-      publishContractArtifactPair({
-        outputJsonPath,
-        outputDtsPath,
-        contractJson: NEXT_JSON,
-        contractDts: NEXT_DTS,
-        publicationToken: 'publish',
-        beforePublish,
-      }),
-    ).resolves.toBe(false);
+    await expect(publishNext({ outputJsonPath, outputDtsPath }, { beforePublish })).resolves.toBe(
+      false,
+    );
 
     expect(beforePublish).toHaveBeenCalledTimes(2);
     expect(vi.mocked(mockedFs.rename)).not.toHaveBeenCalled();
@@ -127,15 +129,9 @@ describe('publishContractArtifactPair', () => {
       return actualFs.writeFile(...args);
     });
 
-    await expect(
-      publishContractArtifactPair({
-        outputJsonPath,
-        outputDtsPath,
-        contractJson: NEXT_JSON,
-        contractDts: NEXT_DTS,
-        publicationToken: 'publish',
-      }),
-    ).rejects.toThrow('simulated dts write failure');
+    await expect(publishNext({ outputJsonPath, outputDtsPath })).rejects.toThrow(
+      'simulated dts write failure',
+    );
 
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(PREVIOUS_DTS);
@@ -157,21 +153,17 @@ describe('publishContractArtifactPair', () => {
       return actualFs.rename(...args);
     });
 
-    await expect(
-      publishContractArtifactPair({
-        outputJsonPath,
-        outputDtsPath,
-        contractJson: NEXT_JSON,
-        contractDts: NEXT_DTS,
-        publicationToken: 'publish',
-      }),
-    ).rejects.toSatisfy((error: unknown) => {
-      expect(error).toBe(publishError);
-      expect(error).toBeInstanceOf(Error);
-      expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(AggregateError);
-      expect((error as Error & { cause?: AggregateError }).cause?.errors).toEqual([rollbackError]);
-      return true;
-    });
+    await expect(publishNext({ outputJsonPath, outputDtsPath })).rejects.toSatisfy(
+      (error: unknown) => {
+        expect(error).toBe(publishError);
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error & { cause?: unknown }).cause).toBeInstanceOf(AggregateError);
+        expect((error as Error & { cause?: AggregateError }).cause?.errors).toEqual([
+          rollbackError,
+        ]);
+        return true;
+      },
+    );
 
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(NEXT_DTS);
