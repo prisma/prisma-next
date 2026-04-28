@@ -52,13 +52,21 @@
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
 
 const SUPABASE_URL = process.env['SUPABASE_URL'] ?? 'http://127.0.0.1:54321';
 const SUPABASE_SERVICE_ROLE_KEY = process.env['SUPABASE_SERVICE_ROLE_KEY'];
+const DATABASE_URL = process.env['DATABASE_URL'];
 
 if (!SUPABASE_SERVICE_ROLE_KEY) {
   throw new Error(
     'SUPABASE_SERVICE_ROLE_KEY is required (run `supabase status` to find the local key).',
+  );
+}
+if (!DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is required (the direct Postgres URL — see .env.example). ' +
+      'Used by ensureRealtimePublication() to ALTER PUBLICATION supabase_realtime.',
   );
 }
 
@@ -197,6 +205,46 @@ async function upsertMessage(userId: string, fixture: MessageFixture): Promise<v
   if (error) throw error;
 }
 
+/**
+ * Add `public.todos` to the `supabase_realtime` publication so the
+ * Vite SPA's `postgres_changes` channel (T4.11) receives INSERT /
+ * UPDATE / DELETE events for the user's todos.
+ *
+ * Why here, not in a PN migration:
+ *  - PN's contract IR doesn't model logical-replication publications
+ *    (FL-20). The contract only describes app schema; publication
+ *    membership is a Supabase-runtime concern. Authoring it as a PN
+ *    migration step would require a `rawSql`-style escape hatch on
+ *    the migration ops surface, which the IR explicitly avoids.
+ *  - The seed script is already the bootstrap step — it runs once
+ *    after `supabase start && pnpm migrate:up`, owns the direct DB
+ *    URL, and is the canonical place for "demo wiring that lives
+ *    outside the contract."
+ *  - It's cheap to make idempotent: check `pg_publication_tables`
+ *    first, only `ALTER PUBLICATION ADD TABLE` when the table isn't
+ *    already a member.
+ *
+ * `public_messages` does not need to be in the publication — the SPA
+ * does not subscribe to it (the public board reads via REST), and
+ * adding it would only create extra logical-replication traffic.
+ */
+async function ensureRealtimePublication(): Promise<void> {
+  const pool = new Pool({ connectionString: DATABASE_URL });
+  try {
+    const { rows } = await pool.query(
+      "SELECT 1 FROM pg_publication_tables WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = 'todos'",
+    );
+    if (rows.length > 0) {
+      console.log('realtime publication: public.todos already a member, no change');
+      return;
+    }
+    await pool.query('ALTER PUBLICATION supabase_realtime ADD TABLE public.todos');
+    console.log('realtime publication: added public.todos to supabase_realtime');
+  } finally {
+    await pool.end();
+  }
+}
+
 async function main(): Promise<void> {
   const userIdsByLabel = new Map<string, string>();
 
@@ -217,6 +265,8 @@ async function main(): Promise<void> {
     if (!userId) throw new Error(`no user id for ${message.authorLabel}`);
     await upsertMessage(userId, message);
   }
+
+  await ensureRealtimePublication();
 
   console.log('seed complete');
 }

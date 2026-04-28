@@ -445,6 +445,9 @@ importers:
 
   examples/supabase-todos:
     dependencies:
+      '@hono/node-server':
+        specifier: ^2.0.0
+        version: 2.0.0(hono@4.11.4)
       '@prisma-next/adapter-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/6-adapters/postgres
@@ -4075,6 +4078,12 @@ packages:
     peerDependencies:
       hono: 4.11.4
 
+  '@hono/node-server@2.0.0':
+    resolution: {integrity: sha512-n3GfHwwCvHCkGmOwKfxUPOlbfzuO64Sbc5XC4NGPIXxkuOnJrdgExdRKmHfF924r914WRJPT397GdqLvdYTeyQ==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      hono: 4.11.4
+
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
     engines: {node: '>=18'}
@@ -7500,6 +7509,10 @@ snapshots:
   '@floating-ui/utils@0.2.11': {}
 
   '@hono/node-server@1.19.7(hono@4.11.4)':
+    dependencies:
+      hono: 4.11.4
+
+  '@hono/node-server@2.0.0(hono@4.11.4)':
     dependencies:
       hono: 4.11.4
 

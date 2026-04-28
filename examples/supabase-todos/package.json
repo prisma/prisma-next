@@ -10,11 +10,13 @@
     "migrate:up": "prisma-next migration apply",
     "seed": "tsx scripts/seed.ts",
     "dev": "vite",
+    "dev:server": "tsx --env-file=.env --watch src/server/index.ts",
     "test": "vitest run --passWithNoTests",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "lint": "biome check . --error-on-warnings"
   },
   "dependencies": {
+    "@hono/node-server": "^2.0.0",
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
