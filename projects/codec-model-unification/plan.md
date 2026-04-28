@@ -145,6 +145,7 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 2. **postgres-core** — for each parameterized codec (numeric, timestamp, timestamptz, char if present, json/jsonb): write the curried factory and the descriptor; replace the existing `vectorColumn`/factory exports.
 3. **Mongo codecs** — same pattern.
 4. **Contract-authoring builder** — update `.column(...)` to detect the partially applied factory shape (`(ctx) => Codec<…>`) and apply `ctx`. The same path handles `storage.types` aggregation. — [design](design/authoring-ergonomics.md#how-ctx-is-supplied)
+   - **4a. Extend `ColumnTypeDescriptor`** in `@prisma-next/contract-authoring` to admit `type?: (ctx: Ctx) => Codec` as a first-class field. Update fixtures (in particular `packages/2-sql/2-authoring/contract-ts/test/fixtures/codec-resolver-fixture.ts`) to drop the structural intersection that M2 R1 relied on. (Surfaced by M2 R1 reviewer; deferred from M2 because the M2 type-level resolver works through TS structural typing, but the production builder needs the explicit slot when factories flow through `.column(...)`.)
 5. **Examples and integration tests** — update demo schemas to use the new factory call shape (`vector(1536)` instead of `vector(1536)` returning the old descriptor — same call site, semantically updated).
 6. **Emit-snapshot diff** — re-emit every contract; assert byte-identical against M0.3 snapshots.
 
