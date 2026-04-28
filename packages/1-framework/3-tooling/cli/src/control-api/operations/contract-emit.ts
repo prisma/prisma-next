@@ -51,6 +51,34 @@ type ValidatedProviderResult =
   | { readonly ok: true; readonly value: unknown }
   | { readonly ok: false; readonly error: ReturnType<typeof errorRuntime> };
 
+function diagnosticLocationSuffix(diagnostic: Record<string, unknown>): string {
+  const sourceId = typeof diagnostic['sourceId'] === 'string' ? diagnostic['sourceId'] : undefined;
+  const span = isRecord(diagnostic['span']) ? diagnostic['span'] : undefined;
+  const start = span && isRecord(span['start']) ? span['start'] : undefined;
+  const line = start && typeof start['line'] === 'number' ? start['line'] : undefined;
+  const column = start && typeof start['column'] === 'number' ? start['column'] : undefined;
+  if (sourceId && line !== undefined && column !== undefined) {
+    return ` (${sourceId}:${line}:${column})`;
+  }
+  if (sourceId) {
+    return ` (${sourceId})`;
+  }
+  return '';
+}
+
+function mapDiagnosticsToIssues(
+  diagnostics: readonly unknown[],
+): ReadonlyArray<{ readonly kind: string; readonly message: string }> {
+  const issues: { readonly kind: string; readonly message: string }[] = [];
+  for (const raw of diagnostics) {
+    if (!isRecord(raw)) continue;
+    const code = typeof raw['code'] === 'string' ? raw['code'] : 'diagnostic';
+    const message = typeof raw['message'] === 'string' ? raw['message'] : '';
+    issues.push({ kind: code, message: `${message}${diagnosticLocationSuffix(raw)}` });
+  }
+  return issues;
+}
+
 function validateProviderResult(providerResult: unknown): ValidatedProviderResult {
   if (!isRecord(providerResult) || typeof providerResult['ok'] !== 'boolean') {
     return {
@@ -96,6 +124,7 @@ function validateProviderResult(providerResult: unknown): ValidatedProviderResul
       'Fix contract source diagnostics and return ok(Contract).',
       {
         diagnostics: failure['diagnostics'],
+        issues: mapDiagnosticsToIssues(failure['diagnostics']),
         ...ifDefined('providerMeta', failure['meta']),
       },
     ),
