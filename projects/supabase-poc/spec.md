@@ -227,7 +227,7 @@ These are documentation, not commitments. Each is sized to fit on half a page an
 
 - **R-FX-1.** With `scopeMode: 'transaction'` against the local Supavisor pooled URL: a session for user A reading `todos` returns only A's rows; a session for user B reads only B's. `anon` returns zero rows on `todos` and reads `public_messages` successfully.
 - **R-FX-2.** Server handlers issuing `SELECT * FROM todos` (no explicit `WHERE user_id = ?`) return only the authenticated user's rows. The PoC must demonstrate this, because it is the proof RLS is doing the work.
-- **R-FX-3.** With `scopeMode: 'connection'` against a direct (non-pooled) URL, behavior identical to R-FX-1 obtains.
+- **R-FX-3.** *(deferred — see [FL-18](framework-limitations.md#fl-18))* With `scopeMode: 'connection'` against a direct (non-pooled) URL, behavior identical to R-FX-1 obtains. **Status:** M3 (connection-scope mode) was descoped at the orchestrator's call after phase-2 closed cleanly. The original spec text below the bullet is preserved verbatim as the requirement that *would* be satisfied if connection mode landed; the design context lives in FL-18 and the upstream design surface lives in [Sketch 1 — Scoped-session SPI](framework-limitations.md#sketch-1--scoped-session-spi).
 - **R-FX-4.** A run of N parallel `authenticate()` calls with distinct claims, each executing a query, sees no cross-contamination. (No GUC leakage between concurrent scopes on the same pool.)
 - **R-FX-5.** Calling `authenticate({ role: 'something-not-in-allowedRoles' })` throws synchronously; no SQL is sent to the database.
 - **R-FX-6.** A pool with `max: 2` and 10 concurrent scoped runtimes completes a stress run with all connections returned to the pool. (No connection leaks via the scope wrapper.)
@@ -302,7 +302,7 @@ These are documentation, not commitments. Each is sized to fit on half a page an
 - [ ] Vitest integration test: pool exhaustion + recovery (R-FX-6).
 - [ ] Vitest integration test: mid-stream error → rollback + eviction (R-FX-7).
 - [ ] Vitest unit test: `beginTransaction()` in transaction mode throws (R-FX-8).
-- [ ] Connection-scope mode acceptance is conditional on M3 landing. If M3 is descoped, R-FX-3 moves to `framework-limitations.md` as a known gap; this is acceptable.
+- [x] Connection-scope mode acceptance is conditional on M3 landing. If M3 is descoped, R-FX-3 moves to `framework-limitations.md` as a known gap; this is acceptable. **Resolved: M3 was descoped after phase-2 closed cleanly; R-FX-3 is recorded as [FL-18](framework-limitations.md#fl-18). This is the spec-sanctioned outcome.**
 
 **Migration factories** (satisfies R-FM-*)
 

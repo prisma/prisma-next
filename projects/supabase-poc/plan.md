@@ -49,7 +49,7 @@ Phases that don't touch the example (e.g. `phase-close` after the example is mig
 | `phase-1d` | 1.8–1.9 | Admin (service-role) runtime exists; vitest smoke tests pass. | `pnpm --filter supabase-todos test test/runtime/admin.test.ts` green. |
 | `phase-1e` | 1.10–1.11 | Example `README.md` covers the M1 sequence; agent skill seeded with valid frontmatter and all eleven section headers. | Skill frontmatter parses (e.g. via `js-yaml`); `README.md` step list runs end-to-end on a fresh checkout. |
 | `phase-2` | 2.1–2.4 | `createSupabaseRuntime` in transaction mode; integration tests prove RLS isolation, parallel-scope safety, error handling. | `pnpm --filter supabase-todos test test/runtime/factory.test.ts` green; type test in 2.3 compiles. |
-| `phase-3` | 3.1–3.3 | *(stretch)* Connection-scope mode; same matrix passes against direct URL. | Parameterized integration matrix green for both modes. |
+| `phase-3` | 3.1–3.3 | *(descoped — see [FL-18](framework-limitations.md#fl-18))* Connection-scope mode deferred; design context recorded in the FL log and the M5.2 scoped-session SPI sketch. | n/a (descoped). |
 | `phase-4a` | 4.1–4.4 | Hono JWT-verification middleware + per-request scoped-runtime middleware; both vitest-tested. | `pnpm --filter supabase-todos test test/server/middleware/` green. |
 | `phase-4b` | 4.5–4.8 | Todos JSON API + public messages endpoint; integration tests with two real users prove handlers don't filter manually. | `pnpm --filter supabase-todos test test/server/routes/` green. |
 | `phase-4c` | 4.9–4.13 | Vite SPA: auth, todos page, realtime, public board; example `README.md` updated with `pnpm dev` step and two-tab demo procedure. | `pnpm --filter supabase-todos dev` boots without runtime errors; manual two-tab procedure documented in README. |
@@ -147,20 +147,22 @@ This is the headline milestone of the PoC. Implements `createSupabaseRuntime` in
 - [ ] **2.4 Update `framework-limitations.md`.**
   At minimum: an entry covering "user transactions inside a scoped runtime are unsupported" (R-FX-8 / FL-NN). Anything else hit during 2.2 lands here too.
 
-### Milestone 3 — Connection-scope mode *(stretch)*
+### Milestone 3 — Connection-scope mode *(descoped)*
 
-> **After this milestone:** The factory also supports direct/session-mode connections with zero per-query overhead.
+> **Descoped at orchestrator's call after phase-2.** See [FL-18](framework-limitations.md#fl-18) for the design context that would have lived here, and [Sketch 1 — Scoped-session SPI](framework-limitations.md#sketch-1--scoped-session-spi) for the upstream surface that would replace this milestone outright. M2 closed cleanly, so the descope is by choice rather than by deadline pressure; the spec ([§ Acceptance Criteria](spec.md), R-FX-3 row) explicitly accepts this path.
+
+> **After this milestone (would have been):** The factory also supports direct/session-mode connections with zero per-query overhead.
 
 Optional. Spec accepts that this may be descoped if M2 takes longer than expected — in which case R-FX-3 moves to `framework-limitations.md` as a known gap and we close the PoC at M5.
 
-**Tasks:**
+**Tasks** *(all descoped — recorded in [FL-18](framework-limitations.md#fl-18))*:
 
-- [ ] **3.1 Vitest spec for `'connection'` mode (tests-first).**
+- [descoped] **3.1 Vitest spec for `'connection'` mode (tests-first).**
   Same matrix as 2.1, parameterized so each test runs once in `'transaction'` mode against the pooled URL and once in `'connection'` mode against the direct URL. Include a connection-mode-specific test: `session.beginTransaction()` works (the wrapper delegates).
-- [ ] **3.2 Implement `'connection'` mode.**
+- [descoped] **3.2 Implement `'connection'` mode.**
   Borrow one `PoolClient` on `authenticate()`. On first `execute()`, run `SET request.jwt.claims = $1; SET ROLE <role>` once. Wrap the borrowed client in a 1-connection `SqlDriver`; build a `Runtime` around it. `session.end()` releases the client. Errors mid-query call `destroy(err)` rather than `release()`. `session.beginTransaction()` works (delegates to the underlying driver).
-- [ ] **3.3 Auto-detect `scopeMode` (judgment call).**
-  Helper `pickScopeMode(connectionString): ScopeMode` returning `'transaction'` for URLs containing `pgbouncer=true`, port `6543`, or matching known Supavisor patterns; otherwise `'connection'`. Exported alongside the factory. **If detection feels brittle in practice, drop it and require explicit choice** — record as `FL-NN`.
+- [descoped] **3.3 Auto-detect `scopeMode` (judgment call).**
+  Helper `pickScopeMode(connectionString): ScopeMode` returning `'transaction'` for URLs containing `pgbouncer=true`, port `6543`, or matching known Supavisor patterns; otherwise `'connection'`. Exported alongside the factory. **If detection feels brittle in practice, drop it and require explicit choice** — record as `FL-NN`. (Resolved: the [Open items default](#open-items) was applied at descope — explicit choice required, no auto-detect — folded into FL-18's design sketch.)
 
 ### Milestone 4 — HTTP API + UI + realtime
 
@@ -239,7 +241,7 @@ Every requirement in [`spec.md`](spec.md#requirements) maps to at least one test
 | R-FE-5 (anon page reads `public_messages`) | Integration + manual | 4.7, 4.8, 4.12 |
 | R-FX-1 (transaction-mode RLS isolation) | Vitest integration | 2.1 |
 | R-FX-2 (handlers don't filter by user, RLS does) | Vitest integration | 2.1, 4.5 |
-| R-FX-3 (connection-mode RLS isolation) | Vitest integration *(stretch)* | 3.1 |
+| R-FX-3 (connection-mode RLS isolation) | *(descoped — [FL-18](framework-limitations.md#fl-18))* | — |
 | R-FX-4 (no leakage across parallel scopes) | Vitest integration | 2.1 |
 | R-FX-5 (role allowlist enforcement, no SQL on rejection) | Vitest unit | 2.1 |
 | R-FX-6 (no connection leak under stress) | Vitest integration | 2.1 |
@@ -272,7 +274,7 @@ These are decisions deferred to execution time, not unresolved spec questions. E
 
 | Item | Decide by | Default if not decided |
 |---|---|---|
-| Auto-detect for `scopeMode` is worth shipping | M3.3 | Drop; require explicit choice. Record as `FL-NN`. |
+| Auto-detect for `scopeMode` is worth shipping | M3.3 | **Resolved by descope** — M3 was descoped (see [FL-18](framework-limitations.md#fl-18)); the default fallback was applied (drop auto-detect; require explicit choice). The design sketch in FL-18 reflects this decision. |
 | Composition with existing `PostgresQueryable` is feasible without copy-paste | 2.2 | If not, copy with a clear comment + `FL-NN` entry. |
 | Whether `@prisma-next/target-postgres/migration` exports a public `quoteIdentifier` helper | 1.5 | If not, write a 3-line in-example version + `FL-NN` entry; revisit during 5.1. |
 | Supabase JWKS endpoint vs shared secret for local dev | 4.2 | Shared secret (simpler local setup). Document in README. |
