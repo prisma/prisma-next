@@ -1,4 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
+import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -13,7 +19,7 @@ import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder
 import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
-import { compileGroupedAggregate } from './query-plan';
+import { compileGroupedAggregate, mergeUserAnnotations } from './query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -82,8 +88,21 @@ export class GroupedCollection<
     }) as GroupedCollection<TContract, ModelName, GroupFields>;
   }
 
-  async aggregate<Spec extends AggregateSpec>(
+  /**
+   * Read terminal: run a grouped aggregate query.
+   *
+   * Accepts an optional variadic of read-typed user annotations after
+   * the builder callback. The `As & ValidAnnotations<'read', As>` gate
+   * rejects write-only annotations at the call site; the runtime check
+   * fails closed for callers that bypass the type gate. Annotations
+   * are merged into the compiled plan's `meta.annotations`.
+   */
+  async aggregate<
+    Spec extends AggregateSpec,
+    As extends readonly AnnotationValue<unknown, OperationKind>[],
+  >(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
+    ...annotations: As & ValidAnnotations<'read', As>
   ): Promise<
     Array<
       SimplifyDeep<
@@ -103,13 +122,27 @@ export class GroupedCollection<
       }
     }
 
-    const compiled = compileGroupedAggregate(
-      this.contract,
-      this.tableName,
-      this.baseFilters,
-      this.groupByColumns,
-      aggregateSpec,
-      combineWhereExprs(this.havingFilters),
+    const annotationsAsValues = annotations as readonly AnnotationValue<unknown, OperationKind>[];
+    let annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined;
+    if (annotationsAsValues.length > 0) {
+      assertAnnotationsApplicable(annotationsAsValues, 'read', 'groupBy.aggregate');
+      const next = new Map<string, AnnotationValue<unknown, OperationKind>>();
+      for (const annotation of annotationsAsValues) {
+        next.set(annotation.namespace, annotation);
+      }
+      annotationsMap = next;
+    }
+
+    const compiled = mergeUserAnnotations(
+      compileGroupedAggregate(
+        this.contract,
+        this.tableName,
+        this.baseFilters,
+        this.groupByColumns,
+        aggregateSpec,
+        combineWhereExprs(this.havingFilters),
+      ),
+      annotationsMap,
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,

@@ -1,6 +1,10 @@
 import { defineAnnotation } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
-import { createCollection } from './collection-fixtures';
+import {
+  createCollection,
+  createCollectionFor,
+  createReturningCollectionFor,
+} from './collection-fixtures';
 
 const cacheAnnotation = defineAnnotation<{ ttl: number; skip?: boolean }, 'read'>({
   namespace: 'cache',
@@ -196,5 +200,378 @@ describe('Collection annotations alongside framework-internal codecs metadata', 
     if (plan.meta.annotations?.['codecs'] !== undefined) {
       expect(plan.meta.annotations['codecs']).toEqual(expect.any(Object));
     }
+  });
+});
+
+describe('Collection.create annotations', () => {
+  it('writes the applied write annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+
+    expect(runtime.executions).toHaveLength(1);
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+
+  it('accepts a both-kind annotation', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      otelAnnotation.apply({ traceId: 't-1' }),
+    );
+
+    const plan = runtime.executions[0]!.plan;
+    expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
+  });
+
+  it('zero annotations leaves the plan without user annotations', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection.create({ id: 1, name: 'Alice', email: 'a@b.com' });
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toBeUndefined();
+    expect(otelAnnotation.read(plan)).toBeUndefined();
+  });
+
+  it('runtime gate rejects a read-only annotation forced through a cast', async () => {
+    const { collection } = createReturningCollectionFor('User');
+    const createFn = collection.create as unknown as (
+      data: unknown,
+      annotation: unknown,
+    ) => Promise<unknown>;
+    await expect(
+      createFn.call(
+        collection,
+        { id: 1, name: 'Alice', email: 'a@b.com' },
+        cacheAnnotation.apply({ ttl: 60 }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+      category: 'RUNTIME',
+    });
+  });
+});
+
+describe('Collection.createAll annotations', () => {
+  it('writes the applied annotation onto every plan emitted by the split path', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([
+      [{ id: 1, name: 'A', email: 'a@b.com' }],
+      [{ id: 2, name: 'B', email: 'b@b.com' }],
+    ]);
+
+    await collection
+      .createAll(
+        [
+          { id: 1, name: 'A', email: 'a@b.com' },
+          { id: 2, name: 'B', email: 'b@b.com' },
+        ],
+        auditAnnotation.apply({ actor: 'system' }),
+      )
+      .toArray();
+
+    expect(runtime.executions.length).toBeGreaterThan(0);
+    for (const execution of runtime.executions) {
+      expect(auditAnnotation.read(execution.plan)).toEqual({ actor: 'system' });
+    }
+  });
+});
+
+describe('Collection.createCount annotations', () => {
+  it('writes the applied annotation onto the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[]]);
+
+    await collection.createCount(
+      [{ id: 1, name: 'A', email: 'a@b.com' }],
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+
+    expect(runtime.executions.length).toBeGreaterThan(0);
+    for (const execution of runtime.executions) {
+      expect(auditAnnotation.read(execution.plan)).toEqual({ actor: 'system' });
+    }
+  });
+});
+
+describe('Collection.upsert annotations', () => {
+  it('writes the applied annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection.upsert(
+      {
+        create: { id: 1, name: 'Alice', email: 'a@b.com' },
+        update: { name: 'Alice' },
+        conflictOn: { id: 1 },
+      },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+
+  it('runtime gate rejects a read-only annotation forced through a cast', async () => {
+    const { collection } = createReturningCollectionFor('User');
+    const upsertFn = collection.upsert as unknown as (
+      input: unknown,
+      annotation: unknown,
+    ) => Promise<unknown>;
+    await expect(
+      upsertFn.call(
+        collection,
+        {
+          create: { id: 1, name: 'Alice', email: 'a@b.com' },
+          update: { name: 'Alice' },
+          conflictOn: { id: 1 },
+        },
+        cacheAnnotation.apply({ ttl: 60 }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+    });
+  });
+});
+
+describe('Collection.update annotations', () => {
+  it('writes the applied annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection
+      .where({ id: 1 })
+      .update({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }));
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+
+  it('runtime gate rejects a read-only annotation forced through a cast', async () => {
+    const { collection } = createReturningCollectionFor('User');
+    const filtered = collection.where({ id: 1 });
+    const updateFn = filtered.update as unknown as (
+      data: unknown,
+      annotation: unknown,
+    ) => Promise<unknown>;
+    await expect(
+      updateFn.call(filtered, { name: 'Alice' }, cacheAnnotation.apply({ ttl: 60 })),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+    });
+  });
+});
+
+describe('Collection.updateAll annotations', () => {
+  it('writes the applied annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection
+      .where({ id: 1 })
+      .updateAll({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }))
+      .toArray();
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+});
+
+describe('Collection.updateCount annotations', () => {
+  it('writes the applied annotation onto the update statement (not the matching read)', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    // Two execute calls: matching select first, then the update.
+    runtime.setNextResults([[{ id: 1 }], []]);
+
+    await collection
+      .where({ id: 1 })
+      .updateCount({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }));
+
+    expect(runtime.executions).toHaveLength(2);
+    const matchingPlan = runtime.executions[0]!.plan;
+    const updatePlan = runtime.executions[1]!.plan;
+    // The matching read does NOT carry the write annotation.
+    expect(auditAnnotation.read(matchingPlan)).toBeUndefined();
+    // The update statement DOES.
+    expect(auditAnnotation.read(updatePlan)).toEqual({ actor: 'system' });
+  });
+});
+
+describe('Collection.delete annotations', () => {
+  it('writes the applied annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection.where({ id: 1 }).delete(auditAnnotation.apply({ actor: 'system' }));
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+
+  it('runtime gate rejects a read-only annotation forced through a cast', async () => {
+    const { collection } = createReturningCollectionFor('User');
+    const filtered = collection.where({ id: 1 });
+    const deleteFn = filtered.delete as unknown as (annotation: unknown) => Promise<unknown>;
+    await expect(deleteFn.call(filtered, cacheAnnotation.apply({ ttl: 60 }))).rejects.toMatchObject(
+      {
+        code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+      },
+    );
+  });
+});
+
+describe('Collection.deleteAll annotations', () => {
+  it('writes the applied annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
+
+    await collection
+      .where({ id: 1 })
+      .deleteAll(auditAnnotation.apply({ actor: 'system' }))
+      .toArray();
+
+    const plan = runtime.executions[0]!.plan;
+    expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
+  });
+});
+
+describe('Collection.deleteCount annotations', () => {
+  it('writes the applied annotation onto the delete statement (not the matching read)', async () => {
+    const { collection, runtime } = createReturningCollectionFor('User');
+    // Two execute calls: matching select first, then the delete.
+    runtime.setNextResults([[{ id: 1 }], []]);
+
+    await collection.where({ id: 1 }).deleteCount(auditAnnotation.apply({ actor: 'system' }));
+
+    expect(runtime.executions).toHaveLength(2);
+    const matchingPlan = runtime.executions[0]!.plan;
+    const deletePlan = runtime.executions[1]!.plan;
+    // The matching read does NOT carry the write annotation.
+    expect(auditAnnotation.read(matchingPlan)).toBeUndefined();
+    // The delete statement DOES.
+    expect(auditAnnotation.read(deletePlan)).toEqual({ actor: 'system' });
+  });
+});
+
+describe('Collection.aggregate annotations', () => {
+  it('writes the applied read annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ count: '5' }]]);
+
+    await collection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+
+    expect(runtime.executions).toHaveLength(1);
+    const plan = runtime.executions[0]!.plan;
+    expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
+  });
+
+  it('accepts a both-kind annotation', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ count: '5' }]]);
+
+    await collection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      otelAnnotation.apply({ traceId: 't-1' }),
+    );
+
+    const plan = runtime.executions[0]!.plan;
+    expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
+  });
+
+  it('zero annotations leaves the plan without user annotations', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ count: '5' }]]);
+
+    await collection.aggregate((aggregate) => ({ count: aggregate.count() }));
+
+    const plan = runtime.executions[0]!.plan;
+    expect(cacheAnnotation.read(plan)).toBeUndefined();
+    expect(otelAnnotation.read(plan)).toBeUndefined();
+  });
+
+  it('runtime gate rejects a write-only annotation forced through a cast', async () => {
+    const { collection } = createCollectionFor('Post');
+    const aggregateFn = collection.aggregate as unknown as (
+      fn: unknown,
+      annotation: unknown,
+    ) => Promise<unknown>;
+    await expect(
+      aggregateFn.call(
+        collection,
+        (aggregate: { count: () => unknown }) => ({ count: aggregate.count() }),
+        auditAnnotation.apply({ actor: 'system' }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+      category: 'RUNTIME',
+    });
+  });
+});
+
+describe('GroupedCollection.aggregate annotations', () => {
+  it('writes the applied read annotation under its namespace on the executed plan', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
+
+    await collection
+      .groupBy('userId')
+      .aggregate((aggregate) => ({ count: aggregate.count() }), cacheAnnotation.apply({ ttl: 60 }));
+
+    expect(runtime.executions).toHaveLength(1);
+    const plan = runtime.executions[0]!.plan;
+    expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
+  });
+
+  it('accepts a both-kind annotation', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
+
+    await collection
+      .groupBy('userId')
+      .aggregate(
+        (aggregate) => ({ count: aggregate.count() }),
+        otelAnnotation.apply({ traceId: 't-1' }),
+      );
+
+    const plan = runtime.executions[0]!.plan;
+    expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
+  });
+
+  it('zero annotations leaves the plan without user annotations', async () => {
+    const { collection, runtime } = createCollectionFor('Post');
+    runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
+
+    await collection.groupBy('userId').aggregate((aggregate) => ({ count: aggregate.count() }));
+
+    const plan = runtime.executions[0]!.plan;
+    expect(cacheAnnotation.read(plan)).toBeUndefined();
+    expect(otelAnnotation.read(plan)).toBeUndefined();
+  });
+
+  it('runtime gate rejects a write-only annotation forced through a cast', async () => {
+    const { collection } = createCollectionFor('Post');
+    const grouped = collection.groupBy('userId') as unknown as {
+      aggregate(fn: unknown, annotation: unknown): Promise<unknown>;
+    };
+    await expect(
+      grouped.aggregate(
+        (aggregate: { count: () => unknown }) => ({ count: aggregate.count() }),
+        auditAnnotation.apply({ actor: 'system' }),
+      ),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+    });
   });
 });

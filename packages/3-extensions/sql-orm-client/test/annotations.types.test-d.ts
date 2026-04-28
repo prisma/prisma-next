@@ -5,6 +5,7 @@ import {
 } from '@prisma-next/framework-components/runtime';
 import { describe, expectTypeOf, test } from 'vitest';
 import type { Collection } from '../src/collection';
+import type { GroupedCollection } from '../src/grouped-collection';
 import type { TestContract } from './helpers';
 
 /**
@@ -157,5 +158,303 @@ describe('annotation handle types are preserved through the lane', () => {
         AnnotationValue<{ traceId: string }, 'read' | 'write'>,
       ]
     >();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Write terminals
+//
+// The contract is symmetrical to the read terminals: each write terminal
+// accepts write-only and both-kind annotations, rejects read-only ones at
+// the type level, preserves its return type, and accepts an empty variadic.
+// ---------------------------------------------------------------------------
+
+declare const userCollectionWithWhere: Collection<
+  TestContract,
+  'User',
+  Record<string, unknown>,
+  {
+    readonly hasOrderBy: false;
+    readonly hasWhere: true;
+    readonly hasUniqueFilter: false;
+    readonly variantName: undefined;
+  }
+>;
+
+describe('Collection.create (write-typed)', () => {
+  test('accepts a write-only annotation', () => {
+    userCollection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('accepts a both-kind annotation', () => {
+    userCollection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      otelAnnotation.apply({ traceId: 't' }),
+    );
+  });
+
+  test('accepts zero annotations (empty variadic)', () => {
+    userCollection.create({ id: 1, name: 'Alice', email: 'a@b.com' });
+  });
+
+  test('rejects a read-only annotation (negative)', () => {
+    userCollection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('rejects a mix containing a read-only annotation (negative)', () => {
+    // biome-ignore format: keep on one line so @ts-expect-error attaches to the call
+    // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+    userCollection.create({ id: 1, name: 'Alice', email: 'a@b.com' }, auditAnnotation.apply({ actor: 'system' }), cacheAnnotation.apply({ ttl: 60 }));
+  });
+
+  test('the return type is Promise<Row>', () => {
+    const result = userCollection.create(
+      { id: 1, name: 'Alice', email: 'a@b.com' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+    expectTypeOf(result).resolves.toMatchTypeOf<Record<string, unknown>>();
+  });
+});
+
+describe('Collection.createAll (write-typed)', () => {
+  test('accepts a write-only annotation', () => {
+    userCollection.createAll(
+      [{ id: 1, name: 'Alice', email: 'a@b.com' }],
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('accepts zero annotations (empty variadic)', () => {
+    userCollection.createAll([{ id: 1, name: 'Alice', email: 'a@b.com' }]);
+  });
+
+  test('rejects a read-only annotation (negative)', () => {
+    userCollection.createAll(
+      [{ id: 1, name: 'Alice', email: 'a@b.com' }],
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+});
+
+describe('Collection.createCount (write-typed)', () => {
+  test('accepts a write-only annotation', () => {
+    userCollection.createCount(
+      [{ id: 1, name: 'Alice', email: 'a@b.com' }],
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('rejects a read-only annotation (negative)', () => {
+    userCollection.createCount(
+      [{ id: 1, name: 'Alice', email: 'a@b.com' }],
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('the return type is Promise<number>', () => {
+    const result = userCollection.createCount(
+      [{ id: 1, name: 'Alice', email: 'a@b.com' }],
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+    expectTypeOf(result).resolves.toBeNumber();
+  });
+});
+
+describe('Collection.upsert (write-typed)', () => {
+  test('accepts a write-only annotation', () => {
+    userCollection.upsert(
+      {
+        create: { id: 1, name: 'Alice', email: 'a@b.com' },
+        update: { name: 'Alice' },
+        conflictOn: { id: 1 },
+      },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('rejects a read-only annotation (negative)', () => {
+    userCollection.upsert(
+      {
+        create: { id: 1, name: 'Alice', email: 'a@b.com' },
+        update: { name: 'Alice' },
+        conflictOn: { id: 1 },
+      },
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+});
+
+describe('Collection.update / .updateAll / .updateCount (write-typed)', () => {
+  // Update terminals require the receiver to satisfy the
+  // `State['hasWhere'] extends true` gate, so we use a separately-
+  // declared `userCollectionWithWhere` whose State is post-where.
+  test('update accepts a write-only annotation', () => {
+    userCollectionWithWhere.update({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }));
+  });
+
+  test('update rejects a read-only annotation (negative)', () => {
+    userCollectionWithWhere.update(
+      { name: 'Alice' },
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('updateAll accepts a write-only annotation', () => {
+    userCollectionWithWhere.updateAll(
+      { name: 'Alice' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('updateAll rejects a read-only annotation (negative)', () => {
+    userCollectionWithWhere.updateAll(
+      { name: 'Alice' },
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('updateCount accepts a write-only annotation', () => {
+    userCollectionWithWhere.updateCount(
+      { name: 'Alice' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('updateCount rejects a read-only annotation (negative)', () => {
+    userCollectionWithWhere.updateCount(
+      { name: 'Alice' },
+      // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('updateCount returns Promise<number>', () => {
+    const result = userCollectionWithWhere.updateCount(
+      { name: 'Alice' },
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+    expectTypeOf(result).resolves.toBeNumber();
+  });
+});
+
+describe('Collection.delete / .deleteAll / .deleteCount (write-typed)', () => {
+  test('delete accepts a write-only annotation', () => {
+    userCollectionWithWhere.delete(auditAnnotation.apply({ actor: 'system' }));
+  });
+
+  test('delete rejects a read-only annotation (negative)', () => {
+    // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+    userCollectionWithWhere.delete(cacheAnnotation.apply({ ttl: 60 }));
+  });
+
+  test('deleteAll accepts a write-only annotation', () => {
+    userCollectionWithWhere.deleteAll(auditAnnotation.apply({ actor: 'system' }));
+  });
+
+  test('deleteAll rejects a read-only annotation (negative)', () => {
+    // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+    userCollectionWithWhere.deleteAll(cacheAnnotation.apply({ ttl: 60 }));
+  });
+
+  test('deleteCount accepts a write-only annotation', () => {
+    userCollectionWithWhere.deleteCount(auditAnnotation.apply({ actor: 'system' }));
+  });
+
+  test('deleteCount rejects a read-only annotation (negative)', () => {
+    // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
+    userCollectionWithWhere.deleteCount(cacheAnnotation.apply({ ttl: 60 }));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Aggregate terminals (read-typed)
+//
+// Both `Collection.aggregate(fn, ...annotations)` and
+// `GroupedCollection.aggregate(fn, ...annotations)` are read terminals that
+// run a single SQL aggregation query and accept user annotations after the
+// builder callback.
+// ---------------------------------------------------------------------------
+
+describe('Collection.aggregate (read-typed)', () => {
+  test('accepts a read-only annotation', () => {
+    userCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('accepts a both-kind annotation', () => {
+    userCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      otelAnnotation.apply({ traceId: 't' }),
+    );
+  });
+
+  test('accepts zero annotations (empty variadic)', () => {
+    userCollection.aggregate((aggregate) => ({ count: aggregate.count() }));
+  });
+
+  test('rejects a write-only annotation (negative)', () => {
+    userCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
+      auditAnnotation.apply({ actor: 'system' }),
+    );
+  });
+
+  test('rejects a mix containing a write-only annotation (negative)', () => {
+    // biome-ignore format: keep on one line so @ts-expect-error attaches to the call
+    // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
+    userCollection.aggregate((aggregate) => ({ count: aggregate.count() }), cacheAnnotation.apply({ ttl: 60 }), auditAnnotation.apply({ actor: 'system' }));
+  });
+
+  test('the aggregation spec type is preserved through the gate', () => {
+    const result = userCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+    expectTypeOf(result).resolves.toMatchTypeOf<{ count: number }>();
+  });
+});
+
+declare const userGroupedCollection: GroupedCollection<TestContract, 'Post', ['userId']>;
+
+describe('GroupedCollection.aggregate (read-typed)', () => {
+  test('accepts a read-only annotation', () => {
+    userGroupedCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      cacheAnnotation.apply({ ttl: 60 }),
+    );
+  });
+
+  test('accepts a both-kind annotation', () => {
+    userGroupedCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      otelAnnotation.apply({ traceId: 't' }),
+    );
+  });
+
+  test('accepts zero annotations (empty variadic)', () => {
+    userGroupedCollection.aggregate((aggregate) => ({ count: aggregate.count() }));
+  });
+
+  test('rejects a write-only annotation (negative)', () => {
+    userGroupedCollection.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
+      auditAnnotation.apply({ actor: 'system' }),
+    );
   });
 });

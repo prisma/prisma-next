@@ -701,8 +701,22 @@ export class Collection<
     return rows[0] ?? null;
   }
 
-  async aggregate<Spec extends AggregateSpec>(
+  /**
+   * Read terminal: run an aggregate query (count, sum, avg, min, max)
+   * built via the `AggregateBuilder` callback.
+   *
+   * Accepts an optional variadic of read-typed user annotations after
+   * the builder callback. The `As & ValidAnnotations<'read', As>` gate
+   * rejects write-only annotations at the call site; the runtime check
+   * fails closed for callers that bypass the type gate. Annotations
+   * are merged into the compiled plan's `meta.annotations`.
+   */
+  async aggregate<
+    Spec extends AggregateSpec,
+    As extends readonly AnnotationValue<unknown, OperationKind>[],
+  >(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
+    ...annotations: As & ValidAnnotations<'read', As>
   ): Promise<AggregateResult<Spec>> {
     const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const entries = Object.entries(aggregateSpec);
@@ -716,11 +730,15 @@ export class Collection<
       }
     }
 
-    const compiled = compileAggregate(
-      this.contract,
-      this.tableName,
-      this.state.filters,
-      aggregateSpec,
+    const annotationsMap = this.#buildAnnotationsMap(
+      annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      'read',
+      'aggregate',
+    );
+
+    const compiled = mergeUserAnnotations(
+      compileAggregate(this.contract, this.tableName, this.state.filters, aggregateSpec),
+      annotationsMap,
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
