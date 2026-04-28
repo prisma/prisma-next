@@ -1,9 +1,8 @@
 {
   "extends": ["@prisma-next/tsconfig/base"],
   "compilerOptions": {
-    "rootDir": ".",
-    "lib": ["ES2024"]
+    "rootDir": "."
   },
-  "include": ["src", "test", "*.config.*", "package.json"],
+  "include": ["src", "*.config.*", "package.json"],
   "exclude": ["dist", "dist-tsc", "dist-tsc-prod", "node_modules"]
 }
