@@ -21,6 +21,22 @@ function getEmitOutputQueue(outputJsonPath: string): EmitOutputQueueState {
   return created;
 }
 
+/**
+ * Issues a monotonically increasing generation number for the given output path.
+ *
+ * Call this at the START of an emit request (before source resolution and the
+ * `emit()` call), not at publish time. The generation reflects request order,
+ * which — given that all in-tree contract source providers
+ * (`prismaContract`, `typescriptContract`, `typescriptContractFromPath`)
+ * capture their bytes synchronously inside `load()` — also reflects
+ * byte-capture order. So a request issued later carries newer bytes, and the
+ * supersession check correctly preserves the newer-bytes-on-disk invariant.
+ *
+ * Issuing at publish time instead would invert this: a slow emit that started
+ * earlier (and therefore reads older source bytes) would receive a higher
+ * generation than a fast emit started later, and the slower/older emit would
+ * win the supersession check. That's a regression — do not move the call site.
+ */
 export function issueContractArtifactGeneration(outputJsonPath: string): number {
   const state = getEmitOutputQueue(outputJsonPath);
   state.nextGeneration += 1;

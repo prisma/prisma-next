@@ -57,20 +57,6 @@ function createSourceProvider(load: () => Promise<unknown>): {
   };
 }
 
-async function eventually(assertion: () => void): Promise<void> {
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 20; attempt++) {
-    try {
-      assertion();
-      return;
-    } catch (error) {
-      lastError = error;
-      await Promise.resolve();
-    }
-  }
-  throw lastError;
-}
-
 function createMockContract(): Contract {
   return {
     capabilities: {},
@@ -168,22 +154,41 @@ describe('executeContractEmit', () => {
     };
   }
 
+  /**
+   * Issues two `executeContractEmit` calls back-to-back, deterministically
+   * waiting for each call to reach the mocked `emit()` before issuing the next.
+   * The caller supplies the two `emit()` return values via `firstEntry` /
+   * `secondEntry` deferreds so test ordering does not depend on microtask
+   * scheduling.
+   */
   async function withStartedOverlappingEmits<T>(
     outputJsonPath: string,
+    options: {
+      readonly firstEmit: PromiseLike<EmitResult>;
+      readonly secondEmit: PromiseLike<EmitResult>;
+    },
     run: (emits: {
       readonly first: ReturnType<typeof executeContractEmit>;
       readonly second: ReturnType<typeof executeContractEmit>;
     }) => Promise<T>,
   ): Promise<T> {
+    const firstEntered = Promise.withResolvers<void>();
+    const secondEntered = Promise.withResolvers<void>();
+    mockedEmit
+      .mockImplementationOnce(() => {
+        firstEntered.resolve();
+        return options.firstEmit;
+      })
+      .mockImplementationOnce(() => {
+        secondEntered.resolve();
+        return options.secondEmit;
+      });
+
     return await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
       const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(1);
-      });
+      await firstEntered.promise;
       const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      await eventually(() => {
-        expect(mockedEmit).toHaveBeenCalledTimes(2);
-      });
+      await secondEntered.promise;
       return await run({ first, second });
     });
   }
@@ -276,20 +281,20 @@ describe('executeContractEmit', () => {
     const firstEmit = Promise.withResolvers<EmitResult>();
     const secondEmit = Promise.withResolvers<EmitResult>();
 
-    mockedEmit
-      .mockImplementationOnce(() => firstEmit.promise)
-      .mockImplementationOnce(() => secondEmit.promise);
+    await withStartedOverlappingEmits(
+      outputJsonPath,
+      { firstEmit: firstEmit.promise, secondEmit: secondEmit.promise },
+      async ({ first, second }) => {
+        secondEmit.resolve(createEmitResult('newer'));
+        const secondResult = await second;
 
-    await withStartedOverlappingEmits(outputJsonPath, async ({ first, second }) => {
-      secondEmit.resolve(createEmitResult('newer'));
-      const secondResult = await second;
+        firstEmit.resolve(createEmitResult('older'));
+        const firstResult = await first;
 
-      firstEmit.resolve(createEmitResult('older'));
-      const firstResult = await first;
-
-      expect(secondResult.publication).toBe('written');
-      expect(firstResult.publication).toBe('superseded');
-    });
+        expect(secondResult.publication).toBe('written');
+        expect(firstResult.publication).toBe('superseded');
+      },
+    );
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(JSON.stringify({ generation: 'newer' }));
     expect(await readFile(outputDtsPath, 'utf-8')).toBe("export type Generation = 'newer';\n");
@@ -305,34 +310,42 @@ describe('executeContractEmit', () => {
     await writeFile(outputJsonPath, previousJson, 'utf-8');
     await writeFile(outputDtsPath, previousDts, 'utf-8');
 
-    mockedEmit
-      .mockImplementationOnce(() => firstEmit.promise)
-      .mockResolvedValueOnce(createEmitResult('newer'));
-
+    // Fail the second `.next.tmp` write we observe (the newer generation),
+    // matched on the temp-file naming shape rather than a hardcoded token, so
+    // the test stays valid if `createTempArtifactPath`'s phase slug evolves.
+    const NEXT_TMP_SUFFIX = /\.next\.tmp$/;
+    let nextTmpWriteCount = 0;
     const localFs = await vi.importActual<FsModule>('node:fs/promises');
     mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
       const [path] = args;
-      if (String(path).includes('.2.next.tmp')) {
-        throw new Error('simulated newer generation write failure');
+      if (NEXT_TMP_SUFFIX.test(String(path))) {
+        nextTmpWriteCount += 1;
+        if (nextTmpWriteCount === 2) {
+          throw new Error('simulated newer generation write failure');
+        }
       }
       return localFs.writeFile(...args);
     });
 
-    await withStartedOverlappingEmits(outputJsonPath, async ({ first, second }) => {
-      await expect(second).rejects.toThrow('simulated newer generation write failure');
+    await withStartedOverlappingEmits(
+      outputJsonPath,
+      { firstEmit: firstEmit.promise, secondEmit: Promise.resolve(createEmitResult('newer')) },
+      async ({ first, second }) => {
+        await expect(second).rejects.toThrow('simulated newer generation write failure');
 
-      firstEmit.resolve({
-        ...createEmitResult('older'),
-        contractDts: [
-          "import type { Missing } from '@example/missing-types';",
-          "export type Generation = 'older';",
-          '',
-        ].join('\n'),
-      });
-      const firstResult = await first;
-      expect(firstResult.publication).toBe('superseded');
-      expect(firstResult.validationWarning).toBeUndefined();
-    });
+        firstEmit.resolve({
+          ...createEmitResult('older'),
+          contractDts: [
+            "import type { Missing } from '@example/missing-types';",
+            "export type Generation = 'older';",
+            '',
+          ].join('\n'),
+        });
+        const firstResult = await first;
+        expect(firstResult.publication).toBe('superseded');
+        expect(firstResult.validationWarning).toBeUndefined();
+      },
+    );
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
     expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
