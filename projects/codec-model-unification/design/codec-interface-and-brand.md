@@ -44,9 +44,21 @@ The no-emit `FieldOutputType<Definition>` is rewritten to follow `typeRef` throu
 
 This satisfies [AC-1](../spec.md#ac-1-brand-mechanism-works-at-the-type-level), [AC-2](../spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly), [AC-5](../spec.md#ac-5-base-codec-is-clean), and [AC-6](../spec.md#ac-6-initparams-instancemeta-signature-is-locked).
 
+### Driving cases
+
+The interface decisions below are checked against three concrete cases from [spec.md § Cases that pin the design](../spec.md#cases-that-pin-the-design):
+
+- [**Case V — Vector**](../spec.md#case-v--vector-literal-typed-numeric-param) (literal-typed numeric param). Pins the brand HKT, `paramsSchema` validation, and the symmetry between `renderOutputType` and `Brand`. Worked code: [authoring-ergonomics.md#case-v](authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param).
+- [**Case J — JSON-with-schema**](../spec.md#case-j--json-with-schema) (output type derived from a schema *value*). Pins `paramsSchema: StandardSchemaV1<…>` and the brand's ability to project a type out of one of its inputs. Worked code: [authoring-ergonomics.md#case-j](authoring-ergonomics.md#case-j--json-with-schema).
+- [**Case C — CipherStash column-scoped encryption**](../spec.md#case-c--cipherstash-column-scoped-encryption). Pins the `init(params, instance)` signature and the `storage.types`-instance keying. Worked code: [runtime-contract-and-compatibility.md#case-c](runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption).
+
+Each subsection below indicates which case(s) it answers to.
+
 ---
 
 ## Brand mechanism
+
+*Driving cases:* V, J. Case V needs literal numeric inference (`{ length: 1536 }` → `Vector<1536>`); Case J needs the brand to project a type *out of* one of its inputs (`{ schema: S }` → `InferOutput<S>`). Both demand the same primitive: a type-level function from `Params` to output. The HKT idiom below covers both.
 
 The brand is a type-level function from `Params` to the codec's output type, defined next to the codec:
 
@@ -159,6 +171,8 @@ Enforces:
 
 ## Init signature
 
+*Driving case:* C. CipherStash's encryption codec needs to know which `(table, column)` pairs it serves so it can derive a column-scoped key once per `storage.types` instance. The current `init?(params)` signature can't express that. Authors of simpler codecs (precompiled regex, params-derived constants) also benefit from a stable hook even though they don't need column context. See [runtime-contract-and-compatibility.md#case-c](runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption) for the worked authoring code.
+
 The optional `init` hook accepts `(params, instance)`:
 
 ```typescript
@@ -182,6 +196,8 @@ The runtime side (calling `init` once per `storage.types` instance, routing disp
 ---
 
 ## Rewriting the no-emit `FieldOutputType`
+
+*Driving cases:* V, J, C. All three need the no-emit path to resolve the column's TS type through the brand: V pins literal preservation, J pins schema-derived inference, C pins resolution through `typeRef` to a shared `storage.types` instance.
 
 ### Today's implementation
 

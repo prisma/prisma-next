@@ -50,17 +50,58 @@ The same shape change also lets us declare a stable `init(params, instanceMeta)`
 | **`typeRef`** | Existing column property pointing at a `storage.types` entry by name (alternative to inline `typeParams`). |
 | **`init`** | Optional codec hook that runs once per `storage.types` instance to derive per-instance state from params and `(table, column)` context. Signature locked here; runtime dispatch is [TML-2330](https://linear.app/prisma-company/issue/TML-2330). |
 
+## Cases that pin the design
+
+These are the concrete codecs the design must support end-to-end. They are the test the design has to pass; together they constrain the moving parts. Each design decision in [How it works](#how-it-works) is justified against at least one of these cases, and each design doc traces back to them.
+
+### Case V — Vector (literal-typed numeric param)
+
+Worked code: [authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param](design/authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param).
+
+A user writes `vector({ length: 1536 })`. The column's TS type resolves to `Vector<1536>` (not `number[]`) in both the emit path and the no-emit path. The codec author writes `pgVectorCodec` once: one `paramsSchema`, one `renderOutputType`, one `Brand`. No per-codec column factory. Same shape pins `char(N)`, `numeric(p, s)`, `timestamp(N)`.
+
+What this case pins:
+
+- The brand is a type-level function from `Params` to output type. Literal numeric inference must flow through.
+- `columnFor(codec)({…})` preserves literals.
+- Emit and no-emit paths agree on the resolved type.
+
+### Case J — JSON-with-schema
+
+Output type derived from a schema *value* (not a literal). Worked code: [authoring-ergonomics.md#case-j--json-with-schema](design/authoring-ergonomics.md#case-j--json-with-schema).
+
+A user writes `columnFor(jsonCodec)({ schema: ProductSettings })` where `ProductSettings` is an Arktype / Zod / Valibot schema. The column's TS type resolves to the schema's `InferOutput`. The same schema validates wire payloads at runtime. We do not ship a JSON-Schema → TS converter.
+
+What this case pins:
+
+- `paramsSchema: StandardSchemaV1<…>` — any Standard-Schema-compliant library acts as a param.
+- The brand HKT must be able to project a type *out of* one of its inputs (`infer S extends StandardSchemaV1` then `InferOutput<S>`), not just transform a literal.
+- `jsonCodec` must be a `ParameterizedCodec` like any other; nothing JSON-specific in the framework.
+
+### Case C — CipherStash column-scoped encryption
+
+`init` must carry column context. Worked code: [runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption](design/runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption).
+
+A CipherStash codec encrypts column values with a key derived from `(table, column)` plus contract-level config. Authoring it requires `init(params, instance)` where `instance` exposes the columns served by the codec. **Runtime dispatch through the per-instance helper is deferred to [TML-2330](https://linear.app/prisma-company/issue/TML-2330)**; this project locks the signature so CipherStash can author against a stable surface today. A subcase, `encryptedJson<T>(schema)`, composes Case J with this one (encrypted column whose plaintext type is the schema's `InferOutput`).
+
+What this case pins:
+
+- `init`'s second argument shape: `{ name, usedAt: ReadonlyArray<{ table, column }> }`.
+- `storage.types` instance keying — columns sharing a `typeRef` share the helper that `init` returns.
+- Anonymous instances for inline `typeParams` — single-column ergonomics still work.
+- The brand mechanism applies even when the codec output type is the *plaintext* type (encryption invisible at the type level). The compound `encryptedJson<T>` case proves the brand and `init` compose.
+
 ## How it works
 
-The design has six moving parts. Each is summarized here; details live in the design docs.
+The design has six moving parts. Each is summarized here; details live in the design docs. Driving cases are marked.
 
-### 1. The codec interface splits in two
+### 1. The codec interface splits in two — driving cases: V, J, C
 
 `Codec` keeps the pure encode/decode/traits surface. A new `ParameterizedCodec` extends it with the parameterization-related fields, all required: `paramsSchema`, `renderOutputType`, `Brand`, and an optional `init`. A `parameterizedCodec({…})` factory enforces the requirements at the type level.
 
 → Detail and rejected alternatives in [design/codec-interface-and-brand.md](design/codec-interface-and-brand.md).
 
-### 2. Each parameterized codec carries a co-located type-level brand
+### 2. Each parameterized codec carries a co-located type-level brand — driving cases: V, J
 
 A `CodecBrand` is a TypeScript "type-level function" using the `this['Input']` HKT idiom. Each parameterized codec defines one next to its implementation:
 
@@ -75,13 +116,13 @@ interface VectorBrand extends CodecBrand<{ length: number }> {
 
 → Detail in [design/codec-interface-and-brand.md#brand-mechanism](design/codec-interface-and-brand.md#brand-mechanism).
 
-### 3. The no-emit `FieldOutputType` rewrites against the brand
+### 3. The no-emit `FieldOutputType` rewrites against the brand — driving cases: V, J, C
 
 `FieldOutputType` in [packages/2-sql/2-authoring/contract-ts/src/contract-types.ts](../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts) follows `typeRef` through `storage.types`, then consults `Apply<codec.Brand, column.typeParams>` when the codec is parameterized. Falls back to the codec's base output otherwise. Nullability is preserved.
 
 → Detail in [design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype](design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype).
 
-### 4. `columnFor(codec)` replaces per-codec column factories
+### 4. `columnFor(codec)` replaces per-codec column factories — driving cases: V, J
 
 A single, type-discriminated helper:
 
@@ -94,13 +135,13 @@ Validates inline params against the codec's `paramsSchema` at runtime. Pack auth
 
 → Detail in [design/authoring-ergonomics.md#the-columnfor-helper](design/authoring-ergonomics.md#the-columnfor-helper).
 
-### 5. `jsonCodec(schema)` types JSON columns from the user's schema
+### 5. `jsonCodec(schema)` types JSON columns from the user's schema — driving case: J (and the J-subcase of C)
 
 A `ParameterizedCodec` whose `Brand` projects `StandardSchemaV1.InferOutput<S>` as the output type. Pack authors get correct inference for JSON columns without us writing a JSON-Schema-to-TS converter — the user's schema library (Arktype, Zod, Valibot, …) does it via Standard Schema.
 
 → Detail in [design/authoring-ergonomics.md#jsoncodec-helper](design/authoring-ergonomics.md#jsoncodec-helper).
 
-### 6. The `init(params, instanceMeta)` signature is declared, not implemented
+### 6. The `init(params, instanceMeta)` signature is declared, not implemented — driving case: C
 
 ```typescript
 readonly init?: (
@@ -117,13 +158,15 @@ We ship the signature, the documentation, and the `storage.types`-instance keyin
 
 Branched from `origin/worktree/op-registry-ts` ([PR #374](https://github.com/prisma/prisma-next/pull/374)). #374 introduces codec-typed expressions whose type-level reads of `CodecTypes` are the same seam this project's brand plugs into. Once #374 merges to `main`, rebase to `origin/main`. Rebase strategy in [design/runtime-contract-and-compatibility.md#rebase-strategy](design/runtime-contract-and-compatibility.md#rebase-strategy).
 
-## Requirements satisfied
+## Outcomes
 
-- **TML-2229** — no-emit path resolves `vector(1536)` to `Vector<1536>` and JSON-with-schema to the schema's inferred type.
-- **ADR 186 follow-up** — closes the deferred no-emit fix; emit-path output is unchanged.
-- **CipherStash G1 forward-compat** — `init(params, instanceMeta)` signature shape stable; encryption codecs author against it today.
-- **CipherStash G16 forward-compat** — `jsonCodec(schema)` pattern is reusable for `encryptedJson`.
-- **Pack-author DX** — one helper (`columnFor`) replaces per-codec factories; one place to plug in (`paramsSchema`, `renderOutputType`, `Brand`) for parameterized codecs.
+The cases above are the concrete shape of what we're shipping. In framing terms:
+
+- **TML-2229** is closed by Cases V and J working in the no-emit path.
+- **[ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md) follow-up** is the same Cases-V-and-J no-emit fix; emit-path output is unchanged.
+- **CipherStash G1 forward-compat** is Case C: their codec authors against `init(params, instanceMeta)` today, even though the runtime side ships in [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+- **CipherStash G16 forward-compat** is Case J: `encryptedJson<T>` reuses the `jsonCodec(schema)` pattern.
+- **Pack-author DX** is the consequence of how Cases V and J are authored — one factory (`parameterizedCodec`), one column helper (`columnFor`), no per-codec boilerplate.
 
 Out-of-scope items (CipherStash G4, G6, G9, G10, G2/G3) are listed under [Non-goals](#non-goals) and discussed in [design/runtime-contract-and-compatibility.md#explicit-out-of-scope-extension-points](design/runtime-contract-and-compatibility.md#explicit-out-of-scope-extension-points).
 

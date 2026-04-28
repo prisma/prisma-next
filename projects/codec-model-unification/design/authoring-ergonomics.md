@@ -2,7 +2,7 @@
 
 **Audience:** pack authors and reviewers concerned with the API surface this project ships. Companion to [codec-interface-and-brand.md](codec-interface-and-brand.md), which covers the underlying mechanism.
 
-**What this doc covers:** the `columnFor` helper, the `jsonCodec` helper, the `storage.types`/`typeRef` model with worked examples, and the pack-author guidance that ships at close-out.
+**What this doc covers:** the `columnFor` helper, the `jsonCodec` helper, and the `storage.types`/`typeRef` model. The bulk of the doc is two end-to-end **case studies** ([Case V — Vector](#case-v--vector-literal-typed-numeric-param), [Case J — JSON-with-schema](#case-j--json-with-schema)) drawn from [spec.md § Cases that pin the design](../spec.md#cases-that-pin-the-design); the third case (CipherStash, [Case C](runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption)) lives in the runtime-contract doc because it's primarily about the runtime side.
 
 ---
 
@@ -25,7 +25,7 @@ columnFor(jsonCodec)({ schema: ProductSettings }) // → ColumnTypeDescriptor wi
 
 `storage.types` (named instances) and `typeRef` (column-level reference) become the authoring affordance for cross-column sharing. Unchanged at the IR level; surfaced more visibly in pack-author docs.
 
-This satisfies [AC-3](../spec.md#ac-3-columnfor-and-jsoncodec-ship-the-documented-surface) and underwrites [AC-2](../spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly) (JSON column case) and [AC-4](../spec.md#ac-4-existing-parameterized-codecs-migrated) (per-codec migrations are one-line).
+This satisfies [AC-3](../spec.md#ac-3-columnfor-and-jsoncodec-ship-the-documented-surface) and underwrites [AC-2](../spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly) (JSON column case) and [AC-4](../spec.md#ac-4-existing-parameterized-codecs-migrated) (per-codec migrations are one-line). Driving cases: [V](../spec.md#case-v--vector-literal-typed-numeric-param), [J](../spec.md#case-j--json-with-schema).
 
 ---
 
@@ -199,7 +199,9 @@ Forcing one over the other would be opinionated to no clear benefit.
 
 ---
 
-## Worked example: pgvector
+## Case V — Vector (literal-typed numeric param)
+
+The minimum viable parameterized codec: numeric param, literal-preserved, output is a brand of the literal. Same shape as `char(N)`, `numeric(p, s)`, `timestamp(N)`. From [spec.md § Case V](../spec.md#case-v--vector-literal-typed-numeric-param).
 
 ### Before
 
@@ -267,9 +269,16 @@ const Document = {
 
 `Document.embedding` resolves to `Vector<1536>` in both the emit path (via `renderOutputType`) and the no-emit path (via `Apply<VectorBrand, { length: 1536 }>`). Migration is a single replace at the user's call site.
 
+### What this case pins
+
+- The brand mechanism must propagate literal numeric types from `params` to output (`{ length: 1536 }` → `Vector<1536>`). This is what fails today in the no-emit path.
+- `columnFor(codec)({...})` must preserve literals through TS inference. Forces `<Params extends P>` quantification on the returned function.
+- `paramsSchema` (Standard Schema) must validate `params` at runtime — distinct from the type-level brand application.
+- Emit and no-emit paths must agree on the resolved type. `renderOutputType` (string for `contract.d.ts`) and `Brand` (type-level function) are siblings on `ParameterizedCodec` so they can't drift.
+
 ---
 
-## Worked example: hypothetical `char(N)` codec
+## Case V (variant) — `char(N)`, `numeric(p, s)`, and friends
 
 A pack author adds Postgres `char(N)` support.
 
@@ -302,11 +311,15 @@ const User = {
 };
 ```
 
-The pack ships ~25 lines and gets correct emit-path *and* no-emit-path types, runtime validation of `params`, and the `columnFor` ergonomic for free.
+The pack ships ~25 lines and gets correct emit-path *and* no-emit-path types, runtime validation of `params`, and the `columnFor` ergonomic for free. `numeric(precision, scale)` and `timestamp(precision)` follow the same shape with multi-key params.
+
+This variant pins the same constraints as Case V plus: the per-pack burden must collapse to ~25 lines so adding a parameterized codec doesn't read as a framework extension.
 
 ---
 
-## Worked example: JSON column with Arktype schema
+## Case J — JSON-with-schema
+
+The output type is derived from a *value* (the user's schema), not from a literal. This case is what makes `paramsSchema: StandardSchemaV1<…>` non-negotiable and forces the brand mechanism to support projecting types out of inputs. From [spec.md § Case J](../spec.md#case-j--json-with-schema).
 
 ```typescript
 import { type } from 'arktype';
@@ -333,6 +346,13 @@ The same schema:
 - Validates wire payloads at runtime.
 - Types the column at the no-emit type level.
 - Drives the emitted `contract.d.ts` at the emit path (the `renderOutputType` for `jsonCodec` calls into the schema's TS-source serialization, if any).
+
+### What this case pins
+
+- `paramsSchema: StandardSchemaV1<…>` — a JSON schema lives next to the codec author as a *value* and must compose with whatever schema library the user picks. `Type<…>` (arktype-only) doesn't generalize; Standard Schema does.
+- The brand HKT must `infer` types out of `Input` and apply schema-library type utilities (`StandardSchemaV1.InferOutput<S>`). Pure literal-narrowing isn't enough.
+- `jsonCodec` is a `ParameterizedCodec` like any other — no JSON-specific surface in the framework. This means the same pattern composes for **encrypted JSON** (Case C subcase): `encryptedJson<T>(schema)` reuses this brand idiom with a different `init`.
+- We must not write a JSON-Schema → TS converter. Composition with the user's schema library replaces it.
 
 ---
 

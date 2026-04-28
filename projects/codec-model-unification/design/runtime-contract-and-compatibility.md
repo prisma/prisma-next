@@ -2,7 +2,7 @@
 
 **Audience:** future implementers (especially of [TML-2330](https://linear.app/prisma-company/issue/TML-2330)) and reviewers concerned with how this project fits with downstream extension work. Companion to [codec-interface-and-brand.md](codec-interface-and-brand.md) and [authoring-ergonomics.md](authoring-ergonomics.md).
 
-**What this doc covers:** the per-instance materialization contract we declare without implementing, how the design fits the CipherStash extension work, the explicit out-of-scope extension points, and the rebase strategy off [PR #374](https://github.com/prisma/prisma-next/pull/374).
+**What this doc covers:** the per-instance materialization contract we declare without implementing, the [Case C — CipherStash column-scoped encryption](#case-c--cipherstash-column-scoped-encryption) study that drives the contract's shape, the explicit out-of-scope extension points, and the rebase strategy off [PR #374](https://github.com/prisma/prisma-next/pull/374).
 
 ---
 
@@ -21,7 +21,7 @@ We ship the signature, the keying convention (`storage.types` instance), the doc
 
 We also **resolve open question 1** in the spec: inline-`typeParams` columns produce **anonymous instances** with deterministic names (one entry in `usedAt`). Sharing requires explicit opt-in via `storage.types`.
 
-This satisfies [AC-6](../spec.md#ac-6-initparams-instancemeta-signature-is-locked) and underwrites the forward-compatibility claims in [Requirements satisfied](../spec.md#requirements-satisfied) (CipherStash G1, G16).
+This satisfies [AC-6](../spec.md#ac-6-initparams-instancemeta-signature-is-locked). It is the design response to [Case C](../spec.md#case-c--cipherstash-column-scoped-encryption); see [the case study below](#case-c--cipherstash-column-scoped-encryption) for what an authoring extension looks like today and what it depends on from [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
 
 ---
 
@@ -83,35 +83,100 @@ name = `<anon:${table}.${column}>`;
 
 ---
 
-## CipherStash compatibility
+## Case C — CipherStash column-scoped encryption
 
-[assets/cipherstash-ext-framework-gaps.md](../assets/cipherstash-ext-framework-gaps.md) lists 16 framework gaps that held back a CipherStash extension. Three intersect this project; the rest are referenced in [Explicit out-of-scope extension points](#explicit-out-of-scope-extension-points).
+This is the case that pins the `init(params, instanceMeta)` signature. The CipherStash extension wants to author an encryption codec whose ciphertext is keyed by `(table, column)` plus contract-level config. The framework today doesn't give the codec column context anywhere, so the only place that fits is `init`. This case ties together CipherStash gaps **G1** (column metadata) and **G16** (`encryptedJson<T>` schema-typed) from [assets/cipherstash-ext-framework-gaps.md](../assets/cipherstash-ext-framework-gaps.md). From [spec.md § Case C](../spec.md#case-c--cipherstash-column-scoped-encryption).
 
-### G1 — Codecs receive no per-call column metadata
+### What the codec author writes today (signature complete, runtime deferred)
 
-**CipherStash's need:** an encryption codec needs to know which `(table, column)` it's serving so it can derive a column-scoped encryption key. Today the codec sees only `(value)` on encode and `(wire)` on decode.
+```typescript
+// 1. Parameter shape: which key id, which mode, which schema (compound case).
+const cipherTextParams = type({
+  keyId:   'string',
+  mode:    "'deterministic' | 'randomized'",
+});
 
-**Our overlap:** the `init(params, instanceMeta)` signature is exactly the right shape. A CipherStash codec's `init` derives a key from `params` (the schema parameters) and `instance.usedAt` (the bound columns); the helper returned by `init` closes over the key. Subsequent `encode`/`decode` calls go through the helper, which carries the column context.
+// 2. Brand: ciphertext is opaque at the wire, but the column's *plaintext* type
+//    is what users see. Encryption is invisible at the type level.
+interface CipherTextBrand extends CodecBrand<typeof cipherTextParams.infer> {
+  readonly Input:  typeof cipherTextParams.infer;
+  readonly Output: string;  // plaintext
+}
 
-**What this project ships:** the signature, the keying convention, the documentation, the brand mechanism so CipherStash's parameterized columns also resolve correctly in the no-emit path.
+// 3. The codec.
+export const cipherStashTextCodec = parameterizedCodec({
+  id: 'cipherstash/text@1',
+  targetTypes: ['eql_v2_encrypted'],
+  traits: ['equality'],   // mode === 'deterministic' allows equality
+  paramsSchema: cipherTextParams,
+  renderOutputType: () => 'string',
+  Brand: undefined as unknown as CipherTextBrand,
 
-**What [TML-2330](https://linear.app/prisma-company/issue/TML-2330) ships:** the runtime context-builder rewiring that calls `init` per instance and routes dispatch through the helper.
+  // 4. init is the *whole point* of Case C.
+  init: (params, instance) => {
+    // Derive a column-scoped key once, here. instance.usedAt enumerates the
+    // (table, column) pairs that share this storage.types entry.
+    const key = deriveColumnKey({
+      keyId:   params.keyId,
+      mode:    params.mode,
+      columns: instance.usedAt,        // ← the load-bearing piece
+      // …contract-level config…
+    });
 
-### G16 — `JsonValue` constraint for `encryptedJson<T>` is unconstrained
+    return {
+      encrypt: (value: string) => seal(value, key),
+      decrypt: (wire: string)  => open(wire, key),
+    };
+  },
 
-**CipherStash's need:** a way to author a JSON-encrypting column whose `T` is constrained to a user-supplied schema-derivable shape, with that shape flowing through to the column type.
+  // 5. encode/decode today: the runtime *doesn't* yet route through init's
+  //    return value — that's TML-2330. Authors that want to ship before then
+  //    fall back to a degenerate mode (e.g. failing if init was needed but the
+  //    runtime didn't call it) or wait for TML-2330.
+  encode: (value: string) => /* will use the helper post-TML-2330 */ value,
+  decode: (wire:  string) => /* will use the helper post-TML-2330 */ wire,
+});
 
-**Our overlap:** `jsonCodec(schema)` does this for the unencrypted case. CipherStash's `encryptedJson` follows the same pattern: a `ParameterizedCodec` whose `Brand` projects `StandardSchemaV1.InferOutput<S>` as the output type. They get no-emit-path-correct typing for free.
+// 6. Authoring at the column.
+export const cipherStashText = columnFor(cipherStashTextCodec);
 
-**What this project ships:** `jsonCodec` and the `StandardSchemaV1`-based brand pattern; CipherStash adopts the pattern in their pack.
+// 7. User schema (shared key across both columns via storage.types).
+const contract = {
+  storage: {
+    types: {
+      EmailCipher: cipherStashText({ keyId: 'email-key', mode: 'deterministic' }),
+    },
+    tables: {
+      User:    { columns: { email: { typeRef: 'EmailCipher' } } },
+      Invite:  { columns: { email: { typeRef: 'EmailCipher' } } },
+    },
+  },
+} as const;
+```
 
-**What's CipherStash-side:** their codec adds the encryption layer; the schema-inference layer is ours.
+`User.email` and `Invite.email` share an `init` call: when the runtime side lands, `init` runs once for `EmailCipher` with `instance.usedAt = [{ table: 'User', column: 'email' }, { table: 'Invite', column: 'email' }]`.
 
-### G6 — `preferParam` codec trait
+The compound subcase **`encryptedJson<T>(schema)`** combines this case with [Case J](authoring-ergonomics.md#case-j--json-with-schema): the brand projects `StandardSchemaV1.InferOutput<S>` as the plaintext type, while `init` derives a column-scoped key. CipherStash gets a JSON-typed encrypted column without the framework knowing anything about JSON or encryption.
 
-**CipherStash's need:** a codec trait signaling the planner to lift literals to query parameters (encrypted literals must be parameterized).
+### What this case pins
 
-**Our overlap:** orthogonal — `preferParam` is a new codec slot, not a parameterization shape. The interface split makes adding it cleaner: it goes on base `Codec` (since both parameterized and non-parameterized codecs may want it). Out of scope here; flagged as a clean follow-up.
+- `init`'s second arg is `(params, instance: { name, usedAt })`. Without `usedAt`, key derivation can't bind to columns.
+- Keying by `storage.types` instance: shared keys for shared types (`typeRef`), distinct keys for distinct types. Anonymous instances for inline params keep one-off ergonomics.
+- The brand mechanism applies even when the codec output type is the *plaintext* type — encryption invisible at the type level.
+- The signature must be locked **before** the runtime side ships, so CipherStash and other extension authors don't have to migrate when the runtime catches up.
+
+### What this project ships vs. defers
+
+| Surface | This project | Deferred to [TML-2330](https://linear.app/prisma-company/issue/TML-2330) |
+|---|---|---|
+| `init(params, instance)` signature | ✓ locked | — |
+| `instance.name`, `instance.usedAt` semantics | ✓ documented | — |
+| `storage.types`-instance keying | ✓ documented | — |
+| Brand resolution for `cipherStashTextCodec`-typed columns | ✓ no-emit path correct | — |
+| Runtime calling `init` once per instance | — | ✓ |
+| Encode/decode routed through `init`'s helper | — | ✓ |
+| Helper lifecycle (caching, async construction, errors) | — | ✓ |
+| `preferParam` planner hint (CipherStash G6) | — | follow-up |
 
 ---
 
@@ -124,7 +189,7 @@ The following CipherStash gaps describe additions to the codec interface or surr
 | **G4** | `bulkEncode` for network-backed codecs (one network round-trip per `Promise.all` wave). | New slot on `ParameterizedCodec` (or base `Codec`). The interface split makes it straightforward to add later. |
 | **G10** | `AbortSignal` plumbed into `encode`/`decode`. | Touches the runtime more than the interface. The brand mechanism doesn't depend on encode/decode shape, so this addition is clean. |
 | **G9** | Trait-gated wire redaction (omit wire payload from error envelopes for codecs carrying `redactWire`). | Trait-only addition; tracked as [TML-2329](https://linear.app/prisma-company/issue/TML-2329). |
-| **G6** | `preferParam` planner hint. | See [CipherStash compatibility](#cipherstash-compatibility). |
+| **G6** | `preferParam` planner hint (codec signals the planner to lift literals to query parameters; encrypted literals must be parameterized). | New slot orthogonal to parameterization — goes on base `Codec` since both kinds of codec may want it. The interface split makes adding it later clean. |
 | **G2, G3** | Migration-planner inputs (`(table, column)` plumbing on the migration plane). | Same architectural pattern as G1, different plane. Addressed when the migration planner gets its own pass. |
 | **G11–G15** | Publishing, type-level testing, bundle composition. | Outside the codec interface entirely. |
 
