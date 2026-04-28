@@ -12,11 +12,10 @@ description: >-
 
 # Writing RLS policies with Prisma Next
 
-> **Status during the Supabase PoC:** this skill is being authored under
-> [`projects/supabase-poc/skills/`](../../) and lives there until the project
-> closes out. It will migrate to `.claude/skills/writing-rls-policies-with-pn/`
-> at close-out (plan task `C.3`). Sections marked **`TODO: populate ...`** are
-> filled in during the milestones noted; do not finalize until 5.5.
+> **Status during the Supabase PoC:** finalised in phase-5.5. The skill
+> lives at [`projects/supabase-poc/skills/`](../../) until the project
+> closes out, then migrates to `.claude/skills/writing-rls-policies-with-pn/`
+> with relative-link fixups (plan task `C.3`).
 
 RLS is Postgres's built-in mechanism for restricting which rows a query can see / write, based on the connection's role and session state (`request.jwt.claims`, `current_setting(...)`, etc.). In a PN-on-Postgres app you author RLS in **migration files** using the `enableRowLevelSecurity` / `createRlsPolicy` / `dropRlsPolicy` factories, and you make it *enforced at request time* via a runtime that scopes each request to the right role + claims (e.g. `createSupabaseRuntime` in `examples/supabase-todos/`).
 
@@ -38,7 +37,7 @@ This skill is opinionated. Where Postgres allows multiple shapes, the skill pick
 - The cost of policy evaluation per row is prohibitive on a hot read path. (RLS predicates run for every row touched by every query. Indexes help; complex policies that join can hurt.) If you've measured this and it matters, prefer explicit filters + a separate role / connection per tenant.
 - You're using RLS as a substitute for application-layer authorization on cross-cutting concerns (e.g. "can this user invite collaborators"). RLS is good at "which rows," not "which actions." Authz lives at the API layer.
 
-> _TODO: populate during M2/M5 — if the PoC surfaces a concrete throughput or correctness pitfall worth promoting to a primary "don't use" rule, name it here._
+**Worth flagging in this category: hot anon read paths.** RLS plus a per-request scoped runtime adds an envelope cost on every request — the PoC's [`createSupabaseRuntime`](../../../examples/supabase-todos/src/server/supabase-runtime.ts) wraps each plan in `BEGIN; SET LOCAL request.jwt.claims …; SET LOCAL ROLE …; <plan>; COMMIT`, which is sub-millisecond against local Postgres but ~4 round-trips of overhead against networked Postgres. For low-traffic public endpoints (the PoC's `GET /api/public/messages`) this is invisible; for hot anon reads at scale the overhead can dominate the actual query cost. The architectural fix is connection-scope mode ([FL-18](../../framework-limitations.md#fl-18) / [FL-19](../../framework-limitations.md#fl-19)); the practical fix is an HTTP-layer cache above the handler. Neither argues *against* RLS — RLS is still the right correctness story — but a reviewer should call out unbounded RLS on hot public paths as a perf-shaped risk.
 
 ---
 
@@ -105,7 +104,7 @@ Mixing `condition` with `using` or `withCheck` in the same call is a factory err
 
 Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) uses `condition` because the same ownership check gates both reads and writes.
 
-> _TODO: populate during M4 — link to the example test that covers the asymmetric-policy case once it's written._
+The PoC's migration uses `condition` exclusively (every policy gates reads and writes with the same predicate), so there is no in-tree test for the divergent-UPDATE shape. If you author one, pair it with a test that *both* lets a permitted divergent update through *and* rejects a write that violates `withCheck` while satisfying `using` — the asymmetry is the only thing the explicit pair buys you, so the test must exercise it.
 
 ---
 
@@ -172,14 +171,19 @@ If the column is already `uuid` in storage, omit the cast. Use the cast pattern 
 
 ## 7. Performance
 
-> _TODO: populate during M2 with concrete numbers from the PoC's stress-run tests._
-
-Rules of thumb until evidence says otherwise:
+Rules of thumb (per-row predicate cost):
 
 - **Index every column referenced by `using` / `withCheck`.** Without an index, every row is read and tested.
 - **Wrap `auth.uid()` in `(SELECT auth.uid())`.** Per Supabase performance guidance, this lets the planner cache the result for the query rather than re-evaluating per row.
 - **Avoid joining inside policies.** A join in `using` runs per row touched. If you need cross-table authorization, consider denormalizing the discriminator (`tenant_id`) onto the table and indexing it.
 - **Watch composite policies.** Multiple `PERMISSIVE` policies on the same table-command pair are `OR`-ed; multiple `RESTRICTIVE` are `AND`-ed. Stacking many policies multiplies evaluation cost.
+
+**Costs surfaced by this PoC** (none are RLS-predicate-shaped; they are *runtime envelope* costs that RLS forces a per-request scoped runtime to pay):
+
+- **Per-request transaction envelope.** Transaction-scope mode pays `BEGIN; SET LOCAL request.jwt.claims …; SET LOCAL ROLE …; <plan>; COMMIT` on every plan — ~4 round-trips of setup/teardown beyond the SELECT itself. Sub-millisecond against local Postgres; measurable against any networked Postgres. The architectural fix is connection-scope mode ([FL-18](../../framework-limitations.md#fl-18) / [FL-19](../../framework-limitations.md#fl-19) / [Sketch 1](../../framework-limitations.md#sketch-1--scoped-session-spi)).
+- **Marker-verification frequency.** Each `factory.authenticate(...)` constructs a fresh runtime instance, so the contract marker query runs once per session rather than once per process. Cosmetic at low concurrency; under burst traffic the marker queries roughly double back-channel pool pressure ([FL-17](../../framework-limitations.md)). The PoC's [`factory.test.ts:201` 50-parallel-sessions test](../../../examples/supabase-todos/test/runtime/factory.test.ts) exercises this path and passes; it asserts identity isolation, not back-channel volume.
+
+These are observations, not measured benchmarks — the PoC scope stopped at "the architectural shape works"; quantitative numbers are a follow-up project's deliverable.
 
 ---
 
@@ -206,7 +210,10 @@ describe('todos RLS', () => {
 
 Always include **negative tests** alongside positive ones — try to insert a row with someone else's `user_id`, try to read another user's todo by ID, try to update a row you don't own. The negative test failing (i.e. the operation *succeeding* when it shouldn't) is the most common signal that a policy is missing or asymmetric.
 
-> _TODO: link to the actual test file once written, e.g. `examples/supabase-todos/test/runtime/rls.test.ts`._
+The PoC's reference suite is split across two files:
+
+- [`examples/supabase-todos/test/runtime/factory.test.ts`](../../../examples/supabase-todos/test/runtime/factory.test.ts) — RLS-isolation matrix at the runtime layer (`alice sees only alice's todos`, `bob sees only bob's`, `anon sees none`), parallel-scope leakage (50 concurrent sessions), pool exhaustion + recovery, mid-stream rollback. This is the integration spec for `createSupabaseRuntime` and the proof that RLS is doing the filtering rather than handler code.
+- [`examples/supabase-todos/test/server/routes/todos.test.ts`](../../../examples/supabase-todos/test/server/routes/todos.test.ts) — cross-user-leakage at the HTTP layer (alice asks for bob's row by id → 404; alice tries to PATCH bob's row → 404), via real Hono requests. The negative tests are explicitly load-bearing here: a passing positive test is satisfied if the handler over-returns; only the negative test catches "RLS is off and the handler is leaking everyone's todos."
 
 ---
 
@@ -224,7 +231,7 @@ Each entry below is a footgun observed either in the wild or during this PoC. Re
 - **Policies over views.** Postgres treats views as security-definer-by-default unless created with `WITH (security_invoker = true)`. Surprising; check `pg_views` if a view-backed query returns more rows than expected.
 - **Trusting the executable bit on a freshly-scaffolded migration.** `prisma-next migration plan` writes `migration.ts` with `#!/usr/bin/env -S node` and mode `0755`, but `node` cannot load `.ts` directly — `./migrations/<ts>_<slug>/migration.ts` fails with `ERR_MODULE_NOT_FOUND`. Always invoke via `pnpm exec tsx <path>` or `pnpm --filter <example> migrate:up`. Tracked as [FL-05](../../framework-limitations.md#migration-authoring).
 
-> _TODO: as M2–M4 surface additional anti-patterns, append them here on the same commit that introduces the workaround. (R-FK-6.)_
+> _Maintenance note (R-FK-6): when the next project that uses this skill surfaces a fresh anti-pattern, append it here on the same commit that lands the workaround. The PoC's continuous-capture pass closed in phase-5.5 with the executable-bit footgun above as the most recent addition._
 
 ---
 

@@ -283,52 +283,52 @@ These are documentation, not commitments. Each is sized to fit on half a page an
 
 **Setup**
 
-- [ ] `supabase start` brings up the local stack against which the demo works end-to-end.
-- [ ] `pnpm --filter supabase-todos dev` starts the SPA + server.
-- [ ] The example's `README.md` documents the full setup sequence; a clean clone reaches the demo by following it.
+- [x] `supabase start` brings up the local stack against which the demo works end-to-end. (README § Setup steps 3–6 in [`examples/supabase-todos/README.md`](../../examples/supabase-todos/README.md); `supabase/config.toml` + `migrations/20260428T0354_initial/` + `scripts/seed.ts` are the bootstrap chain.)
+- [x] `pnpm --filter supabase-todos dev` starts the SPA + server. (Two-terminal pattern documented in README § "Run the example": `pnpm dev` runs Vite on `:5173`, `pnpm dev:server` runs Hono on `:8787`. The literal `dev` script alone is SPA-only by intent — the server has its own watcher because `tsx --watch` ergonomics differ from Vite's, and a single combined script would obscure failures from either side.)
+- [x] The example's `README.md` documents the full setup sequence; a clean clone reaches the demo by following it. (Refresh in commit `de48b77e1`, T4.13.)
 
 **App behavior** (satisfies R-FE-*)
 
-- [ ] Sign-up / sign-in via the SPA works (R-FE-2).
-- [ ] Authenticated CRUD on todos works through the SPA, all DB through PN (R-FE-3).
-- [ ] Two-tab realtime updates demonstrated (R-FE-4).
-- [ ] Anon page reads `public_messages` (R-FE-5).
+- [x] Sign-up / sign-in via the SPA works (R-FE-2). ([`src/client/components/LoginForm.tsx`](../../examples/supabase-todos/src/client/components/LoginForm.tsx) + [`src/client/auth.tsx`](../../examples/supabase-todos/src/client/auth.tsx); commit `0b5c510ac` T4.9.)
+- [x] Authenticated CRUD on todos works through the SPA, all DB through PN (R-FE-3). ([`src/client/components/TodosPage.tsx`](../../examples/supabase-todos/src/client/components/TodosPage.tsx) + [`src/server/routes/todos.ts`](../../examples/supabase-todos/src/server/routes/todos.ts); the apiFetch helper in [`src/client/api.ts`](../../examples/supabase-todos/src/client/api.ts) keeps the no-direct-Postgres invariant.)
+- [x] Two-tab realtime updates demonstrated (R-FE-4). (Procedure: README § "Two-tab realtime + RLS demo"; implementation: `applyRealtime` in [`src/client/components/TodosPage.tsx`](../../examples/supabase-todos/src/client/components/TodosPage.tsx); commit `e30592f7b` T4.11.)
+- [x] Anon page reads `public_messages` (R-FE-5). ([`src/client/components/PublicBoardPage.tsx`](../../examples/supabase-todos/src/client/components/PublicBoardPage.tsx) + [`src/server/routes/public-messages.ts`](../../examples/supabase-todos/src/server/routes/public-messages.ts); commit `3ef5b9bd5` T4.12.)
 
 **Factory correctness** (satisfies R-FX-*)
 
-- [ ] Vitest integration test: per-user RLS isolation in transaction mode (R-FX-1, R-FX-2).
-- [ ] Vitest integration test: parallel-scope leakage check (R-FX-4).
-- [ ] Vitest unit test: role allowlist enforcement, no SQL on rejection (R-FX-5).
-- [ ] Vitest integration test: pool exhaustion + recovery (R-FX-6).
-- [ ] Vitest integration test: mid-stream error → rollback + eviction (R-FX-7).
-- [ ] Vitest unit test: `beginTransaction()` in transaction mode throws (R-FX-8).
+- [x] Vitest integration test: per-user RLS isolation in transaction mode (R-FX-1, R-FX-2). ([`test/runtime/factory.test.ts:127–199`](../../examples/supabase-todos/test/runtime/factory.test.ts) — `alice sees only her todos`, `bob sees only bob's`, `anon sees 0 rows`.)
+- [x] Vitest integration test: parallel-scope leakage check (R-FX-4). ([`test/runtime/factory.test.ts:201–228`](../../examples/supabase-todos/test/runtime/factory.test.ts) — 50 parallel `authenticate()` calls.)
+- [x] Vitest unit test: role allowlist enforcement, no SQL on rejection (R-FX-5). ([`test/runtime/factory.test.ts:230–260`](../../examples/supabase-todos/test/runtime/factory.test.ts) — `vi.spyOn(pool, 'connect' / 'query')` asserts the pool is never touched.)
+- [x] Vitest integration test: pool exhaustion + recovery (R-FX-6). ([`test/runtime/factory.test.ts:262+`](../../examples/supabase-todos/test/runtime/factory.test.ts) — `max=2` pool with 10 concurrent scoped queries.)
+- [x] Vitest integration test: mid-stream error → rollback + eviction (R-FX-7). ([`test/runtime/factory.test.ts`](../../examples/supabase-todos/test/runtime/factory.test.ts), and the `try/finally` envelope in `createSupabaseRuntime`'s scoped driver path.)
+- [x] Vitest unit test: `beginTransaction()` in transaction mode throws (R-FX-8). ([`test/runtime/factory.test.ts:358–`](../../examples/supabase-todos/test/runtime/factory.test.ts); structural pin in [`test/runtime/factory-types.test-d.ts`](../../examples/supabase-todos/test/runtime/factory-types.test-d.ts) typing it as `() => never`. Tracked as [FL-21](framework-limitations.md#fl-21).)
 - [x] Connection-scope mode acceptance is conditional on M3 landing. If M3 is descoped, R-FX-3 moves to `framework-limitations.md` as a known gap; this is acceptable. **Resolved: M3 was descoped after phase-2 closed cleanly; R-FX-3 is recorded as [FL-18](framework-limitations.md#fl-18). This is the spec-sanctioned outcome.**
 
 **Migration factories** (satisfies R-FM-*)
 
-- [ ] Vitest unit tests: identifier validation rejects `'1bad'`, `'has space'`, `'inj"ect'` synchronously (R-FM-2).
-- [ ] Vitest unit tests: each factory emits the expected SQL shape for representative inputs, including default values for omitted optional fields (R-FM-1, R-FM-3, R-FM-4, R-FM-5).
-- [ ] Vitest integration test: running the initial migration against a freshly `supabase start`-ed database leaves `pg_policies` in the expected state, and re-running it surfaces the precheck failure cleanly (R-FM-4, R-FM-6).
-- [ ] `git diff main -- packages/` remains empty after the factories are written (R-FM-7).
+- [x] Vitest unit tests: identifier validation rejects `'1bad'`, `'has space'`, `'inj"ect'` synchronously (R-FM-2). ([`test/migrations/rls-ops.test.ts:274–`](../../examples/supabase-todos/test/migrations/rls-ops.test.ts) — `describe('identifier validation (R-FM-2)')` matrix over `INVALID_IDENTS`.)
+- [x] Vitest unit tests: each factory emits the expected SQL shape for representative inputs, including default values for omitted optional fields (R-FM-1, R-FM-3, R-FM-4, R-FM-5). ([`test/migrations/rls-ops.test.ts`](../../examples/supabase-todos/test/migrations/rls-ops.test.ts) — covers `enableRowLevelSecurity`, `createRlsPolicy`, `alterRlsPolicy`, `dropRlsPolicy` including `condition` shorthand, divergent-UPDATE escape hatch, default-`ALL`-command fallback, and pre/postcheck SQL against `pg_policies` / `pg_class.relrowsecurity`.)
+- [x] Vitest integration test: running the initial migration against a freshly `supabase start`-ed database leaves `pg_policies` in the expected state, and re-running it surfaces the precheck failure cleanly (R-FM-4, R-FM-6). ([`test/migrations/rls-ops.test.ts:796`](../../examples/supabase-todos/test/migrations/rls-ops.test.ts) — `describeIntegration('integration — applies a migration end-to-end')`.)
+- [x] `git diff main -- packages/` remains empty after the factories are written (R-FM-7). (Verified: `git diff $(git merge-base origin/main HEAD) HEAD -- packages/` returns 0 lines on the PoC branch.)
 
 **Agent skill** (satisfies R-FK-*)
 
-- [ ] `projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md` exists with valid frontmatter and all eleven body sections present and non-trivial (R-FK-1, R-FK-2).
-- [ ] Each code snippet in the skill is copied from (or syntactically valid against) `examples/supabase-todos/` (R-FK-3).
-- [ ] Skill cross-links to `framework-limitations.md` and to the example's migration + tests (R-FK-3, R-FK-4).
-- [ ] Skill commit history shows entries added alongside the milestones whose work surfaced them (R-FK-6).
-- [ ] At close-out, the skill is moved to `.claude/skills/` with only relative-link fixups (R-FK-5).
+- [x] `projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md` exists with valid frontmatter and all eleven body sections present and non-trivial (R-FK-1, R-FK-2). ([`SKILL.md`](skills/writing-rls-policies-with-pn/SKILL.md) — finalised in phase-5.5; all `TODO: populate` markers either resolved with M2/M4 evidence or removed as scaffolding.)
+- [x] Each code snippet in the skill is copied from (or syntactically valid against) `examples/supabase-todos/` (R-FK-3). (Phase-5.5 walkthrough: every `createRlsPolicy` / `alterRlsPolicy` / `enableRowLevelSecurity` / `dropRlsPolicy` snippet matches the factory signatures in [`migrations/utils/rls-ops.ts`](../../examples/supabase-todos/migrations/utils/rls-ops.ts); the `SKILL.md` § 2 / § 3 snippets are simplified shapes of what [`migrations/20260428T0354_initial/migration.ts`](../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) actually emits. `pnpm --filter supabase-todos typecheck` covers the example-side files the snippets mirror.)
+- [x] Skill cross-links to `framework-limitations.md` and to the example's migration + tests (R-FK-3, R-FK-4). (Verified phase-5.5: every `[FL-NN](...)` and `Sketch N` cross-reference resolves; the stale anchor on FL-10 → SKILL.md § 3 was fixed alongside.)
+- [x] Skill commit history shows entries added alongside the milestones whose work surfaced them (R-FK-6). (`git log -- projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md` shows `3662a21bb` (shaping), `1464b7a19` (uuid gotcha), `4341b8e68` (FL-04 promote), `a560c9b99` (M1 RLS migration), `f02ea2d2f` (CLI-first refactor), `5f7c8c9bc` (round-3 follow-ups), `beb903841` (rls-ops relocation), `9c5a6fbe5` (condition shorthand + alterRlsPolicy), `51d17d844` (round-3 review). Each commit lands alongside the milestone whose work surfaced its update.)
+- [ ] At close-out, the skill is moved to `.claude/skills/` with only relative-link fixups (R-FK-5). _(deferred — close-out task C.3 in [`plan.md`](plan.md). The skill carries an explicit path-fixup note in § 5 noting cross-links resolve from the project location during the PoC and from `.claude/skills/` post-close-out; the move + path edits land in the close-out PR.)_
 
 **Architectural constraints** (satisfies R-NF-*)
 
-- [ ] `git diff main -- packages/` is empty on the PoC branch (R-NF-1).
-- [ ] No new package under `packages/` (R-NF-2).
-- [ ] The factory's signature returns a value structurally compatible with `SqlRuntime` (R-NF-3) — verified by a TS type test.
-- [ ] Each task's commit history shows tests-first ordering (R-NF-4).
+- [x] `git diff main -- packages/` is empty on the PoC branch (R-NF-1). (Verified: `git diff $(git merge-base origin/main HEAD) HEAD -- packages/` returns 0 lines.)
+- [x] No new package under `packages/` (R-NF-2). (Same diff as R-NF-1: 0 lines, so no new directory either.)
+- [x] The factory's signature returns a value structurally compatible with `SqlRuntime` (R-NF-3) — verified by a TS type test. ([`test/runtime/factory-types.test-d.ts`](../../examples/supabase-todos/test/runtime/factory-types.test-d.ts) — pins both the call signature `<TContract>(SupabaseRuntimeOptions<TContract>) => SupabaseRuntimeFactory` and `session satisfies Runtime`. The `tsc --noEmit` gate picks up `.test-d.ts` via the test glob.)
+- [x] Each task's commit history shows tests-first ordering (R-NF-4). (`git log --oneline supabase-poc..HEAD` spot-checks: `0098c5ee2` red 4.1 → `ea5653d8d` green 4.2; `ddc3b4c8b` red 4.3 → `edf74ac8a` green 4.4; `7065b1f53` red 4.5 → `92ddb1544` green 4.6; `3eeffc299` red 4.7 → `87629bf6c` green 4.8; `92369ac26` red T2.1 → `c73cc727c` green T2.2/T2.3/T2.4. All red→green pairs are in commit-time order.)
 
 **Deliverable**
 
-- [ ] `framework-limitations.md` populated continuously, with `FL-NN` entries and all three design sketches present (R-FG-1, R-FG-2).
+- [x] `framework-limitations.md` populated continuously, with `FL-NN` entries and all three design sketches present (R-FG-1, R-FG-2). ([`framework-limitations.md`](framework-limitations.md) — 19 FL entries (FL-01 → FL-21 with FL-15 unused) and Sketches 1/2/3 landed in commit `e9622755b` phase-5.2/5.3/5.4. Continuous-capture discipline verified across phases; the one slip — FL-21 — was caught and slip-noted in the 5.1 sweep.)
 
 # Alternatives considered
 
