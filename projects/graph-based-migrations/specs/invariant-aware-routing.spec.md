@@ -221,9 +221,28 @@ No compat shim. This spec already commits to a breaking `edgeId` change (see F2 
 
 Consistent with the rest of the spec's upgrade story: we're prerelease/internal; we haven't had real users; adding compat machinery for a scenario we've asked consumers not to be in is solving a problem nobody has.
 
-**Mongo family.** No DDL concept. `readMarker` reads `doc.invariants ?? []`; `updateMarker` unions with `$set: { invariants: newUnion }`. Existing marker documents without the field transparently read as empty — not a compat shim, just natural schema-less behaviour. No migration needed.
+**Mongo family.** No DDL concept. `readMarker` reads `doc.invariants ?? []`; `updateMarker` merges incoming via an aggregation pipeline (`$setUnion + $sortArray`) — see §"Concurrency: server-side merge for invariants" below. Existing marker documents without the field transparently read as empty — not a compat shim, just natural schema-less behaviour. No migration needed.
 
 **What this does not handle.** If a user somehow ends up with a *newer* CLI reading a marker row whose column exists but whose data is malformed (non-array, unknown type), the Arktype validator at the storage boundary throws. That's correct — data corruption is not something we silently paper over.
+
+## Concurrency: server-side merge for invariants
+
+Marker writes for `invariants` happen server-side, atomically, via the storage engine's set-union primitives. The runner does not compute the union client-side and does not do CAS-on-invariants or a retry loop — the storage primitive is atomic enough.
+
+- **Postgres**: the runner's `UPDATE` uses a self-referential expression
+  `invariants = array(select distinct unnest(invariants || $N::text[]) order by 1)`.
+  Reads the current column under the row lock, unions with the incoming array, dedupes, and sorts ascending. Single statement.
+- **Mongo**: the runner's `findOneAndUpdate` uses an aggregation pipeline:
+  `[{ $set: { invariants: { $sortArray: { input: { $setUnion: [{ $ifNull: ['$invariants', []] }, incoming] }, sortBy: 1 } } } }]`.
+  Single document operation, atomic at the document level.
+
+This eliminates the read-then-write race that a client-side union would otherwise expose: two concurrent runners performing invariant-only updates against the same marker (e.g. multiple app instances running migrations on startup) would each base their union on the same stale read; the second writer's `$set` would clobber the first's accumulated invariants and silently lose data. With server-side merge, that window doesn't exist.
+
+**API consequence.** The runner-facing storage API (`buildWriteMarkerStatements` for Postgres, `updateMarker` for Mongo) accepts incoming invariants and merges server-side. `invariants: []` is therefore a no-op (nothing to merge) rather than a clobber. The "preserve" semantic for sign callers (`writeContractMarker` in `sql-runtime`, `updateMarker` with omitted `invariants` in target-mongo) is unchanged: omitting the field leaves the column / doc field untouched.
+
+**Why not CAS-with-version or CAS-on-invariants.** Both alternatives were considered. A version column adds schema and threading cost on both families. CAS using the invariants array as the token works without a schema change but pushes a retry loop into the runner and must still distinguish "hash drifted" from "invariants drifted" on each retry. Server-side merge needs neither; the storage write is unconditional and idempotent given an already-deduped existing set, and the existing `storageHash` CAS still catches genuine hash drift.
+
+**Sign-side stays "set" semantics.** The sign-side writer (`writeContractMarker` in `sql-runtime`) doesn't accumulate invariants, so it doesn't need merge. Its `invariants?` field is "preserve when omitted; set when explicit" — sign callers in family-sql/family-mongo always omit, so the field stays untouched on sign. If a future caller (recovery tooling, admin CLI) needs to set the invariants field to a specific value, that's an explicit operation; see Deferred.
 
 # Prerequisites
 
@@ -289,7 +308,7 @@ Because `migration.json` is part of the `edgeId` hash, tampering with `providedI
 
 **F9. No behaviour change when no invariants are required.** Every existing caller that does not thread invariants sees the same routing outcome, the same exit code, and no new pre-existing output rows. "Behaviour" here means routing outcome + exit code + existing output structure, not bit-for-bit CLI text. New pathfinder is a functional superset of the old one.
 
-**F10. Marker table stores the applied-invariants set.** `prisma_contract.marker` gains an `invariants text[] not null default '{}'` column (SQL) / field (Mongo, schemaless). The column sits in the `CREATE TABLE IF NOT EXISTS` DDL from the start (no compat shim — see §Schema evolution). The column is populated by union: on every successful `migration apply`, the runner sets `marker.invariants := existingMarker.invariants ∪ manifest.providedInvariants`, atomic with the marker hash update inside the existing `upsertMarker` transaction. `db update` and other marker-only flows pass `invariants: []` — the union is a no-op, the existing set is preserved.
+**F10. Marker table stores the applied-invariants set.** `prisma_contract.marker` gains an `invariants text[] not null default '{}'` column (SQL) / field (Mongo, schemaless). The column sits in the `CREATE TABLE IF NOT EXISTS` DDL from the start (no compat shim — see §Schema evolution). The column is populated by server-side merge: on every successful `migration apply`, the storage write atomically unions `manifest.providedInvariants` into the existing column value (Postgres: self-referential SQL expression in the UPDATE; Mongo: aggregation pipeline `$setUnion + $sortArray`). See §"Concurrency: server-side merge for invariants" for the design rationale. `db update` and other marker-only flows pass `invariants: []` — the merge is a no-op, the existing set is preserved.
 
 **F11. `ContractMarkerRecord.invariants` is always present.** The framework-level `ContractMarkerRecord` type (in `@prisma-next/contract/types`) gains `invariants: readonly string[]`, never undefined. Both families' `readMarker` implementations populate it:
 - **family-sql** projects the column into the returned record. The Arktype row schema asserts `invariants: string[]` exactly — required, non-nullable, no default fallback. The column lives in the `CREATE TABLE IF NOT EXISTS` DDL with `not null default '{}'`, so a row without it (or with `null`) signals storage corruption and fails parser validation. Consumers coming from an older internal release re-apply against a fresh database per the F2 upgrade story.
@@ -297,16 +316,9 @@ Because `migration.json` is part of the `edgeId` hash, tampering with `providedI
 
 No new SPI method. `ControlClient.readMarker()` is already wired through both families; CLI consumers receive `invariants` alongside the existing fields.
 
-**F12. Runner unions `options.invariants` into the marker on apply.** `SqlMigrationRunnerExecuteOptions` gains `invariants?: readonly string[]` (default `[]`). On apply, the runner:
+**F12. Runner threads `options.invariants` into the marker write; storage merges server-side.** `SqlMigrationRunnerExecuteOptions` gains `invariants?: readonly string[]` (default `[]`). The runner sorts + dedupes the incoming set (so the INSERT path writes a stable initial value) and passes it through to `buildWriteMarkerStatements` (Postgres) or `updateMarker` (Mongo). The storage layer merges the incoming set into the existing column / field server-side, atomically. INSERT writes the literal incoming value (there's nothing to merge with on a fresh marker); UPDATE uses a self-referential SQL expression (Postgres) or aggregation pipeline (Mongo) — see §"Concurrency: server-side merge for invariants" for the exact shape and rationale. The marker write and the rest of the apply (operations, ledger append) commit together inside the existing transaction (Postgres) or share document-level atomicity (Mongo).
 
-1. Reads `existingMarker.invariants` (already read for origin validation).
-2. Computes `newInvariants = existingMarker.invariants ∪ options.invariants` (set union, stable-sorted for deterministic on-disk ordering).
-3. Passes `newInvariants` to `buildWriteMarkerStatements` as a new field on `WriteMarkerInput`.
-4. The marker write and the rest of the apply (operations, ledger append) all commit together.
-
-The Mongo runner does the equivalent: `readMarker` → union → `updateMarker({ …, invariants: newInvariants })`. Same atomicity guarantees the marker update already provides.
-
-Callers supply `options.invariants`: the CLI reads `manifest.providedInvariants` from the migration being applied and passes it through. For `db update` / marker-only flows the caller omits the option (defaults to `[]`, union is a no-op).
+Callers supply `options.invariants`: the CLI reads `manifest.providedInvariants` from the migration being applied and passes it through. For `db update` / marker-only flows the caller omits the option (defaults to `[]`, the merge is a no-op).
 
 **F13. Effective required set subtracts applied invariants.** In the CLI (apply + status), before calling the pathfinder, call `family.readMarker()`, compute `appliedInvariants = marker.invariants ?? []`, and set `effectiveRequired = ref.invariants − appliedInvariants`. Pass `effectiveRequired` to `findPathWithInvariants`. Consequence: re-applying a ref whose invariants include an invariant already in `marker.invariants` routes as if that invariant were not required — no spurious `NO_INVARIANT_PATH`, monotonicity honoured.
 
@@ -546,6 +558,7 @@ Parked explicitly — not blocking, revisit once the routing layer is in and we 
 - **`UNKNOWN_INVARIANT` pre-check at `ref set` time.** F15 handles apply-time + status-time checks; a `ref set`-time pre-check would catch typos earlier but requires `ref set` to read the graph (it doesn't today). Revisit if apply-time diagnostics turn out to fire too often.
 - **Dagre graph rendering (`--graph`).** Tree view only for v1.
 - **Draft edges and invariant routing asymmetry.** Drafts are excluded from the routing graph (`reconstructGraph` only accepts attested bundles) but *are* rendered in `migration status` via a separate `draftEdges` channel. A user could author a draft with `dataTransform({ name: 'X' })`, see it in the status view, and be confused when routing still reports `X` as missing. The routing behaviour is correct (drafts aren't runnable), but the UX mismatch is worth a follow-up: either visually distinguish draft-provided invariants in the rendered tree, or surface the "attest your draft to enable routing" hint in the `NO_INVARIANT_PATH` error text.
+- **Explicit `resetMarkerInvariants` operation.** The runner-facing storage API merges server-side and never clobbers; `invariants: []` is a no-op merge, not a reset. Recovery tooling or admin paths that need to set `marker.invariants` to a specific value (e.g. clear after corruption, snapshot to a known set) would call a dedicated operation that bypasses the merge. Not added until a use case materializes; until then, manual SQL / `mongosh` is the escape hatch.
 - **CLI surface for editing `ref.invariants`.** Edit JSON manually for now.
   - Possible approach: `prisma-next ref sync <ref-name> <migration>` to sync ref to hash and implied invariant state based on migration path from ref's current hash to the provided migration's destination hash.
 - **User-facing vocabulary (`invariant` → ?).** *Follow-up; rename choice pending.* "Invariant" is jargon that leaks into public surfaces: the `invariantId` field on the authoring API, four error codes (`NO_INVARIANT_PATH`, `INVALID_INVARIANT_ID`, `DUPLICATE_INVARIANT_IN_EDGE`, `UNKNOWN_INVARIANT`), CLI copy ("required / applied / missing invariants"), and `ref.invariants` on disk. End users are unlikely to intuit what an "invariant" means in this context. v1 ships with "invariant" consistently — it's already wired through the codebase and renaming mid-spec would churn every surface — but the term is not defended. Candidate alternatives: **guarantee** (closest user-facing read, but overloaded by transactional / SLA usage elsewhere), **requirement** (accurate, generic to the point of being non-specific), **data-migration requirement** (explicit, verbose), **routing key** (implementation-leaning, hides intent from authors). Decision deferred until we have end-user feedback from v1. Whatever we land on gets swept across: authoring API (`invariantId` → `<new>Id`), error codes (public wire contract — requires a deprecation plan), CLI output, docs, this spec, and `ref.invariants`.

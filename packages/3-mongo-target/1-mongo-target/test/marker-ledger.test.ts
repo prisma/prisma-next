@@ -125,7 +125,7 @@ describe('updateMarker', () => {
     expect(marker?.storageHash).toBe('sha256:v1');
   });
 
-  it('writes the caller-supplied invariants to the doc', async () => {
+  it('merges caller-supplied invariants into the existing field server-side', async () => {
     await initMarker(db, {
       storageHash: 'sha256:v1',
       profileHash: 'sha256:p1',
@@ -135,12 +135,29 @@ describe('updateMarker', () => {
     const updated = await updateMarker(db, 'sha256:v1', {
       storageHash: 'sha256:v2',
       profileHash: 'sha256:p2',
-      invariants: ['alpha', 'beta'],
+      invariants: ['beta', 'gamma'],
     });
 
     expect(updated).toBe(true);
     const marker = await readMarker(db);
-    expect(marker?.invariants).toEqual(['alpha', 'beta']);
+    expect(marker?.invariants).toEqual(['alpha', 'beta', 'gamma']);
+  });
+
+  it('dedupes and sorts the merged set', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['gamma', 'alpha'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: ['delta', 'alpha', 'beta'],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta', 'delta', 'gamma']);
   });
 
   it('leaves existing invariants untouched when the caller omits the field', async () => {
@@ -157,6 +174,23 @@ describe('updateMarker', () => {
 
     const marker = await readMarker(db);
     expect(marker?.invariants).toEqual(['alpha']);
+  });
+
+  it('treats [] as a no-op merge (does not clobber existing invariants)', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha', 'beta'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: [],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 });
 

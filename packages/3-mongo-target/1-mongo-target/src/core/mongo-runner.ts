@@ -92,13 +92,6 @@ function runnerFailure(
   });
 }
 
-function unionInvariants(
-  existing: readonly string[],
-  incoming: readonly string[],
-): readonly string[] {
-  return Array.from(new Set([...existing, ...incoming])).sort();
-}
-
 export class MongoMigrationRunner {
   constructor(private readonly deps: MongoRunnerDependencies) {}
 
@@ -195,21 +188,24 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
-    const unionedInvariants = unionInvariants(
-      existingMarker?.invariants ?? [],
-      options.invariants ?? [],
+    // Sort + dedupe the incoming set so the initMarker path writes a
+    // stable initial value. updateMarker merges server-side via an
+    // aggregation pipeline (see marker-ledger.ts), so client-side union
+    // is no longer needed.
+    const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
+    const existingInvariantSet = new Set(existingMarker?.invariants ?? []);
+    const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
+      existingInvariantSet.has(id),
     );
+    const markerAlreadyAtDestination =
+      existingMarker !== null &&
+      existingMarker.storageHash === destination.storageHash &&
+      existingMarker.profileHash === profileHash;
 
     // Skip marker/ledger writes (and schema verification) only when the apply
     // is a true no-op: no operations executed, marker already at destination,
-    // and incoming invariants are a subset of the stored set (so the union
-    // wouldn't grow it).
-    if (
-      operationsExecuted === 0 &&
-      existingMarker?.storageHash === destination.storageHash &&
-      existingMarker.profileHash === profileHash &&
-      existingMarker.invariants.length === unionedInvariants.length
-    ) {
+    // and every incoming invariant is already in the stored set.
+    if (operationsExecuted === 0 && markerAlreadyAtDestination && incomingIsSubsetOfExisting) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
     }
 
@@ -232,7 +228,7 @@ export class MongoMigrationRunner {
       const updated = await markerOps.updateMarker(existingMarker.storageHash, {
         storageHash: destination.storageHash,
         profileHash,
-        invariants: unionedInvariants,
+        invariants: incomingInvariants,
       });
       if (!updated) {
         return runnerFailure(
@@ -250,7 +246,7 @@ export class MongoMigrationRunner {
       await markerOps.initMarker({
         storageHash: destination.storageHash,
         profileHash,
-        invariants: unionedInvariants,
+        invariants: incomingInvariants,
       });
     }
 

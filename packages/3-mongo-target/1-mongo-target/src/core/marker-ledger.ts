@@ -24,9 +24,15 @@ async function executeFindOneAndUpdate(
   db: Db,
   cmd: RawFindOneAndUpdateCommand,
 ): Promise<Document | null> {
-  return db
-    .collection(cmd.collection)
-    .findOneAndUpdate(cmd.filter, cmd.update as Record<string, unknown>, { upsert: cmd.upsert });
+  const collection = db.collection(cmd.collection);
+  if (Array.isArray(cmd.update)) {
+    return collection.findOneAndUpdate(cmd.filter, cmd.update as Document[], {
+      upsert: cmd.upsert,
+    });
+  }
+  return collection.findOneAndUpdate(cmd.filter, cmd.update as Record<string, unknown>, {
+    upsert: cmd.upsert,
+  });
 }
 
 export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
@@ -68,6 +74,17 @@ export async function initMarker(
   await executeInsertOne(db, cmd);
 }
 
+/**
+ * Updates the marker doc atomically (CAS on `expectedFrom`).
+ *
+ * `destination.invariants`:
+ * - `undefined` → existing field left untouched. Sign and
+ *   verify-database paths use this; they don't accumulate invariants.
+ * - explicit value → merged into the existing field server-side via an
+ *   aggregation pipeline (`$setUnion + $sortArray`), atomic at the
+ *   document level. `[]` is a no-op merge. See §"Concurrency:
+ *   server-side merge for invariants" in the routing spec.
+ */
 export async function updateMarker(
   db: Db,
   expectedFrom: string,
@@ -77,18 +94,35 @@ export async function updateMarker(
     readonly invariants?: readonly string[];
   },
 ): Promise<boolean> {
-  const set: Record<string, unknown> = {
+  const setBase: Record<string, unknown> = {
     storageHash: destination.storageHash,
     profileHash: destination.profileHash,
     updatedAt: new Date(),
   };
-  if (destination.invariants !== undefined) {
-    set['invariants'] = destination.invariants;
-  }
+  // When invariants is supplied, use an aggregation pipeline so the
+  // merge runs server-side against the doc's current value (atomic, no
+  // read-then-write window). When omitted, a regular update doc keeps
+  // the field untouched.
+  const update: Document | Document[] =
+    destination.invariants === undefined
+      ? { $set: setBase }
+      : [
+          {
+            $set: {
+              ...setBase,
+              invariants: {
+                $sortArray: {
+                  input: { $setUnion: [{ $ifNull: ['$invariants', []] }, destination.invariants] },
+                  sortBy: 1,
+                },
+              },
+            },
+          },
+        ];
   const cmd = new RawFindOneAndUpdateCommand(
     COLLECTION,
     { _id: MARKER_ID, storageHash: expectedFrom },
-    { $set: set },
+    update,
     false,
   );
   const result = await executeFindOneAndUpdate(db, cmd);

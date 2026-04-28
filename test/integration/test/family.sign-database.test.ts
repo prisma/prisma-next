@@ -237,6 +237,54 @@ describe('family instance sign', () => {
       },
       timeouts.spinUpPpgDev,
     );
+
+    it(
+      'preserves existing invariants when re-signing',
+      async () => {
+        if (!connectionString) {
+          throw new Error('Connection string not set');
+        }
+
+        await withClient(connectionString, async (client) => {
+          await client.query(
+            'update prisma_contract.marker set invariants = $1::text[] where id = 1',
+            [['email-verified', 'phone-backfill']],
+          );
+        });
+
+        const contract = createTestContract();
+        const validatedContract = validateContract<Contract<SqlStorage>>(
+          contract,
+          emptyCodecLookup,
+        );
+
+        const driver = await postgresDriver.create(connectionString);
+        try {
+          const familyInstance = sql.create(
+            createControlStack({
+              family: sql,
+              target: postgres,
+              adapter: postgresAdapter,
+              driver: postgresDriver,
+              extensionPacks: [],
+            }),
+          );
+
+          await familyInstance.sign({
+            driver,
+            contract: validatedContract,
+            contractPath: './contract.json',
+          });
+
+          const marker = await readMarker(driver);
+          expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
+          expect(marker?.invariants).toEqual(['email-verified', 'phone-backfill']);
+        } finally {
+          await driver.close();
+        }
+      },
+      timeouts.spinUpPpgDev,
+    );
   });
 
   describe('idempotent behavior', () => {

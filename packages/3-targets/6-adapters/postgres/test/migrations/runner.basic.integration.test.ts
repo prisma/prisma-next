@@ -258,6 +258,21 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         });
         expect(fifthResult.ok).toBe(true);
         expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+        // db-update flow with invariants omitted (the real `db update` caller's
+        // contract): origin=null, no invariants option, existing set preserved.
+        // Distinct from `secondResult`/`fifthResult` — this exercises the
+        // origin=null path with the default-empty option, which is what M4's
+        // `db update` caller will use.
+        const sixthResult = await runner.execute({
+          plan: dbUpdatePlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        expect(sixthResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
       },
     );
   });
