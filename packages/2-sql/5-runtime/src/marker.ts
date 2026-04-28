@@ -9,7 +9,7 @@ export interface ContractMarkerRow {
   updated_at: Date;
   app_tag: string | null;
   meta: unknown | null;
-  invariants: readonly string[] | null;
+  invariants: readonly string[];
 }
 
 const MetaSchema = type({ '[string]': 'unknown' });
@@ -46,7 +46,7 @@ const ContractMarkerRowSchema = type({
   'updated_at?': 'Date | string',
   'app_tag?': 'string | null',
   'meta?': 'unknown | null',
-  'invariants?': type('string').array().or('null'),
+  invariants: type('string').array(),
 });
 
 export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
@@ -70,6 +70,6 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     updatedAt,
     appTag: result.app_tag ?? null,
     meta: parseMeta(result.meta),
-    invariants: result.invariants ?? [],
+    invariants: result.invariants,
   };
 }
