@@ -1,7 +1,7 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import {
-  buildWriteMarkerStatements,
+  buildMergeMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
@@ -116,7 +116,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         await executeStatement(driver!, ensureMarkerTableStatement);
         await executeStatement(driver!, ensureLedgerTableStatement);
 
-        const mismatchedMarker = buildWriteMarkerStatements({
+        const mismatchedMarker = buildMergeMarkerStatements({
           storageHash: 'sha256:other-contract',
           profileHash: 'sha256:other-profile',
           contractJson: { storageHash: 'sha256:other-contract' },

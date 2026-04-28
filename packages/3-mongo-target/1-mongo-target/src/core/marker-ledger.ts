@@ -4,10 +4,49 @@ import {
   RawFindOneAndUpdateCommand,
   RawInsertOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { type } from 'arktype';
 import type { Db, Document, UpdateFilter } from 'mongodb';
 
 const COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
+
+// Mirrors the Postgres `ContractMarkerRowSchema` shape (in
+// `family-sql/verify.ts` / `sql-runtime/marker.ts`) but with camelCase
+// fields and Mongo-native types: `Date` is BSON-hydrated, `meta` is
+// stored as a native object (not JSON-stringified), `_id` and any
+// extension fields are tolerated. `invariants?` is optional so pre-M1
+// docs without the field still parse — absent reads as `[]` per spec
+// §"Schema evolution" (natural schemaless behaviour); present-but-
+// malformed throws ("data corruption is not something we silently
+// paper over").
+const MongoMarkerDocSchema = type({
+  storageHash: 'string',
+  profileHash: 'string',
+  'contractJson?': 'unknown | null',
+  'canonicalVersion?': 'number | null',
+  'updatedAt?': 'Date',
+  'appTag?': 'string | null',
+  'meta?': type({ '[string]': 'unknown' }).or('null'),
+  'invariants?': type('string').array(),
+  '+': 'delete',
+});
+
+function parseMongoMarkerDoc(doc: unknown): ContractMarkerRecord {
+  const result = MongoMarkerDocSchema(doc);
+  if (result instanceof type.errors) {
+    throw new Error(`Invalid marker doc on ${COLLECTION}: ${result.summary}`);
+  }
+  return {
+    storageHash: result.storageHash,
+    profileHash: result.profileHash,
+    contractJson: result.contractJson ?? null,
+    canonicalVersion: result.canonicalVersion ?? null,
+    updatedAt: result.updatedAt ?? new Date(),
+    appTag: result.appTag ?? null,
+    meta: (result.meta as Record<string, unknown> | null) ?? {},
+    invariants: result.invariants ?? [],
+  };
+}
 
 async function executeAggregate(db: Db, cmd: RawAggregateCommand): Promise<Document[]> {
   return db
@@ -41,16 +80,7 @@ export async function readMarker(db: Db): Promise<ContractMarkerRecord | null> {
   const docs = await executeAggregate(db, cmd);
   const doc = docs[0];
   if (!doc) return null;
-  return {
-    storageHash: doc['storageHash'] as string,
-    profileHash: doc['profileHash'] as string,
-    contractJson: (doc['contractJson'] as unknown) ?? null,
-    canonicalVersion: (doc['canonicalVersion'] as number) ?? null,
-    updatedAt: doc['updatedAt'] as Date,
-    appTag: (doc['appTag'] as string) ?? null,
-    meta: (doc['meta'] as Record<string, unknown>) ?? {},
-    invariants: (doc['invariants'] as readonly string[]) ?? [],
-  };
+  return parseMongoMarkerDoc(doc);
 }
 
 export async function initMarker(

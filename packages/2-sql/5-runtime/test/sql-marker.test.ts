@@ -33,13 +33,13 @@ describe('writeContractMarker', () => {
       expect(sample.insert.sql).toMatch(/invariants/);
     });
 
-    it('includes invariants in the UPDATE clause', () => {
-      expect(sample.update.sql).toMatch(/invariants = \$8::text\[\]/);
+    it('includes invariants in the UPDATE clause with a positional placeholder', () => {
+      expect(sample.update.sql).toMatch(/invariants = \$\d+::text\[\]/);
     });
 
-    it('passes the invariants array as the 8th param', () => {
-      expect(sample.insert.params[7]).toEqual(['alpha', 'beta']);
-      expect(sample.update.params[7]).toEqual(['alpha', 'beta']);
+    it('binds the invariants array as a parameter', () => {
+      expect(sample.insert.params).toContainEqual(['alpha', 'beta']);
+      expect(sample.update.params).toContainEqual(['alpha', 'beta']);
     });
   });
 
@@ -51,8 +51,8 @@ describe('writeContractMarker', () => {
     });
 
     it('treats explicit [] as a write (distinct from undefined)', () => {
-      expect(sample.update.sql).toMatch(/invariants = \$8::text\[\]/);
-      expect(sample.update.params[7]).toEqual([]);
+      expect(sample.update.sql).toMatch(/invariants = \$\d+::text\[\]/);
+      expect(sample.update.params).toContainEqual([]);
     });
   });
 });

@@ -38,7 +38,7 @@ export const ensureLedgerTableStatement: SqlStatement = {
   params: [],
 };
 
-export interface WriteMarkerInput {
+export interface MergeMarkerInput {
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -55,7 +55,7 @@ export interface WriteMarkerInput {
   readonly invariants: readonly string[];
 }
 
-export function buildWriteMarkerStatements(input: WriteMarkerInput): {
+export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   readonly insert: SqlStatement;
   readonly update: SqlStatement;
 } {

@@ -56,6 +56,34 @@ describe('readMarker', () => {
     const marker = await readMarker(db);
     expect(marker?.invariants).toEqual([]);
   });
+
+  it('throws when invariants is present but not a string array (storage corruption)', async () => {
+    // Mongo is schemaless, but spec §"Schema evolution" line 226 says:
+    // "data corruption is not something we silently paper over." Mirrors the
+    // Postgres parser's strict stance — absent is fine (schemaless default),
+    // but a present-but-malformed value is a hard error.
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+      invariants: [1, 2, 3], // numbers, not strings
+    });
+
+    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+  });
+
+  it('throws when invariants is present but not an array (storage corruption)', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+      invariants: 'not-an-array',
+    });
+
+    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+  });
 });
 
 describe('initMarker', () => {

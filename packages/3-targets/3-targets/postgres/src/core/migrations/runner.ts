@@ -23,7 +23,7 @@ import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
-  buildWriteMarkerStatements,
+  buildMergeMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
@@ -621,7 +621,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     // initial value. UPDATE merges server-side (see
     // statement-builders.ts), so client-side union is no longer needed.
     const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
-    const writeStatements = buildWriteMarkerStatements({
+    const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??
