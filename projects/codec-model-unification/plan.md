@@ -1,178 +1,305 @@
-# Codec Model Unification — Execution Plan
+# Plan — Codec model unification
 
-## Summary
+This plan delivers the requirements in [spec.md](spec.md). Each milestone has acceptance gates that map back to spec acceptance criteria.
 
-Promote codec parameterization into a first-class `ParameterizedCodec` interface with a co-located type-level brand, a single `columnFor` authoring helper, and standard-schema-driven JSON inference. Rewrite the no-emit `FieldOutputType` once against the brand so parameterized columns (`vector(1536)`, `char(36)`, JSON-shaped scalars) resolve to their precise branded TS types in both the emit and no-emit paths. Resolves [TML-2229](https://linear.app/prisma-company/issue/TML-2229) by addressing its root cause rather than the surface symptom.
+For design rationale and rejected alternatives, see the design docs:
 
-**Spec:** [projects/codec-model-unification/spec.md](spec.md)
+- [design/codec-interface-and-brand.md](design/codec-interface-and-brand.md)
+- [design/authoring-ergonomics.md](design/authoring-ergonomics.md)
+- [design/runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md)
 
-**Linear:** [TML-2229](https://linear.app/prisma-company/issue/TML-2229) — to be re-scoped after spec/plan iteration
+## Milestones at a glance
 
-**Base branch:** `origin/worktree/op-registry-ts` ([PR #374](https://github.com/prisma/prisma-next/pull/374))
+- **M0** Project shaping (this milestone produces the artifacts being read now)
+- **M1** Brand mechanism + `ParameterizedCodec` (no migration, no consumers yet)
+- **M2** No-emit `FieldOutputType` rewrite (against the new brand)
+- **M3** `columnFor` and `jsonCodec` authoring helpers
+- **M4** Migrate existing parameterized codecs (pgvector, postgres-core, mongo)
+- **M5** Cleanup base `Codec` (remove parameterization fields, hard cut)
+- **M6** Documentation finalization + close-out
 
-## Collaborators
+Each milestone is implemented in a focused PR. PRs are reviewable independently except where dependency requires sequencing.
 
-| Role | Person | Context |
-|---|---|---|
-| Maker | Will | Drives execution |
-| Reviewer | _TBD_ | Architectural review of brand mechanism + base `Codec` cleanup |
-| Collaborator | Pack authors | Affected by `columnFor` API and removal of optional fields from `Codec` |
+---
 
-## Sequencing notes
+## M0 — Project shaping
 
-- **Depends on PR #374**: this branch is based on `origin/worktree/op-registry-ts`. Once #374 merges to `main`, rebase to `origin/main`. The plan assumes #374 is the implementation surface for `Expression<T>` and `CodecExpression<…>`; M5 verifies brand-resolved types flow through them.
-- **Hard cut on the base `Codec` cleanup** (M5): no deprecation window. All migrations land first (M3, M4), then the optional fields disappear from base `Codec` in one commit.
-- **JSON-codec helper** (M2 step 2.4) intentionally lands before the brand is wired into pgvector so that the JSON path drives the `Brand['Input']` ergonomics.
+**Goal:** Spec, plan, and design docs in place; baseline measurements captured.
 
-## Milestones
+### M0.1 — Spec & plan
 
-### Milestone 0: Baseline & scaffolding
+- Initial `spec.md` and `plan.md` (committed earlier in this branch).
+- Tightened `spec.md` to point at design docs for rationale (this commit).
 
-Capture before-state metrics so the M5/M6 budgets in [spec §A8](spec.md#a8-build-performance-budget) are measurable, and lock the project to PR #374's branch tip.
+### M0.2 — Design docs
 
-**Tasks:**
+Three design docs under `projects/codec-model-unification/design/`:
 
-- [ ] 0.1 — Record a typecheck baseline for `@prisma-next/sql-relational-core` and `@prisma-next/contract-ts` (3 runs each, median wall time) into `projects/codec-model-unification/assets/typecheck-baseline.md`. Used as the ±20% gate for A8.
-- [ ] 0.2 — Confirm the base branch matches `origin/worktree/op-registry-ts`. Document the rebase contract in `assets/base-branch-notes.md`: when #374 merges to main, this branch rebases to `origin/main` (not to a renamed branch).
+- `codec-interface-and-brand.md` — interface split, brand mechanism, no-emit rewrite, rejected alternatives.
+- `authoring-ergonomics.md` — `columnFor`, `jsonCodec`, `storage.types`/`typeRef`, worked examples, pack-author guidance.
+- `runtime-contract-and-compatibility.md` — declared per-instance materialization contract, CipherStash overlap, explicit out-of-scope extension points, rebase strategy.
 
-### Milestone 1: `ParameterizedCodec` interface, brand mechanism, factory
+### M0.3 — Baseline measurements
 
-The minimal vertical: define the new shape, add a factory, prove the brand mechanism with a synthetic codec. No production codecs migrate yet.
+- Run `pnpm typecheck` for `@prisma-next/sql-relational-core` and `@prisma-next/contract-ts`; record durations in `assets/typecheck-baseline.md`.
+- Note current emit snapshot count to confirm A8 (snapshots byte-identical) is meaningful.
 
-**Validation:** type-level tests for `Apply<Brand, Params>` with a fixture `Brand`, factory typecheck failures when required fields are omitted.
+### M0 acceptance
 
-**Tasks:**
+- [ ] `spec.md` lean (requirements + AC, design pointed at design docs).
+- [ ] Three design docs committed and cross-linked from `spec.md` and `plan.md`.
+- [ ] Baseline timings recorded.
+- [ ] Linear ticket [TML-2229](https://linear.app/prisma-company/issue/TML-2229) updated to point at this project; follow-up tickets ([TML-2329](https://linear.app/prisma-company/issue/TML-2329), [TML-2330](https://linear.app/prisma-company/issue/TML-2330)) created with cross-links.
 
-- [ ] 1.1 — In `@prisma-next/framework-components`, add `CodecBrand` and `Apply<B, P>` (5 LOC). Type-level test fixtures: a `VectorBrand` extending `CodecBrand` with `Output: this['Input'] extends { length: infer N extends number } ? Vector<N> : never`. Test: `Apply<VectorBrand, { length: 1536 }>` ≡ `Vector<1536>`.
-- [ ] 1.2 — In `@prisma-next/framework-components`, add `ParameterizedCodec<Id, Traits, Wire, Js, Params, Helper, Brand>` extending `Codec` with required `paramsSchema`, `renderOutputType`, `Brand`. Optional `init`. Type-level test: `ParameterizedCodec` is assignable to `Codec`.
-- [ ] 1.3 — In `@prisma-next/sql-relational-core/ast`, add `parameterizedCodec({ … })` factory wrapping `codec()`. Validates at the type level that `Brand['Input']` is assignable from `Params`. Negative type tests (`.test-d.ts`) for: missing `Brand`, missing `paramsSchema`, missing `renderOutputType`, brand whose `Input` doesn't match `Params`.
-- [ ] 1.4 — Update `@prisma-next/sql-relational-core/ast`'s `paramsSchema` from `Type<TParams>` (arktype-only) to `StandardSchemaV1<TParams>`. Verify existing arktype callers still typecheck (Arktype implements StandardSchema).
-- [ ] 1.5 — Type-level test: a synthetic `Length3StringBrand` brand applied to `{ n: 3 }` resolves to a length-3 phantom-typed string. Confirms the HKT idiom works for non-vector shapes.
+---
 
-### Milestone 2: `columnFor` helper + JSON-codec helper
+## M1 — Brand mechanism + `ParameterizedCodec`
 
-Author-facing surface lands. Pack authors gain a single helper and a Standard-Schema JSON path. Still no migration of production codecs.
+**Goal:** Add the new types and factory. No migrations, no consumers. PR is small and reviewable in isolation.
 
-**Validation:** runtime tests for `columnFor` validation; type-level tests for `columnFor(parameterizedCodec)(params)` literal preservation; type-level test for a JSON column with an Arktype schema resolving to the schema's type.
+**Spec mapping:** FR1, FR2, FR3 (params schema only), FR8 (`init` signature). Acceptance: A1, A2 (`paramsSchema` shape), A7.
 
-**Tasks:**
+### M1.1 — Add `CodecBrand` and `Apply<B, P>`
 
-- [ ] 2.1 — In `@prisma-next/contract-authoring` (or wherever `ColumnTypeDescriptor` exports live), add `columnFor<C extends Codec | ParameterizedCodec>(codec)`. Discriminate via conditional return type: parameterized → `(params) => ColumnTypeDescriptor & { typeParams: Params }`; non-parameterized → `ColumnTypeDescriptor`.
-- [ ] 2.2 — Runtime test: `columnFor(paramCodec)(validParams)` returns the descriptor with literal `typeParams`. `columnFor(paramCodec)(invalidParams)` throws via `paramsSchema.~standard.validate`.
-- [ ] 2.3 — Type-level test: `columnFor(pgVectorCodec)(...)` constrains `params` to `Brand['Input']`-compatible objects; passing `{ length: 'oops' }` fails to typecheck.
-- [ ] 2.4 — Add `jsonCodec(schema)` helper in framework-components (or sql-relational-core, depending on where the existing `pgJsonCodec` lives). Wraps a `StandardSchemaV1` schema. Brand: `SchemaBrand<S>` with `Output: StandardSchemaV1.InferOutput<S>`. `paramsSchema` accepts `{ schema: <any standard schema> }`.
-- [ ] 2.5 — Type-level test: `columnFor(jsonCodec)({ schema: arktypeSchema })` resolves to `arktypeSchema`'s inferred TS type when consumed by `FieldOutputTypes` (uses a fresh fixture contract).
+In `@prisma-next/framework-components`:
 
-### Milestone 3: No-emit `FieldOutputType` rewrite
+```typescript
+export interface CodecBrand<Params = unknown> {
+  readonly Input: Params;
+  readonly Output: unknown;
+}
 
-The headline fix. Rewrites the no-emit path against the brand. Migrates pgvector to drive the test scenarios end-to-end.
+export type Apply<B extends CodecBrand, P> = (B & { readonly Input: P })['Output'];
+```
 
-**Validation:** comprehensive type-level tests in `contract-types.test-d.ts` covering inline `typeParams`, `typeRef`, JSON schemas, non-parameterized fallback, nullability.
+Co-locate with the existing `Codec` interface. Add type tests under the package's test surface verifying `Apply` is a type-level function.
 
-**Tasks:**
+### M1.2 — Add `ParameterizedCodec`
 
-- [ ] 3.1 — Migrate `pgVectorCodec` to `parameterizedCodec({ … })` with co-located `VectorBrand`. Replace `vector(N)` factory in `packages/3-extensions/pgvector/src/exports/column-types.ts` with `columnFor(pgVectorCodec)`. Existing pgvector tests must still pass.
-- [ ] 3.2 — Rewrite `FieldOutputType` in `packages/2-sql/2-authoring/contract-ts/src/contract-types.ts` per [spec FR5](spec.md#fr5-no-emit-fieldoutputtype-rewrite). Add `CodecsForDefinition<Definition>` lookup that pulls codec instances (not just `CodecTypes`) from the contract's target + extension packs.
-- [ ] 3.3 — Type-level test in `contract-ts/test`: a fixture contract with a `vector(1536)` column resolves the field type to `Vector<1536>` (was `number[]`).
-- [ ] 3.4 — Type-level test: a fixture contract with `storage.types: { Embedding1536: vector(1536) }` and a column with `typeRef: 'Embedding1536'` also resolves to `Vector<1536>`.
-- [ ] 3.5 — Type-level test: a JSON column declared via `columnFor(jsonCodec)({ schema: arktypeSchema })` resolves to the schema's inferred type.
-- [ ] 3.6 — Type-level test: nullability — `vector(1536)` nullable column resolves to `Vector<1536> | null`.
-- [ ] 3.7 — Type-level test: a non-parameterized column (`text`, `int4`) still resolves to the base codec output type (regression guard).
-- [ ] 3.8 — Type-level test in `@prisma-next/sql-relational-core/test`: `ComputeColumnJsType` returns the brand-resolved type for the same fixture columns (delegates to `ExtractFieldOutputTypes` so the fix flows transparently).
+```typescript
+export interface ParameterizedCodec<
+  Id extends string = string,
+  TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
+  TWire = unknown,
+  TJs = unknown,
+  TParams = Record<string, unknown>,
+  TBrand extends CodecBrand<TParams> = CodecBrand<TParams>,
+  THelper = unknown,
+> extends Codec<Id, TTraits, TWire, TJs> {
+  readonly paramsSchema: StandardSchemaV1<TParams>;
+  readonly renderOutputType: (params: TParams) => string;
+  readonly Brand: TBrand;
+  readonly init?: (
+    params: TParams,
+    instance: {
+      readonly name: string;
+      readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
+    },
+  ) => THelper;
+}
+```
 
-### Milestone 4: Migrate remaining parameterized codecs
+`paramsSchema` typed as `StandardSchemaV1<TParams>` (FR3 type-side; arktype-only validation behavior remains until M1.3).
 
-Convert the rest. Largest scope by file count, but mechanical once M3 lands.
+### M1.3 — `parameterizedCodec({…})` factory
 
-**Validation:** every migrated codec has a co-located `Brand`, an updated `columnFor` export, and existing tests pass.
+The factory enforces the required fields at the type level. The single justified `as unknown as TBrand` cast lives here (or in the codec body; see open question 3 in spec).
 
-**Tasks:**
+### M1.4 — Wire `paramsSchema` validation
 
-- [ ] 4.1 — Migrate postgres core codecs (per `rg -l "renderOutputType" packages/3-targets/`): `pgNumericCodec`, `pgTimestampCodec`, `pgJsonCodec`, `pgJsonbCodec`, and any `pgCharCodec`. One brand per codec. One `columnFor(...)` export per codec.
-- [ ] 4.2 — Migrate mongo codecs (per `rg -l "renderOutputType" packages/2-mongo-family/ packages/3-mongo-target/`): convert to `parameterizedCodec({ … })` with co-located brands. Update mongo column factories analogously.
-- [ ] 4.3 — Migrate sqlite/paradedb codecs if they declare `renderOutputType?` (check via `rg -l "renderOutputType" packages/3-targets/ packages/3-extensions/`).
-- [ ] 4.4 — Update `packages/3-extensions/pgvector/test/codec-render-output-type.test.ts` and `packages/3-targets/6-adapters/postgres/test/codec-render-output-type.test.ts` to call `renderOutputType` through the parameterized type (no behavioural change expected; assertion shapes may tighten).
-- [ ] 4.5 — `pnpm test:packages` passes across the workspace.
-- [ ] 4.6 — `pnpm lint:deps` passes.
+Validation entry points (`columnFor` in M3, contract canonicalization where it already runs against `paramsSchema`) accept `StandardSchemaV1`. No behavior change beyond the type widening.
 
-### Milestone 5: Base `Codec` cleanup + Expression integration
+### M1 acceptance
 
-Hard cut: remove the optional parameterization fields from base `Codec`. Verify PR #374's `Expression<T>` / `CodecExpression<…>` consume brand-resolved types.
+- [ ] A1 (interface and `Apply` type tests pass).
+- [ ] A7 (`init` signature shape).
+- [ ] `pnpm typecheck` passes; `pnpm lint:deps` passes.
+- [ ] No production callers yet — types exist alongside the existing optional fields on base `Codec`.
 
-**Validation:** workspace-wide typecheck, no `@ts-expect-error` regressions, expression-level type tests show brand-resolved types.
+---
 
-**Tasks:**
+## M2 — No-emit `FieldOutputType` rewrite
 
-- [ ] 5.1 — Remove `paramsSchema?`, `init?`, `renderOutputType?` from `packages/1-framework/1-core/framework-components/src/codec-types.ts`'s base `Codec` interface. Remove the same fields from `@prisma-next/sql-relational-core/ast`'s `Codec` extension where they were only for parameterized codecs.
-- [ ] 5.2 — Update the SQL `codec()` factory: drop `paramsSchema`, `init`, `renderOutputType` from its config type. Pack authors using `codec()` for parameterized codecs get a clear compile error pointing at `parameterizedCodec()`.
-- [ ] 5.3 — Verify `pnpm typecheck` passes across the workspace. Fix any callers that still consult `codec.renderOutputType` without narrowing to `ParameterizedCodec` (registry consumers — emitters and the runtime context builder).
-- [ ] 5.4 — Type-level test: a `CodecExpression<'pg/vector@1', false, CT>` over a `vector(1536)` column carries `Vector<1536>` as its `returnType`'s inferred output (consumes [PR #374](https://github.com/prisma/prisma-next/pull/374)'s plumbing).
-- [ ] 5.5 — Re-record typecheck timings for `@prisma-next/sql-relational-core` and `@prisma-next/contract-ts`. Compare against M0's baseline; confirm within ±20%.
+**Goal:** Rewrite the type-level resolver against the new brand. Unblocked by M1 even though no codec implements `Brand` yet (a synthetic test fixture proves the wiring).
 
-### Milestone 6: Documentation, ADR, close-out
+**Spec mapping:** FR5. Acceptance: A4.
 
-Pack-author-visible docs land, ADR finalizes the architectural decision, project artifacts migrate to `docs/`.
+### M2.1 — Test fixture: `paramVectorCodec`
 
-**Validation:** ADR exists at `docs/architecture docs/adrs/`, codecs subsystem doc updated, project folder deletable.
+A test-only `ParameterizedCodec` with a known brand under `packages/2-sql/2-authoring/contract-ts/src/__tests__/fixtures/`. Used to assert `FieldOutputType` resolves to the correct branded type without depending on pgvector or any other extension.
 
-**Tasks:**
+### M2.2 — Rewrite `FieldOutputType`
 
-- [ ] 6.1 — Add a "Authoring a parameterized codec" section to the README of the package hosting `parameterizedCodec` and `columnFor` (likely `@prisma-next/sql-relational-core` or `@prisma-next/contract-authoring`). Worked example: pgvector. Per `.cursor/rules/doc-maintenance.mdc`, link contributor details from the package README.
-- [ ] 6.2 — Update `docs/architecture docs/subsystems/` codec-related doc(s) to describe `ParameterizedCodec`, `CodecBrand`, `columnFor`, and the storage.types/typeRef relationship per [spec OQ6](spec.md#open-questions).
-- [ ] 6.3 — Draft ADR `docs/architecture docs/adrs/ADR XXX - Codec model unification.md` extending ADR 186. Records: parameterization promoted to first-class interface; brand co-located; `columnFor` unified helper; Standard Schema for JSON inference; no-emit `FieldOutputType` rewritten against the brand; base `Codec` no longer carries parameterization fields.
-- [ ] 6.4 — Verify all spec acceptance criteria are met (walk [spec §Acceptance Criteria](spec.md#acceptance-criteria); link evidence in the close-out PR description).
-- [ ] 6.5 — Strip repo-wide references to `projects/codec-model-unification/**` (search via `rg -l 'projects/codec-model-unification'` and replace with canonical `docs/` links or remove).
-- [ ] 6.6 — Delete `projects/codec-model-unification/` as part of the close-out PR.
-- [ ] 6.7 — Update Linear ticket [TML-2229](https://linear.app/prisma-company/issue/TML-2229): re-scope description to reference this project, link to the merged ADR, mark as done.
+In [packages/2-sql/2-authoring/contract-ts/src/contract-types.ts](../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts):
 
-## Test Coverage
+- Resolve `typeRef` indirection through `storage.types` first.
+- Detect `Brand extends CodecBrand` on the codec entry.
+- Apply: `Apply<Brand, typeParams>`; fall back to `CodecTypes[id]['output']` if no brand.
+- Preserve nullability.
 
-| Acceptance Criterion | Test Type | Task | Notes |
-|---|---|---|---|
-| A1: `ParameterizedCodec`/`CodecBrand`/`Apply` exist | Type test (`.test-d.ts`) | 1.1, 1.2 | Fixture brand verified |
-| A1: `parameterizedCodec({…})` enforces required fields | Negative type test | 1.3 | Missing `Brand`/`paramsSchema`/`renderOutputType` |
-| A2: `paramsSchema` accepts any StandardSchema | Type test | 1.4 | Arktype-backed regression |
-| A2: JSON codec infers from user schema | Type test | 2.4, 2.5 | Arktype fixture schema |
-| A3: `columnFor(nonParam)` returns descriptor | Unit test | 2.1, 2.2 | Runtime smoke |
-| A3: `columnFor(param)(params)` literal-preserves | Type test | 2.3 | `as const` flow |
-| A3: `columnFor(param)(badParams)` runtime throws | Unit test | 2.2 | StandardSchema validation |
-| A4: `vector(1536)` column → `Vector<1536>` | Type test (`contract-ts/test`) | 3.3 | Headline fix |
-| A4: `typeRef: 'Embedding1536'` → `Vector<1536>` | Type test | 3.4 | Indirection through `storage.types` |
-| A4: JSON column → schema-inferred type | Type test | 3.5 | Standard Schema path |
-| A4: nullability preserved | Type test | 3.6 | `Vector<1536> \| null` |
-| A4: non-parameterized columns unchanged | Type test (regression) | 3.7 | `text`, `int4` |
-| A4: `ComputeColumnJsType` resolves brand types | Type test (`relational-core`) | 3.8 | Delegates via `ExtractFieldOutputTypes` |
-| A5: pgvector migrated | Existing tests pass | 3.1 | Co-located `VectorBrand` |
-| A5: postgres core codecs migrated | Existing tests pass | 4.1 | numeric, timestamp, json, jsonb |
-| A5: mongo codecs migrated | Existing tests pass | 4.2 | All codecs with `renderOutputType?` |
-| A5: column factories replaced with `columnFor` | Existing tests pass | 3.1, 4.1, 4.2 | One per codec |
-| A6: base `Codec` loses parameterization fields | Workspace typecheck | 5.1, 5.3 | `pnpm typecheck` |
-| A6: `pnpm lint:deps` passes | Lint | 4.6, 5.3 | No layering regression |
-| A7: emit-path snapshots unchanged | Existing snapshot tests | 5.3 | `pnpm --filter @prisma-next/emitter-* test` |
-| A8: typecheck within ±20% of baseline | Manual measurement | 0.1, 5.5 | `assets/typecheck-baseline.md` |
-| A9: pack-author README section | Doc presence | 6.1 | Worked example with pgvector |
-| A9: ADR finalized | Doc presence | 6.3 | Extends ADR 186 |
-| A9: subsystem doc updated | Doc presence | 6.2 | Codecs + brand + `storage.types`/`typeRef` |
+Detail: [design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype](design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype).
 
-## Open Items
+### M2.3 — Type tests
 
-Carried forward from [spec §Open Questions](spec.md#open-questions); each will be resolved during M1 design or in the implementing PR:
+- Inline `typeParams` resolves to brand.
+- `typeRef` resolves to brand.
+- Non-parameterized columns unchanged.
+- Nullability preserved.
+- `ComputeColumnJsType` resolves to brand (transparent via delegation).
 
-1. **Where does `parameterizedCodec()` live?** — framework-components (default) vs SQL-only. Resolve in 1.3.
-2. **`codec()` accepting parameterization fields during transition.** — hard cut (default). Confirmed in 5.2.
-3. **Brand storage shape.** — declared `readonly Brand` value cast (default) vs phantom `_brand?` slot. Resolve in 1.2.
-4. **`columnFor` name.** — keep `columnFor` (default). Confirm in 2.1.
-5. **JSON-codec API surface.** — `jsonCodec({ schema })` as typeParam (default) vs `jsonCodec(schema)` direct. Resolve in 2.4.
-6. **Docs clarification of `storage.types` vs `typeRef`.** — short paragraph in subsystem doc as part of 6.2.
-7. **Runtime-string `renderOutputType` on base `Codec`.** — drop entirely (default). Confirmed in 5.1.
+### M2 acceptance
 
-## Close-out (required)
+- [ ] A4 (all type-test cases pass).
+- [ ] Existing `pnpm test:packages` green for `@prisma-next/contract-ts`.
+- [ ] No production codec migrated yet.
 
-Tracked in M6:
+---
 
-- [ ] 6.4 — Verify all acceptance criteria in [spec.md](spec.md#acceptance-criteria)
-- [ ] 6.3 — Finalize ADR under `docs/architecture docs/adrs/`
-- [ ] 6.2 — Migrate long-lived docs into `docs/architecture docs/subsystems/`
-- [ ] 6.5 — Strip repo-wide references to `projects/codec-model-unification/**`
-- [ ] 6.6 — Delete `projects/codec-model-unification/`
-- [ ] 6.7 — Update Linear ticket TML-2229
+## M3 — `columnFor` and `jsonCodec` authoring helpers
+
+**Goal:** Pack-author surface that replaces hand-rolled per-codec factories and gives JSON columns first-class schema-driven inference.
+
+**Spec mapping:** FR3 (json helper), FR4. Acceptance: A2, A3.
+
+### M3.1 — `columnFor(codec)`
+
+Type-discriminated:
+
+- `codec extends ParameterizedCodec<…>` → `(params: Params) => ColumnTypeDescriptor<typeParams: Params>`.
+- otherwise → `ColumnTypeDescriptor`.
+
+Validates inline `params` against `paramsSchema` at runtime; throws with a clear error message on failure.
+
+Detail: [design/authoring-ergonomics.md#the-columnfor-helper](design/authoring-ergonomics.md#the-columnfor-helper).
+
+### M3.2 — `jsonCodec(schema)`
+
+Wraps the existing JSON codec; threads through `StandardSchemaV1.InferOutput<S>` as the codec's brand-applied type.
+
+Detail: [design/authoring-ergonomics.md#json-codec-helper](design/authoring-ergonomics.md#json-codec-helper).
+
+### M3.3 — Tests
+
+- Type tests for both modes of `columnFor`.
+- Type tests confirming JSON inference flows from a user-provided schema.
+- Runtime tests for `paramsSchema` validation behavior.
+
+### M3 acceptance
+
+- [ ] A2, A3.
+- [ ] `pnpm test:packages` and `pnpm typecheck` green.
+- [ ] No migration yet — production codecs still use their old factories.
+
+---
+
+## M4 — Migrate existing parameterized codecs
+
+**Goal:** Move every codec that currently implements optional `renderOutputType?` to `ParameterizedCodec` with co-located brands and a `columnFor` factory export.
+
+**Spec mapping:** FR6. Acceptance: A4 (now with real codecs), A5.
+
+### M4.1 — pgvector
+
+- `Vector<N>` brand co-located with `pgVectorCodec`.
+- `pgVectorCodec` migrated to `parameterizedCodec({…})`.
+- Replace `vector(length)` factory with `columnFor(pgVectorCodec)`.
+- Update extension's exports to expose both the codec and the column factory.
+
+### M4.2 — postgres-core
+
+For each parameterized codec (numeric, timestamp, timestamptz, char if present, json/jsonb):
+
+- Define brand.
+- Migrate to `parameterizedCodec`.
+- Replace per-codec factory with `columnFor(...)`.
+
+### M4.3 — mongo codecs
+
+Same pattern.
+
+### M4.4 — Examples & integration tests
+
+Update demo schemas / examples to use the unified `columnFor` form. Verify integration tests stay green.
+
+### M4 acceptance
+
+- [ ] A4 with production codecs (pgvector `Vector<1536>`, char(N), JSON-with-schema).
+- [ ] A5 (all migrated, factories replaced).
+- [ ] Emit-path snapshots byte-identical (A8 partially verified here; final verification in M5).
+- [ ] `pnpm test:packages` green.
+
+---
+
+## M5 — Cleanup base `Codec` (hard cut)
+
+**Goal:** Remove parameterization fields from base `Codec`. Now safe because every codec that needed them has migrated.
+
+**Spec mapping:** FR7. Acceptance: A6, A8 (final).
+
+### M5.1 — Remove `paramsSchema?`, `init?`, `renderOutputType?` from base `Codec`
+
+In `@prisma-next/framework-components` and the SQL extension's `Codec` interface.
+
+### M5.2 — Confirm zero callers
+
+`rg` confirms no surviving references on base-`Codec` instances. Any caller that needs them now uses `ParameterizedCodec` or the codec's narrowed type.
+
+### M5.3 — Final emit-snapshot diff
+
+Run emit across the demo and example contracts; assert byte-identical output.
+
+### M5 acceptance
+
+- [ ] A6 (base `Codec` clean).
+- [ ] A8 (typecheck within ±20%).
+- [ ] Emit snapshots byte-identical.
+- [ ] `pnpm typecheck` and `pnpm lint:deps` pass.
+
+---
+
+## M6 — Documentation finalization + close-out
+
+**Goal:** Long-lived docs in `docs/`, project artifacts gone, ADR finalized.
+
+**Spec mapping:** A9.
+
+### M6.1 — ADR
+
+Author ADR under `docs/architecture docs/adrs/` extending [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md):
+
+- Decision: split `Codec` and `ParameterizedCodec`; co-located brands; `columnFor` and `jsonCodec`; `init(params, instanceMeta)` shape declared with runtime rewiring deferred.
+- Rationale: pulls from the project's design docs.
+- Consequences: pack-author API surface, future runtime rewiring path, downstream extension fit.
+
+### M6.2 — Subsystem docs
+
+Update `docs/architecture docs/subsystems/` (codec subsystem) and the relevant package READMEs:
+
+- Pack-author README sections on `parameterizedCodec`, `columnFor`, `jsonCodec`, `storage.types`/`typeRef`.
+- Code-level pointers to the new types.
+
+### M6.3 — Strip and close out
+
+- Migrate any long-lived design content into `docs/`.
+- Strip repo-wide references to `projects/codec-model-unification/**`.
+- Delete `projects/codec-model-unification/`.
+
+### M6 acceptance
+
+- [ ] ADR merged.
+- [ ] Subsystem docs and package READMEs updated.
+- [ ] `projects/codec-model-unification/` deleted.
+- [ ] No surviving references in the repo to the project path.
+
+---
+
+## Sequencing & PRs
+
+Default mapping (one PR per milestone) keeps each PR small. M2 can ship before M3 because the synthetic fixture proves `FieldOutputType` independently. M4 is the largest PR; it can be split per codec family if the diff grows.
+
+## Risks & mitigations
+
+- **Brand cast scope creep.** Single `as unknown as Brand` per codec; design doc enumerates the rule. Reviewers veto wider casts.
+- **Standard Schema validator wiring.** Existing arktype validators implement Standard Schema; no behavior change expected. M1.4 limited to the type widening.
+- **Emit-path regression.** A8 enforces byte-identical snapshots; verified at M4 and again at M5.
+- **`init(params, instanceMeta)` shape locks in something we'd want to change later.** Mitigated by limiting the shape to the minimum necessary for known consumers (CipherStash G1) and by leaving the runtime contract documented in the design doc rather than enforced.
