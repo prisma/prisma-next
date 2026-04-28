@@ -235,7 +235,18 @@ export function resolveFieldType(
     case 'scalar': {
       let outputResolved: string | undefined;
       if (codecLookup && type.typeParams && Object.keys(type.typeParams).length > 0) {
-        const codec = codecLookup.get(type.codecId);
+        // Family-specific codec extensions (SQL, Mongo) may attach a `renderOutputType`
+        // hook to a parameterized codec object as a temporary holding place. M4 of the
+        // codec-model-unification project moves this hook onto `ParameterizedCodecDescriptor`
+        // and the emitter switches to a descriptor lookup; until then we duck-type the
+        // optional field off the base `Codec` shape.
+        const codec = codecLookup.get(type.codecId) as
+          | {
+              readonly renderOutputType?: (
+                typeParams: Record<string, unknown>,
+              ) => string | undefined;
+            }
+          | undefined;
         if (codec?.renderOutputType) {
           const rendered = codec.renderOutputType(type.typeParams);
           if (rendered && isSafeTypeExpression(rendered)) {

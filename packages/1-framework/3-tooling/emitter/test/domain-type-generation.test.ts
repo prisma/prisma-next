@@ -765,7 +765,12 @@ describe('generateValueObjectTypeAliases', () => {
   });
 });
 
-function stubCodec(overrides: Partial<Codec> & { id: string }): Codec {
+type StubCodec = Partial<Codec> & {
+  readonly id: string;
+  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+};
+
+function stubCodec(overrides: StubCodec): Codec {
   return {
     targetTypes: [],
     decode: (w: unknown) => w,
