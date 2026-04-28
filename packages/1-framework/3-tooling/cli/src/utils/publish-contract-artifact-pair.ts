@@ -9,12 +9,14 @@ function createTempArtifactPath(path: string, publicationToken: string, phase: s
   return join(dirname(path), `.${basename(path)}.${process.pid}.${publicationToken}.${phase}.tmp`);
 }
 
-async function readExistingArtifact(path: string): Promise<string | undefined> {
+type PreviousArtifact = { readonly content: string } | 'remove';
+
+async function readExistingArtifact(path: string): Promise<PreviousArtifact> {
   try {
-    return await readFile(path, 'utf-8');
+    return { content: await readFile(path, 'utf-8') };
   } catch (error) {
     if (isRecord(error) && error['code'] === 'ENOENT') {
-      return undefined;
+      return 'remove';
     }
     throw error;
   }
@@ -22,16 +24,16 @@ async function readExistingArtifact(path: string): Promise<string | undefined> {
 
 async function restoreArtifact(
   path: string,
-  content: string | undefined,
+  previous: PreviousArtifact,
   publicationToken: string,
 ): Promise<void> {
-  if (content === undefined) {
+  if (previous === 'remove') {
     await rm(path, { force: true });
     return;
   }
 
   const restorePath = createTempArtifactPath(path, publicationToken, 'rollback');
-  await writeFile(restorePath, content, 'utf-8');
+  await writeFile(restorePath, previous.content, 'utf-8');
   try {
     await rename(restorePath, path);
   } finally {
@@ -42,7 +44,7 @@ async function restoreArtifact(
 interface PublishEntry {
   readonly tempPath: string;
   readonly outputPath: string;
-  readonly previous: string | undefined;
+  readonly previous: PreviousArtifact;
 }
 
 function withRollbackFailureCause(error: unknown, rollbackFailures: readonly unknown[]): Error {
@@ -106,22 +108,17 @@ export async function publishContractArtifactPair({
 }): Promise<boolean> {
   const tempJsonPath = createTempArtifactPath(outputJsonPath, publicationToken, 'next');
   const tempDtsPath = createTempArtifactPath(outputDtsPath, publicationToken, 'next');
-  const canPublish = async () => (await beforePublish?.()) !== false;
 
   try {
     await writeFile(tempJsonPath, contractJson, 'utf-8');
     await writeFile(tempDtsPath, contractDts, 'utf-8');
 
-    if (!(await canPublish())) {
+    if ((await beforePublish?.()) === false) {
       return false;
     }
 
     const previousJson = await readExistingArtifact(outputJsonPath);
     const previousDts = await readExistingArtifact(outputDtsPath);
-
-    if (!(await canPublish())) {
-      return false;
-    }
 
     await publishPairWithRollback(
       [

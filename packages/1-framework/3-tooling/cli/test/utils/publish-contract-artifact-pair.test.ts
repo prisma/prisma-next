@@ -104,15 +104,15 @@ describe('publishContractArtifactPair', () => {
     ]);
   });
 
-  it('rechecks beforePublish after snapshotting previous artifacts', async () => {
+  it('skips publication when beforePublish returns false', async () => {
     const { outputJsonPath, outputDtsPath } = await seedPreviousArtifacts();
-    const beforePublish = vi.fn().mockReturnValueOnce(true).mockReturnValueOnce(false);
+    const beforePublish = vi.fn().mockReturnValue(false);
 
     await expect(publishNext({ outputJsonPath, outputDtsPath }, { beforePublish })).resolves.toBe(
       false,
     );
 
-    expect(beforePublish).toHaveBeenCalledTimes(2);
+    expect(beforePublish).toHaveBeenCalledTimes(1);
     expect(vi.mocked(mockedFs.rename)).not.toHaveBeenCalled();
     expect(await actualFs.readFile(outputJsonPath, 'utf-8')).toBe(PREVIOUS_JSON);
     expect(await actualFs.readFile(outputDtsPath, 'utf-8')).toBe(PREVIOUS_DTS);
