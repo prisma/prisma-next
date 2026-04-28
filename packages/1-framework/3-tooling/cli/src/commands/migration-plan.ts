@@ -525,8 +525,11 @@ export type PrefixResolutionFailure =
   | { reason: 'not-found' };
 
 /**
- * Resolve a migration package by exact hash or prefix match.
+ * Resolve a migration package by **target contract hash** (`metadata.to`)
+ * using exact match or prefix match.
  *
+ * Note: matches `metadata.to` (the contract hash this migration produces),
+ * not `metadata.migrationHash` (the package's content-addressed identity).
  * Tries exact match first, then prefix match (auto-prepending `sha256:` when
  * the needle omits the scheme). Returns the matched package on success, or a
  * discriminated failure indicating whether the prefix was ambiguous or simply
