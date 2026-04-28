@@ -263,7 +263,7 @@ describe('Journey: Mongo migration authoring (offline)', { timeout: timeouts.spi
     }
 
     const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-      migrationHash: string | null;
+      migrationHash: string;
     };
     expect(manifest.migrationHash).toMatch(/^sha256:/);
   });
@@ -481,7 +481,7 @@ MigrationCLI.run(import.meta.url, M);
       expect(ops.some((o) => o.id.startsWith('index.users.'))).toBe(true);
 
       const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8')) as {
-        migrationHash: string | null;
+        migrationHash: string;
       };
       expect(manifest.migrationHash).toMatch(/^sha256:/);
 
