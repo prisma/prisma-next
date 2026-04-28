@@ -13,9 +13,12 @@ coverage
 packages/e2e-tests/.tmp-output
 /wip
 .pnpm-store
-.cursor/rules
-.cursor/commands
-.cursor
+# Local-only Cursor state; cloud-agent config below is committed.
+# See https://cursor.com/docs/cloud-agent/setup
+.cursor/*
+!.cursor/environment.json
+!.cursor/Dockerfile
+!.cursor/hooks.json
 .claude/settings.local.json
 .claude/worktrees
 CLAUDE.local.md

@@ -1,0 +1,5 @@
+{
+  "$schema": "https://www.cursor.com/schemas/environment.schema.json",
+  "name": "prisma-next",
+  "install": "corepack enable && pnpm install --frozen-lockfile && pnpm build && pnpm install"
+}
