@@ -1,2 +1,8 @@
-export type { Codec, CodecLookup, CodecTrait } from '../codec-types';
+export type {
+  Codec,
+  CodecLookup,
+  CodecTrait,
+  Ctx,
+  ParameterizedCodecDescriptor,
+} from '../codec-types';
 export { emptyCodecLookup } from '../codec-types';

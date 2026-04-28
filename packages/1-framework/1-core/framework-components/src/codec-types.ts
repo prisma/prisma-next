@@ -1,4 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
@@ -33,8 +34,6 @@ export interface Codec<
   encodeJson(value: TJs): JsonValue;
   /** Converts a JSON representation back to the JS type. Called during contract loading via `validateContract`. */
   decodeJson(json: JsonValue): TJs;
-  /** Produces the TypeScript output type expression for a field given its `typeParams`. Used during contract.d.ts emission. */
-  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
 }
 
 export interface CodecLookup {
@@ -44,3 +43,48 @@ export interface CodecLookup {
 export const emptyCodecLookup: CodecLookup = {
   get: () => undefined,
 };
+
+/**
+ * Column context supplied by the contract-authoring API when applying a higher-order
+ * codec factory. Allows stateful codecs (e.g. CipherStash column-scoped encryption)
+ * to derive per-instance state from the column it is bound to.
+ *
+ * - `name` — the `storage.types` instance name (e.g. `Embedding1536`) or the
+ *   synthesized anonymous instance name (`<anon:Document.embedding>`).
+ * - `usedAt` — every column that references this storage-types entry. For inline
+ *   `typeParams` columns the array has exactly one entry; for `typeRef` columns
+ *   pointing at a shared `storage.types` entry the array lists every referencing
+ *   column post-aggregation.
+ */
+export interface Ctx {
+  readonly name: string;
+  readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
+}
+
+/**
+ * Sister descriptor that registers a parameterized codec with the framework.
+ *
+ * A parameterized codec is a curried higher-order function `(params) => (ctx) => Codec`.
+ * The function is the type-level surface and the runtime implementation. The
+ * descriptor carries the framework-facing metadata (id, runtime params validator,
+ * optional emit-path renderer) and a reference to the factory.
+ *
+ * @template P - The shape of the params accepted by the factory (e.g. `{ length: number }`).
+ */
+export interface ParameterizedCodecDescriptor<P = Record<string, unknown>> {
+  /** The codec ID this descriptor applies to (e.g. `pg/vector@1`). */
+  readonly codecId: string;
+  /**
+   * Standard Schema validator for the factory's params. Validates JSON-sourced
+   * params at the contract boundary (PSL → IR; `contract.json` → runtime).
+   */
+  readonly paramsSchema: StandardSchemaV1<P>;
+  /**
+   * Emit-path string renderer for `contract.d.ts`. Returns the TypeScript output
+   * type expression for given params (e.g. `Vector<1536>`). Optional; absent
+   * renderers cause the emitter to fall back to the codec's base output type.
+   */
+  readonly renderOutputType?: (params: P) => string;
+  /** The curried higher-order codec. The descriptor's only behavior; everything else is data. */
+  readonly factory: (params: P) => (ctx: Ctx) => Codec;
+}
