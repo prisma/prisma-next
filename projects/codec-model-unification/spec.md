@@ -2,239 +2,268 @@
 
 ## Decision
 
-Promote parameterization from a sprinkle of optional fields on the base `Codec` interface to a first-class shape called `ParameterizedCodec`, with a co-located type-level **output-type function** (`CodecOutputTypeFn`). Use that function to fix the no-emit path's field-type resolution. Ship a unified `columnFor` authoring helper and a `jsonCodec(schema)` helper at the same time, since they fall out cleanly from the new shape and remove parallel boilerplate. Declare (but don't implement) an `init(params, instanceMeta)` contract that a runtime follow-up will consume.
+A *parameterized codec* is a **higher-order codec**: a curried TypeScript function `(params) → (ctx) → Codec`. Pack authors write one such function per parameterized type (`vector`, `char`, `numeric`, `json`, `cipherStashText`, …). Its **TS signature is the surface** — both the type-level resolution for the no-emit path and the runtime implementation that closes over `params` and column context. Following [ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md), the function is the only behavior-bearing artifact; there is no separate type-level brand, no HKT, no `OutputType` field, no `init` hook. Adjacent metadata (`paramsSchema`, `renderOutputType`) lives on a small sister `ParameterizedCodecDescriptor` that registers the function with the framework, mirroring `SqlOperationDescriptor` from ADR 204.
 
-Before — parameterization is three optional fields on the base `Codec`:
+Before — three optional, drift-prone fields on the base `Codec`, plus per-codec column factories that strip type information:
 
 ```typescript
 interface Codec<Id, Traits, Wire, Js> {
-  // …encode/decode/traits/meta…
+  // …encode / decode / traits / meta…
   readonly paramsSchema?: Type<Record<string, unknown>>;
   readonly renderOutputType?: (params: Record<string, unknown>) => string;
   readonly init?: (params: Record<string, unknown>) => unknown;
 }
+
+// Per-codec factory, hand-rolled, output type collapses to the base
+function vector<N extends number>(length: N): ColumnTypeDescriptor & { typeParams: { length: N } } { … }
 ```
 
-After — base `Codec` has no parameterization fields; `ParameterizedCodec` carries them all (required), plus an `OutputType` field that holds the type-level function from `Params` to the codec's output type:
+After — one factory function per parameterized codec, **curried** so the user passes params and the contract-authoring API supplies `ctx`:
 
 ```typescript
-interface Codec<Id, Traits, Wire, Js> {
-  // …encode/decode/traits/meta — no parameterization fields…
-}
+type Ctx = {
+  readonly name: string;                                              // storage.types instance name
+  readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
+};
 
-interface CodecOutputTypeFn<Params = unknown> {
-  readonly Input: Params;
-  readonly Output: unknown;
-}
+// pgvector
+function vector<N extends number>(length: N): (ctx: Ctx) =>
+  Codec<'pg/vector@1', ['equality'], string, Vector<N>> { … }
 
-type Apply<F extends CodecOutputTypeFn, P> = (F & { readonly Input: P })['Output'];
+// json with user-supplied schema
+function json<S extends StandardSchemaV1>(schema: S): (ctx: Ctx) =>
+  Codec<'pg/json@1', ['equality'], string, StandardSchemaV1.InferOutput<S>> { … }
 
-interface ParameterizedCodec<
-  Id, Traits, Wire, Js,
-  Params,
-  OutputType extends CodecOutputTypeFn<Params>,
-  Helper = unknown,
-> extends Codec<Id, Traits, Wire, Js> {
-  readonly paramsSchema:      StandardSchemaV1<Params>;
-  readonly renderOutputType:  (params: Params) => string;
-  readonly OutputType:        OutputType;
-  readonly init?:             (params: Params, instance: InstanceMeta) => Helper;
-}
+// CipherStash column-scoped encryption — ctx is load-bearing
+function cipherStashText(params: { keyId: string; mode: 'deterministic' | 'randomized' }): (ctx: Ctx) =>
+  Codec<'cipherstash/text@1', ['equality'], string, string> { … }
 ```
 
-Around that interface change:
+The user calls only `vector(1536)`, `json(productSchema)`, etc. The contract-authoring builder applies `ctx`.
 
-- **Per-codec column factories** (`vector(N)`, `char(N)`, `numeric(p, s)`, …) collapse into one helper: `columnFor(codec)` (or `columnFor(codec)(params)` when parameterized).
-- **JSON columns** restore schema-driven inference: `columnFor(jsonCodec)({ schema })` resolves to `StandardSchemaV1.InferOutput<schema>`. (This worked before the no-emit path was introduced; [TML-2229](https://linear.app/prisma-company/issue/TML-2229) restores it.)
-- **No-emit `FieldOutputType<Definition>`** is rewritten to follow `typeRef` through `storage.types`, then apply `Apply<codec.OutputType, column.typeParams>` when the codec is parameterized — fixing the [TML-2229](https://linear.app/prisma-company/issue/TML-2229) bug.
+Each parameterized codec also ships a sister **descriptor** that registers it with the framework (matches ADR 204's `{method, self, impl}` pattern for operations):
+
+```typescript
+interface ParameterizedCodecDescriptor<P> {
+  readonly codecId: string;
+  readonly paramsSchema: StandardSchemaV1<P>;                  // validates JSON-sourced params
+  readonly renderOutputType?: (params: P) => string;           // emit path → contract.d.ts string
+  readonly factory: (params: P) => (ctx: Ctx) => Codec;        // the higher-order codec
+}
+
+// pgvector exports both:
+export const vector;            // user-facing factory
+export const pgVectorCodec: ParameterizedCodecDescriptor;  // framework registration
+```
+
+Around that change:
+
+- **`FieldOutputType<Definition>`** (no-emit path) follows `typeRef` through `storage.types`, reads the user's column expression (which is the curried factory result), and extracts the `Codec`'s `Js` slot. No HKT.
+- **The factory is called twice** in the contract's life: once at contract-authoring (returns codec object whose data part — `id`, `typeParams` — is serialized to `contract.json`, with closures discarded); once at runtime load (factory called again with params recovered from `contract.json` plus the same `ctx`, returns a fresh `Codec` whose `encode`/`decode` close over per-instance state). Same function, same inputs both times.
+- **`paramsSchema` validates params at the JSON boundary** (PSL → contract, contract.json → runtime). `renderOutputType` is the emit path's string-rendering hook. Both live on the descriptor; both optional.
+- **`columnFor` and per-codec `column…` helpers go away.** Each pack exports the typed factory function directly; that *is* the column-author surface.
+- **JSON columns regain schema-driven inference** — the `json(schema)` factory's return type is `(ctx) => Codec<…, InferOutput<schema>>`. (Restoration: JSON columns inferred through their schema before the no-emit path was introduced; [TML-2229](https://linear.app/prisma-company/issue/TML-2229) restores this.)
+- **The base `Codec` interface is unchanged** structurally — `paramsSchema?` and `init?` are removed from the SQL `Codec` extension (they migrate to the descriptor and the factory closure respectively). `renderOutputType?` migrates from base `Codec` to the descriptor (default per [open question 2](#open-questions); locked at M1) so the base `Codec` carries no parameterization slots at all.
 
 ## Why
 
-Two motivations, one fix.
+**The bug.** [TML-2229](https://linear.app/prisma-company/issue/TML-2229). The no-emit path (`FieldOutputTypes<Definition>` computed at the type level, no `pnpm emit` step) ignores `typeParams`, so `vector(1536)` resolves to `number[]` instead of `Vector<1536>`, and a JSON column with a narrowed schema resolves to `JsonValue` instead of the schema's inferred shape. [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md) deferred this fix.
 
-**The bug** — [TML-2229](https://linear.app/prisma-company/issue/TML-2229). The no-emit path (`FieldOutputTypes<Definition>` computed at the type level, no `pnpm emit` step) ignores `typeParams`, so a `vector(1536)` column resolves to `number[]` instead of `Vector<1536>`, and a JSON column with a narrowed schema resolves to `JsonValue` instead of the schema's inferred shape (a regression — JSON columns *did* infer through their schema before the no-emit path was introduced). [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md) explicitly deferred this fix. The fix needs a way for the type system to find a function-from-`params`-to-output-type per codec — i.e. an *output-type function*.
+**Why higher-order codecs.** The parameterized codecs we ship today already *are* functions `(params) → descriptor` — the user's `vector(1536)` is the call. Today those functions throw away type information at the boundary (their return type is a generic `ColumnTypeDescriptor`, not `Codec<…, Vector<N>>`). Putting the resolved type on the function's return is one type annotation per pack and fixes the no-emit path. Following ADR 204's "function is the signature" principle, runtime and type-level become a single artifact — they cannot drift.
 
-**The cleanup that comes with it** — once we add an `OutputType` field to a codec, the parameterization-related fields stop being optional for codecs that have them and stop existing for codecs that don't. Splitting the interface formalizes that. The split also makes the per-codec column factories (`vector(N)`, `char(N)`, …) collapse into a single `columnFor(codec)` and restores schema-driven inference for JSON columns through the same mechanism. Doing this once is cheaper than threading an `OutputType` field through the optional-fields shape and then revisiting the same code to clean it up.
+**Why the function takes `ctx`.** The CipherStash extension wants column-scoped encryption keys derived from `(table, column)`. The contract-authoring API has that information at the point where the factory is invoked (we're inside `.column('embedding', ...)`). Passing it down as `ctx` lets stateful codecs close over it, with no separate `init` hook. Stateless codecs (Vector, char, numeric, plain JSON) ignore `ctx`.
 
-The same shape change also lets us declare a stable `init(params, instanceMeta)` signature that downstream extensions (CipherStash) and a future runtime rewiring ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)) can author against. Locking the signature now is free; locking it wrong and migrating later is not.
+**Why a sister descriptor for `paramsSchema` / `renderOutputType`.** These run on JSON-shaped params (the framework reads them at the contract boundary, before/independently of the factory). They aren't about closing over column context; they're metadata. Following ADR 204's `{method, self, impl}` pattern, we keep "the function" and "the framework metadata that surrounds the function" as sibling fields on a small descriptor object. The user-facing surface stays just the function.
 
 ## Glossary
 
 | Term | Meaning |
 |---|---|
+| **Codec** | The existing interface: `encode`, `decode`, `traits`, `meta`. Unchanged by this project. |
+| **Higher-order codec** (HoC) | A curried function `(params) → (ctx) → Codec` that produces a parameterized codec specialized to specific params and column context. Each parameterized type ships one. |
+| **Codec factory** | Pragmatic synonym for "higher-order codec." Used interchangeably; "factory" is the user-facing word. |
+| **Ctx** | The column context passed when the HoC is applied to its params: `{ name: string; usedAt: ReadonlyArray<{ table: string; column: string }> }`. The contract-authoring API supplies it; the user never writes it. |
+| **`ParameterizedCodecDescriptor`** | The sister descriptor that registers a parameterized codec with the framework. Holds `codecId`, `paramsSchema`, optional `renderOutputType`, and the `factory` itself. Analogous to `SqlOperationDescriptor` ([ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md)). |
 | **Emit path** | `pnpm emit` walks the contract and writes a fully-resolved `contract.d.ts`. Already correct after [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md). |
 | **No-emit path** | Authoring code imports the contract definition directly; output types are computed at the type level by `FieldOutputTypes<Definition>`. The site of the bug. |
-| **`renderOutputType`** | Runtime method on a parameterized codec returning a TS-source string for the emit path (e.g. `({length}) => `Vector<${length}>``). Used by the emitter. |
-| **`OutputType` field** (typed `CodecOutputTypeFn`) | Type-level twin of `renderOutputType`. A type-level function from `Params` to the codec's output type, defined next to the codec. Consumed by `FieldOutputType` in the no-emit path. Not the same concept as a "branded type" (which is a phantom-marked nominal type like `Vector<N> = number[] & { __vectorLength?: N }`); the codec's `OutputType` *produces* such types. |
-| **`Apply<F, P>`** | Applies an output-type function `F` to params `P`, yielding the resolved output type. Type-level. |
-| **Branded type** | A nominal TypeScript type marked by an unused phantom property/symbol — e.g. `Vector<N> = number[] & { __vectorLength?: N }`. Output of an output-type function may itself be a branded type, but the function and the type are distinct concepts. |
-| **`columnFor`** | Single authoring helper that turns any codec into a column-descriptor factory. Replaces per-codec factories. |
+| **`renderOutputType`** | Optional descriptor field: `(params) → string` for `contract.d.ts`. |
+| **`paramsSchema`** | Required descriptor field: a `StandardSchemaV1<Params>` for runtime validation when params arrive as data (PSL parse, JSON load). |
 | **`storage.types`** | Existing contract IR registry of *named* parameterized type instances (e.g. `Embedding1536: vector(1536)`). |
 | **`typeRef`** | Existing column property pointing at a `storage.types` entry by name (alternative to inline `typeParams`). |
-| **`init`** | Optional codec hook that runs once per `storage.types` instance to derive per-instance state from params and `(table, column)` context. Signature locked here; runtime dispatch is [TML-2330](https://linear.app/prisma-company/issue/TML-2330). |
+| **Anonymous instance** | The `storage.types`-equivalent entry the runtime synthesizes for an inline-`typeParams` column. Deterministic name `<anon:table.column>`. |
+| **Branded type** | A nominal TypeScript type marked by an unused phantom property/symbol — e.g. `Vector<N> = number[] & { __vectorLength?: N }`. The factory's return type may include such types; the factory itself is not a brand. |
 
 ## Cases that pin the design
 
-These are the concrete codecs the design must support end-to-end. They are the test the design has to pass; together they constrain the moving parts. Each design decision in [How it works](#how-it-works) is justified against at least one of these cases, and each design doc traces back to them.
+These are the concrete codecs the design must support end-to-end. They constrain the moving parts; each "How it works" subsection traces back to one or more.
 
 ### Case V — Vector (literal-typed numeric param)
 
-Worked code: [authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param](design/authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param).
-
-A user writes `vector({ length: 1536 })`. The column's TS type resolves to `Vector<1536>` (not `number[]`) in both the emit path and the no-emit path. The codec author writes `pgVectorCodec` once: one `paramsSchema`, one `renderOutputType`, one `OutputType`. No per-codec column factory. Same shape pins `char(N)`, `numeric(p, s)`, `timestamp(N)`.
+A user writes `vector(1536)` at a column site. The column's TS type resolves to `Vector<1536>` in both the emit path and the no-emit path. The factory's signature is `<N extends number>(length: N) => (ctx: Ctx) => Codec<…, Vector<N>>`. `ctx` is unused by Vector. Same shape pins `char(N)`, `numeric(p, s)`, `timestamp(N)`. Worked code: [authoring-ergonomics.md#case-v](design/authoring-ergonomics.md#case-v--vector-literal-typed-numeric-param).
 
 What this case pins:
 
-- `CodecOutputTypeFn` is a type-level function from `Params` to output type. Literal numeric inference must flow through.
-- `columnFor(codec)({…})` preserves literals.
-- Emit and no-emit paths agree on the resolved type.
+- The factory's return type carries the resolved column type, parameterized over `params`.
+- Literal numeric inference must flow through (`1536`, not `number`).
+- Emit and no-emit paths produce the same type — `renderOutputType` and the factory's TS return are written next to each other and tested against each other.
 
 ### Case J — JSON-with-schema
 
-Output type derived from a schema *value* (not a literal). Worked code: [authoring-ergonomics.md#case-j--json-with-schema](design/authoring-ergonomics.md#case-j--json-with-schema).
-
-A user writes `columnFor(jsonCodec)({ schema: ProductSettings })` where `ProductSettings` is an Arktype / Zod / Valibot schema. The column's TS type resolves to the schema's `InferOutput`. The same schema validates wire payloads at runtime. We do not ship a JSON-Schema → TS converter.
+A user writes `json(ProductSchema)` where `ProductSchema` is an Arktype / Zod / Valibot schema. The column's TS type resolves to `StandardSchemaV1.InferOutput<ProductSchema>`. The same schema validates wire payloads at runtime. We do not ship a JSON-Schema-to-TS converter. Worked code: [authoring-ergonomics.md#case-j](design/authoring-ergonomics.md#case-j--json-with-schema).
 
 What this case pins:
 
-- `paramsSchema: StandardSchemaV1<…>` — any Standard-Schema-compliant library acts as a param.
-- `CodecOutputTypeFn` must be able to project a type *out of* one of its inputs (`infer S extends StandardSchemaV1` then `InferOutput<S>`), not just transform a literal.
-- `jsonCodec` must be a `ParameterizedCodec` like any other; nothing JSON-specific in the framework.
+- The factory's signature can take a *schema value* and project a TS type from it (`StandardSchemaV1.InferOutput<S>`). No HKT needed — TS infers `S` at the call site and the return type uses it directly.
+- The factory's body uses the same schema for runtime validation.
+- `json` is just one factory among many; nothing JSON-specific in the framework.
 
 ### Case C — CipherStash column-scoped encryption
 
-`init` must carry column context. Worked code: [runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption](design/runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption).
-
-A CipherStash codec encrypts column values with a key derived from `(table, column)` plus contract-level config. Authoring it requires `init(params, instance)` where `instance` exposes the columns served by the codec. **Runtime dispatch through the per-instance helper is deferred to [TML-2330](https://linear.app/prisma-company/issue/TML-2330)**; this project locks the signature so CipherStash can author against a stable surface today. A subcase, `encryptedJson<T>(schema)`, composes Case J with this one (encrypted column whose plaintext type is the schema's `InferOutput`).
+`ctx` is load-bearing. A CipherStash codec encrypts column values with a key derived from `(table, column)` plus contract-level config. The factory `cipherStashText(params)(ctx)` derives the key from `params` + `ctx.usedAt` and returns a codec whose `encode`/`decode` close over the key. A subcase, `encryptedJson<S>(schema, params)(ctx)`, composes Case J with this one. Worked code: [runtime-contract-and-compatibility.md#case-c](design/runtime-contract-and-compatibility.md#case-c--cipherstash-column-scoped-encryption).
 
 What this case pins:
 
-- `init`'s second argument shape: `{ name, usedAt: ReadonlyArray<{ table, column }> }`.
-- `storage.types` instance keying — columns sharing a `typeRef` share the helper that `init` returns.
-- Anonymous instances for inline `typeParams` — single-column ergonomics still work.
-- The `OutputType` mechanism applies even when the codec output type is the *plaintext* type (encryption invisible at the type level). The compound `encryptedJson<T>` case proves `OutputType` and `init` compose.
+- `ctx` shape: `{ name, usedAt: ReadonlyArray<{ table, column }> }`. `usedAt` is plural so a shared `storage.types` instance can derive one key bound to all its columns.
+- The factory runs at runtime load too — closures over derived state must survive contract serialization.
+- Encryption invisible at the type level: the factory's return is `Codec<…, string>` (plaintext), even though the wire is ciphertext.
 
 ## How it works
 
-The design has six moving parts. Each is summarized here; details live in the design docs. Driving cases are marked.
+Six moving parts. Each links to detailed design.
 
-### 1. The codec interface splits in two — driving cases: V, J, C
+### 1. The base `Codec` interface is unchanged — driving cases: V, J, C
 
-`Codec` keeps the pure encode/decode/traits surface. A new `ParameterizedCodec` extends it with the parameterization-related fields, all required: `paramsSchema`, `renderOutputType`, `OutputType`, and an optional `init`. A `parameterizedCodec({…})` factory enforces the requirements at the type level.
+The base `Codec` interface (`id`, `targetTypes`, `traits`, `encode`, `decode`, `encodeJson`, `decodeJson`, `meta`) stays as it is. No interface split, no new required fields. The currently-optional `paramsSchema?` and `init?` (the SQL `Codec` extension over framework-components' base) are removed — they migrate to `ParameterizedCodecDescriptor` (paramsSchema) and the higher-order factory (init's intent absorbed into the closure the factory returns).
 
-→ Detail and rejected alternatives in [design/codec-interface-and-output-types.md](design/codec-interface-and-output-types.md).
+→ Detail: [higher-order-codecs.md#the-codec-interface](design/higher-order-codecs.md#the-codec-interface).
 
-### 2. Each parameterized codec carries a co-located type-level output-type function — driving cases: V, J
+### 2. A higher-order codec is a curried, typed factory function — driving cases: V, J, C
 
-A `CodecOutputTypeFn` is a TypeScript "type-level function" using the `this['Input']` HKT idiom. Each parameterized codec defines one next to its implementation:
+Each parameterized codec ships as a curried function:
 
 ```typescript
-interface VectorOutputType extends CodecOutputTypeFn<{ length: number }> {
-  readonly Input: { length: number };
-  readonly Output: this['Input'] extends { length: infer N extends number } ? Vector<N> : never;
+function vector<N extends number>(length: N) {
+  return (ctx: Ctx): Codec<'pg/vector@1', ['equality'], string, Vector<N>> => ({
+    id: 'pg/vector@1',
+    targetTypes: ['vector'],
+    traits: ['equality'],
+    typeParams: { length },                                  // becomes part of contract IR
+    encode: (v: number[]) => `[${v.join(',')}]`,
+    decode: (w: string) => parseVector(w),
+    encodeJson: (v) => v,
+    decodeJson: (j) => j as number[],
+    meta: { db: { sql: { postgres: { nativeType: 'vector' } } } },
+  });
 }
 ```
 
-`Apply<VectorOutputType, { length: 1536 }>` evaluates to `Vector<1536>`. The codec carries this function as a phantom `readonly OutputType` field. No global declaration merging.
+The function is the type-level surface (its return type is what `FieldOutputType` reads) *and* the runtime implementation (its body builds the codec object). One artifact.
 
-→ Detail in [design/codec-interface-and-output-types.md#output-type-function-mechanism](design/codec-interface-and-output-types.md#output-type-function-mechanism).
+→ Detail: [higher-order-codecs.md#anatomy-of-a-higher-order-codec](design/higher-order-codecs.md#anatomy-of-a-higher-order-codec).
 
-### 3. The no-emit `FieldOutputType` rewrites against `OutputType` — driving cases: V, J, C
+### 3. The descriptor registers the factory with the framework — driving cases: V, J, C
 
-`FieldOutputType` in [packages/2-sql/2-authoring/contract-ts/src/contract-types.ts](../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts) follows `typeRef` through `storage.types`, then consults `Apply<codec.OutputType, column.typeParams>` when the codec is parameterized. Falls back to the codec's base output otherwise. Nullability is preserved.
-
-→ Detail in [design/codec-interface-and-output-types.md#rewriting-the-no-emit-fieldoutputtype](design/codec-interface-and-output-types.md#rewriting-the-no-emit-fieldoutputtype).
-
-### 4. `columnFor(codec)` replaces per-codec column factories — driving cases: V, J
-
-A single, type-discriminated helper:
+Each parameterized codec ships a `ParameterizedCodecDescriptor`:
 
 ```typescript
-columnFor(textCodec)                              // → ColumnTypeDescriptor
-columnFor(pgVectorCodec)({ length: 1536 })        // → ColumnTypeDescriptor & { typeParams: { length: 1536 } }
+export const pgVectorCodec: ParameterizedCodecDescriptor<{ length: number }> = {
+  codecId: 'pg/vector@1',
+  paramsSchema: type({ length: 'number > 0' }),
+  renderOutputType: ({ length }) => `Vector<${length}>`,
+  factory: vector,
+};
 ```
 
-Validates inline params against the codec's `paramsSchema` at runtime. Pack authors stop hand-rolling factories; users get one mental model. Existing per-codec factories collapse into thin re-exports of `columnFor(codec)` (or vanish entirely).
+Packs export both the function (for column authoring) and the descriptor (for the framework to register via the existing `parameterizedCodecs` slot on the runtime descriptor). This mirrors ADR 204's `{method, self, impl}` shape for operations.
 
-→ Detail in [design/authoring-ergonomics.md#the-columnfor-helper](design/authoring-ergonomics.md#the-columnfor-helper).
+→ Detail: [higher-order-codecs.md#the-descriptor](design/higher-order-codecs.md#the-descriptor).
 
-### 5. `jsonCodec(schema)` types JSON columns from the user's schema — driving case: J (and the J-subcase of C)
+### 4. The no-emit `FieldOutputType` reads the factory's return type — driving cases: V, J, C
 
-A `ParameterizedCodec` whose `OutputType` projects `StandardSchemaV1.InferOutput<S>` as the output type. Pack authors get correct inference for JSON columns without us writing a JSON-Schema-to-TS converter — the user's schema library (Arktype, Zod, Valibot, …) does it via Standard Schema.
+`FieldOutputType` in [packages/2-sql/2-authoring/contract-ts/src/contract-types.ts](../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts) follows `typeRef` through `storage.types`, then reads `Js` off the `Codec<Id, Traits, Wire, Js>` resulting from applying the user's column expression to a synthetic `ctx` at the type level. Nullability preserved.
 
-→ Detail in [design/authoring-ergonomics.md#jsoncodec-helper](design/authoring-ergonomics.md#jsoncodec-helper).
+→ Detail: [higher-order-codecs.md#rewriting-the-no-emit-fieldoutputtype](design/higher-order-codecs.md#rewriting-the-no-emit-fieldoutputtype).
 
-### 6. The `init(params, instanceMeta)` signature is declared, not implemented — driving case: C
+### 5. The contract-authoring API supplies `ctx` — driving case: C (V, J ignore it)
 
-```typescript
-readonly init?: (
-  params: Params,
-  instance: { name: string; usedAt: ReadonlyArray<{ table: string; column: string }> },
-) => Helper;
-```
+When the user writes `.column('embedding', vector(1536))`, the value passed in is the partially-applied `(ctx) => Codec<…, Vector<1536>>`. The authoring builder, having walked the model and computed `(table, column)`, applies it: `vector(1536)({ name: '<anon:Document.embedding>', usedAt: [{ table: 'Document', column: 'embedding' }] })`. For `storage.types` entries, `ctx.usedAt` lists every column that references the entry (post-aggregation).
 
-We ship the signature, the documentation, and the `storage.types`-instance keying convention. We do not wire the runtime context builder to call `init` per instance — that's [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The signature is forward-compatible with CipherStash G1 (column-scoped encryption keys) and simpler use cases (precompiled regex, cached params-derived constants).
+→ Detail: [authoring-ergonomics.md#how-ctx-is-supplied](design/authoring-ergonomics.md#how-ctx-is-supplied).
 
-→ Detail in [design/runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md).
+### 6. The runtime calls the factory again at contract load — driving case: C
+
+When `contract.json` is loaded, the runtime walks `storage.types` entries (named + anonymous-from-inline). For each entry it looks up the descriptor by `codecId`, validates the JSON-sourced `typeParams` via `descriptor.paramsSchema`, then calls `descriptor.factory(typeParams)(ctx)` once. The returned `Codec` is indexed by instance name; `encode`/`decode` for any column referencing the instance dispatches through it.
+
+The runtime side is **declared here, implemented in [TML-2330](https://linear.app/prisma-company/issue/TML-2330)**. This project locks the factory + descriptor shape so CipherStash and other extension authors can author against a stable surface today.
+
+→ Detail: [runtime-contract-and-compatibility.md#runtime-materialization-contract](design/runtime-contract-and-compatibility.md#runtime-materialization-contract).
+
+### 7. JSON columns use a shipped factory — driving case: J
+
+We ship one new factory + descriptor pair in `@prisma-next/postgres-core`: `json<S extends StandardSchemaV1>(schema: S)` returning `(ctx) => Codec<'pg/json@1', ['equality'], string, InferOutput<S>>`. Pack authors and users get correct inference for JSON columns without us writing a JSON-Schema-to-TS converter — the user's schema library does it via Standard Schema.
+
+→ Detail: [authoring-ergonomics.md#json-factory](design/authoring-ergonomics.md#json-factory).
 
 ## Project base
 
-Branched from `origin/worktree/op-registry-ts` ([PR #374](https://github.com/prisma/prisma-next/pull/374)). #374 introduces codec-typed expressions whose type-level reads of `CodecTypes` are the same seam this project's `OutputType` plugs into. Once #374 merges to `main`, rebase to `origin/main`. Rebase strategy in [design/runtime-contract-and-compatibility.md#rebase-strategy](design/runtime-contract-and-compatibility.md#rebase-strategy).
+Branched from `origin/worktree/op-registry-ts` ([PR #374](https://github.com/prisma/prisma-next/pull/374)). #374 establishes "function is the signature" for SQL operations ([ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md)); this project applies the same principle to parameterized codecs. Once #374 merges to `main`, rebase to `origin/main`. Detail: [runtime-contract-and-compatibility.md#rebase-strategy](design/runtime-contract-and-compatibility.md#rebase-strategy).
 
 ## Outcomes
 
-The cases above are the concrete shape of what we're shipping. In framing terms:
+Concretely:
 
 - **TML-2229** is closed by Cases V and J working in the no-emit path.
-- **[ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md) follow-up** is the same Cases-V-and-J no-emit fix; emit-path output is unchanged.
-- **CipherStash G1 forward-compat** is Case C: their codec authors against `init(params, instanceMeta)` today, even though the runtime side ships in [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
-- **CipherStash G16 forward-compat** is Case J: `encryptedJson<T>` reuses the `jsonCodec(schema)` pattern.
-- **Pack-author DX** is the consequence of how Cases V and J are authored — one factory (`parameterizedCodec`), one column helper (`columnFor`), no per-codec boilerplate.
+- **[ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md) follow-up** is the same Cases V and J no-emit fix; emit-path output is unchanged.
+- **CipherStash G1 forward-compat** is Case C: their codec authors against `(params, ctx)` today, even though the runtime side ships in [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+- **CipherStash G16 forward-compat** is Case J: `encryptedJson<S>` reuses the `json(schema)` pattern.
+- **Pack-author DX** is the consequence of how Cases V and J are authored — one typed factory function per codec, no parallel boilerplate.
 
-Out-of-scope items (CipherStash G4, G6, G9, G10, G2/G3) are listed under [Non-goals](#non-goals) and discussed in [design/runtime-contract-and-compatibility.md#explicit-out-of-scope-extension-points](design/runtime-contract-and-compatibility.md#explicit-out-of-scope-extension-points).
+Out-of-scope items (CipherStash G4, G6, G9, G10, G2/G3) are listed under [Non-goals](#non-goals).
 
 ## Acceptance criteria
 
 Observable properties grouped by area; each is a green-light gate for a milestone in [plan.md](plan.md).
 
-### AC-1. Output-type function mechanism works at the type level
+### AC-1. Higher-order codec factories type-resolve correctly
 
-- `Apply<VectorOutputType, { length: 1536 }>` ≡ `Vector<1536>` (and analogous for any other registered codec).
-- `parameterizedCodec({…})` rejects at compile time when `paramsSchema`, `renderOutputType`, or `OutputType` is missing.
-- `parameterizedCodec({…})` rejects at compile time when `OutputType['Input']` is not assignable from `Params`.
+- `vector(1536)` typechecks as `(ctx: Ctx) => Codec<'pg/vector@1', ['equality'], string, Vector<1536>>`.
+- `json(productSchema)` typechecks with `Js = StandardSchemaV1.InferOutput<typeof productSchema>`.
+- `cipherStashText({ keyId: 'k', mode: 'deterministic' })` typechecks as `(ctx) => Codec<'cipherstash/text@1', ['equality'], string, string>`.
+- Literal numeric / object types preserved through the factory call.
+- `ParameterizedCodecDescriptor.factory`'s type matches the exported factory function's type.
 
 ### AC-2. No-emit `FieldOutputType` resolves correctly
 
-- Inline `typeParams` column: `vector({ length: 1536 })` → `Vector<1536>`.
-- `typeRef` column resolves through `storage.types` to the same resolved type.
-- JSON column declared via `columnFor(jsonCodec)({ schema })` resolves to the schema's `InferOutput`.
+- Inline column written as `.column('embedding', vector(1536))` resolves to `Vector<1536>`.
+- `typeRef` column resolves through `storage.types` to the same type.
+- JSON column with a Standard-Schema schema resolves to its `InferOutput`.
 - Non-parameterized columns unchanged.
 - `Vector<1536> | null` for nullable columns.
-- `ComputeColumnJsType` returns the `Apply<OutputType, …>`-resolved type for the same fixtures.
+- `ComputeColumnJsType` returns the same resolved type for the same fixtures.
 
-### AC-3. `columnFor` and `jsonCodec` ship the documented surface
+### AC-3. Authoring-side `ctx` is supplied to factories
 
-- `columnFor(nonParamCodec)` returns a descriptor; `columnFor(paramCodec)(params)` returns a descriptor with literal-preserved `typeParams`.
-- Bad params fail typecheck.
-- Runtime validation against `paramsSchema` throws on bad input.
-- `jsonCodec` accepts any Standard Schema; existing arktype-typed callers keep typechecking.
+- Writing `.column('embedding', vector(1536))` causes the contract-authoring builder to apply the partially-applied factory with `ctx.name = '<anon:Document.embedding>'` and `ctx.usedAt = [{ table: 'Document', column: 'embedding' }]`.
+- `storage.types: { Embedding1536: vector(1536) }` applies the factory with `ctx.name = 'Embedding1536'` and `ctx.usedAt` listing every referencing column post-aggregation.
 
 ### AC-4. Existing parameterized codecs migrated
 
-- pgvector, postgres-core (numeric, timestamp/timestamptz, char if present, json/jsonb), and mongo codecs use `parameterizedCodec({…})` with co-located output-type functions.
-- Per-codec factories replaced (or aliased) with `columnFor(codec)`.
+- pgvector, postgres-core (numeric, timestamp/timestamptz, char if present, json/jsonb), and mongo codecs ship as curried factory functions paired with `ParameterizedCodecDescriptor` exports.
+- Per-codec column-descriptor factories (e.g. `vectorColumn`, today's `vector(N)` returning a generic descriptor) are removed; the typed factory replaces them.
+- Today's `paramsSchema?` and `init?` fields on the SQL `Codec` interface are removed; the equivalent moves to `ParameterizedCodecDescriptor`.
 - Emit-path snapshots byte-identical pre/post.
 
-### AC-5. Base `Codec` is clean
+### AC-5. JSON factory ships
 
-- `paramsSchema?`, `renderOutputType?`, `init?` removed from base `Codec` (framework-components and SQL extension).
-- `pnpm typecheck` and `pnpm lint:deps` pass workspace-wide.
+- `json<S extends StandardSchemaV1>(schema: S)` is exported from `@prisma-next/postgres-core`.
+- Inferred output equals `StandardSchemaV1.InferOutput<S>` at the type level.
+- Factory body validates wire payloads against `schema` at runtime.
+- `ParameterizedCodecDescriptor` for `pg/json@1` is exported and uses Standard Schema as `paramsSchema`.
 
-### AC-6. `init(params, instanceMeta)` signature is locked
+### AC-6. CipherStash forward-compat surface is locked
 
-- `init?` on `ParameterizedCodec` accepts `(params, instance)` with `instance: { name, usedAt }`.
-- A codec defining `init` typechecks against the new signature.
-- No runtime context-builder change in this project.
+- The curried factory shape `(params) => (ctx: { name, usedAt }) => Codec<…>` typechecks for a synthetic CipherStash-style fixture.
+- The runtime contract for "factory is called once per `storage.types` instance at contract load" is documented (not implemented) in [runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md).
 
 ### AC-7. Build performance acceptable
 
@@ -242,16 +271,16 @@ Observable properties grouped by area; each is a green-light gate for a mileston
 
 ### AC-8. Documentation lands
 
-- ADR under `docs/architecture docs/adrs/` extending [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md).
-- Pack-author README section on `parameterizedCodec`, `columnFor`, `jsonCodec`, `storage.types`/`typeRef`.
+- ADR under `docs/architecture docs/adrs/` extending [ADR 186](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md), referencing [ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md) as the precedent for "function is the signature."
+- Pack-author README sections on writing higher-order codecs, the `(params, ctx)` shape, and `paramsSchema` / `renderOutputType` co-located metadata.
 - Codec subsystem doc in `docs/architecture docs/subsystems/` updated.
 - Project artifacts under `projects/codec-model-unification/` removed at close-out (long-lived content migrated to `docs/`).
 
 ## Non-goals
 
-- **Runtime rewiring of per-instance materialization.** Signature only; runtime context builder calling `init` per `storage.types` instance and routing dispatch through the helper is [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
-- **Other codec interface slots**: `bulkEncode` (CipherStash G4), `AbortSignal` plumbing (G10), redaction traits (G9, [TML-2329](https://linear.app/prisma-company/issue/TML-2329)), `preferParam` (G6). The interface split makes each cleaner to add later.
-- **PSL-side authoring of parameterized types.** PSL parsing already lands `typeParams` on the descriptor; this project addresses the TS-authored path.
+- **Runtime rewiring of per-instance materialization.** Factory shape only; the runtime calling factories per `storage.types` instance and routing dispatch is [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+- **Other codec interface slots**: `bulkEncode` (CipherStash G4), `AbortSignal` plumbing (G10), redaction traits (G9, [TML-2329](https://linear.app/prisma-company/issue/TML-2329)), `preferParam` (G6). Each is orthogonal to this project's shape and easy to add later.
+- **PSL-side authoring of parameterized types.** PSL parsing already lands `typeParams` on the descriptor; this project addresses the TS-authored path. The PSL → factory bridge runs at runtime, where `paramsSchema` validates the JSON-sourced params before factory invocation.
 - **`ComputeColumnJsType` rework.** Already delegates to `ExtractFieldOutputTypes<Contract>`; picks up the fix transparently.
 - **Migration-planner input plumbing** (CipherStash G2/G3). Same architectural pattern, different plane.
 - **Sanity-checking `typeRef` at column-declaration time.** Out of scope.
@@ -259,47 +288,52 @@ Observable properties grouped by area; each is a green-light gate for a mileston
 
 ## Non-functional constraints
 
-- **Typesafety rules** ([AGENTS.md](../../AGENTS.md)): no `any`, no `@ts-expect-error` outside negative type tests, no `@ts-nocheck`, no biome suppressions. The single `as unknown as <CodecOutputTypeFn>` cast per parameterized codec is justified by a comment.
-- **No backwards-compatibility shims**: hard cut on the base `Codec` parameterization fields.
-- **Layering**: `Codec`, `ParameterizedCodec`, `CodecOutputTypeFn`, `Apply` belong at the framework-components layer; `columnFor` lives in contract-authoring. `pnpm lint:deps` passes.
-- **No global declaration merging.** Output-type functions are co-located on the codec.
+- **Typesafety rules** ([AGENTS.md](../../AGENTS.md)): no `any`, no `@ts-expect-error` outside negative type tests, no `@ts-nocheck`, no biome suppressions. The new model should require **zero** type casts in the per-codec migration; if a cast appears, it's evidence the factory's signature is wrong.
+- **No backwards-compatibility shims**: hard cut on the old optional fields on base `Codec` and on per-codec column-descriptor factories.
+- **Layering**: the `Codec` type stays at framework-components. Factories live in their owning packs. `Ctx` lives in framework-components. `pnpm lint:deps` passes.
+- **No global declaration merging.** Each factory is its own typed function; the contract-authoring API resolves codecs by `codecId` at runtime via the existing registry.
 - **No in-house JSON-Schema → TS converter.** JSON inference comes from the user's Standard Schema.
 
 ## Open questions
 
-Project-level questions affecting what we ship. Each has a default resolution in the design docs; they're locked at the relevant milestone.
+Project-level questions affecting what we ship. Each has a default resolution in the design docs; locked at the relevant milestone.
 
-1. **Anonymous instance materialization.** When a column carries inline `typeParams` (no `typeRef`), does the runtime materialize an anonymous `storage.types` instance, require promotion, or accept either? Default in [design/runtime-contract-and-compatibility.md#anonymous-vs-named-instances](design/runtime-contract-and-compatibility.md#anonymous-vs-named-instances): materialize anonymously with a deterministic name. Locked at M1.
-2. **Where does `parameterizedCodec()` live?** Default: `@prisma-next/framework-components` (so Mongo benefits without a parallel SQL/Mongo split). Locked at M1.
-3. **`OutputType` field shape.** Default: declared `readonly OutputType` carrying a single justified `as unknown as <PerCodecOutputType>` cast (discoverable in autocomplete). Alternative: phantom `_outputType?` slot (cleaner, less discoverable). Locked at M1.
+1. **Where does `ParameterizedCodecDescriptor` live?** Default: `@prisma-next/framework-components` (next to the base `Codec` interface). Alternative: `@prisma-next/sql-relational-core/ast` (next to today's SQL `Codec` extension). Default keeps the descriptor target-family-agnostic so non-SQL families (mongo, document) can reuse it. Locked at M1.
+2. **`renderOutputType` placement: base `Codec` or descriptor?** Default: migrate to the descriptor, where it belongs (only parameterized codecs have it). Once moved, the base `Codec` carries no parameterization slots at all. Locked at M1.
+3. **Anonymous instance naming.** Default: `<anon:${table}.${column}>`. Locked at M1.
 
 ## Alternatives considered
 
 Each alternative was considered and rejected for the reasons summarized; full rationale lives in the design docs.
 
-### Keep parameterization fields optional on the base `Codec`
+### Type-level brand / `OutputType` HKT field on the codec
 
-Add `OutputType?: CodecOutputTypeFn` next to the existing optional `paramsSchema?` / `renderOutputType?` / `init?`. Smaller diff. Rejected because every consumer (emitter, validator, runtime, type resolver) keeps handling missing fields, and we forfeit the documentation value of "your codec needs parameters? extend `ParameterizedCodec`." Detail: [design/codec-interface-and-output-types.md#rejected-alternatives](design/codec-interface-and-output-types.md#rejected-alternatives).
+Earlier iteration of this project. The codec carries an `OutputType: CodecOutputTypeFn<Params>` field, and `FieldOutputType` consults `Apply<codec.OutputType, typeParams>` in the no-emit path. Rejected because the same information already lives in the factory function's TS return type — there's no reason to encode it twice and synchronize the two encodings via `renderOutputType`. Detail: [higher-order-codecs.md#rejected-alternatives](design/higher-order-codecs.md#rejected-alternatives).
+
+### Optional `init(params, instance)` hook on the codec
+
+Earlier iteration. Codec carries `init?` separately from the factory; runtime calls `init` per `storage.types` instance for stateful codecs. Rejected because the higher-order factory IS what `init` was — they have the same signature, the same lifecycle, and the same purpose. One artifact, not two. Detail: same link.
+
+### `columnFor(codec)(params)` discriminated helper
+
+Earlier iteration. A single `columnFor` helper turned any codec into a column-descriptor factory, type-discriminated on whether the codec was parameterized. Rejected once each pack ships a typed factory directly — `columnFor` had no type information to add and added an indirection at the call site. Pack authors ship `vector`, not `columnFor(pgVectorCodec)`. Detail: [authoring-ergonomics.md#why-not-a-shared-columnfor-helper](design/authoring-ergonomics.md#why-not-a-shared-columnfor-helper).
 
 ### Global `CodecOutputTypes` interface with declaration merging
 
-Each codec augments a global output-type registry. Rejected for ambient global pollution, order-dependent merging, and version/identity brittleness. Detail: same link.
+Each codec augments a global registry. Rejected for ambient global pollution, order-dependent merging, and version/identity brittleness. Detail: [higher-order-codecs.md#rejected-alternatives](design/higher-order-codecs.md#rejected-alternatives).
 
-### Compute output type from the codec's `output` type alone, no explicit `OutputType` field
+### Compute output type from the codec's `output` type alone
 
-A "smart" `FieldOutputType` narrows the codec's existing `output` (e.g. `number[]`) using `typeParams`. Rejected: there's no general path from `(number[], { length: 1536 })` to `Vector<1536>` without somewhere encoding the relationship — which is exactly what the `OutputType` function is for. Doesn't generalize to JSON-with-schema.
+A "smart" `FieldOutputType` narrows the codec's existing `output` (e.g. `number[]`) using `typeParams`. Rejected: there's no general path from `(number[], { length: 1536 })` to `Vector<1536>` without somewhere encoding the relationship — which is what the factory's return type does. Doesn't generalize to JSON-with-schema.
 
-### Per-extension factories carry parameter awareness without an `OutputType` function
+### Implement the runtime per-instance materialization in this project
 
-Existing per-codec factories (`vector(N)`) preserve literal-typed `typeParams`. Have `FieldOutputType` consult both the column's `typeParams` and the codec's factory's return type. Rejected: TypeScript doesn't expose a factory's return type from a codec ID; doesn't unify `typeRef` and inline-`typeParams` paths; doesn't generalize.
-
-### Implement the runtime `init` rewiring in this project
-
-Rejected as scope creep. The runtime side has its own design surface (error handling, resource lifecycle, async helper construction) and would balloon the PR. Locking the signature is free and high-leverage; implementing the runtime is [TML-2330](https://linear.app/prisma-company/issue/TML-2330). Detail: [design/runtime-contract-and-compatibility.md#why-declare-without-implementing](design/runtime-contract-and-compatibility.md#why-declare-without-implementing).
+Rejected as scope creep. The runtime side has its own design surface (error handling, resource lifecycle, async helper construction) and would balloon the PR. Locking the factory shape is free and high-leverage; implementing the runtime is [TML-2330](https://linear.app/prisma-company/issue/TML-2330). Detail: [runtime-contract-and-compatibility.md#why-declare-without-implementing](design/runtime-contract-and-compatibility.md#why-declare-without-implementing).
 
 ## References
 
 - [ADR 186 — Codec-dispatched type rendering](../../docs/architecture%20docs/adrs/ADR%20186%20-%20Codec-dispatched%20type%20rendering.md)
+- [ADR 204 — Operations as TypeScript functions](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Operations%20as%20TypeScript%20functions.md) — the "function is the signature" precedent
 - [TML-2229](https://linear.app/prisma-company/issue/TML-2229) — original ticket (re-scoped)
 - [TML-2329](https://linear.app/prisma-company/issue/TML-2329) — trait-gated redaction (CipherStash G9 follow-up)
 - [TML-2330](https://linear.app/prisma-company/issue/TML-2330) — runtime per-instance materialization + concurrency (CipherStash G1, G4 follow-up)
@@ -307,7 +341,6 @@ Rejected as scope creep. The runtime side has its own design surface (error hand
 - [Standard Schema spec](https://github.com/standard-schema/standard-schema)
 - [assets/cipherstash-ext-framework-gaps.md](assets/cipherstash-ext-framework-gaps.md) — framework-gaps analysis driving forward-compatibility work
 - Design docs:
-  - [design/codec-interface-and-output-types.md](design/codec-interface-and-output-types.md)
+  - [design/higher-order-codecs.md](design/higher-order-codecs.md)
   - [design/authoring-ergonomics.md](design/authoring-ergonomics.md)
   - [design/runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md)
-- Plan: [plan.md](plan.md)
