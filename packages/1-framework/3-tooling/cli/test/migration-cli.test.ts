@@ -229,7 +229,7 @@ describe('MigrationCLI.run', () => {
     const existing = {
       from: 'sha256:from',
       to: 'sha256:to',
-      migrationId: null,
+      migrationHash: null,
       kind: 'regular',
       fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
       toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
@@ -246,6 +246,10 @@ describe('MigrationCLI.run', () => {
     expect(manifest.toContract).toEqual(existing.toContract);
     expect(manifest.labels).toEqual(existing.labels);
     expect(manifest.createdAt).toBe(existing.createdAt);
+    // Even though the on-disk fixture started with `migrationHash: null`,
+    // MigrationCLI.run must rewrite it to a real `sha256:...` digest —
+    // otherwise readMigrationPackage() would reject the package.
+    expect(manifest.migrationHash).toMatch(/^sha256:/);
   });
 
   it('falls back to a synthesized manifest when the existing migration.json is unparseable', async () => {

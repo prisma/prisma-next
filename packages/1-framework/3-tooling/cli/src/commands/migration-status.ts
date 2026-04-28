@@ -1,18 +1,15 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import {
   findPath,
   findPathWithDecision,
   findReachableLeaves,
-} from '@prisma-next/migration-tools/dag';
+} from '@prisma-next/migration-tools/migration-graph';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type {
-  MigrationBundle,
-  MigrationChainEntry,
-  MigrationGraph,
-} from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { cyan, dim, magenta, yellow } from 'colorette';
@@ -20,10 +17,15 @@ import { Command } from 'commander';
 
 import { loadConfig } from '../config-loader';
 import { createControlClient } from '../control-api/client';
-import { type CliStructuredError, errorRuntime, errorUnexpected } from '../utils/cli-errors';
+import {
+  type CliStructuredError,
+  errorRuntime,
+  errorUnexpected,
+  mapMigrationToolsError,
+} from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllBundles,
+  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -61,7 +63,7 @@ export interface MigrationStatusEntry {
   readonly dirName: string;
   readonly from: string;
   readonly to: string;
-  readonly migrationId: string;
+  readonly migrationHash: string;
   readonly operationCount: number;
   readonly operationSummary: string;
   readonly hasDestructive: boolean;
@@ -86,7 +88,7 @@ export interface MigrationStatusResult {
     readonly refName?: string;
     readonly selectedPath: readonly {
       readonly dirName: string;
-      readonly migrationId: string;
+      readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
     }[];
@@ -94,7 +96,7 @@ export interface MigrationStatusResult {
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
   readonly graph?: MigrationGraph;
-  readonly bundles?: readonly MigrationBundle[];
+  readonly bundles?: readonly MigrationPackage[];
   readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
@@ -154,7 +156,7 @@ export function deriveEdgeStatuses(
 ): EdgeStatus[] {
   if (mode === 'offline') return [];
 
-  const edgeKey = (e: MigrationChainEntry) => `${e.from}\0${e.to}`;
+  const edgeKey = (e: MigrationEdge) => `${e.from}\0${e.to}`;
 
   // No marker = empty DB — treat root as the marker (nothing applied, everything pending)
   const effectiveMarker = markerHash ?? EMPTY_CONTRACT_HASH;
@@ -224,8 +226,8 @@ export function deriveEdgeStatuses(
  * @param markerHash — the marker hash from the database, or undefined if no marker row / offline
  */
 function buildMigrationEntries(
-  chain: readonly MigrationChainEntry[],
-  packages: readonly MigrationBundle[],
+  chain: readonly MigrationEdge[],
+  packages: readonly MigrationPackage[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
   edgeStatuses?: readonly EdgeStatus[],
@@ -261,7 +263,7 @@ function buildMigrationEntries(
       dirName: migration.dirName,
       from: migration.from,
       to: migration.to,
-      migrationId: migration.migrationId,
+      migrationHash: migration.migrationHash,
       operationCount: ops.length,
       operationSummary: summary,
       hasDestructive,
@@ -294,7 +296,7 @@ function resolveDisplayChain(
   graph: MigrationGraph,
   targetHash: string,
   markerHash: string | undefined,
-): readonly MigrationChainEntry[] | null {
+): readonly MigrationEdge[] | null {
   if (markerHash === undefined) {
     return findPath(graph, EMPTY_CONTRACT_HASH, targetHash);
   }
@@ -345,7 +347,7 @@ async function executeMigrationStatusCommand(
   ui: TerminalUI,
 ): Promise<Result<MigrationStatusResult, CliStructuredError>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -357,46 +359,29 @@ async function executeMigrationStatusCommand(
   let activeRefHash: string | undefined;
   let allRefs: Refs = {};
   try {
-    allRefs = await readRefs(refsPath);
+    allRefs = await readRefs(refsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     throw error;
   }
 
   if (options.ref) {
     activeRefName = options.ref;
-    const refHash = allRefs[activeRefName];
-    if (refHash) {
-      activeRefHash = refHash;
-    } else {
-      try {
-        activeRefHash = resolveRef(allRefs, activeRefName);
-      } catch (error) {
-        if (MigrationToolsError.is(error)) {
-          return notOk(
-            errorRuntime(error.message, {
-              why: error.why,
-              fix: error.fix,
-              meta: { code: error.code },
-            }),
-          );
-        }
-        throw error;
+    try {
+      activeRefHash = resolveRef(allRefs, activeRefName).hash;
+    } catch (error) {
+      if (MigrationToolsError.is(error)) {
+        return notOk(mapMigrationToolsError(error));
       }
+      throw error;
     }
   }
 
-  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, hash]) => ({
+  const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, entry]) => ({
     name,
-    hash,
+    hash: entry.hash,
     active: name === activeRefName,
   }));
 
@@ -434,15 +419,13 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let bundles: readonly MigrationBundle[];
+  let bundles: readonly MigrationPackage[];
   let graph: MigrationGraph;
   try {
-    ({ bundles, graph } = await loadAllBundles(migrationsDir));
+    ({ bundles, graph } = await loadMigrationPackages(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, { why: error.why, fix: error.fix, meta: { code: error.code } }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     return notOk(
       errorUnexpected(error instanceof Error ? error.message : String(error), {

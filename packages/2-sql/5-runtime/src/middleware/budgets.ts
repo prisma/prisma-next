@@ -1,7 +1,10 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
-import { type RuntimeErrorEnvelope, runtimeError } from '@prisma-next/framework-components/runtime';
-import type { AfterExecuteResult } from '@prisma-next/runtime-executor';
+import {
+  type AfterExecuteResult,
+  type RuntimeErrorEnvelope,
+  runtimeError,
+} from '@prisma-next/framework-components/runtime';
 import { isQueryAst, type SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { SqlMiddleware, SqlMiddlewareContext } from './sql-middleware';
 
 export interface BudgetsOptions {
@@ -48,7 +51,7 @@ function estimateRowsFromAst(
 }
 
 function estimateRowsFromHeuristics(
-  plan: ExecutionPlan,
+  plan: SqlExecutionPlan,
   tableRows: Record<string, number>,
   defaultTableRows: number,
 ): number | null {
@@ -67,7 +70,7 @@ function estimateRowsFromHeuristics(
   return tableEstimate;
 }
 
-function hasDetectableLimitFromHeuristics(plan: ExecutionPlan): boolean {
+function hasDetectableLimitFromHeuristics(plan: SqlExecutionPlan): boolean {
   return typeof plan.meta.annotations?.['limit'] === 'number';
 }
 
@@ -93,13 +96,13 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
   const maxLatencyMs = options?.maxLatencyMs ?? 1_000;
   const rowSeverity = options?.severities?.rowCount ?? 'error';
 
-  const observedRowsByPlan = new WeakMap<ExecutionPlan, { count: number }>();
+  const observedRowsByPlan = new WeakMap<SqlExecutionPlan, { count: number }>();
 
   return Object.freeze({
     name: 'budgets',
     familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: SqlMiddlewareContext) {
+    async beforeExecute(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
       observedRowsByPlan.set(plan, { count: 0 });
 
       if (isQueryAst(plan.ast)) {
@@ -112,7 +115,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
       return evaluateWithHeuristics(plan, ctx);
     },
 
-    async onRow(_row: Record<string, unknown>, plan: ExecutionPlan, _ctx: SqlMiddlewareContext) {
+    async onRow(_row: Record<string, unknown>, plan: SqlExecutionPlan, _ctx: SqlMiddlewareContext) {
       const state = observedRowsByPlan.get(plan);
       if (!state) return;
       state.count += 1;
@@ -126,7 +129,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     },
 
     async afterExecute(
-      _plan: ExecutionPlan,
+      _plan: SqlExecutionPlan,
       result: AfterExecuteResult,
       ctx: SqlMiddlewareContext,
     ) {
@@ -145,7 +148,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     },
   });
 
-  function evaluateSelectAst(plan: ExecutionPlan, ast: SelectAst, ctx: SqlMiddlewareContext) {
+  function evaluateSelectAst(plan: SqlExecutionPlan, ast: SelectAst, ctx: SqlMiddlewareContext) {
     const hasAggNoGroup = hasAggregateWithoutGroupBy(ast);
     const estimated = estimateRowsFromAst(
       ast,
@@ -195,7 +198,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     }
   }
 
-  async function evaluateWithHeuristics(plan: ExecutionPlan, ctx: SqlMiddlewareContext) {
+  async function evaluateWithHeuristics(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
     const estimated = estimateRowsFromHeuristics(plan, tableRows, defaultTableRows);
     const isUnbounded = !hasDetectableLimitFromHeuristics(plan);
     const sqlUpper = plan.sql.trimStart().toUpperCase();

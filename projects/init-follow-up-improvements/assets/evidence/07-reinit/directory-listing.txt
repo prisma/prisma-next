@@ -1,0 +1,20 @@
+=== wip/init-experiments/07-reinit/ after target switch (Postgres -> Mongo) ===
+
+# Top level:
+total 32
+drwxr-xr-x@  9 wmadden  staff   288 Apr 26 06:15 .
+drwxr-xr-x@ 13 wmadden  staff   416 Apr 26 06:14 ..
+drwxr-xr-x@  3 wmadden  staff    96 Apr 26 06:14 .agents
+-rw-r--r--@  1 wmadden  staff   259 Apr 26 06:14 package.json
+drwxr-xr-x@  4 wmadden  staff   128 Apr 26 06:14 prisma
+-rw-r--r--@  1 wmadden  staff   216 Apr 26 06:14 prisma-next.config.ts
+-rw-r--r--@  1 wmadden  staff  3266 Apr 26 06:14 prisma-next.md
+drwxr-xr-x@  3 wmadden  staff    96 Apr 26 06:15 projects
+-rw-r--r--@  1 wmadden  staff   276 Apr 26 06:14 tsconfig.json
+
+# prisma/ subdirectory:
+total 16
+drwxr-xr-x@ 4 wmadden  staff  128 Apr 26 06:14 .
+drwxr-xr-x@ 9 wmadden  staff  288 Apr 26 06:15 ..
+-rw-r--r--@ 1 wmadden  staff  315 Apr 26 06:14 contract.prisma
+-rw-r--r--@ 1 wmadden  staff  214 Apr 26 06:14 db.ts

@@ -1,0 +1,26 @@
+=== install (pnpm) ===
+../../..                                 | Progress: resolved 1, reused 0, downloaded 0, added 0
+../../..                                 | Progress: resolved 22, reused 22, downloaded 0, added 0
+../../..                                 |  +45 +++++
+../../..                                 | Progress: resolved 45, reused 45, downloaded 0, added 18, done
+
+dependencies:
++ @prisma-next/mongo 0.3.0 (0.4.1 is available)
++ dotenv 16.6.1 (17.4.2 is available)
+
+Done in 1.9s using pnpm v10.27.0
+INSTALL_EXIT=0
+--- contract emit (pnpm install) ---
+undefined
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command "prisma-next" not found
+--- contract emit via npx ---
+{
+  "ok": false,
+  "code": "PN-CLI-4009",
+  "domain": "CLI",
+  "severity": "error",
+  "summary": "Config validation error",
+  "why": "Config.contract.source must be a provider object",
+  "fix": "Check your prisma-next.config.ts and ensure all required fields are provided",
+  "docsUrl": "https://prisma-next.dev/docs/cli/config"
+}

@@ -7,6 +7,7 @@ import {
   LiteralExpr,
 } from '@prisma-next/sql-relational-core/ast';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
+import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import {
   getColumnToFieldMap,
   resolveFieldToColumn,
@@ -40,7 +41,6 @@ import type {
   RelationMutation,
   RelationMutator,
   RuntimeQueryable,
-  RuntimeScope,
 } from './types';
 import { emptyState } from './types';
 

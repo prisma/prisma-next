@@ -1,12 +1,12 @@
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { evaluateRawGuardrails } from '@prisma-next/runtime-executor';
 import {
   type AnyFromSource,
   type AnyQueryAst,
   isQueryAst,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { evaluateRawGuardrails } from '../guardrails/raw';
 import type { SqlMiddleware, SqlMiddlewareContext } from './sql-middleware';
 
 export interface LintsOptions {
@@ -145,7 +145,7 @@ export function lints(options?: LintsOptions): SqlMiddleware {
     name: 'lints',
     familyId: 'sql' as const,
 
-    async beforeExecute(plan: ExecutionPlan, ctx: SqlMiddlewareContext) {
+    async beforeExecute(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
       if (isQueryAst(plan.ast)) {
         const findings = evaluateAstLints(plan.ast);
 

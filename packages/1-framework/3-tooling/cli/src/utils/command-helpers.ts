@@ -1,10 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
-import type { PathDecision } from '@prisma-next/migration-tools/dag';
-import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type { MigrationBundle, MigrationGraph } from '@prisma-next/migration-tools/types';
+import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
+import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -85,7 +86,7 @@ export function resolveMigrationPaths(
   configPath: string;
   migrationsDir: string;
   migrationsRelative: string;
-  refsPath: string;
+  refsDir: string;
 } {
   const configPath = configOption
     ? relative(process.cwd(), resolve(configOption))
@@ -95,8 +96,8 @@ export function resolveMigrationPaths(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
-  const refsPath = resolve(migrationsDir, 'refs.json');
-  return { configPath, migrationsDir, migrationsRelative, refsPath };
+  const refsDir = resolve(migrationsDir, 'refs');
+  return { configPath, migrationsDir, migrationsRelative, refsDir };
 }
 
 /**
@@ -111,7 +112,7 @@ export interface PathDecisionResult {
   readonly refName?: string;
   readonly selectedPath: readonly {
     readonly dirName: string;
-    readonly migrationId: string;
+    readonly migrationHash: string;
     readonly from: string;
     readonly to: string;
   }[];
@@ -129,7 +130,7 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
     ...ifDefined('refName', decision.refName),
     selectedPath: decision.selectedPath.map((entry) => ({
       dirName: entry.dirName,
-      migrationId: entry.migrationId,
+      migrationHash: entry.migrationHash,
       from: entry.from,
       to: entry.to,
     })),
@@ -146,32 +147,18 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
 
 /**
  * Reads the migrations directory and builds the migration graph from all
- * bundles. Throws on I/O or graph errors — callers handle error mapping.
+ * packages. Throws on I/O or graph errors — callers handle error mapping.
  *
- * Every on-disk bundle is content-addressed (`migrationId` is always a
+ * Every on-disk package is content-addressed (`migrationHash` is always a
  * string); there is no draft state to filter out.
  */
-export async function loadMigrationBundles(migrationsDir: string): Promise<{
-  bundles: readonly MigrationBundle[];
+export async function loadMigrationPackages(migrationsDir: string): Promise<{
+  bundles: readonly MigrationPackage[];
   graph: MigrationGraph;
 }> {
   const bundles = await readMigrationsDir(migrationsDir);
   const graph = reconstructGraph(bundles);
   return { bundles, graph };
-}
-
-export interface MigrationBundleSet {
-  readonly bundles: readonly MigrationBundle[];
-  readonly graph: MigrationGraph;
-}
-
-/**
- * Alias of `loadMigrationBundles` retained for naming-clarity in commands
- * that previously needed both attested and draft splits. With the
- * collapse of the draft state, both helpers do the same thing.
- */
-export async function loadAllBundles(migrationsDir: string): Promise<MigrationBundleSet> {
-  return loadMigrationBundles(migrationsDir);
 }
 
 /**

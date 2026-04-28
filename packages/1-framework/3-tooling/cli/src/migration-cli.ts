@@ -41,13 +41,13 @@ import { fileURLToPath } from 'node:url';
 import { CliStructuredError, errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
 import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import {
   buildMigrationArtifacts,
   isDirectEntrypoint,
   type Migration,
   printMigrationHelp,
 } from '@prisma-next/migration-tools/migration';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
 import { dirname, join } from 'pathe';
 import { loadConfig } from './config-loader';
 
@@ -202,16 +202,23 @@ export class MigrationCLI {
  * `buildMigrationArtifacts` so the pure builder can preserve fields owned
  * by `migration plan` (contract bookends, hints, labels, `createdAt`)
  * across re-emits.
+ *
+ * Author-time path: this loader is non-verifying by design. Hash mismatch
+ * is the *expected* outcome of a re-author (the developer's source
+ * changes invalidate the prior hash by construction), and verification
+ * here would block legitimate regenerations. Apply-time consumers always
+ * route through the verifying `readMigrationPackage` in
+ * `@prisma-next/migration-tools/io` instead.
  */
-function readExistingManifest(manifestPath: string): Partial<MigrationManifest> | null {
+function readExistingMetadata(metadataPath: string): Partial<MigrationMetadata> | null {
   let raw: string;
   try {
-    raw = readFileSync(manifestPath, 'utf-8');
+    raw = readFileSync(metadataPath, 'utf-8');
   } catch {
     return null;
   }
   try {
-    return JSON.parse(raw) as Partial<MigrationManifest>;
+    return JSON.parse(raw) as Partial<MigrationMetadata>;
   } catch {
     return null;
   }
@@ -236,19 +243,19 @@ function serializeMigrationToDisk(
   migrationDir: string,
   dryRun: boolean,
 ): void {
-  const manifestPath = join(migrationDir, 'migration.json');
-  const existing = readExistingManifest(manifestPath);
-  const { opsJson, manifestJson } = buildMigrationArtifacts(instance, existing);
+  const metadataPath = join(migrationDir, 'migration.json');
+  const existing = readExistingMetadata(metadataPath);
+  const { opsJson, metadataJson } = buildMigrationArtifacts(instance, existing);
 
   if (dryRun) {
-    process.stdout.write(`--- migration.json ---\n${manifestJson}\n`);
+    process.stdout.write(`--- migration.json ---\n${metadataJson}\n`);
     process.stdout.write('--- ops.json ---\n');
     process.stdout.write(`${opsJson}\n`);
     return;
   }
 
   writeFileSync(join(migrationDir, 'ops.json'), opsJson);
-  writeFileSync(manifestPath, manifestJson);
+  writeFileSync(metadataPath, metadataJson);
 
   process.stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
 }

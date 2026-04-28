@@ -28,12 +28,14 @@
     "@prisma-next/mongo-query-builder": "workspace:*",
     "@prisma-next/mongo-runtime": "workspace:*",
     "@prisma-next/target-mongo": "workspace:*",
+    "mongodb": "catalog:",
     "pathe": "^2.0.3"
   },
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
+    "mongodb-memory-server": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

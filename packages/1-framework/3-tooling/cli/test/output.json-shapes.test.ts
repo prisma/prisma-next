@@ -40,7 +40,7 @@ describe('MigrationApplyResult JSON shape', () => {
         alternativeCount: 0,
         tieBreakReasons: [],
         selectedPath: [
-          { dirName: 'm1', migrationId: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+          { dirName: 'm1', migrationHash: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
         ],
       },
       timings: { total: 42 },
@@ -66,6 +66,14 @@ describe('MigrationApplyResult JSON shape', () => {
         "toHash",
       ]
     `);
+    // Pin the selectedPath entry shape so a regression that drops
+    // `migrationHash` (or any other field) from the wire shape would fail.
+    expect(result.pathDecision!.selectedPath[0]).toEqual({
+      dirName: 'm1',
+      migrationHash: 'sha256:mid',
+      from: 'sha256:a',
+      to: 'sha256:b',
+    });
   });
 
   it('pathDecision with ref includes refName', () => {
@@ -83,11 +91,17 @@ describe('MigrationApplyResult JSON shape', () => {
         tieBreakReasons: ['at sha256:a: 2 candidates, selected by tie-break'],
         refName: 'production',
         selectedPath: [
-          { dirName: 'm1', migrationId: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+          { dirName: 'm1', migrationHash: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
         ],
       },
       timings: { total: 10 },
     };
+    expect(result.pathDecision!.selectedPath[0]).toEqual({
+      dirName: 'm1',
+      migrationHash: 'sha256:mid',
+      from: 'sha256:a',
+      to: 'sha256:b',
+    });
     expect(Object.keys(result.pathDecision!).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
@@ -166,7 +180,7 @@ describe('MigrationStatusResult JSON shape', () => {
       dirName: '20260101T1200_init',
       from: 'sha256:a',
       to: 'sha256:b',
-      migrationId: 'sha256:mid',
+      migrationHash: 'sha256:mid',
       operationCount: 3,
       operationSummary: '3 ops (all additive)',
       hasDestructive: false,
@@ -177,7 +191,7 @@ describe('MigrationStatusResult JSON shape', () => {
         "dirName",
         "from",
         "hasDestructive",
-        "migrationId",
+        "migrationHash",
         "operationCount",
         "operationSummary",
         "status",

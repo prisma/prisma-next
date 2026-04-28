@@ -3,7 +3,7 @@ export {
   formatMigrationDirName,
   readMigrationPackage,
   readMigrationsDir,
-  writeMigrationManifest,
+  writeMigrationMetadata,
   writeMigrationOps,
   writeMigrationPackage,
 } from '../io';

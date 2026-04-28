@@ -37,103 +37,107 @@ describe('adapter-postgres codecs', () => {
 
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
-      encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+      encode: (value: string | Date) => Promise<string>;
+      decode: (wire: string | Date) => Promise<string>;
     };
 
-    it('encodes Date to ISO string', () => {
+    it('encodes Date to ISO string', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes Date to ISO string', () => {
+    it('decodes Date to ISO string', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('decodes string to string', () => {
-      const result = timestampCodec.decode('2024-01-15T10:30:00.000Z');
+    it('decodes string to string', async () => {
+      const result = await timestampCodec.decode('2024-01-15T10:30:00.000Z');
       expect(result).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('encodes strings as-is', () => {
-      expect(timestampCodec.encode('2024-01-15T10:30:00.000Z')).toBe('2024-01-15T10:30:00.000Z');
+    it('encodes strings as-is', async () => {
+      expect(await timestampCodec.encode('2024-01-15T10:30:00.000Z')).toBe(
+        '2024-01-15T10:30:00.000Z',
+      );
     });
   });
 
   describe('sql-timestamp codec', () => {
     const timestampCodec = codecDefinitions['sql-timestamp'].codec as {
-      encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+      encode: (value: string | Date) => Promise<string>;
+      decode: (wire: string | Date) => Promise<string>;
     };
 
-    it('encodes Date values to ISO strings', () => {
+    it('encodes Date values to ISO strings', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('keeps string values stable', () => {
+    it('keeps string values stable', async () => {
       const wire = '2024-01-15T10:30:00.000Z';
-      expect(timestampCodec.encode(wire)).toBe(wire);
-      expect(timestampCodec.decode(wire)).toBe(wire);
+      expect(await timestampCodec.encode(wire)).toBe(wire);
+      expect(await timestampCodec.decode(wire)).toBe(wire);
     });
   });
 
   describe('timestamptz codec', () => {
     const timestamptzCodec = codecDefinitions.timestamptz.codec as {
-      encode: (value: string | Date) => string;
-      decode: (wire: string | Date) => string;
+      encode: (value: string | Date) => Promise<string>;
+      decode: (wire: string | Date) => Promise<string>;
     };
 
-    it('encodes Date values to ISO strings', () => {
+    it('encodes Date values to ISO strings', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(timestamptzCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await timestamptzCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
     });
 
-    it('keeps strings and already-decoded values stable', () => {
+    it('keeps strings and already-decoded values stable', async () => {
       const wire = '2024-01-15T10:30:00.000Z';
-      expect(timestamptzCodec.encode(wire)).toBe(wire);
-      expect(timestamptzCodec.decode(wire)).toBe(wire);
+      expect(await timestamptzCodec.encode(wire)).toBe(wire);
+      expect(await timestamptzCodec.decode(wire)).toBe(wire);
     });
   });
 
   describe('json codec', () => {
     const jsonCodec = codecDefinitions.json.codec as {
-      encode: (value: unknown) => string;
-      decode: (wire: string | unknown) => unknown;
+      encode: (value: unknown) => Promise<string>;
+      decode: (wire: string | unknown) => Promise<unknown>;
     };
 
-    it('encodes object to JSON string', () => {
-      expect(jsonCodec.encode({ key: 'value', nested: { ok: true } })).toBe(
+    it('encodes object to JSON string', async () => {
+      expect(await jsonCodec.encode({ key: 'value', nested: { ok: true } })).toBe(
         '{"key":"value","nested":{"ok":true}}',
       );
     });
 
-    it('decodes JSON string to object', () => {
-      expect(jsonCodec.decode('{"key":"value"}')).toEqual({ key: 'value' });
+    it('decodes JSON string to object', async () => {
+      expect(await jsonCodec.decode('{"key":"value"}')).toEqual({ key: 'value' });
     });
 
-    it('passes through already-decoded values', () => {
-      expect(jsonCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
+    it('passes through already-decoded values', async () => {
+      expect(await jsonCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
     });
   });
 
   describe('jsonb codec', () => {
     const jsonbCodec = codecDefinitions.jsonb.codec as {
-      encode: (value: unknown) => string;
-      decode: (wire: string | unknown) => unknown;
+      encode: (value: unknown) => Promise<string>;
+      decode: (wire: string | unknown) => Promise<unknown>;
     };
 
-    it('encodes arrays and null values', () => {
-      expect(jsonbCodec.encode([1, null, { active: false }])).toBe('[1,null,{"active":false}]');
+    it('encodes arrays and null values', async () => {
+      expect(await jsonbCodec.encode([1, null, { active: false }])).toBe(
+        '[1,null,{"active":false}]',
+      );
     });
 
-    it('decodes JSON string to array', () => {
-      expect(jsonbCodec.decode('[1,true,{"x":1}]')).toEqual([1, true, { x: 1 }]);
+    it('decodes JSON string to array', async () => {
+      expect(await jsonbCodec.decode('[1,true,{"x":1}]')).toEqual([1, true, { x: 1 }]);
     });
 
-    it('passes through already-decoded values', () => {
-      expect(jsonbCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
+    it('passes through already-decoded values', async () => {
+      expect(await jsonbCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
     });
   });
 
@@ -142,13 +146,13 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'sql-text', value: 'portable text' },
       { scalar: 'text', value: 'hello world' },
       { scalar: 'enum', value: 'ADMIN' },
-    ] as const)('keeps $scalar values unchanged', ({ scalar, value }) => {
+    ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecDefinitions[scalar].codec as {
-        encode: (input: string) => string;
-        decode: (input: string) => string;
+        encode: (input: string) => Promise<string>;
+        decode: (input: string) => Promise<string>;
       };
-      expect(codec.encode(value)).toBe(value);
-      expect(codec.decode(value)).toBe(value);
+      expect(await codec.encode(value)).toBe(value);
+      expect(await codec.decode(value)).toBe(value);
     });
 
     it.each([
@@ -157,177 +161,177 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'int8', value: 9001 },
       { scalar: 'float4', value: 3.14 },
       { scalar: 'float8', value: Math.E },
-    ] as const)('keeps $scalar values unchanged', ({ scalar, value }) => {
+    ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecDefinitions[scalar].codec as {
-        encode: (input: number) => number;
-        decode: (input: number) => number;
+        encode: (input: number) => Promise<number>;
+        decode: (input: number) => Promise<number>;
       };
-      expect(codec.encode(value)).toBe(value);
-      expect(codec.decode(value)).toBe(value);
+      expect(await codec.encode(value)).toBe(value);
+      expect(await codec.decode(value)).toBe(value);
     });
 
-    it('keeps boolean values unchanged', () => {
+    it('keeps boolean values unchanged', async () => {
       const boolCodec = codecDefinitions.bool.codec as {
-        encode: (input: boolean) => boolean;
-        decode: (input: boolean) => boolean;
+        encode: (input: boolean) => Promise<boolean>;
+        decode: (input: boolean) => Promise<boolean>;
       };
-      expect(boolCodec.encode(true)).toBe(true);
-      expect(boolCodec.decode(false)).toBe(false);
+      expect(await boolCodec.encode(true)).toBe(true);
+      expect(await boolCodec.decode(false)).toBe(false);
     });
   });
 
   describe('character codec', () => {
     const charCodec = codecDefinitions.character.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = 'A';
-      const encoded = charCodec.encode(value);
+      const encoded = await charCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = 'Z';
-      const decoded = charCodec.decode(value);
+      const decoded = await charCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('character varying codec', () => {
     const varcharCodec = codecDefinitions['character varying'].codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = 'hello';
-      const encoded = varcharCodec.encode(value);
+      const encoded = await varcharCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = 'world';
-      const decoded = varcharCodec.decode(value);
+      const decoded = await varcharCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('numeric codec', () => {
     const numericCodec = codecDefinitions.numeric.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string | number) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string | number) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '123.45';
-      const encoded = numericCodec.encode(value);
+      const encoded = await numericCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes number to string', () => {
-      const decoded = numericCodec.decode(42);
+    it('decodes number to string', async () => {
+      const decoded = await numericCodec.decode(42);
       expect(decoded).toBe('42');
     });
   });
 
   describe('time codec', () => {
     const timeCodec = codecDefinitions.time.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '12:34:56';
-      const encoded = timeCodec.encode(value);
+      const encoded = await timeCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = '23:59:59';
-      const decoded = timeCodec.decode(value);
+      const decoded = await timeCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('timetz codec', () => {
     const timetzCodec = codecDefinitions.timetz.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '12:34:56+02';
-      const encoded = timetzCodec.encode(value);
+      const encoded = await timetzCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = '23:59:59-05';
-      const decoded = timetzCodec.decode(value);
+      const decoded = await timetzCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('bit codec', () => {
     const bitCodec = codecDefinitions.bit.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '1010';
-      const encoded = bitCodec.encode(value);
+      const encoded = await bitCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = '0101';
-      const decoded = bitCodec.decode(value);
+      const decoded = await bitCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('bit varying codec', () => {
     const varbitCodec = codecDefinitions['bit varying'].codec as {
-      encode: (value: string) => string;
-      decode: (wire: string) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '11110000';
-      const encoded = varbitCodec.encode(value);
+      const encoded = await varbitCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = '00001111';
-      const decoded = varbitCodec.decode(value);
+      const decoded = await varbitCodec.decode(value);
       expect(decoded).toBe(value);
     });
   });
 
   describe('interval codec', () => {
     const intervalCodec = codecDefinitions.interval.codec as {
-      encode: (value: string) => string;
-      decode: (wire: string | Record<string, unknown>) => string;
+      encode: (value: string) => Promise<string>;
+      decode: (wire: string | Record<string, unknown>) => Promise<string>;
     };
 
-    it('encodes string as-is', () => {
+    it('encodes string as-is', async () => {
       const value = '1 day';
-      const encoded = intervalCodec.encode(value);
+      const encoded = await intervalCodec.encode(value);
       expect(encoded).toBe(value);
     });
 
-    it('decodes string as-is', () => {
+    it('decodes string as-is', async () => {
       const value = '2 hours';
-      const decoded = intervalCodec.decode(value);
+      const decoded = await intervalCodec.decode(value);
       expect(decoded).toBe(value);
     });
 
-    it('serializes object wire values to JSON strings', () => {
-      const decoded = intervalCodec.decode({ hours: 2, minutes: 30 });
+    it('serializes object wire values to JSON strings', async () => {
+      const decoded = await intervalCodec.decode({ hours: 2, minutes: 30 });
       expect(decoded).toBe('{"hours":2,"minutes":30}');
     });
   });
@@ -506,14 +510,14 @@ describe('adapter-postgres codecs', () => {
 
   describe('numeric codec decode', () => {
     const numericCodec = codecDefinitions.numeric.codec as {
-      decode: (wire: string | number) => string;
+      decode: (wire: string | number) => Promise<string>;
     };
 
     it.each([
       { wire: 42, expected: '42' },
       { wire: '123.45', expected: '123.45' },
-    ])('decodes $wire to $expected', ({ wire, expected }) => {
-      expect(numericCodec.decode(wire)).toBe(expected);
+    ])('decodes $wire to $expected', async ({ wire, expected }) => {
+      expect(await numericCodec.decode(wire)).toBe(expected);
     });
   });
 });

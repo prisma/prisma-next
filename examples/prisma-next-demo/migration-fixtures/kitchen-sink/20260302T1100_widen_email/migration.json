@@ -1,7 +1,7 @@
 {
   "from": "sha256:ef9de2767997cc2d57d1a4b6b0a4907d54b94793afd5309225803b14be0463bc",
   "to": "sha256:cc527d28d178b9a94302953bb9944199e09f1793c3c77ca1f628cb3a4f09fcb7",
-  "migrationId": "sha256:59a00ca1a29012fb031a1853865f257616c15908c01d4f4266009b0e682274de",
+  "migrationHash": "sha256:59a00ca1a29012fb031a1853865f257616c15908c01d4f4266009b0e682274de",
   "kind": "regular",
   "fromContract": {
     "schemaVersion": "1",

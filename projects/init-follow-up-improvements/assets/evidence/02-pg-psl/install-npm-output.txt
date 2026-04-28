@@ -1,0 +1,34 @@
+=== npm install instead ===
+
+added 59 packages, and audited 60 packages in 4s
+
+5 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+---
+
+added 36 packages, and audited 96 packages in 3s
+
+13 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+NPM_INSTALL_EXIT=0
+=== contract emit ===
+{
+  "ok": true,
+  "storageHash": "sha256:f1c8f920666ed76cc48d59ef4f214494d04ded0cd79078558e24c9f74f13066b",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "outDir": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/02-pg-psl/prisma",
+  "files": {
+    "json": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/02-pg-psl/prisma/contract.json",
+    "dts": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/02-pg-psl/prisma/contract.d.ts"
+  },
+  "timings": {
+    "total": 1274
+  }
+}
+EMIT_EXIT=0
+=== tsc --noEmit (PG PSL) ===
+prisma-next.config.ts(7,17): error TS2591: Cannot find name 'process'. Do you need to install type definitions for node? Try `npm i --save-dev @types/node` and then add 'node' to the types field in your tsconfig.

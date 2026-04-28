@@ -1,13 +1,14 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import {
   getColumnToFieldMap,
   getCompleteColumnToFieldMap,
   getFieldToColumnMap,
   type PolymorphismInfo,
 } from './collection-contract';
-import type { CollectionContext, RuntimeConnection, RuntimeScope } from './types';
+import type { CollectionContext, RuntimeConnection } from './types';
 
 export interface RowEnvelope {
   readonly raw: Record<string, unknown>;

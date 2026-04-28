@@ -1,11 +1,10 @@
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
-import type { ExecutionPlan } from '@prisma-next/contract/types';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { AsyncIterableResult } from '@prisma-next/runtime-executor';
+import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { SelectAst } from '@prisma-next/sql-relational-core/ast';
-import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
@@ -39,7 +38,7 @@ export function getTestContext(): ExecutionContext<TestContract> {
 }
 
 export interface MockExecution {
-  plan: ExecutionPlan | SqlQueryPlan<unknown>;
+  plan: SqlExecutionPlan | SqlQueryPlan<unknown>;
   rows: Record<string, unknown>[];
 }
 
@@ -175,10 +174,12 @@ export function createMockRuntime(): MockRuntime {
     setNextResults(results: Record<string, unknown>[][]) {
       nextResult = [...results];
     },
-    execute<Row>(plan: ExecutionPlan<Row> | SqlQueryPlan<Row>): AsyncIterableResult<Row> {
+    execute<Row>(
+      plan: (SqlExecutionPlan | SqlQueryPlan) & { readonly _row?: Row },
+    ): AsyncIterableResult<Row> {
       const rows = (nextResult.shift() ?? []) as Row[];
       executions.push({
-        plan: plan as ExecutionPlan | SqlQueryPlan<unknown>,
+        plan,
         rows: rows as Record<string, unknown>[],
       });
       const gen = async function* (): AsyncGenerator<Row, void, unknown> {

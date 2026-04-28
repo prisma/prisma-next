@@ -32,7 +32,8 @@ describe('value objects in contract definition builder', () => {
           id,
           targetTypes: ['jsonb'],
           traits: ['equality'] as const,
-          decode: (wire: unknown) => wire,
+          encode: async (value: unknown) => value,
+          decode: async (wire: unknown) => wire,
           encodeJson: (value: unknown) => {
             if (!isMoneyValue(value)) {
               throw new Error('Expected a Money value');

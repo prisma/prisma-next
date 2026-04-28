@@ -1,5 +1,9 @@
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import type {
+  ControlDriverInstance,
+  ControlFamilyInstance,
+} from '@prisma-next/framework-components/control';
 import type { MongoDriver } from '@prisma-next/mongo-lowering';
+import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
 import {
   initMarker,
   type MongoRunnerDependencies,
@@ -25,6 +29,7 @@ export function extractDb(driver: ControlDriverInstance<'mongo', 'mongo'>): Db {
 export function createMongoRunnerDeps(
   controlDriver: ControlDriverInstance<'mongo', 'mongo'>,
   driver: MongoDriver,
+  family: ControlFamilyInstance<'mongo', MongoSchemaIR>,
 ): MongoRunnerDependencies {
   const db = extractDb(controlDriver);
   return {
@@ -38,5 +43,6 @@ export function createMongoRunnerDeps(
       updateMarker: (expectedFrom, dest) => updateMarker(db, expectedFrom, dest),
       writeLedgerEntry: (entry) => writeLedgerEntry(db, entry),
     },
+    introspectSchema: () => family.introspect({ driver: controlDriver }),
   };
 }

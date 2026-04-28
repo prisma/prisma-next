@@ -4,14 +4,15 @@ import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { computeMigrationId } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
-import type { MigrationManifest, MigrationPackage } from '@prisma-next/migration-tools/types';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
@@ -41,16 +42,16 @@ function createOp(
 }
 
 /**
- * Build a draft (un-attested) base manifest. The actual on-disk manifest
- * is attested inside `setupMigrationDir`, where the `migrationId` is
+ * Build a draft (un-attested) base metadata. The actual on-disk metadata
+ * is attested inside `setupMigrationDir`, where the `migrationHash` is
  * computed once we know the full ops list.
  */
-function createManifest(
+function createMetadata(
   from: string,
   to: string,
   toContract: Contract,
   fromContract: Contract | null = null,
-): Omit<MigrationManifest, 'migrationId'> {
+): Omit<MigrationMetadata, 'migrationHash'> {
   return {
     from,
     to,
@@ -66,23 +67,23 @@ function createManifest(
 async function setupMigrationDir(
   migrationsDir: string,
   name: string,
-  baseManifest: Omit<MigrationManifest, 'migrationId'>,
+  baseMetadata: Omit<MigrationMetadata, 'migrationHash'>,
   ops: MigrationPlanOperation[],
   dateOffset = 0,
 ): Promise<string> {
   const date = new Date(2026, 0, 1 + dateOffset, 10, 0);
   const dirName = formatMigrationDirName(date, name);
   const packageDir = join(migrationsDir, dirName);
-  const manifest: MigrationManifest = {
-    ...baseManifest,
-    migrationId: computeMigrationId(baseManifest, ops),
+  const metadata: MigrationMetadata = {
+    ...baseMetadata,
+    migrationHash: computeMigrationHash(baseMetadata, ops),
   };
-  await writeMigrationPackage(packageDir, manifest, ops);
+  await writeMigrationPackage(packageDir, metadata, ops);
   return packageDir;
 }
 
 describe('resolveByHashPrefix', () => {
-  it('resolves exact migrationId match', async () => {
+  it('resolves exact migrationHash match', async () => {
     const tempDir = await createTempDir('exact');
     const migrationsDir = join(tempDir, 'migrations');
     await mkdir(migrationsDir, { recursive: true });
@@ -98,18 +99,18 @@ describe('resolveByHashPrefix', () => {
     await setupMigrationDir(
       migrationsDir,
       'add-user',
-      createManifest(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
+      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
     const packages = await readMigrationsDir(migrationsDir);
     const pkg = packages[0]!;
-    const migrationId = pkg.manifest.migrationId!;
+    const migrationHash = pkg.metadata.migrationHash;
 
-    const result = resolveByHashPrefix(packages, migrationId);
+    const result = resolveByHashPrefix(packages, migrationHash);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.migrationId).toBe(migrationId);
+      expect(result.value.metadata.migrationHash).toBe(migrationHash);
     }
   });
 
@@ -129,18 +130,18 @@ describe('resolveByHashPrefix', () => {
     await setupMigrationDir(
       migrationsDir,
       'add-user',
-      createManifest(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
+      createMetadata(EMPTY_CONTRACT_HASH, 'sha256:hash-a', contract),
       [createOp('table.user', 'Create table "user"', 'additive')],
     );
 
     const packages = await readMigrationsDir(migrationsDir);
-    const migrationId = packages[0]!.manifest.migrationId!;
-    const prefix = migrationId.slice(0, 12);
+    const migrationHash = packages[0]!.metadata.migrationHash;
+    const prefix = migrationHash.slice(0, 12);
 
     const result = resolveByHashPrefix(packages, prefix);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.migrationId).toBe(migrationId);
+      expect(result.value.metadata.migrationHash).toBe(migrationHash);
     }
   });
 
@@ -149,10 +150,10 @@ describe('resolveByHashPrefix', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
-        manifest: {
+        metadata: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          migrationId: 'sha256:abc123',
+          migrationHash: 'sha256:abc123',
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
@@ -177,10 +178,10 @@ describe('resolveByHashPrefix', () => {
       {
         dirName: '20260101_100000_first',
         dirPath: '/tmp/first',
-        manifest: {
+        metadata: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          migrationId: 'sha256:abc111',
+          migrationHash: 'sha256:abc111',
           kind: 'regular',
           fromContract: null,
           toContract: contract,
@@ -193,10 +194,10 @@ describe('resolveByHashPrefix', () => {
       {
         dirName: '20260102_100000_second',
         dirPath: '/tmp/second',
-        manifest: {
+        metadata: {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
-          migrationId: 'sha256:abc222',
+          migrationHash: 'sha256:abc222',
           kind: 'regular',
           fromContract: contract,
           toContract: contract,
@@ -220,10 +221,10 @@ describe('resolveByHashPrefix', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
-        manifest: {
+        metadata: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          migrationId: 'sha256:abc123def456',
+          migrationHash: 'sha256:abc123def456',
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
@@ -238,23 +239,23 @@ describe('resolveByHashPrefix', () => {
     const result = resolveByHashPrefix(packages, 'abc123');
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.value.manifest.migrationId).toBe('sha256:abc123def456');
+      expect(result.value.metadata.migrationHash).toBe('sha256:abc123def456');
     }
   });
 
   it('returns no match when prefix matches nothing', () => {
     // After the draft state was collapsed, every package has a real
-    // `migrationId` — there is no longer a "skip draft" branch. The
+    // `migrationHash` — there is no longer a "skip draft" branch. The
     // prefix lookup simply returns no-match if nothing in the chain
     // shares the requested prefix.
     const packages: MigrationPackage[] = [
       {
         dirName: '20260101_100000_only',
         dirPath: '/tmp/only',
-        manifest: {
+        metadata: {
           from: EMPTY_CONTRACT_HASH,
           to: 'sha256:hash-a',
-          migrationId: 'sha256:abc999000000',
+          migrationHash: 'sha256:abc999000000',
           kind: 'regular',
           fromContract: null,
           toContract: createContract(),
@@ -283,7 +284,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_add_user',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -300,7 +301,7 @@ describe('formatMigrationShowOutput', () => {
     expect(stripped).toContain('kind: regular');
     expect(stripped).toContain(`from: ${EMPTY_CONTRACT_HASH}`);
     expect(stripped).toContain('to:   sha256:hash-a');
-    expect(stripped).toContain('migrationId: sha256:edge-abc');
+    expect(stripped).toContain('migrationHash: sha256:edge-abc');
     expect(stripped).toContain('2026-01-01T10:00:00.000Z');
   });
 
@@ -312,7 +313,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -344,7 +345,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -374,7 +375,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -399,7 +400,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
@@ -424,7 +425,7 @@ describe('formatMigrationShowOutput', () => {
         dirPath: 'migrations/20260101_100000_test',
         from: EMPTY_CONTRACT_HASH,
         to: 'sha256:hash-a',
-        migrationId: 'sha256:edge-abc',
+        migrationHash: 'sha256:edge-abc',
         kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],

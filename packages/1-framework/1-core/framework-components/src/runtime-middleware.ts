@@ -1,5 +1,5 @@
-import type { PlanMeta } from '@prisma-next/contract/types';
 import type { AsyncIterableResult } from './async-iterable-result';
+import type { QueryPlan } from './query-plan';
 import { runtimeError } from './runtime-error';
 
 export interface RuntimeLog {
@@ -22,18 +22,22 @@ export interface AfterExecuteResult {
   readonly completed: boolean;
 }
 
-export interface RuntimeMiddleware {
+/**
+ * Family-agnostic middleware SPI parameterized over the plan marker.
+ *
+ * `TPlan` defaults to the framework `QueryPlan` marker so a generic
+ * middleware (e.g. cross-family telemetry) can be authored without
+ * naming a family. Family-specific middleware (`SqlMiddleware`,
+ * `MongoMiddleware`) narrow `TPlan` to their concrete plan type.
+ */
+export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
-  beforeExecute?(plan: { readonly meta: PlanMeta }, ctx: RuntimeMiddlewareContext): Promise<void>;
-  onRow?(
-    row: Record<string, unknown>,
-    plan: { readonly meta: PlanMeta },
-    ctx: RuntimeMiddlewareContext,
-  ): Promise<void>;
+  beforeExecute?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
+  onRow?(row: Record<string, unknown>, plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
   afterExecute?(
-    plan: { readonly meta: PlanMeta },
+    plan: TPlan,
     result: AfterExecuteResult,
     ctx: RuntimeMiddlewareContext,
   ): Promise<void>;
@@ -45,9 +49,9 @@ export interface RuntimeMiddleware {
  * Mongo structurally (due to its phantom Row parameter using a unique symbol).
  *
  * The `_row` intersection on `execute` connects the `Row` type parameter to the
- * plan, mirroring how `ExecutionPlan<Row>` carries a phantom `_row?: Row`.
+ * plan, mirroring how `QueryPlan<Row>` carries a phantom `_row?: Row`.
  */
-export interface RuntimeExecutor<TPlan extends { readonly meta: PlanMeta }> {
+export interface RuntimeExecutor<TPlan extends QueryPlan> {
   execute<Row>(plan: TPlan & { readonly _row?: Row }): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }

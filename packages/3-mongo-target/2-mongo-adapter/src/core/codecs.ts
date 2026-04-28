@@ -56,6 +56,11 @@ export const mongoDateCodec = mongoCodec({
   traits: ['equality', 'order'],
   decode: (wire: Date) => wire,
   encode: (value: Date) => value,
+  encodeJson: (value: Date) => value.toISOString(),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') throw new Error('expected ISO date string');
+    return new Date(json);
+  },
 });
 
 export const mongoVectorCodec = mongoCodec({

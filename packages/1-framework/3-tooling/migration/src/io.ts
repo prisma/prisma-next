@@ -7,9 +7,12 @@ import {
   errorInvalidJson,
   errorInvalidManifest,
   errorInvalidSlug,
+  errorMigrationHashMismatch,
   errorMissingFile,
 } from './errors';
-import type { MigrationBundle, MigrationManifest, MigrationOps } from './types';
+import { verifyMigrationHash } from './hash';
+import type { MigrationMetadata } from './metadata';
+import type { MigrationOps, MigrationPackage } from './package';
 
 const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
@@ -25,10 +28,10 @@ const MigrationHintsSchema = type({
   plannerVersion: 'string',
 });
 
-const MigrationManifestSchema = type({
+const MigrationMetadataSchema = type({
   from: 'string',
   to: 'string',
-  migrationId: 'string',
+  migrationHash: 'string',
   kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',
@@ -56,7 +59,7 @@ const MigrationOpsSchema = MigrationOpSchema.array();
 
 export async function writeMigrationPackage(
   dir: string,
-  manifest: MigrationManifest,
+  metadata: MigrationMetadata,
   ops: MigrationOps,
 ): Promise<void> {
   await mkdir(dirname(dir), { recursive: true });
@@ -70,7 +73,9 @@ export async function writeMigrationPackage(
     throw error;
   }
 
-  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(manifest, null, 2), { flag: 'wx' });
+  await writeFile(join(dir, MANIFEST_FILE), JSON.stringify(metadata, null, 2), {
+    flag: 'wx',
+  });
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
 }
 
@@ -98,18 +103,18 @@ export async function copyFilesWithRename(
   }
 }
 
-export async function writeMigrationManifest(
+export async function writeMigrationMetadata(
   dir: string,
-  manifest: MigrationManifest,
+  metadata: MigrationMetadata,
 ): Promise<void> {
-  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(manifest, null, 2)}\n`);
+  await writeFile(join(dir, MANIFEST_FILE), `${JSON.stringify(metadata, null, 2)}\n`);
 }
 
 export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise<void> {
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
-export async function readMigrationPackage(dir: string): Promise<MigrationBundle> {
+export async function readMigrationPackage(dir: string): Promise<MigrationPackage> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);
 
@@ -133,9 +138,9 @@ export async function readMigrationPackage(dir: string): Promise<MigrationBundle
     throw error;
   }
 
-  let manifest: MigrationManifest;
+  let metadata: MigrationMetadata;
   try {
-    manifest = JSON.parse(manifestRaw);
+    metadata = JSON.parse(manifestRaw);
   } catch (e) {
     throw errorInvalidJson(manifestPath, e instanceof Error ? e.message : String(e));
   }
@@ -147,22 +152,29 @@ export async function readMigrationPackage(dir: string): Promise<MigrationBundle
     throw errorInvalidJson(opsPath, e instanceof Error ? e.message : String(e));
   }
 
-  validateManifest(manifest, manifestPath);
+  validateMetadata(metadata, manifestPath);
   validateOps(ops, opsPath);
 
-  return {
+  const pkg: MigrationPackage = {
     dirName: basename(dir),
     dirPath: dir,
-    manifest,
+    metadata,
     ops,
   };
+
+  const verification = verifyMigrationHash(pkg);
+  if (!verification.ok) {
+    throw errorMigrationHashMismatch(dir, verification.storedHash, verification.computedHash);
+  }
+
+  return pkg;
 }
 
-function validateManifest(
-  manifest: unknown,
+function validateMetadata(
+  metadata: unknown,
   filePath: string,
-): asserts manifest is MigrationManifest {
-  const result = MigrationManifestSchema(manifest);
+): asserts metadata is MigrationMetadata {
+  const result = MigrationMetadataSchema(metadata);
   if (result instanceof type.errors) {
     throw errorInvalidManifest(filePath, result.summary);
   }
@@ -177,7 +189,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly MigrationBundle[]> {
+): Promise<readonly MigrationPackage[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -188,7 +200,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: MigrationBundle[] = [];
+  const packages: MigrationPackage[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);

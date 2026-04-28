@@ -5,6 +5,22 @@ export interface RuntimeErrorEnvelope extends Error {
   readonly details?: Record<string, unknown>;
 }
 
+/**
+ * Type guard for the runtime-error envelope produced by `runtimeError`.
+ *
+ * Prefer this over duck-typing on `error.code` directly so consumers stay
+ * insulated from the envelope's internal shape.
+ */
+export function isRuntimeError(error: unknown): error is RuntimeErrorEnvelope {
+  return (
+    error instanceof Error &&
+    'code' in error &&
+    typeof (error as { code?: unknown }).code === 'string' &&
+    'category' in error &&
+    'severity' in error
+  );
+}
+
 export function runtimeError(
   code: string,
   message: string,

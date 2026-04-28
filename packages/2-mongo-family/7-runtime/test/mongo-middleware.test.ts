@@ -1,8 +1,8 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { RuntimeMiddleware } from '@prisma-next/framework-components/runtime';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
+import type { MongoMiddleware } from '../src/mongo-middleware';
 import { createMongoRuntime } from '../src/mongo-runtime';
 
 const baseMeta: PlanMeta = {
@@ -45,7 +45,7 @@ function createMockDriver(rows: Record<string, unknown>[] = []): MongoDriver {
 describe('MongoRuntime middleware lifecycle', () => {
   it('calls beforeExecute, onRow, afterExecute in order', async () => {
     const callOrder: string[] = [];
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'test',
       async beforeExecute() {
         callOrder.push('beforeExecute');
@@ -92,7 +92,7 @@ describe('MongoRuntime middleware lifecycle', () => {
 
   it('passes plan metadata to middleware hooks', async () => {
     const receivedMeta: PlanMeta[] = [];
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'meta-inspector',
       async beforeExecute(plan) {
         receivedMeta.push(plan.meta);
@@ -127,7 +127,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     } as unknown as MongoDriver;
 
     let afterResult: { completed: boolean; rowCount: number } | undefined;
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'error-observer',
       async afterExecute(_plan, result) {
         afterResult = { completed: result.completed, rowCount: result.rowCount };
@@ -161,7 +161,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     } as unknown as MongoDriver;
 
     const beforeCalled = vi.fn();
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'no-afterExecute',
       async beforeExecute() {
         beforeCalled();
@@ -194,7 +194,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       close: vi.fn(async () => {}),
     } as unknown as MongoDriver;
 
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'failing-afterExecute',
       async afterExecute() {
         throw new Error('afterExecute also fails');
@@ -218,7 +218,7 @@ describe('MongoRuntime middleware lifecycle', () => {
 
   it('reports correct rowCount and completed: true on success', async () => {
     let afterResult: { completed: boolean; rowCount: number } | undefined;
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'result-observer',
       async afterExecute(_plan, result) {
         afterResult = { completed: result.completed, rowCount: result.rowCount };
@@ -242,7 +242,7 @@ describe('MongoRuntime middleware lifecycle', () => {
 
   it('passes mode through to middleware context', async () => {
     let receivedMode: string | undefined;
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'mode-inspector',
       async beforeExecute(_plan, ctx) {
         receivedMode = ctx.mode;
@@ -267,7 +267,7 @@ describe('MongoRuntime middleware lifecycle', () => {
 
   it('provides working log and now on the middleware context', async () => {
     let logWorks = false;
-    const middleware: RuntimeMiddleware = {
+    const middleware: MongoMiddleware = {
       name: 'ctx-tester',
       async beforeExecute(_plan, ctx) {
         ctx.log.info('test');
@@ -296,7 +296,7 @@ describe('MongoRuntime middleware lifecycle', () => {
 
 describe('MongoRuntime middleware compatibility validation', () => {
   it('accepts a generic middleware (no familyId)', () => {
-    const middleware: RuntimeMiddleware = { name: 'generic' };
+    const middleware: MongoMiddleware = { name: 'generic' };
     expect(() =>
       createMongoRuntime({
         adapter: createMockAdapter(),
@@ -309,7 +309,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
   });
 
   it('accepts a mongo middleware', () => {
-    const middleware: RuntimeMiddleware = { name: 'mongo-specific', familyId: 'mongo' };
+    const middleware: MongoMiddleware = { name: 'mongo-specific', familyId: 'mongo' };
     expect(() =>
       createMongoRuntime({
         adapter: createMockAdapter(),
@@ -322,7 +322,13 @@ describe('MongoRuntime middleware compatibility validation', () => {
   });
 
   it('rejects a SQL middleware with a clear error', () => {
-    const middleware: RuntimeMiddleware = { name: 'sql-lints', familyId: 'sql' };
+    // Intentionally misconfigured to verify the runtime rejects mismatched familyId.
+    // The static type narrows familyId to 'mongo' | undefined, so we cast to bypass
+    // the type check and exercise the runtime path.
+    const middleware = {
+      name: 'sql-lints',
+      familyId: 'sql' as const,
+    } as unknown as MongoMiddleware;
     expect(() =>
       createMongoRuntime({
         adapter: createMockAdapter(),

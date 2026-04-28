@@ -34,69 +34,88 @@ class MongoAdapterImpl implements MongoAdapter {
     this.#codecs = codecs;
   }
 
-  #resolveDocument(expr: MongoExpr): Document {
+  async #resolveDocument(expr: MongoExpr): Promise<Document> {
+    const entries = Object.entries(expr);
+    const resolved = await Promise.all(entries.map(([, val]) => resolveValue(val, this.#codecs)));
     const result: Record<string, unknown> = {};
-    for (const [key, val] of Object.entries(expr)) {
-      result[key] = resolveValue(val, this.#codecs);
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (entry) {
+        result[entry[0]] = resolved[i];
+      }
     }
     return result;
   }
 
-  #lowerUpdate(update: MongoUpdateSpec): Document | ReadonlyArray<Document> {
+  async #lowerUpdate(update: MongoUpdateSpec): Promise<Document | ReadonlyArray<Document>> {
     if (isUpdatePipeline(update)) {
-      return update.map((stage) => lowerStage(stage));
+      return Promise.all(update.map((stage) => lowerStage(stage, this.#codecs)));
     }
     return this.#resolveDocument(update);
   }
 
-  lower(plan: MongoQueryPlan): AnyMongoWireCommand {
+  async lower(plan: MongoQueryPlan): Promise<AnyMongoWireCommand> {
     const { command } = plan;
     switch (command.kind) {
       case 'insertOne':
         return new InsertOneWireCommand(
           command.collection,
-          this.#resolveDocument(command.document),
+          await this.#resolveDocument(command.document),
         );
-      case 'updateOne':
-        return new UpdateOneWireCommand(
-          command.collection,
-          lowerFilter(command.filter),
+      case 'updateOne': {
+        const [filter, update] = await Promise.all([
+          lowerFilter(command.filter, this.#codecs),
           this.#lowerUpdate(command.update),
-          command.upsert,
-        );
+        ]);
+        return new UpdateOneWireCommand(command.collection, filter, update, command.upsert);
+      }
       case 'insertMany':
         return new InsertManyWireCommand(
           command.collection,
-          command.documents.map((doc) => this.#resolveDocument(doc)),
+          await Promise.all(command.documents.map((doc) => this.#resolveDocument(doc))),
         );
-      case 'updateMany':
-        return new UpdateManyWireCommand(
-          command.collection,
-          lowerFilter(command.filter),
+      case 'updateMany': {
+        const [filter, update] = await Promise.all([
+          lowerFilter(command.filter, this.#codecs),
           this.#lowerUpdate(command.update),
-          command.upsert,
-        );
+        ]);
+        return new UpdateManyWireCommand(command.collection, filter, update, command.upsert);
+      }
       case 'deleteOne':
-        return new DeleteOneWireCommand(command.collection, lowerFilter(command.filter));
+        return new DeleteOneWireCommand(
+          command.collection,
+          await lowerFilter(command.filter, this.#codecs),
+        );
       case 'deleteMany':
-        return new DeleteManyWireCommand(command.collection, lowerFilter(command.filter));
-      case 'findOneAndUpdate':
+        return new DeleteManyWireCommand(
+          command.collection,
+          await lowerFilter(command.filter, this.#codecs),
+        );
+      case 'findOneAndUpdate': {
+        const [filter, update] = await Promise.all([
+          lowerFilter(command.filter, this.#codecs),
+          this.#lowerUpdate(command.update),
+        ]);
         return new FindOneAndUpdateWireCommand(
           command.collection,
-          lowerFilter(command.filter),
-          this.#lowerUpdate(command.update),
+          filter,
+          update,
           command.upsert,
           command.sort,
           command.returnDocument,
         );
+      }
       case 'findOneAndDelete':
         return new FindOneAndDeleteWireCommand(
           command.collection,
-          lowerFilter(command.filter),
+          await lowerFilter(command.filter, this.#codecs),
           command.sort,
         );
       case 'aggregate':
-        return new AggregateWireCommand(command.collection, lowerPipeline(command.pipeline));
+        return new AggregateWireCommand(
+          command.collection,
+          await lowerPipeline(command.pipeline, this.#codecs),
+        );
       case 'rawAggregate':
         return new AggregateWireCommand(command.collection, command.pipeline);
       case 'rawInsertOne':

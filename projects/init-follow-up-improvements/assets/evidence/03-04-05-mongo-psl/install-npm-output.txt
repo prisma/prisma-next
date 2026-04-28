@@ -1,0 +1,31 @@
+=== install + emit Mongo (npm) ===
+
+added 47 packages, and audited 48 packages in 9s
+
+2 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+---
+
+added 39 packages, and audited 87 packages in 6s
+
+10 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+--- contract emit ---
+{
+  "ok": true,
+  "storageHash": "sha256:7a57ad033d7571c6047480084f4cd531a0cb0ad13757e861aaf48b0fe0e2a238",
+  "profileHash": "sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840",
+  "outDir": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/03-04-05-mongo-psl/prisma",
+  "files": {
+    "json": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/03-04-05-mongo-psl/prisma/contract.json",
+    "dts": "/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/tml-2263-init-follow-up-improvements/wip/init-experiments/03-04-05-mongo-psl/prisma/contract.d.ts"
+  },
+  "timings": {
+    "total": 1019
+  }
+}
+EMIT_EXIT=0

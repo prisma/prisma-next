@@ -10,7 +10,7 @@ SQL runtime implementation for Prisma Next.
 
 ## Overview
 
-The SQL runtime package implements the SQL family runtime by composing `@prisma-next/runtime-executor` with SQL-specific adapters, drivers, and codecs. It provides the public runtime API for SQL-based databases, including descriptor-based static context derivation via `SqlStaticContributions` and execution-plane composition via `ExecutionStack`.
+The SQL runtime package implements the SQL family runtime by extending the abstract `RuntimeCore` base class from `@prisma-next/framework-components/runtime` with SQL-specific adapters, drivers, codecs, marker verification, telemetry fingerprinting, and a `beforeCompile` middleware chain. It provides the public runtime API for SQL-based databases, including descriptor-based static context derivation via `SqlStaticContributions` and execution-plane composition via `ExecutionStack`.
 
 ## Purpose
 
@@ -26,13 +26,16 @@ Execute SQL query Plans with deterministic verification, guardrails, and feedbac
 - **SQL Marker Management**: Provide SQL statements for reading/writing contract markers
 - **Codec Encoding/Decoding**: Encode parameters and decode rows using SQL codec registries
 - **Codec Validation**: Validate that codec registries contain all required codecs
-- **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts
-- **SQL Runtime**: Compose runtime-executor with SQL-specific logic
+- **SQL Family Adapter**: Implement `RuntimeFamilyAdapter` for SQL contracts (defined in `runtime-spi.ts`)
+- **Marker Verification**: Parse contract-marker rows from the database (`marker.ts`) and gate execution on hash equality
+- **Telemetry Fingerprinting**: Compute SQL fingerprints for telemetry events (`fingerprint.ts`)
+- **Raw-SQL Guardrails**: Heuristic safety checks for raw SQL plans (`guardrails/raw.ts`)
+- **`beforeCompile` Chain**: AST-rewrite middleware chain run pre-lowering (`middleware/before-compile-chain.ts`)
+- **SQL Runtime**: `SqlRuntime` extends `RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>` and overrides `lower`, `runDriver`, `runBeforeCompile`, and `close` with SQL-specific behaviour
 
 ## Dependencies
 
-- `@prisma-next/framework-components` - Runtime component descriptor types (via `./execution`)
-- `@prisma-next/runtime-executor` - Target-neutral execution engine
+- `@prisma-next/framework-components` - Runtime component descriptor types (`./execution`) and the abstract `RuntimeCore` base class plus `runWithMiddleware` helper (`./runtime`)
 - `@prisma-next/sql-contract` - SQL contract types (via `@prisma-next/sql-contract/types`)
 - `@prisma-next/operations` - Operation registry
 
@@ -44,7 +47,12 @@ import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgresTarget from '@prisma-next/target-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
-import { createExecutionContext, createRuntime, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import {
+  budgets,
+  createExecutionContext,
+  createRuntime,
+  createSqlExecutionStack,
+} from '@prisma-next/sql-runtime';
 
 const contract = validateContract<Contract>(contractJson);
 const stack = createSqlExecutionStack({
@@ -65,7 +73,7 @@ const runtime = createRuntime({
   context,
   driver,
   verify: { mode: 'onFirstUse', requireMarker: false },
-  plugins: [budgets()],
+  middleware: [budgets()],
 });
 
 for await (const row of runtime.execute(plan)) {
@@ -116,44 +124,44 @@ for await (const row of runtime.execute(plan)) {
 
 - `lowerSqlPlan` - SQL plan lowering via adapter
 
-### Plugins
+### Middleware
 
-- `budgets` - **AST-first budget plugin** (canonical in SQL domain), inspects `plan.ast` when present for row estimation
-- `lints` - **AST-first lint plugin** (canonical in SQL domain), inspects `plan.ast` when present
-- `BudgetsOptions`, `LintsOptions` - Plugin option types
-- `Plugin`, `PluginContext` - Plugin interface types (from runtime-executor)
-- `AfterExecuteResult` - Plugin hook result type
-- `Log` - Log entry type
+- `budgets` - **AST-first budget middleware** (canonical in SQL domain), inspects `plan.ast` when present for row estimation
+- `lints` - **AST-first lint middleware** (canonical in SQL domain), inspects `plan.ast` when present
+- `SqlMiddleware`, `SqlMiddlewareContext` - SQL-family middleware interface and per-execution context
+- `BudgetsOptions`, `LintsOptions` - Middleware option types
+- `AfterExecuteResult` - Middleware `afterExecute` hook result type (re-exported from `@prisma-next/framework-components/runtime`)
+- `Log` - Log entry type (re-exported from `@prisma-next/framework-components/runtime`)
 
-#### Lints plugin (SQL domain)
+#### Lints middleware (SQL domain)
 
-The `lints` plugin operates on `plan.ast` when it is a SQL `QueryAst`:
+The `lints` middleware operates on `plan.ast` when it is a SQL `QueryAst`:
 
 - **DELETE without WHERE** — blocks execution (configurable severity)
 - **UPDATE without WHERE** — blocks execution (configurable severity)
 - **Unbounded SELECT** — warns/errors when `limit` is missing
 - **SELECT \* intent** — warns/errors when `selectAllIntent` is present
 
-When `plan.ast` is missing, the plugin falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
+When `plan.ast` is missing, the middleware falls back to raw heuristic guardrails (`fallbackWhenAstMissing: 'raw'`) or skips linting (`fallbackWhenAstMissing: 'skip'`). Default is `'raw'`.
 
 ```typescript
 import { createRuntime, lints } from '@prisma-next/sql-runtime';
 
 const runtime = createRuntime({
   // ...
-  plugins: [lints({ severities: { noLimit: 'error' } })],
+  middleware: [lints({ severities: { noLimit: 'error' } })],
 });
 ```
 
 ## Architecture
 
-The SQL runtime composes runtime-executor with SQL-specific implementations. Descriptors implement `SqlStaticContributions` so `ExecutionContext` can be derived from the descriptors-only stack without instantiation.
+The SQL runtime extends the abstract `RuntimeCore` base class from `@prisma-next/framework-components/runtime` with SQL-specific implementations. Descriptors implement `SqlStaticContributions` so `ExecutionContext` can be derived from the descriptors-only stack without instantiation.
 
 1. **ExecutionStack**: Descriptors-only stack (from `@prisma-next/framework-components/execution`)
 2. **SqlStaticContributions**: Codecs, operation signatures, parameterized codecs, and mutation default generators contributed by each descriptor
 3. **ExecutionContext**: Built from contract + stack descriptors (no instantiation)
 4. **ExecutionStackInstance**: Instantiated components used at runtime for execution
-5. **SqlRuntime**: Wraps `RuntimeCore` and adds SQL-specific encoding/decoding
+5. **SqlRuntime**: `class SqlRuntimeImpl extends RuntimeCore<SqlQueryPlan, SqlExecutionPlan, SqlMiddleware>` — overrides `lower` (with codec param-encoding), `runDriver`, `runBeforeCompile` (delegates to the SQL `beforeCompile` chain), and `close`. The execution path also wraps the `runWithMiddleware` helper from `framework-components/runtime` with codec row-decoding, marker verification (via the `RuntimeFamilyAdapter` defined in `runtime-spi.ts`), and telemetry fingerprinting (via `computeSqlFingerprint` from `fingerprint.ts`).
 6. **SqlMarker**: Provides SQL statements for marker management
 
 ```mermaid
@@ -164,7 +172,7 @@ flowchart LR
   Stack --> AdapterDesc[Adapter Descriptor]
   Stack --> Packs[Extension Packs]
   Context --> Runtime[SqlRuntime]
-  Runtime --> Core[RuntimeCore]
+  Runtime -.extends.-> Core[RuntimeCore]
   DriverDesc --> DriverInst[Driver Instance]
   AdapterDesc --> AdapterInst[Adapter Instance]
   Runtime --> DriverInst

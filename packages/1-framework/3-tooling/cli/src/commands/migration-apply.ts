@@ -1,9 +1,8 @@
-import { verifyMigrationBundle } from '@prisma-next/migration-tools/attestation';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type { MigrationBundle } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 
@@ -18,11 +17,11 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllBundles,
-  type MigrationBundleSet,
+  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -64,7 +63,7 @@ export interface MigrationApplyResult {
     readonly refName?: string;
     readonly selectedPath: readonly {
       readonly dirName: string;
-      readonly migrationId: string;
+      readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
     }[];
@@ -72,19 +71,6 @@ export interface MigrationApplyResult {
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredErrorType {
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
@@ -95,12 +81,12 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: MigrationBundle): MigrationApplyStep {
+function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
-    from: pkg.manifest.from,
-    to: pkg.manifest.to,
-    toContract: pkg.manifest.toContract,
+    from: pkg.metadata.from,
+    to: pkg.metadata.to,
+    toContract: pkg.metadata.toContract,
     operations: pkg.ops,
   };
 }
@@ -112,7 +98,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -149,8 +135,8 @@ async function executeMigrationApplyCommand(
   if (options.ref) {
     refName = options.ref;
     try {
-      const refs = await readRefs(refsPath);
-      destinationHash = resolveRef(refs, refName);
+      const refs = await readRefs(refsDir);
+      destinationHash = resolveRef(refs, refName).hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -196,35 +182,14 @@ async function executeMigrationApplyCommand(
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
-  let migrations: MigrationBundleSet;
+  let migrations: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
-    migrations = await loadAllBundles(migrationsDir);
+    migrations = await loadMigrationPackages(migrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
-  }
-
-  // Defense in depth: re-hash every bundle and confirm the recorded
-  // `migrationId` matches the on-disk `(manifest, ops)`. Catches FS
-  // corruption, partial writes, and post-emit hand edits before we
-  // start touching the database.
-  for (const bundle of migrations.bundles) {
-    const verified = verifyMigrationBundle(bundle);
-    if (!verified.ok) {
-      return notOk(
-        errorRuntime(`Migration package is corrupt: ${bundle.dirName}`, {
-          why: `Stored migrationId "${verified.storedMigrationId}" does not match the recomputed hash "${verified.computedMigrationId}" for ${migrationsRelative}/${bundle.dirName}. The migration.json or ops.json has been edited or partially written since emit.`,
-          fix: `Re-emit the package by running \`node "${migrationsRelative}/${bundle.dirName}/migration.ts"\`, or restore the directory from version control.`,
-          meta: {
-            dirName: bundle.dirName,
-            storedMigrationId: verified.storedMigrationId,
-            computedMigrationId: verified.computedMigrationId,
-          },
-        }),
-      );
-    }
   }
 
   const client = createControlClient({

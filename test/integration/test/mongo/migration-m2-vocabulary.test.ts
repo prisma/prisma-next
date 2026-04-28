@@ -2,6 +2,7 @@ import { createMongoRunnerDeps, extractDb } from '@prisma-next/adapter-mongo/con
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import mongoControlDriver from '@prisma-next/driver-mongo/control';
+import { createMongoFamilyInstance } from '@prisma-next/family-mongo/control';
 import type { MongoContract, MongoStorageCollection } from '@prisma-next/mongo-contract';
 import type { MongoMigrationPlanOperation } from '@prisma-next/mongo-query-ast/control';
 import {
@@ -18,6 +19,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 const ALL_POLICY = {
   allowedOperationClasses: ['additive', 'widening', 'destructive'] as const,
 };
+
+function makeFamily(): ReturnType<typeof createMongoFamilyInstance> {
+  // ControlStack arg is unused by the mongo factory; an empty object suffices for these integration tests.
+  return createMongoFamilyInstance(
+    {} as unknown as Parameters<typeof createMongoFamilyInstance>[0],
+  );
+}
 
 function makeContract(
   collections: Record<string, MongoStorageCollection>,
@@ -79,7 +87,11 @@ async function planAndApply(
   const controlDriver = await mongoControlDriver.create(replSetUri);
   try {
     const runner = new MongoMigrationRunner(
-      createMongoRunnerDeps(controlDriver, MongoDriverImpl.fromDb(extractDb(controlDriver))),
+      createMongoRunnerDeps(
+        controlDriver,
+        MongoDriverImpl.fromDb(extractDb(controlDriver)),
+        makeFamily(),
+      ),
     );
     const runResult = await runner.execute({
       plan: {

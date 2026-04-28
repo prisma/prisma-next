@@ -8,8 +8,9 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import { computeMigrationId } from './attestation';
-import type { MigrationHints, MigrationManifest, MigrationOps } from './types';
+import { computeMigrationHash } from './hash';
+import type { MigrationHints, MigrationMetadata } from './metadata';
+import type { MigrationOps } from './package';
 
 export interface MigrationMeta {
   readonly from: string;
@@ -30,7 +31,7 @@ const MigrationMetaSchema = type({
  *
  * A `Migration` subclass is itself a `MigrationPlan`: CLI commands and the
  * runner can consume it directly via `targetId`, `operations`, `origin`, and
- * `destination`. The manifest-shaped inputs come from `describe()`, which
+ * `destination`. The metadata-shaped inputs come from `describe()`, which
  * every migration must implement — `migration.json` is required for a
  * migration to be valid.
  */
@@ -123,64 +124,67 @@ function printHelp(): void {
 
 /**
  * In-memory artifacts produced from a `Migration` instance: the
- * serialized `ops.json` body, the `migration.json` manifest object, and
+ * serialized `ops.json` body, the `migration.json` metadata object, and
  * its serialized form. Returned by `buildMigrationArtifacts` so callers
  * (today: `MigrationCLI.run` in `@prisma-next/cli/migration-cli`) can
  * decide how to persist them — write to disk, print in dry-run, ship
  * over the wire — without coupling artifact construction to file I/O.
+ *
+ * `metadataJson` is `JSON.stringify(metadata, null, 2)` — the canonical
+ * on-disk shape that the arktype loader-schema in `./io` validates.
  */
 export interface MigrationArtifacts {
   readonly opsJson: string;
-  readonly manifest: MigrationManifest;
-  readonly manifestJson: string;
+  readonly metadata: MigrationMetadata;
+  readonly metadataJson: string;
 }
 
 /**
- * Build the attested manifest from `describe()`-derived metadata, the
- * operations list, and the previously-scaffolded manifest (if any).
+ * Build the attested metadata from `describe()`-derived metadata, the
+ * operations list, and the previously-scaffolded metadata (if any).
  *
  * When a `migration.json` already exists for this package (the common
  * case: it was scaffolded by `migration plan`), preserve the contract
  * bookends, hints, labels, and `createdAt` set there — those fields are
  * owned by the CLI scaffolder, not the authored class. Only the
  * `describe()`-derived fields (`from`, `to`, `kind`) and the operations
- * change as the author iterates. When no manifest exists yet (a bare
+ * change as the author iterates. When no metadata exists yet (a bare
  * `migration.ts` run from scratch), synthesize a minimal but
- * schema-conformant manifest so the resulting package can still be read,
+ * schema-conformant record so the resulting package can still be read,
  * verified, and applied.
  *
- * The `migrationId` is recomputed against the current manifest + ops so
+ * The `migrationHash` is recomputed against the current metadata + ops so
  * the on-disk artifacts are always fully attested.
  */
-function buildAttestedManifest(
+function buildAttestedMetadata(
   meta: MigrationMeta,
   ops: MigrationOps,
-  existing: Partial<MigrationManifest> | null,
-): MigrationManifest {
-  const baseManifest: Omit<MigrationManifest, 'migrationId'> = {
+  existing: Partial<MigrationMetadata> | null,
+): MigrationMetadata {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: meta.from,
     to: meta.to,
     kind: meta.kind ?? 'regular',
     labels: meta.labels ?? existing?.labels ?? [],
     createdAt: existing?.createdAt ?? new Date().toISOString(),
     fromContract: existing?.fromContract ?? null,
-    // When no scaffolded manifest exists we synthesize a minimal contract
+    // When no scaffolded metadata exists we synthesize a minimal contract
     // stub so the package is still readable end-to-end. The cast is
     // intentional: only the storage bookend matters for hash computation
-    // (everything else is stripped by `computeMigrationId`), and a real
+    // (everything else is stripped by `computeMigrationHash`), and a real
     // contract bookend would only be available after `migration plan`.
     toContract: existing?.toContract ?? ({ storage: { storageHash: meta.to } } as Contract),
     hints: normalizeHints(existing?.hints),
     ...ifDefined('authorship', existing?.authorship),
   };
 
-  const migrationId = computeMigrationId(baseManifest, ops);
-  return { ...baseManifest, migrationId };
+  const migrationHash = computeMigrationHash(baseMetadata, ops);
+  return { ...baseMetadata, migrationHash };
 }
 
 /**
  * Project `existing.hints` down to the known `MigrationHints` shape, dropping
- * any legacy keys that may linger in manifests scaffolded by older CLI
+ * any legacy keys that may linger in metadata scaffolded by older CLI
  * versions (e.g. `planningStrategy`). Picking fields explicitly instead of
  * spreading keeps refreshed `migration.json` files schema-clean regardless
  * of what was on disk before.
@@ -195,16 +199,16 @@ function normalizeHints(existing: MigrationHints | undefined): MigrationHints {
 
 /**
  * Pure conversion from a `Migration` instance (plus the previously
- * scaffolded manifest, when one exists on disk) to the in-memory
+ * scaffolded metadata, when one exists on disk) to the in-memory
  * artifacts that downstream tooling persists. Owns metadata validation,
- * manifest synthesis/preservation, hint normalization, and the
- * content-addressed `migrationId` computation, but performs no file I/O
+ * metadata synthesis/preservation, hint normalization, and the
+ * content-addressed `migrationHash` computation, but performs no file I/O
  * — callers handle reads (to source `existing`) and writes (to persist
- * `opsJson` / `manifestJson`).
+ * `opsJson` / `metadataJson`).
  */
 export function buildMigrationArtifacts(
   instance: Migration,
-  existing: Partial<MigrationManifest> | null,
+  existing: Partial<MigrationMetadata> | null,
 ): MigrationArtifacts {
   const ops = instance.operations;
   if (!Array.isArray(ops)) {
@@ -217,11 +221,11 @@ export function buildMigrationArtifacts(
     throw new Error(`describe() returned invalid metadata: ${parsed.summary}`);
   }
 
-  const manifest = buildAttestedManifest(parsed, ops, existing);
+  const metadata = buildAttestedMetadata(parsed, ops, existing);
 
   return {
     opsJson: JSON.stringify(ops, null, 2),
-    manifest,
-    manifestJson: JSON.stringify(manifest, null, 2),
+    metadata,
+    metadataJson: JSON.stringify(metadata, null, 2),
   };
 }

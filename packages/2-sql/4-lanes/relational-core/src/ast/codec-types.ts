@@ -46,20 +46,22 @@ export interface CodecMeta {
 }
 
 /**
- * SQL codec interface — extends the framework base with SQL-specific fields.
+ * SQL codec — extends the framework codec base with SQL-specific metadata:
+ * driver-native type info (`meta.db.sql.<dialect>.nativeType`) and an
+ * optional parameterized-codec descriptor (`paramsSchema` + `init`) for
+ * codecs that require type-parameter validation (e.g. `pg/vector@1`).
  *
- * Codecs are pure, synchronous functions with no side effects or IO.
- * They provide deterministic conversion between database wire types and JS values,
- * and between JS values and contract JSON.
+ * See `Codec` in `@prisma-next/framework-components/codec` for the codec
+ * contract that this interface extends.
  */
 export interface Codec<
   Id extends string = string,
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
-  TJs = unknown,
+  TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TJs> {
+> extends BaseCodec<Id, TTraits, TWire, TInput> {
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -180,30 +182,68 @@ class CodecRegistryImpl implements CodecRegistry {
 }
 
 /**
- * Codec factory - creates a codec with typeId and encode/decode functions.
- * Provides identity defaults for encodeJson/decodeJson when not supplied.
+ * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
+ * structurally assignable to `JsonValue` the identity defaults are
+ * sound and both fields are optional; otherwise both fields are
+ * required so an author cannot silently produce a non-JSON-safe
+ * contract artifact.
+ */
+type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
+  ? {
+      encodeJson?: (value: TInput) => JsonValue;
+      decodeJson?: (json: JsonValue) => TInput;
+    }
+  : {
+      encodeJson: (value: TInput) => JsonValue;
+      decodeJson: (json: JsonValue) => TInput;
+    };
+
+/**
+ * Construct a SQL codec from author functions and optional metadata.
+ *
+ * Author `encode` and `decode` as sync or async functions; the factory
+ * produces a {@link Codec} whose query-time methods follow the boundary
+ * contract documented on `Codec`.
+ *
+ * `encode` is optional — when omitted, an identity default is installed
+ * (declaring "the input value already is the wire value", so `TInput` and
+ * `TWire` are interchangeable for that codec). `decode` is always
+ * required. `encodeJson` and `decodeJson` default to identity **only when
+ * `TInput` is assignable to `JsonValue`**; otherwise both are required
+ * so the contract artifact stays JSON-safe.
  */
 export function codec<
   Id extends string,
-  const TTraits extends readonly CodecTrait[],
-  TWire,
-  TJs,
+  const TTraits extends readonly CodecTrait[] = readonly [],
+  TWire = unknown,
+  TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
->(config: {
-  typeId: Id;
-  targetTypes: readonly string[];
-  encode: (value: TJs) => TWire;
-  decode: (wire: TWire) => TJs;
-  encodeJson?: (value: TJs) => JsonValue;
-  decodeJson?: (json: JsonValue) => TJs;
-  meta?: CodecMeta;
-  paramsSchema?: Type<TParams>;
-  init?: (params: TParams) => THelper;
-  traits?: TTraits;
-  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+>(
+  config: {
+    typeId: Id;
+    targetTypes: readonly string[];
+    encode?: (value: TInput) => TWire | Promise<TWire>;
+    decode: (wire: TWire) => TInput | Promise<TInput>;
+    meta?: CodecMeta;
+    paramsSchema?: Type<TParams>;
+    init?: (params: TParams) => THelper;
+    traits?: TTraits;
+    renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+  } & JsonRoundTripConfig<TInput>,
+): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
+  // The synchronous identity default is only safe when the author has
+  // declared "the input is already the wire value" (i.e. TInput == TWire);
+  // it returns the value directly, never a Promise.
+  const userEncode = config.encode ?? ((value: TInput) => value as unknown as TWire);
+  const userDecode = config.decode;
+  // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the
+  // boundary; widen back to the generic shape inside the factory body.
+  const widenedConfig = config as {
+    encodeJson?: (value: TInput) => JsonValue;
+    decodeJson?: (json: JsonValue) => TInput;
+  };
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
@@ -215,10 +255,22 @@ export function codec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: config.encode,
-    decode: config.decode,
-    encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
-    decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
+    encode: (value) => {
+      try {
+        return Promise.resolve(userEncode(value));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    decode: (wire) => {
+      try {
+        return Promise.resolve(userDecode(wire));
+      } catch (error) {
+        return Promise.reject(error);
+      }
+    },
+    encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
+    decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
   };
 }
 
@@ -228,9 +280,7 @@ export function codec<
 export type CodecId<T> =
   T extends Codec<infer Id> ? Id : T extends { readonly id: infer Id } ? Id : never;
 export type CodecInput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
-export type CodecOutput<T> =
-  T extends Codec<string, readonly CodecTrait[], unknown, infer JsT> ? JsT : never;
+  T extends Codec<string, readonly CodecTrait[], unknown, infer In> ? In : never;
 export type CodecTraits<T> =
   T extends Codec<string, infer TTraits> ? TTraits[number] & CodecTrait : never;
 
@@ -242,7 +292,7 @@ export type ExtractCodecTypes<
 > = {
   readonly [K in keyof ScalarNames as ScalarNames[K] extends Codec<infer Id> ? Id : never]: {
     readonly input: CodecInput<ScalarNames[K]>;
-    readonly output: CodecOutput<ScalarNames[K]>;
+    readonly output: CodecInput<ScalarNames[K]>;
     readonly traits: CodecTraits<ScalarNames[K]>;
   };
 };
@@ -283,8 +333,8 @@ export interface CodecDefBuilder<
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
-      readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly output: CodecInput<ScalarNames[K]>;
+      readonly jsType: CodecInput<ScalarNames[K]>;
     };
   };
 
@@ -323,7 +373,7 @@ class CodecDefBuilderImpl<
       const codecImplTyped = codecImpl as Codec<string>;
       codecTypes[codecImplTyped.id] = {
         input: undefined as unknown as CodecInput<typeof codecImplTyped>,
-        output: undefined as unknown as CodecOutput<typeof codecImplTyped>,
+        output: undefined as unknown as CodecInput<typeof codecImplTyped>,
         traits: undefined as unknown as CodecTraits<typeof codecImplTyped>,
       };
     }
@@ -368,8 +418,8 @@ class CodecDefBuilderImpl<
       readonly scalar: K;
       readonly codec: ScalarNames[K];
       readonly input: CodecInput<ScalarNames[K]>;
-      readonly output: CodecOutput<ScalarNames[K]>;
-      readonly jsType: CodecOutput<ScalarNames[K]>;
+      readonly output: CodecInput<ScalarNames[K]>;
+      readonly jsType: CodecInput<ScalarNames[K]>;
     };
   } {
     const result: Record<
@@ -391,8 +441,8 @@ class CodecDefBuilderImpl<
         scalar: scalarName,
         codec: codec,
         input: undefined as unknown as CodecInput<typeof codec>,
-        output: undefined as unknown as CodecOutput<typeof codec>,
-        jsType: undefined as unknown as CodecOutput<typeof codec>,
+        output: undefined as unknown as CodecInput<typeof codec>,
+        jsType: undefined as unknown as CodecInput<typeof codec>,
       };
     }
 
@@ -402,8 +452,8 @@ class CodecDefBuilderImpl<
         readonly scalar: K;
         readonly codec: ScalarNames[K];
         readonly input: CodecInput<ScalarNames[K]>;
-        readonly output: CodecOutput<ScalarNames[K]>;
-        readonly jsType: CodecOutput<ScalarNames[K]>;
+        readonly output: CodecInput<ScalarNames[K]>;
+        readonly jsType: CodecInput<ScalarNames[K]>;
       };
     };
   }
