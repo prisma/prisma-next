@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
+import { MigrationToolsError } from '../src/errors';
+import type { MigrationChainEntry } from '../src/graph';
+import { computeMigrationHash } from '../src/hash';
 import {
   detectCycles,
   detectOrphans,
@@ -9,10 +12,7 @@ import {
   findPathWithDecision,
   findReachableLeaves,
   reconstructGraph,
-} from '../src/dag';
-import { MigrationToolsError } from '../src/errors';
-import type { MigrationChainEntry } from '../src/graph';
-import { computeMigrationHash } from '../src/hash';
+} from '../src/migration-graph';
 import type { MigrationPackage } from '../src/package';
 import { createTestMetadata, createTestOps } from './fixtures';
 

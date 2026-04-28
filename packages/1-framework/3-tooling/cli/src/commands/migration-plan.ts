@@ -6,7 +6,6 @@ import {
   type MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLatestMigration } from '@prisma-next/migration-tools/dag';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -15,6 +14,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';

@@ -8,7 +8,7 @@ export default defineConfig({
     'exports/errors': 'src/exports/errors.ts',
     'exports/io': 'src/exports/io.ts',
     'exports/hash': 'src/exports/hash.ts',
-    'exports/dag': 'src/exports/dag.ts',
+    'exports/migration-graph': 'src/exports/migration-graph.ts',
     'exports/refs': 'src/exports/refs.ts',
     'exports/constants': 'src/exports/constants.ts',
     'exports/migration-ts': 'src/exports/migration-ts.ts',

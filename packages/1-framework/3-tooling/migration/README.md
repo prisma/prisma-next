@@ -46,7 +46,7 @@ Full semantic validation happens in target/family migration planners and runners
 graph TD
     CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> HASH["hash.ts<br/>Migration hashing"]
-    CLI --> GRAPH["dag.ts<br/>Graph operations"]
+    CLI --> GRAPH["migration-graph.ts<br/>Graph operations"]
     IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
@@ -80,7 +80,7 @@ graph TD
 | `./graph` | `MigrationGraph`, `MigrationChainEntry` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
 | `./hash` | `computeMigrationHash`, `verifyMigrationHash` |
-| `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
+| `./migration-graph` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
 | `./errors` | `MigrationToolsError` |
 | `./constants` | `EMPTY_CONTRACT_HASH` |
 

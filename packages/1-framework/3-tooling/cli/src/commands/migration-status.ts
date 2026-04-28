@@ -1,12 +1,12 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import {
   findPath,
   findPathWithDecision,
   findReachableLeaves,
-} from '@prisma-next/migration-tools/dag';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
-import type { MigrationChainEntry, MigrationGraph } from '@prisma-next/migration-tools/graph';
+} from '@prisma-next/migration-tools/migration-graph';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';

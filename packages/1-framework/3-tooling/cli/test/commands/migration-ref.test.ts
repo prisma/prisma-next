@@ -5,7 +5,6 @@ import { createSqlContract } from '@prisma-next/contract/testing';
 import type { Contract } from '@prisma-next/contract/types';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findPath, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -14,6 +13,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { findPath, reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import {
   deleteRef,

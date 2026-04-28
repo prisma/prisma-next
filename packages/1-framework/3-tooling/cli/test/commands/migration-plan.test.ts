@@ -4,7 +4,6 @@ import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
@@ -13,6 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { findLeaf, reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { resolveBundleByPrefix } from '../../src/commands/migration-plan';
