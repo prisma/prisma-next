@@ -95,12 +95,29 @@ export function json<S extends StandardSchemaV1>(schema: S): (ctx: Ctx) => JsonC
             { codecId: PG_JSON_CODEC_ID, issues: result.issues },
           );
         }
+        // Standard Schema's `~standard.validate` is typed `(value: unknown) =>
+        // Result<unknown>` — the spec types `validate` against the unconstrained
+        // variant even when the schema's `S` is fully captured. At this call
+        // site `S` is captured from the factory's generic parameter, so
+        // `result.value` is structurally `StandardSchemaV1.InferOutput<S>` once
+        // the issues branch above is excluded.
         return result.value as JsType;
       },
       encodeJson(value: JsType): JsonValue {
+        // The contract IR's JSON-side surface (`encodeJson`/`decodeJson`) is
+        // typed against `JsonValue` for serialization; the JS-side type `JsType`
+        // is whatever the user's schema produced. There is no general structural
+        // assertion that `JsType` is a `JsonValue` (a schema may emit `Date`,
+        // class instances, etc.) — the cast is a wire-level identity by
+        // contract: the caller of `encodeJson` agrees the value is JSON-safe.
         return value as JsonValue;
       },
       decodeJson(jsonValue: JsonValue): JsType {
+        // Symmetric with `encodeJson`: the JSON-side input is contract-level
+        // JSON-safe data, and the schema-derived `JsType` is what the user code
+        // expects to consume. The JSON wire is structurally identical to the
+        // codec's JS form for json columns; runtime validation lives in
+        // `decode` (above), not on the contract-load path.
         return jsonValue as JsType;
       },
     };
