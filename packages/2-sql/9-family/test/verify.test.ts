@@ -32,6 +32,7 @@ describe('marker parser', () => {
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -48,33 +49,12 @@ describe('marker parser', () => {
     });
   });
 
-  it('defaults invariants to empty array when the field is absent', () => {
-    const row = {
-      core_hash: 'sha256:abc123',
-      profile_hash: 'sha256:def456',
-      meta: { k: 'v' },
-    };
-
-    const result = parseContractMarkerRow(row);
-    expect(result.invariants).toEqual([]);
-  });
-
-  it('defaults invariants to empty array when the field is null', () => {
-    const row = {
-      core_hash: 'sha256:abc123',
-      profile_hash: 'sha256:def456',
-      invariants: null,
-    };
-
-    const result = parseContractMarkerRow(row);
-    expect(result.invariants).toEqual([]);
-  });
-
   it('parses updated_at as string', () => {
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       updated_at: '2024-01-01T00:00:00Z',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -87,6 +67,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: '{"key":"value"}',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -99,6 +80,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: { key: 'value' },
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -111,6 +93,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: null,
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -122,6 +105,7 @@ describe('marker parser', () => {
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -134,6 +118,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: 'invalid json',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -146,6 +131,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: 'not an object',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -160,6 +146,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: '123', // JSON string that parses to a number
+      invariants: [],
     };
 
     // This tests the branch where MetaSchema validation fails (line 33)
