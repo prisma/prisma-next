@@ -6,6 +6,7 @@ import { Command } from 'commander';
 import { dirname, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { executeContractEmit } from '../control-api/operations/contract-emit';
+import type { ContractEmitResult } from '../control-api/types';
 import { CliStructuredError, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
@@ -114,7 +115,7 @@ async function executeContractEmitCommand(
   const onProgress = createProgressAdapter({ ui, flags });
   const configPath = options.config ? resolve(options.config) : 'prisma-next.config.ts';
 
-  let result: Awaited<ReturnType<typeof executeContractEmit>>;
+  let result: ContractEmitResult;
   try {
     result = await executeContractEmit({ configPath, onProgress });
   } catch (error) {

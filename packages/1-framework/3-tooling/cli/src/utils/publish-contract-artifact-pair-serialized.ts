@@ -91,10 +91,6 @@ function queueEmitWrite<T>(
   return run;
 }
 
-function throwIfAborted(signal?: AbortSignal): void {
-  signal?.throwIfAborted();
-}
-
 export async function publishContractArtifactPairSerialized({
   outputJsonPath,
   outputDtsPath,
@@ -111,7 +107,7 @@ export async function publishContractArtifactPairSerialized({
   readonly contractDts: string;
 }): Promise<'written' | 'superseded'> {
   return await queueEmitWrite(outputJsonPath, async (state) => {
-    throwIfAborted(signal);
+    signal?.throwIfAborted();
 
     if (isSuperseded(state, generation)) {
       return 'superseded';
@@ -124,7 +120,7 @@ export async function publishContractArtifactPairSerialized({
       contractDts,
       publicationToken: String(generation),
       beforePublish: () => {
-        throwIfAborted(signal);
+        signal?.throwIfAborted();
         return !isSuperseded(state, generation);
       },
     });

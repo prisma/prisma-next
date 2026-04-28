@@ -310,9 +310,14 @@ describe('executeContractEmit', () => {
     await writeFile(outputJsonPath, previousJson, 'utf-8');
     await writeFile(outputDtsPath, previousDts, 'utf-8');
 
-    // Fail the second `.next.tmp` write we observe (the newer generation),
-    // matched on the temp-file naming shape rather than a hardcoded token, so
-    // the test stays valid if `createTempArtifactPath`'s phase slug evolves.
+    // The first emit is parked in `mockedEmit` waiting on `firstEmit.promise`,
+    // so it cannot reach `publishContractArtifactPair` and never writes a
+    // `.next.tmp` file before we trip this mock. The second (newer) emit's
+    // `mockedEmit` resolves immediately, so the *first* two `.next.tmp` writes
+    // (json + dts) both belong to the second emit's publication. Failing the
+    // second write therefore fails the second emit's dts stage. Matched on the
+    // naming *shape* rather than a hardcoded token so this stays valid if
+    // `createTempArtifactPath`'s phase slug evolves.
     const NEXT_TMP_SUFFIX = /\.next\.tmp$/;
     let nextTmpWriteCount = 0;
     const localFs = await vi.importActual<FsModule>('node:fs/promises');
