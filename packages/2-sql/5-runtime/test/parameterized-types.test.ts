@@ -1,5 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -11,6 +12,13 @@ import type {
   SqlRuntimeExtensionDescriptor,
 } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
+
+// M1 stub factory: production codecs migrate to the curried factory in M4.
+function pendingFactory(_params: unknown): (ctx: Ctx) => Codec {
+  return (_ctx) => {
+    throw new Error('M1 stub factory: TML-2330 not yet implemented');
+  };
+}
 
 // =============================================================================
 // Test helpers
@@ -106,10 +114,11 @@ describe('parameterized types', () => {
       init?: (params: { length: number }) => { dimensions: number };
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
       // biome-ignore lint/suspicious/noExplicitAny: test helper with flexible type params
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<any, any>[] = [
+      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
+          factory: pendingFactory,
           ...ifDefined('init', options?.init),
         },
       ];
@@ -245,6 +254,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
+          factory: pendingFactory,
           init: initFn,
         },
       ];
@@ -304,6 +314,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
+          factory: pendingFactory,
         },
       ];
 
@@ -366,6 +377,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
+          factory: pendingFactory,
         },
       ];
 
@@ -424,6 +436,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
+          factory: pendingFactory,
         },
       ];
 
@@ -488,6 +501,7 @@ describe('parameterized types', () => {
           {
             codecId: 'pg/vector@1',
             paramsSchema: vectorParamsSchema,
+            factory: pendingFactory,
           },
         ];
 

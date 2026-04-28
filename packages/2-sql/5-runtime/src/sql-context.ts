@@ -1,4 +1,5 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -22,7 +23,6 @@ import {
 import type {
   Adapter,
   AnyQueryAst,
-  CodecParamsDescriptor,
   CodecRegistry,
   LoweredStatement,
   SqlDriver,
@@ -36,25 +36,30 @@ import type {
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import { type as arktype } from 'arktype';
 
 /**
  * Runtime parameterized codec descriptor.
- * Provides validation schema and optional init hook for codecs that support type parameters.
- * Used at runtime to validate typeParams and create type helpers.
  *
- * This is a type alias for `CodecParamsDescriptor` from the AST layer,
- * which is the shared definition used by both adapter and runtime.
+ * M1 widens the slot from the legacy `{codecId, paramsSchema, init?}` shape to the
+ * curried-factory shape contributed by `ParameterizedCodecDescriptor` (factory +
+ * `paramsSchema: StandardSchemaV1<P>` + optional `renderOutputType`). The
+ * transitional `init?` field is preserved so existing runtime tests and extensions
+ * (pgvector, postgres-jsonb) continue to compile until production codecs migrate to
+ * the curried factory in M4 ([TML-2330]).
  */
-export type RuntimeParameterizedCodecDescriptor<
-  TParams = Record<string, unknown>,
-  THelper = unknown,
-> = CodecParamsDescriptor<TParams, THelper>;
+export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> =
+  ParameterizedCodecDescriptor<P> & {
+    /**
+     * Transitional helper hook from the pre-M1 descriptor shape. Replaced by the
+     * curried factory's closure in M4; do not introduce new uses.
+     */
+    readonly init?: (params: P) => unknown;
+  };
 
 export interface SqlStaticContributions {
   readonly codecs: () => CodecRegistry;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
-  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any>>;
   readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
@@ -206,9 +211,16 @@ function validateTypeParams(
   codecDescriptor: RuntimeParameterizedCodecDescriptor,
   context: { typeName?: string; tableName?: string; columnName?: string },
 ): Record<string, unknown> {
-  const result = codecDescriptor.paramsSchema(typeParams);
-  if (result instanceof arktype.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
+  const result = codecDescriptor.paramsSchema['~standard'].validate(typeParams);
+  if (result instanceof Promise) {
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
+      `paramsSchema for codec '${codecDescriptor.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
+      { ...context, codecId: codecDescriptor.codecId, typeParams },
+    );
+  }
+  if (result.issues) {
+    const messages = result.issues.map((issue) => issue.message).join('; ');
     const locationInfo = context.typeName
       ? `type '${context.typeName}'`
       : `column '${context.tableName}.${context.columnName}'`;
@@ -218,7 +230,7 @@ function validateTypeParams(
       { ...context, codecId: codecDescriptor.codecId, typeParams },
     );
   }
-  return result as Record<string, unknown>;
+  return result.value as Record<string, unknown>;
 }
 
 function collectParameterizedCodecDescriptors(

@@ -1,5 +1,6 @@
 import type { Contract, ExecutionPlan, ParamDescriptor } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -10,6 +11,14 @@ import type {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
+
+// M1 stub factory: production codecs migrate to the curried factory in M4.
+function pendingFactory(_params: unknown): (ctx: Ctx) => Codec {
+  return (_ctx) => {
+    throw new Error('M1 stub factory: TML-2330 not yet implemented');
+  };
+}
+
 import { decodeRow } from '../src/codecs/decoding';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
 import type {
@@ -171,6 +180,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     {
       codecId: 'pg/json@1',
       paramsSchema: jsonTypeParamsSchema,
+      factory: pendingFactory,
       init: (params: Record<string, unknown>) => ({
         validate: createStubValidator(params['schema'] as Record<string, unknown>),
       }),
@@ -178,6 +188,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     {
       codecId: 'pg/jsonb@1',
       paramsSchema: jsonTypeParamsSchema,
+      factory: pendingFactory,
       init: (params: Record<string, unknown>) => ({
         validate: createStubValidator(params['schema'] as Record<string, unknown>),
       }),
@@ -311,7 +322,13 @@ describe('JSON Schema validator registry', () => {
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        parameterizedCodecs: () => [{ codecId: 'pg/jsonb@1', paramsSchema: jsonTypeParamsSchema }],
+        parameterizedCodecs: () => [
+          {
+            codecId: 'pg/jsonb@1',
+            paramsSchema: jsonTypeParamsSchema,
+            factory: pendingFactory,
+          },
+        ],
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
