@@ -1,4 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { ScalarFieldBuilder } from '../../src/contract-dsl';
@@ -55,20 +56,20 @@ export type ProductOutput = StandardSchemaV1.InferOutput<ProductSchema>;
 
 /**
  * Synthetic field-state shape mirroring `ScalarFieldState` from the production
- * DSL but adding a `type` slot on the descriptor (the column-author-supplied
- * curried factory). M4 will surface that slot through the real DSL; for M2 the
- * fixture carries it directly so we can assert the type-level resolver.
+ * DSL. The `descriptor.type` slot is now a first-class field on
+ * `ColumnTypeDescriptor` (M4 sub-task 4a), so the fixture relies on the real
+ * type rather than a structural intersection.
  */
 type ScalarFieldStateLike<
   CodecId extends string,
   Nullable extends boolean,
-  Descriptor extends Record<string, unknown> | undefined = undefined,
+  Descriptor extends ColumnTypeDescriptor | undefined = undefined,
   TypeRef extends string | undefined = undefined,
 > = {
   readonly kind: 'scalar';
   readonly nullable: Nullable;
-} & (Descriptor extends Record<string, unknown>
-  ? { readonly descriptor: Descriptor & { readonly codecId: CodecId; readonly nativeType: string } }
+} & (Descriptor extends ColumnTypeDescriptor
+  ? { readonly descriptor: Descriptor & { readonly codecId: CodecId } }
   : Record<string, never>) &
   (TypeRef extends string ? { readonly typeRef: TypeRef } : Record<string, never>);
 
@@ -80,7 +81,7 @@ type ScalarFieldStateLike<
 type FieldOf<
   CodecId extends string,
   Nullable extends boolean,
-  Descriptor extends Record<string, unknown> | undefined = undefined,
+  Descriptor extends ColumnTypeDescriptor | undefined = undefined,
   TypeRef extends string | undefined = undefined,
 > = ScalarFieldBuilder<ScalarFieldStateLike<CodecId, Nullable, Descriptor, TypeRef>>;
 

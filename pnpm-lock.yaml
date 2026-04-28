@@ -630,6 +630,10 @@ importers:
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
   packages/1-framework/2-authoring/contract:
+    dependencies:
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../1-core/framework-components
     devDependencies:
       '@prisma-next/tsconfig':
         specifier: workspace:*
