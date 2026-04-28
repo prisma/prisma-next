@@ -158,6 +158,18 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 If the diff in any sub-task balloons, split into separate PRs by codec family.
 
+### M4 Cleanups (carve-outs from M1, [TML-2330](https://linear.app/prisma-company/issue/TML-2330))
+
+These transitional fields and call sites were carried into M1 to keep the emit
+path and runtime validator wiring green without migrating production codecs. M4
+must remove them as part of the codec migration, in step with the curried-factory
+rollout:
+
+- Remove `renderOutputType?` from the SQL `Codec` extension at [packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts) and from the `codec()` factory's config.
+- Remove `renderOutputType?` from the `MongoCodec` extension at [packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts](../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts) and from the `mongoCodec()` factory's config.
+- Replace the emitter's duck-typed `renderOutputType` cast at [packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts](../../packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts) with a typed `ParameterizedCodecDescriptor`-keyed lookup driven from the control stack.
+- Drop the per-codec inline `renderOutputType` configurations now living on production codec objects (`sql-codecs.ts`, `postgres/core/codecs.ts`, `pgvector/core/codecs.ts`, `mongo-adapter/core/codecs.ts`); the renderer moves onto the codec's `ParameterizedCodecDescriptor`.
+
 ---
 
 ## M5 — Documentation and close-out

@@ -240,6 +240,9 @@ export function resolveFieldType(
         // codec-model-unification project moves this hook onto `ParameterizedCodecDescriptor`
         // and the emitter switches to a descriptor lookup; until then we duck-type the
         // optional field off the base `Codec` shape.
+        // Transitional during M1; removed in M4 once parameterized codecs ship via
+        // `ParameterizedCodecDescriptor.renderOutputType`
+        // ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
         const codec = codecLookup.get(type.codecId) as
           | {
               readonly renderOutputType?: (

@@ -10,6 +10,8 @@ export type MongoCodecTrait = CodecTrait;
  * while production codecs continue to author it inline; the long-term home is
  * `ParameterizedCodecDescriptor.renderOutputType` (codec-model-unification project,
  * locked at M1; production codecs migrate in M4).
+ * Transitional during M1; removed in M4 once parameterized codecs ship via
+ * `ParameterizedCodecDescriptor` ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
  */
 export interface MongoCodec<
   Id extends string = string,
@@ -18,6 +20,11 @@ export interface MongoCodec<
   TJs = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly traits: TTraits;
+  /**
+   * Transitional during M1; removed in M4 once parameterized codecs ship via
+   * `ParameterizedCodecDescriptor.renderOutputType`
+   * ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
+   */
   readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 

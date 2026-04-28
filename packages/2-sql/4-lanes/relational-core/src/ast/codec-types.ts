@@ -34,6 +34,8 @@ export interface CodecMeta {
  * `renderOutputType` is a temporary M1 holding place on the SQL `Codec` extension
  * while production codecs continue to author it inline; the long-term home is
  * `ParameterizedCodecDescriptor.renderOutputType` (open question 2 locked at M1).
+ * Transitional during M1; removed in M4 once parameterized codecs ship via
+ * `ParameterizedCodecDescriptor` ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
  */
 export interface Codec<
   Id extends string = string,
@@ -42,6 +44,11 @@ export interface Codec<
   TJs = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly meta?: CodecMeta;
+  /**
+   * Transitional during M1; removed in M4 once parameterized codecs ship via
+   * `ParameterizedCodecDescriptor.renderOutputType`
+   * ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
+   */
   readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
