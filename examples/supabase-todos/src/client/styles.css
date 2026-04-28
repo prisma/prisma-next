@@ -176,3 +176,95 @@ code {
   text-decoration: underline;
   border-color: transparent;
 }
+
+.todos-page {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.todos-page h1 {
+  margin: 0 0 1rem;
+  font-size: 1.3rem;
+}
+
+.todo-create {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.todo-create input {
+  flex: 1;
+}
+
+.todo-error {
+  background: rgba(248, 113, 113, 0.15);
+  color: var(--danger);
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  font-size: 0.9rem;
+}
+
+.todo-error button {
+  background: transparent;
+  color: var(--danger);
+  padding: 0.2rem 0.5rem;
+}
+
+.todo-loading,
+.todo-empty {
+  color: var(--muted);
+  padding: 0.75rem;
+  text-align: center;
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.todo-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  background: var(--panel-2);
+  border-radius: 6px;
+}
+
+.todo-row.is-completed .todo-title {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.todo-row.is-pending {
+  opacity: 0.55;
+}
+
+.todo-title {
+  flex: 1;
+  word-break: break-word;
+}
+
+.todo-delete {
+  background: transparent;
+  color: var(--muted);
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0.1rem 0.4rem;
+}
+
+.todo-delete:hover:not(:disabled) {
+  color: var(--danger);
+  border-color: var(--danger);
+}

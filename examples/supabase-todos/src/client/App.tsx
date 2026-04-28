@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from './auth';
 import { LoginForm } from './components/LoginForm';
+import { TodosPage } from './components/TodosPage';
 import { TopNav } from './components/TopNav';
 import type { Page } from './router';
 
@@ -33,9 +34,7 @@ export function App(): React.ReactNode {
       <TopNav page={page} onNavigate={setPage} />
       <main className="app-main">
         {page === 'login' ? <LoginForm /> : null}
-        {page === 'todos' && state.status === 'authenticated' ? (
-          <div className="placeholder">Todos page lands in T4.10.</div>
-        ) : null}
+        {page === 'todos' && state.status === 'authenticated' ? <TodosPage /> : null}
         {page === 'public' ? <div className="placeholder">Public board lands in T4.12.</div> : null}
       </main>
     </div>
