@@ -26,16 +26,13 @@ export interface CodecMeta {
  * They provide deterministic conversion between database wire types and JS values,
  * and between JS values and contract JSON.
  *
- * Parameterization slots (`paramsSchema`, `init`) have been removed — they migrate to
- * `ParameterizedCodecDescriptor` (see `@prisma-next/framework-components/codec`) and to
- * the higher-order codec factory's closure respectively (locked at M1 of the
- * codec-model-unification project; production codecs migrate in M4).
- *
- * `renderOutputType` is a temporary M1 holding place on the SQL `Codec` extension
- * while production codecs continue to author it inline; the long-term home is
- * `ParameterizedCodecDescriptor.renderOutputType` (open question 2 locked at M1).
- * Transitional during M1; removed in M4 once parameterized codecs ship via
- * `ParameterizedCodecDescriptor` ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
+ * Parameterization slots have all moved to `ParameterizedCodecDescriptor` (see
+ * `@prisma-next/framework-components/codec`):
+ * - `paramsSchema` and `init` were removed in M1 of the codec-model-unification
+ *   project (descriptor + factory closure replace them).
+ * - `renderOutputType` was held transitionally on this extension through M1-M3
+ *   and is removed in M4 cleanup F01: `ParameterizedCodecDescriptor.renderOutputType`
+ *   is now the sole emit-path source of truth.
  */
 export interface Codec<
   Id extends string = string,
@@ -44,12 +41,6 @@ export interface Codec<
   TJs = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly meta?: CodecMeta;
-  /**
-   * Transitional during M1; removed in M4 once parameterized codecs ship via
-   * `ParameterizedCodecDescriptor.renderOutputType`
-   * ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
-   */
-  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
 /**
@@ -184,7 +175,6 @@ export function codec<
   decodeJson?: (json: JsonValue) => TJs;
   meta?: CodecMeta;
   traits?: TTraits;
-  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }): Codec<Id, TTraits, TWire, TJs> {
   const identity = (v: unknown) => v;
   return {
@@ -195,7 +185,6 @@ export function codec<
       'traits',
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
-    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: config.encode,
     decode: config.decode,
     encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,

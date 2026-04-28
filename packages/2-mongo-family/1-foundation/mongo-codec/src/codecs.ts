@@ -6,12 +6,11 @@ export type MongoCodecTrait = CodecTrait;
 /**
  * Mongo codec interface — extends the framework base.
  *
- * `renderOutputType` is a temporary M1 holding place on the Mongo `Codec` extension
- * while production codecs continue to author it inline; the long-term home is
- * `ParameterizedCodecDescriptor.renderOutputType` (codec-model-unification project,
- * locked at M1; production codecs migrate in M4).
- * Transitional during M1; removed in M4 once parameterized codecs ship via
- * `ParameterizedCodecDescriptor` ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
+ * Parameterization slots have all moved to `ParameterizedCodecDescriptor`
+ * (see `@prisma-next/framework-components/codec`). The transitional
+ * `renderOutputType` hook held here through M1-M3 was removed in M4 cleanup
+ * F01: `ParameterizedCodecDescriptor.renderOutputType` is now the sole emit-
+ * path source of truth.
  */
 export interface MongoCodec<
   Id extends string = string,
@@ -20,12 +19,6 @@ export interface MongoCodec<
   TJs = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly traits: TTraits;
-  /**
-   * Transitional during M1; removed in M4 once parameterized codecs ship via
-   * `ParameterizedCodecDescriptor.renderOutputType`
-   * ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
-   */
-  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
 export function mongoCodec<
@@ -41,7 +34,6 @@ export function mongoCodec<
   decode: (wire: TWire) => TJs;
   encodeJson?: (value: TJs) => JsonValue;
   decodeJson?: (json: JsonValue) => TJs;
-  renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }): MongoCodec<Id, TTraits, TWire, TJs> {
   const traits = config.traits
     ? (Object.freeze([...config.traits]) as TTraits)
@@ -55,7 +47,6 @@ export function mongoCodec<
     encode: config.encode,
     encodeJson: (config.encodeJson ?? identity) as (value: TJs) => JsonValue,
     decodeJson: (config.decodeJson ?? identity) as (json: JsonValue) => TJs,
-    ...(config.renderOutputType ? { renderOutputType: config.renderOutputType } : {}),
   };
 }
 

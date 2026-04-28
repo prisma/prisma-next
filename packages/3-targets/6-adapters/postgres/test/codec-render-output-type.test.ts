@@ -1,163 +1,129 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import {
+  allPostgresParameterizedCodecs,
+  pgBitCodec,
+  pgCharCodec,
+  pgEnumCodec,
+  pgIntervalCodec,
+  pgJsonbLegacyCodec,
+  pgJsonLegacyCodec,
+  pgNumericCodec,
+  pgTimeCodec,
+  pgTimestampCodec,
+  pgTimestamptzCodec,
+  pgTimetzCodec,
+  pgVarbitCodec,
+  pgVarcharCodec,
+  sqlCharCodec,
+  sqlVarcharCodec,
+} from '../src/codecs/postgres-codec-descriptors';
 
-describe('codec renderOutputType', () => {
+// M4 cleanup F01: `renderOutputType` was retired from the codec object and
+// now lives on `ParameterizedCodecDescriptor.renderOutputType`. The
+// descriptor's `paramsSchema` validates inputs upstream; tests below assert
+// the renderer's output for valid inputs only (the throw-on-bad-input
+// assertions are obsolete because paramsSchema now guards the input).
+describe('parameterized codec descriptor renderOutputType', () => {
   describe('pg/char@1', () => {
-    const codec = codecDefinitions['character'].codec;
-
-    it('renders Char<length> when length is present', () => {
-      expect(codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
-    });
-
-    it('returns undefined when length is absent', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
-    });
-
-    it('throws on invalid length type', () => {
-      expect(() => codec.renderOutputType!({ length: 'bad' })).toThrow(/expected integer "length"/);
+    it('renders Char<length>', () => {
+      expect(pgCharCodec.renderOutputType!({ length: 36 })).toBe('Char<36>');
     });
   });
 
   describe('pg/varchar@1', () => {
-    const codec = codecDefinitions['character varying'].codec;
-
     it('renders Varchar<length>', () => {
-      expect(codec.renderOutputType!({ length: 255 })).toBe('Varchar<255>');
-    });
-
-    it('returns undefined when length is absent', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
-    });
-
-    it('throws on invalid length type', () => {
-      expect(() => codec.renderOutputType!({ length: 'bad' })).toThrow(/expected integer "length"/);
+      expect(pgVarcharCodec.renderOutputType!({ length: 255 })).toBe('Varchar<255>');
     });
   });
 
   describe('sql/char@1', () => {
-    const codec = codecDefinitions['char'].codec;
-
     it('renders Char<length>', () => {
-      expect(codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
+      expect(sqlCharCodec.renderOutputType!({ length: 36 })).toBe('Char<36>');
     });
   });
 
   describe('sql/varchar@1', () => {
-    const codec = codecDefinitions['varchar'].codec;
-
     it('renders Varchar<length>', () => {
-      expect(codec.renderOutputType!({ length: 100 })).toBe('Varchar<100>');
+      expect(sqlVarcharCodec.renderOutputType!({ length: 100 })).toBe('Varchar<100>');
     });
   });
 
   describe('pg/numeric@1', () => {
-    const codec = codecDefinitions['numeric'].codec;
-
     it('renders Numeric<P, S> when both precision and scale are present', () => {
-      expect(codec.renderOutputType!({ precision: 10, scale: 2 })).toBe('Numeric<10, 2>');
+      expect(pgNumericCodec.renderOutputType!({ precision: 10, scale: 2 })).toBe('Numeric<10, 2>');
     });
 
     it('renders Numeric<P> when only precision is present', () => {
-      expect(codec.renderOutputType!({ precision: 10 })).toBe('Numeric<10>');
-    });
-
-    it('returns undefined when precision is absent', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+      expect(pgNumericCodec.renderOutputType!({ precision: 10 })).toBe('Numeric<10>');
     });
   });
 
   describe('pg/bit@1', () => {
-    const codec = codecDefinitions['bit'].codec;
-
     it('renders Bit<length>', () => {
-      expect(codec.renderOutputType!({ length: 8 })).toBe('Bit<8>');
-    });
-
-    it('returns undefined when length is absent', () => {
-      expect(codec.renderOutputType!({})).toBeUndefined();
+      expect(pgBitCodec.renderOutputType!({ length: 8 })).toBe('Bit<8>');
     });
   });
 
   describe('pg/varbit@1', () => {
-    const codec = codecDefinitions['bit varying'].codec;
-
     it('renders VarBit<length>', () => {
-      expect(codec.renderOutputType!({ length: 16 })).toBe('VarBit<16>');
+      expect(pgVarbitCodec.renderOutputType!({ length: 16 })).toBe('VarBit<16>');
     });
   });
 
   describe('pg/timestamp@1', () => {
-    const codec = codecDefinitions['timestamp'].codec;
-
     it('renders Timestamp<P> when precision is present', () => {
-      expect(codec.renderOutputType!({ precision: 3 })).toBe('Timestamp<3>');
+      expect(pgTimestampCodec.renderOutputType!({ precision: 3 })).toBe('Timestamp<3>');
     });
 
     it('renders Timestamp when precision is missing', () => {
-      expect(codec.renderOutputType!({})).toBe('Timestamp');
+      expect(pgTimestampCodec.renderOutputType!({})).toBe('Timestamp');
     });
   });
 
   describe('pg/timestamptz@1', () => {
-    const codec = codecDefinitions['timestamptz'].codec;
-
     it('renders Timestamptz<P>', () => {
-      expect(codec.renderOutputType!({ precision: 6 })).toBe('Timestamptz<6>');
+      expect(pgTimestamptzCodec.renderOutputType!({ precision: 6 })).toBe('Timestamptz<6>');
     });
 
     it('renders Timestamptz when precision is missing', () => {
-      expect(codec.renderOutputType!({})).toBe('Timestamptz');
+      expect(pgTimestamptzCodec.renderOutputType!({})).toBe('Timestamptz');
     });
   });
 
   describe('pg/time@1', () => {
-    const codec = codecDefinitions['time'].codec;
-
     it('renders Time<P>', () => {
-      expect(codec.renderOutputType!({ precision: 0 })).toBe('Time<0>');
+      expect(pgTimeCodec.renderOutputType!({ precision: 0 })).toBe('Time<0>');
     });
   });
 
   describe('pg/timetz@1', () => {
-    const codec = codecDefinitions['timetz'].codec;
-
     it('renders Timetz<P>', () => {
-      expect(codec.renderOutputType!({ precision: 3 })).toBe('Timetz<3>');
+      expect(pgTimetzCodec.renderOutputType!({ precision: 3 })).toBe('Timetz<3>');
     });
   });
 
   describe('pg/interval@1', () => {
-    const codec = codecDefinitions['interval'].codec;
-
     it('renders Interval<P>', () => {
-      expect(codec.renderOutputType!({ precision: 3 })).toBe('Interval<3>');
+      expect(pgIntervalCodec.renderOutputType!({ precision: 3 })).toBe('Interval<3>');
     });
   });
 
   describe('pg/enum@1', () => {
-    const codec = codecDefinitions['enum'].codec;
-
     it('renders literal union from values', () => {
-      expect(codec.renderOutputType!({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
+      expect(pgEnumCodec.renderOutputType!({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
     });
 
     it('escapes backslashes before single quotes', () => {
-      expect(codec.renderOutputType!({ values: ["it's", 'back\\slash'] })).toBe(
+      expect(pgEnumCodec.renderOutputType!({ values: ["it's", 'back\\slash'] })).toBe(
         "'it\\'s' | 'back\\\\slash'",
       );
     });
-
-    it('throws when values is missing', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/expected array "values"/);
-    });
   });
 
-  describe('pg/jsonb@1', () => {
-    const codec = codecDefinitions['jsonb'].codec;
-
+  describe('pg/jsonb@1 (legacy serialized typeParams)', () => {
     it('renders type expression from schemaJson', () => {
-      const result = codec.renderOutputType!({
+      const result = pgJsonbLegacyCodec.renderOutputType!({
         schemaJson: {
           type: 'object',
           properties: { name: { type: 'string' } },
@@ -168,21 +134,15 @@ describe('codec renderOutputType', () => {
     });
 
     it('renders type name from type param', () => {
-      expect(codec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
-    });
-
-    it('throws when no type or schemaJson', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/JSON codec typeParams/);
+      expect(pgJsonbLegacyCodec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
     });
   });
 
-  describe('pg/json@1', () => {
-    const codec = codecDefinitions['json'].codec;
-
+  describe('pg/json@1 (legacy serialized typeParams)', () => {
     it(
       'renders type expression from schemaJson',
       () => {
-        const result = codec.renderOutputType!({
+        const result = pgJsonLegacyCodec.renderOutputType!({
           schemaJson: {
             type: 'object',
             properties: { action: { type: 'string' }, actorId: { type: 'number' } },
@@ -195,20 +155,20 @@ describe('codec renderOutputType', () => {
     );
   });
 
-  describe('non-parameterized codecs', () => {
-    it('pg/int4@1 has no renderOutputType', () => {
-      const codec = codecDefinitions['int4'].codec;
-      expect(codec.renderOutputType).toBeUndefined();
-    });
-
-    it('pg/text@1 has no renderOutputType', () => {
-      const codec = codecDefinitions['text'].codec;
-      expect(codec.renderOutputType).toBeUndefined();
-    });
-
-    it('pg/bool@1 has no renderOutputType', () => {
-      const codec = codecDefinitions['bool'].codec;
-      expect(codec.renderOutputType).toBeUndefined();
+  describe('descriptor registry', () => {
+    it('allPostgresParameterizedCodecs contains every parameterized Postgres codec id', () => {
+      const ids = new Set(allPostgresParameterizedCodecs.map((d) => d.codecId));
+      expect(ids).toContain('pg/char@1');
+      expect(ids).toContain('pg/varchar@1');
+      expect(ids).toContain('pg/numeric@1');
+      expect(ids).toContain('pg/bit@1');
+      expect(ids).toContain('pg/varbit@1');
+      expect(ids).toContain('pg/timestamp@1');
+      expect(ids).toContain('pg/timestamptz@1');
+      expect(ids).toContain('pg/time@1');
+      expect(ids).toContain('pg/timetz@1');
+      expect(ids).toContain('pg/interval@1');
+      expect(ids).toContain('pg/enum@1');
     });
   });
 });

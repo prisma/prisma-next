@@ -18,16 +18,6 @@ const sqlCharCodec = codec<
   traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire.trimEnd(),
-  renderOutputType: (typeParams) => {
-    const length = typeParams['length'];
-    if (length === undefined) return undefined;
-    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-      throw new Error(
-        `renderOutputType: expected integer "length" in typeParams for Char, got ${String(length)}`,
-      );
-    }
-    return `Char<${length}>`;
-  },
 });
 
 const sqlVarcharCodec = codec<
@@ -41,16 +31,6 @@ const sqlVarcharCodec = codec<
   traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  renderOutputType: (typeParams) => {
-    const length = typeParams['length'];
-    if (length === undefined) return undefined;
-    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-      throw new Error(
-        `renderOutputType: expected integer "length" in typeParams for Varchar, got ${String(length)}`,
-      );
-    }
-    return `Varchar<${length}>`;
-  },
 });
 
 const sqlIntCodec = codec({
@@ -83,22 +63,6 @@ const sqlTimestampCodec = codec({
   traits: ['equality', 'order'],
   encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
   decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
-  renderOutputType: (typeParams) => {
-    const precision = typeParams['precision'];
-    if (precision === undefined) {
-      return 'Timestamp';
-    }
-    if (
-      typeof precision !== 'number' ||
-      !Number.isFinite(precision) ||
-      !Number.isInteger(precision)
-    ) {
-      throw new Error(
-        `renderOutputType: expected integer "precision" in typeParams for Timestamp, got ${String(precision)}`,
-      );
-    }
-    return `Timestamp<${precision}>`;
-  },
 });
 
 const codecs = defineCodecs()

@@ -1,6 +1,10 @@
 import type { SqlControlAdapterDescriptor } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import { pgJsonbCodec, pgJsonCodec } from '../codecs/json-factory';
+import {
+  allPostgresParameterizedCodecs,
+  pgJsonbLegacyCodec,
+  pgJsonLegacyCodec,
+} from '../codecs/postgres-codec-descriptors';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -16,17 +20,23 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
     ...postgresAdapterDescriptorMeta.types,
     codecTypes: {
       ...postgresAdapterDescriptorMeta.types.codecTypes,
-      // M4 cleanup F03: register the JSON / JSONB parameterized codec
-      // descriptors with the control stack so the emitter resolves
-      // `renderOutputType` off the descriptor (the spec'"'"'s long-term home).
-      // The other parameterized Postgres codecs (char, numeric, timestamp,
-      // etc.) are still served by their `controlPlaneHooks` / codec-object
-      // `renderOutputType`; M4 closes the gap incrementally — descriptors are
-      // shipped in `core/parameterized-codec-factories.ts` already; wiring the
-      // remaining descriptors into this list is mechanical and tracked under
-      // M5 close-out (no behavior change required for AC-4 since codec-object
-      // `renderOutputType` keeps the emit path warm via the F03 fallback).
-      parameterizedCodecs: [pgJsonCodec, pgJsonbCodec],
+      // M4 cleanups F03 + F01: register every parameterized Postgres codec
+      // descriptor with the control stack so the emitter resolves
+      // `renderOutputType` off the descriptor exclusively. Once the
+      // codec-object `renderOutputType` field is removed (F01), this is the
+      // sole emit-path source of truth.
+      //
+      // Note: the JSON / JSONB descriptors registered here are the *legacy*
+      // serialized-typeParams renderers (`{ schemaJson, type? }`), not the M3
+      // `pgJsonCodec` / `pgJsonbCodec` (which are runtime-load descriptors
+      // keyed off live Standard Schema instances). The emit path sees the
+      // serialized form; the M3 descriptors land in the runtime descriptor
+      // for contract-load-time materialization.
+      parameterizedCodecs: [
+        ...allPostgresParameterizedCodecs,
+        pgJsonLegacyCodec,
+        pgJsonbLegacyCodec,
+      ],
     },
   },
   scalarTypeDescriptors: createPostgresScalarTypeDescriptors(),

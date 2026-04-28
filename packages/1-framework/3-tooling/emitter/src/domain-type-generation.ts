@@ -230,7 +230,11 @@ function applyModifiers(base: string, field: ContractField): string {
 
 export function resolveFieldType(
   field: ContractField,
-  codecLookup?: CodecLookup,
+  // `_codecLookup` is unused now that the descriptor lookup is the sole emit-
+  // path source of `renderOutputType` (M4 cleanup F01 retired the codec-object
+  // hook). Kept in the signature so downstream callers don'"'"'t need to thread a
+  // new tuple of arguments.
+  _codecLookup?: CodecLookup,
   parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): ResolvedFieldType {
   const { type } = field;
@@ -239,59 +243,15 @@ export function resolveFieldType(
     case 'scalar': {
       let outputResolved: string | undefined;
       if (type.typeParams && Object.keys(type.typeParams).length > 0) {
-        // M4 cleanup F03: prefer the descriptor-lookup path. Each
-        // `ParameterizedCodecDescriptor` carries the framework-blessed
-        // `renderOutputType` for its codec id; this is the spec'"'"'s long-term
-        // home. The fallback to the codec object'"'"'s own `renderOutputType`
-        // field is preserved for legacy components that haven'"'"'t shipped a
-        // descriptor yet, and for pre-M4 contracts whose `typeParams` shape
-        // doesn'"'"'t match the descriptor'"'"'s `P` (e.g. JSON columns whose
-        // legacy serialized form is `{ schemaJson, type? }` rather than the
-        // M3 `{ schema }` shape). When the descriptor renders `'unknown'` —
-        // its documented "no precise TS source" sentinel — the legacy
-        // codec-object renderer is given a chance to produce something more
-        // precise. Tagged with TML-2330 for the eventual full cutover.
+        // M4 cleanup F03 + F01: the framework-blessed `renderOutputType` lives
+        // on `ParameterizedCodecDescriptor`. The codec-object hook is gone
+        // (cleanup F01); the descriptor lookup is now the sole source of the
+        // emit-path renderer.
         const descriptor = parameterizedCodecLookup?.get(type.codecId);
-        let descriptorRendered: string | undefined;
         if (descriptor?.renderOutputType) {
           const rendered = descriptor.renderOutputType(type.typeParams);
-          if (rendered && rendered !== 'unknown' && isSafeTypeExpression(rendered)) {
-            descriptorRendered = rendered;
+          if (rendered && isSafeTypeExpression(rendered)) {
             outputResolved = rendered;
-          }
-        }
-        if (outputResolved === undefined && codecLookup) {
-          // Pre-F03 fallback: family-specific codec extensions used to attach
-          // a `renderOutputType` hook to a parameterized codec object. M4
-          // cleanup F01 removes this from the SQL Codec / MongoCodec
-          // extensions in concert with descriptor migration; until every
-          // family ships descriptors, the duck-typed read keeps the emit
-          // path warm.
-          const codec = codecLookup.get(type.codecId) as
-            | {
-                readonly renderOutputType?: (
-                  typeParams: Record<string, unknown>,
-                ) => string | undefined;
-              }
-            | undefined;
-          if (codec?.renderOutputType) {
-            const rendered = codec.renderOutputType(type.typeParams);
-            if (rendered && isSafeTypeExpression(rendered)) {
-              outputResolved = rendered;
-            }
-          }
-        }
-        // If neither path resolved a precise rendering and the descriptor
-        // returned its `'unknown'` sentinel, surface that as the explicit
-        // emit-time output rather than falling through to the codec base —
-        // matches design § JSON factory'"'"'s "renderOutputType returns 'unknown'
-        // for schemas Standard Schema can'"'"'t render to a TS source string."
-        if (outputResolved === undefined && descriptorRendered === undefined) {
-          if (descriptor?.renderOutputType) {
-            const rendered = descriptor.renderOutputType(type.typeParams);
-            if (rendered && isSafeTypeExpression(rendered)) {
-              outputResolved = rendered;
-            }
           }
         }
       }

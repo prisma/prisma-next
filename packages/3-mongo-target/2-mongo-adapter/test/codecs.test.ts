@@ -114,29 +114,20 @@ describe('mongoVectorCodec', () => {
   });
 });
 
-describe('mongoVectorCodec.renderOutputType', () => {
-  it('renders Vector<length> when length is present', () => {
-    expect(mongoVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
+// M4 cleanup F01: `renderOutputType` was retired from the Mongo `Codec`
+// extension and now lives on `mongoVectorParameterizedCodec` (a
+// `ParameterizedCodecDescriptor`). The descriptor's paramsSchema validates
+// upstream of the renderer; tests below assert the renderer's output for
+// valid inputs only.
+describe('mongoVectorParameterizedCodec.renderOutputType', () => {
+  it('renders Vector<length>', async () => {
+    const { mongoVectorParameterizedCodec } = await import('../src/exports/codecs');
+    expect(mongoVectorParameterizedCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
   });
 
-  it('renders Vector<length> with small dimension', () => {
-    expect(mongoVectorCodec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
-  });
-
-  it('returns undefined when length is absent', () => {
-    expect(mongoVectorCodec.renderOutputType!({})).toBeUndefined();
-  });
-
-  it('throws on NaN length', () => {
-    expect(() => mongoVectorCodec.renderOutputType!({ length: Number.NaN })).toThrow(
-      /expected positive integer "length"/,
-    );
-  });
-
-  it('throws on non-integer length', () => {
-    expect(() => mongoVectorCodec.renderOutputType!({ length: 3.5 })).toThrow(
-      /expected positive integer "length"/,
-    );
+  it('renders Vector<length> with small dimension', async () => {
+    const { mongoVectorParameterizedCodec } = await import('../src/exports/codecs');
+    expect(mongoVectorParameterizedCodec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
   });
 });
 

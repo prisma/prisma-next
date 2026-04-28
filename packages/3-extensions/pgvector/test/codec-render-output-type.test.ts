@@ -1,24 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { pgVectorCodec } from '../src/exports/codecs';
 
-describe('pgvector codec renderOutputType', () => {
-  const codec = codecDefinitions['vector'].codec;
-
-  it('renders Vector<length> when length is present', () => {
-    expect(codec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
+// M4 cleanup F01: `renderOutputType` was retired from the codec object and now
+// lives on `pgVectorCodec` (a `ParameterizedCodecDescriptor`). The descriptor's
+// `paramsSchema` validates inputs upstream of `renderOutputType`, so the
+// renderer never sees malformed length values; tests below assert the
+// descriptor's render output for valid inputs.
+describe('pgVectorCodec renderOutputType', () => {
+  it('renders Vector<length>', () => {
+    expect(pgVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');
   });
 
   it('renders Vector<length> with small dimension', () => {
-    expect(codec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
-  });
-
-  it('returns undefined when length is absent', () => {
-    expect(codec.renderOutputType!({})).toBeUndefined();
-  });
-
-  it('throws on NaN length', () => {
-    expect(() => codec.renderOutputType!({ length: Number.NaN })).toThrow(
-      /expected positive integer "length"/,
-    );
+    expect(pgVectorCodec.renderOutputType!({ length: 3 })).toBe('Vector<3>');
   });
 });

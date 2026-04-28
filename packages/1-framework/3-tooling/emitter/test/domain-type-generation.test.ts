@@ -3,7 +3,11 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  Codec,
+  CodecLookup,
+  ParameterizedCodecDescriptorLookup,
+} from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -767,7 +771,6 @@ describe('generateValueObjectTypeAliases', () => {
 
 type StubCodec = Partial<Codec> & {
   readonly id: string;
-  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 };
 
 function stubCodec(overrides: StubCodec): Codec {
@@ -784,19 +787,40 @@ function stubCodecLookup(codecs: Record<string, Codec>): CodecLookup {
   return { get: (id) => codecs[id] };
 }
 
+function stubParameterizedCodecLookup(
+  renderers: Record<string, (typeParams: Record<string, unknown>) => string>,
+): ParameterizedCodecDescriptorLookup {
+  return {
+    get: (codecId) => {
+      const renderer = renderers[codecId];
+      if (!renderer) return undefined;
+      return {
+        codecId,
+        // biome-ignore lint/suspicious/noExplicitAny: stub paramsSchema; the test only exercises renderOutputType.
+        paramsSchema: {
+          '~standard': { version: 1, vendor: 'test', validate: (v: unknown) => ({ value: v }) },
+        } as any,
+        renderOutputType: renderer,
+        // biome-ignore lint/suspicious/noExplicitAny: stub factory; never invoked at emit time.
+        factory: (() => () => ({}) as never) as any,
+      };
+    },
+  };
+}
+
 describe('generateFieldResolvedType', () => {
-  it('uses codec renderOutputType when typeParams are present', () => {
-    const lookup = stubCodecLookup({
-      'pg/char@1': stubCodec({
-        id: 'pg/char@1',
-        renderOutputType: (p) => `Char<${p['length']}>`,
-      }),
+  it('uses descriptor renderOutputType when typeParams are present', () => {
+    const codecLookup = stubCodecLookup({ 'pg/char@1': stubCodec({ id: 'pg/char@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/char@1': (p) => `Char<${p['length']}>`,
     });
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: { length: 36 } },
     };
-    expect(generateFieldResolvedType(field, lookup)).toBe('Char<36>');
+    expect(generateFieldResolvedType(field, codecLookup, 'output', parameterizedLookup)).toBe(
+      'Char<36>',
+    );
   });
 
   it('falls back to CodecTypes lookup when no codecLookup provided', () => {
@@ -807,53 +831,51 @@ describe('generateFieldResolvedType', () => {
     expect(generateFieldResolvedType(field)).toBe("CodecTypes['pg/int4@1']['output']");
   });
 
-  it('falls back to CodecTypes when renderOutputType returns unsafe expression', () => {
-    const lookup = stubCodecLookup({
-      'test@1': stubCodec({
-        id: 'test@1',
-        renderOutputType: () => 'import("fs")',
-      }),
+  it('falls back to CodecTypes when descriptor renderOutputType returns unsafe expression', () => {
+    const codecLookup = stubCodecLookup({ 'test@1': stubCodec({ id: 'test@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'test@1': () => 'import("fs")',
     });
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'test@1', typeParams: { x: 1 } },
     };
-    expect(generateFieldResolvedType(field, lookup)).toBe("CodecTypes['test@1']['output']");
+    expect(generateFieldResolvedType(field, codecLookup, 'output', parameterizedLookup)).toBe(
+      "CodecTypes['test@1']['output']",
+    );
   });
 
-  it('falls back to CodecTypes when codec has no renderOutputType', () => {
-    const lookup = stubCodecLookup({
-      'pg/int4@1': stubCodec({ id: 'pg/int4@1' }),
-    });
+  it('falls back to CodecTypes when no descriptor is registered for the codec', () => {
+    const codecLookup = stubCodecLookup({ 'pg/int4@1': stubCodec({ id: 'pg/int4@1' }) });
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/int4@1', typeParams: { x: 1 } },
     };
-    expect(generateFieldResolvedType(field, lookup)).toBe("CodecTypes['pg/int4@1']['output']");
+    expect(generateFieldResolvedType(field, codecLookup, 'output')).toBe(
+      "CodecTypes['pg/int4@1']['output']",
+    );
   });
 
   it('falls back to CodecTypes when typeParams is empty', () => {
-    const lookup = stubCodecLookup({
-      'pg/char@1': stubCodec({
-        id: 'pg/char@1',
-        renderOutputType: () => 'Char<36>',
-      }),
+    const codecLookup = stubCodecLookup({ 'pg/char@1': stubCodec({ id: 'pg/char@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/char@1': () => 'Char<36>',
     });
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: {} },
     };
-    expect(generateFieldResolvedType(field, lookup)).toBe("CodecTypes['pg/char@1']['output']");
+    expect(generateFieldResolvedType(field, codecLookup, 'output', parameterizedLookup)).toBe(
+      "CodecTypes['pg/char@1']['output']",
+    );
   });
 });
 
 describe('generateFieldOutputTypesMap', () => {
-  it('generates map entries with codec-dispatched rendering', () => {
-    const lookup = stubCodecLookup({
-      'pg/char@1': stubCodec({
-        id: 'pg/char@1',
-        renderOutputType: (p) => `Char<${p['length']}>`,
-      }),
+  it('generates map entries with descriptor-dispatched rendering', () => {
+    const codecLookup = stubCodecLookup({ 'pg/char@1': stubCodec({ id: 'pg/char@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/char@1': (p) => `Char<${p['length']}>`,
     });
     const models: Record<string, ContractModel> = {
       User: {
@@ -871,7 +893,7 @@ describe('generateFieldOutputTypesMap', () => {
         storage: { fields: {}, table: 'user' },
       },
     };
-    const result = generateFieldOutputTypesMap(models, lookup);
+    const result = generateFieldOutputTypesMap(models, codecLookup, parameterizedLookup);
     expect(result).toContain('Char<36>');
     expect(result).toContain("CodecTypes['pg/text@1']['output']");
   });
@@ -984,18 +1006,16 @@ describe('resolveFieldType', () => {
     expect(result.input).toBe('PriceInput');
   });
 
-  it('uses renderOutputType only for output side of parameterized codecs', () => {
-    const lookup = stubCodecLookup({
-      'pg/char@1': stubCodec({
-        id: 'pg/char@1',
-        renderOutputType: (p) => `Char<${p['length']}>`,
-      }),
+  it('uses descriptor renderOutputType only for output side of parameterized codecs', () => {
+    const codecLookup = stubCodecLookup({ 'pg/char@1': stubCodec({ id: 'pg/char@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/char@1': (p) => `Char<${p['length']}>`,
     });
     const field: ContractField = {
       nullable: false,
       type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: { length: 36 } },
     };
-    const result = resolveFieldType(field, lookup);
+    const result = resolveFieldType(field, codecLookup, parameterizedLookup);
     expect(result.output).toBe('Char<36>');
     expect(result.input).toBe("CodecTypes['pg/char@1']['input']");
   });
