@@ -13,11 +13,17 @@ import type {
 } from '../src/sql-context';
 import { createStubAdapter, createTestContext } from './utils';
 
-// M1 stub factory: production codecs migrate to the curried factory in M4.
-function pendingFactory(_params: unknown): (ctx: Ctx) => Codec {
-  return (_ctx) => {
-    throw new Error('M1 stub factory: TML-2330 not yet implemented');
-  };
+// Trivial passthrough factory used by tests that don't care about the resolved codec
+// — they exercise descriptor wiring (paramsSchema validation, duplicate detection)
+// rather than the curried factory's per-instance state.
+function passthroughFactory(_params: unknown): (ctx: Ctx) => Codec {
+  return (_ctx) => ({
+    id: 'pg/vector@1',
+    targetTypes: ['vector'],
+    decode: (wire: unknown) => wire,
+    encodeJson: (value) => value as never,
+    decodeJson: (json) => json as never,
+  });
 }
 
 // =============================================================================
@@ -111,15 +117,12 @@ describe('parameterized types', () => {
 
     function createVectorExtensionDescriptor(options?: {
       paramsSchema?: Type<{ length: number }>;
-      init?: (params: { length: number }) => { dimensions: number };
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
-      // biome-ignore lint/suspicious/noExplicitAny: test helper with flexible type params
       const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
-          factory: pendingFactory,
-          ...ifDefined('init', options?.init),
+          factory: passthroughFactory,
         },
       ];
 
@@ -229,16 +232,24 @@ describe('parameterized types', () => {
     });
   });
 
-  describe('init hook for type helpers', () => {
-    it('calls init hook and stores result in context.types', () => {
-      const vectorParamsSchema = arktype({
-        length: 'number',
-      });
+  describe('curried factory for type helpers', () => {
+    it('stores the codec returned by descriptor.factory(params)(ctx) in context.types', () => {
+      const vectorParamsSchema = arktype({ length: 'number' });
 
-      const initFn = (params: { length: number }) => ({
-        dimensions: params.length,
-        isVector: true,
-      });
+      const factoryFn = (params: { length: number }): ((ctx: Ctx) => Codec) => {
+        return (_ctx) =>
+          ({
+            id: 'pg/vector@1',
+            targetTypes: ['vector'],
+            decode: (wire: unknown) => wire,
+            encodeJson: (v) => v as never,
+            decodeJson: (j) => j as never,
+            // ad-hoc per-instance state riding on the resolved codec — this is what
+            // M4 hands JSON validators / CipherStash key derivation through.
+            dimensions: params.length,
+            isVector: true,
+          }) as Codec & { dimensions: number; isVector: true };
+      };
 
       const registry = createCodecRegistry();
       registry.register(
@@ -254,8 +265,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
-          factory: pendingFactory,
-          init: initFn,
+          factory: factoryFn,
         },
       ];
 
@@ -289,32 +299,36 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      expect(context.types['Vector1536']).toEqual({
-        dimensions: 1536,
-        isVector: true,
-      });
+      const helper = context.types['Vector1536'] as {
+        dimensions?: unknown;
+        isVector?: unknown;
+      };
+      expect(helper.dimensions).toBe(1536);
+      expect(helper.isVector).toBe(true);
     });
 
-    it('stores full type instance when no init hook is provided', () => {
-      const vectorParamsSchema = arktype({
-        length: 'number',
-      });
+    it('passes ctx.name and ctx.usedAt to the factory for storage.types entries', () => {
+      const vectorParamsSchema = arktype({ length: 'number' });
 
-      const registry = createCodecRegistry();
-      registry.register(
-        codec({
-          typeId: 'pg/vector@1',
-          targetTypes: ['vector'],
-          encode: (v: number[]) => v,
-          decode: (w: number[]) => w,
-        }),
-      );
+      let observedCtx: Ctx | undefined;
+      const factoryFn = (_params: { length: number }): ((ctx: Ctx) => Codec) => {
+        return (ctx) => {
+          observedCtx = ctx;
+          return {
+            id: 'pg/vector@1',
+            targetTypes: ['vector'],
+            decode: (wire: unknown) => wire,
+            encodeJson: (v) => v as never,
+            decodeJson: (j) => j as never,
+          };
+        };
+      };
 
       const parameterizedCodecs = [
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
-          factory: pendingFactory,
+          factory: factoryFn,
         },
       ];
 
@@ -324,13 +338,10 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
+        codecs: () => createCodecRegistry(),
         parameterizedCodecs: () => parameterizedCodecs,
         create() {
-          return {
-            familyId: 'sql' as const,
-            targetId: 'postgres' as const,
-          };
+          return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
       };
 
@@ -342,18 +353,33 @@ describe('parameterized types', () => {
             typeParams: { length: 1536 },
           },
         },
+        tableColumns: {
+          id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+          embedding: {
+            nativeType: 'vector',
+            codecId: 'pg/vector@1',
+            nullable: false,
+            typeRef: 'Vector1536',
+          },
+          backup: {
+            nativeType: 'vector',
+            codecId: 'pg/vector@1',
+            nullable: false,
+            typeRef: 'Vector1536',
+          },
+        },
       });
 
-      const context = createTestContext(contract, createStubAdapter(), {
+      createTestContext(contract, createStubAdapter(), {
         extensionPacks: [extensionDescriptor],
       });
 
-      // Without init hook, stores the full type instance (matches contract typing)
-      expect(context.types['Vector1536']).toEqual({
-        codecId: 'pg/vector@1',
-        nativeType: 'vector',
-        typeParams: { length: 1536 },
-      });
+      expect(observedCtx).toBeDefined();
+      expect(observedCtx?.name).toBe('Vector1536');
+      expect(observedCtx?.usedAt).toEqual([
+        { table: 'test', column: 'embedding' },
+        { table: 'test', column: 'backup' },
+      ]);
     });
   });
 
@@ -377,7 +403,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
-          factory: pendingFactory,
+          factory: passthroughFactory,
         },
       ];
 
@@ -436,7 +462,7 @@ describe('parameterized types', () => {
         {
           codecId: 'pg/vector@1',
           paramsSchema: vectorParamsSchema,
-          factory: pendingFactory,
+          factory: passthroughFactory,
         },
       ];
 
@@ -501,7 +527,7 @@ describe('parameterized types', () => {
           {
             codecId: 'pg/vector@1',
             paramsSchema: vectorParamsSchema,
-            factory: pendingFactory,
+            factory: passthroughFactory,
           },
         ];
 

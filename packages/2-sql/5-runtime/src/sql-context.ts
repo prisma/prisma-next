@@ -15,7 +15,7 @@ import {
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptor,
@@ -40,21 +40,16 @@ import type {
 /**
  * Runtime parameterized codec descriptor.
  *
- * M1 widens the slot from the legacy `{codecId, paramsSchema, init?}` shape to the
- * curried-factory shape contributed by `ParameterizedCodecDescriptor` (factory +
- * `paramsSchema: StandardSchemaV1<P>` + optional `renderOutputType`). The
- * transitional `init?` field is preserved so existing runtime tests and extensions
- * (pgvector, postgres-jsonb) continue to compile until production codecs migrate to
- * the curried factory in M4 ([TML-2330]).
+ * M1 migrates the slot from the legacy `{codecId, paramsSchema, init?}` shape to the
+ * curried-factory shape contributed by `ParameterizedCodecDescriptor`: the descriptor
+ * carries `factory: (P) => (Ctx) => Codec` plus `paramsSchema: StandardSchemaV1<P>`
+ * and an optional `renderOutputType`. There is no `init` hook — by spec
+ * (`projects/codec-model-unification/spec.md` § Decision and § Rejected alternatives),
+ * the higher-order factory IS what `init` was; per-instance state lives in the codec
+ * the factory returns. Production codecs migrate to typed factories in M4 ([TML-2330]).
  */
 export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> =
-  ParameterizedCodecDescriptor<P> & {
-    /**
-     * Transitional helper hook from the pre-M1 descriptor shape. Replaced by the
-     * curried factory's closure in M4; do not introduce new uses.
-     */
-    readonly init?: (params: P) => unknown;
-  };
+  ParameterizedCodecDescriptor<P>;
 
 export interface SqlStaticContributions {
   readonly codecs: () => CodecRegistry;
@@ -254,32 +249,55 @@ function collectParameterizedCodecDescriptors(
   return descriptors;
 }
 
+function collectTypeRefSites(
+  storage: SqlStorage,
+): Map<string, Array<{ readonly table: string; readonly column: string }>> {
+  const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (typeof column.typeRef !== 'string') continue;
+      const list = sites.get(column.typeRef);
+      const entry = { table: tableName, column: columnName };
+      if (list) {
+        list.push(entry);
+      } else {
+        sites.set(column.typeRef, [entry]);
+      }
+    }
+  }
+  return sites;
+}
+
 function initializeTypeHelpers(
-  storageTypes: Record<string, StorageTypeInstance> | undefined,
+  storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): TypeHelperRegistry {
   const helpers: TypeHelperRegistry = {};
+  const storageTypes = storage.types;
 
   if (!storageTypes) {
     return helpers;
   }
 
+  const typeRefSites = collectTypeRefSites(storage);
+
   for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
     const descriptor = codecDescriptors.get(typeInstance.codecId);
 
-    if (descriptor) {
-      const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
-        typeName,
-      });
-
-      if (descriptor.init) {
-        helpers[typeName] = descriptor.init(validatedParams);
-      } else {
-        helpers[typeName] = typeInstance;
-      }
-    } else {
+    if (!descriptor) {
       helpers[typeName] = typeInstance;
+      continue;
     }
+
+    const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
+      typeName,
+    });
+
+    const usedAt = typeRefSites.get(typeName) ?? [];
+    helpers[typeName] = descriptor.factory(validatedParams)({
+      name: typeName,
+      usedAt,
+    });
   }
 
   return helpers;
@@ -301,13 +319,23 @@ function validateColumnTypeParams(
   }
 }
 
+function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined {
+  if (candidate === null || typeof candidate !== 'object') return undefined;
+  const validate = (candidate as { validate?: unknown }).validate;
+  return typeof validate === 'function' ? (validate as JsonSchemaValidateFn) : undefined;
+}
+
 /**
  * Builds a registry of compiled JSON Schema validators by scanning the contract
- * for columns whose codec descriptor provides an `init` hook returning `{ validate }`.
+ * for columns whose codec descriptor's curried factory yields a Codec instance with
+ * a `validate` JSON-schema hook. Replaces the pre-M1 `init` consultation: per the
+ * spec's "the factory IS what `init` was", per-instance state now lives on the
+ * Codec the factory returns.
  *
  * Handles both:
- * - Inline `typeParams.schema` on columns
- * - `typeRef` → `storage.types[ref]` with init hook results already in `types` registry
+ * - `typeRef` → `storage.types[ref]` with the resolved codec already in `types`.
+ * - Inline `typeParams` on columns → call `factory(typeParams)(ctx)` once and read
+ *   `validate` off the returned codec.
  */
 function buildJsonSchemaValidatorRegistry(
   contract: Contract<SqlStorage>,
@@ -316,43 +344,37 @@ function buildJsonSchemaValidatorRegistry(
 ): JsonSchemaValidatorRegistry | undefined {
   const validators = new Map<string, JsonSchemaValidateFn>();
 
-  // Collect codec IDs that have init hooks (these produce { validate } helpers)
-  const codecIdsWithInit = new Set<string>();
-  for (const [codecId, descriptor] of codecDescriptors) {
-    if (descriptor.init) {
-      codecIdsWithInit.add(codecId);
-    }
-  }
-
-  if (codecIdsWithInit.size === 0) {
+  if (codecDescriptors.size === 0) {
     return undefined;
   }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
-      if (!codecIdsWithInit.has(column.codecId)) continue;
+      const descriptor = codecDescriptors.get(column.codecId);
+      if (!descriptor) continue;
 
       const key = `${tableName}.${columnName}`;
 
-      // Case 1: column references a named type → validator already compiled via init hook
       if (column.typeRef) {
-        const helper = types[column.typeRef] as { validate?: JsonSchemaValidateFn } | undefined;
-        if (helper?.validate) {
-          validators.set(key, helper.validate);
+        const validate = extractValidator(types[column.typeRef]);
+        if (validate) {
+          validators.set(key, validate);
         }
         continue;
       }
 
-      // Case 2: inline typeParams with schema → compile via init hook
       if (column.typeParams) {
-        const descriptor = codecDescriptors.get(column.codecId);
-        if (descriptor?.init) {
-          const helper = descriptor.init(column.typeParams) as
-            | { validate?: JsonSchemaValidateFn }
-            | undefined;
-          if (helper?.validate) {
-            validators.set(key, helper.validate);
-          }
+        const validatedParams = validateTypeParams(column.typeParams, descriptor, {
+          tableName,
+          columnName,
+        });
+        const codec = descriptor.factory(validatedParams)({
+          name: `<anon:${tableName}.${columnName}>`,
+          usedAt: [{ table: tableName, column: columnName }],
+        });
+        const validate = extractValidator(codec);
+        if (validate) {
+          validators.set(key, validate);
         }
       }
     }
@@ -494,7 +516,7 @@ export function createExecutionContext<
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
   }
 
-  const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
+  const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
   const jsonSchemaValidators = buildJsonSchemaValidatorRegistry(
     contract,

@@ -20,6 +20,15 @@ import {
 } from '../core/json-schema-validator';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
 
+/**
+ * Codec instance returned by the JSON/JSONB factory. Carries the per-instance
+ * compiled JSON-schema validator so `sql-runtime`'s validator registry can read
+ * it directly off the resolved codec (replaces the pre-M1 `init` hook on the
+ * descriptor; per spec § Decision and § Rejected alternatives, "the factory IS
+ * what `init` was").
+ */
+type JsonCodecInstance = Codec & { readonly validate: JsonSchemaValidateFn };
+
 export interface SqlRuntimeAdapter
   extends RuntimeAdapterInstance<'sql', 'postgres'>,
     Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement> {}
@@ -41,8 +50,11 @@ const jsonTypeParamsSchema = arktype({
 type JsonTypeParams = typeof jsonTypeParamsSchema.infer;
 
 /**
- * Helper returned by the JSON/JSONB `init` hook.
- * Contains a compiled JSON Schema validate function for runtime conformance checks.
+ * Compiled JSON-schema validator carrier returned by the JSON/JSONB factory.
+ *
+ * Kept as a public alias for downstream consumers that previously imported the
+ * `JsonCodecHelper` shape from this module. The shape is now part of the codec the
+ * factory returns (`JsonCodecInstance`); this alias is a structural subset.
  */
 export type JsonCodecHelper = { readonly validate: JsonSchemaValidateFn };
 
@@ -56,33 +68,36 @@ function createPostgresMutationDefaultGenerators() {
   }));
 }
 
-function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
-  return { validate: compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>) };
-}
-
-// M1 stub: the curried higher-order codec factory replaces the legacy `init` hook
-// in M4 ([TML-2330]). For now the factory throws if invoked; production JSON
-// codecs continue to flow through the transitional `init` field below until M4.
-function pendingJsonFactory(_params: JsonTypeParams): (ctx: Ctx) => Codec {
-  return (_ctx) => {
-    throw new Error(
-      'postgres JSON ParameterizedCodecDescriptor.factory: TML-2330 not yet implemented',
-    );
+function buildJsonFactory(
+  codecId: typeof PG_JSON_CODEC_ID | typeof PG_JSONB_CODEC_ID,
+  nativeType: 'json' | 'jsonb',
+): (params: JsonTypeParams) => (ctx: Ctx) => JsonCodecInstance {
+  return (params) => {
+    const validate = compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>);
+    return (_ctx) => ({
+      id: codecId,
+      targetTypes: [nativeType],
+      decode: (wire: unknown) => wire,
+      encodeJson: (value) => value as never,
+      decodeJson: (json) => json as never,
+      validate,
+    });
   };
 }
+
+const pgJsonFactory = buildJsonFactory(PG_JSON_CODEC_ID, 'json');
+const pgJsonbFactory = buildJsonFactory(PG_JSONB_CODEC_ID, 'jsonb');
 
 const parameterizedCodecDescriptors = [
   {
     codecId: PG_JSON_CODEC_ID,
     paramsSchema: jsonTypeParamsSchema,
-    factory: pendingJsonFactory,
-    init: initJsonCodecHelper,
+    factory: pgJsonFactory,
   },
   {
     codecId: PG_JSONB_CODEC_ID,
     paramsSchema: jsonTypeParamsSchema,
-    factory: pendingJsonFactory,
-    init: initJsonCodecHelper,
+    factory: pgJsonbFactory,
   },
 ] as const satisfies ReadonlyArray<RuntimeParameterizedCodecDescriptor<JsonTypeParams>>;
 

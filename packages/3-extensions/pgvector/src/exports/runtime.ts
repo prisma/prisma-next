@@ -22,20 +22,21 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
-// M1 stub: the curried higher-order codec factory replaces the legacy `init` hook
-// in M4 ([TML-2330]). For now the factory throws if invoked; nothing in the runtime
-// path calls it because production codecs are still authored via the pre-M1 shape.
-function pendingFactory(_params: { readonly length: number }): (ctx: Ctx) => Codec {
-  return (_ctx) => {
-    throw new Error('pgvector ParameterizedCodecDescriptor.factory: TML-2330 not yet implemented');
-  };
+// pgvector is stateless at the per-instance level (no key derivation, no
+// compiled-on-load helper) — `length` is metadata only. The factory therefore
+// simply returns the static `pg/vector@1` codec for any params/ctx; M4
+// ([TML-2330]) will replace this with a typed curried factory whose return type
+// carries `Vector<N>` to drive the no-emit FieldOutputType resolver.
+function vectorFactory(_params: { readonly length: number }): (ctx: Ctx) => Codec {
+  const baseCodec = codecDefinitions.vector.codec;
+  return (_ctx) => baseCodec;
 }
 
 const parameterizedCodecDescriptors = [
   {
     codecId: VECTOR_CODEC_ID,
     paramsSchema: vectorParamsSchema,
-    factory: pendingFactory,
+    factory: vectorFactory,
   },
 ] as const satisfies ReadonlyArray<
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>

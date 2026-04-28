@@ -12,11 +12,37 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
 
-// M1 stub factory: production codecs migrate to the curried factory in M4.
-function pendingFactory(_params: unknown): (ctx: Ctx) => Codec {
-  return (_ctx) => {
-    throw new Error('M1 stub factory: TML-2330 not yet implemented');
+// JSON validator factory used by the test extension. The runtime calls this once
+// per `storage.types` entry (or per inline-typeParams column) and reads `validate`
+// off the resolved codec — replacing the pre-M1 `init` hook on the descriptor.
+function makeJsonValidatorFactory(
+  codecId: 'pg/json@1' | 'pg/jsonb@1',
+  nativeType: 'json' | 'jsonb',
+): (params: { readonly schema: Record<string, unknown> }) => (ctx: Ctx) => Codec {
+  return (params) => {
+    const validate = createStubValidator(params.schema);
+    return (_ctx) =>
+      ({
+        id: codecId,
+        targetTypes: [nativeType],
+        decode: (wire: unknown) => wire,
+        encodeJson: (v) => v as never,
+        decodeJson: (j) => j as never,
+        validate,
+      }) as Codec & { validate: JsonSchemaValidateFn };
   };
+}
+
+// Trivial passthrough factory for test extensions that do not need per-instance
+// validator state.
+function passthroughFactory(_params: unknown): (ctx: Ctx) => Codec {
+  return (_ctx) => ({
+    id: 'pg/jsonb@1',
+    targetTypes: ['jsonb'],
+    decode: (wire: unknown) => wire,
+    encodeJson: (v) => v as never,
+    decodeJson: (j) => j as never,
+  });
 }
 
 import { decodeRow } from '../src/codecs/decoding';
@@ -180,18 +206,18 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     {
       codecId: 'pg/json@1',
       paramsSchema: jsonTypeParamsSchema,
-      factory: pendingFactory,
-      init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params['schema'] as Record<string, unknown>),
-      }),
+      factory: makeJsonValidatorFactory(
+        'pg/json@1',
+        'json',
+      ) as RuntimeParameterizedCodecDescriptor['factory'],
     },
     {
       codecId: 'pg/jsonb@1',
       paramsSchema: jsonTypeParamsSchema,
-      factory: pendingFactory,
-      init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params['schema'] as Record<string, unknown>),
-      }),
+      factory: makeJsonValidatorFactory(
+        'pg/jsonb@1',
+        'jsonb',
+      ) as RuntimeParameterizedCodecDescriptor['factory'],
     },
   ];
 
@@ -304,7 +330,7 @@ describe('JSON Schema validator registry', () => {
       expect(context.jsonSchemaValidators!.get('user.profile')).toBeDefined();
     });
 
-    it('omits validator registry when no init hooks are defined', () => {
+    it('omits validator registry when the resolved codec carries no validate hook', () => {
       const registry = createCodecRegistry();
       registry.register(
         codec({
@@ -315,9 +341,9 @@ describe('JSON Schema validator registry', () => {
         }),
       );
 
-      const noInitExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      const noValidateExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
-        id: 'json-no-init',
+        id: 'json-no-validate',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
@@ -326,7 +352,7 @@ describe('JSON Schema validator registry', () => {
           {
             codecId: 'pg/jsonb@1',
             paramsSchema: jsonTypeParamsSchema,
-            factory: pendingFactory,
+            factory: passthroughFactory,
           },
         ],
         create() {
@@ -336,7 +362,7 @@ describe('JSON Schema validator registry', () => {
 
       const contract = createJsonSchemaContract();
       const context = createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [noInitExtension],
+        extensionPacks: [noValidateExtension],
       });
 
       expect(context.jsonSchemaValidators).toBeUndefined();
