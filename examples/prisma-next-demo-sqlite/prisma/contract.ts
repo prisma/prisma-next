@@ -1,14 +1,7 @@
-import { datetimeColumn, jsonColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
+import { datetimeColumn, textColumn } from '@prisma-next/adapter-sqlite/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import sqlitePack from '@prisma-next/target-sqlite/pack';
-
-export type AddressInput = {
-  readonly street: string;
-  readonly city: string;
-  readonly zip?: string | null;
-  readonly country: string;
-};
 
 export const contract = defineContract(
   {
@@ -32,10 +25,6 @@ export const contract = defineContract(
         email: field.column(textColumn),
         displayName: field.column(textColumn),
         createdAt: field.column(datetimeColumn).defaultSql('now()'),
-        // SQLite has no native enums; `kind` is a plain text column whose
-        // values are conventionally 'admin' or 'user'.
-        kind: field.column(textColumn),
-        address: field.column(jsonColumn).optional(),
       },
     });
 

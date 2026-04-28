@@ -5,9 +5,7 @@
  *
  * Run with: pnpm seed
  *
- * Creates:
- * - 2 users (alice, bob)
- * - 3 posts
+ * Creates 2 users (alice, bob) and 3 posts.
  *
  * Prerequisites:
  * - SQLITE_PATH env var (defaults to ./demo.db)
@@ -29,8 +27,6 @@ async function main() {
           email: 'alice@example.com',
           displayName: 'Alice',
           createdAt: new Date(),
-          kind: 'admin',
-          address: { street: '123 Main St', city: 'San Francisco', zip: '94102', country: 'US' },
         })
         .build(),
     );
@@ -41,8 +37,6 @@ async function main() {
           email: 'bob@example.com',
           displayName: 'Bob',
           createdAt: new Date(),
-          kind: 'user',
-          address: { street: '456 Oak Ave', city: 'Portland', zip: null, country: 'US' },
         })
         .build(),
     );
@@ -73,33 +67,13 @@ async function main() {
     console.log(`Created user: ${bob.email} (id: ${bob.id})`);
 
     await runtime.execute(
-      db.sql.post
-        .insert({
-          title: 'First Post',
-          userId: alice.id,
-          createdAt: new Date(),
-        })
-        .build(),
+      db.sql.post.insert({ title: 'First Post', userId: alice.id, createdAt: new Date() }).build(),
     );
-
     await runtime.execute(
-      db.sql.post
-        .insert({
-          title: 'Second Post',
-          userId: alice.id,
-          createdAt: new Date(),
-        })
-        .build(),
+      db.sql.post.insert({ title: 'Second Post', userId: alice.id, createdAt: new Date() }).build(),
     );
-
     await runtime.execute(
-      db.sql.post
-        .insert({
-          title: 'Third Post',
-          userId: bob.id,
-          createdAt: new Date(),
-        })
-        .build(),
+      db.sql.post.insert({ title: 'Third Post', userId: bob.id, createdAt: new Date() }).build(),
     );
 
     console.log('Seed completed successfully!');

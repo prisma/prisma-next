@@ -9,17 +9,15 @@ export interface OrmClientCreateUserInput {
   readonly id: string;
   readonly email: string;
   readonly displayName: string;
-  readonly kind: 'admin' | 'user';
   readonly createdAt: Date | string;
 }
 
 export async function ormClientCreateUser(data: OrmClientCreateUserInput, runtime: Runtime) {
   const db = createOrmClient(runtime);
-  return db.User.select('id', 'email', 'kind').create({
+  return db.User.select('id', 'email').create({
     id: toUserId(data.id),
     email: data.email,
     displayName: data.displayName,
-    kind: data.kind,
     createdAt: toUserCreatedAt(data.createdAt),
   });
 }

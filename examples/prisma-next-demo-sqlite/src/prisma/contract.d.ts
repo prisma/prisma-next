@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:357b86d293f0fd09eead75c96d2665e3c5fa463c584353411e74cfd160f45116'>;
+  StorageHashBase<'sha256:e24794a683382da0d74efb644461a150560e3fbde9cea38126586bab96bbdaad'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:0903547be862dca3fa2dbc62a85cd52e9ca595f00cf43b6b26a3da3d4b9740ae'>;
 export type ProfileHash =
@@ -41,8 +41,6 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['sqlite/text@1']['output'];
     readonly displayName: CodecTypes['sqlite/text@1']['output'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
-    readonly kind: CodecTypes['sqlite/text@1']['output'];
-    readonly address: CodecTypes['sqlite/json@1']['output'] | null;
   };
 };
 export type FieldInputTypes = {
@@ -57,8 +55,6 @@ export type FieldInputTypes = {
     readonly email: CodecTypes['sqlite/text@1']['input'];
     readonly displayName: CodecTypes['sqlite/text@1']['input'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
-    readonly kind: CodecTypes['sqlite/text@1']['input'];
-    readonly address: CodecTypes['sqlite/json@1']['input'] | null;
   };
 };
 export type TypeMaps = TypeMapsType<
@@ -134,16 +130,6 @@ type ContractBase = ContractType<
             readonly codecId: 'sqlite/datetime@1';
             readonly nullable: false;
             readonly default: { readonly kind: 'function'; readonly expression: 'now()' };
-          };
-          readonly kind: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/text@1';
-            readonly nullable: false;
-          };
-          readonly address: {
-            readonly nativeType: 'text';
-            readonly codecId: 'sqlite/json@1';
-            readonly nullable: true;
           };
         };
         primaryKey: { readonly columns: readonly ['id'] };
@@ -225,14 +211,6 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/datetime@1' };
         };
-        readonly kind: {
-          readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/text@1' };
-        };
-        readonly address: {
-          readonly nullable: true;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/json@1' };
-        };
       };
       readonly relations: {
         readonly posts: {
@@ -251,8 +229,6 @@ type ContractBase = ContractType<
           readonly email: { readonly column: 'email' };
           readonly displayName: { readonly column: 'displayName' };
           readonly createdAt: { readonly column: 'createdAt' };
-          readonly kind: { readonly column: 'kind' };
-          readonly address: { readonly column: 'address' };
         };
       };
     };

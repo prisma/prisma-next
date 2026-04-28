@@ -79,13 +79,6 @@
     },
     "User": {
       "fields": {
-        "address": {
-          "nullable": true,
-          "type": {
-            "codecId": "sqlite/json@1",
-            "kind": "scalar"
-          }
-        },
         "createdAt": {
           "nullable": false,
           "type": {
@@ -116,13 +109,6 @@
               "length": 36
             }
           }
-        },
-        "kind": {
-          "nullable": false,
-          "type": {
-            "codecId": "sqlite/text@1",
-            "kind": "scalar"
-          }
         }
       },
       "relations": {
@@ -141,9 +127,6 @@
       },
       "storage": {
         "fields": {
-          "address": {
-            "column": "address"
-          },
           "createdAt": {
             "column": "createdAt"
           },
@@ -155,9 +138,6 @@
           },
           "id": {
             "column": "id"
-          },
-          "kind": {
-            "column": "kind"
           }
         },
         "table": "user"
@@ -165,7 +145,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:357b86d293f0fd09eead75c96d2665e3c5fa463c584353411e74cfd160f45116",
+    "storageHash": "sha256:e24794a683382da0d74efb644461a150560e3fbde9cea38126586bab96bbdaad",
     "tables": {
       "post": {
         "columns": {
@@ -226,11 +206,6 @@
       },
       "user": {
         "columns": {
-          "address": {
-            "codecId": "sqlite/json@1",
-            "nativeType": "text",
-            "nullable": true
-          },
           "createdAt": {
             "codecId": "sqlite/datetime@1",
             "default": {
@@ -257,11 +232,6 @@
             "typeParams": {
               "length": 36
             }
-          },
-          "kind": {
-            "codecId": "sqlite/text@1",
-            "nativeType": "text",
-            "nullable": false
           }
         },
         "foreignKeys": [],
