@@ -6,6 +6,7 @@ export {
   findLeaf,
   findPath,
   findPathWithDecision,
+  findPathWithInvariants,
   findReachableLeaves,
   reconstructGraph,
 } from '../migration-graph';

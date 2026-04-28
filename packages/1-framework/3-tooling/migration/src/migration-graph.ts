@@ -141,6 +141,153 @@ export function findPath(
 }
 
 /**
+ * Find the shortest path from `fromHash` to `toHash` whose edges collectively
+ * cover every invariant in `required`. Returns `null` when no such path exists
+ * (either `fromHash`→`toHash` is structurally unreachable, or every reachable
+ * path leaves at least one required invariant uncovered).
+ *
+ * When `required` is empty we delegate to `findPath` so existing callers see
+ * byte-identical behaviour (F8). The plan permits either delegating or
+ * reimplementing `findPath` atop this primitive — delegation keeps the F8
+ * guarantee trivial to reason about.
+ *
+ * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup.
+ * The covered subset is encoded as a 30-bit unsigned mask over a sorted
+ * enumeration of `required`; this is a constant-factor speed-up over the
+ * spec's suggested sorted-`join('\0')` string key for the typical k ≤ 16
+ * case. The 30-bit cap is enforced at entry — k beyond that is far outside
+ * the spec's "single-digit realistic" expectation (N1/N2) and we'd rather
+ * fail loudly than silently misbehave from JS's signed 32-bit bitwise ops.
+ *
+ * Neighbour ordering when `required ≠ ∅` (D11): edges covering ≥1
+ * still-needed invariant come first, with the existing
+ * `labelPriority → createdAt → to → migrationHash` order as the secondary
+ * key. The heuristic steers BFS toward the satisfying path; correctness
+ * (shortest, deterministic) does not depend on it.
+ */
+export function findPathWithInvariants(
+  graph: MigrationGraph,
+  fromHash: string,
+  toHash: string,
+  required: ReadonlySet<string>,
+): readonly MigrationEdge[] | null {
+  if (required.size === 0) {
+    return findPath(graph, fromHash, toHash);
+  }
+  if (required.size > 30) {
+    throw new Error(
+      `findPathWithInvariants: required.size=${required.size} exceeds the 30-bit subset-mask cap. The spec expects single-digit k (N1/N2); please file an issue if you hit this in practice.`,
+    );
+  }
+  if (fromHash === toHash) {
+    // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
+    return null;
+  }
+
+  const requiredArr = [...required].sort();
+  const requiredBit = new Map<string, number>();
+  for (let i = 0; i < requiredArr.length; i++) {
+    requiredBit.set(requiredArr[i]!, 1 << i);
+  }
+  const fullMask = (1 << requiredArr.length) - 1;
+
+  const edgeMaskOf = (edge: MigrationEdge): number => {
+    let m = 0;
+    for (const inv of edge.invariants) {
+      const bit = requiredBit.get(inv);
+      if (bit !== undefined) m |= bit;
+    }
+    return m;
+  };
+
+  // State key: `${node}${mask}`. Hash format never contains 
+  // (it's `sha256:…` or `h:…` in tests), so collisions are impossible.
+  const stateKey = (node: string, mask: number) => `${node}${mask}`;
+
+  interface ParentLink {
+    readonly parentKey: string;
+    readonly edge: MigrationEdge;
+  }
+  const parents = new Map<string, ParentLink>();
+  const visited = new Set<string>();
+
+  const startKey = stateKey(fromHash, 0);
+  visited.add(startKey);
+
+  // Inline BFS frontier with a head-index cursor. We can't reuse the generic
+  // `bfs` generator in graph-ops.ts because its visited set is keyed on node
+  // alone; this primitive needs state-level dedup (counter-example in
+  // spec §Pathfinder algorithm).
+  interface Frontier {
+    readonly node: string;
+    readonly mask: number;
+    readonly key: string;
+  }
+  const queue: Frontier[] = [{ node: fromHash, mask: 0, key: startKey }];
+  let head = 0;
+
+  while (head < queue.length) {
+    // biome-ignore lint/style/noNonNullAssertion: head < queue.length guarantees defined
+    const cur = queue[head++]!;
+
+    if (cur.node === toHash && cur.mask === fullMask) {
+      return reconstructInvariantPath(parents, cur.key);
+    }
+
+    const outgoing = graph.forwardChain.get(cur.node);
+    if (!outgoing || outgoing.length === 0) continue;
+
+    const remainingMask = fullMask & ~cur.mask;
+    const ordered = sortNeighboursByInvariantUtility(outgoing, remainingMask, edgeMaskOf);
+
+    for (const edge of ordered) {
+      const provided = edgeMaskOf(edge);
+      const nextMask = cur.mask | provided;
+      const nextKey = stateKey(edge.to, nextMask);
+      if (visited.has(nextKey)) continue;
+      visited.add(nextKey);
+      parents.set(nextKey, { parentKey: cur.key, edge });
+      queue.push({ node: edge.to, mask: nextMask, key: nextKey });
+    }
+  }
+
+  return null;
+}
+
+function reconstructInvariantPath(
+  parents: ReadonlyMap<string, { parentKey: string; edge: MigrationEdge }>,
+  endKey: string,
+): MigrationEdge[] {
+  const path: MigrationEdge[] = [];
+  let cur: string | undefined = endKey;
+  while (cur !== undefined) {
+    const p = parents.get(cur);
+    if (!p) break;
+    path.push(p.edge);
+    cur = p.parentKey;
+  }
+  path.reverse();
+  return path;
+}
+
+function sortNeighboursByInvariantUtility(
+  edges: readonly MigrationEdge[],
+  remainingMask: number,
+  edgeMaskOf: (e: MigrationEdge) => number,
+): readonly MigrationEdge[] {
+  const annotated = edges.map((edge) => ({
+    edge,
+    useful: (edgeMaskOf(edge) & remainingMask) !== 0 ? 1 : 0,
+  }));
+  annotated.sort((a, b) => {
+    const u = b.useful - a.useful;
+    if (u !== 0) return u;
+    return compareTieBreak(a.edge, b.edge);
+  });
+  return annotated.map((a) => a.edge);
+}
+
+/**
  * Reverse-BFS from `toHash` over `reverseChain` to collect every node from
  * which `toHash` is reachable (inclusive of `toHash` itself).
  */
