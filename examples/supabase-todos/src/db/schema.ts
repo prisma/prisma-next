@@ -19,9 +19,9 @@ import postgresPack from '@prisma-next/target-postgres/pack';
  * for either today — see `projects/supabase-poc/framework-limitations.md`
  * FL-01 (no contract-level RLS metadata) and FL-02 (no cross-schema FK
  * in the contract DSL). Both are authored in the PN migration file
- * (T1.6) instead, using the in-example `enableRowLevelSecurity` /
- * `createRlsPolicy` factories (T1.5) for RLS and raw SQL for the
- * `auth.users` FKs.
+ * instead, using the in-example `enableRowLevelSecurity` /
+ * `createRlsPolicy` factories from `migrations/utils/rls-ops.ts` for
+ * RLS, and raw SQL for the `auth.users` FKs.
  */
 export const contract = defineContract(
   {

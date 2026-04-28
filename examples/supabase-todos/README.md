@@ -2,9 +2,9 @@
 
 A Prisma Next reference application running against a local Supabase stack. The example exercises Supabase Row Level Security (RLS) and Realtime through PN's contract-first runtime: app schema is authored as a PN contract, RLS policies are authored in PN migration files, and per-request reads/writes are scoped to the authenticated user via a userspace runtime factory.
 
-This is the running-app deliverable for the Supabase PoC. The design rationale, requirements, and milestones live in [`projects/supabase-poc/spec.md`](../../projects/supabase-poc/spec.md) and [`projects/supabase-poc/plan.md`](../../projects/supabase-poc/plan.md).
+This is the running-app deliverable for the Supabase PoC. The design rationale and requirements live in [`projects/supabase-poc/spec.md`](../../projects/supabase-poc/spec.md).
 
-> **Status:** Milestones 1–4 complete. The example scaffolds the schema, RLS policies, seed fixtures, an admin (RLS-bypassing) runtime, the per-request scoped runtime (`createSupabaseRuntime`), the Hono `/api/todos` + `/api/public/messages` API, and a Vite SPA with authentication, optimistic-CRUD todos, realtime subscriptions, and a public board.
+> **Status:** Feature-complete. The example scaffolds the schema, RLS policies, seed fixtures, an admin (RLS-bypassing) runtime, the per-request scoped runtime (`createSupabaseRuntime`), the Hono `/api/todos` + `/api/public/messages` API, and a Vite SPA with authentication, optimistic-CRUD todos, realtime subscriptions, and a public board.
 
 ## Architecture at a glance
 
@@ -96,7 +96,7 @@ Run from the **repo root** unless noted otherwise.
 
    > The seed is **idempotent but not convergent**. If a row drifts (e.g. a test mutated it without cleaning up), `pnpm seed` will not repair it. Recovery: `supabase db reset` from this directory, then `pnpm migrate:up && pnpm seed` to rebuild the baseline.
 
-7. **Run the test suite.** Vitest covers the in-example RLS migration factories ([`test/migrations/rls-ops.test.ts`](test/migrations/rls-ops.test.ts)), the admin / per-request runtime ([`test/runtime/`](test/runtime/)), the JWT + scoped-runtime middleware ([`test/server/middleware/`](test/server/middleware/)), and the Hono routes ([`test/server/routes/`](test/server/routes/)). 149 tests as of phase-4c.
+7. **Run the test suite.** Vitest covers the in-example RLS migration factories ([`test/migrations/rls-ops.test.ts`](test/migrations/rls-ops.test.ts)), the admin / per-request runtime ([`test/runtime/`](test/runtime/)), the JWT + scoped-runtime middleware ([`test/server/middleware/`](test/server/middleware/)), and the Hono routes ([`test/server/routes/`](test/server/routes/)).
 
    ```bash
    pnpm --filter supabase-todos test
@@ -201,11 +201,11 @@ examples/supabase-todos/
 ├── src/
 │   ├── db/                                       ← contract (schema.ts → contract.json + .d.ts)
 │   ├── server/
-│   │   ├── index.ts                              ← Hono entry (T4.13 prereq)
+│   │   ├── index.ts                              ← Hono entry
 │   │   ├── db.ts                                 ← admin (RLS-bypass) PN runtime
 │   │   ├── supabase-runtime.ts                   ← per-request scoped runtime factory
-│   │   ├── middleware/{jwt,scoped-runtime}.ts    ← phase-4a auth + RLS-scoping
-│   │   └── routes/{todos,public-messages}.ts     ← phase-4b /api/* handlers
+│   │   ├── middleware/{jwt,scoped-runtime}.ts    ← auth + RLS-scoping
+│   │   └── routes/{todos,public-messages}.ts     ← /api/* handlers
 │   └── client/
 │       ├── main.tsx                              ← React entry
 │       ├── supabase.ts                           ← browser supabase-js (auth + channel only)
@@ -215,7 +215,7 @@ examples/supabase-todos/
 │       └── components/{LoginForm,TopNav,TodosPage,PublicBoardPage}.tsx
 ├── migrations/20260428T0354_initial/             ← PN migration (tables + RLS policies)
 ├── scripts/seed.ts                               ← demo fixtures + realtime publication
-└── test/                                         ← vitest (149 tests as of phase-4c)
+└── test/                                         ← vitest (unit + integration)
 ```
 
 ## Production gaps
@@ -233,13 +233,8 @@ This example is **demo-scoped, not production-ready**. The architectural shape (
 
 These are recorded as gaps the PoC does not close; "addressing them" is a separate scope. If the patterns established here graduate into the framework, the [design sketches](../../projects/supabase-poc/framework-limitations.md#design-sketches--proposed-upstream-work) at the bottom of the framework-limitations doc are the path.
 
-## What's next
-
-The PoC is feature-complete through milestone 4. Milestone 5 (consolidation pass) finalises [`framework-limitations.md`](../../projects/supabase-poc/framework-limitations.md), the [agent skill](../../projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md), and the design sketches; see [`projects/supabase-poc/plan.md § Milestone 5`](../../projects/supabase-poc/plan.md).
-
 ## Cross-references
 
 - [`projects/supabase-poc/spec.md`](../../projects/supabase-poc/spec.md) — PoC design and requirements.
-- [`projects/supabase-poc/plan.md`](../../projects/supabase-poc/plan.md) — milestone plan and phase index.
 - [`projects/supabase-poc/framework-limitations.md`](../../projects/supabase-poc/framework-limitations.md) — gaps surfaced by the PoC and the design sketches that close them.
 - [`projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md`](../../projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md) — opinionated guide to authoring RLS in a PN codebase.

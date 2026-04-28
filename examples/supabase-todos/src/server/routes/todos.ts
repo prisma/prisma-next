@@ -1,5 +1,5 @@
 /**
- * Todos JSON API (T4.6).
+ * Todos JSON API.
  *
  * Five endpoints under `/api/todos`, mounted via
  * `app.route('/api/todos', createTodosRoutes({ sql: adminDb.sql }))`
@@ -42,18 +42,15 @@
  * APIs do this; called out so a future maintainer doesn't add a
  * regression test that depends on byte-preserving titles.
  *
- * ## SKILL.md note (per phase-4b discipline)
+ * ## SKILL.md note
  *
  * "PN does not auto-populate insert columns from session GUCs" is a
  * real RLS-skill-shaped finding worth advising future authors about,
  * but it is already covered by SKILL.md § 5 (service-role guidance)
- * and § 6 (auth.uid() and anon). The phase-4b dispatch flagged this
- * as a possible SKILL.md update — declined: SKILL.md already covers
- * the underlying mechanic. Cross-link from a future revision if the
- * insert-supplies-user_id pattern surfaces as confusing.
+ * and § 6 (auth.uid() and anon). Cross-link from a future revision
+ * if the insert-supplies-user_id pattern surfaces as confusing.
  *
  * @see projects/supabase-poc/spec.md § R-FX-2, R-FE-3
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.6
  */
 import { Hono } from 'hono';
 import type { AdminDb } from '../db';

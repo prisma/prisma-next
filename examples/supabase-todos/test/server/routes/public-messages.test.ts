@@ -1,10 +1,5 @@
 /**
- * Integration spec for the public-messages endpoint (T4.7).
- *
- * Lands in `phase-4b` ahead of T4.8's implementation, so the commit
- * history records tests-first ordering (R-NF-4). Until
- * `src/server/routes/public-messages.ts` exists, the import below
- * fails and the suite is red.
+ * Integration spec for the public-messages endpoint.
  *
  * What this spec verifies (covers spec.md R-FE-5)
  * -----------------------------------------------
@@ -24,7 +19,6 @@
  * the public-route opt-out" regression breaks the anon path loudly.
  *
  * @see projects/supabase-poc/spec.md § R-FE-5
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.7, 4.8
  */
 import 'dotenv/config';
 import { Hono } from 'hono';
@@ -41,9 +35,6 @@ import {
   createScopedRuntimeMiddleware,
   type ScopedRuntimeEnv,
 } from '../../../src/server/middleware/scoped-runtime';
-// `routes/public-messages` is the T4.8 deliverable; until it lands,
-// this import fails with `ERR_MODULE_NOT_FOUND` and the suite is
-// red. That failure is the tests-first proof.
 import { createPublicMessagesRoutes } from '../../../src/server/routes/public-messages';
 import {
   createSupabaseRuntime,
@@ -97,7 +88,7 @@ function buildPublicMessagesApp(deps: AppDeps) {
     .route('/api/public/messages', createPublicMessagesRoutes({ sql: deps.sql }));
 }
 
-describe.skipIf(!databaseUrl)('Public messages endpoint (T4.7)', () => {
+describe.skipIf(!databaseUrl)('Public messages endpoint', () => {
   let adminDb: AdminDb;
   let adminRuntime: Awaited<ReturnType<AdminDb['connect']>>;
   let pool: Pool;

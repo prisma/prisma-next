@@ -1,5 +1,5 @@
 /**
- * Hono JWT-verification middleware (T4.2).
+ * Hono JWT-verification middleware.
  *
  * Sits in front of authenticated route handlers. Reads
  * `Authorization: Bearer <token>`, verifies the token via `jose`
@@ -13,12 +13,11 @@
  *
  * Local Supabase signs access tokens with HS256 and a fixed secret
  * exposed via `supabase status -o env` (`JWT_SECRET=...`); the same
- * secret is configured for `gotrue` and validated by PostgREST. The
- * project plan's open item ("Supabase JWKS endpoint vs shared secret
- * for local dev") was resolved in favour of the **shared-secret**
- * default — JWKS would require an HTTP fetch per process startup,
- * caching, key rotation handling, etc. None of that is interesting
- * for a PoC whose goal is to exercise the RLS pipeline. A production
+ * secret is configured for `gotrue` and validated by PostgREST. We
+ * default to the **shared-secret** verifier because JWKS would
+ * require an HTTP fetch per process startup, caching, key rotation
+ * handling, etc. — none of that is interesting for a PoC whose goal
+ * is to exercise the RLS pipeline. A production
  * deployment can swap this out for a JWKS-backed verifier without
  * changing the middleware's surface (just construct a different
  * `secret` resolver).
@@ -33,9 +32,9 @@
  * app.get('/api/public/messages', publicRoute(), jwtAuth, scoped, handler);
  * ```
  *
- * The downstream scoped-runtime middleware (T4.4) reads
- * `c.var.public` to decide between an authenticated session and an
- * `anon`-scoped session.
+ * The downstream scoped-runtime middleware reads `c.var.public` to
+ * decide between an authenticated session and an `anon`-scoped
+ * session.
  *
  * ## Error code namespace
  *
@@ -54,7 +53,6 @@
  * can wrap this later without changing the wire shape.
  *
  * @see projects/supabase-poc/spec.md § Hono server (JWT verify)
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.2
  */
 import type { MiddlewareHandler } from 'hono';
 import { type JWTPayload, errors as joseErrors, jwtVerify } from 'jose';
@@ -62,7 +60,7 @@ import { type JWTPayload, errors as joseErrors, jwtVerify } from 'jose';
 /**
  * Shape attached to `c.var.jwt` on a successfully-verified request.
  * `claims` is the decoded JWT payload verbatim; `role` is the value
- * the per-request scoped-runtime middleware (T4.4) hands to
+ * the per-request scoped-runtime middleware hands to
  * `factory.authenticate({ role })`. Defaults to `'authenticated'`
  * when the token has no explicit `role` claim.
  */
@@ -73,7 +71,7 @@ export interface JwtAuth {
 
 /**
  * Hono `Env` shape for the JWT middleware. The downstream
- * scoped-runtime middleware (T4.4) extends this with a `db` variable.
+ * scoped-runtime middleware extends this with a `db` variable.
  */
 export type JwtAuthEnv = {
   Variables: {
@@ -173,8 +171,8 @@ export function createJwtMiddleware(options: JwtMiddlewareOptions): MiddlewareHa
  * `auth/missing-bearer` before the marker is ever set. The marker
  * sets `c.var.public = true`; the JWT middleware checks the flag at
  * the top of its handler and short-circuits past verification, and
- * the scoped-runtime middleware (T4.4) reads the same flag to attach
- * an `anon`-scoped session instead of an authenticated one.
+ * the scoped-runtime middleware reads the same flag to attach an
+ * `anon`-scoped session instead of an authenticated one.
  *
  * ```ts
  * // Right: marker before auth + scope.

@@ -1,13 +1,13 @@
 /**
- * `createSupabaseRuntime` — userspace per-request RLS-scoped runtime factory (T2.2).
+ * `createSupabaseRuntime` — userspace per-request RLS-scoped runtime factory.
  *
  * Headline mechanism of the PoC. Wraps a shared `pg.Pool` so each
  * request can `authenticate({ jwtClaims, role })` and receive a
  * `SqlRuntime`-shaped session that runs every plan inside its own
  * `BEGIN; SET LOCAL request.jwt.claims = …; SET LOCAL ROLE …; <plan>; COMMIT`
  * envelope. The role downgrade (from `postgres` superuser → `authenticated`
- * / `anon`) is what activates the RLS policies authored in the M1 migration;
- * `auth.uid()` reads the `sub` claim from the GUC.
+ * / `anon`) is what activates the RLS policies authored in the initial
+ * migration; `auth.uid()` reads the `sub` claim from the GUC.
  *
  * Lives in the example (no `packages/` edits, R-NF-1 / R-NF-2). The factory
  * is the proof that PN's existing public surface is sufficient to assemble
@@ -22,8 +22,8 @@
  *   between transactions, so only `SET LOCAL` inside `BEGIN..COMMIT` is
  *   safe). Each `runtime.execute(plan)` borrows a `PoolClient`, runs
  *   `BEGIN; SET LOCAL …` (2 round-trips), executes the plan, then
- *   `COMMIT` and returns the client to the pool. Connection-mode is the
- *   M3 stretch; not built here.
+ *   `COMMIT` and returns the client to the pool. Connection-scope mode is
+ *   a possible follow-up; not built here.
  * - **Identifier validation, not parameterization.** `SET ROLE` does not
  *   accept bind parameters in Postgres — the role must be in the SQL
  *   text. We allowlist-check the role against `allowedRoles` synchronously
@@ -65,7 +65,7 @@
  * try {
  *   const rows = await session.execute(plan); // RLS-scoped
  * } finally {
- *   await session.end(); // no-op in transaction mode; required in connection mode (M3)
+ *   await session.end(); // no-op in transaction mode; required in connection-scope mode
  * }
  * ```
  *
@@ -75,7 +75,6 @@
  * unchanged.
  *
  * @see projects/supabase-poc/spec.md § Functional requirements (R-FX-*)
- * @see projects/supabase-poc/plan.md § Milestone 2 → 2.2
  * @see projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md § 5
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
@@ -106,7 +105,7 @@ export interface SupabaseRuntimeOptions<TContract extends Contract<SqlStorage>> 
    * the pool; the caller is responsible for `pool.end()` at process shutdown.
    */
   readonly pool: Pool;
-  /** Only `'transaction'` is supported in M2. Connection-scope mode is the M3 stretch. */
+  /** Only `'transaction'` is supported. Connection-scope mode is a possible follow-up. */
   readonly scopeMode: ScopeMode;
   /**
    * Allowlist of role names that `authenticate({ role })` may pass through to
@@ -134,8 +133,8 @@ export interface SupabaseSession extends Runtime {
   /**
    * Tear-down hook. In transaction-scope mode this is a no-op (every plan
    * is already its own self-contained transaction); kept on the surface so
-   * call sites are forward-compatible with the connection-scope mode (M3),
-   * which borrows a long-lived `PoolClient` and releases it here.
+   * call sites are forward-compatible with a future connection-scope mode,
+   * which would borrow a long-lived `PoolClient` and release it here.
    */
   end(): Promise<void>;
 }
@@ -164,8 +163,8 @@ function unsupportedScopedTxError(): UnsupportedScopedTxError {
 /**
  * Typed error for the R-FX-5 allowlist rejection. The factory throws
  * synchronously from `authenticate()` when the requested role is not in
- * `allowedRoles`; the scoped-runtime middleware (T4.4) `instanceof`-
- * checks this shape (or matches on `code`) to map the throw to a 403
+ * `allowedRoles`; the scoped-runtime middleware `instanceof`-checks this
+ * shape (or matches on `code`) to map the throw to a 403
  * `auth/role-not-allowed` response rather than letting it propagate as
  * a 500 ("server bug") to the client. Exposing a class — rather than
  * making the middleware brittle-match on the message string — keeps
@@ -220,9 +219,9 @@ function toPgParams(params: readonly unknown[] | undefined): unknown[] | undefin
 /**
  * If `destroy()` fails on a cleanup path we already have an upstream error
  * we are about to propagate; attach the destroy failure as `cause` so it
- * reaches the caller's stack trace instead of being silently swallowed
- * (M3 reviewer follow-up). We only set `cause` when it is undefined to
- * avoid clobbering a richer chain the caller might have constructed.
+ * reaches the caller's stack trace instead of being silently swallowed.
+ * We only set `cause` when it is undefined to avoid clobbering a richer
+ * chain the caller might have constructed.
  */
 function attachDestroyFailure(upstream: unknown, destroyError: unknown): void {
   if (upstream instanceof Error && destroyError instanceof Error && upstream.cause === undefined) {
@@ -493,8 +492,8 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
 ): SupabaseRuntimeFactory {
   if (options.scopeMode !== 'transaction') {
     throw new Error(
-      `createSupabaseRuntime: scopeMode '${String(options.scopeMode)}' is not supported in M2. ` +
-        "Only 'transaction' is implemented; 'connection' mode is the M3 stretch.",
+      `createSupabaseRuntime: scopeMode '${String(options.scopeMode)}' is not supported. ` +
+        "Only 'transaction' is implemented; 'connection' mode is not yet built.",
     );
   }
   const allowedRoles = new Set(options.allowedRoles);
@@ -517,8 +516,8 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
       // R-FX-5: synchronous validation. Throw before constructing any driver
       // / runtime so the spy-based test can prove the pool was never touched.
       // The error is typed (`RoleNotAllowedError` w/ `code:
-      // 'auth/role-not-allowed'`) so the scoped-runtime middleware (T4.4) can
-      // map the throw to a 403 `auth/role-not-allowed` response — a
+      // 'auth/role-not-allowed'`) so the scoped-runtime middleware can map
+      // the throw to a 403 `auth/role-not-allowed` response — a
       // forged-but-valid JWT carrying `role: 'admin'` is an auth failure, not
       // a server bug, and shouldn't surface to the client as a 500.
       if (!allowedRoles.has(role)) {
@@ -558,8 +557,8 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
       });
 
       // Build the session as a wrapper rather than mutating `runtime` in
-      // place (M1 reviewer follow-up). Forwarding methods explicitly keeps
-      // the `SupabaseSession ⊆ Runtime` relationship structural, avoids
+      // place. Forwarding methods explicitly keeps the
+      // `SupabaseSession ⊆ Runtime` relationship structural, avoids
       // shadowing surprises if `Runtime` ever grows a `beginTransaction`
       // of its own, and pins the override semantics at the type level.
       const session: SupabaseSession = {
@@ -573,8 +572,8 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
         async end(): Promise<void> {
           // Transaction-scope mode: every plan is its own self-contained
           // transaction, so there is no long-lived per-session connection
-          // to release here. Connection-scope mode (M3) will release the
-          // borrowed client.
+          // to release here. A future connection-scope mode would release
+          // the borrowed client here.
         },
       };
 

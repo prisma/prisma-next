@@ -1,5 +1,5 @@
 /**
- * Todos page (T4.10).
+ * Todos page.
  *
  * Authenticated route — alice / bob CRUD their own todos via the
  * Hono `/api/todos` API. All reads / writes go through `apiFetch`;
@@ -28,10 +28,10 @@
  *
  * The render path keeps a `TodoView` shape that distinguishes
  * `optimistic: true` placeholders (greyed out) from server-confirmed
- * rows. T4.11 layers realtime updates on top — `postgres_changes`
- * inserts append (or replace any matching optimistic placeholder),
- * updates patch in place, deletes remove. The placeholder lifecycle
- * here is the foundation realtime builds on.
+ * rows. Realtime updates layer on top — `postgres_changes` inserts
+ * append (or replace any matching optimistic placeholder), updates
+ * patch in place, deletes remove. The placeholder lifecycle here is
+ * the foundation realtime builds on.
  */
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
@@ -107,7 +107,7 @@ export function TodosPage(): React.ReactNode {
     };
   }, [userId]);
 
-  // Realtime subscription (T4.11). Pushes INSERT / UPDATE /
+  // Realtime subscription. Pushes INSERT / UPDATE /
   // DELETE events for `public.todos` rows where `user_id = <uid>`
   // into the local list so:
   //   1. an INSERT done in another tab (or via psql) appears

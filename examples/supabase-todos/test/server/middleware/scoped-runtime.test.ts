@@ -1,15 +1,9 @@
 /**
- * Vitest spec for the per-request scoped-runtime middleware (T4.3).
- *
- * Lands in `phase-4a` ahead of T4.4's implementation, so the commit
- * history records tests-first ordering (R-NF-4). Until
- * `src/server/middleware/scoped-runtime.ts` exists, the import below
- * fails and the suite is red — which is exactly what tests-first
- * wants.
+ * Vitest spec for the per-request scoped-runtime middleware.
  *
  * What this spec verifies (covers spec.md § Hono server: scoped runtime)
  * ----------------------------------------------------------------------
- * The middleware sits *after* the JWT middleware (T4.2) and turns
+ * The middleware sits *after* the JWT middleware and turns
  * the per-request identity into an RLS-scoped `SupabaseSession`
  * attached to `c.var.db`. Handlers then call `c.var.db.execute(plan)`
  * without any explicit `WHERE user_id = ?` filtering — RLS does the
@@ -33,15 +27,14 @@
  *
  * Why these are integration tests, not pure unit tests
  * ----------------------------------------------------
- * The factory under test is the real `createSupabaseRuntime` from
- * T2.2; mocking its session would re-test what `factory.test.ts`
- * already covers and would not surface integration bugs (e.g. the
- * scoped runtime not actually enforcing RLS through Hono's request
- * lifecycle). The suite skips when `DATABASE_URL` is absent, same
- * as the rest of the example's tests.
+ * The factory under test is the real `createSupabaseRuntime`; mocking
+ * its session would re-test what `factory.test.ts` already covers and
+ * would not surface integration bugs (e.g. the scoped runtime not
+ * actually enforcing RLS through Hono's request lifecycle). The suite
+ * skips when `DATABASE_URL` is absent, same as the rest of the
+ * example's tests.
  *
  * @see projects/supabase-poc/spec.md § Hono server (scoped runtime)
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.3, 4.4
  */
 import 'dotenv/config';
 import type { MiddlewareHandler } from 'hono';
@@ -50,9 +43,6 @@ import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../../src/server/db';
 import type { JwtAuth, JwtAuthEnv } from '../../../src/server/middleware/jwt';
-// `middleware/scoped-runtime` is the T4.4 deliverable; until it
-// lands, this import fails with `ERR_MODULE_NOT_FOUND` and the suite
-// is red. That failure is the tests-first proof.
 import {
   createScopedRuntimeMiddleware,
   type ScopedRuntimeEnv,
@@ -142,7 +132,7 @@ function instrumentFactory(real: SupabaseRuntimeFactory): InstrumentedFactory {
   };
 }
 
-describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware (T4.3)', () => {
+describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware', () => {
   let adminDb: AdminDb;
   let adminRuntime: Awaited<ReturnType<AdminDb['connect']>>;
   let pool: Pool;
@@ -346,8 +336,7 @@ describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware (T4.3)', () => {
   // to a **403 `auth/role-not-allowed`** response — a forged-but-valid
   // JWT is an auth failure, not a server bug, and shouldn't reach the
   // client as a 500. Pins all three properties (status, body code, no
-  // DB roundtrip); cross-references phase-4a code-review § Major 1
-  // and phase-4b system-design-review § Minor 3.
+  // DB roundtrip).
   it('JWT role outside allowedRoles maps to 403 auth/role-not-allowed (defense in depth)', async () => {
     const app = new Hono<ScopedRuntimeEnv>().get(
       '/me/admin-token',

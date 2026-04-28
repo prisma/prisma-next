@@ -1,8 +1,8 @@
 /**
- * Per-request scoped-runtime middleware (T4.4).
+ * Per-request scoped-runtime middleware.
  *
- * Sits *after* the JWT-verification middleware (T4.2) in a route's
- * chain. Turns the per-request identity (`c.var.jwt`) — or the
+ * Sits *after* the JWT-verification middleware in a route's chain.
+ * Turns the per-request identity (`c.var.jwt`) — or the
  * `publicRoute()` marker (`c.var.public`) — into an RLS-scoped
  * `SupabaseSession`, attaches it to `c.var.db`, and ensures
  * `session.end()` runs after the response regardless of whether the
@@ -13,7 +13,7 @@
  * ```ts
  * // Authenticated route
  * app.get('/api/todos',
- *   jwtAuth,                              // T4.2 — sets c.var.jwt
+ *   jwtAuth,                              // sets c.var.jwt
  *   createScopedRuntimeMiddleware({ factory }),
  *   async (c) => {
  *     const rows = await c.var.db.execute(adminDb.sql.todos.select(...).build());
@@ -23,7 +23,7 @@
  *
  * // Public route
  * app.get('/api/public/messages',
- *   publicRoute(),                         // T4.2 — sets c.var.public
+ *   publicRoute(),                         // sets c.var.public
  *   jwtAuth,                               // skips when c.var.public === true
  *   createScopedRuntimeMiddleware({ factory }),
  *   handler,
@@ -55,7 +55,6 @@
  * missing precondition.
  *
  * @see projects/supabase-poc/spec.md § Hono server (scoped runtime)
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.4
  */
 import type { MiddlewareHandler } from 'hono';
 import {

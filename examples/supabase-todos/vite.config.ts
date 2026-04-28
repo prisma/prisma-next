@@ -25,7 +25,6 @@ import { defineConfig, loadEnv } from 'vite';
  * PN scoped runtime.
  *
  * @see projects/supabase-poc/spec.md § Hono server
- * @see projects/supabase-poc/plan.md § Milestone 4
  */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');

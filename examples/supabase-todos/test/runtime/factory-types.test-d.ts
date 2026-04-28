@@ -1,5 +1,5 @@
 /**
- * Type-level test for `createSupabaseRuntime` (T2.3).
+ * Type-level test for `createSupabaseRuntime`.
  *
  * Asserts that the factory's `authenticate()` returns something
  * structurally compatible with the framework's `SqlRuntime` (R-NF-3).
@@ -9,23 +9,20 @@
  *
  * ## Why `satisfies`, not `expectTypeOf`
  *
- * The plan calls out (T1.9 retro) that `expectTypeOf(...).toMatchTypeOf()`
- * rejected branded codec types in `admin.test.ts`, with `satisfies` used
- * as the workaround. There is no other type-test precedent in
- * `examples/supabase-todos/test/`, so we stick with `satisfies` here for
- * consistency: the assertion is structurally identical (the value must be
- * assignable to the asserted type) and the failure mode is a clear `tsc`
- * error pointing at the missing-or-wider field. No vitest typecheck mode
- * is configured for this package; the gate is `pnpm --filter
- * supabase-todos typecheck` (`tsc --noEmit`), which picks this file up
- * via the test glob include in `tsconfig.json`.
+ * `expectTypeOf(...).toMatchTypeOf()` rejected branded codec types in
+ * `admin.test.ts`; we used `satisfies` as the workaround. The assertion
+ * is structurally identical (the value must be assignable to the asserted
+ * type) and the failure mode is a clear `tsc` error pointing at the
+ * missing-or-wider field. No vitest typecheck mode is configured for this
+ * package; the gate is `pnpm --filter supabase-todos typecheck`
+ * (`tsc --noEmit`), which picks this file up via the test glob include
+ * in `tsconfig.json`.
  *
  * The file extension is `.test-d.ts` so it is excluded from vitest's
  * default test discovery (which matches `*.test.ts` only) — it has no
  * runtime body, only type-level assertions.
  *
  * @see projects/supabase-poc/spec.md § R-NF-3
- * @see projects/supabase-poc/plan.md § Milestone 2 → 2.3
  */
 
 import type { Contract as FrameworkContract } from '@prisma-next/contract/types';

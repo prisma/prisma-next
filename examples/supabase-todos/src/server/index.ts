@@ -1,10 +1,10 @@
 /**
- * Hono server entry for the supabase-todos example (T4.13 prerequisite).
+ * Hono server entry for the supabase-todos example.
  *
- * Composes the JWT-verification middleware (T4.2) and the per-request
- * scoped-runtime middleware (T4.4) over the `/api/todos` (T4.6) and
- * `/api/public/messages` (T4.8) sub-apps, then listens on HTTP via
- * `@hono/node-server`. The Vite dev server (T4.9–T4.12, configured in
+ * Composes the JWT-verification middleware and the per-request
+ * scoped-runtime middleware over the `/api/todos` and
+ * `/api/public/messages` sub-apps, then listens on HTTP via
+ * `@hono/node-server`. The Vite dev server (configured in
  * `vite.config.ts`) proxies `/api/*` here at runtime so the SPA can
  * call the API on the same origin.
  *
@@ -52,7 +52,6 @@
  * + `await pool.end()` in `afterAll`).
  *
  * @see projects/supabase-poc/spec.md § Hono server
- * @see projects/supabase-poc/plan.md § Milestone 4
  */
 import { serve } from '@hono/node-server';
 import 'dotenv/config';

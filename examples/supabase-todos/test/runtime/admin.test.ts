@@ -1,33 +1,25 @@
 /**
- * Smoke tests for the admin Prisma Next runtime (T1.9).
- *
- * Lands in `phase-1d` ahead of T1.8's implementation, so the commit
- * history records tests-first ordering (R-NF-4). Until `src/server/db.ts`
- * exists, the import below fails and the suite is red — which is
- * exactly what tests-first wants.
+ * Smoke tests for the admin Prisma Next runtime.
  *
  * What this verifies
  * ------------------
  * The admin runtime in `examples/supabase-todos/src/server/db.ts` is
- * the first PN runtime in this example. It binds to the local Supabase
- * Postgres direct URL with the `postgres` superuser, which bypasses
- * RLS — appropriate for migrations / seeds / admin tools, *never* for
- * request handlers (M2's territory).
+ * the baseline PN runtime in this example. It binds to the local
+ * Supabase Postgres direct URL with the `postgres` superuser, which
+ * bypasses RLS — appropriate for migrations / seeds / admin tools,
+ * *never* for request handlers.
  *
  * The suite asserts:
  *   - PN can read the seed fixtures end-to-end (contract → planner →
  *     adapter → driver → live database → decoded rows) when RLS is
  *     bypassed.
  *   - The decoded row shapes line up with the contract's emitted
- *     `FieldOutputTypes` (one `satisfies` per table; the vitest spec
- *     [§ T1.9](../../../../projects/supabase-poc/plan.md) accepts
- *     `expectTypeOf` / `assertType` / a manual `satisfies` for this
- *     leg). Storage column names are snake_case (per
- *     `naming: { columns: 'snake_case' }` on the contract), so the
- *     row keys here are snake_case too.
+ *     `FieldOutputTypes` (one `satisfies` per table). Storage column
+ *     names are snake_case (per `naming: { columns: 'snake_case' }`
+ *     on the contract), so the row keys here are snake_case too.
  *
- * It is the baseline before M2 layers RLS-scoped runtimes on. Cross-
- * contamination tests (RLS actually filtering) live in `phase-2`'s
+ * It is the baseline before the per-request RLS-scoped runtimes layer
+ * on. Cross-contamination tests (RLS actually filtering) live in
  * `test/runtime/factory.test.ts`.
  *
  * Environment
@@ -55,7 +47,7 @@ import { type AdminDb, createAdminDb } from '../../src/server/db';
 
 const databaseUrl = process.env['DATABASE_URL'];
 
-describe.skipIf(!databaseUrl)('admin runtime (T1.9)', () => {
+describe.skipIf(!databaseUrl)('admin runtime', () => {
   let db: AdminDb;
   let runtime: Runtime;
 

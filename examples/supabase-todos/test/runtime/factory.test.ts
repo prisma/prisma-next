@@ -1,10 +1,5 @@
 /**
- * Integration spec for the per-request scoped Supabase runtime (T2.1).
- *
- * Lands in `phase-2 slice 1` ahead of T2.2's implementation, so the
- * commit history records tests-first ordering (R-NF-4). Until
- * `src/server/supabase-runtime.ts` exists, the import below fails and
- * the suite is red — which is exactly what tests-first wants.
+ * Integration spec for the per-request scoped Supabase runtime.
  *
  * What this spec verifies (covers spec.md R-FX-1, R-FX-2, R-FX-4 → R-FX-8)
  * --------------------------------------------------------------------
@@ -13,10 +8,10 @@
  * issues `SET LOCAL request.jwt.claims = …` and `SET LOCAL ROLE …`,
  * and proxies the resulting transaction-scoped queryable as a
  * `Runtime`. Because the role is downgraded from `postgres` (superuser,
- * RLS bypass) to `authenticated` / `anon`, RLS policies authored in
- * the M1 migration take effect — the *only* way alice's session sees
- * 3 todos rather than all 5 is for the `SET LOCAL ROLE` step to fire
- * and for `auth.uid()` to read alice's `sub` claim from the GUC.
+ * RLS bypass) to `authenticated` / `anon`, the RLS policies authored in
+ * the initial migration take effect — the *only* way alice's session
+ * sees 3 todos rather than all 5 is for the `SET LOCAL ROLE` step to
+ * fire and for `auth.uid()` to read alice's `sub` claim from the GUC.
  *
  * Cross-contamination tests (RLS actually filtering) live here; the
  * baseline "RLS bypassed → all rows visible" admin runtime is covered
@@ -32,7 +27,7 @@
  * be rolled back and the borrowed client either returned clean or
  * destroyed. We assert both via the original error reaching the
  * caller and a follow-up authenticated session succeeding against
- * the same pool. If T2.2's implementation does not expose a public
+ * the same pool. If the implementation does not expose a public
  * cursor surface, this test still asserts the rollback contract via
  * the recovery path.
  *
@@ -49,15 +44,11 @@
  *   3. `pnpm --filter supabase-todos seed` has been run.
  *
  * @see projects/supabase-poc/spec.md § Functional requirements (R-FX-*)
- * @see projects/supabase-poc/plan.md § Milestone 2 → 2.1
  */
 import 'dotenv/config';
 import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../src/server/db';
-// `supabase-runtime` is the T2.2 deliverable; until it lands, this
-// import fails with `ERR_MODULE_NOT_FOUND` and the suite is red. That
-// failure is the tests-first proof.
 import { createSupabaseRuntime } from '../../src/server/supabase-runtime';
 
 const databaseUrl = process.env['DATABASE_URL'];
@@ -81,7 +72,7 @@ const ALICE_TODO_TITLES = ['Review the plan', 'Ship the PoC', 'Write the spec'] 
 const BOB_TODO_TITLES = ['Read the spec', 'Test RLS'] as const;
 const PUBLIC_MESSAGE_BODIES = ['Bob says hi', 'Hello world from Alice'] as const;
 
-describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)', () => {
+describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode', () => {
   let adminDb: AdminDb;
   let adminRuntime: Awaited<ReturnType<AdminDb['connect']>>;
   let pool: Pool;
@@ -325,7 +316,7 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
         observed = err;
       } finally {
         // Defensive — `end()` must be safe to call even after an
-        // in-flight error; T2.2 is responsible for the rollback path.
+        // in-flight error; the factory owns the rollback path.
         await failingSession.end().catch(() => {});
       }
 
@@ -383,12 +374,12 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
     }
   });
 
-  // M4 (reviewer follow-up): cover three branches the original 9 tests
-  // didn't exercise — identifier rejection (allowlisted but malformed),
-  // COMMIT failure (release rejects + evicts), and abandoned iteration
-  // (consumer break → ROLLBACK + evict).
+  // Cover three branches the headline RLS-isolation tests don't exercise —
+  // identifier rejection (allowlisted but malformed), COMMIT failure
+  // (release rejects + evicts), and abandoned iteration (consumer break →
+  // ROLLBACK + evict).
 
-  it('rejects allowlisted roles that fail IDENT_PATTERN before touching the pool (M4)', () => {
+  it('rejects allowlisted roles that fail IDENT_PATTERN before touching the pool', () => {
     const isolatedPool = new Pool({ connectionString: databaseUrl });
     const isolatedFactory = createSupabaseRuntime({
       context: adminDb.context,
@@ -420,7 +411,7 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
     }
   });
 
-  it('COMMIT failure evicts the connection and propagates the error (M4)', async () => {
+  it('COMMIT failure evicts the connection and propagates the error', async () => {
     const failPool = new Pool({ connectionString: databaseUrl, max: 2 });
     const failFactory = createSupabaseRuntime({
       context: adminDb.context,
@@ -489,7 +480,7 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
     }
   });
 
-  it('abandoned iteration (break) rolls back and evicts the connection (M4)', async () => {
+  it('abandoned iteration (break) rolls back and evicts the connection', async () => {
     const breakPool = new Pool({ connectionString: databaseUrl, max: 2 });
     const breakFactory = createSupabaseRuntime({
       context: adminDb.context,
@@ -563,7 +554,7 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
 });
 
 /**
- * Narrow helper types used by the M4 monkey-patch tests.
+ * Narrow helper types used by the monkey-patch tests above.
  *
  * `pg.PoolClient.query` is a heavily-overloaded interface (callback /
  * promise / config / stream variants); replacing the method via that

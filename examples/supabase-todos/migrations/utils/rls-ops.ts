@@ -350,8 +350,8 @@ export function alterRlsPolicy(spec: AlterRlsPolicySpec): Op {
     // future caller needs the stricter classification, expose it as an
     // option then; defaults match neighbouring `alter*` ops today.
     //
-    // Assumption (R-FM-7 marker, reviewer N2 of phase-1c-cli round 3):
-    // the planner does not currently gate behavior on `operationClass`
+    // Assumption (R-FM-7 marker): the planner does not currently gate
+    // behavior on `operationClass`
     // for the apply path this PoC exercises, so a single default is
     // acceptable even though `ALTER POLICY` can also *tighten* a
     // predicate (which would conceptually be `'destructive'` rather

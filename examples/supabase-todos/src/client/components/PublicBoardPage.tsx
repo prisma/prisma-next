@@ -1,9 +1,9 @@
 /**
- * Public board page (T4.12).
+ * Public board page.
  *
  * Renders `/api/public/messages` — the public-route Hono endpoint
- * that the phase-4b scoped-runtime middleware attaches an
- * **anon-scoped** PN session to. The endpoint works with or without
+ * that the scoped-runtime middleware attaches an **anon-scoped**
+ * PN session to. The endpoint works with or without
  * a bearer token; the SPA hits it via `apiFetch`, which attaches
  * the bearer when a session is active and omits it otherwise. Both
  * branches return the same data because the underlying RLS policy

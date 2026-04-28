@@ -40,8 +40,8 @@ major_version = 17
 
 [db.pooler]
 # Enabled so the example can demonstrate the realistic Supabase
-# transaction-mode pooler path (Supavisor) used by `createSupabaseRuntime`
-# in M2 — every per-request RLS scope acquires from the pooler.
+# transaction-mode pooler path (Supavisor) — every per-request RLS
+# scope acquires from the pooler.
 enabled = true
 port = 54329
 pool_mode = "transaction"
@@ -74,7 +74,7 @@ openai_api_key = "env(OPENAI_API_KEY)"
 
 [inbucket]
 # Local email testing UI. Useful to confirm sign-up emails during
-# development of the SPA in M4.
+# development of the SPA.
 enabled = true
 port = 54324
 

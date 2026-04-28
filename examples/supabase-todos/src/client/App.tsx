@@ -8,10 +8,7 @@ import type { Page } from './router';
 
 /**
  * Top-level SPA shell. Decides which page to render based on auth
- * state and the user's active tab selection. Only `auth` is wired in
- * this commit — `todos` and `public` lay-down placeholders that the
- * subsequent phase-4c commits replace with real components (T4.10,
- * T4.12, T4.11).
+ * state and the user's active tab selection.
  */
 export function App(): React.ReactNode {
   const { state } = useAuth();

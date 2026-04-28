@@ -8,9 +8,8 @@
  *
  * ## Authoring workflow (CLI-first; FL-01 worked example)
  *
- * Per the project's [CLI-first migration authoring rule]
- * (../../../../projects/supabase-poc/plan.md#working-rules-for-this-project),
- * this file was scaffolded by the framework and then edited:
+ * Following the project's CLI-first migration authoring rule, this
+ * file was scaffolded by the framework and then edited:
  *
  *  1. **Scaffold from the contract.** From `examples/supabase-todos/`,
  *     `pnpm exec prisma-next migration plan --name initial` reads the
@@ -179,8 +178,9 @@ export default class M extends Migration {
       // --- profiles policies ---
       // SELECT and UPDATE for the row owner. No INSERT policy: profile
       // rows mirror `auth.users` rows and are inserted under
-      // service-role at signup time (T1.7 / T1.8). `auth.uid()` returns
-      // `uuid`; `profiles.id` is `char(36)`, hence the cast. `condition`
+      // service-role at signup time (see `scripts/seed.ts`).
+      // `auth.uid()` returns `uuid`; `profiles.id` is `char(36)`, hence
+      // the cast. `condition`
       // shorthand: the same predicate gates both the read and the write
       // (no ownership transfer permitted), so we don't need the verbose
       // `using` + `withCheck` pair.

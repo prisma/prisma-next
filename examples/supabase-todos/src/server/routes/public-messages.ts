@@ -1,5 +1,5 @@
 /**
- * Public messages endpoint (T4.8).
+ * Public messages endpoint.
  *
  * Single read-only endpoint mounted via
  * `app.route('/api/public/messages', createPublicMessagesRoutes({ sql: adminDb.sql }))`.
@@ -51,7 +51,6 @@
  * [Sketch 1 — Scoped-session SPI](../../../../projects/supabase-poc/framework-limitations.md#sketch-1--scoped-session-spi).
  *
  * @see projects/supabase-poc/spec.md § R-FE-5
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.8
  */
 import { Hono } from 'hono';
 import type { AdminDb } from '../db';

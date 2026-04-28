@@ -1,16 +1,11 @@
 /**
- * Integration spec for the Todos JSON API (T4.5).
- *
- * Lands in `phase-4b` ahead of T4.6's implementation, so the commit
- * history records tests-first ordering (R-NF-4). Until
- * `src/server/routes/todos.ts` exists, the import below fails and
- * the suite is red — which is exactly what tests-first wants.
+ * Integration spec for the Todos JSON API.
  *
  * What this spec verifies (covers spec.md R-FE-3, R-FX-1, R-FX-2)
  * --------------------------------------------------------------
  * Four endpoints under `/api/todos` exercised end-to-end against the
  * live local Supabase Postgres stack via the JWT + scoped-runtime
- * middleware composed in phase-4a:
+ * middleware composed by the Hono server entry:
  *
  *   - `GET    /api/todos`        — list the authenticated user's todos
  *   - `GET    /api/todos/:id`    — fetch one (404 if not the user's)
@@ -36,7 +31,6 @@
  * whole point.
  *
  * @see projects/supabase-poc/spec.md § R-FX-2, R-FE-3
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.5, 4.6
  */
 import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
@@ -50,9 +44,6 @@ import {
   createScopedRuntimeMiddleware,
   type ScopedRuntimeEnv,
 } from '../../../src/server/middleware/scoped-runtime';
-// `routes/todos` is the T4.6 deliverable; until it lands, this
-// import fails with `ERR_MODULE_NOT_FOUND` and the suite is red.
-// That failure is the tests-first proof.
 import { createTodosRoutes } from '../../../src/server/routes/todos';
 import {
   createSupabaseRuntime,
@@ -91,7 +82,7 @@ function buildTodosApp(deps: AppDeps) {
     .route('/api/todos', createTodosRoutes({ sql: deps.sql }));
 }
 
-describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
+describe.skipIf(!databaseUrl)('Todos JSON API', () => {
   let adminDb: AdminDb;
   let adminRuntime: Awaited<ReturnType<AdminDb['connect']>>;
   let pool: Pool;
@@ -214,7 +205,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
 
   it('POST /api/todos — alice creates a todo with user_id taken from claims.sub', async () => {
     const app = buildTodosApp({ factory, sql: adminDb.sql });
-    const title = `phase-4b-create-${Date.now()}`;
+    const title = `test-create-${Date.now()}`;
     const res = await app.request('/api/todos', {
       method: 'POST',
       headers: {
@@ -259,13 +250,13 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
         Authorization: `Bearer ${aliceToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title: `phase-4b-patch-fixture-${Date.now()}` }),
+      body: JSON.stringify({ title: `test-patch-fixture-${Date.now()}` }),
     });
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as TodoRow;
 
     try {
-      const newTitle = `phase-4b-patched-${Date.now()}`;
+      const newTitle = `test-patched-${Date.now()}`;
       const res = await app.request(`/api/todos/${created.id}`, {
         method: 'PATCH',
         headers: {
@@ -339,7 +330,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
         Authorization: `Bearer ${aliceToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title: `phase-4b-delete-${Date.now()}` }),
+      body: JSON.stringify({ title: `test-delete-${Date.now()}` }),
     });
     expect(createRes.status).toBe(201);
     const created = (await createRes.json()) as TodoRow;

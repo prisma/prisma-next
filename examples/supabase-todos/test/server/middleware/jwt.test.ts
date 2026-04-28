@@ -1,10 +1,5 @@
 /**
- * Vitest spec for the Hono JWT-verification middleware (T4.1).
- *
- * Lands in `phase-4a` ahead of T4.2's implementation, so the commit
- * history records tests-first ordering (R-NF-4). Until
- * `src/server/middleware/jwt.ts` exists, the import below fails and
- * the suite is red — which is exactly what tests-first wants.
+ * Vitest spec for the Hono JWT-verification middleware.
  *
  * What this spec verifies (covers spec.md § Hono server: JWT verify)
  * ------------------------------------------------------------------
@@ -19,28 +14,24 @@
  * marker middleware *before* the JWT middleware in the per-route
  * chain. The marker sets a flag the JWT middleware checks first; if
  * present, verification is skipped entirely and `c.var.jwt` is left
- * undefined (the per-request scoped-runtime middleware in T4.4 picks
- * this up and attaches an `anon` session instead).
+ * undefined (the per-request scoped-runtime middleware picks this up
+ * and attaches an `anon` session instead).
  *
  * Why a fixed test secret rather than env coupling
  * ------------------------------------------------
  * The middleware factory accepts the secret as a config field so unit
  * tests can pin a known-good value without touching `process.env`.
  * The example's real wiring reads `process.env['SUPABASE_JWT_SECRET']`
- * at the server entry (M4b) and forwards it; this layer doesn't care
- * where the bytes came from. Local Supabase publishes the secret via
+ * at the server entry and forwards it; this layer doesn't care where
+ * the bytes came from. Local Supabase publishes the secret via
  * `supabase status -o env` (`JWT_SECRET=...`) and pins it via
  * `supabase/config.toml` for reproducibility.
  *
  * @see projects/supabase-poc/spec.md § Hono server (JWT verify)
- * @see projects/supabase-poc/plan.md § Milestone 4 → 4.1, 4.2
  */
 import { Hono } from 'hono';
 import { SignJWT } from 'jose';
 import { describe, expect, it } from 'vitest';
-// `middleware/jwt` is the T4.2 deliverable; until it lands, this
-// import fails with `ERR_MODULE_NOT_FOUND` and the suite is red. That
-// failure is the tests-first proof.
 import {
   createJwtMiddleware,
   type JwtAuthEnv,
@@ -93,7 +84,7 @@ function buildApp() {
   return app;
 }
 
-describe('createJwtMiddleware (T4.1)', () => {
+describe('createJwtMiddleware', () => {
   it('valid token populates c.var.jwt with claims and derived role', async () => {
     const app = buildApp();
     const token = await signJwt({ sub: 'user-1', role: 'authenticated', aud: 'authenticated' });

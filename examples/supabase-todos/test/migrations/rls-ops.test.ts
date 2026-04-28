@@ -10,10 +10,6 @@ import {
 /**
  * Vitest spec for the RLS migration factories.
  *
- * Lands in T1.4 (`projects/supabase-poc/plan.md` § Milestone 1)
- * before the implementation in T1.5, so the commit history records
- * tests-first ordering (R-NF-4).
- *
  * Coverage maps to spec § Migration factories (R-FM):
  * - R-FM-1: factories exist and emit `Op`s usable inside a `Migration`
  *           (asserted indirectly by every unit-test below + integration).
@@ -414,7 +410,7 @@ describe('createRlsPolicy', () => {
     });
   });
 
-  describe('empty `to: []` rejection (M1)', () => {
+  describe('empty `to: []` rejection', () => {
     it('throws synchronously with a directive message', () => {
       expect(() =>
         createRlsPolicy({
@@ -447,7 +443,7 @@ describe('createRlsPolicy', () => {
       throw new Error('expected createRlsPolicy to throw');
     });
 
-    it('still permits omitted `to` (PUBLIC fallback) — M1 is empty-array-only', () => {
+    it('still permits omitted `to` (PUBLIC fallback) — empty-array-only', () => {
       const op = createRlsPolicy({
         schema: 'public',
         table: 'todos',

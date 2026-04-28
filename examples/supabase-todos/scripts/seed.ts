@@ -12,9 +12,9 @@
  *   2. **Realtime publication membership** — calls
  *      `ensureRealtimePublication()` which idempotently `ALTER`s
  *      `supabase_realtime` to include `public.todos`. Without this
- *      step the SPA's phase-4c `postgres_changes` channel returns no
- *      events because the publication has no tables. The check is
- *      gated on `pg_publication_tables` so a second run is a no-op.
+ *      step the SPA's `postgres_changes` channel returns no events
+ *      because the publication has no tables. The check is gated on
+ *      `pg_publication_tables` so a second run is a no-op.
  *
  * The DDL responsibility is a **documented framework gap**, not a
  * design preference: PN's contract IR has no notion of logical-
@@ -60,11 +60,12 @@
  *
  * Why supabase-js, not the PN admin runtime
  * -----------------------------------------
- * T1.7 stays separable from T1.8 (admin PN runtime in `src/server/db.ts`).
- * The admin client + PostgREST goes through the service-role JWT, which
- * bypasses RLS naturally — same end result for seeding without prejudging
- * the runtime composition T1.8 will land. The seed script also doubles
- * as a worked example of the `service-role-via-supabase-js` pattern.
+ * Keeps the seed pathway separable from the admin PN runtime in
+ * `src/server/db.ts`. The admin client + PostgREST goes through the
+ * service-role JWT, which bypasses RLS naturally — same end result
+ * for seeding without prejudging the runtime composition. The seed
+ * script also doubles as a worked example of the
+ * `service-role-via-supabase-js` pattern.
  *
  * Environment
  * -----------
@@ -237,8 +238,8 @@ async function upsertMessage(userId: string, fixture: MessageFixture): Promise<v
 
 /**
  * Add `public.todos` to the `supabase_realtime` publication so the
- * Vite SPA's `postgres_changes` channel (T4.11) receives INSERT /
- * UPDATE / DELETE events for the user's todos.
+ * Vite SPA's `postgres_changes` channel receives INSERT / UPDATE /
+ * DELETE events for the user's todos.
  *
  * Why here, not in a PN migration:
  *  - PN's contract IR doesn't model logical-replication publications
