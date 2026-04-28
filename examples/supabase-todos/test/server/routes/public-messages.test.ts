@@ -32,7 +32,11 @@ import { SignJWT } from 'jose';
 import { Pool } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../../src/server/db';
-import { createJwtMiddleware, type JwtAuthEnv } from '../../../src/server/middleware/jwt';
+import {
+  createJwtMiddleware,
+  type JwtAuthEnv,
+  publicRoute,
+} from '../../../src/server/middleware/jwt';
 import {
   createScopedRuntimeMiddleware,
   type ScopedRuntimeEnv,
@@ -73,14 +77,21 @@ interface AppDeps {
 }
 
 function buildPublicMessagesApp(deps: AppDeps) {
-  // Mount JWT middleware globally so authenticated requests through
-  // the public route still populate c.var.jwt; the publicRoute()
-  // marker on the public-messages routes themselves causes the JWT
-  // middleware to skip verification when no bearer is sent. This
-  // mirrors the production composition shape: the example's server
-  // entry attaches JWT + scoped-runtime globally, and individual
-  // routes opt out via publicRoute().
+  // Production-shape composition: publicRoute() is registered as a
+  // path-prefix middleware **before** the global JWT middleware, so
+  // it runs first in registration order and sets c.var.public = true
+  // before JWT inspects the request. The JWT middleware then
+  // short-circuits past verification (regardless of whether a bearer
+  // is sent), and the scoped-runtime middleware sees c.var.public
+  // set and attaches an anon session.
+  //
+  // Putting publicRoute() *inside* createPublicMessagesRoutes()'s
+  // sub-app would be too late: parent-level use('*') middleware runs
+  // before sub-app middleware, so JWT would 401 before publicRoute()
+  // had a chance. Documented in the route module's docblock and in
+  // the JWT middleware's publicRoute() JSDoc.
   return new Hono<ScopedRuntimeEnv & JwtAuthEnv>()
+    .use('/api/public/*', publicRoute())
     .use('*', createJwtMiddleware({ secret: TEST_SECRET }))
     .use('*', createScopedRuntimeMiddleware({ factory: deps.factory }))
     .route('/api/public/messages', createPublicMessagesRoutes({ sql: deps.sql }));
