@@ -190,7 +190,10 @@ function resolveClauses(
   if (condition !== undefined) {
     if (using !== undefined || withCheck !== undefined) {
       throw new Error(
-        '`condition` is mutually exclusive with `using` / `withCheck`; pass one shape',
+        'Cannot pass both `condition` and `using`/`withCheck`. ' +
+          "Use `condition: '<predicate>'` for the common case (same predicate gates read and write); " +
+          "use `using: '<read>'` and/or `withCheck: '<write>'` only when UPDATE needs divergent " +
+          'read vs write predicates.',
       );
     }
     if (command === 'SELECT' || command === 'DELETE') {
@@ -213,6 +216,14 @@ export function createRlsPolicy(spec: CreateRlsPolicySpec): Op {
   validateIdent(schema, 'schema');
   validateIdent(table, 'table');
   validateIdent(name, 'policy name');
+  if (to !== undefined && to.length === 0) {
+    throw new Error(
+      `createRlsPolicy on "${name}": \`to\` cannot be an empty array — ` +
+        "pass roles like `to: ['authenticated']`, or omit `to` entirely if you " +
+        'really want the policy to apply to PUBLIC (almost never the right answer; ' +
+        'see SKILL.md § 4).',
+    );
+  }
   if (to) {
     for (const role of to) {
       validateIdent(role, 'role in to[]');
@@ -338,6 +349,15 @@ export function alterRlsPolicy(spec: AlterRlsPolicySpec): Op {
     // policy-relaxation step, not a `'destructive'` data change. If a
     // future caller needs the stricter classification, expose it as an
     // option then; defaults match neighbouring `alter*` ops today.
+    //
+    // Assumption (R-FM-7 marker, reviewer N2 of phase-1c-cli round 3):
+    // the planner does not currently gate behavior on `operationClass`
+    // for the apply path this PoC exercises, so a single default is
+    // acceptable even though `ALTER POLICY` can also *tighten* a
+    // predicate (which would conceptually be `'destructive'` rather
+    // than `'widening'`). If the planner ever starts gating on it
+    // (e.g. requiring `--allow-destructive` for tightening migrations),
+    // promote this to a per-call option and require the caller to pick.
     operationClass: 'widening',
     target: buildTargetDetails(schema, name, table),
     precheck: [

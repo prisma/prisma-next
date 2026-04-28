@@ -376,7 +376,7 @@ describe('createRlsPolicy', () => {
           condition: 'true',
           using: 'false',
         }),
-      ).toThrow(/mutually exclusive/);
+      ).toThrow(/Cannot pass both `condition` and `using`\/`withCheck`/);
     });
 
     it('rejects condition + withCheck together', () => {
@@ -390,7 +390,94 @@ describe('createRlsPolicy', () => {
           condition: 'true',
           withCheck: 'false',
         }),
-      ).toThrow(/mutually exclusive/);
+      ).toThrow(/Cannot pass both `condition` and `using`\/`withCheck`/);
+    });
+
+    it('mutual-exclusion error names which shape fits which situation (N1)', () => {
+      try {
+        createRlsPolicy({
+          schema: 'public',
+          table: 'todos',
+          name: 'p',
+          command: 'UPDATE',
+          to: ['authenticated'],
+          condition: 'true',
+          using: 'true',
+        });
+      } catch (err) {
+        const msg = (err as Error).message;
+        expect(msg).toMatch(/condition: '<predicate>'/);
+        expect(msg).toMatch(/divergent/);
+        return;
+      }
+      throw new Error('expected createRlsPolicy to throw');
+    });
+  });
+
+  describe('empty `to: []` rejection (M1)', () => {
+    it('throws synchronously with a directive message', () => {
+      expect(() =>
+        createRlsPolicy({
+          schema: 'public',
+          table: 'todos',
+          name: 'todos_select_own',
+          command: 'SELECT',
+          to: [],
+          condition: 'true',
+        }),
+      ).toThrow(/`to` cannot be an empty array/);
+    });
+
+    it('error message points the user at either roles or omitting `to`', () => {
+      try {
+        createRlsPolicy({
+          schema: 'public',
+          table: 'todos',
+          name: 'todos_select_own',
+          command: 'SELECT',
+          to: [],
+          condition: 'true',
+        });
+      } catch (err) {
+        const msg = (err as Error).message;
+        expect(msg).toMatch(/authenticated/);
+        expect(msg).toMatch(/PUBLIC/);
+        return;
+      }
+      throw new Error('expected createRlsPolicy to throw');
+    });
+
+    it('still permits omitted `to` (PUBLIC fallback) — M1 is empty-array-only', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_public',
+        command: 'SELECT',
+        condition: 'true',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).not.toMatch(/\sTO\s/);
+    });
+  });
+
+  describe('divergent-UPDATE escape hatch (N4)', () => {
+    it('createRlsPolicy emits both USING and WITH CHECK with their own predicates', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_update_within_org',
+        command: 'UPDATE',
+        to: ['authenticated'],
+        using: "(org_id = current_setting('app.current_org')::uuid)",
+        withCheck: '(user_id = (auth.uid())::text)',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain("USING ((org_id = current_setting('app.current_org')::uuid))");
+      expect(sql).toContain('WITH CHECK ((user_id = (auth.uid())::text))');
+      const usingIdx = sql.indexOf('USING ');
+      const withCheckIdx = sql.indexOf('WITH CHECK ');
+      expect(usingIdx).toBeGreaterThanOrEqual(0);
+      expect(withCheckIdx).toBeGreaterThan(usingIdx);
     });
   });
 });
@@ -465,7 +552,7 @@ describe('alterRlsPolicy', () => {
         condition: 'true',
         using: 'false',
       }),
-    ).toThrow(/mutually exclusive/);
+    ).toThrow(/Cannot pass both `condition` and `using`\/`withCheck`/);
   });
 
   it('precheck asserts the policy exists in pg_policies', () => {
