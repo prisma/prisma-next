@@ -268,3 +268,45 @@ code {
   color: var(--danger);
   border-color: var(--danger);
 }
+
+.public-board {
+  background: var(--panel);
+  border-radius: 10px;
+  padding: 1.25rem;
+}
+
+.public-board h1 {
+  margin: 0 0 0.5rem;
+  font-size: 1.3rem;
+}
+
+.public-board-hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  margin: 0 0 1rem;
+}
+
+.public-board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.public-board-row {
+  background: var(--panel-2);
+  padding: 0.7rem 0.9rem;
+  border-radius: 6px;
+}
+
+.public-board-body {
+  font-size: 0.95rem;
+}
+
+.public-board-meta {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 0.3rem;
+}
