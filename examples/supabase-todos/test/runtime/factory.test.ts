@@ -52,7 +52,7 @@
  * @see projects/supabase-poc/plan.md § Milestone 2 → 2.1
  */
 import 'dotenv/config';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../src/server/db';
 // `supabase-runtime` is the T2.2 deliverable; until it lands, this
@@ -382,4 +382,201 @@ describe.skipIf(!databaseUrl)('createSupabaseRuntime — transaction mode (T2.1)
       await session.end();
     }
   });
+
+  // M4 (reviewer follow-up): cover three branches the original 9 tests
+  // didn't exercise — identifier rejection (allowlisted but malformed),
+  // COMMIT failure (release rejects + evicts), and abandoned iteration
+  // (consumer break → ROLLBACK + evict).
+
+  it('rejects allowlisted roles that fail IDENT_PATTERN before touching the pool (M4)', () => {
+    const isolatedPool = new Pool({ connectionString: databaseUrl });
+    const isolatedFactory = createSupabaseRuntime({
+      context: adminDb.context,
+      pool: isolatedPool,
+      scopeMode: 'transaction',
+      // The hyphen passes the allowlist (a Set of strings, no shape
+      // check) but fails IDENT_PATTERN, exercising the second
+      // synchronous-throw branch in `authenticate()`.
+      allowedRoles: ['authenticated', 'invalid-role; DROP TABLE users;'],
+    });
+
+    const connectSpy = vi.spyOn(isolatedPool, 'connect');
+    const querySpy = vi.spyOn(isolatedPool, 'query');
+
+    try {
+      expect(() =>
+        isolatedFactory.authenticate({
+          jwtClaims: { role: 'invalid-role; DROP TABLE users;' },
+          role: 'invalid-role; DROP TABLE users;',
+        }),
+      ).toThrow(/valid Postgres identifier|SET LOCAL ROLE/);
+
+      expect(connectSpy).not.toHaveBeenCalled();
+      expect(querySpy).not.toHaveBeenCalled();
+    } finally {
+      connectSpy.mockRestore();
+      querySpy.mockRestore();
+      void isolatedPool.end();
+    }
+  });
+
+  it('COMMIT failure evicts the connection and propagates the error (M4)', async () => {
+    const failPool = new Pool({ connectionString: databaseUrl, max: 2 });
+    const failFactory = createSupabaseRuntime({
+      context: adminDb.context,
+      pool: failPool,
+      scopeMode: 'transaction',
+      allowedRoles: ['authenticated', 'anon'],
+    });
+
+    // Wrap every pool checkout so that `client.query('COMMIT', …)`
+    // rejects with a known error. Wrapping all clients (not just the
+    // first) is intentional: the FL-14 back-channel runs the marker
+    // query on its own client checkout *before* the user plan
+    // checkout, and a `mockImplementationOnce` would otherwise trap
+    // the wrong client. The marker path issues no COMMIT (it's a bare
+    // `query()` outside any transaction envelope), so the only
+    // observed `release()` call with a truthy arg is the user-plan
+    // client's eviction after the COMMIT failure.
+    const releaseCalls: unknown[] = [];
+    const wrapClient = (client: PoolClient): PoolClient => {
+      const originalQuery: NarrowQueryFn = client.query.bind(client) as NarrowQueryFn;
+      const originalRelease: NarrowReleaseFn = client.release.bind(client);
+      const patchable: { query: NarrowQueryFn; release: NarrowReleaseFn } = client;
+      patchable.query = (sql, params) => {
+        if (sql === 'COMMIT') {
+          return Promise.reject(new Error('simulated COMMIT failure'));
+        }
+        return originalQuery(sql, params);
+      };
+      patchable.release = (arg) => {
+        releaseCalls.push(arg);
+        return originalRelease(arg);
+      };
+      return client;
+    };
+    const originalConnect = failPool.connect.bind(failPool) as () => Promise<PoolClient>;
+    const connectSpy = vi
+      .spyOn(failPool, 'connect')
+      .mockImplementation(async () => wrapClient(await originalConnect()));
+
+    const session = failFactory.authenticate({
+      jwtClaims: { sub: aliceAuthUserId, role: 'authenticated' },
+      role: 'authenticated',
+    });
+    const plan = adminDb.sql.todos.select('id', 'user_id', 'title', 'completed').build();
+
+    let observed: unknown;
+    try {
+      await session.execute(plan);
+    } catch (err) {
+      observed = err;
+    } finally {
+      await session.end().catch(() => {});
+    }
+
+    try {
+      expect(observed).toBeInstanceOf(Error);
+      expect((observed as Error).message).toMatch(/simulated COMMIT failure/);
+      // Truthy `release()` arg means the pool evicts the client rather
+      // than returning it for reuse — the COMMIT-failed client is not
+      // safe to reuse. Verify *some* release call carried an Error
+      // (ignoring the marker-path's bare `release()`).
+      expect(releaseCalls.some((arg) => arg instanceof Error)).toBe(true);
+    } finally {
+      connectSpy.mockRestore();
+      await failPool.end();
+    }
+  });
+
+  it('abandoned iteration (break) rolls back and evicts the connection (M4)', async () => {
+    const breakPool = new Pool({ connectionString: databaseUrl, max: 2 });
+    const breakFactory = createSupabaseRuntime({
+      context: adminDb.context,
+      pool: breakPool,
+      scopeMode: 'transaction',
+      allowedRoles: ['authenticated', 'anon'],
+    });
+
+    // Wrap every checkout — see comment in the COMMIT-failure test for
+    // why `mockImplementationOnce` would catch the wrong client (the
+    // marker-verification back-channel runs first).
+    let rollbackSeen = false;
+    const releaseCalls: unknown[] = [];
+    const wrapClient = (client: PoolClient): PoolClient => {
+      const originalQuery: NarrowQueryFn = client.query.bind(client) as NarrowQueryFn;
+      const originalRelease: NarrowReleaseFn = client.release.bind(client);
+      const patchable: { query: NarrowQueryFn; release: NarrowReleaseFn } = client;
+      patchable.query = (sql, params) => {
+        if (sql === 'ROLLBACK') rollbackSeen = true;
+        return originalQuery(sql, params);
+      };
+      patchable.release = (arg) => {
+        releaseCalls.push(arg);
+        return originalRelease(arg);
+      };
+      return client;
+    };
+    const originalConnect = breakPool.connect.bind(breakPool) as () => Promise<PoolClient>;
+    const connectSpy = vi
+      .spyOn(breakPool, 'connect')
+      .mockImplementation(async () => wrapClient(await originalConnect()));
+
+    const session = breakFactory.authenticate({
+      jwtClaims: { sub: aliceAuthUserId, role: 'authenticated' },
+      role: 'authenticated',
+    });
+    const plan = adminDb.sql.todos.select('id', 'user_id', 'title', 'completed').build();
+
+    let count = 0;
+    for await (const _row of session.execute(plan)) {
+      count++;
+      break;
+    }
+    await session.end();
+
+    try {
+      expect(count).toBe(1);
+      expect(rollbackSeen).toBe(true);
+      // ROLLBACK + eviction: the abandoned-iteration path takes the
+      // `destroy()` branch in `iterateAndCleanup`, which calls
+      // `release(evictArg)` with a sentinel Error.
+      expect(releaseCalls.some((arg) => arg instanceof Error)).toBe(true);
+
+      // Recovery: a follow-up session against the same pool succeeds —
+      // proves the bad client was evicted, not leaked.
+      const recovery = breakFactory.authenticate({
+        jwtClaims: { sub: aliceAuthUserId, role: 'authenticated' },
+        role: 'authenticated',
+      });
+      try {
+        const rows = (await recovery.execute(plan)) satisfies readonly TodoRow[];
+        expect(rows).toHaveLength(ALICE_TODO_TITLES.length);
+      } finally {
+        await recovery.end();
+      }
+    } finally {
+      connectSpy.mockRestore();
+      await breakPool.end();
+    }
+  });
 });
+
+/**
+ * Narrow helper types used by the M4 monkey-patch tests.
+ *
+ * `pg.PoolClient.query` is a heavily-overloaded interface (callback /
+ * promise / config / stream variants); replacing the method via that
+ * surface explodes into casts. The narrow types below describe just
+ * the shape `ScopedConnection` actually exercises (one positional
+ * `sql`, optional positional `params`, returns
+ * `Promise<{rows: unknown[]}>`-shaped) and let us replace the
+ * property in one tight cast scope per wrap site (per AGENTS.md
+ * "minimize cast scope"). The `as NarrowQueryFn` cast is the only
+ * place the broader pg type intersects the narrow one.
+ */
+type NarrowQueryFn = (
+  sql: string,
+  params?: readonly unknown[],
+) => Promise<{ readonly rows: unknown[] }>;
+type NarrowReleaseFn = (arg?: Error | boolean | undefined) => void;

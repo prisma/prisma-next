@@ -79,7 +79,6 @@
  */
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import type { Contract } from '@prisma-next/contract/types';
-import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
@@ -168,17 +167,41 @@ interface ScopedSessionConfig {
 }
 
 /**
+ * `pg`'s `Client.query` typing wants `unknown[] | undefined`; the SqlDriver
+ * SPI hands us `readonly unknown[] | undefined`. The cast erases the
+ * `readonly` brand only — `pg` does not mutate the array — so this is
+ * safe and the cast scope is one expression rather than three call sites
+ * (per AGENTS.md "minimize cast scope").
+ */
+function toPgParams(params: readonly unknown[] | undefined): unknown[] | undefined {
+  return params as unknown[] | undefined;
+}
+
+/**
+ * If `destroy()` fails on a cleanup path we already have an upstream error
+ * we are about to propagate; attach the destroy failure as `cause` so it
+ * reaches the caller's stack trace instead of being silently swallowed
+ * (M3 reviewer follow-up). We only set `cause` when it is undefined to
+ * avoid clobbering a richer chain the caller might have constructed.
+ */
+function attachDestroyFailure(upstream: unknown, destroyError: unknown): void {
+  if (upstream instanceof Error && destroyError instanceof Error && upstream.cause === undefined) {
+    (upstream as { cause?: unknown }).cause = destroyError;
+  }
+}
+
+/**
  * Async generator helper that turns a (potentially) thrown iteration into
- * a destroy-instead-of-release decision. Used by both the driver-level
- * `execute()` (per-plan transaction) and as the cleanup contract on
- * `SqlConnection.execute()` of the scoped connection.
+ * a destroy-instead-of-release decision. Used by the driver-level
+ * `execute()` (per-plan transaction) wrapper.
  *
  * Cleanup semantics:
  *  - Generator runs to completion → `success = true` → `release()` (COMMIT + return to pool).
- *  - Generator throws (downstream SQL error) → `success = false` → `destroy(err)` (ROLLBACK + evict).
+ *  - Generator throws (downstream SQL error) → caught → destroy + attach destroy failure (if any) as `cause` → re-throw.
  *  - `for await` body throws (consumer error) → `iterator.return()` → finally fires → `destroy()` (ROLLBACK + evict).
+ *    A destroy failure on this path cannot be attached to the consumer's error (we don't see it from inside the generator); it is silenced.
  *
- * The third case is what R-FX-7 exercises.
+ * The third case is what R-FX-7 (mid-iteration throw) exercises.
  */
 async function* iterateAndCleanup<Row>(
   rows: AsyncIterable<Row>,
@@ -186,15 +209,28 @@ async function* iterateAndCleanup<Row>(
   destroy: (reason?: unknown) => Promise<void>,
 ): AsyncGenerator<Row, void, unknown> {
   let success = false;
+  let consumerCancelled = true;
   try {
-    for await (const row of rows) {
-      yield row;
+    try {
+      for await (const row of rows) {
+        yield row;
+      }
+      success = true;
+      consumerCancelled = false;
+    } catch (generatorError) {
+      consumerCancelled = false;
+      await destroy(generatorError).catch((destroyError) => {
+        attachDestroyFailure(generatorError, destroyError);
+      });
+      throw generatorError;
     }
-    success = true;
   } finally {
     if (success) {
       await release();
-    } else {
+    } else if (consumerCancelled) {
+      // Consumer broke / threw / early-returned out of the for-await; we
+      // cannot reach their error from here, so a destroy failure is
+      // silently lost. Documented above; cross-references FL-17.
       await destroy().catch(() => undefined);
     }
   }
@@ -222,8 +258,7 @@ class ScopedConnection implements SqlConnection {
   }
 
   async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
-    const params = request.params as unknown[] | undefined;
-    const result = await this.#client.query(request.sql, params);
+    const result = await this.#client.query(request.sql, toPgParams(request.params));
     for (const row of result.rows as Row[]) {
       yield row;
     }
@@ -233,13 +268,13 @@ class ScopedConnection implements SqlConnection {
     sql: string,
     params?: readonly unknown[],
   ): Promise<SqlQueryResult<Row>> {
-    const result = await this.#client.query(sql, params as unknown[] | undefined);
+    const result = await this.#client.query(sql, toPgParams(params));
     return result as unknown as SqlQueryResult<Row>;
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
     const text = `EXPLAIN (FORMAT JSON) ${request.sql}`;
-    const result = await this.#client.query(text, request.params as unknown[] | undefined);
+    const result = await this.#client.query(text, toPgParams(request.params));
     return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
   }
 
@@ -308,6 +343,16 @@ class ScopedDriver implements SqlDriver<void> {
   }
 
   async acquireConnection(): Promise<SqlConnection> {
+    return this.#acquireScopedConnection();
+  }
+
+  /**
+   * Internal variant of `acquireConnection()` that returns the concrete
+   * `ScopedConnection` type so callers (e.g. `explain()`) can invoke
+   * methods that are optional on the `SqlConnection` SPI but always
+   * defined on `ScopedConnection`. Avoids casts at each call site.
+   */
+  async #acquireScopedConnection(): Promise<ScopedConnection> {
     const client = await this.#pool.connect();
     try {
       await client.query('BEGIN');
@@ -336,7 +381,7 @@ class ScopedDriver implements SqlDriver<void> {
     const driver = this;
     return {
       async *[Symbol.asyncIterator]() {
-        const conn = await driver.acquireConnection();
+        const conn = await driver.#acquireScopedConnection();
         const release = (): Promise<void> => conn.release();
         const destroy = (reason?: unknown): Promise<void> => conn.destroy(reason);
         yield* iterateAndCleanup<Row>(conn.execute<Row>(request), release, destroy);
@@ -368,7 +413,9 @@ class ScopedDriver implements SqlDriver<void> {
    *
    * (If/when the framework grows a "skip verify entirely" mode, this
    * back-channel can collapse into a single per-plan envelope. Tracked
-   * as FL-NN.)
+   * as FL-14. A related concern — every `authenticate()` produces a fresh
+   * runtime instance, so the marker query fires once per session — is
+   * tracked as FL-17.)
    */
   async query<Row = Record<string, unknown>>(
     sql: string,
@@ -376,7 +423,7 @@ class ScopedDriver implements SqlDriver<void> {
   ): Promise<SqlQueryResult<Row>> {
     const client = await this.#pool.connect();
     try {
-      const result = await client.query(sql, params as unknown[] | undefined);
+      const result = await client.query(sql, toPgParams(params));
       return result as unknown as SqlQueryResult<Row>;
     } finally {
       client.release();
@@ -384,15 +431,18 @@ class ScopedDriver implements SqlDriver<void> {
   }
 
   async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
-    const conn = await this.acquireConnection();
+    // Use the private accessor so we get the concrete `ScopedConnection`
+    // type and can call `.explain()` directly — avoids the SPI-level
+    // optional-method cast that the original implementation needed.
+    const conn = await this.#acquireScopedConnection();
     try {
-      const result = await (conn.explain as (req: SqlExecuteRequest) => Promise<SqlExplainResult>)(
-        request,
-      );
+      const result = await conn.explain(request);
       await conn.release();
       return result;
     } catch (error) {
-      await conn.destroy(error).catch(() => undefined);
+      await conn.destroy(error).catch((destroyError) => {
+        attachDestroyFailure(error, destroyError);
+      });
       throw error;
     }
   }
@@ -409,14 +459,15 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
   }
   const allowedRoles = new Set(options.allowedRoles);
 
-  // Build a stack instance once and reuse it across sessions. Mirrors what
-  // `postgres()` does internally — the standard postgres driver descriptor is
-  // attached for completeness but its `create()` is never called; each session
-  // constructs its own ScopedDriver instance.
+  // Build a stack instance once and reuse it across sessions. The `driver`
+  // descriptor field is intentionally omitted: `createSqlExecutionStack` accepts
+  // it as optional, and `createRuntime` reads `stackInstance.adapter` but
+  // never `stackInstance.driver` when the caller supplies a `SqlDriver`
+  // instance directly (which we do — each session constructs its own
+  // ScopedDriver below). Importing `postgresDriver` here would be dead weight.
   const stack = createSqlExecutionStack({
     target: postgresTarget,
     adapter: postgresAdapter,
-    driver: postgresDriver,
     extensionPacks: [],
   });
   const stackInstance = instantiateExecutionStack(stack);
@@ -455,15 +506,26 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
         stackInstance,
         context: options.context,
         driver,
-        // Marker verification under a downgraded role can fail (the marker
-        // table may not be readable to `authenticated` / `anon`); skipping
-        // the strict requirement keeps the per-request runtime usable. The
-        // admin runtime still verifies on first use; that's sufficient to
-        // catch contract drift before the request runtime ever runs.
-        verify: { mode: 'onFirstUse', requireMarker: false },
+        // Marker verification fires once per session (FL-17) via the
+        // back-channel `query()` path, which runs as the pool's underlying
+        // superuser (FL-14) — so the marker table is always readable here
+        // even though the per-plan envelope downgrades the role. We
+        // therefore enable `requireMarker: true`: a missing marker now
+        // fails loudly (e.g. pool pointed at the wrong DB), instead of
+        // surfacing later as "queries return zero rows."
+        verify: { mode: 'onFirstUse', requireMarker: true },
       });
 
-      const session: SupabaseSession = Object.assign(runtime, {
+      // Build the session as a wrapper rather than mutating `runtime` in
+      // place (M1 reviewer follow-up). Forwarding methods explicitly keeps
+      // the `SupabaseSession ⊆ Runtime` relationship structural, avoids
+      // shadowing surprises if `Runtime` ever grows a `beginTransaction`
+      // of its own, and pins the override semantics at the type level.
+      const session: SupabaseSession = {
+        execute: runtime.execute.bind(runtime),
+        connection: runtime.connection.bind(runtime),
+        telemetry: runtime.telemetry.bind(runtime),
+        close: runtime.close.bind(runtime),
         beginTransaction(): never {
           throw unsupportedScopedTxError();
         },
@@ -473,7 +535,7 @@ export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
           // to release here. Connection-scope mode (M3) will release the
           // borrowed client.
         },
-      });
+      };
 
       return session;
     },

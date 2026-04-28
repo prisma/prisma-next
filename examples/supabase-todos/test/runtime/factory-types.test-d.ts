@@ -27,6 +27,9 @@
  * @see projects/supabase-poc/spec.md § R-NF-3
  * @see projects/supabase-poc/plan.md § Milestone 2 → 2.3
  */
+
+import type { Contract as FrameworkContract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Pool } from 'pg';
 import type { Contract } from '../../src/db/contract.d';
@@ -34,11 +37,23 @@ import type { AdminDb } from '../../src/server/db';
 import {
   createSupabaseRuntime,
   type SupabaseRuntimeFactory,
+  type SupabaseRuntimeOptions,
   type SupabaseSession,
 } from '../../src/server/supabase-runtime';
 
 declare const adminDb: AdminDb;
 declare const pool: Pool;
+
+// Pin `createSupabaseRuntime`'s call signature: it must accept a
+// `SupabaseRuntimeOptions<TContract>` and return a `SupabaseRuntimeFactory`.
+// (Asserting `factory satisfies SupabaseRuntimeFactory` would be tautological
+// — the factory's declared return type *is* `SupabaseRuntimeFactory`, so the
+// assertion would only fail if the export disappears entirely. Pinning the
+// call signature instead catches drift in *either* the input options or the
+// return type.)
+createSupabaseRuntime satisfies <TContract extends FrameworkContract<SqlStorage>>(
+  options: SupabaseRuntimeOptions<TContract>,
+) => SupabaseRuntimeFactory;
 
 const factory = createSupabaseRuntime<Contract>({
   context: adminDb.context,
@@ -46,9 +61,6 @@ const factory = createSupabaseRuntime<Contract>({
   scopeMode: 'transaction',
   allowedRoles: ['authenticated', 'anon'],
 });
-
-// Factory shape is the public type.
-factory satisfies SupabaseRuntimeFactory;
 
 const session = factory.authenticate({
   jwtClaims: { sub: 'fixture-uuid', role: 'authenticated' },
