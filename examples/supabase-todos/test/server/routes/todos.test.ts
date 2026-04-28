@@ -81,13 +81,14 @@ async function signTokenFor(sub: string, role = 'authenticated'): Promise<string
 
 interface AppDeps {
   readonly factory: SupabaseRuntimeFactory;
+  readonly sql: AdminDb['sql'];
 }
 
 function buildTodosApp(deps: AppDeps) {
   return new Hono<ScopedRuntimeEnv & JwtAuthEnv>()
     .use('*', createJwtMiddleware({ secret: TEST_SECRET }))
     .use('*', createScopedRuntimeMiddleware({ factory: deps.factory }))
-    .route('/api/todos', createTodosRoutes());
+    .route('/api/todos', createTodosRoutes({ sql: deps.sql }));
 }
 
 describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
@@ -120,16 +121,24 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
     aliceAuthUserId = aliceProfile.id;
     bobAuthUserId = bobProfile.id;
 
-    // Pick one seeded todo per user so the cross-user leakage tests
-    // can ask "alice fetches bob's-todo-id." `factory.test.ts` already
-    // verifies which titles belong to whom (3 alice, 2 bob).
-    const todoPlan = adminDb.sql.todos.select('id', 'user_id').build();
+    // Pick one seeded todo per user **deterministically** (by title)
+    // so any test ordering / DB row-order shuffle still picks the
+    // same fixture row, and so write tests don't accidentally land
+    // on a row whose title other suites assert against. The seed
+    // titles are stable: alice owns 'Review the plan', 'Ship the PoC',
+    // 'Write the spec'; bob owns 'Read the spec', 'Test RLS'. Routes
+    // tests **only read** from these seeded rows; writes (PATCH/POST/
+    // DELETE) operate on transient per-test rows so concurrent suites
+    // (admin / factory / scoped-runtime) see a stable seed snapshot.
+    const todoPlan = adminDb.sql.todos.select('id', 'user_id', 'title').build();
     const todos = await adminRuntime.execute(todoPlan);
-    const aliceTodo = todos.find((t) => t.user_id === aliceAuthUserId);
-    const bobTodo = todos.find((t) => t.user_id === bobAuthUserId);
+    const aliceTodo = todos.find(
+      (t) => t.user_id === aliceAuthUserId && t.title === 'Review the plan',
+    );
+    const bobTodo = todos.find((t) => t.user_id === bobAuthUserId && t.title === 'Read the spec');
     if (!aliceTodo || !bobTodo) {
       throw new Error(
-        'expected at least one seeded todo per user; run `pnpm --filter supabase-todos seed` first',
+        'expected the canonical seed titles; run `pnpm --filter supabase-todos seed` first',
       );
     }
     aliceTodoId = aliceTodo.id;
@@ -151,7 +160,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('GET /api/todos — alice sees only alice\u2019s todos (RLS-scoped)', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const res = await app.request('/api/todos', {
       headers: { Authorization: `Bearer ${aliceToken}` },
     });
@@ -162,7 +171,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('GET /api/todos — bob sees only bob\u2019s todos (RLS-scoped)', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const bobToken = await signTokenFor(bobAuthUserId);
     const res = await app.request('/api/todos', {
       headers: { Authorization: `Bearer ${bobToken}` },
@@ -174,7 +183,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('GET /api/todos/:id — alice fetching her own todo returns 200', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const res = await app.request(`/api/todos/${aliceTodoId}`, {
       headers: { Authorization: `Bearer ${aliceToken}` },
     });
@@ -189,7 +198,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
     // the table but the SELECT, scoped to alice, sees zero rows. Any
     // other status code (200/403) would mean RLS is bypassed or the
     // handler did its own filtering.
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const res = await app.request(`/api/todos/${bobTodoId}`, {
       headers: { Authorization: `Bearer ${aliceToken}` },
     });
@@ -197,7 +206,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('POST /api/todos — alice creates a todo with user_id taken from claims.sub', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const title = `phase-4b-create-${Date.now()}`;
     const res = await app.request('/api/todos', {
       method: 'POST',
@@ -222,33 +231,48 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('PATCH /api/todos/:id — alice updates her own todo', async () => {
-    const app = buildTodosApp({ factory });
-    const newTitle = `phase-4b-patched-${Date.now()}`;
-    const res = await app.request(`/api/todos/${aliceTodoId}`, {
-      method: 'PATCH',
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
+    // Use a transient row so the seed data stays untouched (other
+    // suites assert exact seed counts / titles, so mutating
+    // 'Review the plan' or 'Ship the PoC' would race with them).
+    const createRes = await app.request('/api/todos', {
+      method: 'POST',
       headers: {
         Authorization: `Bearer ${aliceToken}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ title: newTitle, completed: true }),
+      body: JSON.stringify({ title: `phase-4b-patch-fixture-${Date.now()}` }),
     });
-    expect(res.status).toBe(200);
-    const row = (await res.json()) as TodoRow;
-    expect(row.id).toBe(aliceTodoId);
-    expect(row.title).toBe(newTitle);
-    expect(row.completed).toBe(true);
+    expect(createRes.status).toBe(201);
+    const created = (await createRes.json()) as TodoRow;
 
-    // Restore prior shape so subsequent tests / re-runs see the seed
-    // data unchanged.
-    const restorePlan = adminDb.sql.todos
-      .update({ title: 'Review the plan', completed: false })
-      .where((f, fns) => fns.eq(f.id, aliceTodoId))
-      .build();
-    await adminRuntime.execute(restorePlan);
+    try {
+      const newTitle = `phase-4b-patched-${Date.now()}`;
+      const res = await app.request(`/api/todos/${created.id}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${aliceToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: newTitle, completed: true }),
+      });
+      expect(res.status).toBe(200);
+      const row = (await res.json()) as TodoRow;
+      expect(row.id).toBe(created.id);
+      expect(row.title).toBe(newTitle);
+      expect(row.completed).toBe(true);
+    } finally {
+      // Always clean up — even if the assertion above failed.
+      const cleanupPlan = adminDb.sql.todos
+        .delete()
+        .where((f, fns) => fns.eq(f.id, created.id))
+        .build();
+      await adminRuntime.execute(cleanupPlan);
+    }
   });
 
   it('PATCH /api/todos/:id — alice patching bob\u2019s todo returns 404 (RLS filtered)', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const res = await app.request(`/api/todos/${bobTodoId}`, {
       method: 'PATCH',
       headers: {
@@ -273,7 +297,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('DELETE /api/todos/:id — alice deleting bob\u2019s todo returns 404 (RLS filtered)', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     const res = await app.request(`/api/todos/${bobTodoId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${aliceToken}` },
@@ -290,7 +314,7 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   });
 
   it('DELETE /api/todos/:id — alice deleting her own freshly-created todo returns 204', async () => {
-    const app = buildTodosApp({ factory });
+    const app = buildTodosApp({ factory, sql: adminDb.sql });
     // Create a throwaway todo so the seed fixture set is preserved.
     const createRes = await app.request('/api/todos', {
       method: 'POST',
@@ -333,14 +357,20 @@ describe.skipIf(!databaseUrl)('Todos JSON API (T4.5)', () => {
   // (`f.user_id` / `f.userId`, `tables.todos.columns.user_id`, …)
   // and any literal `WHERE user_id` SQL fragment.
   it('handler source contains no per-user WHERE filter (R-FX-2)', async () => {
-    const handlerSource = await readFile(
+    const raw = await readFile(
       new URL('../../../src/server/routes/todos.ts', import.meta.url),
       'utf8',
     );
-    expect(handlerSource).not.toMatch(/WHERE\s+user_id/i);
-    expect(handlerSource).not.toMatch(/\bf\.user_id\b/);
-    expect(handlerSource).not.toMatch(/\bf\.userId\b/);
-    expect(handlerSource).not.toMatch(/columns\.user_id\b/);
-    expect(handlerSource).not.toMatch(/columns\.userId\b/);
+    // Strip block (`/* ... */`) and line (`// ...`) comments so the
+    // regex only inspects executable code. Without this the static
+    // pin would false-match on the docblock that explains *why*
+    // these patterns are banned (the prose itself mentions
+    // `f.user_id` etc.).
+    const code = raw.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|\s)\/\/.*$/gm, '$1');
+    expect(code).not.toMatch(/WHERE\s+user_id/i);
+    expect(code).not.toMatch(/\bf\.user_id\b/);
+    expect(code).not.toMatch(/\bf\.userId\b/);
+    expect(code).not.toMatch(/columns\.user_id\b/);
+    expect(code).not.toMatch(/columns\.userId\b/);
   });
 });
