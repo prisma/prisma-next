@@ -4,6 +4,7 @@ import type {
   ContractRelation,
   StorageHashBase,
 } from '@prisma-next/contract/types';
+import type { Codec, CodecTrait, Ctx } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type {
   ContractWithTypeMaps,
@@ -238,6 +239,19 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
   ? TypeRef
   : undefined;
 
+/**
+ * Extract the partially-applied higher-order codec factory from a descriptor or
+ * `storage.types` entry. The factory is the column-author-supplied expression
+ * `vector(1536)`, `json(schema)`, `cipherStashText({...})` — typed as
+ * `(ctx: Ctx) => Codec<…>`. Defined per the M2 design in
+ * `projects/codec-model-unification/design/higher-order-codecs.md`.
+ */
+type DescriptorTypeFactory<Descriptor> = Descriptor extends {
+  readonly type: infer Factory extends (ctx: Ctx) => Codec;
+}
+  ? Factory
+  : undefined;
+
 type LookupNamedStorageTypeKeyByValue<Definition, TypeRef extends StorageTypeInstance> = {
   [TypeName in keyof DefinitionTypes<Definition> & string]: [TypeRef] extends [
     DefinitionTypes<Definition>[TypeName],
@@ -280,6 +294,17 @@ type ResolveFieldColumnTypeParams<Definition, FieldState> = [
 ] extends [string]
   ? undefined
   : DescriptorTypeParams<FieldDescriptorOf<FieldState>>;
+
+/**
+ * Lift the higher-order codec factory off the resolved column descriptor so it
+ * is reachable from `ModelStorageColumn`. For inline columns the factory lives
+ * on the field's own descriptor; for `typeRef` columns it lives on the
+ * referenced `storage.types` entry. Either way we surface it as the column's
+ * `type` slot, which `FieldOutputType` reads to compute the no-emit JS type.
+ */
+type ResolveFieldColumnTypeFactory<Definition, FieldState> = DescriptorTypeFactory<
+  ResolveFieldDescriptor<Definition, FieldState>
+>;
 
 type ModelTableName<Definition, ModelName extends ModelNames<Definition>> = [
   Present<
@@ -376,6 +401,7 @@ type StorageColumn<
   NativeType extends string,
   TypeRef extends string | undefined = undefined,
   TypeParams extends Record<string, unknown> | undefined = undefined,
+  TypeFactory extends ((ctx: Ctx) => Codec) | undefined = undefined,
 > = {
   readonly nativeType: NativeType;
   readonly codecId: CodecId;
@@ -384,6 +410,9 @@ type StorageColumn<
 } & (TypeRef extends string ? { readonly typeRef: TypeRef } : Record<string, never>) &
   (TypeParams extends Record<string, unknown>
     ? { readonly typeParams: TypeParams }
+    : Record<string, never>) &
+  (TypeFactory extends (ctx: Ctx) => Codec
+    ? { readonly type: TypeFactory }
     : Record<string, never>);
 
 type ModelStorageColumn<
@@ -400,7 +429,8 @@ type ModelStorageColumn<
         ResolveFieldDescriptor<Definition, ModelFieldState<Definition, ModelName, FieldName>>
       >,
       ResolveFieldColumnTypeRef<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
-      ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>
+      ResolveFieldColumnTypeParams<Definition, ModelFieldState<Definition, ModelName, FieldName>>,
+      ResolveFieldColumnTypeFactory<Definition, ModelFieldState<Definition, ModelName, FieldName>>
     >
   : never;
 
@@ -484,21 +514,70 @@ type BuiltStorage<Definition> = {
   readonly types: DefinitionTypes<Definition>;
 };
 
-type FieldOutputType<
+/**
+ * Apply a column's nullability flag to a base resolved type.
+ * Used by both the parameterized (`type` factory) and non-parameterized
+ * (`codecId` -> base output) paths so nullability handling stays uniform.
+ */
+type ApplyNullable<Col, T> = Col extends { readonly nullable: true } ? T | null : T;
+
+/**
+ * Extract `Js` from a `Codec<Id, Traits, Wire, Js>`. Mirrors the slot the
+ * higher-order codec factory's return type carries through.
+ */
+type CodecJs<C> = C extends Codec<string, readonly CodecTrait[], unknown, infer Js> ? Js : unknown;
+
+/**
+ * Apply a synthetic `Ctx` at the type level to a partially-applied higher-order
+ * codec factory and infer the resulting `Codec`.
+ */
+type ApplyCtx<F> = F extends (ctx: Ctx) => infer C ? C : never;
+
+/**
+ * Follow `typeRef` through `Definition['types']`. The resolved entry is itself
+ * a column-like value (the same shape an inline column would have, including
+ * the partially applied factory in its `type` slot). The column's nullability
+ * is reattached so callers can apply it uniformly.
+ */
+type ResolveTypeRef<Definition, Col> = Col extends {
+  readonly typeRef: infer Ref extends string;
+}
+  ? Ref extends keyof DefinitionTypes<Definition>
+    ? DefinitionTypes<Definition>[Ref] & {
+        readonly nullable: Col extends { readonly nullable: true } ? true : false;
+      }
+    : Col
+  : Col;
+
+/**
+ * No-emit field output resolver. Follows `typeRef` through `storage.types`,
+ * reads `Js` off the higher-order codec factory's return type when present, and
+ * otherwise falls through to the codec registry's base `output`.
+ *
+ * See `projects/codec-model-unification/design/higher-order-codecs.md`
+ * § "Rewriting the no-emit `FieldOutputType`" for the rationale.
+ */
+export type FieldOutputType<
   Definition,
   ModelName extends ModelNames<Definition>,
   FieldName extends ModelFieldNames<Definition, ModelName>,
 > = ModelStorageColumn<Definition, ModelName, FieldName> extends infer Col
-  ? Col extends { readonly codecId: infer Id extends string }
-    ? Id extends keyof CodecTypesFromDefinition<Definition>
-      ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
-        ? Col extends { readonly nullable: true }
-          ? O | null
-          : O
+  ? ResolveTypeRef<Definition, Col> extends infer Resolved
+    ? Resolved extends { readonly type: infer Factory extends (ctx: Ctx) => Codec }
+      ? ApplyNullable<Resolved, CodecJs<ApplyCtx<Factory>>>
+      : Resolved extends { readonly codecId: infer Id extends string }
+        ? Id extends keyof CodecTypesFromDefinition<Definition>
+          ? CodecTypesFromDefinition<Definition>[Id] extends { readonly output: infer O }
+            ? ApplyNullable<Resolved, O>
+            : unknown
+          : unknown
         : unknown
-      : unknown
     : unknown
   : unknown;
+// `FieldOutputType` is intentionally exported from this module so the M2 type
+// tests can import it directly. It is not re-exported through `src/exports/` —
+// it remains an internal symbol, used transitively by `SqlContractResult` and
+// the contract typemap.
 
 type FieldOutputTypes<Definition> = {
   readonly [ModelName in ModelNames<Definition>]: {
