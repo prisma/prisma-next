@@ -66,6 +66,14 @@ describe('MigrationApplyResult JSON shape', () => {
         "toHash",
       ]
     `);
+    // Pin the selectedPath entry shape so a regression that drops
+    // `migrationHash` (or any other field) from the wire shape would fail.
+    expect(result.pathDecision!.selectedPath[0]).toEqual({
+      dirName: 'm1',
+      migrationHash: 'sha256:mid',
+      from: 'sha256:a',
+      to: 'sha256:b',
+    });
   });
 
   it('pathDecision with ref includes refName', () => {
@@ -88,6 +96,12 @@ describe('MigrationApplyResult JSON shape', () => {
       },
       timings: { total: 10 },
     };
+    expect(result.pathDecision!.selectedPath[0]).toEqual({
+      dirName: 'm1',
+      migrationHash: 'sha256:mid',
+      from: 'sha256:a',
+      to: 'sha256:b',
+    });
     expect(Object.keys(result.pathDecision!).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
