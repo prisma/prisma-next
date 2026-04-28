@@ -1,3 +1,9 @@
+import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
+import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
 import { DerivedTableSource, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
@@ -79,6 +85,38 @@ abstract class QueryBase<
 
   distinct(): this {
     return this.clone(cloneState(this.state, { distinct: true }));
+  }
+
+  /**
+   * Attach one or more user annotations to this query plan.
+   *
+   * Read builders (`SelectQueryImpl`, `GroupedQueryImpl`) accept
+   * annotations whose declared `applicableTo` includes `'read'`.
+   * The type-level `As & ValidAnnotations<'read', As>` gate rejects
+   * write-only annotations at the call site; the runtime check below
+   * fails closed for callers that bypass the type gate (cast / `any`).
+   *
+   * Multiple `.annotate(...)` calls compose; duplicate namespaces use
+   * last-write-wins. The accumulated annotations are merged into
+   * `plan.meta.annotations` at `.build()` time, alongside any framework-
+   * internal metadata under reserved namespaces (e.g. `codecs`).
+   *
+   * Chainable in any position (before / after `.where`, `.select`,
+   * `.limit`, etc.); the returned builder has the same row type.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): this {
+    assertAnnotationsApplicable(
+      annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      'read',
+      'sql-dsl.annotate',
+    );
+    const next = new Map(this.state.userAnnotations);
+    for (const annotation of annotations as readonly AnnotationValue<unknown, OperationKind>[]) {
+      next.set(annotation.namespace, annotation);
+    }
+    return this.clone(cloneState(this.state, { userAnnotations: next }));
   }
 
   groupBy(

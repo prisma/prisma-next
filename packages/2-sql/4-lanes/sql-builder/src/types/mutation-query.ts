@@ -1,3 +1,8 @@
+import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type { ExpressionBuilder, WithFields } from '../expression';
@@ -30,6 +35,17 @@ export interface InsertQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > {
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * Annotations declare `applicableTo: ['write']` (or `['read', 'write']`)
+   * via `defineAnnotation`; read-only annotations fail to compile here.
+   * Annotations are merged into `plan.meta.annotations` at `.build()` time.
+   * Chainable in any position; multiple calls compose with last-write-wins
+   * on duplicate namespaces.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): InsertQuery<QC, AvailableScope, RowType>;
   returning: GatedMethod<
     QC['capabilities'],
     ReturningCapability,
@@ -45,6 +61,13 @@ export interface UpdateQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > {
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * See `InsertQuery.annotate` for semantics.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): UpdateQuery<QC, AvailableScope, RowType>;
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType>;
   returning: GatedMethod<
     QC['capabilities'],
@@ -61,6 +84,13 @@ export interface DeleteQuery<
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
 > {
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * See `InsertQuery.annotate` for semantics.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): DeleteQuery<QC, AvailableScope, RowType>;
   where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType>;
   returning: GatedMethod<
     QC['capabilities'],

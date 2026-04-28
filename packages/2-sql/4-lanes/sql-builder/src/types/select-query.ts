@@ -1,4 +1,9 @@
 import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
+import type {
   Expression,
   ExpressionBuilder,
   FieldProxy,
@@ -20,6 +25,18 @@ export interface SelectQuery<
     WithDistinct,
     WithAlias<RowType>,
     WithBuild<QC, RowType> {
+  /**
+   * Attach one or more read-typed user annotations to this query plan.
+   * Annotations declare `applicableTo: ['read']` (or `['read', 'write']`)
+   * via `defineAnnotation`; write-only annotations fail to compile here.
+   * Annotations are merged into `plan.meta.annotations` at `.build()` time.
+   * Chainable in any position; multiple calls compose with last-write-wins
+   * on duplicate namespaces.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): SelectQuery<QC, AvailableScope, RowType>;
+
   where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType>;
 
   orderBy(

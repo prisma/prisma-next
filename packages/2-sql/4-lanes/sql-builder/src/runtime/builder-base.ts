@@ -1,4 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
@@ -69,6 +70,12 @@ export interface BuilderState {
   readonly distinctOn: readonly AstExpression[] | undefined;
   readonly scope: Scope;
   readonly rowFields: Record<string, ScopeField>;
+  /**
+   * User annotations accumulated through `.annotate(...)` calls.
+   * Stored as a `Map<namespace, AnnotationValue>` so duplicate
+   * namespaces last-write-win. Empty on a fresh state.
+   */
+  readonly userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 }
 
 export interface BuilderContext {
@@ -96,6 +103,7 @@ export function emptyState(from: TableSource, scope: Scope): BuilderState {
     distinctOn: undefined,
     scope,
     rowFields: {},
+    userAnnotations: new Map(),
   };
 }
 
@@ -131,6 +139,7 @@ export function buildQueryPlan<Row = unknown>(
   ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
   rowFields: Record<string, ScopeField>,
   ctx: BuilderContext,
+  userAnnotations?: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
 ): SqlQueryPlan<Row> {
   const projectionTypes: Record<string, string> = {};
   const codecs: Record<string, string> = {};
@@ -161,6 +170,26 @@ export function buildQueryPlan<Row = unknown>(
 
   const hasProjectionTypes = Object.keys(projectionTypes).length > 0;
   const hasCodecs = Object.keys(codecs).length > 0;
+  const hasUserAnnotations = userAnnotations !== undefined && userAnnotations.size > 0;
+
+  // Compose `meta.annotations` from up to two sources: the framework-
+  // internal `codecs` map (emitted by the SQL emitter for runtime decode)
+  // and any user annotations attached via `.annotate(...)`. Reserved
+  // namespaces (`codecs`) win over user annotations under the same key
+  // — see TSDoc on `defineAnnotation` for the reserved-namespace policy.
+  let annotations: Record<string, unknown> | undefined;
+  if (hasCodecs || hasUserAnnotations) {
+    annotations = {};
+    if (hasUserAnnotations) {
+      for (const [namespace, value] of userAnnotations) {
+        annotations[namespace] = value;
+      }
+    }
+    if (hasCodecs) {
+      annotations['codecs'] = Object.freeze(codecs);
+    }
+    Object.freeze(annotations);
+  }
 
   const meta: PlanMeta = Object.freeze({
     target: ctx.target,
@@ -168,7 +197,7 @@ export function buildQueryPlan<Row = unknown>(
     lane: 'dsl',
     paramDescriptors,
     ...(hasProjectionTypes ? { projectionTypes } : {}),
-    ...(hasCodecs ? { annotations: Object.freeze({ codecs: Object.freeze(codecs) }) } : {}),
+    ...(annotations !== undefined ? { annotations } : {}),
   });
 
   return Object.freeze({ ast, params: paramValues, meta });
@@ -178,7 +207,7 @@ export function buildPlan<Row = unknown>(
   state: BuilderState,
   ctx: BuilderContext,
 ): SqlQueryPlan<Row> {
-  return buildQueryPlan<Row>(buildSelectAst(state), state.rowFields, ctx);
+  return buildQueryPlan<Row>(buildSelectAst(state), state.rowFields, ctx, state.userAnnotations);
 }
 
 export function tableToScope(name: string, table: StorageTable): Scope {

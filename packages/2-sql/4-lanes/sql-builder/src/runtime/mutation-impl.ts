@@ -1,3 +1,9 @@
+import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
+import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression as AstExpression,
@@ -27,6 +33,29 @@ import {
 } from './builder-base';
 import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
+
+/**
+ * Validates and merges a variadic annotations call into a builder's
+ * accumulated user-annotations map. Used by `.annotate(...)` on each of
+ * the three mutation builders (`InsertQueryImpl`, `UpdateQueryImpl`,
+ * `DeleteQueryImpl`); the read builders share the same logic via
+ * `QueryBase.annotate()` in `./query-impl.ts`.
+ *
+ * Runs `assertAnnotationsApplicable` at call time (not at `.build()`) so
+ * inapplicable annotations forced through casts surface immediately
+ * rather than at plan-construction time.
+ */
+function mergeWriteAnnotations(
+  current: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
+  annotations: readonly AnnotationValue<unknown, OperationKind>[],
+): ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> {
+  assertAnnotationsApplicable(annotations, 'write', 'sql-dsl.annotate');
+  const next = new Map(current);
+  for (const annotation of annotations) {
+    next.set(annotation.namespace, annotation);
+  }
+  return next;
+}
 
 type WhereCallback = ExpressionBuilder<Scope, QueryContext>;
 
@@ -78,6 +107,7 @@ export class InsertQueryImpl<
   readonly #values: Record<string, unknown>;
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
+  readonly #userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
     tableName: string,
@@ -87,6 +117,7 @@ export class InsertQueryImpl<
     ctx: BuilderContext,
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
+    userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -95,6 +126,7 @@ export class InsertQueryImpl<
     this.#values = values;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
+    this.#userAnnotations = userAnnotations;
   }
 
   returning = this._gate<ReturningCapability, string[], InsertQuery<QC, AvailableScope, never>>(
@@ -115,9 +147,35 @@ export class InsertQueryImpl<
         this.ctx,
         columns,
         newRowFields,
+        this.#userAnnotations,
       ) as unknown as InsertQuery<QC, AvailableScope, never>;
     },
   );
+
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * The type-level `As & ValidAnnotations<'write', As>` gate rejects
+   * read-only annotations at the call site; the runtime check fails
+   * closed for callers that bypass the type gate. See `QueryBase.annotate`
+   * in `./query-impl.ts` for the read-builder counterpart.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): InsertQuery<QC, AvailableScope, RowType> {
+    return new InsertQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      this.#values,
+      this.ctx,
+      this.#returningColumns,
+      this.#rowFields,
+      mergeWriteAnnotations(
+        this.#userAnnotations,
+        annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      ),
+    );
+  }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const paramValues = buildParamValues(
@@ -138,6 +196,7 @@ export class InsertQueryImpl<
       ast,
       this.#rowFields,
       this.ctx,
+      this.#userAnnotations,
     );
   }
 }
@@ -157,6 +216,7 @@ export class UpdateQueryImpl<
   readonly #whereCallbacks: readonly WhereCallback[];
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
+  readonly #userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
     tableName: string,
@@ -167,6 +227,7 @@ export class UpdateQueryImpl<
     whereCallbacks: readonly WhereCallback[] = [],
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
+    userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -176,6 +237,7 @@ export class UpdateQueryImpl<
     this.#whereCallbacks = whereCallbacks;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
+    this.#userAnnotations = userAnnotations;
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
@@ -188,6 +250,7 @@ export class UpdateQueryImpl<
       [...this.#whereCallbacks, expr as unknown as WhereCallback],
       this.#returningColumns,
       this.#rowFields,
+      this.#userAnnotations,
     );
   }
 
@@ -210,9 +273,34 @@ export class UpdateQueryImpl<
         this.#whereCallbacks,
         columns,
         newRowFields,
+        this.#userAnnotations,
       ) as unknown as UpdateQuery<QC, AvailableScope, never>;
     },
   );
+
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * See `InsertQueryImpl.annotate` for semantics; the runtime check
+   * fails closed for callers that bypass the type-level gate.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): UpdateQuery<QC, AvailableScope, RowType> {
+    return new UpdateQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      this.#setValues,
+      this.ctx,
+      this.#whereCallbacks,
+      this.#returningColumns,
+      this.#rowFields,
+      mergeWriteAnnotations(
+        this.#userAnnotations,
+        annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      ),
+    );
+  }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const setParams = buildParamValues(
@@ -241,6 +329,7 @@ export class UpdateQueryImpl<
       ast,
       this.#rowFields,
       this.ctx,
+      this.#userAnnotations,
     );
   }
 }
@@ -258,6 +347,7 @@ export class DeleteQueryImpl<
   readonly #whereCallbacks: readonly WhereCallback[];
   readonly #returningColumns: string[];
   readonly #rowFields: Record<string, ScopeField>;
+  readonly #userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 
   constructor(
     tableName: string,
@@ -266,6 +356,7 @@ export class DeleteQueryImpl<
     whereCallbacks: readonly WhereCallback[] = [],
     returningColumns: string[] = [],
     rowFields: Record<string, ScopeField> = {},
+    userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> = new Map(),
   ) {
     super(ctx);
     this.#tableName = tableName;
@@ -273,6 +364,7 @@ export class DeleteQueryImpl<
     this.#whereCallbacks = whereCallbacks;
     this.#returningColumns = returningColumns;
     this.#rowFields = rowFields;
+    this.#userAnnotations = userAnnotations;
   }
 
   where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType> {
@@ -283,6 +375,7 @@ export class DeleteQueryImpl<
       [...this.#whereCallbacks, expr as unknown as WhereCallback],
       this.#returningColumns,
       this.#rowFields,
+      this.#userAnnotations,
     );
   }
 
@@ -303,9 +396,31 @@ export class DeleteQueryImpl<
         this.#whereCallbacks,
         columns,
         newRowFields,
+        this.#userAnnotations,
       ) as unknown as DeleteQuery<QC, AvailableScope, never>;
     },
   );
+
+  /**
+   * Attach one or more write-typed user annotations to this query plan.
+   * See `InsertQueryImpl.annotate` for semantics.
+   */
+  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'write', As>
+  ): DeleteQuery<QC, AvailableScope, RowType> {
+    return new DeleteQueryImpl(
+      this.#tableName,
+      this.#scope,
+      this.ctx,
+      this.#whereCallbacks,
+      this.#returningColumns,
+      this.#rowFields,
+      mergeWriteAnnotations(
+        this.#userAnnotations,
+        annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      ),
+    );
+  }
 
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>> {
     const whereExpr = combineWhereExprs(
@@ -324,6 +439,7 @@ export class DeleteQueryImpl<
       ast,
       this.#rowFields,
       this.ctx,
+      this.#userAnnotations,
     );
   }
 }
