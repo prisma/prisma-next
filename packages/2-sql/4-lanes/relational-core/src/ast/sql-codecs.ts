@@ -1,4 +1,3 @@
-import { type as arktype } from 'arktype';
 import { codec, defineCodecs } from './codec-types';
 
 export const SQL_CHAR_CODEC_ID = 'sql/char@1' as const;
@@ -7,28 +6,6 @@ export const SQL_INT_CODEC_ID = 'sql/int@1' as const;
 export const SQL_FLOAT_CODEC_ID = 'sql/float@1' as const;
 export const SQL_TEXT_CODEC_ID = 'sql/text@1' as const;
 export const SQL_TIMESTAMP_CODEC_ID = 'sql/timestamp@1' as const;
-
-const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
-
-const precisionParamsSchema = arktype({
-  'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
-
-type LengthTypeHelper = {
-  readonly kind: 'fixed' | 'variable';
-  readonly maxLength: number;
-};
-
-function createLengthTypeHelper(
-  kind: LengthTypeHelper['kind'],
-): (params: Record<string, unknown>) => LengthTypeHelper {
-  return (params) => ({
-    kind,
-    maxLength: params['length'] as number,
-  });
-}
 
 const sqlCharCodec = codec<
   typeof SQL_CHAR_CODEC_ID,
@@ -41,8 +18,6 @@ const sqlCharCodec = codec<
   traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire.trimEnd(),
-  paramsSchema: lengthParamsSchema,
-  init: createLengthTypeHelper('fixed'),
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
     if (length === undefined) return undefined;
@@ -66,8 +41,6 @@ const sqlVarcharCodec = codec<
   traits: ['equality', 'order', 'textual'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  paramsSchema: lengthParamsSchema,
-  init: createLengthTypeHelper('variable'),
   renderOutputType: (typeParams) => {
     const length = typeParams['length'];
     if (length === undefined) return undefined;
@@ -110,7 +83,6 @@ const sqlTimestampCodec = codec({
   traits: ['equality', 'order'],
   encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
   decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];
     if (precision === undefined) {

@@ -1,4 +1,3 @@
-import type { Type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types';
 
@@ -63,48 +62,15 @@ describe('codec factory', () => {
     expect(testCodec.decodeJson('world')).toBe('world');
   });
 
-  it.each([
-    {
-      label: 'without meta',
-      config: {},
-      check: (testCodec: unknown) => {
-        expect((testCodec as { readonly meta?: unknown }).meta).toBeUndefined();
-      },
-    },
-    {
-      label: 'with paramsSchema',
-      config: {
-        paramsSchema: {} as unknown as Type<{ readonly precision: number }>,
-      },
-      check: (testCodec: unknown) => {
-        expect((testCodec as { readonly paramsSchema?: unknown }).paramsSchema).toBeDefined();
-      },
-    },
-    {
-      label: 'with init',
-      config: {
-        init: (params: { precision: number }) => ({ normalized: params.precision }),
-      },
-      check: (testCodec: unknown) => {
-        const codecWithInit = testCodec as {
-          readonly init?: (params: { readonly precision: number }) => {
-            readonly normalized: number;
-          };
-        };
-        expect(codecWithInit.init).toBeDefined();
-        expect(codecWithInit.init?.({ precision: 12 })).toEqual({ normalized: 12 });
-      },
-    },
-  ])('creates codec $label', ({ config, check }) => {
+  it('creates codec without meta', () => {
     const testCodec = codec({
-      typeId: 'test/optional@1',
+      typeId: 'test/no-meta@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
-      ...config,
     });
 
-    check(testCodec);
+    expect((testCodec as { readonly meta?: unknown }).meta).toBeUndefined();
   });
 });
 
@@ -589,17 +555,15 @@ describe('codec traits', () => {
 });
 
 describe('SqlCodecTypes with traits', () => {
-  it('SqlCodecTypes carries narrow traits for codecs without init', async () => {
+  it('SqlCodecTypes carries narrow traits for non-parameterized codecs', async () => {
     type SqlCTypes = import('../../src/ast/sql-codecs').SqlCodecTypes;
 
-    // Int (no init/paramsSchema): TTraits inferred as literal tuple
     true satisfies 'numeric' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
     true satisfies 'equality' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
     true satisfies 'order' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
     false satisfies 'textual' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
     false satisfies 'boolean' extends SqlCTypes['sql/int@1']['traits'] ? true : false;
 
-    // Float (no init/paramsSchema): same narrow traits
     true satisfies 'numeric' extends SqlCTypes['sql/float@1']['traits'] ? true : false;
     false satisfies 'textual' extends SqlCTypes['sql/float@1']['traits'] ? true : false;
   });

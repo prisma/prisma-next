@@ -1,35 +1,9 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
-import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
 export type { CodecTrait } from '@prisma-next/framework-components/codec';
-
-/**
- * Descriptor for parameterized codecs that require type parameter validation.
- * Shared between adapter (compile-time) and runtime layers to avoid duplication.
- *
- * @template TParams - The shape of the type parameters (e.g., `{ length: number }`)
- * @template THelper - The type returned by the optional `init` hook
- */
-export interface CodecParamsDescriptor<TParams = Record<string, unknown>, THelper = unknown> {
-  /** The codec ID this descriptor applies to (e.g., 'pg/vector@1') */
-  readonly codecId: string;
-
-  /**
-   * Arktype schema for validating typeParams.
-   * Used to validate both storage.types entries and inline column typeParams.
-   */
-  readonly paramsSchema: Type<TParams>;
-
-  /**
-   * Optional init hook called during runtime context creation.
-   * Receives validated params and returns a helper object to be stored in context.types.
-   * If not provided, the validated params are stored directly.
-   */
-  readonly init?: (params: TParams) => THelper;
-}
 
 /**
  * Codec metadata for database-specific type information.
@@ -51,18 +25,24 @@ export interface CodecMeta {
  * Codecs are pure, synchronous functions with no side effects or IO.
  * They provide deterministic conversion between database wire types and JS values,
  * and between JS values and contract JSON.
+ *
+ * Parameterization slots (`paramsSchema`, `init`) have been removed — they migrate to
+ * `ParameterizedCodecDescriptor` (see `@prisma-next/framework-components/codec`) and to
+ * the higher-order codec factory's closure respectively (locked at M1 of the
+ * codec-model-unification project; production codecs migrate in M4).
+ *
+ * `renderOutputType` is a temporary M1 holding place on the SQL `Codec` extension
+ * while production codecs continue to author it inline; the long-term home is
+ * `ParameterizedCodecDescriptor.renderOutputType` (open question 2 locked at M1).
  */
 export interface Codec<
   Id extends string = string,
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TJs = unknown,
-  TParams = Record<string, unknown>,
-  THelper = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TJs> {
   readonly meta?: CodecMeta;
-  readonly paramsSchema?: Type<TParams>;
-  readonly init?: (params: TParams) => THelper;
+  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
 /**
@@ -188,8 +168,6 @@ export function codec<
   const TTraits extends readonly CodecTrait[],
   TWire,
   TJs,
-  TParams = Record<string, unknown>,
-  THelper = unknown,
 >(config: {
   typeId: Id;
   targetTypes: readonly string[];
@@ -198,18 +176,14 @@ export function codec<
   encodeJson?: (value: TJs) => JsonValue;
   decodeJson?: (json: JsonValue) => TJs;
   meta?: CodecMeta;
-  paramsSchema?: Type<TParams>;
-  init?: (params: TParams) => THelper;
   traits?: TTraits;
   renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+}): Codec<Id, TTraits, TWire, TJs> {
   const identity = (v: unknown) => v;
   return {
     id: config.typeId,
     targetTypes: config.targetTypes,
     ...ifDefined('meta', config.meta),
-    ...ifDefined('paramsSchema', config.paramsSchema),
-    ...ifDefined('init', config.init),
     ...ifDefined(
       'traits',
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
