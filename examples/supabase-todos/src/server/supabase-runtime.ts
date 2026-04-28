@@ -1,0 +1,481 @@
+/**
+ * `createSupabaseRuntime` — userspace per-request RLS-scoped runtime factory (T2.2).
+ *
+ * Headline mechanism of the PoC. Wraps a shared `pg.Pool` so each
+ * request can `authenticate({ jwtClaims, role })` and receive a
+ * `SqlRuntime`-shaped session that runs every plan inside its own
+ * `BEGIN; SET LOCAL request.jwt.claims = …; SET LOCAL ROLE …; <plan>; COMMIT`
+ * envelope. The role downgrade (from `postgres` superuser → `authenticated`
+ * / `anon`) is what activates the RLS policies authored in the M1 migration;
+ * `auth.uid()` reads the `sub` claim from the GUC.
+ *
+ * Lives in the example (no `packages/` edits, R-NF-1 / R-NF-2). The factory
+ * is the proof that PN's existing public surface is sufficient to assemble
+ * a Supabase-style developer experience without framework changes — the
+ * headline result of the PoC for the realtime/RLS half.
+ *
+ * ## Design choices (kept here so the call site stays small)
+ *
+ * - **Transaction-per-plan.** `'transaction'` mode is the only supported
+ *   `scopeMode` today; it matches the realistic Supabase deployment
+ *   (Supavisor transaction-mode pooler rebinds underlying connections
+ *   between transactions, so only `SET LOCAL` inside `BEGIN..COMMIT` is
+ *   safe). Each `runtime.execute(plan)` borrows a `PoolClient`, runs
+ *   `BEGIN; SET LOCAL …` (2 round-trips), executes the plan, then
+ *   `COMMIT` and returns the client to the pool. Connection-mode is the
+ *   M3 stretch; not built here.
+ * - **Identifier validation, not parameterization.** `SET ROLE` does not
+ *   accept bind parameters in Postgres — the role must be in the SQL
+ *   text. We allowlist-check the role against `allowedRoles` synchronously
+ *   (R-FX-5) and additionally validate it against a strict identifier
+ *   regex before quoting it with `"…"`. `request.jwt.claims` *does*
+ *   parameterize via `set_config('request.jwt.claims', $1, true)` (the
+ *   `true` flag = local to the current transaction, equivalent to
+ *   `SET LOCAL`).
+ * - **Lazy connection acquisition.** `authenticate()` is synchronous and
+ *   never touches the pool — it constructs the scoped driver and
+ *   wraps it in a `Runtime`. The pool is touched only when the caller
+ *   first calls `session.execute(plan)`. This is what makes R-FX-5 work:
+ *   a disallowed role throws synchronously, before any SQL is sent.
+ * - **Mid-iteration error → ROLLBACK + evict.** `execute()` is an async
+ *   generator; the `try/finally` cleanup distinguishes successful
+ *   completion (COMMIT + `release()`) from interrupted iteration
+ *   (ROLLBACK + `destroy(err)`, which evicts the client from the pool
+ *   so a possibly-broken connection is never reused). R-FX-7.
+ * - **`session.beginTransaction()` throws synchronously** with code
+ *   `runtime/unsupported-scoped-tx` (R-FX-8). User-initiated transactions
+ *   inside the per-plan transaction have subtle semantics we explicitly
+ *   ruled out for the PoC (FL-NN); the throw is the bright line.
+ *
+ * ## Public surface
+ *
+ * ```ts
+ * const factory = createSupabaseRuntime({
+ *   context: adminDb.context,
+ *   pool,
+ *   scopeMode: 'transaction',
+ *   allowedRoles: ['authenticated', 'anon'],
+ * });
+ *
+ * const session = factory.authenticate({
+ *   jwtClaims: { sub: userId, role: 'authenticated' },
+ *   role: 'authenticated',
+ * });
+ * try {
+ *   const rows = await session.execute(plan); // RLS-scoped
+ * } finally {
+ *   await session.end(); // no-op in transaction mode; required in connection mode (M3)
+ * }
+ * ```
+ *
+ * `SupabaseSession` is structurally a `SqlRuntime` plus `end()` and a
+ * `beginTransaction()` that throws. Calling code does not need to know
+ * the runtime is RLS-scoped — the lane / plan / middleware story is
+ * unchanged.
+ *
+ * @see projects/supabase-poc/spec.md § Functional requirements (R-FX-*)
+ * @see projects/supabase-poc/plan.md § Milestone 2 → 2.2
+ * @see projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md § 5
+ */
+import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import type { Contract } from '@prisma-next/contract/types';
+import postgresDriver from '@prisma-next/driver-postgres/runtime';
+import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type {
+  SqlConnection,
+  SqlDriver,
+  SqlDriverState,
+  SqlExecuteRequest,
+  SqlExplainResult,
+  SqlQueryResult,
+  SqlTransaction,
+} from '@prisma-next/sql-relational-core/ast';
+import type { ExecutionContext, Runtime } from '@prisma-next/sql-runtime';
+import { createRuntime, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import type { Pool, PoolClient } from 'pg';
+
+export type ScopeMode = 'transaction';
+
+export interface SupabaseRuntimeOptions<TContract extends Contract<SqlStorage>> {
+  /** Execution context built from the contract — typically `adminDb.context`. */
+  readonly context: ExecutionContext<TContract>;
+  /**
+   * Shared `pg.Pool` the factory borrows from. The factory does **not** own
+   * the pool; the caller is responsible for `pool.end()` at process shutdown.
+   */
+  readonly pool: Pool;
+  /** Only `'transaction'` is supported in M2. Connection-scope mode is the M3 stretch. */
+  readonly scopeMode: ScopeMode;
+  /**
+   * Allowlist of role names that `authenticate({ role })` may pass through to
+   * `SET LOCAL ROLE`. R-FX-5: any role outside this list throws synchronously
+   * before any SQL is sent (the spy-based test verifies the pool is never
+   * touched on rejection).
+   */
+  readonly allowedRoles: readonly string[];
+}
+
+export interface AuthenticateOptions {
+  /** JWT claims to expose via `request.jwt.claims` GUC. Supabase's `auth.uid()` reads `sub`. */
+  readonly jwtClaims: Readonly<Record<string, unknown>>;
+  /** Postgres role to `SET LOCAL` for the duration of the per-plan transaction. */
+  readonly role: string;
+}
+
+export interface SupabaseSession extends Runtime {
+  /**
+   * R-FX-8: user-initiated transactions inside the per-plan transaction
+   * are out of scope for the PoC. Throws synchronously with code
+   * `runtime/unsupported-scoped-tx`.
+   */
+  beginTransaction(): never;
+  /**
+   * Tear-down hook. In transaction-scope mode this is a no-op (every plan
+   * is already its own self-contained transaction); kept on the surface so
+   * call sites are forward-compatible with the connection-scope mode (M3),
+   * which borrows a long-lived `PoolClient` and releases it here.
+   */
+  end(): Promise<void>;
+}
+
+export interface SupabaseRuntimeFactory {
+  authenticate(options: AuthenticateOptions): SupabaseSession;
+}
+
+/** Strict Postgres identifier — defensive, since `SET ROLE <ident>` cannot be parameterized. */
+const IDENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+interface UnsupportedScopedTxError extends Error {
+  readonly code: 'runtime/unsupported-scoped-tx';
+}
+
+function unsupportedScopedTxError(): UnsupportedScopedTxError {
+  const err = new Error(
+    'createSupabaseRuntime: session.beginTransaction() is not supported in transaction-scope mode. ' +
+      'Each plan already runs in its own implicit transaction with `SET LOCAL` for the request identity. ' +
+      'Nested user-initiated transactions are out of scope for the PoC; see framework-limitations.md.',
+  ) as UnsupportedScopedTxError;
+  Object.assign(err, { code: 'runtime/unsupported-scoped-tx' as const });
+  return err;
+}
+
+/** Pre-validated session config — the bits that get baked into each `SET LOCAL`. */
+interface ScopedSessionConfig {
+  readonly jwtClaimsJson: string;
+  readonly setRoleSql: string;
+}
+
+/**
+ * Async generator helper that turns a (potentially) thrown iteration into
+ * a destroy-instead-of-release decision. Used by both the driver-level
+ * `execute()` (per-plan transaction) and as the cleanup contract on
+ * `SqlConnection.execute()` of the scoped connection.
+ *
+ * Cleanup semantics:
+ *  - Generator runs to completion → `success = true` → `release()` (COMMIT + return to pool).
+ *  - Generator throws (downstream SQL error) → `success = false` → `destroy(err)` (ROLLBACK + evict).
+ *  - `for await` body throws (consumer error) → `iterator.return()` → finally fires → `destroy()` (ROLLBACK + evict).
+ *
+ * The third case is what R-FX-7 exercises.
+ */
+async function* iterateAndCleanup<Row>(
+  rows: AsyncIterable<Row>,
+  release: () => Promise<void>,
+  destroy: (reason?: unknown) => Promise<void>,
+): AsyncGenerator<Row, void, unknown> {
+  let success = false;
+  try {
+    for await (const row of rows) {
+      yield row;
+    }
+    success = true;
+  } finally {
+    if (success) {
+      await release();
+    } else {
+      await destroy().catch(() => undefined);
+    }
+  }
+}
+
+/**
+ * `SqlConnection` wrapping a `PoolClient` already inside a transaction with
+ * `SET LOCAL` applied. `release()` issues `COMMIT` + returns the client to
+ * the pool; `destroy(reason)` issues `ROLLBACK` + releases with an error so
+ * the pool evicts the client (state may be indeterminate — e.g. a failed
+ * COMMIT/ROLLBACK leaves the protocol in a state we do not want to reuse).
+ *
+ * `execute()` runs the plan via the buffered path (`client.query(sql, params)`
+ * then yields rows). Cursor mode is intentionally not used — it requires
+ * `pg-cursor` (a transitive dep of `@prisma-next/driver-postgres`, not a
+ * direct dep of the example) and the ergonomic gain is small for the
+ * fixture-sized result sets in this PoC.
+ */
+class ScopedConnection implements SqlConnection {
+  readonly #client: PoolClient;
+  #released = false;
+
+  constructor(client: PoolClient) {
+    this.#client = client;
+  }
+
+  async *execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    const params = request.params as unknown[] | undefined;
+    const result = await this.#client.query(request.sql, params);
+    for (const row of result.rows as Row[]) {
+      yield row;
+    }
+  }
+
+  async query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<SqlQueryResult<Row>> {
+    const result = await this.#client.query(sql, params as unknown[] | undefined);
+    return result as unknown as SqlQueryResult<Row>;
+  }
+
+  async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
+    const text = `EXPLAIN (FORMAT JSON) ${request.sql}`;
+    const result = await this.#client.query(text, request.params as unknown[] | undefined);
+    return { rows: result.rows as ReadonlyArray<Record<string, unknown>> };
+  }
+
+  beginTransaction(): Promise<SqlTransaction> {
+    throw unsupportedScopedTxError();
+  }
+
+  async release(): Promise<void> {
+    if (this.#released) return;
+    this.#released = true;
+    try {
+      await this.#client.query('COMMIT');
+      this.#client.release();
+    } catch (commitError) {
+      // COMMIT failed — protocol state is ambiguous. Try a best-effort
+      // ROLLBACK to put the server back in a known state, then evict the
+      // client either way (truthy arg to release() = pool eviction).
+      await this.#client.query('ROLLBACK').catch(() => undefined);
+      this.#client.release(commitError instanceof Error ? commitError : new Error('COMMIT failed'));
+      throw commitError;
+    }
+  }
+
+  async destroy(reason?: unknown): Promise<void> {
+    if (this.#released) return;
+    this.#released = true;
+    await this.#client.query('ROLLBACK').catch(() => undefined);
+    const evictArg: Error =
+      reason instanceof Error ? reason : new Error('ScopedConnection destroyed');
+    this.#client.release(evictArg);
+  }
+}
+
+/**
+ * Custom `SqlDriver` that owns the per-plan transaction lifecycle. Each
+ * top-level `execute()` borrows a `PoolClient`, opens a transaction,
+ * applies the per-session GUCs, runs the plan, then either COMMITs (clean
+ * iteration) or ROLLBACKs and evicts (interrupted iteration / SQL error).
+ *
+ * The driver does **not** own the `pg.Pool`. `close()` is a no-op; the
+ * caller (the host process) is responsible for `pool.end()`. The factory
+ * builds one driver per `authenticate()` call so the per-session config
+ * (claims JSON + role identifier) is captured by the closure rather than
+ * threaded through the SPI.
+ */
+class ScopedDriver implements SqlDriver<void> {
+  readonly state: SqlDriverState = 'connected';
+  readonly #pool: Pool;
+  readonly #config: ScopedSessionConfig;
+
+  constructor(pool: Pool, config: ScopedSessionConfig) {
+    this.#pool = pool;
+    this.#config = config;
+  }
+
+  async connect(): Promise<void> {
+    // No-op: the driver is constructed already "connected" to the shared
+    // pool. Defined so the SqlDriver SPI is satisfied; the framework never
+    // calls it on a custom driver instance supplied via createRuntime().
+  }
+
+  async close(): Promise<void> {
+    // No-op: the factory does not own the pool. Calling pool.end() here
+    // would tear down the shared resource for every other in-flight
+    // session against this factory.
+  }
+
+  async acquireConnection(): Promise<SqlConnection> {
+    const client = await this.#pool.connect();
+    try {
+      await client.query('BEGIN');
+      // Parameterize the JWT claims via set_config(name, value, is_local).
+      // SET LOCAL request.jwt.claims = $1 is NOT a valid parameterized form
+      // in Postgres — the value must be a literal in SET syntax — so we use
+      // the function-call form, which accepts a bind parameter.
+      await client.query("SELECT set_config('request.jwt.claims', $1, true)", [
+        this.#config.jwtClaimsJson,
+      ]);
+      // SET ROLE cannot be parameterized either; the identifier is in the
+      // SQL text, validated against IDENT_PATTERN and quoted by the factory
+      // before reaching here.
+      await client.query(this.#config.setRoleSql);
+    } catch (setupError) {
+      await client.query('ROLLBACK').catch(() => undefined);
+      const evictArg: Error =
+        setupError instanceof Error ? setupError : new Error('ScopedDriver setup failed');
+      client.release(evictArg);
+      throw setupError;
+    }
+    return new ScopedConnection(client);
+  }
+
+  execute<Row = Record<string, unknown>>(request: SqlExecuteRequest): AsyncIterable<Row> {
+    const driver = this;
+    return {
+      async *[Symbol.asyncIterator]() {
+        const conn = await driver.acquireConnection();
+        const release = (): Promise<void> => conn.release();
+        const destroy = (reason?: unknown): Promise<void> => conn.destroy(reason);
+        yield* iterateAndCleanup<Row>(conn.execute<Row>(request), release, destroy);
+      },
+    };
+  }
+
+  /**
+   * Top-level `query()` is the runtime's back-channel for marker
+   * verification (`RuntimeCore.verifyPlanIfNeeded` calls
+   * `driver.query(readMarkerSql, [])` on first plan execution to compare
+   * the contract hash against the database's `__prisma_next_marker` row).
+   * That table is in the `prisma_contract` schema, which is **not**
+   * readable to the downgraded `authenticated` / `anon` roles — running
+   * the marker query inside the per-plan `BEGIN; SET LOCAL ROLE …`
+   * envelope would fail with `permission denied for schema
+   * prisma_contract` and surface as a runtime error to the caller.
+   *
+   * Marker verification is conceptually admin-y: it asks "is this
+   * database the right shape for this contract?", not "what data is this
+   * user allowed to see?". So we deliberately run `query()` **without**
+   * the role downgrade — a plain pool checkout, executed as the pool's
+   * underlying superuser. RLS scoping is preserved on the user-visible
+   * paths (`execute()` and `acquireConnection()`).
+   *
+   * User code does not have a path to `runtime.query()`; the public
+   * `Runtime` surface exposes only `execute()` and `connection()`. The
+   * back-channel split is invisible at the call site.
+   *
+   * (If/when the framework grows a "skip verify entirely" mode, this
+   * back-channel can collapse into a single per-plan envelope. Tracked
+   * as FL-NN.)
+   */
+  async query<Row = Record<string, unknown>>(
+    sql: string,
+    params?: readonly unknown[],
+  ): Promise<SqlQueryResult<Row>> {
+    const client = await this.#pool.connect();
+    try {
+      const result = await client.query(sql, params as unknown[] | undefined);
+      return result as unknown as SqlQueryResult<Row>;
+    } finally {
+      client.release();
+    }
+  }
+
+  async explain(request: SqlExecuteRequest): Promise<SqlExplainResult> {
+    const conn = await this.acquireConnection();
+    try {
+      const result = await (conn.explain as (req: SqlExecuteRequest) => Promise<SqlExplainResult>)(
+        request,
+      );
+      await conn.release();
+      return result;
+    } catch (error) {
+      await conn.destroy(error).catch(() => undefined);
+      throw error;
+    }
+  }
+}
+
+export function createSupabaseRuntime<TContract extends Contract<SqlStorage>>(
+  options: SupabaseRuntimeOptions<TContract>,
+): SupabaseRuntimeFactory {
+  if (options.scopeMode !== 'transaction') {
+    throw new Error(
+      `createSupabaseRuntime: scopeMode '${String(options.scopeMode)}' is not supported in M2. ` +
+        "Only 'transaction' is implemented; 'connection' mode is the M3 stretch.",
+    );
+  }
+  const allowedRoles = new Set(options.allowedRoles);
+
+  // Build a stack instance once and reuse it across sessions. Mirrors what
+  // `postgres()` does internally — the standard postgres driver descriptor is
+  // attached for completeness but its `create()` is never called; each session
+  // constructs its own ScopedDriver instance.
+  const stack = createSqlExecutionStack({
+    target: postgresTarget,
+    adapter: postgresAdapter,
+    driver: postgresDriver,
+    extensionPacks: [],
+  });
+  const stackInstance = instantiateExecutionStack(stack);
+
+  return {
+    authenticate({ jwtClaims, role }: AuthenticateOptions): SupabaseSession {
+      // R-FX-5: synchronous validation. Throw before constructing any driver
+      // / runtime so the spy-based test can prove the pool was never touched.
+      if (!allowedRoles.has(role)) {
+        throw new Error(
+          `createSupabaseRuntime: role '${role}' is not in allowedRoles ` +
+            `[${[...allowedRoles].map((r) => `'${r}'`).join(', ')}]. ` +
+            'Reject the request before issuing any SQL.',
+        );
+      }
+      // Defensive: even though the role is in the allowlist, validate it as
+      // a Postgres identifier before interpolating into `SET LOCAL ROLE`,
+      // which cannot be parameterized.
+      if (!IDENT_PATTERN.test(role)) {
+        throw new Error(
+          `createSupabaseRuntime: role '${role}' is not a valid Postgres identifier ` +
+            `(must match ${IDENT_PATTERN.source}). Refusing to interpolate into SET LOCAL ROLE.`,
+        );
+      }
+
+      const config: ScopedSessionConfig = {
+        jwtClaimsJson: JSON.stringify(jwtClaims),
+        // Quote the identifier defensively even though it has already passed
+        // IDENT_PATTERN — keeps the SQL self-evidently safe to a reader and
+        // matches the convention used by the migration factories.
+        setRoleSql: `SET LOCAL ROLE "${role.replace(/"/g, '""')}"`,
+      };
+
+      const driver = new ScopedDriver(options.pool, config);
+      const runtime: Runtime = createRuntime({
+        stackInstance,
+        context: options.context,
+        driver,
+        // Marker verification under a downgraded role can fail (the marker
+        // table may not be readable to `authenticated` / `anon`); skipping
+        // the strict requirement keeps the per-request runtime usable. The
+        // admin runtime still verifies on first use; that's sufficient to
+        // catch contract drift before the request runtime ever runs.
+        verify: { mode: 'onFirstUse', requireMarker: false },
+      });
+
+      const session: SupabaseSession = Object.assign(runtime, {
+        beginTransaction(): never {
+          throw unsupportedScopedTxError();
+        },
+        async end(): Promise<void> {
+          // Transaction-scope mode: every plan is its own self-contained
+          // transaction, so there is no long-lived per-session connection
+          // to release here. Connection-scope mode (M3) will release the
+          // borrowed client.
+        },
+      });
+
+      return session;
+    },
+  };
+}
