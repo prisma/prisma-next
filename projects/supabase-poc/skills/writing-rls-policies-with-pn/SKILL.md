@@ -57,10 +57,12 @@ enableRowLevelSecurity('public', 'todos'),
 createRlsPolicy({
   schema: 'public', table: 'todos', name: 'todos_select_own',
   command: 'SELECT', to: ['authenticated'],
-  using: '(user_id = auth.uid())',
+  condition: '(user_id = auth.uid())',
 }),
 // ... INSERT, UPDATE, DELETE policies follow
 ```
+
+The `condition` shorthand picks the right Postgres keyword for you: `USING` for `SELECT` and `DELETE`, `WITH CHECK` for `INSERT`, both for `UPDATE` and `ALL`. Use the explicit `using` + `withCheck` pair only for the rare `UPDATE` case where the read and write predicates differ (see § 3 for that escape hatch).
 
 **Default-deny is implicit.** An RLS-enabled table with no matching policy returns zero rows for the role in question. This is a feature: if you forget to add an `INSERT` policy, inserts fail loudly rather than silently writing rows nobody can read.
 
@@ -68,27 +70,40 @@ createRlsPolicy({
 
 ## 3. `USING` vs `WITH CHECK` on `UPDATE` (the most common bug)
 
-For `SELECT` and `DELETE`: only `using` matters (which rows are visible).
-For `INSERT`: only `withCheck` matters (which rows are valid to insert).
-For `UPDATE`: **both** matter, and they're different.
+Postgres' rule, expressed in terms of `createRlsPolicy`'s API:
 
-- `using` decides which rows the user is allowed to **see and target** for update.
-- `withCheck` decides what the row must look like **after** the change.
+- `SELECT` and `DELETE` accept only `USING` (which rows are visible).
+- `INSERT` accepts only `WITH CHECK` (which rows are valid to insert).
+- `UPDATE` accepts **both**:
+  - `USING` decides which rows the user is allowed to **see and target** for update.
+  - `WITH CHECK` decides what the row must look like **after** the change.
 
-Asymmetric example: a user can update their own todo, but cannot transfer ownership to someone else.
+**Default to `condition`.** When the same predicate gates both the read and the write — the common case for ownership-style policies — use the `condition` shorthand. The factory fans out to the right keyword(s) for the command:
 
 ```ts
 createRlsPolicy({
   schema: 'public', table: 'todos', name: 'todos_update_own',
   command: 'UPDATE', to: ['authenticated'],
-  using: '(user_id = auth.uid())',          // can target rows they own
-  withCheck: '(user_id = auth.uid())',      // result must still be theirs
+  condition: '(user_id = auth.uid())',  // becomes USING + WITH CHECK
 }),
 ```
 
-If you only set `using` and leave `withCheck` unset, Postgres **defaults `WITH CHECK` to `USING`** — but in this case you should still write both explicitly so the intent is unambiguous to the next reader. The pattern "only `using` set" is a code-review smell on `UPDATE` policies.
+That policy says: a user can target rows they own *and* the post-update row must still be theirs (no ownership transfer). The fan-out is mechanical: same predicate either side.
 
-Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) — both `using` and `withCheck` set explicitly, expressions identical because there's no ownership transfer permitted.
+**Reach for the explicit pair only when the predicates diverge.** The rare case is an `UPDATE` policy where the user can read more rows than they can write to (or vice versa). Then the `condition` shorthand is wrong — there are *two* predicates, and they need to be authored separately:
+
+```ts
+createRlsPolicy({
+  schema: 'public', table: 'todos', name: 'todos_update_within_org',
+  command: 'UPDATE', to: ['authenticated'],
+  using: '(org_id = current_setting(\'app.current_org\')::uuid)',         // any row in your org is visible
+  withCheck: '(user_id = auth.uid())',                                     // but you can only end up owning your own
+}),
+```
+
+Mixing `condition` with `using` or `withCheck` in the same call is a factory error (mutual exclusion). Either you have one predicate (use `condition`) or you have two (use the explicit pair). If you only set `using` and leave `withCheck` unset, Postgres **defaults `WITH CHECK` to `USING`** — but in that case use `condition`, which makes the intent legible at the call site.
+
+Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) uses `condition` because the same ownership check gates both reads and writes.
 
 > _TODO: populate during M4 — link to the example test that covers the asymmetric-policy case once it's written._
 
@@ -142,8 +157,7 @@ If you want anon to be able to read public rows, write a separate `SELECT` polic
 `auth.uid()` returns Postgres `uuid`. If the column it's compared against is **not** `uuid` — most commonly because the contract was authored with `field.uuid()`, which lowers to `character(36)` (FL-03) — the comparison needs an explicit cast. **Cast on the function side, once per query:**
 
 ```ts
-using: '(user_id = (auth.uid())::text)',
-withCheck: '(user_id = (auth.uid())::text)',
+condition: '(user_id = (auth.uid())::text)',
 ```
 
 Why this direction:
@@ -253,6 +267,29 @@ Apply with `pnpm --filter <example> migrate:up`. Use the **service-role** URL fo
 
 Working reference: [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) — three `createTable`s scaffolded by `migration plan`, three `enableRowLevelSecurity`s and eight `createRlsPolicy`s appended by hand. The docblock at the top documents the workflow narrative (which ops are CLI-derived, which are the hand-authored bolt-on) and the two intentional non-features (no `alterColumnType` to native `uuid`, no FK to `auth.users`), with cross-links to FL-01 / FL-02 / FL-03.
 
+### Changing an existing policy
+
+Use `alterRlsPolicy` for surgical updates — change the role list, the `USING` predicate, or the `WITH CHECK` predicate without dropping and recreating the policy:
+
+```ts
+import { alterRlsPolicy } from '../utils/rls-ops';
+
+export default class M extends Migration {
+  override get operations() {
+    return [
+      alterRlsPolicy({
+        schema: 'public', table: 'todos', name: 'todos_select_own',
+        condition: '(user_id = (auth.uid())::text OR org_id = current_setting(\'app.current_org\')::uuid)',
+      }),
+    ];
+  }
+}
+```
+
+Pass only the fields you want to change. The factory's precheck asserts the policy exists in `pg_policies`; if it doesn't, the migration aborts with `precheck failed` rather than silently creating it. Use `condition` when the same predicate gates both reads and writes (it fans out to both `USING` and `WITH CHECK` because `ALTER POLICY` doesn't carry a `command` slot — the original `CREATE POLICY` already chose); use the explicit `using` + `withCheck` pair to set them independently.
+
+`alterRlsPolicy` is an in-example factory in [`examples/supabase-todos/migrations/utils/rls-ops.ts`](../../../examples/supabase-todos/migrations/utils/rls-ops.ts) — Prisma Next has no built-in surface for `ALTER POLICY` (FL-11). The fallback if `alterRlsPolicy` isn't available is `dropRlsPolicy(...)` followed by `createRlsPolicy(...)` in the same migration.
+
 ---
 
 ## 11. Known framework gaps the skill has to live with
@@ -265,6 +302,8 @@ These are recorded in [`framework-limitations.md`](../../framework-limitations.m
 - **`field.uuid()` is `char(36)`, not pg `uuid`** (FL-03). The portable `field.uuid()` callback helper lowers to `sql/char@1` with `length: 36`. The contract therefore declares `character(36)`, and the apply-time verifier enforces that — `alterColumnType` to native `uuid` is rejected as `type_mismatch`. Two options: (a) keep `char(36)` end-to-end and bridge to `auth.uid()` (which is `uuid`) by casting on the function side in policy bodies (`(<col> = (auth.uid())::text)` — see § 6); or (b) use the structural DSL with a custom `ColumnTypeDescriptor` of `{ codecId: 'pg/uuid@1', nativeType: 'uuid' }` so the contract itself declares `uuid`. The PoC takes option (a) so the contract stays target-portable.
 - **No first-class scoped-session SPI.** Per-request RLS context is threaded via a userspace runtime factory (this PoC's `createSupabaseRuntime`). (Sketch 1.)
 - **No subscription lane.** Realtime change streams against RLS-protected tables go through `supabase-js` directly, not PN. (Sketch 2.)
+- **No DDL query builder + no public op-authoring surface** (FL-06 — `rawSql` collides with the runtime builder name; FL-07 — `PostgresPlanTargetDetails` opaque; FL-08 — `step` not exported; FL-09 — no DDL builder; FL-12 — `Op` / `IDENT_PATTERN` not exported). User-authored migration op factories like the in-example RLS family use string concatenation, re-declare framework-internal helpers, and alias `rawSql` on import. The fallback today is what the PoC does in [`examples/supabase-todos/migrations/utils/rls-ops.ts`](../../../examples/supabase-todos/migrations/utils/rls-ops.ts); none of these block correctness.
+- **No policy DSL, no built-in `ALTER POLICY`** (FL-10 — `condition` shorthand is in-example; FL-11 — `alterRlsPolicy` is in-example). The PoC's RLS factories add both as conveniences over raw `CREATE POLICY` / `ALTER POLICY` SQL. If the framework grows a policy DSL (Sketch 3), the same shape — `condition` shorthand, surgical `alter` — should be the default.
 
 ---
 

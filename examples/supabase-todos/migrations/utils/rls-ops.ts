@@ -38,6 +38,21 @@ function validateIdent(value: string, slot: string): void {
   }
 }
 
+/**
+ * Build the `target` envelope every migration op carries
+ * (`{ id: 'postgres', details: PostgresPlanTargetDetails }`).
+ *
+ * Why this is a helper rather than a tidy `targets.policy(...)` call:
+ * `PostgresPlanTargetDetails` is the framework's opaque tri-shape
+ * `{ schema, objectType, name, table? }`, in which `name` overloads as
+ * either the *table* name (for table-level ops like `ENABLE ROW LEVEL
+ * SECURITY`, `table = undefined`) or the *policy/index/constraint* name
+ * (for relation-bound ops, with `table` set to the parent table). The
+ * `objectType` discriminant lacks a `'policy'` value (FL-04), so RLS
+ * policy ops fall back to `'dependency'`. Both decisions are the
+ * framework's; the helper is the in-example bridge until FL-04 / FL-07
+ * land. See `framework-limitations.md` § Migration authoring.
+ */
 function buildTargetDetails(
   schema: string,
   name: string,
@@ -136,6 +151,13 @@ export function enableRowLevelSecurity(schema: string, table: string): Op {
  * - `using` and `withCheck` are interpolated **verbatim**, wrapped in
  *   double parens (`USING ((<expr>))`). Authors are responsible for the
  *   safety of expressions they pass in (R-FM-3).
+ * - `condition` is a shorthand: pass it instead of `using` / `withCheck`
+ *   when the same expression should serve as both. Mapping by command:
+ *     - `SELECT` / `DELETE` → `using` only (those commands reject `WITH CHECK`).
+ *     - `INSERT` → `withCheck` only (`USING` is rejected by Postgres).
+ *     - `UPDATE` / `ALL` (or omitted) → both `using` and `withCheck`.
+ *   Mixing `condition` with `using` or `withCheck` in the same call
+ *   throws synchronously — pick one shape.
  */
 export interface CreateRlsPolicySpec {
   readonly schema: string;
@@ -146,10 +168,47 @@ export interface CreateRlsPolicySpec {
   readonly to?: ReadonlyArray<string>;
   readonly using?: string;
   readonly withCheck?: string;
+  readonly condition?: string;
+}
+
+/**
+ * Resolve a `{ using?, withCheck?, condition? }` triple to the concrete
+ * `using` / `withCheck` clauses the policy should emit. Encapsulates the
+ * mutual-exclusion + command-aware fan-out so `createRlsPolicy` and
+ * `alterRlsPolicy` share one source of truth.
+ *
+ * `command === undefined` is treated as the `ALL` case (both clauses set).
+ * `alterRlsPolicy` passes `'ALL'` explicitly because Postgres' `ALTER POLICY`
+ * grammar has no `command` slot — once the policy exists, its command is
+ * frozen.
+ */
+function resolveClauses(
+  spec: { using?: string; withCheck?: string; condition?: string },
+  command: CreateRlsPolicySpec['command'],
+): { using?: string; withCheck?: string } {
+  const { using, withCheck, condition } = spec;
+  if (condition !== undefined) {
+    if (using !== undefined || withCheck !== undefined) {
+      throw new Error(
+        '`condition` is mutually exclusive with `using` / `withCheck`; pass one shape',
+      );
+    }
+    if (command === 'SELECT' || command === 'DELETE') {
+      return { using: condition };
+    }
+    if (command === 'INSERT') {
+      return { withCheck: condition };
+    }
+    return { using: condition, withCheck: condition };
+  }
+  const out: { using?: string; withCheck?: string } = {};
+  if (using !== undefined) out.using = using;
+  if (withCheck !== undefined) out.withCheck = withCheck;
+  return out;
 }
 
 export function createRlsPolicy(spec: CreateRlsPolicySpec): Op {
-  const { schema, table, name, command, permissive, to, using, withCheck } = spec;
+  const { schema, table, name, command, permissive, to } = spec;
 
   validateIdent(schema, 'schema');
   validateIdent(table, 'table');
@@ -159,6 +218,8 @@ export function createRlsPolicy(spec: CreateRlsPolicySpec): Op {
       validateIdent(role, 'role in to[]');
     }
   }
+
+  const { using, withCheck } = resolveClauses(spec, command);
 
   const parts: string[] = [
     'CREATE POLICY',
@@ -198,6 +259,101 @@ export function createRlsPolicy(spec: CreateRlsPolicySpec): Op {
     postcheck: [
       step(
         `verify policy "${name}" exists`,
+        `SELECT EXISTS (SELECT 1 FROM pg_policies WHERE ${where})`,
+      ),
+    ],
+  });
+}
+
+/**
+ * Spec for `alterRlsPolicy`. Mirrors Postgres' second `ALTER POLICY`
+ * form (the one that mutates the policy body, not the rename form):
+ *
+ *     ALTER POLICY <name> ON <schema>.<table>
+ *       [ TO <roles> ]
+ *       [ USING (<expr>) ]
+ *       [ WITH CHECK (<expr>) ]
+ *
+ * At least one of `to` / `using` / `withCheck` / `condition` must be
+ * given — Postgres rejects an `ALTER POLICY` that names no clauses.
+ *
+ * `condition` shorthand: same mutual-exclusion rule as `createRlsPolicy`.
+ * Because `ALTER POLICY` has no `command` slot, `condition` always sets
+ * **both** `USING` and `WITH CHECK` (Postgres validates per-policy that
+ * the clauses match the underlying command).
+ */
+export interface AlterRlsPolicySpec {
+  readonly schema: string;
+  readonly table: string;
+  readonly name: string;
+  readonly to?: ReadonlyArray<string>;
+  readonly using?: string;
+  readonly withCheck?: string;
+  readonly condition?: string;
+}
+
+export function alterRlsPolicy(spec: AlterRlsPolicySpec): Op {
+  const { schema, table, name, to } = spec;
+
+  validateIdent(schema, 'schema');
+  validateIdent(table, 'table');
+  validateIdent(name, 'policy name');
+  if (to) {
+    for (const role of to) {
+      validateIdent(role, 'role in to[]');
+    }
+  }
+
+  // `'ALL'` so `condition` lifts to both clauses; Postgres' grammar has
+  // no command slot for `ALTER POLICY`, the underlying policy keeps its
+  // command from `CREATE POLICY`.
+  const { using, withCheck } = resolveClauses(spec, 'ALL');
+
+  if ((to === undefined || to.length === 0) && using === undefined && withCheck === undefined) {
+    throw new Error(
+      `alterRlsPolicy on "${name}": at least one of \`to\`, \`using\`, \`withCheck\`, or \`condition\` must be given`,
+    );
+  }
+
+  const head = `ALTER POLICY ${quoteIdentifier(name)} ON ${quoteIdentifier(schema)}.${quoteIdentifier(table)}`;
+  const tail: string[] = [];
+  if (to && to.length > 0) {
+    tail.push(`TO ${to.map(quoteIdentifier).join(', ')}`);
+  }
+  if (using !== undefined) {
+    tail.push(`USING (${using})`);
+  }
+  if (withCheck !== undefined) {
+    tail.push(`WITH CHECK (${withCheck})`);
+  }
+  const alterSql = `${head} ${tail.join(' ')}`;
+  const where = policyPredicate(schema, table, name);
+
+  return rawSql({
+    id: `alterRlsPolicy.${schema}.${table}.${name}`,
+    label: `Alter policy "${name}" on "${table}"`,
+    summary: `Alters RLS policy "${name}" on "${schema}"."${table}"`,
+    // `'widening'` mirrors `dropNotNull` / `setDefault` (widening case)
+    // — modifying an existing security predicate is conceptually a
+    // policy-relaxation step, not a `'destructive'` data change. If a
+    // future caller needs the stricter classification, expose it as an
+    // option then; defaults match neighbouring `alter*` ops today.
+    operationClass: 'widening',
+    target: buildTargetDetails(schema, name, table),
+    precheck: [
+      step(
+        `ensure policy "${name}" exists before alter`,
+        `SELECT EXISTS (SELECT 1 FROM pg_policies WHERE ${where})`,
+      ),
+    ],
+    execute: [step(`alter policy "${name}"`, alterSql)],
+    // Postcheck only confirms the policy still exists; we don't try to
+    // re-verify the precise `qual` / `with_check` text because Postgres
+    // normalises predicates aggressively in `pg_policies` (parens,
+    // implicit casts, etc.) and the round-trip would be brittle.
+    postcheck: [
+      step(
+        `verify policy "${name}" still exists after alter`,
         `SELECT EXISTS (SELECT 1 FROM pg_policies WHERE ${where})`,
       ),
     ],

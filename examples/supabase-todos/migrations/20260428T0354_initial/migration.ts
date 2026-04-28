@@ -180,14 +180,17 @@ export default class M extends Migration {
       // SELECT and UPDATE for the row owner. No INSERT policy: profile
       // rows mirror `auth.users` rows and are inserted under
       // service-role at signup time (T1.7 / T1.8). `auth.uid()` returns
-      // `uuid`; `profiles.id` is `char(36)`, hence the cast.
+      // `uuid`; `profiles.id` is `char(36)`, hence the cast. `condition`
+      // shorthand: the same predicate gates both the read and the write
+      // (no ownership transfer permitted), so we don't need the verbose
+      // `using` + `withCheck` pair.
       createRlsPolicy({
         schema: SCHEMA,
         table: 'profiles',
         name: 'profiles_select_own',
         command: 'SELECT',
         to: ['authenticated'],
-        using: '(id = (auth.uid())::text)',
+        condition: '(id = (auth.uid())::text)',
       }),
       createRlsPolicy({
         schema: SCHEMA,
@@ -195,21 +198,20 @@ export default class M extends Migration {
         name: 'profiles_update_own',
         command: 'UPDATE',
         to: ['authenticated'],
-        using: '(id = (auth.uid())::text)',
-        withCheck: '(id = (auth.uid())::text)',
+        condition: '(id = (auth.uid())::text)',
       }),
 
       // --- public_messages policies ---
       // Public read: both `anon` and `authenticated` can SELECT
-      // (SKILL.md § 4). Write is gated to authenticated users with
-      // `withCheck` ensuring they can only post as themselves.
+      // (SKILL.md § 4). Write is gated to authenticated users with the
+      // `condition` predicate ensuring they can only post as themselves.
       createRlsPolicy({
         schema: SCHEMA,
         table: 'public_messages',
         name: 'public_messages_select_public',
         command: 'SELECT',
         to: ['anon', 'authenticated'],
-        using: 'true',
+        condition: 'true',
       }),
       createRlsPolicy({
         schema: SCHEMA,
@@ -217,22 +219,24 @@ export default class M extends Migration {
         name: 'public_messages_insert_own',
         command: 'INSERT',
         to: ['authenticated'],
-        withCheck: '(author_id = (auth.uid())::text)',
+        condition: '(author_id = (auth.uid())::text)',
       }),
 
       // --- todos policies ---
       // Each command gets its own factory call (SKILL.md § 2). UPDATE
-      // sets both `using` and `withCheck` so a user cannot reassign
-      // ownership in the same write that they're permitted to make
-      // (SKILL.md § 3). No `anon` policy: anon naturally gets zero rows
-      // via default-deny.
+      // uses `condition` so the same predicate gates both reads and
+      // writes — a user cannot reassign ownership in the same write
+      // they're permitted to make (SKILL.md § 3). For the rare case
+      // where the read and write predicates differ, fall back to the
+      // explicit `using` + `withCheck` pair. No `anon` policy: anon
+      // naturally gets zero rows via default-deny.
       createRlsPolicy({
         schema: SCHEMA,
         table: 'todos',
         name: 'todos_select_own',
         command: 'SELECT',
         to: ['authenticated'],
-        using: '(user_id = (auth.uid())::text)',
+        condition: '(user_id = (auth.uid())::text)',
       }),
       createRlsPolicy({
         schema: SCHEMA,
@@ -240,7 +244,7 @@ export default class M extends Migration {
         name: 'todos_insert_own',
         command: 'INSERT',
         to: ['authenticated'],
-        withCheck: '(user_id = (auth.uid())::text)',
+        condition: '(user_id = (auth.uid())::text)',
       }),
       createRlsPolicy({
         schema: SCHEMA,
@@ -248,8 +252,7 @@ export default class M extends Migration {
         name: 'todos_update_own',
         command: 'UPDATE',
         to: ['authenticated'],
-        using: '(user_id = (auth.uid())::text)',
-        withCheck: '(user_id = (auth.uid())::text)',
+        condition: '(user_id = (auth.uid())::text)',
       }),
       createRlsPolicy({
         schema: SCHEMA,
@@ -257,7 +260,7 @@ export default class M extends Migration {
         name: 'todos_delete_own',
         command: 'DELETE',
         to: ['authenticated'],
-        using: '(user_id = (auth.uid())::text)',
+        condition: '(user_id = (auth.uid())::text)',
       }),
     ];
   }

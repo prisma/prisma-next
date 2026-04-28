@@ -1,6 +1,7 @@
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
+  alterRlsPolicy,
   createRlsPolicy,
   dropRlsPolicy,
   enableRowLevelSecurity,
@@ -293,6 +294,252 @@ describe('createRlsPolicy', () => {
       expect(() => createRlsPolicy({ ...baseSpec, to: [bad] })).toThrow(/identifier/i);
     });
   });
+
+  describe('`condition` shorthand', () => {
+    it('SELECT: condition fans out to USING only (no WITH CHECK)', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_select_own',
+        command: 'SELECT',
+        to: ['authenticated'],
+        condition: '(user_id = auth.uid())',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain('USING ((user_id = auth.uid()))');
+      expect(sql).not.toMatch(/WITH CHECK/);
+    });
+
+    it('DELETE: condition fans out to USING only', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_delete_own',
+        command: 'DELETE',
+        to: ['authenticated'],
+        condition: '(user_id = auth.uid())',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain('USING ((user_id = auth.uid()))');
+      expect(sql).not.toMatch(/WITH CHECK/);
+    });
+
+    it('INSERT: condition fans out to WITH CHECK only', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_insert_own',
+        command: 'INSERT',
+        to: ['authenticated'],
+        condition: '(user_id = auth.uid())',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain('WITH CHECK ((user_id = auth.uid()))');
+      expect(sql).not.toMatch(/USING/);
+    });
+
+    it('UPDATE: condition fans out to both USING and WITH CHECK', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_update_own',
+        command: 'UPDATE',
+        to: ['authenticated'],
+        condition: '(user_id = auth.uid())',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain('USING ((user_id = auth.uid()))');
+      expect(sql).toContain('WITH CHECK ((user_id = auth.uid()))');
+    });
+
+    it('ALL (default command): condition fans out to both', () => {
+      const op = createRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'todos_anything',
+        to: ['authenticated'],
+        condition: 'true',
+      });
+      const sql = op.execute[0]?.sql ?? '';
+      expect(sql).toContain('USING (true)');
+      expect(sql).toContain('WITH CHECK (true)');
+    });
+
+    it('rejects condition + using together', () => {
+      expect(() =>
+        createRlsPolicy({
+          schema: 'public',
+          table: 'todos',
+          name: 'p',
+          command: 'SELECT',
+          to: ['authenticated'],
+          condition: 'true',
+          using: 'false',
+        }),
+      ).toThrow(/mutually exclusive/);
+    });
+
+    it('rejects condition + withCheck together', () => {
+      expect(() =>
+        createRlsPolicy({
+          schema: 'public',
+          table: 'todos',
+          name: 'p',
+          command: 'INSERT',
+          to: ['authenticated'],
+          condition: 'true',
+          withCheck: 'false',
+        }),
+      ).toThrow(/mutually exclusive/);
+    });
+  });
+});
+
+describe('alterRlsPolicy', () => {
+  it('emits ALTER POLICY with USING when only `using` is given', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_select_own',
+      using: '(user_id = auth.uid())',
+    });
+    expect(op.execute).toHaveLength(1);
+    expect(op.execute[0]?.sql).toBe(
+      'ALTER POLICY "todos_select_own" ON "public"."todos" USING ((user_id = auth.uid()))',
+    );
+  });
+
+  it('emits ALTER POLICY with WITH CHECK when only `withCheck` is given', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_insert_own',
+      withCheck: '(user_id = auth.uid())',
+    });
+    expect(op.execute[0]?.sql).toBe(
+      'ALTER POLICY "todos_insert_own" ON "public"."todos" WITH CHECK ((user_id = auth.uid()))',
+    );
+  });
+
+  it('emits TO + USING + WITH CHECK in order when all three are given', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_update_own',
+      to: ['authenticated', 'service_role'],
+      using: '(user_id = auth.uid())',
+      withCheck: '(user_id = auth.uid())',
+    });
+    expect(op.execute[0]?.sql).toBe(
+      'ALTER POLICY "todos_update_own" ON "public"."todos" ' +
+        'TO "authenticated", "service_role" ' +
+        'USING ((user_id = auth.uid())) ' +
+        'WITH CHECK ((user_id = auth.uid()))',
+    );
+  });
+
+  it('condition shorthand fans out to BOTH USING and WITH CHECK (no command slot in ALTER)', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_update_own',
+      condition: '(user_id = auth.uid())',
+    });
+    const sql = op.execute[0]?.sql ?? '';
+    expect(sql).toContain('USING ((user_id = auth.uid()))');
+    expect(sql).toContain('WITH CHECK ((user_id = auth.uid()))');
+  });
+
+  it('rejects calls with no clauses (Postgres rejects empty ALTER POLICY)', () => {
+    expect(() => alterRlsPolicy({ schema: 'public', table: 'todos', name: 'p' })).toThrow(
+      /at least one of/,
+    );
+  });
+
+  it('rejects condition + using together', () => {
+    expect(() =>
+      alterRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'p',
+        condition: 'true',
+        using: 'false',
+      }),
+    ).toThrow(/mutually exclusive/);
+  });
+
+  it('precheck asserts the policy exists in pg_policies', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_select_own',
+      using: 'true',
+    });
+    const sql = op.precheck[0]?.sql ?? '';
+    expect(sql).toMatch(/pg_policies/);
+    expect(sql).toMatch(/'todos_select_own'/);
+    expect(sql).toMatch(/SELECT EXISTS/);
+  });
+
+  it('postcheck asserts the policy still exists after alter', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_select_own',
+      using: 'true',
+    });
+    const sql = op.postcheck[0]?.sql ?? '';
+    expect(sql).toMatch(/pg_policies/);
+    expect(sql).toMatch(/'todos_select_own'/);
+    expect(sql).toMatch(/SELECT EXISTS/);
+  });
+
+  it('Op envelope: id, label, target, operationClass = "widening"', () => {
+    const op = alterRlsPolicy({
+      schema: 'public',
+      table: 'todos',
+      name: 'todos_select_own',
+      using: 'true',
+    });
+    expect(op.operationClass).toBe('widening');
+    expect(typeof op.id).toBe('string');
+    expect(op.id.length).toBeGreaterThan(0);
+    expect(op.label).toContain('todos_select_own');
+    expect(op.target.id).toBe('postgres');
+    expect(op.target.details).toMatchObject({
+      schema: 'public',
+      objectType: 'dependency',
+      name: 'todos_select_own',
+      table: 'todos',
+    });
+  });
+
+  it.each(INVALID_IDENTS)('rejects invalid schema %p', (bad) => {
+    expect(() => alterRlsPolicy({ schema: bad, table: 'todos', name: 'p', using: 'true' })).toThrow(
+      /identifier/i,
+    );
+  });
+  it.each(INVALID_IDENTS)('rejects invalid table %p', (bad) => {
+    expect(() =>
+      alterRlsPolicy({ schema: 'public', table: bad, name: 'p', using: 'true' }),
+    ).toThrow(/identifier/i);
+  });
+  it.each(INVALID_IDENTS)('rejects invalid name %p', (bad) => {
+    expect(() =>
+      alterRlsPolicy({ schema: 'public', table: 'todos', name: bad, using: 'true' }),
+    ).toThrow(/identifier/i);
+  });
+  it.each(INVALID_IDENTS)('rejects invalid role in to[] %p', (bad) => {
+    expect(() =>
+      alterRlsPolicy({
+        schema: 'public',
+        table: 'todos',
+        name: 'p',
+        to: [bad],
+        using: 'true',
+      }),
+    ).toThrow(/identifier/i);
+  });
 });
 
 describe('dropRlsPolicy', () => {
@@ -521,10 +768,60 @@ describeIntegration('integration — applies a migration end-to-end', () => {
     await expect(applyOps(client, ops)).rejects.toThrow(/precheck failed/i);
   });
 
+  it('alterRlsPolicy round-trips a USING change against pg_policies', async () => {
+    // Create a fresh policy so this test is order-independent (the
+    // dropRlsPolicy test below removes the original).
+    const policyName = 'widgets_select_alterable';
+    await applyOps(client, [
+      createRlsPolicy({
+        schema,
+        table: 'widgets',
+        name: policyName,
+        command: 'SELECT',
+        to: ['authenticated'],
+        condition: '(owner = current_user)',
+      }),
+    ]);
+
+    const before = await client.query(
+      `SELECT qual FROM pg_policies WHERE schemaname = $1 AND tablename = 'widgets' AND policyname = $2`,
+      [schema, policyName],
+    );
+    expect(before.rows[0]?.qual).toMatch(/owner/);
+
+    await applyOps(client, [
+      alterRlsPolicy({
+        schema,
+        table: 'widgets',
+        name: policyName,
+        using: '(owner = session_user)',
+      }),
+    ]);
+
+    const after = await client.query(
+      `SELECT qual FROM pg_policies WHERE schemaname = $1 AND tablename = 'widgets' AND policyname = $2`,
+      [schema, policyName],
+    );
+    expect(after.rows[0]?.qual).toMatch(/session_user/i);
+    expect(after.rows[0]?.qual).not.toMatch(/current_user/i);
+  });
+
+  it('alterRlsPolicy precheck fails cleanly when the policy does not exist', async () => {
+    const ops = [
+      alterRlsPolicy({
+        schema,
+        table: 'widgets',
+        name: 'never_existed',
+        using: 'true',
+      }),
+    ];
+    await expect(applyOps(client, ops)).rejects.toThrow(/precheck failed/i);
+  });
+
   it('dropRlsPolicy removes the policy and postcheck confirms', async () => {
     await applyOps(client, [dropRlsPolicy(schema, 'widgets', 'widgets_select_own')]);
     const policies = await client.query(
-      `SELECT policyname FROM pg_policies WHERE schemaname = $1 AND tablename = 'widgets'`,
+      `SELECT policyname FROM pg_policies WHERE schemaname = $1 AND tablename = 'widgets' AND policyname = 'widgets_select_own'`,
       [schema],
     );
     expect(policies.rows).toHaveLength(0);
