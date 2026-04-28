@@ -168,19 +168,20 @@ export function defineAnnotation<Payload, Kinds extends OperationKind>(
  * site of the terminal.
  *
  * Lane terminals constrain their variadic `...annotations` parameter via
- * `ValidAnnotations<K, As>`:
+ * `As & ValidAnnotations<K, As>`. **The intersection is load-bearing** —
+ * see the note below.
  *
  * @example
  * ```typescript
  * class Collection<Row> {
  *   first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
  *     where: WhereInput,
- *     ...annotations: ValidAnnotations<'read', As>
+ *     ...annotations: As & ValidAnnotations<'read', As>
  *   ): Promise<Row | null>;
  *
  *   create<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
  *     input: CreateInput,
- *     ...annotations: ValidAnnotations<'write', As>
+ *     ...annotations: As & ValidAnnotations<'write', As>
  *   ): Promise<Row>;
  * }
  *
@@ -191,6 +192,17 @@ export function defineAnnotation<Payload, Kinds extends OperationKind>(
  * // ✗ cacheAnnotation declares 'read'; create() requires 'write'.
  * //   Element resolves to `never` → tuple unassignable → type error.
  * ```
+ *
+ * **Why `As & ValidAnnotations<K, As>` and not `ValidAnnotations<K, As>`
+ * alone.** TypeScript's variadic-tuple inference is too forgiving when
+ * the parameter type refers to `As` only through `ValidAnnotations`: it
+ * will pick an `As` that makes the call valid even when the gated tuple
+ * would contain `never` for an inapplicable element. The intersection
+ * pins `As` to the actual call-site tuple AND requires it to be
+ * assignable to the gated form. A `never` element in the gated tuple
+ * then collapses the corresponding intersection position to `never`,
+ * and the inapplicable argument fails to assign — surfacing the mismatch
+ * as a type error at the call site.
  *
  * The runtime helper `assertAnnotationsApplicable` covers the equivalent
  * check at runtime so casts and `any` cannot bypass this gate.
