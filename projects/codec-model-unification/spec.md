@@ -4,26 +4,41 @@
 
 Promote parameterization from a sprinkle of optional fields on the base `Codec` interface to a first-class shape called `ParameterizedCodec`, with a co-located type-level brand. Use that brand to fix the no-emit path's field-type resolution. Ship a unified `columnFor` authoring helper and a `jsonCodec(schema)` helper at the same time, since they fall out cleanly from the new shape and remove parallel boilerplate. Declare (but don't implement) a `init(params, instanceMeta)` contract that a runtime follow-up will consume.
 
-In one diagram:
+Before:
 
 ```text
-                         BEFORE                                      AFTER
-─────────────────────────────────────────────────       ─────────────────────────────────────────────────
-Codec<Id, Traits, Wire, Js>                             Codec<Id, Traits, Wire, Js>      ParameterizedCodec<…, Params, Brand>
-  paramsSchema?: Type<…>          ──── all optional       (no parameterization fields)     paramsSchema:    StandardSchemaV1<Params>
-  renderOutputType?(params): str  ──── always present                                      renderOutputType(params): string
-  init?(params): Helper           ──── for some codecs                                     Brand:           CodecBrand<Params>
-                                                                                            init?(params, instanceMeta): Helper
+Codec<Id, Traits, Wire, Js>
+  paramsSchema?:     Type<…>                       — optional, sometimes present
+  renderOutputType?(params): string                — optional, sometimes present
+  init?(params): Helper                            — optional, sometimes present
 
-Per-codec column factories                              One factory:
-  vector(N), char(N), numeric(p,s)  …                     columnFor(codec)[(params)]
+Per-codec column factories: vector(N), char(N), numeric(p, s), …
 
-JSON columns                                            JSON columns
-  output type = JsonValue                                 output type = StandardSchemaV1.InferOutput<schema>
+JSON columns: output type = JsonValue (no schema-driven inference)
 
-No-emit FieldOutputType<Definition>                     No-emit FieldOutputType<Definition>
-  reads CodecTypes[id]['output']                          reads codec.Brand, applies typeParams (or schema)
-  ignores typeParams  ← TML-2229 bug                      follows typeRef through storage.types
+No-emit FieldOutputType<Definition>
+  reads CodecTypes[id]['output']
+  ignores typeParams                               ← TML-2229 bug
+```
+
+After:
+
+```text
+Codec<Id, Traits, Wire, Js>                        — no parameterization fields
+
+ParameterizedCodec<…, Params, Brand> extends Codec
+  paramsSchema:      StandardSchemaV1<Params>      — required
+  renderOutputType(params): string                 — required
+  Brand:             CodecBrand<Params>            — required
+  init?(params, instanceMeta): Helper              — optional
+
+One column factory:           columnFor(codec)[(params)]
+
+JSON columns: output type = StandardSchemaV1.InferOutput<schema>
+
+No-emit FieldOutputType<Definition>
+  follows typeRef through storage.types
+  reads codec.Brand, applies typeParams (or schema)
 ```
 
 ## Why
