@@ -208,6 +208,7 @@ Each entry below is a footgun observed either in the wild or during this PoC. Re
 - **Granting `service_role` to a connection used by request handlers.** Bypasses RLS unconditionally. The runtime factory pattern exists specifically to prevent this; use it.
 - **Treating RLS as the only defense.** RLS is a row-visibility layer, not an authorization framework. Action-level concerns (who can invite, who can change billing) belong in the API.
 - **Policies over views.** Postgres treats views as security-definer-by-default unless created with `WITH (security_invoker = true)`. Surprising; check `pg_views` if a view-backed query returns more rows than expected.
+- **Trusting the executable bit on a freshly-scaffolded migration.** `prisma-next migration plan` writes `migration.ts` with `#!/usr/bin/env -S node` and mode `0755`, but `node` cannot load `.ts` directly — `./migrations/<ts>_<slug>/migration.ts` fails with `ERR_MODULE_NOT_FOUND`. Always invoke via `pnpm exec tsx <path>` or `pnpm --filter <example> migrate:up`. Tracked as [FL-05](../../framework-limitations.md#migration-authoring).
 
 > _TODO: as M2–M4 surface additional anti-patterns, append them here on the same commit that introduces the workaround. (R-FK-6.)_
 
