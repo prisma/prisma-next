@@ -178,7 +178,7 @@ export function findPathWithInvariants(
   }
   if (required.size > 30) {
     throw new Error(
-      `Cannot route with more than 30 required invariants in a single call (got ${required.size}). If you've hit this in practice, please file an issue — typical usage is well under that.`,
+      `Cannot route with more than 30 required invariants in a single call (got ${required.size}). Please file an issue if you need a higher cap.`,
     );
   }
   if (fromHash === toHash) {
