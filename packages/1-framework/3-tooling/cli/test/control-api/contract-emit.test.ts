@@ -300,7 +300,6 @@ describe('executeContractEmit', () => {
     const previousJson = JSON.stringify({ generation: 'previous' });
     const previousDts = "export type Generation = 'previous';\n";
     const firstEmit = Promise.withResolvers<EmitResult>();
-    const stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
 
     await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
     await writeFile(outputJsonPath, previousJson, 'utf-8');
@@ -332,7 +331,7 @@ describe('executeContractEmit', () => {
       });
       const firstResult = await first;
       expect(firstResult.publication).toBe('superseded');
-      expect(stderrSpy).not.toHaveBeenCalled();
+      expect(firstResult.validationWarning).toBeUndefined();
     });
 
     expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);

@@ -3,45 +3,23 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { errorRuntime } from '../../src/utils/cli-errors';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
-type CreateContractEmitCommand =
-  typeof import('../../src/commands/contract-emit')['createContractEmitCommand'];
-
-const mocks = vi.hoisted(() => {
-  const loadConfigMock = vi.fn();
-  const emitMock = vi.fn();
-  const closeMock = vi.fn();
-  const createControlClientMock = vi.fn(() => ({
-    emit: emitMock,
-    close: closeMock,
-  }));
-  const issueContractArtifactGenerationMock = vi.fn(() => 7);
-  const publishContractArtifactPairSerializedMock = vi.fn();
-
-  return {
-    loadConfigMock,
-    emitMock,
-    closeMock,
-    createControlClientMock,
-    issueContractArtifactGenerationMock,
-    publishContractArtifactPairSerializedMock,
-  };
-});
+const mocks = vi.hoisted(() => ({
+  loadConfigMock: vi.fn(),
+  executeContractEmitMock: vi.fn(),
+}));
 
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfigMock,
 }));
 
-vi.mock('../../src/control-api/client', () => ({
-  createControlClient: mocks.createControlClientMock,
+vi.mock('../../src/control-api/operations/contract-emit', () => ({
+  executeContractEmit: mocks.executeContractEmitMock,
 }));
 
-vi.mock('../../src/utils/publish-contract-artifact-pair-serialized', () => ({
-  issueContractArtifactGeneration: mocks.issueContractArtifactGenerationMock,
-  publishContractArtifactPairSerialized: mocks.publishContractArtifactPairSerializedMock,
-}));
+type CreateContractEmitCommand =
+  typeof import('../../src/commands/contract-emit')['createContractEmitCommand'];
 
 describe('contract emit command', () => {
   let consoleOutput: string[] = [];
@@ -59,12 +37,7 @@ describe('contract emit command', () => {
     cleanupMocks = commandMocks.cleanup;
 
     mocks.loadConfigMock.mockReset();
-    mocks.emitMock.mockReset();
-    mocks.closeMock.mockReset();
-    mocks.createControlClientMock.mockClear();
-    mocks.issueContractArtifactGenerationMock.mockClear();
-    mocks.publishContractArtifactPairSerializedMock.mockReset();
-    mocks.closeMock.mockResolvedValue(undefined);
+    mocks.executeContractEmitMock.mockReset();
   }, timeouts.typeScriptCompilation);
 
   afterEach(async () => {
@@ -76,43 +49,81 @@ describe('contract emit command', () => {
     vi.clearAllMocks();
   });
 
-  it('returns an error envelope when publication is superseded', async () => {
-    const outputPath = join(tmpDir, 'contract.json');
-
-    mocks.loadConfigMock.mockResolvedValue({
+  function configWithOutput(outputJsonPath: string) {
+    return {
       family: { familyId: 'sql' },
       target: { targetId: 'postgres' },
       adapter: {},
       extensionPacks: [],
       contract: {
         source: { load: vi.fn() },
-        output: outputPath,
+        output: outputJsonPath,
       },
-    });
-    mocks.emitMock.mockResolvedValue({
-      ok: true,
-      value: {
-        storageHash: 'storage-hash',
-        profileHash: 'profile-hash',
-        contractJson: '{"generation":"next"}',
-        contractDts: "export type Generation = 'next';\n",
+    };
+  }
+
+  function emitResult(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      storageHash: 'storage-hash',
+      profileHash: 'profile-hash',
+      publication: 'written' as const,
+      files: {
+        json: join(tmpDir, 'contract.json'),
+        dts: join(tmpDir, 'contract.d.ts'),
       },
-    });
-    mocks.publishContractArtifactPairSerializedMock.mockResolvedValue('superseded');
+      ...overrides,
+    };
+  }
+
+  it('delegates to executeContractEmit and exits successfully', async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult());
 
     const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--json'])).resolves.toBe(0);
 
-    await expect(executeCommand(command, ['--json'])).rejects.toBeDefined();
+    expect(mocks.executeContractEmitMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        configPath: 'prisma-next.config.ts',
+        onProgress: expect.any(Function),
+      }),
+    );
+  });
+
+  it("treats publication: 'superseded' as success rather than an error envelope", async () => {
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(emitResult({ publication: 'superseded' }));
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, ['--json'])).resolves.toBe(0);
 
     const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
     expect(jsonLine).toBeDefined();
-    const envelope = JSON.parse(jsonLine!) as { code: string; why: string };
-    expect(envelope.code).toBe(
-      errorRuntime('Contract artifacts were superseded before publication', {
-        why: 'A newer emit claimed the same output path before this command could publish its artifacts.',
-        fix: 'Avoid overlapping emits for the same output path, or cancel the older emit before starting a newer one.',
-      }).toEnvelope().code,
+    const parsed = JSON.parse(jsonLine!);
+    expect(parsed).toMatchObject({
+      storageHash: 'storage-hash',
+      profileHash: 'profile-hash',
+    });
+  });
+
+  it('surfaces validationWarning via the terminal UI', async () => {
+    cleanupMocks();
+    // ui.warn is a no-op when not interactive; promote to TTY so the warning surfaces.
+    const interactiveMocks = setupCommandMocks({ isTTY: true });
+    consoleOutput = interactiveMocks.consoleOutput;
+    cleanupMocks = interactiveMocks.cleanup;
+
+    const outputPath = join(tmpDir, 'contract.json');
+    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
+    mocks.executeContractEmitMock.mockResolvedValue(
+      emitResult({ validationWarning: 'sample dependency warning' }),
     );
-    expect(envelope.why).toContain('newer emit claimed the same output path');
+
+    const command = createContractEmitCommand();
+    await expect(executeCommand(command, [])).resolves.toBe(0);
+
+    expect(consoleOutput.some((line) => line.includes('sample dependency warning'))).toBe(true);
   });
 });

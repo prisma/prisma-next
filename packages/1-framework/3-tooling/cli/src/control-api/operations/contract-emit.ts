@@ -14,7 +14,14 @@ import {
 } from '../../utils/publish-contract-artifact-pair-serialized';
 import { validateContractDeps } from '../../utils/validate-contract-deps';
 import { enrichContract } from '../contract-enrichment';
-import type { ContractEmitOptions, ContractEmitResult } from '../types';
+import type {
+  ContractEmitOptions,
+  ContractEmitResult,
+  ControlActionName,
+  OnControlProgress,
+} from '../types';
+
+const EMIT_ACTION: ControlActionName = 'emit';
 
 interface ProviderFailureLike {
   readonly summary: string;
@@ -36,15 +43,25 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
   );
 }
 
+function startSpan(onProgress: OnControlProgress | undefined, spanId: string, label: string): void {
+  onProgress?.({ action: EMIT_ACTION, kind: 'spanStart', spanId, label });
+}
+
+function endSpan(
+  onProgress: OnControlProgress | undefined,
+  spanId: string,
+  outcome: 'ok' | 'error',
+): void {
+  onProgress?.({ action: EMIT_ACTION, kind: 'spanEnd', spanId, outcome });
+}
+
 /**
- * Executes the contract emit operation.
+ * Canonical contract emit operation.
  *
- * This is an offline operation that:
- * 1. Loads the Prisma Next config from the specified path
- * 2. Resolves the contract source from config
- * 3. Creates a control plane stack and family instance
- * 4. Emits contract artifacts (JSON and DTS)
- * 5. Publishes staged artifacts to the configured output paths
+ * This is the SINGLE publication path used by both the CLI command
+ * (`prisma-next contract emit`) and the Vite plugin
+ * (`@prisma-next/vite-plugin-contract-emit`). New callers must go through this
+ * function rather than re-implementing load → emit → publish.
  *
  * Publication is serialized per output JSON path. Each emit stages temp files,
  * renames `contract.d.ts` before `contract.json`, and attempts to restore the
@@ -53,26 +70,20 @@ function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
  * If a newer generation has already claimed the same output path by the time
  * this request reaches publication, the operation returns successfully with
  * `publication: 'superseded'` and leaves the on-disk artifacts unchanged.
+ * Callers must treat that outcome as a successful no-op (the bytes on disk are
+ * at least as fresh as this request's bytes), not as an error.
  *
- * Callers that can overlap emits for the same output should cancel older work
- * before starting newer work. The queue prevents stale overwrites, but a newer
- * failed emit can still supersede an older successful emit that arrives later.
- *
- * @param options - Options including configPath and optional signal
- * @returns File paths and hashes for the emitted bytes, plus whether they were published
- * @throws If config loading fails, contract is invalid, or file I/O fails
- * @throws signal.reason if cancelled via AbortSignal (typically DOMException with name 'AbortError')
+ * @throws {CliStructuredError} on config/source/validation problems
+ * @throws {DOMException} `AbortError` if cancelled via `signal`
  */
 export async function executeContractEmit(
   options: ContractEmitOptions,
 ): Promise<ContractEmitResult> {
-  const { configPath, signal = new AbortController().signal } = options;
+  const { configPath, signal = new AbortController().signal, onProgress } = options;
   const unlessAborted = abortable(signal);
 
-  // Load config using the existing config loader
   const config = await unlessAborted(loadConfig(configPath));
 
-  // Validate contract config is present
   if (!config.contract) {
     throw errorContractConfigMissing({
       why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ... }',
@@ -81,14 +92,12 @@ export async function executeContractEmit(
 
   const contractConfig = config.contract;
 
-  // Validate output path is present and ends with .json
   if (!contractConfig.output) {
     throw errorContractConfigMissing({
       why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
     });
   }
 
-  // Validate source exists and is callable
   if (typeof contractConfig.source?.load !== 'function') {
     throw errorContractConfigMissing({
       why: 'Contract config must include a valid source provider object',
@@ -117,10 +126,12 @@ export async function executeContractEmit(
     resolvedInputs: contractConfig.source.inputs ?? [],
   };
 
+  startSpan(onProgress, 'resolveSource', 'Resolving contract source...');
   let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
   try {
     providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
   } catch (error) {
+    endSpan(onProgress, 'resolveSource', 'error');
     if (signal.aborted || isAbortError(error)) {
       throw error;
     }
@@ -131,6 +142,7 @@ export async function executeContractEmit(
   }
 
   if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
+    endSpan(onProgress, 'resolveSource', 'error');
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed result shape.',
       fix: 'Ensure contract.source.load resolves to ok(Contract) or notOk({ summary, diagnostics }).',
@@ -138,6 +150,7 @@ export async function executeContractEmit(
   }
 
   if (providerResult.ok && !('value' in providerResult)) {
+    endSpan(onProgress, 'resolveSource', 'error');
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed success result: missing value.',
       fix: 'Ensure contract.source.load success payload is ok(Contract).',
@@ -145,6 +158,7 @@ export async function executeContractEmit(
   }
 
   if (!providerResult.ok && !isProviderFailureLike(providerResult.failure)) {
+    endSpan(onProgress, 'resolveSource', 'error');
     throw errorRuntime('Failed to resolve contract source', {
       why: 'Contract source provider returned malformed failure result: expected summary and diagnostics.',
       fix: 'Ensure contract.source.load failure payload is notOk({ summary, diagnostics, meta? }).',
@@ -152,6 +166,7 @@ export async function executeContractEmit(
   }
 
   if (!providerResult.ok) {
+    endSpan(onProgress, 'resolveSource', 'error');
     throw errorRuntime('Failed to resolve contract source', {
       why: providerResult.failure.summary,
       fix: 'Fix contract source diagnostics and return ok(Contract).',
@@ -161,23 +176,28 @@ export async function executeContractEmit(
       },
     });
   }
+  endSpan(onProgress, 'resolveSource', 'ok');
 
-  const familyInstance = config.family.create(stack);
-
-  const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
-  const frameworkComponents = assertFrameworkComponentsCompatible(
-    config.family.familyId,
-    config.target.targetId,
-    rawComponents,
-  );
-  const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
-
-  familyInstance.validateContract(enrichedIR);
-  const emitResult = await unlessAborted(
-    emit(enrichedIR, stack, config.family.emission, {
-      outputJsonPath,
-    }),
-  );
+  startSpan(onProgress, 'emit', 'Emitting contract...');
+  let emitResult: Awaited<ReturnType<typeof emit>>;
+  try {
+    const familyInstance = config.family.create(stack);
+    const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+    const frameworkComponents = assertFrameworkComponentsCompatible(
+      config.family.familyId,
+      config.target.targetId,
+      rawComponents,
+    );
+    const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
+    familyInstance.validateContract(enrichedIR);
+    emitResult = await unlessAborted(
+      emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),
+    );
+  } catch (error) {
+    endSpan(onProgress, 'emit', 'error');
+    throw error;
+  }
+  endSpan(onProgress, 'emit', 'ok');
 
   await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
   const publication = await publishContractArtifactPairSerialized({
@@ -189,12 +209,10 @@ export async function executeContractEmit(
     contractDts: emitResult.contractDts,
   });
 
-  if (publication === 'written') {
-    const depsValidation = validateContractDeps(emitResult.contractDts, dirname(outputDtsPath));
-    if (depsValidation.warning) {
-      process.stderr.write(`\n⚠ ${depsValidation.warning}\n`);
-    }
-  }
+  const validationWarning =
+    publication === 'written'
+      ? validateContractDeps(emitResult.contractDts, dirname(outputDtsPath)).warning
+      : undefined;
 
   return {
     storageHash: emitResult.storageHash,
@@ -205,5 +223,6 @@ export async function executeContractEmit(
       json: outputJsonPath,
       dts: outputDtsPath,
     },
+    ...ifDefined('validationWarning', validationWarning),
   };
 }

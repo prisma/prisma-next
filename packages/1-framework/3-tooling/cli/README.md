@@ -1092,23 +1092,57 @@ flowchart TD
     CMD_EMIT[Emit Command]
     CMD_DB[DB Commands]
     CMD_MIG[Migration Commands]
-    LOAD[TS Contract Loader]
+    EXEC_EMIT[executeContractEmit]
+    PUBLISH[publishContractArtifactPairSerialized]
     EMIT[Emitter]
     CTRL[Control Client]
     MIG_TOOLS["@prisma-next/migration-tools"]
     FS[File System]
+    VITE["@prisma-next/vite-plugin-contract-emit"]
 
     CLI --> CMD_EMIT
     CLI --> CMD_DB
     CLI --> CMD_MIG
-    CMD_EMIT --> LOAD
-    LOAD --> EMIT
+    CMD_EMIT --> EXEC_EMIT
+    VITE --> EXEC_EMIT
+    EXEC_EMIT --> EMIT
+    EXEC_EMIT --> PUBLISH
+    PUBLISH --> FS
     CMD_DB --> CTRL
     CMD_MIG --> CTRL
     CMD_MIG --> MIG_TOOLS
     MIG_TOOLS --> FS
     CTRL --> FS
 ```
+
+## Canonical Contract Emit Path
+
+> **For agents/contributors**: `executeContractEmit` is the SINGLE publication path
+> for `contract.json` + `contract.d.ts`. The CLI command (`prisma-next contract
+> emit`) and the Vite plugin (`@prisma-next/vite-plugin-contract-emit`) both
+> call into it. Do NOT re-implement the load → emit → publish dance in a new
+> caller; if you need additional behavior, extend `ContractEmitOptions` /
+> `ContractEmitResult` and update `executeContractEmit` itself.
+
+Why this matters:
+
+- Atomic publication (`.d.ts` renamed before `.json`, rollback on failure) lives in
+  `src/utils/publish-contract-artifact-pair.ts`. Bypassing `executeContractEmit`
+  bypasses atomicity — type-only consumers can observe a mismatched pair.
+- Per-output supersession (a slower older emit cannot overwrite a newer one) lives
+  in `src/utils/publish-contract-artifact-pair-serialized.ts`. Bypassing the
+  serialized helper races with concurrent emits.
+- Long-lived hosts (Vite dev server, watch CLIs) must call `disposeEmitOutputQueue`
+  on shutdown to drop the per-output queue state, otherwise the module-global
+  queue map leaks one entry per unique output path.
+
+`ContractEmitResult.publication === 'superseded'` is a successful no-op, NOT an
+error: the bytes already on disk are at least as fresh as the request's bytes.
+Callers must not map it to a non-zero exit code or a thrown error.
+
+The `validateContractDeps` warning is returned in `ContractEmitResult.validationWarning`
+rather than written to stderr by the operation — callers (CLI, Vite plugin) decide
+how to render it (`ui.warn`, plugin logger, etc.).
 
 ## Config Validation and Normalization
 

@@ -512,8 +512,12 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
 
 /**
  * Options for the standalone executeContractEmit function.
- * Used by tooling (e.g., Vite plugin) that needs to emit contracts
- * without the full ControlClient infrastructure.
+ *
+ * `executeContractEmit` is the canonical publication path for both the
+ * `prisma-next contract emit` CLI command and the `@prisma-next/vite-plugin-contract-emit`
+ * Vite plugin. Do not duplicate the load → emit → publish dance elsewhere; if a
+ * caller needs additional behavior, extend this options shape and update the
+ * single implementation rather than building a parallel publication path.
  *
  * Callers that may issue overlapping emits for the same output should pass a
  * signal and cancel the older request before starting the newer one. Publication
@@ -525,6 +529,8 @@ export interface ContractEmitOptions {
   readonly configPath: string;
   /** Optional AbortSignal for cancelling in-flight emits before publication */
   readonly signal?: AbortSignal;
+  /** Optional progress callback for observing source-resolution and emit spans */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
@@ -532,7 +538,9 @@ export interface ContractEmitOptions {
  *
  * The returned hashes always describe the emitted bytes for this request. When
  * `publication` is `'superseded'`, those bytes were not written to disk because
- * a newer generation claimed the output path before publication.
+ * a newer generation claimed the output path before publication. Callers should
+ * treat `'superseded'` as a successful no-op, not an error: the bytes already on
+ * disk are at least as fresh as this request's bytes.
  */
 export interface ContractEmitResult {
   /** Hash of the storage contract (schema-level) */
@@ -550,6 +558,12 @@ export interface ContractEmitResult {
     /** Path to the emitted contract.d.ts file */
     readonly dts: string;
   };
+  /**
+   * Warning surfaced by `validateContractDeps` after a successful publication.
+   * Callers (CLI, Vite plugin) decide how to render this; the operation does
+   * not write to stderr itself. Undefined when no warning was raised.
+   */
+  readonly validationWarning?: string;
 }
 
 // ============================================================================
