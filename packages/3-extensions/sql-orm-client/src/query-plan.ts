@@ -2,6 +2,7 @@ export {
   compileAggregate,
   compileGroupedAggregate,
 } from './query-plan-aggregate';
+export { mergeUserAnnotations } from './query-plan-meta';
 export {
   compileDeleteCount,
   compileDeleteReturning,
