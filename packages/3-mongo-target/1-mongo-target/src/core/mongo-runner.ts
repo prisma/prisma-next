@@ -413,13 +413,12 @@ export class MongoMigrationRunner {
   ): MigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;
     if (!origin) {
-      if (marker) {
-        return runnerFailure(
-          'MARKER_ORIGIN_MISMATCH',
-          'Database already has a contract marker but the plan has no origin. This would silently overwrite the existing marker.',
-          { meta: { markerStorageHash: marker.storageHash } },
-        );
-      }
+      // No origin assertion on the plan — the caller does not want origin
+      // validation. This is the case for `db update`, which introspects the
+      // live schema and does not rely on marker continuity. Mirrors the
+      // Postgres runner's `ensureMarkerCompatibility` behaviour; previously
+      // this branch errored when a marker existed, which broke `db update`
+      // against any already-signed Mongo database.
       return undefined;
     }
 
