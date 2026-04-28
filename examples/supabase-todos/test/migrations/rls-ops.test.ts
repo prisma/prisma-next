@@ -4,7 +4,7 @@ import {
   createRlsPolicy,
   dropRlsPolicy,
   enableRowLevelSecurity,
-} from '../../src/db/migrations/rls-ops';
+} from '../../migrations/utils/rls-ops';
 
 /**
  * Vitest spec for the RLS migration factories.

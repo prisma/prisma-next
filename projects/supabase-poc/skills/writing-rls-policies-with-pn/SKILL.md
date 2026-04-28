@@ -233,7 +233,7 @@ The scaffolded file already has the `Migration` class, `MigrationCLI.run(...)` f
 ```ts
 import { createTable, addForeignKey, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
 // In-example for now (PoC); will be upstreamed if Sketch 3 of framework-limitations.md is adopted.
-import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from '../../src/db/migrations/rls-ops';
+import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from '../utils/rls-ops';
 
 export default class M extends Migration {
   override get operations() {

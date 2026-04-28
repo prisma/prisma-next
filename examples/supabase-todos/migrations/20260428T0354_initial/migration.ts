@@ -24,7 +24,7 @@
  *     `framework-limitations.md`), so the planner cannot emit
  *     `enableRowLevelSecurity` / `createRlsPolicy` calls. We append
  *     them by hand, calling the in-example RLS factories from
- *     `src/db/migrations/rls-ops.ts`. This is the "edit" half of
+ *     `migrations/utils/rls-ops.ts`. This is the "edit" half of
  *     scaffold-and-edit.
  *  3. **Re-attest.** `pnpm exec tsx migrations/20260428T0354_initial/migration.ts`
  *     (or `pnpm migrate:up` which goes through `prisma-next migration apply`)
@@ -104,7 +104,7 @@
  * tables manually via `psql` and re-run.
  */
 import { createTable, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
-import { createRlsPolicy, enableRowLevelSecurity } from '../../src/db/migrations/rls-ops';
+import { createRlsPolicy, enableRowLevelSecurity } from '../utils/rls-ops';
 
 const SCHEMA = 'public';
 

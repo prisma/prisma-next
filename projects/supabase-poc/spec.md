@@ -107,7 +107,7 @@ The public-board page is included specifically so the role-switching path throug
 
 ## Migration operation factories for RLS (in the example)
 
-The PoC also introduces a small set of **migration operation factories** that let the example author RLS in TypeScript instead of as hand-written SQL files. They live in the example (`examples/supabase-todos/src/db/migrations/rls-ops.ts`), import the public migration surface from `@prisma-next/target-postgres/migration`, and produce ordinary `Op` values usable inside any `Migration.operations` array.
+The PoC also introduces a small set of **migration operation factories** that let the example author RLS in TypeScript instead of as hand-written SQL files. They live in the example (`examples/supabase-todos/migrations/utils/rls-ops.ts`), import the public migration surface from `@prisma-next/target-postgres/migration`, and produce ordinary `Op` values usable inside any `Migration.operations` array.
 
 **API:**
 
@@ -132,7 +132,7 @@ createRlsPolicy(spec: {
 
 ```ts
 import { addForeignKey, createTable, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
-import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from '../../src/db/migrations/rls-ops';
+import { createRlsPolicy, dropRlsPolicy, enableRowLevelSecurity } from '../utils/rls-ops';
 
 export default class M extends Migration {
   override get operations() {
@@ -236,7 +236,7 @@ These are documentation, not commitments. Each is sized to fit on half a page an
 
 ### Migration factories (R-FM)
 
-- **R-FM-1.** `enableRowLevelSecurity(schema, table)`, `createRlsPolicy(spec)`, and `dropRlsPolicy(schema, table, name)` are exported from `examples/supabase-todos/src/db/migrations/rls-ops.ts` and used inside the example's PN migration file(s).
+- **R-FM-1.** `enableRowLevelSecurity(schema, table)`, `createRlsPolicy(spec)`, and `dropRlsPolicy(schema, table, name)` are exported from `examples/supabase-todos/migrations/utils/rls-ops.ts` and used inside the example's PN migration file(s).
 - **R-FM-2.** Identifier slots (`schema`, `table`, `name`, role names in `to`) are validated against `^[A-Za-z_][A-Za-z0-9_]*$` and rendered via `quoteIdentifier`. Invalid identifiers throw synchronously with a clear error before any SQL is constructed.
 - **R-FM-3.** `using` and `withCheck` are interpolated verbatim into `CREATE POLICY` (consumers' responsibility to author trusted SQL — same contract as `ColumnSpec.defaultSql`). The factory does not attempt to parse or sanitize them.
 - **R-FM-4.** Each emitted `Op` is shaped consistently with neighboring factories: `precheck` ensures the policy / RLS-state does not already exist, `execute` runs the `CREATE POLICY` / `ALTER TABLE … ENABLE ROW LEVEL SECURITY` statement, `postcheck` queries `pg_policies` / `pg_class.relrowsecurity` to confirm. Re-running the migration on an already-applied database is diagnosable from the precheck output.

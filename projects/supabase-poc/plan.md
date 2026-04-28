@@ -83,7 +83,7 @@ This milestone exercises **two** parts of PN against a real Supabase database: t
   - **Unit**: each factory's `Op` carries the conventional fields (`id`, `label`, `summary`, `target`, `operationClass`); `dropRlsPolicy` is `'destructive'`; the others are `'additive'` (R-FM-4, R-FM-5).
   - **Integration** (against `supabase start`): apply a small migration that creates a table, enables RLS, and adds one policy via the factories using `MigrationCLI` programmatically; assert `pg_policies` reflects it; re-run the migration and assert the precheck failure is surfaced cleanly (R-FM-6).
 - [ ] **1.5 Implement the RLS migration factories.**
-  Under `examples/supabase-todos/src/db/migrations/rls-ops.ts`. Exports `enableRowLevelSecurity`, `createRlsPolicy`, `dropRlsPolicy` with the signatures in [`spec.md` § Migration operation factories for RLS](spec.md#migration-operation-factories-for-rls-in-the-example). Internals:
+  Under `examples/supabase-todos/migrations/utils/rls-ops.ts`. Exports `enableRowLevelSecurity`, `createRlsPolicy`, `dropRlsPolicy` with the signatures in [`spec.md` § Migration operation factories for RLS](spec.md#migration-operation-factories-for-rls-in-the-example). Internals:
   - Built on `rawSql({ id, label, summary, operationClass, target, precheck, execute, postcheck })` from `@prisma-next/target-postgres/migration`.
   - Identifier validation: small local helper `validateIdent(value, slot)` against `^[A-Za-z_][A-Za-z0-9_]*$`; throws synchronously on miss.
   - Identifier rendering: local `quoteIdentifier` (or pulled from a small in-example utility — do **not** reach into private adapter internals; if a public quote helper isn't exported, a 3-line in-example version is fine and is itself a `FL-NN`).
