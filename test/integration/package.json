@@ -59,6 +59,7 @@
   },
   "devDependencies": {
     "@prisma-next/framework-components": "workspace:*",
+    "@prisma-next/middleware-cache": "workspace:*",
     "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",

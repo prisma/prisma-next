@@ -3219,6 +3219,9 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../packages/1-framework/1-core/framework-components
+      '@prisma-next/middleware-cache':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/middleware-cache
       '@prisma-next/middleware-telemetry':
         specifier: workspace:*
         version: link:../../packages/3-extensions/middleware-telemetry
