@@ -1,5 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type {
+  AnnotationValue,
+  OperationKind,
+  ValidAnnotations,
+} from '@prisma-next/framework-components/runtime';
+import {
+  AsyncIterableResult,
+  assertAnnotationsApplicable,
+} from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   BinaryExpr,
@@ -618,8 +626,23 @@ export class Collection<
     return this.#clone({ offset: n });
   }
 
-  all(): AsyncIterableResult<Row> {
-    return this.#dispatch();
+  /**
+   * Read terminal: stream all rows matching the current state.
+   *
+   * Accepts an optional variadic of read-typed user annotations. The
+   * `As & ValidAnnotations<'read', As>` gate rejects write-only
+   * annotations at the call site; the runtime check fails closed for
+   * callers that bypass the type gate. Annotations are merged into
+   * `plan.meta.annotations` at compile time.
+   */
+  all<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): AsyncIterableResult<Row> {
+    return this.#withAnnotations(
+      annotations as readonly AnnotationValue<unknown, OperationKind>[],
+      'read',
+      'all',
+    ).#dispatch();
   }
 
   async first(): Promise<Row | null>;
@@ -627,18 +650,52 @@ export class Collection<
     filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
   ): Promise<Row | null>;
   async first(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
+  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): Promise<Row | null>;
+  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): Promise<Row | null>;
+  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+    filter: ShorthandWhereFilter<TContract, ModelName>,
+    ...annotations: As & ValidAnnotations<'read', As>
+  ): Promise<Row | null>;
+  /**
+   * Read terminal: return the first matching row, or `null`.
+   *
+   * Accepts an optional `filter` (function, shorthand, or annotation),
+   * followed by an optional variadic of read-typed user annotations.
+   * The first positional arg is interpreted as a filter only when it is
+   * a function or a non-`AnnotationValue` shorthand record; an
+   * `AnnotationValue` first arg is treated as the leading annotation.
+   */
   async first(
-    filter?:
+    filterOrFirstAnnotation?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
-      | ShorthandWhereFilter<TContract, ModelName>,
+      | ShorthandWhereFilter<TContract, ModelName>
+      | AnnotationValue<unknown, OperationKind>,
+    ...rest: readonly AnnotationValue<unknown, OperationKind>[]
   ): Promise<Row | null> {
+    let filter:
+      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
+      | ShorthandWhereFilter<TContract, ModelName>
+      | undefined;
+    let annotations: readonly AnnotationValue<unknown, OperationKind>[];
+    if (isAnnotationValue(filterOrFirstAnnotation)) {
+      filter = undefined;
+      annotations = [filterOrFirstAnnotation, ...rest];
+    } else {
+      filter = filterOrFirstAnnotation;
+      annotations = rest;
+    }
     const scoped =
       filter === undefined
         ? this
         : typeof filter === 'function'
           ? this.where(filter)
           : this.where(filter);
-    const limited = scoped.take(1);
+    const limited = scoped.take(1).#withAnnotations(annotations, 'read', 'first');
     const rows = await limited.#dispatch().toArray();
     return rows[0] ?? null;
   }
@@ -1293,4 +1350,41 @@ export class Collection<
       modelName: this.modelName,
     });
   }
+
+  /**
+   * Validates the annotation kinds against the terminal's operation
+   * kind and returns a clone whose `state.userAnnotations` carries the
+   * accumulated map. The runtime gate fails closed via
+   * `assertAnnotationsApplicable` when callers bypass the type gate
+   * through casts or `any`.
+   *
+   * Empty `annotations` returns the receiver unchanged.
+   */
+  #withAnnotations(
+    annotations: readonly AnnotationValue<unknown, OperationKind>[],
+    kind: OperationKind,
+    terminalName: string,
+  ): this {
+    if (annotations.length === 0) {
+      return this;
+    }
+    assertAnnotationsApplicable(annotations, kind, terminalName);
+    const next = new Map(this.state.userAnnotations);
+    for (const annotation of annotations) {
+      next.set(annotation.namespace, annotation);
+    }
+    return this.#clone({ userAnnotations: next }) as this;
+  }
+}
+
+/**
+ * Type guard identifying branded `AnnotationValue` objects. Used by
+ * terminals like `first()` whose leading argument may be either a
+ * filter or an annotation.
+ */
+function isAnnotationValue(value: unknown): value is AnnotationValue<unknown, OperationKind> {
+  if (value === null || typeof value !== 'object') {
+    return false;
+  }
+  return (value as { readonly __annotation?: unknown }).__annotation === true;
 }

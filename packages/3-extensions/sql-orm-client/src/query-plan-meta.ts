@@ -1,4 +1,5 @@
 import type { Contract, ParamDescriptor, PlanMeta } from '@prisma-next/contract/types';
+import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -78,6 +79,7 @@ export function buildOrmQueryPlan<Row>(
   ast: AnyQueryAst,
   params: readonly unknown[],
   paramDescriptors: readonly ParamDescriptor[] = [],
+  userAnnotations?: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
 ): SqlQueryPlan<Row> {
   const projectionTypes = resolveProjectionCodecs(contract, ast);
   const codecAnnotations = projectionTypes
@@ -85,9 +87,23 @@ export function buildOrmQueryPlan<Row>(
     : undefined;
   const limitAnnotation =
     ast.kind === 'select' && ast.limit !== undefined ? { limit: ast.limit } : undefined;
+  const userAnnotationEntries: Record<string, AnnotationValue<unknown, OperationKind>> = {};
+  if (userAnnotations !== undefined) {
+    for (const [namespace, value] of userAnnotations) {
+      userAnnotationEntries[namespace] = value;
+    }
+  }
+  const hasUserAnnotations = Object.keys(userAnnotationEntries).length > 0;
+  // Reserved framework namespaces (`codecs`, `limit`) win over user
+  // annotations if a user handle ever names one of them — see the
+  // reserved-namespace policy on `defineAnnotation`.
   const annotations =
-    codecAnnotations || limitAnnotation
-      ? Object.freeze({ ...codecAnnotations, ...limitAnnotation })
+    codecAnnotations || limitAnnotation || hasUserAnnotations
+      ? Object.freeze({
+          ...userAnnotationEntries,
+          ...codecAnnotations,
+          ...limitAnnotation,
+        })
       : undefined;
 
   return Object.freeze({
@@ -98,5 +114,48 @@ export function buildOrmQueryPlan<Row>(
       ...ifDefined('projectionTypes', projectionTypes),
       ...ifDefined('annotations', annotations),
     },
+  });
+}
+
+/**
+ * Merges user annotations into an existing `SqlQueryPlan`'s
+ * `meta.annotations` and returns a new frozen plan.
+ *
+ * Used by the ORM dispatch path to attach terminal-call annotations to
+ * plans produced by mutation compile functions (which don't take user
+ * annotations as parameters). Reads compile through `compileSelect`-
+ * family functions that pass `state.userAnnotations` directly to
+ * `buildOrmQueryPlan`; this helper is the alternate path for write
+ * terminals where user annotations arrive at the call site, not via
+ * state.
+ *
+ * Returns the input plan unchanged when `userAnnotations` is undefined
+ * or empty. Reserved framework namespaces (`codecs`, `limit`) on the
+ * input plan win over user annotations under the same key — see the
+ * reserved-namespace policy on `defineAnnotation`.
+ */
+export function mergeUserAnnotations<Row>(
+  plan: SqlQueryPlan<Row>,
+  userAnnotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined,
+): SqlQueryPlan<Row> {
+  if (userAnnotations === undefined || userAnnotations.size === 0) {
+    return plan;
+  }
+  const userEntries: Record<string, AnnotationValue<unknown, OperationKind>> = {};
+  for (const [namespace, value] of userAnnotations) {
+    userEntries[namespace] = value;
+  }
+  // User annotations go first so framework-reserved keys on the existing
+  // plan (codecs, limit) override any user-supplied collision.
+  const mergedAnnotations = Object.freeze({
+    ...userEntries,
+    ...(plan.meta.annotations ?? {}),
+  });
+  return Object.freeze({
+    ...plan,
+    meta: Object.freeze({
+      ...plan.meta,
+      annotations: mergedAnnotations,
+    }),
   });
 }

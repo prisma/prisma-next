@@ -438,7 +438,7 @@ export function compileSelect(
   );
 
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors, state.userAnnotations);
 }
 
 export function compileRelationSelect(
@@ -514,5 +514,5 @@ export function compileSelectWithIncludeStrategy(
   );
 
   const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  return buildOrmQueryPlan(contract, ast, params, paramDescriptors, state.userAnnotations);
 }
