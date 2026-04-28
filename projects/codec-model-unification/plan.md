@@ -118,8 +118,8 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 ### Tasks
 
-1. **Implement `json<S extends StandardSchemaV1>(schema: S)`** as a curried factory returning `(ctx) => Codec<'pg/json@1', ['equality'], string, InferOutput<S>>`. Body uses `schema['~standard'].validate` for runtime validation in `decode`. — [design](design/authoring-ergonomics.md#json-factory)
-2. **Implement the descriptor `pgJsonCodec: ParameterizedCodecDescriptor<{ schema: StandardSchemaV1 }>`.** `paramsSchema` validates that `schema` is a Standard Schema. `renderOutputType` calls into the schema's TS-source serialization if available, falling back to `'unknown'`.
+1. **Implement `json<S extends StandardSchemaV1>(schema: S)`** as a curried factory returning `(ctx) => Codec<'pg/json@1', ['equality'], string, InferOutput<S>>` in `@prisma-next/adapter-postgres` (the home of postgres column-type factories — earlier plan revisions said `@prisma-next/postgres-core`, which doesn't exist). Body uses `schema['~standard'].validate` for runtime validation in `decode`. — [design](design/authoring-ergonomics.md#json-factory)
+2. **Implement the descriptor `pgJsonCodec: ParameterizedCodecDescriptor<{ schema: StandardSchemaV1 }>`** in `@prisma-next/adapter-postgres`. `paramsSchema` validates that `schema` is a Standard Schema. `renderOutputType` calls into the schema's TS-source serialization if available, falling back to `'unknown'`.
 3. **Tests**:
    - Type test: `json(arktypeSchema)` infers as `(ctx) => Codec<…, InferOutput<typeof arktypeSchema>>`.
    - Runtime test: `decode` rejects payloads that don't match the schema.
