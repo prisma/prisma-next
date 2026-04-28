@@ -106,17 +106,31 @@ export interface RecreateTableArgs {
    * the table has been replaced. The planner pre-merges these.
    */
   readonly indexes: readonly SqliteIndexSpec[];
-  readonly issues: readonly SchemaIssue[];
+  /** Human-readable summary of the change, built by the planner from issues. */
+  readonly summary: string;
+  /**
+   * Per-issue postcheck steps appended after the structural postchecks. The
+   * planner pre-builds these via `buildRecreatePostchecks` so the call IR
+   * carries flat, serializable data only — no `SchemaIssue` references.
+   */
+  readonly postchecks: readonly { readonly description: string; readonly sql: string }[];
   readonly operationClass: MigrationOperationClass;
 }
 
 export function recreateTable(args: RecreateTableArgs): Op {
-  const { tableName, contractTable, schemaColumnNames, indexes, issues, operationClass } = args;
+  const {
+    tableName,
+    contractTable,
+    schemaColumnNames,
+    indexes,
+    summary,
+    postchecks,
+    operationClass,
+  } = args;
   const tempName = `_prisma_new_${tableName}`;
   const liveSet = new Set(schemaColumnNames);
   const sharedColumns = contractTable.columns.filter((c) => liveSet.has(c.name)).map((c) => c.name);
   const columnList = sharedColumns.map(quoteIdentifier).join(', ');
-  const issueDescriptions = issues.map((i) => i.message).join('; ');
 
   const indexStatements = indexes.map((idx) => ({
     description: `recreate index "${idx.name}" on "${tableName}"`,
@@ -140,7 +154,7 @@ export function recreateTable(args: RecreateTableArgs): Op {
   return {
     id: `recreateTable.${tableName}`,
     label: `Recreate table ${tableName}`,
-    summary: `Recreates table ${tableName} to apply schema changes: ${issueDescriptions}`,
+    summary,
     operationClass,
     target: { id: 'sqlite', details: buildTargetDetails('table', tableName) },
     precheck: [
@@ -175,18 +189,32 @@ export function recreateTable(args: RecreateTableArgs): Op {
         `verify temp table "${tempName}" is gone`,
         `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tempName)}'`,
       ),
-      ...buildIssuePostchecks(tableName, issues, contractTable.columns),
+      ...postchecks,
     ],
   };
+}
+
+/**
+ * Build a one-line summary of a recreate-table operation from the schema
+ * issues that triggered it. Lives next to `recreateTable` so the planner
+ * (which has the issues) can produce the same description the factory
+ * used to build inline. Keeping the formatting target-side keeps
+ * `RecreateTableCall` issue-free at the IR layer.
+ */
+export function buildRecreateSummary(tableName: string, issues: readonly SchemaIssue[]): string {
+  const messages = issues.map((i) => i.message).join('; ');
+  return `Recreates table ${tableName} to apply schema changes: ${messages}`;
 }
 
 /**
  * Per-issue postchecks verifying the recreated table's column shape. Reads
  * expectations from the flat `SqliteColumnSpec`s embedded in the spec —
  * `typeSql` is the upper-cased native type and `defaultSql` is the
- * pre-rendered DEFAULT clause.
+ * pre-rendered DEFAULT clause. Exported so the planner can pre-build the
+ * postcheck list at construction time and `RecreateTableCall` doesn't
+ * have to carry `SchemaIssue` objects through to render time.
  */
-function buildIssuePostchecks(
+export function buildRecreatePostchecks(
   tableName: string,
   issues: readonly SchemaIssue[],
   columns: readonly SqliteColumnSpec[],

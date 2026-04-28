@@ -16,10 +16,7 @@ import type {
   MigrationOperationClass,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import type {
-  OpFactoryCall as FrameworkOpFactoryCall,
-  SchemaIssue,
-} from '@prisma-next/framework-components/control';
+import type { OpFactoryCall as FrameworkOpFactoryCall } from '@prisma-next/framework-components/control';
 import { type ImportRequirement, jsonToTsSource, TsExpression } from '@prisma-next/ts-render';
 import { addColumn, dropColumn } from './operations/columns';
 import { createIndex, dropIndex } from './operations/indexes';
@@ -103,7 +100,8 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
   readonly contractTable: SqliteTableSpec;
   readonly schemaColumnNames: readonly string[];
   readonly indexes: readonly SqliteIndexSpec[];
-  readonly issues: readonly SchemaIssue[];
+  readonly summary: string;
+  readonly postchecks: readonly { readonly description: string; readonly sql: string }[];
   readonly label: string;
 
   constructor(args: {
@@ -111,7 +109,8 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     contractTable: SqliteTableSpec;
     schemaColumnNames: readonly string[];
     indexes: readonly SqliteIndexSpec[];
-    issues: readonly SchemaIssue[];
+    summary: string;
+    postchecks: readonly { readonly description: string; readonly sql: string }[];
     operationClass: MigrationOperationClass;
   }) {
     super();
@@ -119,7 +118,8 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
     this.contractTable = args.contractTable;
     this.schemaColumnNames = args.schemaColumnNames;
     this.indexes = args.indexes;
-    this.issues = args.issues;
+    this.summary = args.summary;
+    this.postchecks = args.postchecks;
     this.operationClass = args.operationClass;
     this.label = `Recreate table ${args.tableName}`;
     this.freeze();
@@ -131,7 +131,8 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
       contractTable: this.contractTable,
       schemaColumnNames: this.schemaColumnNames,
       indexes: this.indexes,
-      issues: this.issues,
+      summary: this.summary,
+      postchecks: this.postchecks,
       operationClass: this.operationClass,
     });
   }
@@ -142,7 +143,8 @@ export class RecreateTableCall extends SqliteOpFactoryCallNode {
       contractTable: this.contractTable,
       schemaColumnNames: this.schemaColumnNames,
       indexes: this.indexes,
-      issues: this.issues,
+      summary: this.summary,
+      postchecks: this.postchecks,
       operationClass: this.operationClass,
     };
     return `recreateTable(${jsonToTsSource(args)})`;

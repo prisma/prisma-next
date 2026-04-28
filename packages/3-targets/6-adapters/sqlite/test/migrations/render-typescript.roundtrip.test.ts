@@ -189,14 +189,11 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
           },
           schemaColumnNames: ['id', 'email'],
           indexes: [{ name: 'idx_user_email', columns: ['email'] }],
-          issues: [
+          summary: 'Recreates table user',
+          postchecks: [
             {
-              kind: 'nullability_mismatch',
-              table: 'user',
-              column: 'email',
-              expected: 'true',
-              actual: 'false',
-              message: 'm',
+              description: 'verify "email" nullability on "user"',
+              sql: "SELECT COUNT(*) > 0 FROM pragma_table_info('user') WHERE name = 'email' AND \"notnull\" = 0",
             },
           ],
           operationClass: 'widening',

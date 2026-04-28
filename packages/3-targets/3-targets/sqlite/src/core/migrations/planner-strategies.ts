@@ -27,6 +27,7 @@ import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { toTableSpec } from './issue-planner';
 import { DataTransformCall, RecreateTableCall, type SqliteOpFactoryCall } from './op-factory-call';
 import type { SqliteIndexSpec } from './operations/shared';
+import { buildRecreatePostchecks, buildRecreateSummary } from './operations/tables';
 
 export interface StrategyContext {
   readonly toContract: Contract<SqlStorage>;
@@ -148,7 +149,8 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
         contractTable: tableSpec,
         schemaColumnNames: Object.keys(schemaTable.columns),
         indexes,
-        issues: entry.issues,
+        summary: buildRecreateSummary(tableName, entry.issues),
+        postchecks: buildRecreatePostchecks(tableName, entry.issues, tableSpec.columns),
         operationClass,
       }),
     );

@@ -195,14 +195,11 @@ describe('RecreateTableCall', () => {
       contractTable: contractSpec,
       schemaColumnNames: ['id', 'email'],
       indexes: [{ name: 'idx_email', columns: ['email'] }],
-      issues: [
+      summary: 'Recreates table user to apply schema changes: type mismatch on email',
+      postchecks: [
         {
-          kind: 'type_mismatch',
-          table: 'user',
-          column: 'email',
-          expected: 'TEXT',
-          actual: 'INT',
-          message: 'm',
+          description: 'verify "email" type on "user"',
+          sql: "SELECT COUNT(*) > 0 FROM pragma_table_info('user') WHERE name = 'email'",
         },
       ],
       operationClass: 'destructive',
@@ -212,6 +209,7 @@ describe('RecreateTableCall', () => {
     const op = call.toOp();
     expect(op.id).toBe('recreateTable.user');
     expect(op.operationClass).toBe('destructive');
+    expect(op.summary).toBe('Recreates table user to apply schema changes: type mismatch on email');
 
     // Execute order: temp-create → copy → drop → rename → index
     const descriptions = op.execute.map((s) => s.description);
@@ -221,7 +219,7 @@ describe('RecreateTableCall', () => {
     expect(descriptions[3]).toContain('rename');
     expect(descriptions[4]).toContain('idx_email');
 
-    // Per-issue postcheck (type_mismatch)
+    // Pre-built postcheck flows through to the produced op.
     expect(op.postcheck.some((s) => s.description.includes('type'))).toBe(true);
   });
 
@@ -240,7 +238,8 @@ describe('RecreateTableCall', () => {
       contractTable: contractSpec,
       schemaColumnNames: ['id', 'old_col'],
       indexes: [],
-      issues: [],
+      summary: 'Recreates table user',
+      postchecks: [],
       operationClass: 'widening',
     });
 
