@@ -161,22 +161,6 @@ export async function loadMigrationPackages(migrationsDir: string): Promise<{
   return { bundles, graph };
 }
 
-export interface MigrationPackageSet {
-  readonly bundles: readonly MigrationPackage[];
-  readonly graph: MigrationGraph;
-}
-
-/**
- * Alias of `loadMigrationPackages` retained for naming-clarity in commands
- * that previously needed both attested and draft splits. With the
- * collapse of the draft state, both helpers do the same thing.
- */
-export async function loadAllMigrationPackages(
-  migrationsDir: string,
-): Promise<MigrationPackageSet> {
-  return loadMigrationPackages(migrationsDir);
-}
-
 /**
  * The subset of the emitted contract.json that the framework layer can
  * safely type. The emitter adds these fields on top of the family-specific
