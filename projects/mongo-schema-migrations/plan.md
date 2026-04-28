@@ -120,12 +120,21 @@ Extends every layer to cover the full breadth of MongoDB server-side configurati
 
 ### Milestone 3: Polymorphic index generation
 
-Auto-derives partial indexes for polymorphic (STI) collections. Depends on the contract carrying discriminator/variants metadata.
+Auto-derives `partialFilterExpression` for indexes declared on variant models in polymorphic Mongo collections (STI). The Mongo authoring layer (PSL interpreter and TS contract-builder) attaches the discriminator-scoped partial filter at the existing variant-merge point, using a small shared helper in `@prisma-next/mongo-contract`. No planner, runner, schema IR, framework SPI, or emit-pipeline change.
+
+**Spec:** [m3-polymorphic-indexes.spec.md](specs/m3-polymorphic-indexes.spec.md)
+**Plan:** [m3-plan.md](plans/m3-plan.md)
+
+Cross-family parity (Postgres/SQLite `WHERE`, MySQL warning) is deferred — each SQL target solves its own version when SQL polymorphism work tackles indexes.
 
 **Tasks:**
 
-- [ ] **3.1 Implement polymorphic partial index derivation.** When a collection holds multiple variants, variant-specific field indexes must use `partialFilterExpression` scoped to the discriminator value. The planner derives this automatically from the contract's `discriminator` + `variants` metadata. No user intervention. Unit tests with hand-crafted polymorphic contracts. Integration test: planner output → runner → verify partial indexes on `mongodb-memory-server`.
-- [ ] **3.2 End-to-end polymorphic proof.** Contract with a polymorphic collection (base + variants + discriminator) → planner generates partial indexes with correct `partialFilterExpression` → runner applies → partial indexes exist on MongoDB. Integration test with `mongodb-memory-server`.
+- [ ] **3.1 Helper: `applyPolymorphicScopeToMongoIndex`.** Pure helper in `@prisma-next/mongo-contract` that AND-merges a discriminator scope predicate into a `MongoStorageIndex.partialFilterExpression`, with idempotence and conflict detection. Validates the discriminator value is a JSON scalar. Unit tests cover the matrix of empty/compatible/matching/conflicting/non-scalar inputs.
+- [ ] **3.2 PSL interpreter call site.** At the variant-merge block in `mongo-contract-psl/src/interpreter.ts`, scope each variant's indexes via the helper before pushing into the base collection. Conflicts surface as `PSL_INVALID_INDEX` diagnostics with the index attribute's span. Strengthens existing `interpreter.polymorphism.test.ts` "merges variant indexes" tests to assert `partialFilterExpression`; adds tests for user-supplied filters (compatible, matching, conflicting) and confirms the field-resolution rule still rejects indexing inherited base fields on a variant.
+- [ ] **3.3 TS contract-builder call site.** Same rule applied in `mongo-contract-ts/src/contract-builder.ts` `buildCollections()`. Conflicts thrown as `Error`. Tests assert PSL/TS parity for equivalent inputs.
+- [ ] **3.4 Mongo demo: variant-specific index.** Add an index on a variant-specific field to `examples/mongo-demo/prisma/contract.prisma` (`Article` or `Tutorial`). Re-emit; sanity-check `contract.json` carries the expected `partialFilterExpression`.
+- [ ] **3.5 End-to-end integration test.** Polymorphic PSL contract with a variant-specific `@@unique` → emit → plan → apply against `mongodb-memory-server` → assert `db.collection.listIndexes()` contains the expected `partialFilterExpression`. Insert variant-specific documents and verify the partial unique constraint is enforced per variant.
+- [ ] **3.6 Round-trip introspection.** After applying an M3-produced migration, introspect live indexes and run `verifyMongoSchema` against the originating contract. Assert no diff.
 
 ### Milestone 4: Online CLI commands + live introspection
 
@@ -204,8 +213,15 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 | Emitter populates enriched collections | Unit | 2.17 | PSL → contract with indexes + validator |
 | End-to-end full vocabulary | Integration | 2.18 | All index types + validators + options on `mongodb-memory-server` |
 | End-to-end PSL authoring | Integration | 2.19 | PSL → contract → plan → apply → verify |
-| Polymorphic partial indexes auto-generated | Unit + Integration | 3.1 | Discriminator → partialFilterExpression; planner output applied on `mongodb-memory-server` |
-| End-to-end polymorphic proof | Integration | 3.2 | `mongodb-memory-server` |
+| `applyPolymorphicScopeToMongoIndex` semantics (merge/idempotence/conflict/scalar guard) | Unit | 3.1 | Helper in `@prisma-next/mongo-contract` |
+| Mongo PSL: variant index auto-scoped with `partialFilterExpression` | Unit | 3.2 | Strengthened polymorphism interpreter tests |
+| Mongo PSL: user-conflicting filter on variant index → diagnostic | Unit | 3.2 | `PSL_INVALID_INDEX` with attribute span |
+| Mongo PSL: base index unchanged | Unit | 3.2 | Regression — base-declared indexes stay unscoped |
+| Mongo TS DSL: variant index parity with PSL | Unit | 3.3 | Contract-builder call site |
+| Mongo demo emits expected `partialFilterExpression` | Smoke | 3.4 | `examples/mongo-demo` |
+| End-to-end polymorphic proof | Integration | 3.5 | `mongodb-memory-server`: emit → plan → apply → `listIndexes()` |
+| Partial unique constraint enforced per variant | Integration | 3.5 | `mongodb-memory-server`: insert duplicates across variants |
+| Introspection round-trip diff is empty | Integration | 3.6 | `verifyMongoSchema` reports no issues |
 | Live introspection produces `MongoSchemaIR` | Integration | 4.1 | `mongodb-memory-server` |
 | `db init` works with Mongo target | Integration | 4.2 | Additive-only bootstrap |
 | `db update` works with Mongo target | Integration | 4.3 | Interactive destructive confirmation |
@@ -217,7 +233,8 @@ Adds Mongo support to all CLI commands that interact with a live database. The o
 
 ## Open Items
 
-- **ORM consolidation dependency (M3):** Polymorphic index generation depends on the contract carrying discriminator/variants metadata. If that shape changes during ORM consolidation, M3 logic may need updating. Low risk: M3 is last and uses hand-crafted contracts for testing.
+- **ORM consolidation dependency (M3):** Polymorphic index generation depends on the contract carrying `discriminator`/`variants`/`base` metadata, which Phase 1.75b has already shipped. The Mongo PSL interpreter and TS contract-builder both populate it today. M3's helper relies on those invariants via `validateDiscriminators`/`validateVariantsAndBases`. Low risk; integration test in 3.5 catches any drift.
+- **SQL parity (deferred):** The same problem applies to SQL STI (Postgres/SQLite partial-index `WHERE` clauses; MySQL no-op + warning per ADR 173). Not in M3 scope — each SQL target tackles it inline when SQL polymorphism work reaches indexes.
 - **M4 sequencing:** M4 can start after M1 (the offline path must work first). Live introspection (4.1) is the prerequisite for most M4 tasks. M4 tasks for commands that only need the marker (`db verify --marker-only`, `migration status` offline) could theoretically start alongside M1 completion.
 - **`contract infer` for Mongo:** The `contract infer` command (infer PSL from live DB) is not in scope. It requires a Mongo-to-PSL reverse mapping which is a separate project.
 
