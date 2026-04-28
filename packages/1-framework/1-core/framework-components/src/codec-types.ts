@@ -1,7 +1,22 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
-export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
+export type CodecTrait =
+  | 'equality'
+  | 'order'
+  | 'boolean'
+  | 'numeric'
+  | 'textual'
+  /**
+   * The codec carries a per-instance `validate(value: unknown) => unknown`
+   * function on the resolved codec object (one that the framework's
+   * `JsonSchemaValidatorRegistry` consults at runtime). This trait is the
+   * gate that lets the runtime'"'"'s `extractValidator` cast resolve from
+   * structurally-typed (`unknown`) to a typed `JsonValidatorCodec` view.
+   *
+   * Codec-model-unification project, M4 cleanup F06.
+   */
+  | 'json-validator';
 
 /**
  * Base codec interface for all target families.

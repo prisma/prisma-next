@@ -55,6 +55,10 @@ function buildJsonRuntimeFactory(
     return (_ctx) => ({
       id: codecId,
       targetTypes: [nativeType],
+      // The `'json-validator'` trait is the M4-F06 gate that lets sql-runtime'"'"'s
+      // `extractValidator` resolve `validate` as a typed field rather than via
+      // an unknown cast.
+      traits: ['json-validator'] as const,
       decode: (wire: unknown) => wire,
       encodeJson: (value) => value as never,
       decodeJson: (json) => json as never,

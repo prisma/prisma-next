@@ -319,10 +319,34 @@ function validateColumnTypeParams(
   }
 }
 
+/**
+ * View of a codec that exposes a per-instance JSON-schema `validate` function.
+ * Codecs declare this contract by including the `'json-validator'` `CodecTrait`
+ * in their `traits` array; the trait is the gate that lets `extractValidator`
+ * resolve from structurally-typed `unknown` to this typed view.
+ */
+type JsonValidatorCodec = {
+  readonly traits?: ReadonlyArray<unknown>;
+  readonly validate: JsonSchemaValidateFn;
+};
+
+function hasJsonValidatorTrait(candidate: unknown): candidate is JsonValidatorCodec {
+  if (candidate === null || typeof candidate !== 'object') return false;
+  const traits = (candidate as { readonly traits?: unknown }).traits;
+  if (!Array.isArray(traits)) return false;
+  if (!traits.includes('json-validator')) return false;
+  const validate = (candidate as { readonly validate?: unknown }).validate;
+  return typeof validate === 'function';
+}
+
+/**
+ * M4 cleanup F06: gate the `validate` extraction on the `'json-validator'`
+ * `CodecTrait`. Codecs that participate in the JSON-schema validator registry
+ * must declare the trait; the runtime'"'"'s read of `validate` is then a typed
+ * field-access on `JsonValidatorCodec` rather than a generic `unknown` cast.
+ */
 function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined {
-  if (candidate === null || typeof candidate !== 'object') return undefined;
-  const validate = (candidate as { validate?: unknown }).validate;
-  return typeof validate === 'function' ? (validate as JsonSchemaValidateFn) : undefined;
+  return hasJsonValidatorTrait(candidate) ? candidate.validate : undefined;
 }
 
 /**

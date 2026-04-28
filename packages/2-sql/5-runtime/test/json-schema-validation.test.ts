@@ -25,6 +25,9 @@ function makeJsonValidatorFactory(
       ({
         id: codecId,
         targetTypes: [nativeType],
+        // M4 cleanup F06: declare the `'json-validator'` trait so sql-runtime
+        // recognises this codec as carrying a per-instance validator.
+        traits: ['json-validator'] as const,
         decode: (wire: unknown) => wire,
         encodeJson: (v) => v as never,
         decodeJson: (j) => j as never,
