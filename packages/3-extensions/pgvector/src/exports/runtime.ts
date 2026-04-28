@@ -1,3 +1,4 @@
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
@@ -21,10 +22,20 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
+// M1 stub: the curried higher-order codec factory replaces the legacy `init` hook
+// in M4 ([TML-2330]). For now the factory throws if invoked; nothing in the runtime
+// path calls it because production codecs are still authored via the pre-M1 shape.
+function pendingFactory(_params: { readonly length: number }): (ctx: Ctx) => Codec {
+  return (_ctx) => {
+    throw new Error('pgvector ParameterizedCodecDescriptor.factory: TML-2330 not yet implemented');
+  };
+}
+
 const parameterizedCodecDescriptors = [
   {
     codecId: VECTOR_CODEC_ID,
     paramsSchema: vectorParamsSchema,
+    factory: pendingFactory,
   },
 ] as const satisfies ReadonlyArray<
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>

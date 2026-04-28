@@ -1,4 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
@@ -59,20 +60,31 @@ function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
   return { validate: compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>) };
 }
 
+// M1 stub: the curried higher-order codec factory replaces the legacy `init` hook
+// in M4 ([TML-2330]). For now the factory throws if invoked; production JSON
+// codecs continue to flow through the transitional `init` field below until M4.
+function pendingJsonFactory(_params: JsonTypeParams): (ctx: Ctx) => Codec {
+  return (_ctx) => {
+    throw new Error(
+      'postgres JSON ParameterizedCodecDescriptor.factory: TML-2330 not yet implemented',
+    );
+  };
+}
+
 const parameterizedCodecDescriptors = [
   {
     codecId: PG_JSON_CODEC_ID,
     paramsSchema: jsonTypeParamsSchema,
+    factory: pendingJsonFactory,
     init: initJsonCodecHelper,
   },
   {
     codecId: PG_JSONB_CODEC_ID,
     paramsSchema: jsonTypeParamsSchema,
+    factory: pendingJsonFactory,
     init: initJsonCodecHelper,
   },
-] as const satisfies ReadonlyArray<
-  RuntimeParameterizedCodecDescriptor<JsonTypeParams, JsonCodecHelper>
->;
+] as const satisfies ReadonlyArray<RuntimeParameterizedCodecDescriptor<JsonTypeParams>>;
 
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
   {
