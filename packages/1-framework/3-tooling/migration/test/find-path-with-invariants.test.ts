@@ -460,7 +460,7 @@ describe('findPathWithInvariants — subset-mask cap', () => {
     };
     const required = new Set(Array.from({ length: 31 }, (_, i) => `inv-${i}`));
     expect(() => findPathWithInvariants(graph, 'A', 'B', required)).toThrow(
-      /exceeds the 30-bit subset-mask cap/,
+      /more than 30 required invariants/,
     );
   });
 });

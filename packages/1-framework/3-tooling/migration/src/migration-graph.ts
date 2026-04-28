@@ -156,20 +156,16 @@ export function findPath(
  * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup,
  * implemented as the generic `bfs` generator in graph-ops.ts with a
  * composite-state overload. The covered subset is encoded as a 30-bit
- * unsigned mask over a sorted enumeration of `required`; this is a
- * constant-factor speed-up over the spec's suggested sorted-`join('\0')`
- * string key for the typical k ≤ 16 case. The 30-bit cap is enforced at
- * entry — k beyond that is far outside the spec's "single-digit realistic"
- * expectation (N1/N2) and we'd rather fail loudly than silently misbehave
- * from JS's signed 32-bit bitwise ops.
+ * unsigned mask over a sorted enumeration of `required` — fast for the
+ * typical small-k case and capped at entry to fail loudly past 30 rather
+ * than silently misbehave from JS's signed 32-bit bitwise ops.
  *
- * Neighbour ordering when `required ≠ ∅` (D11): edges covering ≥1
- * still-needed invariant come first, with the existing
- * `labelPriority → createdAt → to → migrationHash` order as the secondary
- * key. Done inside the neighbours closure where the source state — and
- * therefore the still-needed mask — is in scope. The heuristic steers BFS
- * toward the satisfying path; correctness (shortest, deterministic) does
- * not depend on it.
+ * Neighbour ordering when `required ≠ ∅`: edges covering ≥1 still-needed
+ * invariant come first, with `labelPriority → createdAt → to →
+ * migrationHash` as the secondary key. Done inside the neighbours closure
+ * where the source state — and therefore the still-needed mask — is in
+ * scope. The heuristic steers BFS toward the satisfying path; correctness
+ * (shortest, deterministic) does not depend on it.
  */
 export function findPathWithInvariants(
   graph: MigrationGraph,
@@ -182,7 +178,7 @@ export function findPathWithInvariants(
   }
   if (required.size > 30) {
     throw new Error(
-      `findPathWithInvariants: required.size=${required.size} exceeds the 30-bit subset-mask cap. The spec expects single-digit k (N1/N2); please file an issue if you hit this in practice.`,
+      `Cannot route with more than 30 required invariants in a single call (got ${required.size}). If you've hit this in practice, please file an issue — typical usage is well under that.`,
     );
   }
   if (fromHash === toHash) {
