@@ -15,7 +15,6 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type { Codec, CodecMeta, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { type as arktype } from 'arktype';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -41,19 +40,6 @@ import {
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
 import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
-
-const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
-
-const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
-  'scale?': 'number.integer >= 0',
-});
-
-const precisionParamsSchema = arktype({
-  'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
 
 function renderLength(typeName: string, typeParams: Record<string, unknown>): string | undefined {
   const length = typeParams['length'];
@@ -99,34 +85,25 @@ function renderJsonOutputType(typeParams: Record<string, unknown>): string {
   );
 }
 
-function aliasCodec<
-  Id extends string,
-  TTraits extends readonly CodecTrait[],
-  TWire,
-  TJs,
-  TParams,
-  THelper,
->(
-  base: Codec<string, TTraits, TWire, TJs, TParams, THelper>,
+function aliasCodec<Id extends string, TTraits extends readonly CodecTrait[], TWire, TJs>(
+  base: Codec<string, TTraits, TWire, TJs>,
   options: {
     readonly typeId: Id;
     readonly targetTypes: readonly string[];
     readonly meta?: CodecMeta;
   },
-): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
+): Codec<Id, TTraits, TWire, TJs> {
   return {
     id: options.typeId,
     targetTypes: options.targetTypes,
     ...ifDefined('meta', options.meta),
-    ...ifDefined('paramsSchema', base.paramsSchema),
-    ...ifDefined('init', base.init),
     ...ifDefined('encode', base.encode),
     ...ifDefined('traits', base.traits),
     ...ifDefined('renderOutputType', base.renderOutputType),
     decode: base.decode,
     encodeJson: base.encodeJson,
     decodeJson: base.decodeJson,
-  } as Codec<Id, TTraits, TWire, TJs, TParams, THelper>;
+  } as Codec<Id, TTraits, TWire, TJs>;
 }
 
 const sqlCharCodec = sqlCodecDefinitions.char.codec;
@@ -241,7 +218,6 @@ const pgNumericCodec = codec<
     if (typeof wire === 'number') return String(wire);
     return wire;
   },
-  paramsSchema: numericParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];
     if (precision === undefined) return undefined;
@@ -365,7 +341,6 @@ const pgTimestampCodec = codec<
     }
     return date;
   },
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Timestamp', typeParams),
   meta: {
     db: {
@@ -407,7 +382,6 @@ const pgTimestamptzCodec = codec<
     }
     return date;
   },
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Timestamptz', typeParams),
   meta: {
     db: {
@@ -426,7 +400,6 @@ const pgTimeCodec = codec<typeof PG_TIME_CODEC_ID, readonly ['equality', 'order'
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Time', typeParams),
   meta: {
     db: {
@@ -450,7 +423,6 @@ const pgTimetzCodec = codec<
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Timetz', typeParams),
   meta: {
     db: {
@@ -486,7 +458,6 @@ const pgBitCodec = codec<typeof PG_BIT_CODEC_ID, readonly ['equality', 'order'],
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  paramsSchema: lengthParamsSchema,
   renderOutputType: (typeParams) => renderLength('Bit', typeParams),
   meta: {
     db: {
@@ -510,7 +481,6 @@ const pgVarbitCodec = codec<
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  paramsSchema: lengthParamsSchema,
   renderOutputType: (typeParams) => renderLength('VarBit', typeParams),
   meta: {
     db: {
@@ -556,7 +526,6 @@ const pgIntervalCodec = codec<
     if (typeof wire === 'string') return wire;
     return JSON.stringify(wire);
   },
-  paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Interval', typeParams),
   meta: {
     db: {

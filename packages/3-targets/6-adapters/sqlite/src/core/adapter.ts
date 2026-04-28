@@ -1,3 +1,4 @@
+import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';
 import {
   type Adapter,
   type AdapterProfile,
@@ -6,7 +7,6 @@ import {
   type AnyFromSource,
   type AnyQueryAst,
   type BinaryExpr,
-  type CodecParamsDescriptor,
   type ColumnRef,
   createCodecRegistry,
   type DeleteAst,
@@ -68,7 +68,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
     });
   }
 
-  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
+  parameterizedCodecs(): ReadonlyArray<ParameterizedCodecDescriptor> {
     return [];
   }
 

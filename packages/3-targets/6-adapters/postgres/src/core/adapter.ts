@@ -1,3 +1,4 @@
+import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';
 import {
   type Adapter,
   type AdapterProfile,
@@ -6,7 +7,6 @@ import {
   type AnyFromSource,
   type AnyQueryAst,
   type BinaryExpr,
-  type CodecParamsDescriptor,
   type ColumnRef,
   createCodecRegistry,
   type DeleteAst,
@@ -28,7 +28,6 @@ import {
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from './codec-ids';
 import { codecDefinitions } from './codecs';
 import { escapeLiteral, quoteIdentifier } from './sql-utils';
@@ -71,21 +70,12 @@ const defaultCapabilities = Object.freeze({
   },
 });
 
-type AdapterCodec = (typeof codecDefinitions)[keyof typeof codecDefinitions]['codec'];
-type ParameterizedCodec = AdapterCodec & {
-  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
-};
-
-const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(codecDefinitions)
-  .map((definition) => definition.codec)
-  .filter((codec): codec is ParameterizedCodec => codec.paramsSchema !== undefined)
-  .map((codec) =>
-    Object.freeze({
-      codecId: codec.id,
-      paramsSchema: codec.paramsSchema,
-      ...ifDefined('init', codec.init),
-    }),
-  );
+// Parameterized codec descriptors are now contributed by the runtime descriptor
+// (`packages/3-targets/6-adapters/postgres/src/exports/runtime.ts`) using the new
+// `ParameterizedCodecDescriptor` shape. Production codecs are migrated to the
+// curried-factory shape in M4 of the codec-model-unification project; until then
+// the adapter class exposes an empty list to keep the legacy SPI surface intact.
+const parameterizedCodecs: ReadonlyArray<ParameterizedCodecDescriptor> = [];
 
 class PostgresAdapterImpl
   implements Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement>
@@ -117,7 +107,7 @@ class PostgresAdapterImpl
     });
   }
 
-  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
+  parameterizedCodecs(): ReadonlyArray<ParameterizedCodecDescriptor> {
     return parameterizedCodecs;
   }
 

@@ -356,61 +356,10 @@ describe('adapter-postgres codecs', () => {
       expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
     });
 
-    const paramsSchemaPresenceCases: ReadonlyArray<{
-      scalar: keyof typeof codecDefinitions;
-      hasParamsSchema: boolean;
-    }> = [
-      { scalar: 'character', hasParamsSchema: true },
-      { scalar: 'character varying', hasParamsSchema: true },
-      { scalar: 'numeric', hasParamsSchema: true },
-      { scalar: 'sql-timestamp', hasParamsSchema: true },
-      { scalar: 'timestamp', hasParamsSchema: true },
-      { scalar: 'timestamptz', hasParamsSchema: true },
-      { scalar: 'time', hasParamsSchema: true },
-      { scalar: 'timetz', hasParamsSchema: true },
-      { scalar: 'bit', hasParamsSchema: true },
-      { scalar: 'bit varying', hasParamsSchema: true },
-      { scalar: 'interval', hasParamsSchema: true },
-      { scalar: 'sql-text', hasParamsSchema: false },
-      { scalar: 'text', hasParamsSchema: false },
-      { scalar: 'enum', hasParamsSchema: false },
-      { scalar: 'bool', hasParamsSchema: false },
-      { scalar: 'int4', hasParamsSchema: false },
-    ];
-
-    it.each(paramsSchemaPresenceCases)('tracks params schema presence for $scalar', ({
-      scalar,
-      hasParamsSchema,
-    }) => {
-      const codec = codecDefinitions[scalar].codec as {
-        paramsSchema?: unknown;
-      };
-      expect(codec.paramsSchema !== undefined).toBe(hasParamsSchema);
-    });
-
-    const initHookCases: ReadonlyArray<{
-      scalar: keyof typeof codecDefinitions;
-      hasInit: boolean;
-      expected: { kind: 'fixed' | 'variable'; maxLength: number } | undefined;
-    }> = [
-      { scalar: 'character', hasInit: true, expected: { kind: 'fixed', maxLength: 12 } },
-      { scalar: 'character varying', hasInit: true, expected: { kind: 'variable', maxLength: 64 } },
-      { scalar: 'numeric', hasInit: false, expected: undefined },
-    ];
-
-    it.each(initHookCases)('tracks init hook presence for $scalar', ({
-      scalar,
-      hasInit,
-      expected,
-    }) => {
-      const codec = codecDefinitions[scalar].codec as {
-        init?: (params: { length: number }) => unknown;
-      };
-      expect(codec.init !== undefined).toBe(hasInit);
-      if (expected) {
-        expect(codec.init?.({ length: expected.maxLength })).toEqual(expected);
-      }
-    });
+    // M1: paramsSchema and init have moved off the codec object onto
+    // ParameterizedCodecDescriptor (framework-components) / SqlStaticContributions
+    // (sql-runtime). Production codecs migrate to the curried-factory shape in M4
+    // ([TML-2330]); presence-on-codec assertions are removed accordingly.
   });
 
   describe('encodeJson / decodeJson', () => {
