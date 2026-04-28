@@ -25,17 +25,27 @@ function getEmitOutputQueue(outputJsonPath: string): EmitOutputQueueState {
  * Issues a monotonically increasing generation number for the given output path.
  *
  * Call this at the START of an emit request (before source resolution and the
- * `emit()` call), not at publish time. The generation reflects request order,
- * which — given that all in-tree contract source providers
+ * `emit()` call), not at publish time. The generation reflects request *issue*
+ * order, which — given that all in-tree contract source providers
  * (`prismaContract`, `typescriptContract`, `typescriptContractFromPath`)
  * capture their bytes synchronously inside `load()` — also reflects
- * byte-capture order. So a request issued later carries newer bytes, and the
- * supersession check correctly preserves the newer-bytes-on-disk invariant.
+ * byte-capture order. The supersession check (`generation < state.nextGeneration`)
+ * therefore drops an in-flight emit as soon as a later request has been *issued*
+ * for the same output path.
  *
  * Issuing at publish time instead would invert this: a slow emit that started
  * earlier (and therefore reads older source bytes) would receive a higher
  * generation than a fast emit started later, and the slower/older emit would
  * win the supersession check. That's a regression — do not move the call site.
+ *
+ * Stale-artifact case: supersession is by *issue* order, not *publish* outcome.
+ * If a later request fails during `load()` or `emit()` before reaching publish,
+ * the older completed emit it superseded does not roll back, and whatever pair
+ * was on disk before either request stays. Disk is not guaranteed to reflect the
+ * newest bytes ever captured — only that we never write bytes that have since
+ * been outpaced by a later request. This is the right shape for rapid-save hosts
+ * (the user's next save will issue another request); callers that need a stronger
+ * guarantee must cancel older requests before issuing a new generation.
  */
 export function issueContractArtifactGeneration(outputJsonPath: string): number {
   const state = getEmitOutputQueue(outputJsonPath);

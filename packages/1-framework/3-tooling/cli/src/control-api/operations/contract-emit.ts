@@ -143,11 +143,19 @@ function validateProviderResult(providerResult: unknown): ValidatedProviderResul
  * renames `contract.d.ts` before `contract.json`, and attempts to restore the
  * previous pair if publication fails after either path has been replaced.
  *
- * If a newer generation has already claimed the same output path by the time
+ * If a newer generation has been *issued* for the same output path by the time
  * this request reaches publication, the operation returns successfully with
  * `publication: 'superseded'` and leaves the on-disk artifacts unchanged.
- * Callers must treat that outcome as a successful no-op (the bytes on disk are
- * at least as fresh as this request's bytes), not as an error.
+ * Callers must treat that outcome as a successful no-op, not as an error.
+ *
+ * Note: supersession tracks request *issue* order, not publish outcomes. If the
+ * superseding request later fails during `load()` or `emit()`, the disk retains
+ * whatever pair was there before either request — so 'superseded' does *not*
+ * guarantee that fresher bytes have actually been written. This is intentional
+ * for rapid-save hosts (Vite watch mode): each save issues a new generation, and
+ * only the latest one's outcome should reach disk. Callers that need a strict
+ * "newest bytes always on disk" invariant must cancel older requests before
+ * issuing a new generation.
  *
  * @throws {CliStructuredError} on config/source/validation problems
  * @throws {DOMException} `AbortError` if cancelled via `signal`
