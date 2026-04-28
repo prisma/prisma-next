@@ -1,4 +1,4 @@
-import type { Codec } from './codec-types';
+import type { Codec, ParameterizedCodecDescriptor } from './codec-types';
 import type { AuthoringContributions } from './framework-authoring';
 import type { ControlMutationDefaults } from './mutation-default-types';
 import type { TypesImportSpec } from './types-import-spec';
@@ -47,6 +47,19 @@ export interface ComponentMetadata {
        * Used to build a CodecLookup for codec-dispatched type rendering during emission.
        */
       readonly codecInstances?: ReadonlyArray<Codec>;
+      /**
+       * Parameterized codec descriptors contributed by this component. Each
+       * descriptor pairs a codec id with a curried higher-order codec factory
+       * plus the framework-facing metadata (`paramsSchema`, `renderOutputType`).
+       *
+       * The control stack assembles a lookup keyed by `codecId` and threads it
+       * through the emit path so `renderOutputType` is read off the descriptor
+       * (the spec'"'"'s long-term home) rather than off the codec object.
+       *
+       * Codec-model-unification project, M4 cleanup F03.
+       */
+      // biome-ignore lint/suspicious/noExplicitAny: descriptors carry distinct param shapes per codec; the registry is heterogeneous.
+      readonly parameterizedCodecs?: ReadonlyArray<ParameterizedCodecDescriptor<any>>;
     };
     readonly operationTypes?: { readonly import: TypesImportSpec };
     readonly queryOperationTypes?: { readonly import: TypesImportSpec };

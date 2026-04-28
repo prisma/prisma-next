@@ -3,7 +3,10 @@ import type {
   ContractModel,
   ContractValueObject,
 } from '@prisma-next/contract/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  CodecLookup,
+  ParameterizedCodecDescriptorLookup,
+} from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import { isSafeTypeExpression } from './type-expression-safety';
 
@@ -228,32 +231,67 @@ function applyModifiers(base: string, field: ContractField): string {
 export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
       let outputResolved: string | undefined;
-      if (codecLookup && type.typeParams && Object.keys(type.typeParams).length > 0) {
-        // Family-specific codec extensions (SQL, Mongo) may attach a `renderOutputType`
-        // hook to a parameterized codec object as a temporary holding place. M4 of the
-        // codec-model-unification project moves this hook onto `ParameterizedCodecDescriptor`
-        // and the emitter switches to a descriptor lookup; until then we duck-type the
-        // optional field off the base `Codec` shape.
-        // Transitional during M1; removed in M4 once parameterized codecs ship via
-        // `ParameterizedCodecDescriptor.renderOutputType`
-        // ([TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
-        const codec = codecLookup.get(type.codecId) as
-          | {
-              readonly renderOutputType?: (
-                typeParams: Record<string, unknown>,
-              ) => string | undefined;
-            }
-          | undefined;
-        if (codec?.renderOutputType) {
-          const rendered = codec.renderOutputType(type.typeParams);
-          if (rendered && isSafeTypeExpression(rendered)) {
+      if (type.typeParams && Object.keys(type.typeParams).length > 0) {
+        // M4 cleanup F03: prefer the descriptor-lookup path. Each
+        // `ParameterizedCodecDescriptor` carries the framework-blessed
+        // `renderOutputType` for its codec id; this is the spec'"'"'s long-term
+        // home. The fallback to the codec object'"'"'s own `renderOutputType`
+        // field is preserved for legacy components that haven'"'"'t shipped a
+        // descriptor yet, and for pre-M4 contracts whose `typeParams` shape
+        // doesn'"'"'t match the descriptor'"'"'s `P` (e.g. JSON columns whose
+        // legacy serialized form is `{ schemaJson, type? }` rather than the
+        // M3 `{ schema }` shape). When the descriptor renders `'unknown'` —
+        // its documented "no precise TS source" sentinel — the legacy
+        // codec-object renderer is given a chance to produce something more
+        // precise. Tagged with TML-2330 for the eventual full cutover.
+        const descriptor = parameterizedCodecLookup?.get(type.codecId);
+        let descriptorRendered: string | undefined;
+        if (descriptor?.renderOutputType) {
+          const rendered = descriptor.renderOutputType(type.typeParams);
+          if (rendered && rendered !== 'unknown' && isSafeTypeExpression(rendered)) {
+            descriptorRendered = rendered;
             outputResolved = rendered;
+          }
+        }
+        if (outputResolved === undefined && codecLookup) {
+          // Pre-F03 fallback: family-specific codec extensions used to attach
+          // a `renderOutputType` hook to a parameterized codec object. M4
+          // cleanup F01 removes this from the SQL Codec / MongoCodec
+          // extensions in concert with descriptor migration; until every
+          // family ships descriptors, the duck-typed read keeps the emit
+          // path warm.
+          const codec = codecLookup.get(type.codecId) as
+            | {
+                readonly renderOutputType?: (
+                  typeParams: Record<string, unknown>,
+                ) => string | undefined;
+              }
+            | undefined;
+          if (codec?.renderOutputType) {
+            const rendered = codec.renderOutputType(type.typeParams);
+            if (rendered && isSafeTypeExpression(rendered)) {
+              outputResolved = rendered;
+            }
+          }
+        }
+        // If neither path resolved a precise rendering and the descriptor
+        // returned its `'unknown'` sentinel, surface that as the explicit
+        // emit-time output rather than falling through to the codec base —
+        // matches design § JSON factory'"'"'s "renderOutputType returns 'unknown'
+        // for schemas Standard Schema can'"'"'t render to a TS source string."
+        if (outputResolved === undefined && descriptorRendered === undefined) {
+          if (descriptor?.renderOutputType) {
+            const rendered = descriptor.renderOutputType(type.typeParams);
+            if (rendered && isSafeTypeExpression(rendered)) {
+              outputResolved = rendered;
+            }
           }
         }
       }
@@ -296,13 +334,15 @@ export function generateFieldResolvedType(
   field: ContractField,
   codecLookup?: CodecLookup,
   side: 'input' | 'output' = 'output',
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
-  return resolveFieldType(field, codecLookup)[side];
+  return resolveFieldType(field, codecLookup, parameterizedCodecLookup)[side];
 }
 
 export function generateBothFieldTypesMaps(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): ResolvedFieldType {
   if (!models || Object.keys(models).length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -315,7 +355,7 @@ export function generateBothFieldTypesMaps(
     const outputFieldEntries: string[] = [];
     const inputFieldEntries: string[] = [];
     for (const [fieldName, field] of Object.entries(model.fields)) {
-      const resolved = resolveFieldType(field, codecLookup);
+      const resolved = resolveFieldType(field, codecLookup, parameterizedCodecLookup);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);
       inputFieldEntries.push(`${key}: ${resolved.input}`);
@@ -342,15 +382,17 @@ export function generateBothFieldTypesMaps(
 export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup).output;
+  return generateBothFieldTypesMaps(models, codecLookup, parameterizedCodecLookup).output;
 }
 
 export function generateFieldInputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup).input;
+  return generateBothFieldTypesMaps(models, codecLookup, parameterizedCodecLookup).input;
 }
 
 export function generateValueObjectType(
@@ -359,8 +401,11 @@ export function generateValueObjectType(
   _valueObjects: Record<string, ContractValueObject>,
   side: 'input' | 'output' = 'output',
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
-  return resolveValueObjectType(_voName, vo, _valueObjects, codecLookup)[side];
+  return resolveValueObjectType(_voName, vo, _valueObjects, codecLookup, parameterizedCodecLookup)[
+    side
+  ];
 }
 
 export function resolveValueObjectType(
@@ -368,11 +413,12 @@ export function resolveValueObjectType(
   vo: ContractValueObject,
   _valueObjects: Record<string, ContractValueObject>,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): ResolvedFieldType {
   const outputEntries: string[] = [];
   const inputEntries: string[] = [];
   for (const [fieldName, field] of Object.entries(vo.fields)) {
-    const resolved = resolveFieldType(field, codecLookup);
+    const resolved = resolveFieldType(field, codecLookup, parameterizedCodecLookup);
     const key = `readonly ${serializeObjectKey(fieldName)}`;
     outputEntries.push(`${key}: ${resolved.output}`);
     inputEntries.push(`${key}: ${resolved.input}`);
@@ -428,6 +474,7 @@ export function generateValueObjectsDescriptorType(
 export function generateValueObjectTypeAliases(
   valueObjects: Record<string, ContractValueObject> | undefined,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
   if (!valueObjects || Object.keys(valueObjects).length === 0) {
     return '';
@@ -435,7 +482,13 @@ export function generateValueObjectTypeAliases(
 
   const aliases: string[] = [];
   for (const [voName, vo] of Object.entries(valueObjects)) {
-    const resolved = resolveValueObjectType(voName, vo, valueObjects, codecLookup);
+    const resolved = resolveValueObjectType(
+      voName,
+      vo,
+      valueObjects,
+      codecLookup,
+      parameterizedCodecLookup,
+    );
     aliases.push(`export type ${voName}Output = ${resolved.output};`);
     aliases.push(`export type ${voName}Input = ${resolved.input};`);
   }

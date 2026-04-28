@@ -1,4 +1,8 @@
-import type { CodecLookup } from './codec-types';
+import type {
+  CodecLookup,
+  ParameterizedCodecDescriptor,
+  ParameterizedCodecDescriptorLookup,
+} from './codec-types';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -41,6 +45,7 @@ export interface ControlStack<
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecLookup;
+  readonly parameterizedCodecLookup: ParameterizedCodecDescriptorLookup;
   readonly authoringContributions: AssembledAuthoringContributions;
   readonly scalarTypeDescriptors: ReadonlyMap<string, string>;
   readonly controlMutationDefaults: ControlMutationDefaults;
@@ -349,6 +354,41 @@ export function extractCodecLookup(
   return { get: (id) => byId.get(id) };
 }
 
+/**
+ * Assemble a `ParameterizedCodecDescriptorLookup` from every component'"'"'s
+ * `types.codecTypes.parameterizedCodecs` contributions. The emitter consults
+ * this lookup for `renderOutputType` (M4 cleanup F03 — the spec'"'"'s long-term
+ * home is `ParameterizedCodecDescriptor.renderOutputType`, not the codec
+ * object'"'"'s pre-M4 transitional `renderOutputType` field).
+ *
+ * Duplicate `codecId` registrations are an error; each codec id may have at
+ * most one descriptor across the whole stack.
+ */
+export function extractParameterizedCodecLookup(
+  descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
+): ParameterizedCodecDescriptorLookup {
+  // biome-ignore lint/suspicious/noExplicitAny: descriptors carry distinct param shapes per codec; the registry is heterogeneous.
+  const byId = new Map<string, ParameterizedCodecDescriptor<any>>();
+  const owners = new Map<string, string>();
+  for (const descriptor of descriptors) {
+    const parameterizedCodecs = descriptor.types?.codecTypes?.parameterizedCodecs;
+    if (!parameterizedCodecs) continue;
+    const descriptorId = descriptor.id ?? '<unknown>';
+    for (const pcDescriptor of parameterizedCodecs) {
+      assertUniqueCodecOwner({
+        codecId: pcDescriptor.codecId,
+        owners,
+        descriptorId,
+        entityLabel: 'parameterized codec descriptor',
+        entityOwnershipLabel: 'parameterized codec descriptor provider',
+      });
+      owners.set(pcDescriptor.codecId, descriptorId);
+      byId.set(pcDescriptor.codecId, pcDescriptor);
+    }
+  }
+  return { get: (codecId) => byId.get(codecId) };
+}
+
 export function validateScalarTypeCodecIds(
   scalarTypeDescriptors: ReadonlyMap<string, string>,
   codecLookup: CodecLookup,
@@ -372,6 +412,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
   const allDescriptors = [family, target, ...(adapter ? [adapter] : []), ...extensionPacks];
 
   const codecLookup = extractCodecLookup(allDescriptors);
+  const parameterizedCodecLookup = extractParameterizedCodecLookup(allDescriptors);
   const scalarTypeDescriptors = assembleScalarTypeDescriptors(allDescriptors);
 
   return {
@@ -386,6 +427,7 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     codecLookup,
+    parameterizedCodecLookup,
     authoringContributions: assembleAuthoringContributions(allDescriptors),
     scalarTypeDescriptors,
     controlMutationDefaults: assembleControlMutationDefaults(allDescriptors),

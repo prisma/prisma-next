@@ -4,5 +4,9 @@ export type {
   CodecTrait,
   Ctx,
   ParameterizedCodecDescriptor,
+  ParameterizedCodecDescriptorLookup,
 } from '../codec-types';
-export { emptyCodecLookup } from '../codec-types';
+export {
+  emptyCodecLookup,
+  emptyParameterizedCodecDescriptorLookup,
+} from '../codec-types';

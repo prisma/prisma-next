@@ -1,4 +1,7 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  CodecLookup,
+  ParameterizedCodecDescriptorLookup,
+} from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 
 /**
@@ -12,6 +15,7 @@ export interface EmitStackInput {
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
   readonly codecLookup?: CodecLookup;
+  readonly parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup;
 }
 
 export interface EmitOptions {

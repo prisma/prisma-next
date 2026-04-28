@@ -56,6 +56,7 @@ export async function emit(
     contractTypeHashes,
     generateOptions,
     stack.codecLookup,
+    stack.parameterizedCodecLookup,
   );
   const contractDts = await format(contractDtsRaw, {
     parser: 'typescript',

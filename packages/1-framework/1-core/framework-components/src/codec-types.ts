@@ -45,6 +45,22 @@ export const emptyCodecLookup: CodecLookup = {
 };
 
 /**
+ * Lookup of `ParameterizedCodecDescriptor` by `codecId`. Built by the control
+ * stack from `ComponentMetadata.types.codecTypes.parameterizedCodecs` and
+ * threaded into the emit path so the emitter consults `descriptor.renderOutputType`
+ * (the spec'"'"'s long-term home) rather than reading the optional field off the
+ * codec object via duck-typed cast.
+ */
+export interface ParameterizedCodecDescriptorLookup {
+  // biome-ignore lint/suspicious/noExplicitAny: descriptors carry distinct param shapes per codec; the registry is heterogeneous and the consumer narrows per codec.
+  get(codecId: string): ParameterizedCodecDescriptor<any> | undefined;
+}
+
+export const emptyParameterizedCodecDescriptorLookup: ParameterizedCodecDescriptorLookup = {
+  get: () => undefined,
+};
+
+/**
  * Column context supplied by the contract-authoring API when applying a higher-order
  * codec factory. Allows stateful codecs (e.g. CipherStash column-scoped encryption)
  * to derive per-instance state from the column it is bound to.

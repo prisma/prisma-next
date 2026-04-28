@@ -205,7 +205,13 @@ const jsonParamsSchema: StandardSchemaV1<{ readonly schema: StandardSchemaV1 }> 
  * > emit path, `renderOutputType` returns `'unknown'`; the no-emit path keeps
  * > the precise inference.
  */
-function renderSchemaOutputType(schema: StandardSchemaV1): string {
+function renderSchemaOutputType(schema: StandardSchemaV1 | undefined): string {
+  // The descriptor may run against a contract IR carrying the pre-M4 legacy
+  // typeParams shape (`{ schemaJson, type? }`) instead of the M3 `{ schema }`
+  // shape — that contract's `params.schema` is undefined here. Fall through
+  // to `'unknown'` for that path; the no-emit type resolver still produces
+  // `InferOutput<S>` from the column-author's call site at the type level.
+  if (schema === undefined || schema === null) return 'unknown';
   const expression = (schema as { readonly expression?: unknown }).expression;
   if (typeof expression !== 'string') return 'unknown';
   const trimmed = expression.trim();

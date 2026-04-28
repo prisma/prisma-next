@@ -1,5 +1,8 @@
 import type { Contract, ContractModel, ContractValueObject } from '@prisma-next/contract/types';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  CodecLookup,
+  ParameterizedCodecDescriptorLookup,
+} from '@prisma-next/framework-components/codec';
 import type {
   EmissionSpi,
   GenerateContractTypesOptions,
@@ -31,6 +34,7 @@ export function generateContractDts(
   },
   options?: GenerateContractTypesOptions,
   codecLookup?: CodecLookup,
+  parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): string {
   const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
   if (options?.queryOperationTypeImports) {
@@ -60,7 +64,11 @@ export function generateContractDts(
   const rootsType = generateRootsType(contract.roots);
 
   const valueObjects = contract.valueObjects as Record<string, ContractValueObject> | undefined;
-  const valueObjectTypeAliases = generateValueObjectTypeAliases(valueObjects, codecLookup);
+  const valueObjectTypeAliases = generateValueObjectTypeAliases(
+    valueObjects,
+    codecLookup,
+    parameterizedCodecLookup,
+  );
   const valueObjectsDescriptor = generateValueObjectsDescriptorType(valueObjects);
 
   const executionClause =
@@ -71,6 +79,7 @@ export function generateContractDts(
   const fieldTypesMaps = generateBothFieldTypesMaps(
     contract.models as Record<string, ContractModel> | undefined,
     codecLookup,
+    parameterizedCodecLookup,
   );
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');

@@ -4,6 +4,7 @@ import type {
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
+import { pgVectorCodec } from './codecs';
 
 const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
 
@@ -73,6 +74,10 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
       controlPlaneHooks: {
         [PGVECTOR_CODEC_ID]: vectorControlPlaneHooks,
       },
+      // M4 cleanup F03: register the parameterized codec descriptor with the
+      // control stack so the emitter can read `renderOutputType` off the
+      // descriptor (the spec'"'"'s long-term home).
+      parameterizedCodecs: [pgVectorCodec],
     },
   },
   queryOperations: () => pgvectorQueryOperations(),
