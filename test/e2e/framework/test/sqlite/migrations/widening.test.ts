@@ -1,4 +1,5 @@
-import { defineContract, model } from '@prisma-next/sql-contract-ts/contract-builder';
+import { datetimeColumn } from '@prisma-next/adapter-sqlite/column-types';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
 import { applyMigration, int, pack, text } from './harness';
 
@@ -58,6 +59,46 @@ describe('SQLite Migration E2E - Widening operations (recreate-table)', () => {
           (await driver.query<{ status: string }>('SELECT status FROM "Setting" WHERE id = ?', [1]))
             .rows[0]!.status,
         ).toBe('active');
+      },
+    );
+  });
+
+  // Round-trip regression for the canonical `now()` default. SQLite has
+  // several spellings for "wall-clock now" (`CURRENT_TIMESTAMP`,
+  // `datetime('now')`, the bare `now()` form): `parseSqliteDefault`
+  // canonicalizes the schema side, and `lowerDbgenerated` canonicalizes
+  // the contract side. As long as both sides converge on `now()`, the
+  // additive apply must verify clean and the column's stored default
+  // must be one of the SQLite-native spellings (the runner's
+  // post-execute `verifySqlSchema` already proves the canonical
+  // equivalence; this assertion just pins the storage form).
+  it('round-trips a `now()` default through apply + introspect without drift', async () => {
+    await applyMigration(
+      {
+        destination: defineContract({
+          ...pack,
+          models: {
+            User: model('User', {
+              fields: {
+                id: int.id(),
+                name: text,
+                createdAt: field.column(datetimeColumn).defaultSql('now()'),
+              },
+            }),
+          },
+        }),
+      },
+      async ({ schema, driver }) => {
+        const stored = schema.tables['User']!.columns['createdAt']!.default;
+        expect(stored).toBe("datetime('now')");
+        await driver.query('INSERT INTO "User" (id, name) VALUES (?, ?)', [1, 'Alice']);
+        const row = (
+          await driver.query<{ createdAt: string }>(
+            'SELECT createdAt FROM "User" WHERE id = ?',
+            [1],
+          )
+        ).rows[0];
+        expect(typeof row?.createdAt).toBe('string');
       },
     );
   });

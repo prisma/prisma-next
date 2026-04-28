@@ -246,6 +246,17 @@ function lowerNanoid(input: {
   });
 }
 
+/**
+ * SQLite spellings that all denote the same wall-clock-now value. Anything
+ * matching this set when passed through `dbgenerated("...")` is rewritten
+ * to the canonical `now()` form before entering the contract — symmetric
+ * with `parseSqliteDefault` on the introspection side, so the verifier
+ * compares canonical-vs-canonical and a contract using
+ * `dbgenerated("CURRENT_TIMESTAMP")` doesn't drift against the schema it
+ * just produced.
+ */
+const NOW_SYNONYMS = new Set(['current_timestamp', "datetime('now')", 'datetime("now")', 'now()']);
+
 function lowerDbgenerated(input: {
   readonly call: ParsedDefaultFunctionCall;
   readonly context: DefaultFunctionLoweringContext;
@@ -266,20 +277,22 @@ function lowerDbgenerated(input: {
       message: 'Default function "dbgenerated" argument must be a string literal.',
     });
   }
-  if (rawExpression.trim().length === 0) {
+  const trimmed = rawExpression.trim();
+  if (trimmed.length === 0) {
     return invalidArgumentDiagnostic({
       context: input.context,
       span: input.call.args[0]?.span ?? input.call.span,
       message: 'Default function "dbgenerated" argument cannot be empty.',
     });
   }
+  const expression = NOW_SYNONYMS.has(trimmed.toLowerCase()) ? 'now()' : trimmed;
   return {
     ok: true,
     value: {
       kind: 'storage',
       defaultValue: {
         kind: 'function',
-        expression: rawExpression,
+        expression,
       },
     },
   };

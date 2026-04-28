@@ -54,9 +54,13 @@ export function parseSqliteDefault(
     trimmed = stripped;
   }
 
+  // SQLite has several spellings for "current timestamp" — `CURRENT_TIMESTAMP`
+  // (keyword) and `datetime('now')` / `datetime("now")` (function call). The
+  // contract authoring side canonicalizes `dbgenerated("CURRENT_TIMESTAMP")`
+  // (and friends) to `now()` via `lowerDbgenerated`; mirror that here so a
+  // schema produced by either spelling round-trips to the same canonical
+  // form for verification.
   const lower = trimmed.toLowerCase();
-
-  // CURRENT_TIMESTAMP and datetime('now')/datetime("now") are the SQLite forms of now()
   if (lower === 'current_timestamp' || lower === "datetime('now')" || lower === 'datetime("now")') {
     return { kind: 'function', expression: 'now()' };
   }
