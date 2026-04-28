@@ -116,13 +116,24 @@ const server = serve({ fetch: app.fetch, hostname: '127.0.0.1', port }, (info) =
 
 async function shutdown(signal: NodeJS.Signals): Promise<void> {
   console.log(`[supabase-todos] received ${signal}, draining…`);
-  server.close();
+  // server.close() returns synchronously and accepts a callback that
+  // fires once all in-flight connections have ended. Awaiting it
+  // before pool.end() prevents an in-flight handler from hitting a
+  // pool.connect() rejection mid-request: the server first refuses
+  // *new* connections, lets existing ones drain, and only then do
+  // we tear the pool down. Non-zero exit on drain or pool failure
+  // so process supervisors (systemd / k8s / etc.) see the failed
+  // shutdown signal rather than confusing it with a clean exit.
   try {
+    await new Promise<void>((resolve, reject) => {
+      server.close((err) => (err ? reject(err) : resolve()));
+    });
     await pool.end();
+    process.exit(0);
   } catch (err) {
-    console.error('[supabase-todos] pool.end() failed', err);
+    console.error('[supabase-todos] graceful shutdown failed', err);
+    process.exit(1);
   }
-  process.exit(0);
 }
 
 process.on('SIGINT', (s) => void shutdown(s));

@@ -11,7 +11,7 @@
  * and `authenticated` roles.
  *
  * The page is a read-only list — no create / edit / delete. The PoC
- * doesn'\''t exercise INSERT-as-anon (R-FE-5 covers reads only); a
+ * doesn't exercise INSERT-as-anon (R-FE-5 covers reads only); a
  * future demo could layer write-as-authenticated on top.
  */
 import { useEffect, useState } from 'react';

@@ -1,6 +1,33 @@
 /**
  * Seed script for the supabase-todos PoC.
  *
+ * Two responsibilities (data + DDL)
+ * ---------------------------------
+ * The script does **two** things in one bootstrap pass:
+ *
+ *   1. **Fixture data** — creates the `alice@example.test` and
+ *      `bob@example.test` auth users and inserts the demo profiles,
+ *      todos, and public messages. Goes through `@supabase/supabase-js`
+ *      with the service-role key so RLS is bypassed naturally.
+ *   2. **Realtime publication membership** — calls
+ *      `ensureRealtimePublication()` which idempotently `ALTER`s
+ *      `supabase_realtime` to include `public.todos`. Without this
+ *      step the SPA's phase-4c `postgres_changes` channel returns no
+ *      events because the publication has no tables. The check is
+ *      gated on `pg_publication_tables` so a second run is a no-op.
+ *
+ * The DDL responsibility is a **documented framework gap**, not a
+ * design preference: PN's contract IR has no notion of logical-
+ * replication publication membership and the migration ops surface
+ * has no `addToPublication` factory, so there is no PN-shaped place
+ * to author it (cf.
+ * [framework-limitations.md § FL-20](../../../projects/supabase-poc/framework-limitations.md#fl-20)).
+ * The seed script is the closest thing the example has to a "demo
+ * wiring outside the contract" hook, so the publication membership
+ * lives here. If FL-20 lands upstream — e.g. as an
+ * `addToPublication` migration op — this step becomes a candidate
+ * for promotion into the PN migration.
+ *
  * Idempotency (NOT convergence)
  * -----------------------------
  * The seed is **idempotent** but **not convergent**. Each fixture has a
@@ -24,11 +51,12 @@
  * changes *are* convergent for that table only — kept that way so a
  * future fixture rename flows through naturally.)
  *
- * What it creates
- * ---------------
+ * What it creates / configures
+ * ----------------------------
  *   alice@example.test (password: password-alice)  — owns 3 todos
  *   bob@example.test   (password: password-bob)    — owns 2 todos
  *   1 public message per user.
+ *   `public.todos` ∈ `supabase_realtime` publication (FL-20).
  *
  * Why supabase-js, not the PN admin runtime
  * -----------------------------------------
@@ -42,6 +70,8 @@
  * -----------
  *   SUPABASE_URL                 (default http://127.0.0.1:54321)
  *   SUPABASE_SERVICE_ROLE_KEY    (required; from `supabase status`)
+ *   DATABASE_URL                 (required; direct Postgres URL —
+ *                                 used by ensureRealtimePublication())
  *
  * Reset workflow
  * --------------

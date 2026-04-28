@@ -68,3 +68,23 @@ export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKe
     detectSessionInUrl: false,
   },
 });
+
+// Dev-only: expose the client on `window.supabase` so the README's
+// two-tab demo step 3 (cross-user 404 via DevTools) can read the
+// active session's access token without scraping localStorage. The
+// localStorage shape (`sb-<project-ref>-auth-token`) is supabase-js
+// version-dependent, so a `window` handle is the more durable seam
+// for a documented manual test. Gated on `import.meta.env.DEV` so a
+// production build never assigns to `window.supabase` — Vite
+// statically replaces the boolean and tree-shakes the branch out.
+//
+// **This does NOT relax the bright-line rule.** A contributor who
+// types `window.supabase.from('todos').select(...)` in DevTools is
+// breaking the rule the same way a contributor who imports the
+// module directly would. The `window` handle is for inspection
+// during development, not for production-shaped data access. The
+// docblock above remains the load-bearing prose.
+if (import.meta.env.DEV) {
+  // biome-ignore lint/suspicious/noExplicitAny: dev-only window augmentation
+  (globalThis as any).supabase = supabase;
+}

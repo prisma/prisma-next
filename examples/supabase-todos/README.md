@@ -128,26 +128,53 @@ This procedure exercises the headline result: per-user isolation enforced by RLS
 
 1. **Tab A — alice.** Open <http://127.0.0.1:5173/>, sign in as `alice@example.test` / `password-alice`. The todos page renders her three seeded todos.
 2. **Tab B — bob.** Open the same URL in a separate browser profile (or an incognito window so the auth session does not collide), sign in as `bob@example.test` / `password-bob`. The todos page renders his two seeded todos. Bob does not see alice's todos — RLS is doing its job at the server.
-3. **Cross-user 404 (the security proof).** From Tab A's browser DevTools console (alice's session is active), try to read one of bob's todo ids directly. Pick one of bob's todo titles (e.g. `Read the spec`); use Studio (<http://127.0.0.1:54323>) or `psql` to grab its `id`. Then in DevTools:
+3. **Cross-user 404 (the security proof).** From Tab A's browser DevTools console (alice's session is active), try to read one of bob's todo IDs directly. The SPA exposes the `supabase` client on `window` in dev mode (see [`src/client/supabase.ts`](src/client/supabase.ts) — gated on `import.meta.env.DEV`, never present in a production build), and the demo uses it to read the active access token; the manual test does not need to scrape localStorage.
+
+   First, while signed in as **bob** in Tab B, get one of bob's todo IDs from his DevTools console:
 
    ```js
-   const { data: { session } } = await window.supabase?.auth.getSession?.() ?? { data: { session: null } };
-   await fetch(`/api/todos/${'<bob-todo-id>'}`, {
+   const { data: { session } } = await window.supabase.auth.getSession();
+   const todos = await fetch('/api/todos', {
      headers: { Authorization: `Bearer ${session.access_token}` },
-   }).then((r) => r.status);
+   }).then((r) => r.json());
+   console.log(todos);
+   // → [{ id: "…", user_id: "<bob-uid>", title: "Read the spec", … }, …]
+   // Copy any `id` from the output for use below.
    ```
 
-   Expect **`404`**. The server's `GET /api/todos/:id` runs `SELECT … WHERE id = $1` under alice's RLS-scoped session; the policy filters bob's row out before the WHERE clause matches anything; the handler reports zero rows as 404. The 404 (not 403, not 200, not 500) is the proof that RLS is the single point of isolation. See `test/server/routes/todos.test.ts` for the same shape pinned as a vitest assertion.
+   Then switch to **Tab A** (alice's session), open that tab's DevTools, and run — substituting the copied UUID for `BOB_TODO_ID`:
 
-4. **Realtime via psql.** Keep Tab A open on alice's todos page (the realtime channel is subscribed). From a third terminal:
+   ```js
+   const BOB_TODO_ID = 'paste-bob-todo-id-here';
+   const { data: { session } } = await window.supabase.auth.getSession();
+   const status = await fetch(`/api/todos/${BOB_TODO_ID}`, {
+     method: 'PATCH',
+     headers: {
+       'Content-Type': 'application/json',
+       Authorization: `Bearer ${session.access_token}`,
+     },
+     body: JSON.stringify({ completed: true }),
+   }).then((r) => r.status);
+   console.log(status); // expect 404
+   ```
+
+   Expect **`404`**. The server's `PATCH /api/todos/:id` runs `UPDATE … WHERE id = $1 RETURNING …` under alice's RLS-scoped session; the policy filters bob's row out before the WHERE clause matches anything; the handler reports zero returned rows as 404. The 404 (not 403, not 200, not 500) is the proof that RLS is the single point of isolation. See [`test/server/routes/todos.test.ts`](test/server/routes/todos.test.ts) for the same shape pinned as a vitest assertion.
+
+4. **Realtime via psql.** Keep Tab A open on alice's todos page (the realtime channel is subscribed). First derive alice's auth-user UUID from a third terminal — `pnpm seed` also prints it, but `psql` is the most reliable source:
+
+   ```bash
+   ALICE_UID=$(psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
+     -At -c "SELECT id FROM auth.users WHERE email = 'alice@example.test'")
+   echo "$ALICE_UID"   # sanity-check the UUID
+   ```
+
+   Then issue the INSERT, interpolating `$ALICE_UID` (the surrounding shell, not psql, does the substitution — psql sees a literal UUID):
 
    ```bash
    psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" \
-     -c "INSERT INTO public.todos (id, user_id, title, completed) \
-         VALUES (gen_random_uuid(), '<alice-uid>', 'Inserted via psql', false);"
+     -c "INSERT INTO public.todos (id, user_id, title, completed)
+         VALUES (gen_random_uuid(), '$ALICE_UID', 'Inserted via psql', false);"
    ```
-
-   (`<alice-uid>` is the uuid printed by `pnpm seed`, or `SELECT id FROM auth.users WHERE email = 'alice@example.test'`.)
 
    Tab A renders the new todo without a refresh. Bob's tab does **not** receive the event — the realtime broker enforces the same RLS policy the server enforces, and Tab B's filter (`user_id=eq.<bob-uid>`) doesn't match. This is the per-tab realtime proof.
 

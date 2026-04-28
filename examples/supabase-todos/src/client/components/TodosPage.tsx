@@ -12,12 +12,19 @@
  * server response:
  *
  *   - **Create**: insert a placeholder row with a UUIDv4 client id;
- *     replace it with the server'\''s persisted row (which has the
+ *     replace it with the server's persisted row (which has the
  *     server-generated id and `created_at`).
  *   - **Toggle complete**: flip `completed` locally; PATCH; on
  *     success swap in the server row, on failure revert.
- *   - **Delete**: remove the row locally; DELETE; on failure
- *     reinstate it.
+ *   - **Delete**: mark the row `pending` (greyed-out style); DELETE;
+ *     remove on success or on a 404 (the row is already gone — e.g.
+ *     deleted from another tab); clear `pending` and surface the
+ *     error on any other failure. The "remove only after the server
+ *     confirms" shape is more conservative than a true optimistic
+ *     delete (which would remove immediately and reinstate on
+ *     failure) and is the right trade for the PoC: the row stays
+ *     visible until isolation has been observed end-to-end, so a
+ *     reviewer running the demo can see the round-trip happen.
  *
  * The render path keeps a `TodoView` shape that distinguishes
  * `optimistic: true` placeholders (greyed out) from server-confirmed
@@ -108,17 +115,17 @@ export function TodosPage(): React.ReactNode {
   //   2. UPDATE / DELETE from another tab reconcile in place.
   //   3. an INSERT we just made via POST is reconciled with its
   //      corresponding optimistic placeholder if the placeholder
-  //      hasn'\''t been swapped yet.
+  //      hasn't been swapped yet.
   //
   // Two layers enforce isolation:
   //   - **Filter** (`user_id=eq.<uid>`): tells the realtime
-  //     broker not to push events the client wouldn'\''t have
+  //     broker not to push events the client wouldn't have
   //     access to anyway. Display optimization, not a security
   //     boundary.
   //   - **RLS** (per-table policies + the role on the realtime
   //     connection): even without the filter the broker would
-  //     run the same RLS check it runs for SELECT — alice'\''s
-  //     subscription cannot receive bob'\''s rows. Cf. FL-20:
+  //     run the same RLS check it runs for SELECT — alice's
+  //     subscription cannot receive bob's rows. Cf. FL-20:
   //     the publication has to include `public.todos`, set up
   //     in `scripts/seed.ts` via `ensureRealtimePublication()`.
   useEffect(() => {
@@ -201,7 +208,7 @@ export function TodosPage(): React.ReactNode {
       setTodos((prev) => prev.map((t) => (t.id === target.id ? { ...t, pending: false } : t)));
       // 404 means the row is already gone (e.g. another tab deleted
       // it, or RLS hid it after a session change). Swallow it; treat
-      // the user'\''s intent as fulfilled.
+      // the user's intent as fulfilled.
       if (err instanceof ApiError && err.status === 404) {
         setTodos((prev) => prev.filter((t) => t.id !== target.id));
         return;
@@ -290,10 +297,10 @@ function byCreatedAtDesc(a: TodoView, b: TodoView): number {
  * placeholder, once as the realtime row) before the POST response
  * arrives and replaces the placeholder.
  *
- * UPDATE: patch in place. Skip if we don'\''t have the row (we may
+ * UPDATE: patch in place. Skip if we don't have the row (we may
  * have filtered it out, or the SPA was opened mid-stream).
  *
- * DELETE: remove if present. The payload'\''s `old` carries the id
+ * DELETE: remove if present. The payload's `old` carries the id
  * of the deleted row.
  */
 function applyRealtime(
