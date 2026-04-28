@@ -159,6 +159,12 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 If the diff in any sub-task balloons, split into separate PRs by codec family.
 
+## Open items (deferred during the project; address in M5 or as follow-ups)
+
+- **Mongo control-plane has no `parameterizedCodecs` slot.** M4 R1 ships `mongoVectorParameterizedCodec` as an export but cannot register it through control because the Mongo adapter's control descriptor lacks the slot today. Mongo demos don't use vectors so emit baselines are unaffected. M5 audit: either add the slot to the Mongo control plane (small surgical change) or note as TML-2330-scope deferral with a clear marker in the Mongo descriptor source.
+- **Pre-existing stale demo files.** `examples/{mongo-demo, retail-store}/src/contract.{json,d.ts}` were stale even pre-M4 (they don't match what `pnpm emit` produces against the committed source). Out of codec-model-unification scope; recommend a follow-up PR to either re-emit-and-commit them or delete them if they were not meant to be tracked.
+- **`pgEnumCodec` factory placeholder.** M4 R1 added `pgEnumCodec` as a parameterized descriptor with a placeholder factory (registration-only; enum is not parameterized in the M4 sense). M5 audit: ensure no runtime path invokes `allPostgresParameterizedCodecs[pgEnumCodec].factory` for runtime materialization without filtering enum, or replace the placeholder with a real factory if such a path exists.
+
 ### M4 Cleanups (carve-outs from M1, [TML-2330](https://linear.app/prisma-company/issue/TML-2330))
 
 These transitional fields and call sites were carried into M1 to keep the emit
