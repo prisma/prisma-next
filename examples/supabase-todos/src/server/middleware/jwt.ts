@@ -165,15 +165,24 @@ export function createJwtMiddleware(options: JwtMiddlewareOptions): MiddlewareHa
 
 /**
  * Marker middleware that opts a route out of JWT verification.
- * Compose it *before* `createJwtMiddleware(...)` in the route's
- * chain (Hono runs middleware in registration order):
+ *
+ * **Ordering matters — compose `publicRoute()` *before* both
+ * `createJwtMiddleware(...)` and the scoped-runtime middleware in
+ * the route chain.** Hono runs middleware in registration order, so
+ * if `jwtAuth` runs first it rejects the request with 401
+ * `auth/missing-bearer` before the marker is ever set. The marker
+ * sets `c.var.public = true`; the JWT middleware checks the flag at
+ * the top of its handler and short-circuits past verification, and
+ * the scoped-runtime middleware (T4.4) reads the same flag to attach
+ * an `anon`-scoped session instead of an authenticated one.
  *
  * ```ts
+ * // Right: marker before auth + scope.
  * app.get('/api/public/messages', publicRoute(), jwtAuth, scoped, handler);
- * ```
  *
- * The scoped-runtime middleware (T4.4) reads `c.var.public` to
- * decide whether to attach an authenticated or `anon`-scoped session.
+ * // Wrong: jwtAuth runs first and 401s before publicRoute() executes.
+ * app.get('/api/public/messages', jwtAuth, publicRoute(), scoped, handler);
+ * ```
  */
 export function publicRoute(): MiddlewareHandler<JwtAuthEnv> {
   return async (c, next) => {

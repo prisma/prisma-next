@@ -47,7 +47,7 @@ import 'dotenv/config';
 import type { MiddlewareHandler } from 'hono';
 import { Hono } from 'hono';
 import { Pool } from 'pg';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { type AdminDb, createAdminDb } from '../../../src/server/db';
 import type { JwtAuth, JwtAuthEnv } from '../../../src/server/middleware/jwt';
 // `middleware/scoped-runtime` is the T4.4 deliverable; until it
@@ -330,5 +330,55 @@ describe.skipIf(!databaseUrl)('createScopedRuntimeMiddleware (T4.3)', () => {
     await app.request('/me/forgot-jwt');
     expect(caught).toBeInstanceOf(Error);
     expect((caught as Error & { code?: string }).code).toBe('middleware/jwt-not-attached');
+  });
+
+  // Pins the boundary between the JWT middleware (which extracts `role`
+  // from the token claims, defaulting to `'authenticated'`) and the
+  // factory's `allowedRoles` allowlist (which enforces R-FX-5). A
+  // valid bearer carrying `claims.role: 'admin'` flows through JWT
+  // verification untouched — the JWT middleware does NOT pre-validate
+  // the role against the factory's allowlist (the layers are decoupled
+  // on purpose: the factory is the single point of enforcement). When
+  // `factory.authenticate({ role: 'admin' })` is called inside
+  // `openSession`, the factory throws synchronously *before*
+  // constructing the driver / runtime, so no DB query is issued. The
+  // throw propagates out of the middleware (it happens before the
+  // `try { await next() … }` block) and lands in Hono's `onError` as
+  // a 500. This test pins all three of those properties so a future
+  // refactor can't silently regress any of them; cross-references
+  // phase-4a code-review § Major 1.
+  it('JWT role outside allowedRoles is rejected at the factory boundary (defense in depth)', async () => {
+    const app = new Hono<ScopedRuntimeEnv>().get(
+      '/me/admin-token',
+      injectJwt({
+        claims: { sub: aliceAuthUserId, role: 'admin' },
+        role: 'admin',
+      }),
+      createScopedRuntimeMiddleware({ factory }),
+      (c) => c.text('unreachable'),
+    );
+    let caught: Error | undefined;
+    app.onError((err, c) => {
+      if (err instanceof Error) caught = err;
+      return c.json({ ok: false }, 500);
+    });
+
+    const connectSpy = vi.spyOn(pool, 'connect');
+    const callsBefore = connectSpy.mock.calls.length;
+    try {
+      const res = await app.request('/me/admin-token');
+      expect(res.status).toBe(500);
+      expect(caught).toBeInstanceOf(Error);
+      // The factory's role-rejection message names the rejected role
+      // and lists allowedRoles, per phase-2 R-FX-5.
+      expect((caught as Error).message).toMatch(/'admin'/);
+      expect((caught as Error).message).toMatch(/allowedRoles/);
+      // No DB query went out — the synchronous throw lands before
+      // any pool.connect() call (cf. factory.test.ts § 'disallowed role
+      // throws synchronously and never touches the pool').
+      expect(connectSpy.mock.calls.length - callsBefore).toBe(0);
+    } finally {
+      connectSpy.mockRestore();
+    }
   });
 });
