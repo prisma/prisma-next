@@ -26,9 +26,11 @@
  * updates patch in place, deletes remove. The placeholder lifecycle
  * here is the foundation realtime builds on.
  */
+import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 import { type FormEvent, useCallback, useEffect, useState } from 'react';
 import { ApiError, apiJson } from '../api-fetch';
 import { useAuth } from '../auth';
+import { supabase } from '../supabase';
 
 interface ServerTodo {
   readonly id: string;
@@ -95,6 +97,47 @@ export function TodosPage(): React.ReactNode {
       });
     return () => {
       cancelled = true;
+    };
+  }, [userId]);
+
+  // Realtime subscription (T4.11). Pushes INSERT / UPDATE /
+  // DELETE events for `public.todos` rows where `user_id = <uid>`
+  // into the local list so:
+  //   1. an INSERT done in another tab (or via psql) appears
+  //      without a refresh.
+  //   2. UPDATE / DELETE from another tab reconcile in place.
+  //   3. an INSERT we just made via POST is reconciled with its
+  //      corresponding optimistic placeholder if the placeholder
+  //      hasn'\''t been swapped yet.
+  //
+  // Two layers enforce isolation:
+  //   - **Filter** (`user_id=eq.<uid>`): tells the realtime
+  //     broker not to push events the client wouldn'\''t have
+  //     access to anyway. Display optimization, not a security
+  //     boundary.
+  //   - **RLS** (per-table policies + the role on the realtime
+  //     connection): even without the filter the broker would
+  //     run the same RLS check it runs for SELECT — alice'\''s
+  //     subscription cannot receive bob'\''s rows. Cf. FL-20:
+  //     the publication has to include `public.todos`, set up
+  //     in `scripts/seed.ts` via `ensureRealtimePublication()`.
+  useEffect(() => {
+    if (!userId) return;
+    const channel = supabase
+      .channel(`todos:user:${userId}`)
+      .on<ServerTodo>(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'todos',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => applyRealtime(payload, setTodos),
+      )
+      .subscribe();
+    return () => {
+      void supabase.removeChannel(channel);
     };
   }, [userId]);
 
@@ -231,4 +274,52 @@ export function TodosPage(): React.ReactNode {
 
 function byCreatedAtDesc(a: TodoView, b: TodoView): number {
   return a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0;
+}
+
+/**
+ * Reconcile a realtime postgres_changes payload against the local
+ * list. The list state is owned by the React component; this helper
+ * is an extracted pure-ish function (the setter is the only side
+ * effect) so the channel callback stays slim.
+ *
+ * INSERT: append, but de-dupe against the row id AND against any
+ * matching optimistic placeholder by title (a POST round-trip can
+ * race with the realtime push — whichever wins, the local id is
+ * resolved to the server id). Without the title-keyed de-dupe, a
+ * just-created todo would briefly appear twice (once as the
+ * placeholder, once as the realtime row) before the POST response
+ * arrives and replaces the placeholder.
+ *
+ * UPDATE: patch in place. Skip if we don'\''t have the row (we may
+ * have filtered it out, or the SPA was opened mid-stream).
+ *
+ * DELETE: remove if present. The payload'\''s `old` carries the id
+ * of the deleted row.
+ */
+function applyRealtime(
+  payload: RealtimePostgresChangesPayload<ServerTodo>,
+  setTodos: React.Dispatch<React.SetStateAction<readonly TodoView[]>>,
+): void {
+  if (payload.eventType === 'INSERT') {
+    const incoming = fromServer(payload.new);
+    setTodos((prev) => {
+      if (prev.some((t) => t.id === incoming.id)) return prev;
+      const optimisticMatch = prev.find((t) => t.optimistic && t.title === incoming.title);
+      const next = optimisticMatch
+        ? prev.map((t) => (t === optimisticMatch ? incoming : t))
+        : [incoming, ...prev];
+      return [...next].sort(byCreatedAtDesc);
+    });
+    return;
+  }
+  if (payload.eventType === 'UPDATE') {
+    const updated = fromServer(payload.new);
+    setTodos((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+    return;
+  }
+  if (payload.eventType === 'DELETE') {
+    const oldId = (payload.old as Partial<ServerTodo>).id;
+    if (!oldId) return;
+    setTodos((prev) => prev.filter((t) => t.id !== oldId));
+  }
 }
