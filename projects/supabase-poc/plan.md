@@ -22,6 +22,7 @@ These come from repo conventions ([`AGENTS.md`](../../AGENTS.md), [`.cursor/rule
 - **Skill captured continuously.** Whenever a milestone surfaces an opinionated decision, footgun, or anti-pattern worth advising future authors about, the corresponding section of `projects/supabase-poc/skills/writing-rls-policies-with-pn/SKILL.md` is updated on the same commit (R-FK-6). Same posture as `framework-limitations.md`.
 - **Commit-as-you-go.** Small, focused commits with intent-driven messages. Don't batch.
 - **Vitest.** Unit + integration tests live under `examples/supabase-todos/test/`. Integration tests assume `supabase start` is running locally; they are not run in CI.
+- **CLI-first migration authoring.** Migrations are scaffolded by the `prisma-next migration` CLI, never hand-authored from a blank file. `prisma-next migration plan` derives `createTable` / `addForeignKey` / `addColumn` / etc. from the contract diff and writes a populated `migrations/<ts>_<name>/migration.ts`; `prisma-next migration new` scaffolds an empty `migration.ts` for cases where the planner has nothing to derive (pure `rawSql` ops, RLS-only follow-ups, etc.). The author then *edits* the scaffolded file to add ops the planner can't see — e.g. RLS bolt-on (FL-01's planner-side facet) or cross-schema FKs (FL-02). This is the same workflow a normal user would follow; the example demonstrates it rather than skipping past it.
 
 ## Phases and validation gates
 
@@ -89,16 +90,19 @@ This milestone exercises **two** parts of PN against a real Supabase database: t
   - `target.id = 'postgres'`, `target.details.objectType = 'dependency'` (the `OperationClass` union has no `'policy'` value — see spec; record as `FL-NN` on the same commit).
   - Pre/postcheck steps query `pg_policies` (and `pg_class.relrowsecurity` for `enableRowLevelSecurity`); SQL composed with parameter placeholders where possible.
   - Confirm 1.4's tests pass.
-- [ ] **1.6 Author the PN migration file + wire `MigrationCLI`.**
-  Under `examples/supabase-todos/migrations/<ts>_initial/migration.ts`, write a `Migration` that:
-  - Creates `profiles`, `todos`, `public_messages` (via `createTable`, `addForeignKey`, `createIndex` from `@prisma-next/target-postgres/migration`).
-  - Calls `enableRowLevelSecurity` for all three tables.
-  - Adds policies via `createRlsPolicy`:
-    - `profiles`: `SELECT` and `UPDATE` for `authenticated` where `id = auth.uid()`.
-    - `todos`: `SELECT` / `INSERT` / `UPDATE` / `DELETE` for `authenticated` with `using` / `withCheck` of `(user_id = auth.uid())`. No policy for `anon` (effectively zero rows).
-    - `public_messages`: `SELECT` for `anon` *and* `authenticated` (PUBLIC); `INSERT` for `authenticated` with `withCheck` of `(author_id = auth.uid())`.
-  - Ends with `MigrationCLI.run(import.meta.url, M)` so `pnpm --filter supabase-todos migrate:up` runs it.
-  Use the **service-role** URL for `migrate:up` (RLS bypass; documented in 1.9).
+- [ ] **1.6 Scaffold the initial migration via the CLI; bolt RLS on by hand.**
+  This task demonstrates the [CLI-first migration authoring](#working-rules-for-this-project) workflow end-to-end. The planner does what it can from the contract; the author edits to add what the planner can't see (RLS bolt-on, FL-01's planner-side facet).
+  - **Step 1 — scaffold from the contract.** From `examples/supabase-todos/`, run `pnpm exec prisma-next migration plan --name initial`. The planner reads the emitted contract (1.3) and writes `migrations/<ts>_initial/migration.ts` populated with the `createTable` ops it derived for `profiles`, `todos`, `public_messages` (3 tables, snake_case columns per the contract's `naming` config). The scaffolded file already includes the `MigrationCLI.run(import.meta.url, M)` footer and a populated `toContract` reference. **No hand-authoring of `createTable` ops.**
+  - **Step 2 — edit to add the RLS bolt-on.** Open the scaffolded `migration.ts` and append calls to the in-example RLS factories from 1.5:
+    - `enableRowLevelSecurity('public', 'profiles' | 'todos' | 'public_messages')` for all three tables.
+    - `createRlsPolicy(...)` for the policy set:
+      - `profiles`: `SELECT` and `UPDATE` for `authenticated` where `(id = (auth.uid())::text)` (cast on the function side per FL-03; SKILL.md §6).
+      - `todos`: `SELECT` / `INSERT` / `UPDATE` / `DELETE` for `authenticated` with `using` / `withCheck` of `(user_id = (auth.uid())::text)`. No policy for `anon` (effectively zero rows).
+      - `public_messages`: `SELECT` for `anon` *and* `authenticated` (`using: true`); `INSERT` for `authenticated` with `withCheck` of `(author_id = (auth.uid())::text)`.
+  - **Step 3 — re-attest.** Run `node migration.ts` (or `pnpm --filter supabase-todos migrate:up` which runs `prisma-next migration apply`) so the runner re-derives `ops.json` from the edited body and re-attests the package.
+  - **Step 4 — document the workflow in the migration's docblock.** A short header comment naming `migration plan` as the source of the table ops and explaining that the RLS ops were bolted on by hand (with cross-link to FL-01's planner-side facet). This is what makes the example pedagogical for the next user, rather than just "a working migration."
+  - **Heads-up on cross-schema FKs (FL-02).** The planner cannot emit a `REFERENCES auth.users(id)` FK because `auth.users` is in another schema and the contract IR has no surface for it. Per the FL-02 decision (PoC-major-finding; production-blocker), the FK is omitted entirely; integrity is enforced application-side via the seed script and the `INSERT` policies' `withCheck`. Document this omission in the docblock alongside the RLS bolt-on note.
+  - Use the **service-role** URL for `migrate:up` (RLS bypass; documented in 1.9).
 - [ ] **1.7 Seed script.**
   Under `examples/supabase-todos/scripts/seed.ts`. Uses `@supabase/supabase-js` admin client (with the local service-role key from `supabase status`) to create two test users (`alice@example.test`, `bob@example.test`) and insert a few fixture rows in `todos` (owned by each) and `public_messages`. Idempotent — re-running it does not duplicate rows. Wired to `pnpm --filter supabase-todos seed`.
 - [ ] **1.8 Plain PN runtime against `service_role` URL.**
