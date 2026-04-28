@@ -25,12 +25,14 @@ function pkg(
   createdAt = '2026-02-25T14:00:00.000Z',
   labels: readonly string[] = [],
 ): MigrationPackage {
-  const metadata = createTestMetadata({ from, to, createdAt, labels });
+  // Bake a per-pkg counter into createdAt so distinct packages get distinct
+  // hashes — and use the same metadata for both hashing and the returned
+  // package, so each fixture is internally consistent (round-trips through
+  // readMigrationPackage()).
+  const uniqueCreatedAt = `${createdAt}-${migrationCounter++}`;
+  const metadata = createTestMetadata({ from, to, createdAt: uniqueCreatedAt, labels });
   const ops = createTestOps();
-  const migrationHash = computeMigrationHash(
-    { ...metadata, createdAt: `${createdAt}-${migrationCounter++}` },
-    ops,
-  );
+  const migrationHash = computeMigrationHash(metadata, ops);
   return {
     dirName,
     dirPath: `/migrations/${dirName}`,
