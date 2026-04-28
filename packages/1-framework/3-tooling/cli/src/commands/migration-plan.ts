@@ -201,7 +201,16 @@ async function executeMigrationPlanCommand(
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
-    throw error;
+    // Wrap unexpected (non-MigrationToolsError) failures from the migration
+    // load phase in a structured CLI envelope. Letting them throw would
+    // bypass `handleResult()` and crash the command — see CLI structured-
+    // errors guideline (CliStructuredError + Result pattern).
+    const message = error instanceof Error ? error.message : String(error);
+    return notOk(
+      errorUnexpected(message, {
+        why: `Unexpected error while loading migrations: ${message}`,
+      }),
+    );
   }
 
   // Check for no-op (same hash means no changes)
