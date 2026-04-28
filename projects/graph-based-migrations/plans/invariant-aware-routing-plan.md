@@ -6,7 +6,7 @@ Add invariant-aware path selection to the migration graph, end-to-end. Five slic
 
 - **M0. Refs carry invariants.** *(Landed.)* Per-file `migrations/refs/<name>.json` directory layout; each ref is a typed `{ hash, invariants }`.
 - **M1. The DB remembers applied invariants.** `prisma_contract.marker` grows `invariants text[]` (Mongo: a field on the marker doc). Column lives in the `CREATE TABLE IF NOT EXISTS` DDL from the start — no compat shim for pre-upgrade markers (consistent with the breaking `edgeId` change; consumers re-apply against a fresh database). Runner unions `manifest.providedInvariants` on apply; `readMarker` returns the set. No new SPI.
-- **M2. Edges declare invariants.** `invariantId?: string` on `DataTransformOperation` is the opt-in routing key; `migration.json` carries `providedInvariants` (attestation-covered aggregate); `MigrationChainEntry.invariants` propagates from the manifest.
+- **M2. Edges declare invariants.** `invariantId?: string` on `DataTransformOperation` is the opt-in routing key; `migration.json` carries `providedInvariants` (attestation-covered aggregate); `MigrationEdge.invariants` propagates from the manifest.
 - **M3. Invariant-aware pathfinder primitive.** `findPathWithInvariants(graph, from, to, required)` returns the shortest path whose edges collectively cover `required`, or `null`.
 - **M4. CLI integration.** `migration apply --ref` and `migration status --ref` compute `effectiveRequired = ref.invariants − readMarker().invariants` and route through the new primitive. `NO_INVARIANT_PATH` surfaces when unsatisfiable; `status` displays required / applied / missing.
 
@@ -16,7 +16,7 @@ When no invariants are required, existing routing outcomes (same edges, same tie
 
 **PR strategy.** Each milestone is a standalone PR. Spec §*Slices and dependencies* has the dependency graph: M1 and M2 are orthogonal; M3 waits for M2; M4 waits for M1, M2, and M3. This plan sequences them M1 → M2 → M3 → M4 as a reviewer-load preference (storage diff is smaller and self-contained; M2 adds types that ripple through fixtures) — flipping M1 and M2 would be equally valid.
 
-**Prerequisites (P2, P3) land before M2.** Spec §Prerequisites records two renames as prereqs: `dag.ts → graph.ts` (P2) and `MigrationChainEntry → MigrationEdge` (P3). Each is a standalone, logic-free commit/PR; landing them first keeps the M2 (and M3) diff focused on routing work rather than rename churn.
+**Prerequisites (P2, P3) land before M2.** Spec §Prerequisites records two renames as prereqs: `dag.ts → graph.ts` (P2) and `MigrationEdge → MigrationEdge` (P3). Each is a standalone, logic-free commit/PR; landing them first keeps the M2 (and M3) diff focused on routing work rather than rename churn.
 
 **Breaking attestation change.** Adding `providedInvariants` to `migration.json`'s canonical form changes every existing migration's `edgeId` on re-verify. This is a knowing breaking change — all consumers today are prerelease/internal. No compat shim.
 
@@ -104,7 +104,7 @@ The marker table is the single-row source of truth for current database state. A
 
 `invariantId` on `DataTransformOperation`, `providedInvariants` on `migration.json`, verify-time checks, and graph reconstruction reading from the manifest. The migration-tools package typechecks and its tests go green. The two suggested refactors (optional) land as standalone, logic-free commits.
 
-**PR scope:** one PR. Touches framework-components (type), migration-tools (verify, graph), and fixture helpers. Assumes prereqs P2 (`dag.ts → graph.ts`) and P3 (`MigrationChainEntry → MigrationEdge`) have landed; this PR targets the new names.
+**PR scope:** one PR. Touches framework-components (type), migration-tools (verify, graph), and fixture helpers. Assumes prereqs P2 (`dag.ts → graph.ts`) and P3 (`MigrationEdge → MigrationEdge`) have landed; this PR targets the new names.
 
 **Tasks:**
 
@@ -130,10 +130,10 @@ The marker table is the single-row source of truth for current database state. A
 
 *Graph reconstruction:*
 
-- [ ] Add `invariants: readonly string[]` to `MigrationChainEntry` in `packages/1-framework/3-tooling/migration/src/types.ts`
-- [ ] `reconstructGraph` reads `pkg.manifest.providedInvariants` directly into `MigrationChainEntry.invariants`. No re-derivation from ops at this layer — the manifest is source of truth.
+- [ ] Add `invariants: readonly string[]` to `MigrationEdge` in `packages/1-framework/3-tooling/migration/src/types.ts`
+- [ ] `reconstructGraph` reads `pkg.manifest.providedInvariants` directly into `MigrationEdge.invariants`. No re-derivation from ops at this layer — the manifest is source of truth.
 - [ ] Update fixture helper `packages/1-framework/3-tooling/cli/test/utils/graph-helpers.ts` to populate `invariants: []` on constructed entries
-- [ ] Update any test bodies that construct `MigrationChainEntry` literals (search workspace, patch with `invariants: []`)
+- [ ] Update any test bodies that construct `MigrationEdge` literals (search workspace, patch with `invariants: []`)
 
 *Renames land as prereqs, not in this milestone.* See spec §Prerequisites P2 and P3. Each is a standalone, logic-free commit/PR that lands before M2. Assuming prereqs are in before M2 starts, this milestone targets the new names (`graph.ts`, `MigrationEdge`) throughout.
 
@@ -149,7 +149,7 @@ The marker table is the single-row source of truth for current database state. A
 
 **Tasks:**
 
-- [ ] Add `findPathWithInvariants(graph, from, to, required: ReadonlySet<string>): readonly MigrationChainEntry[] | null` to `graph.ts` (or `dag.ts` if the rename is skipped)
+- [ ] Add `findPathWithInvariants(graph, from, to, required: ReadonlySet<string>): readonly MigrationEdge[] | null` to `graph.ts` (or `dag.ts` if the rename is skipped)
 - [ ] Implement BFS over `(node, covered-set)` states with a `Set<string>` covered-set representation
 - [ ] Implement state-level dedup via `Map<node, Set<stableSubsetKey>>`; strict equality skip, no subset-dominance pruning
 - [ ] Choose a stable subset key (e.g. sorted `join('\0')`); document the choice in a code comment
@@ -264,12 +264,12 @@ Every acceptance criterion from the spec maps to at least one test (or a manual 
 | `providedInvariants` participates in attestation (tampering breaks edgeId hash) | Integration | M2 | Hash coverage check; fires independently of PROVIDED_INVARIANTS_MISMATCH |
 | Data op without `invariantId` never contributes to `providedInvariants` | Unit | M2 | Path-dependent ops stay invisible |
 | **— Edge-level invariants (M2) —** | | | |
-| `MigrationChainEntry.invariants` populated from `manifest.providedInvariants` (no re-derivation) | Unit | M2 | Manifest is source of truth |
+| `MigrationEdge.invariants` populated from `manifest.providedInvariants` (no re-derivation) | Unit | M2 | Manifest is source of truth |
 | `reconstructGraph` reads `invariants` directly from manifest | Unit | M2 | |
-| `MigrationChainEntry.invariants` always defined, sorted, deduped | Unit | M2 | Verified at manifest level |
-| Fixture helpers produce `MigrationChainEntry` with `invariants: []` by default | TypeScript compile | M2 | |
+| `MigrationEdge.invariants` always defined, sorted, deduped | Unit | M2 | Verified at manifest level |
+| Fixture helpers produce `MigrationEdge` with `invariants: []` by default | TypeScript compile | M2 | |
 | P2 rename (`dag.ts` → `graph.ts`): logic-free, typecheck+tests green | CI + diff review | P2 prereq | Standalone commit, lands before M2 |
-| P3 rename (`MigrationChainEntry` → `MigrationEdge`): logic-free, typecheck+tests green | CI + diff review | P3 prereq | Standalone commit, lands before M2 |
+| P3 rename (`MigrationEdge` → `MigrationEdge`): logic-free, typecheck+tests green | CI + diff review | P3 prereq | Standalone commit, lands before M2 |
 | Downstream consumers pick up new fields | Workspace typecheck | M2 | After migration-tools rebuild |
 | **— Pathfinder primitive (M3) —** | | | |
 | `findPathWithInvariants(..., new Set())` = `findPath` | Unit | M3 — equivalence test | Across multiple graphs |

@@ -61,9 +61,9 @@
       "types": "./dist/exports/hash.d.mts",
       "import": "./dist/exports/hash.mjs"
     },
-    "./dag": {
-      "types": "./dist/exports/dag.d.mts",
-      "import": "./dist/exports/dag.mjs"
+    "./migration-graph": {
+      "types": "./dist/exports/migration-graph.d.mts",
+      "import": "./dist/exports/migration-graph.mjs"
     },
     "./refs": {
       "types": "./dist/exports/refs.d.mts",

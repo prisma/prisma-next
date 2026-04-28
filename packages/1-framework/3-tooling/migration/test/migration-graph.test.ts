@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
+import { MigrationToolsError } from '../src/errors';
+import type { MigrationEdge } from '../src/graph';
+import { computeMigrationHash } from '../src/hash';
 import {
   detectCycles,
   detectOrphans,
@@ -9,10 +12,7 @@ import {
   findPathWithDecision,
   findReachableLeaves,
   reconstructGraph,
-} from '../src/dag';
-import { MigrationToolsError } from '../src/errors';
-import type { MigrationChainEntry } from '../src/graph';
-import { computeMigrationHash } from '../src/hash';
+} from '../src/migration-graph';
 import type { MigrationPackage } from '../src/package';
 import { createTestMetadata, createTestOps } from './fixtures';
 
@@ -293,15 +293,15 @@ describe('detectCycles', () => {
   it('handles deep linear chain without stack overflow', () => {
     const length = 20_000;
     const nodes = new Set<string>();
-    const forwardChain = new Map<string, MigrationChainEntry[]>();
-    const reverseChain = new Map<string, MigrationChainEntry[]>();
-    const migrationByHash = new Map<string, MigrationChainEntry>();
+    const forwardChain = new Map<string, MigrationEdge[]>();
+    const reverseChain = new Map<string, MigrationEdge[]>();
+    const migrationByHash = new Map<string, MigrationEdge>();
     let prev: string = E;
     for (let i = 0; i < length; i++) {
       const next = `h:${i}`;
       nodes.add(prev);
       nodes.add(next);
-      const entry: MigrationChainEntry = {
+      const entry: MigrationEdge = {
         from: prev,
         to: next,
         migrationHash: `mid:${i}`,

@@ -2,7 +2,7 @@
  * An entry in the migration graph. All on-disk migrations are attested,
  * so `migrationHash` is always a string.
  */
-export interface MigrationChainEntry {
+export interface MigrationEdge {
   readonly from: string;
   readonly to: string;
   readonly migrationHash: string;
@@ -13,7 +13,7 @@ export interface MigrationChainEntry {
 
 export interface MigrationGraph {
   readonly nodes: ReadonlySet<string>;
-  readonly forwardChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
-  readonly reverseChain: ReadonlyMap<string, readonly MigrationChainEntry[]>;
-  readonly migrationByHash: ReadonlyMap<string, MigrationChainEntry>;
+  readonly forwardChain: ReadonlyMap<string, readonly MigrationEdge[]>;
+  readonly reverseChain: ReadonlyMap<string, readonly MigrationEdge[]>;
+  readonly migrationByHash: ReadonlyMap<string, MigrationEdge>;
 }

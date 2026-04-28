@@ -1,7 +1,10 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
+import {
+  findLatestMigration,
+  reconstructGraph,
+} from '@prisma-next/migration-tools/migration-graph';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';

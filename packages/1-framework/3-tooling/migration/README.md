@@ -46,13 +46,13 @@ Full semantic validation happens in target/family migration planners and runners
 graph TD
     CLI["CLI commands<br/>(migration new, plan, apply, show, status)"] --> IO["io.ts<br/>File I/O"]
     CLI --> HASH["hash.ts<br/>Migration hashing"]
-    CLI --> GRAPH["dag.ts<br/>Graph operations"]
+    CLI --> GRAPH["migration-graph.ts<br/>Graph operations"]
     IO --> META["metadata.ts<br/>MigrationMetadata, MigrationHints"]
     IO --> PKG["package.ts<br/>MigrationPackage, MigrationOps"]
     HASH --> IO
     HASH --> CAN["canonicalize-json.ts"]
     HASH --> CP["@prisma-next/emitter<br/>canonicalizeContract"]
-    GRAPH --> GR["graph.ts<br/>MigrationGraph, MigrationChainEntry"]
+    GRAPH --> GR["graph.ts<br/>MigrationGraph, MigrationEdge"]
     GRAPH --> ABS["@prisma-next/migration-tools/constants<br/>EMPTY_CONTRACT_HASH"]
 ```
 
@@ -77,10 +77,10 @@ graph TD
 |---|---|
 | `./metadata` | `MigrationMetadata`, `MigrationHints` |
 | `./package` | `MigrationPackage`, `MigrationOps` |
-| `./graph` | `MigrationGraph`, `MigrationChainEntry` |
+| `./graph` | `MigrationGraph`, `MigrationEdge` |
 | `./io` | `writeMigrationPackage`, `readMigrationPackage`, `readMigrationsDir`, `formatMigrationDirName` |
 | `./hash` | `computeMigrationHash`, `verifyMigrationHash` |
-| `./dag` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
+| `./migration-graph` | `reconstructGraph`, `findLeaf`, `findPath`, `detectCycles`, `detectOrphans` |
 | `./errors` | `MigrationToolsError` |
 | `./constants` | `EMPTY_CONTRACT_HASH` |
 
