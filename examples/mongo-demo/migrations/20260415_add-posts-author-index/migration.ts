@@ -1,3 +1,4 @@
+import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex } from '@prisma-next/target-mongo/migration';
 
@@ -22,4 +23,4 @@ class AddPostsAuthorIndex extends Migration {
 }
 
 export default AddPostsAuthorIndex;
-Migration.run(import.meta.url, AddPostsAuthorIndex);
+MigrationCLI.run(import.meta.url, AddPostsAuthorIndex);

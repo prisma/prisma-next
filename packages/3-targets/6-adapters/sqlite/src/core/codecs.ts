@@ -53,6 +53,13 @@ const sqliteBlobCodec = codec({
   traits: ['equality'],
   encode: (value: Uint8Array): Uint8Array => value,
   decode: (wire: Uint8Array): Uint8Array => wire,
+  encodeJson: (value: Uint8Array): string => Buffer.from(value).toString('base64'),
+  decodeJson: (json: JsonValue): Uint8Array => {
+    if (typeof json !== 'string') {
+      throw new TypeError('sqlite/blob@1 contract value must be a base64 string');
+    }
+    return new Uint8Array(Buffer.from(json, 'base64'));
+  },
 });
 
 const sqliteBooleanCodec = codec({
@@ -69,6 +76,13 @@ const sqliteDatetimeCodec = codec({
   traits: ['equality', 'order'],
   encode: (value: Date): string => value.toISOString(),
   decode: (wire: string): Date => new Date(wire),
+  encodeJson: (value: Date): string => value.toISOString(),
+  decodeJson: (json: JsonValue): Date => {
+    if (typeof json !== 'string') {
+      throw new TypeError('sqlite/datetime@1 contract value must be an ISO-8601 string');
+    }
+    return new Date(json);
+  },
 });
 
 const sqliteJsonCodec = codec({
@@ -86,6 +100,13 @@ const sqliteBigintCodec = codec({
   traits: ['equality', 'order', 'numeric'],
   encode: (value: bigint): number | bigint => value,
   decode: (wire: number | bigint): bigint => BigInt(wire),
+  encodeJson: (value: bigint): string => value.toString(),
+  decodeJson: (json: JsonValue): bigint => {
+    if (typeof json !== 'string' && typeof json !== 'number') {
+      throw new TypeError('sqlite/bigint@1 contract value must be a string or number');
+    }
+    return BigInt(json);
+  },
 });
 
 const codecs = defineCodecs()

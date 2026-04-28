@@ -1,7 +1,8 @@
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { normalizeSchemaNativeType, PostgresControlAdapter } from '../src/core/control-adapter';
+import { PostgresControlAdapter } from '../src/core/control-adapter';
 
 type QueryHandler = {
   readonly match: (sql: string) => boolean;

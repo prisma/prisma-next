@@ -1,5 +1,5 @@
 {
-  "migrationId": "sha256:595df3677eebd59fb6d39191180d1ba425197c3ab2129324f08892df12405375",
+  "migrationHash": "sha256:595df3677eebd59fb6d39191180d1ba425197c3ab2129324f08892df12405375",
   "from": "sha256:empty",
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "kind": "regular",

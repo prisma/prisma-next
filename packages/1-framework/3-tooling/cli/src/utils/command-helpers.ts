@@ -1,15 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
-import type { PathDecision } from '@prisma-next/migration-tools/dag';
-import { reconstructGraph } from '@prisma-next/migration-tools/dag';
+import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
-import type {
-  AttestedMigrationBundle,
-  DraftMigrationBundle,
-  MigrationGraph,
-} from '@prisma-next/migration-tools/types';
-import { isAttested, isDraft } from '@prisma-next/migration-tools/types';
+import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
+import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -90,7 +86,7 @@ export function resolveMigrationPaths(
   configPath: string;
   migrationsDir: string;
   migrationsRelative: string;
-  refsPath: string;
+  refsDir: string;
 } {
   const configPath = configOption
     ? relative(process.cwd(), resolve(configOption))
@@ -100,8 +96,8 @@ export function resolveMigrationPaths(
     config.migrations?.dir ?? 'migrations',
   );
   const migrationsRelative = relative(process.cwd(), migrationsDir);
-  const refsPath = resolve(migrationsDir, 'refs.json');
-  return { configPath, migrationsDir, migrationsRelative, refsPath };
+  const refsDir = resolve(migrationsDir, 'refs');
+  return { configPath, migrationsDir, migrationsRelative, refsDir };
 }
 
 /**
@@ -116,7 +112,7 @@ export interface PathDecisionResult {
   readonly refName?: string;
   readonly selectedPath: readonly {
     readonly dirName: string;
-    readonly migrationId: string;
+    readonly migrationHash: string;
     readonly from: string;
     readonly to: string;
   }[];
@@ -134,7 +130,7 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
     ...ifDefined('refName', decision.refName),
     selectedPath: decision.selectedPath.map((entry) => ({
       dirName: entry.dirName,
-      migrationId: entry.migrationId,
+      migrationHash: entry.migrationHash,
       from: entry.from,
       to: entry.to,
     })),
@@ -150,32 +146,19 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
 }
 
 /**
- * Reads the migrations directory, filters to attested bundles, and builds
- * the migration graph. Throws on I/O or graph errors — callers handle
- * error mapping.
+ * Reads the migrations directory and builds the migration graph from all
+ * packages. Throws on I/O or graph errors — callers handle error mapping.
+ *
+ * Every on-disk package is content-addressed (`migrationHash` is always a
+ * string); there is no draft state to filter out.
  */
-export async function loadMigrationBundles(migrationsDir: string): Promise<{
-  bundles: readonly AttestedMigrationBundle[];
+export async function loadMigrationPackages(migrationsDir: string): Promise<{
+  bundles: readonly MigrationPackage[];
   graph: MigrationGraph;
 }> {
-  const allBundles = await readMigrationsDir(migrationsDir);
-  const bundles = allBundles.filter(isAttested);
+  const bundles = await readMigrationsDir(migrationsDir);
   const graph = reconstructGraph(bundles);
   return { bundles, graph };
-}
-
-export interface MigrationBundleSet {
-  readonly attested: readonly AttestedMigrationBundle[];
-  readonly drafts: readonly DraftMigrationBundle[];
-  readonly graph: MigrationGraph;
-}
-
-export async function loadAllBundles(migrationsDir: string): Promise<MigrationBundleSet> {
-  const all = await readMigrationsDir(migrationsDir);
-  const attested = all.filter(isAttested);
-  const drafts = all.filter(isDraft);
-  const graph = reconstructGraph(attested);
-  return { attested, drafts, graph };
 }
 
 /**

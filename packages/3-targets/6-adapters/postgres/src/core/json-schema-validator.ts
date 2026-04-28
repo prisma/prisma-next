@@ -42,7 +42,8 @@ export function compileJsonSchemaValidator(schema: Record<string, unknown>): Jso
       return { valid: true };
     }
 
-    const errors: JsonSchemaValidationError[] = (validate.errors ?? []).map((err) => ({
+    // biome-ignore lint/style/noNonNullAssertion: Ajv guarantees `errors` is populated whenever `validate(...)` returns false.
+    const errors: JsonSchemaValidationError[] = validate.errors!.map((err) => ({
       path: err.instancePath || '/',
       message: err.message ?? 'unknown validation error',
       keyword: err.keyword,

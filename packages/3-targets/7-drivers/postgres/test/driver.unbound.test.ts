@@ -216,6 +216,38 @@ describe('@prisma-next/driver-postgres runtime driver lifecycle', () => {
         },
         timeouts.spinUpPpgDev,
       );
+
+      it(
+        'transitions to closed state when connection.destroy() tears down the direct-client delegate',
+        async () => {
+          const db = newDb();
+          const { Client: MemClient } = db.adapters.createPg();
+          const memClient = new MemClient();
+
+          const driver = createDriver();
+          await driver.connect({ kind: 'pgClient', client: memClient as unknown as Client });
+          expect(driver.state).toBe('connected');
+
+          const connection = await driver.acquireConnection();
+          await connection.destroy(new Error('rollback failed'));
+
+          // A destroyed connection on a direct-client driver means its single
+          // underlying socket is gone, so the outer runtime driver must also
+          // reflect the closed state and refuse subsequent work — otherwise
+          // callers would route queries to an already-ended delegate.
+          expect(driver.state).toBe('closed');
+
+          await expect(driver.acquireConnection()).rejects.toMatchObject({
+            code: 'DRIVER.NOT_CONNECTED',
+            category: 'RUNTIME',
+          });
+          await expect(driver.query('select 1')).rejects.toMatchObject({
+            code: 'DRIVER.NOT_CONNECTED',
+            category: 'RUNTIME',
+          });
+        },
+        timeouts.spinUpPpgDev,
+      );
     });
 
     describe('when connected with url binding', () => {

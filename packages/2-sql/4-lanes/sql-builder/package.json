@@ -28,6 +28,7 @@
     "@prisma-next/ids": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
+    "@prisma-next/target-postgres": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",

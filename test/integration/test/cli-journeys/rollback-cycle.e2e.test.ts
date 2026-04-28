@@ -16,6 +16,7 @@ import {
   runContractEmit,
   runMigrationApply,
   runMigrationPlan,
+  runMigrationPlanAndEmit,
   runMigrationStatus,
   setupJourney,
   swapContract,
@@ -38,7 +39,7 @@ withTempDir(({ createTempDir }) => {
         // J.01: emit base contract (C1) → plan + apply init
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, 'J.01: emit C1').toBe(0);
-        const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan0.exitCode, 'J.01: plan init').toBe(0);
         const planResult0 = parseJsonOutput<{ to: string }>(plan0);
         const c1Hash = planResult0.to;
@@ -49,7 +50,7 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-phone');
         const emit1 = await runContractEmit(ctx);
         expect(emit1.exitCode, 'J.02: emit C2').toBe(0);
-        const plan1 = await runMigrationPlan(ctx, ['--name', 'add-phone', '--json']);
+        const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-phone', '--json']);
         expect(plan1.exitCode, 'J.02: plan add-phone').toBe(0);
         const planResult1 = parseJsonOutput<{ to: string }>(plan1);
         const c2Hash = planResult1.to;
@@ -61,7 +62,11 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-base');
         const emit2 = await runContractEmit(ctx);
         expect(emit2.exitCode, 'J.03: emit C1 again').toBe(0);
-        const planRollback = await runMigrationPlan(ctx, ['--name', 'rollback-phone', '--json']);
+        const planRollback = await runMigrationPlanAndEmit(ctx, [
+          '--name',
+          'rollback-phone',
+          '--json',
+        ]);
         expect(planRollback.exitCode, 'J.03: plan rollback').toBe(0);
         const apply2 = await runMigrationApply(ctx);
         expect(apply2.exitCode, 'J.03: apply rollback').toBe(0);
@@ -78,7 +83,7 @@ withTempDir(({ createTempDir }) => {
         );
 
         // J.05: plan with --from C1 recovers
-        const planFrom = await runMigrationPlan(ctx, [
+        const planFrom = await runMigrationPlanAndEmit(ctx, [
           '--name',
           'add-bio',
           '--from',

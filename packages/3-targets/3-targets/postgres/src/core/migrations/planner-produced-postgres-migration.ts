@@ -2,14 +2,14 @@
  * Planner-produced Postgres migration.
  *
  * Returned by `PostgresMigrationPlanner.plan(...)` and `emptyMigration(...)`.
- * Holds the class-flow IR (`PostgresOpFactoryCall[]`) alongside
+ * Holds the migration IR (`PostgresOpFactoryCall[]`) alongside
  * `MigrationMeta` and exposes both the runtime-ops view (`get operations`)
  * and the TypeScript authoring view (`renderTypeScript()`). Satisfies
  * `MigrationPlanWithAuthoringSurface` so the CLI can uniformly serialize any
  * planner result back to `migration.ts`.
  *
  * Extends the family-level `SqlMigration` alias rather than the target-local
- * class-flow base directly — mirrors Mongo's `PlannerProducedMongoMigration`
+ * migration base directly — mirrors Mongo's `PlannerProducedMongoMigration`
  * shape and keeps CLI wiring one step removed from target internals.
  *
  * Placeholder-bearing plans: `renderTypeScript()` always succeeds and embeds

@@ -41,10 +41,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             readMarkerStatement: () => ({ sql: '', params: [] }),
           },
           lower() {
-            return {
-              profileId: 'test-profile',
-              body: Object.freeze({ sql: '', params: [] }),
-            };
+            return Object.freeze({ sql: '', params: [] });
           },
         },
       );

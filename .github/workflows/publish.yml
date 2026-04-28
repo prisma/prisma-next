@@ -87,6 +87,15 @@ jobs:
       - name: Build packages
         run: pnpm build
 
+      # Publish-time gate (FR7.1 of init follow-up): packs every publishable
+      # workspace package and verifies the resolved package.json contains no
+      # `workspace:*` or `catalog:` dependency specifiers. `pnpm publish`
+      # rewrites these on its own, but `npm publish` (and some CI flows)
+      # don't — and a single leaked specifier breaks downstream installs.
+      # This gate fails the publish before anything reaches the registry.
+      - name: Check publish dependency specifiers
+        run: pnpm check:publish-deps
+
       # NODE_AUTH_TOKEN is intentionally NOT set. npm detects the OIDC environment
       # (id-token: write) and authenticates via Trusted Publishing automatically.
       # Setting NODE_AUTH_TOKEN to any value -- even empty string -- would block OIDC.

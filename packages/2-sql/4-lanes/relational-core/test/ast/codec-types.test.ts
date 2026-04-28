@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { codec, createCodecRegistry, defineCodecs } from '../../src/ast/codec-types';
 
 describe('codec factory', () => {
-  it('creates codec with id, targetTypes, encode, and decode', () => {
+  it('creates codec with id, targetTypes, encode, and decode', async () => {
     const testCodec = codec({
       typeId: 'test/type@1',
       targetTypes: ['text'],
@@ -16,8 +16,8 @@ describe('codec factory', () => {
       targetTypes: testCodec.targetTypes,
       hasEncode: testCodec.encode !== undefined,
       hasDecode: testCodec.decode !== undefined,
-      encodeResult: testCodec.encode!('hello'),
-      decodeResult: testCodec.decode('WORLD'),
+      encodeResult: await testCodec.encode('hello'),
+      decodeResult: await testCodec.decode('WORLD'),
     }).toMatchObject({
       id: 'test/type@1',
       targetTypes: ['text'],

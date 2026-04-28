@@ -6,7 +6,16 @@
  * so journey tests stay concise and readable.
  */
 
-import { copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { execFile } from 'node:child_process';
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { promisify } from 'node:util';
 import { createContractEmitCommand } from '@prisma-next/cli/commands/contract-emit';
 import { createContractInferCommand } from '@prisma-next/cli/commands/contract-infer';
 import { createDbInitCommand } from '@prisma-next/cli/commands/db-init';
@@ -15,7 +24,6 @@ import { createDbSignCommand } from '@prisma-next/cli/commands/db-sign';
 import { createDbUpdateCommand } from '@prisma-next/cli/commands/db-update';
 import { createDbVerifyCommand } from '@prisma-next/cli/commands/db-verify';
 import { createMigrationApplyCommand } from '@prisma-next/cli/commands/migration-apply';
-import { createMigrationEmitCommand } from '@prisma-next/cli/commands/migration-emit';
 import { createMigrationNewCommand } from '@prisma-next/cli/commands/migration-new';
 import { createMigrationPlanCommand } from '@prisma-next/cli/commands/migration-plan';
 import { createMigrationRefCommand } from '@prisma-next/cli/commands/migration-ref';
@@ -23,8 +31,12 @@ import { createMigrationShowCommand } from '@prisma-next/cli/commands/migration-
 import { createMigrationStatusCommand } from '@prisma-next/cli/commands/migration-status';
 import { createDevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
 import type { Command } from 'commander';
-import { join } from 'pathe';
+import { isAbsolute, join, resolve } from 'pathe';
 import { afterAll, beforeAll } from 'vitest';
+
+const execFileAsync = promisify(execFile);
+const TSX_BIN = resolve(import.meta.dirname, '../../../../node_modules/.bin/tsx');
+
 import { executeCommand, getExitCode, setupCommandMocks } from './cli-test-helpers';
 
 // ---------------------------------------------------------------------------
@@ -380,11 +392,71 @@ export async function runMigrationShow(
   return runCommand(createMigrationShowCommand(), ctx, extraArgs);
 }
 
+/**
+ * Self-emits a migration package by running its `migration.ts` directly with
+ * `tsx`. The migration.ts invokes `MigrationCLI.run(import.meta.url, …)`,
+ * which serializes the class's `operations` to `ops.json` and attests
+ * `migration.json` in the package directory.
+ *
+ * Accepts a trailing `--dir <path>` pair (relative to `ctx.testDir`) to stay
+ * source-compatible with the old `migration emit --dir` callsites. Any other
+ * arguments are forwarded to the spawned process so tests can pass flags like
+ * `--dry-run`.
+ */
 export async function runMigrationEmit(
   ctx: JourneyContext,
   extraArgs: readonly string[] = [],
 ): Promise<CommandResult> {
-  return runCommandRaw(createMigrationEmitCommand(), ctx.testDir, extraArgs);
+  const args = [...extraArgs];
+  const dirIdx = args.indexOf('--dir');
+  if (dirIdx < 0 || dirIdx === args.length - 1) {
+    throw new Error(
+      'runMigrationEmit requires `--dir <migration-dir>` so we know which migration.ts to execute',
+    );
+  }
+  const dirArg = args[dirIdx + 1]!;
+  args.splice(dirIdx, 2);
+
+  const migrationTs = isAbsolute(dirArg)
+    ? join(dirArg, 'migration.ts')
+    : join(ctx.testDir, dirArg, 'migration.ts');
+  try {
+    const { stdout, stderr } = await execFileAsync(TSX_BIN, [migrationTs, ...args], {
+      cwd: ctx.testDir,
+    });
+    return { exitCode: 0, stdout, stderr };
+  } catch (error) {
+    const e = error as { stdout?: string; stderr?: string; code?: number };
+    return { exitCode: e.code ?? 1, stdout: e.stdout ?? '', stderr: e.stderr ?? '' };
+  }
+}
+
+/**
+ * Runs `migration plan` and then self-emits the resulting draft `migration.ts`
+ * via `tsx`. Mirrors the old `migration plan`-auto-emits behaviour that journey
+ * tests relied on before the `migration emit` command was removed.
+ *
+ * Returns the original plan result (so JSON callers still see the plan's
+ * stdout). If plan fails, emit is skipped. If emit fails, the returned result
+ * carries the emit failure via `exitCode`/`stderr`.
+ */
+export async function runMigrationPlanAndEmit(
+  ctx: JourneyContext,
+  extraArgs: readonly string[] = [],
+): Promise<CommandResult> {
+  const planResult = await runMigrationPlan(ctx, extraArgs);
+  if (planResult.exitCode !== 0) return planResult;
+  const latest = getLatestMigrationDir(ctx);
+  if (!latest) return planResult;
+  const emitResult = await runMigrationEmit(ctx, ['--dir', `migrations/${latest}`]);
+  if (emitResult.exitCode !== 0) {
+    return {
+      ...planResult,
+      exitCode: emitResult.exitCode,
+      stderr: `${planResult.stderr}\n[runMigrationPlanAndEmit] migration emit failed (exit ${emitResult.exitCode}):\n${emitResult.stderr}`,
+    };
+  }
+  return planResult;
 }
 
 export async function runMigrationRef(
@@ -468,11 +540,30 @@ export function getMigrationDirs(ctx: JourneyContext): string[] {
 }
 
 /**
- * Returns the latest (last sorted) migration directory name.
+ * Returns the most recently created migration directory name (by mtime).
+ *
+ * Mtime-based selection is more robust than alphabetical sorting: two
+ * migrations planned in the same minute share the `YYYYMMDDTHHMM_` prefix,
+ * and alphabetical tie-break falls through to the slug. A newly-planned
+ * migration whose slug sorts earlier than an existing sibling would be
+ * mis-identified as "not the latest" if we just used `sort().at(-1)`. The
+ * on-disk mtime always reflects the actual creation order.
  */
 export function getLatestMigrationDir(ctx: JourneyContext): string | undefined {
   const dirs = getMigrationDirs(ctx);
-  return dirs[dirs.length - 1];
+  if (dirs.length === 0) return undefined;
+  const migrationsDir = join(ctx.testDir, 'migrations');
+  let newest = dirs[0]!;
+  let newestMtime = statSync(join(migrationsDir, newest)).mtimeMs;
+  for (let i = 1; i < dirs.length; i++) {
+    const dir = dirs[i]!;
+    const mtime = statSync(join(migrationsDir, dir)).mtimeMs;
+    if (mtime > newestMtime) {
+      newestMtime = mtime;
+      newest = dir;
+    }
+  }
+  return newest;
 }
 
 // ---------------------------------------------------------------------------

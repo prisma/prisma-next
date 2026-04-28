@@ -2,8 +2,7 @@
  * `migration new` — scaffolds a migration package with a `migration.ts` file
  * for manual authoring.
  *
- * Both descriptor-flow (Postgres) and class-flow (Mongo) targets go through
- * the same path here: the planner's `emptyMigration(context)` returns a
+ * The planner's `emptyMigration(context)` returns a
  * `MigrationPlanWithAuthoringSurface`, whose `renderTypeScript()` produces
  * the target-appropriate empty stub. The CLI writes the returned source
  * verbatim.
@@ -14,29 +13,35 @@ import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLatestMigration, reconstructGraph } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
   readMigrationsDir,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import {
+  findLatestMigration,
+  reconstructGraph,
+} from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
-import type { MigrationManifest } from '@prisma-next/migration-tools/types';
-import { isAttested, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
-import { join, relative, resolve } from 'pathe';
+import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import {
   CliStructuredError,
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   getTargetMigrations,
+  resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
   setCommandExamples,
@@ -68,11 +73,7 @@ async function executeMigrationNewCommand(
   const config = await loadConfig(options.config);
   const { migrationsDir, migrationsRelative } = resolveMigrationPaths(options.config, config);
 
-  const contractPath = config.contract?.output ?? 'contract.json';
-  const contractPathAbsolute = resolve(
-    options.config ? resolve(options.config, '..') : process.cwd(),
-    contractPath,
-  );
+  const contractPathAbsolute = resolveContractPath(config);
 
   let contractJsonContent: string;
   try {
@@ -121,13 +122,12 @@ async function executeMigrationNewCommand(
 
   try {
     const packages = await readMigrationsDir(migrationsDir);
-    const attested = packages.filter(isAttested);
 
-    if (attested.length > 0) {
-      const graph = reconstructGraph(attested);
+    if (packages.length > 0) {
+      const graph = reconstructGraph(packages);
 
       if (options.from) {
-        const match = attested.find((p) => p.manifest.to.startsWith(options.from!));
+        const match = packages.find((p) => p.metadata.to.startsWith(options.from!));
         if (!match) {
           return notOk(
             errorRuntime('Starting contract not found', {
@@ -136,18 +136,18 @@ async function executeMigrationNewCommand(
             }),
           );
         }
-        fromHash = match.manifest.to;
-        fromContract = match.manifest.toContract;
+        fromHash = match.metadata.to;
+        fromContract = match.metadata.toContract;
         fromContractSourceDir = match.dirPath;
       } else {
         const latestMigration = findLatestMigration(graph);
         if (latestMigration) {
           fromHash = latestMigration.to;
-          const leafPkg = attested.find(
-            (p) => p.manifest.migrationId === latestMigration.migrationId,
+          const leafPkg = packages.find(
+            (p) => p.metadata.migrationHash === latestMigration.migrationHash,
           );
           if (leafPkg) {
-            fromContract = leafPkg.manifest.toContract;
+            fromContract = leafPkg.metadata.toContract;
             fromContractSourceDir = leafPkg.dirPath;
           }
         }
@@ -155,13 +155,7 @@ async function executeMigrationNewCommand(
     }
   } catch (error) {
     if (MigrationToolsError.is(error)) {
-      return notOk(
-        errorRuntime(error.message, {
-          why: error.why,
-          fix: error.fix,
-          meta: { code: error.code },
-        }),
-      );
+      return notOk(mapMigrationToolsError(error));
     }
     throw error;
   }
@@ -180,10 +174,13 @@ async function executeMigrationNewCommand(
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const manifest: MigrationManifest = {
+  // `migration new` scaffolds an empty `migration.ts` for the user to
+  // fill, so we attest over `ops: []`. Re-running self-emit after the
+  // user adds operations will produce a different `migrationHash` (over
+  // the real ops). This is intentional — there is no on-disk draft.
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    migrationId: null,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,
@@ -191,10 +188,13 @@ async function executeMigrationNewCommand(
       used: [],
       applied: [],
       plannerVersion: '1.0.0',
-      planningStrategy: 'manual',
     },
     labels: [],
     createdAt: timestamp.toISOString(),
+  };
+  const metadata: MigrationMetadata = {
+    ...baseMetadata,
+    migrationHash: computeMigrationHash(baseMetadata, []),
   };
 
   const migrations = getTargetMigrations(config.target);
@@ -213,7 +213,7 @@ async function executeMigrationNewCommand(
       ...(config.extensionPacks ?? []),
     ]);
 
-    await writeMigrationPackage(packageDir, manifest, []);
+    await writeMigrationPackage(packageDir, metadata, []);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
@@ -265,8 +265,8 @@ export function createMigrationNewCommand(): Command {
     command,
     'Scaffold a new migration for manual authoring',
     'Creates a migration package with a migration.ts file for manual authoring.\n' +
-      'Write operation descriptors and data transforms in migration.ts, then run\n' +
-      '`migration emit` to resolve and attest the package.',
+      'Write the migration body in migration.ts, then run the file with Node\n' +
+      '(`node migration.ts`) to self-emit ops.json and attest the package.',
   );
   setCommandExamples(command, [
     'prisma-next migration new --name split-name',
@@ -300,7 +300,7 @@ export function createMigrationNewCommand(): Command {
           ui.output(`  from: ${value.from}`);
           ui.output(`  to:   ${value.to}`);
           ui.output(
-            `\nEdit migration.ts, then run \`prisma-next migration emit --dir "${value.dir}"\` to attest.`,
+            `\nEdit migration.ts, then run it directly (\`node "${value.dir}/migration.ts"\`) to self-emit and attest.`,
           );
         }
       });

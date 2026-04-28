@@ -21,7 +21,7 @@ import {
   runDbUpdate,
   runDbVerify,
   runMigrationApply,
-  runMigrationPlan,
+  runMigrationPlanAndEmit,
   runMigrationStatus,
   setupJourney,
   swapContract,
@@ -43,7 +43,7 @@ withTempDir(({ createTempDir }) => {
         // 1. Establish migration workflow: emit C1 → plan init → apply
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, '1: emit C1').toBe(0);
-        const plan0 = await runMigrationPlan(ctx, ['--name', 'init', '--json']);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
         expect(plan0.exitCode, '1: plan init').toBe(0);
         const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
         const apply0 = await runMigrationApply(ctx, ['--json']);
@@ -56,7 +56,7 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-phone');
         const emit1 = await runContractEmit(ctx);
         expect(emit1.exitCode, '2: emit C2').toBe(0);
-        const plan1 = await runMigrationPlan(ctx, ['--name', 'add-phone', '--json']);
+        const plan1 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-phone', '--json']);
         expect(plan1.exitCode, '2: plan C1→C2').toBe(0);
         const c2Hash = parseJsonOutput<{ to: string }>(plan1).to;
         const apply1 = await runMigrationApply(ctx, ['--json']);
@@ -82,7 +82,7 @@ withTempDir(({ createTempDir }) => {
         // 4. Retroactive migration plan: user realizes they should have used migrations.
         //    `migration plan` plans from graph leaf (C2) to current contract (C3).
         //    This is the same edge that db update already applied to the DB.
-        const plan2 = await runMigrationPlan(ctx, ['--name', 'add-bio', '--json']);
+        const plan2 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-bio', '--json']);
         expect(plan2.exitCode, '4: plan C2→C3').toBe(0);
         const plan2Result = parseJsonOutput<{ from: string; to: string }>(plan2);
         expect(plan2Result.from, '4: from is C2 (graph leaf)').toBe(c2Hash);
@@ -103,7 +103,7 @@ withTempDir(({ createTempDir }) => {
         swapContract(ctx, 'contract-all');
         const emit3 = await runContractEmit(ctx);
         expect(emit3.exitCode, '6: emit C4').toBe(0);
-        const plan3 = await runMigrationPlan(ctx, ['--name', 'add-avatar', '--json']);
+        const plan3 = await runMigrationPlanAndEmit(ctx, ['--name', 'add-avatar', '--json']);
         expect(plan3.exitCode, '6: plan C3→C4').toBe(0);
         const plan3Result = parseJsonOutput<{ from: string; to: string }>(plan3);
         expect(plan3Result.from, '6: from is C3 (new graph leaf)').toBe(c3Hash);

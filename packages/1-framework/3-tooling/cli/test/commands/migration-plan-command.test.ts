@@ -1,6 +1,6 @@
 import { errorUnfilledPlaceholder } from '@prisma-next/errors/migration';
 import { timeouts } from '@prisma-next/test-utils';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MigrationPlanResult } from '../../src/commands/migration-plan';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
 
@@ -10,9 +10,8 @@ type CreateMigrationPlanCommand =
 const mocks = vi.hoisted(() => ({
   loadConfig: vi.fn(),
   readFile: vi.fn(),
-  loadAllBundles: vi.fn(),
+  loadMigrationPackages: vi.fn(),
   findLatestMigration: vi.fn(),
-  emitMigration: vi.fn(),
   writeMigrationPackage: vi.fn(),
   copyFilesWithRename: vi.fn(),
   writeMigrationTs: vi.fn(),
@@ -36,14 +35,14 @@ vi.mock('../../src/utils/command-helpers', async () => {
   );
   return {
     ...actual,
-    loadAllBundles: mocks.loadAllBundles,
+    loadMigrationPackages: mocks.loadMigrationPackages,
   };
 });
 
-vi.mock('@prisma-next/migration-tools/dag', async () => {
-  const actual = await vi.importActual<typeof import('@prisma-next/migration-tools/dag')>(
-    '@prisma-next/migration-tools/dag',
-  );
+vi.mock('@prisma-next/migration-tools/migration-graph', async () => {
+  const actual = await vi.importActual<
+    typeof import('@prisma-next/migration-tools/migration-graph')
+  >('@prisma-next/migration-tools/migration-graph');
   return { ...actual, findLatestMigration: mocks.findLatestMigration };
 });
 
@@ -60,10 +59,6 @@ vi.mock('@prisma-next/migration-tools/io', async () => {
 
 vi.mock('@prisma-next/migration-tools/migration-ts', () => ({
   writeMigrationTs: mocks.writeMigrationTs,
-}));
-
-vi.mock('../../src/lib/migration-emit', () => ({
-  emitMigration: mocks.emitMigration,
 }));
 
 vi.mock('../../src/utils/framework-components', () => ({
@@ -88,20 +83,27 @@ function makeContractJson(storageHash: string): string {
 }
 
 function setupBaseConfig(): void {
+  const planner = {
+    plan: vi.fn().mockReturnValue({
+      kind: 'success',
+      plan: {
+        operations: [
+          { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
+        ],
+        renderTypeScript: vi.fn().mockReturnValue('// migration.ts'),
+      },
+    }),
+  };
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: 'mongo' },
+    family: { familyId: 'mongo', create: vi.fn().mockReturnValue({}) },
     target: {
       id: 'mongo',
       familyId: 'mongo',
       targetId: 'mongo',
       kind: 'target',
       migrations: {
-        planWithDescriptors: vi.fn().mockReturnValue({
-          ok: true,
-          descriptors: [{ kind: 'createTable', tableName: 'user' }],
-        }),
-        renderDescriptorTypeScript: vi.fn().mockReturnValue('// migration.ts'),
-        resolveDescriptors: vi.fn().mockReturnValue([]),
+        createPlanner: vi.fn().mockReturnValue(planner),
+        contractToSchema: vi.fn().mockReturnValue({}),
       },
     },
     adapter: { kind: 'adapter', familyId: 'mongo', targetId: 'mongo' },
@@ -133,18 +135,35 @@ describe('migration plan command', () => {
     vi.clearAllMocks();
   });
 
+  // The repo-wide vitest config uses `isolate: false`, so every `vi.mock(...)`
+  // registered above leaks into the next test file in the same worker (which
+  // breaks anything that does real fs I/O against `node:fs/promises.readFile`,
+  // `command-helpers.loadMigrationPackages`, or `migration-tools/io.writeMigrationPackage`).
+  // Use `doUnmock` (non-hoisted) here so subsequent files see the real modules.
+  afterAll(() => {
+    vi.doUnmock('node:fs/promises');
+    vi.doUnmock('../../src/config-loader');
+    vi.doUnmock('../../src/utils/command-helpers');
+    vi.doUnmock('@prisma-next/migration-tools/migration-graph');
+    vi.doUnmock('@prisma-next/migration-tools/io');
+    vi.doUnmock('@prisma-next/migration-tools/migration-ts');
+    vi.doUnmock('../../src/utils/framework-components');
+    vi.doUnmock('../../src/control-api/operations/extract-sql-ddl');
+    vi.doUnmock('@prisma-next/framework-components/control');
+    vi.resetModules();
+  });
+
   describe('no-op short-circuit', () => {
-    it('returns noOp envelope without migrationId or dir when hashes match', async () => {
+    it('returns noOp envelope without dir when hashes match', async () => {
       setupBaseConfig();
       mocks.readFile.mockResolvedValue(makeContractJson(SAME_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: SAME_HASH,
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
 
       const command = createMigrationPlanCommand();
@@ -163,54 +182,50 @@ describe('migration plan command', () => {
         operations: [],
         summary: 'No changes detected between contracts',
       });
-      expect(result).not.toHaveProperty('migrationId');
       expect(result).not.toHaveProperty('dir');
-      expect(mocks.emitMigration).not.toHaveBeenCalled();
       expect(mocks.writeMigrationTs).not.toHaveBeenCalled();
     });
   });
 
-  describe('emit-after-scaffold ordering', () => {
-    it('calls emitMigration after writeMigrationTs in non-no-op path', async () => {
+  describe('non-no-op plan', () => {
+    it('scaffolds migration.ts from the planner result and reports operations', async () => {
       setupBaseConfig();
       const OLD_HASH = 'sha256:old-hash';
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
 
-      const callOrder: string[] = [];
-      mocks.writeMigrationTs.mockImplementation(async () => {
-        callOrder.push('writeMigrationTs');
-      });
-      mocks.emitMigration.mockImplementation(async () => {
-        callOrder.push('emitMigration');
-        return {
-          operations: [
-            { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
-          ],
-          migrationId: 'sha256:new-id',
-        };
-      });
-
       const command = createMigrationPlanCommand();
       const exitCode = await executeCommand(command, ['--json']);
 
       expect(exitCode).toBe(0);
-      expect(callOrder).toEqual(['writeMigrationTs', 'emitMigration']);
-      expect(mocks.emitMigration).toHaveBeenCalledTimes(1);
+      expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const result = JSON.parse(jsonLine!) as MigrationPlanResult;
+      expect(result).toMatchObject({
+        ok: true,
+        noOp: false,
+        from: OLD_HASH,
+        to: NEW_HASH,
+        operations: [
+          { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
+        ],
+      });
+      expect(result).not.toHaveProperty('migrationHash');
     });
   });
 
@@ -261,14 +276,13 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -291,23 +305,21 @@ describe('migration plan command', () => {
       });
       expect(result.summary).toContain('placeholder');
       expect(result.dir).toBeDefined();
-      expect(result.migrationId).toBeUndefined();
     });
 
-    it('writes migration.ts but does not call emitMigration when placeholders are present', async () => {
+    it('writes migration.ts and returns pendingPlaceholders when placeholders are present', async () => {
       setupClassBasedConfig(() => {
         throw errorUnfilledPlaceholder('backfill-users-status:run');
       });
 
       mocks.readFile.mockResolvedValue(makeContractJson('sha256:new'));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: 'sha256:old',
-        migrationId: 'sha256:prev',
+        migrationHash: 'sha256:prev',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
@@ -317,7 +329,6 @@ describe('migration plan command', () => {
       await executeCommand(command, ['--json']);
 
       expect(mocks.writeMigrationTs).toHaveBeenCalledTimes(1);
-      expect(mocks.emitMigration).not.toHaveBeenCalled();
     });
   });
 
@@ -327,9 +338,8 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [],
-        drafts: [],
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue(null);
@@ -337,10 +347,6 @@ describe('migration plan command', () => {
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
-      mocks.emitMigration.mockResolvedValue({
-        operations: [],
-        migrationId: 'sha256:new-id',
-      });
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);
@@ -359,29 +365,24 @@ describe('migration plan command', () => {
       const NEW_HASH = 'sha256:new-hash';
 
       mocks.readFile.mockResolvedValue(makeContractJson(NEW_HASH));
-      mocks.loadAllBundles.mockResolvedValue({
-        attested: [
+      mocks.loadMigrationPackages.mockResolvedValue({
+        bundles: [
           {
-            manifest: { migrationId: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
+            metadata: { migrationHash: 'sha256:prev-id', to: OLD_HASH, toContract: {} },
             dirPath: '/tmp/test/migrations/20260301T0900_prev',
             dirName: '20260301T0900_prev',
           },
         ],
-        drafts: [],
         graph: new Map(),
       });
       mocks.findLatestMigration.mockReturnValue({
         to: OLD_HASH,
-        migrationId: 'sha256:prev-id',
+        migrationHash: 'sha256:prev-id',
       });
       mocks.assertFrameworkComponentsCompatible.mockReturnValue([]);
       mocks.writeMigrationPackage.mockResolvedValue(undefined);
       mocks.copyFilesWithRename.mockResolvedValue(undefined);
       mocks.extractSqlDdl.mockReturnValue([]);
-      mocks.emitMigration.mockResolvedValue({
-        operations: [],
-        migrationId: 'sha256:new-id',
-      });
 
       const command = createMigrationPlanCommand();
       await executeCommand(command, ['--json']);

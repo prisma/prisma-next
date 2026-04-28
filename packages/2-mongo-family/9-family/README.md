@@ -23,6 +23,7 @@ This package is the Mongo family integration point for both control-plane assemb
 - `./control`: control-plane entrypoint exporting `mongoFamilyDescriptor`, `mongoTargetDescriptor`, `createMongoFamilyInstance`, and `MongoControlFamilyInstance`
 - `./migration`: migration authoring — `Migration` class, factory functions, and strategies (re-exported from `@prisma-next/target-mongo/migration`)
 - `./pack`: pure pack ref for TypeScript authoring flows such as `@prisma-next/mongo-contract-ts/contract-builder`
+- `./schema-verify`: re-exports the pure `verifyMongoSchema(...)` from `@prisma-next/target-mongo/schema-verify`. `MongoFamilyInstance.schemaVerify` (i.e. `db verify --schema-only`) and the `MongoMigrationRunner` post-apply verify step both call into this shared verifier, so both surfaces agree on "matches the contract" by construction
 
 ## Usage
 
@@ -99,15 +100,16 @@ The current `contract.ts` slice supports roots and collections, typed reference 
 ### Migration authoring
 
 ```typescript
+import { MigrationCLI } from "@prisma-next/cli/migration-cli"
 import { Migration, createIndex, createCollection }
   from "@prisma-next/family-mongo/migration"
 
 class AddUsersCollection extends Migration {
-  describe() {
+  override describe() {
     return { from: "abc123", to: "def456", labels: ["add-users"] }
   }
 
-  plan() {
+  override get operations() {
     return [
       createCollection("users", {
         validator: { $jsonSchema: { required: ["email"] } },
@@ -119,7 +121,7 @@ class AddUsersCollection extends Migration {
 }
 
 export default AddUsersCollection;
-Migration.run(import.meta.url, AddUsersCollection)
+MigrationCLI.run(import.meta.url, AddUsersCollection);
 ```
 
 Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-run` to preview without writing.
@@ -133,6 +135,7 @@ Run `node migration.ts` to produce `ops.json` and `migration.json`. Use `--dry-r
 - `src/exports/control.ts`: control-plane entrypoint
 - `src/exports/migration.ts`: migration authoring entrypoint
 - `src/exports/pack.ts`: authoring-time family pack ref
+- `src/exports/schema-verify.ts`: schema-verify entrypoint that re-exports from `@prisma-next/target-mongo/schema-verify`
 
 ## Dependencies
 

@@ -6,7 +6,7 @@ import postgresPack from '@prisma-next/target-postgres/pack';
 /**
  * Type-change *from*-state: a `score` column typed as `text`. Pairs with
  * `contract-typechange-int.ts` to drive an unsafe `text → int4` change
- * through the Postgres class-flow planner's `typeChangeCallStrategy`.
+ * through the Postgres planner's `typeChangeCallStrategy`.
  */
 export const contract = defineContract({
   family: sqlFamily,

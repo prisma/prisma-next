@@ -1,5 +1,6 @@
 import { introspectSchema } from '@prisma-next/adapter-mongo/control';
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
+import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   ControlDriverInstance,
   ControlFamilyInstance,
@@ -13,21 +14,15 @@ import type {
 import {
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
-  VERIFY_CODE_SCHEMA_FAILURE,
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import {
-  contractToMongoSchemaIR,
-  initMarker,
-  readMarker,
-  updateMarker,
-} from '@prisma-next/target-mongo/control';
+import { initMarker, readMarker, updateMarker } from '@prisma-next/target-mongo/control';
+import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
-import { diffMongoSchemas } from './schema-diff';
 import { mongoSchemaToView } from './schema-to-view';
 
 export interface MongoControlFamilyInstance
@@ -143,39 +138,26 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
     readonly strict: boolean;
     readonly contractPath: string;
     readonly configPath?: string;
-    readonly frameworkComponents: ReadonlyArray<unknown>;
+    readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', string>>;
   }): Promise<VerifyDatabaseSchemaResult> {
     const { driver, contract: rawContract, strict, contractPath, configPath } = options;
-    const startTime = Date.now();
 
     const validated = validateMongoContract<MongoContract>(rawContract);
     const contract = validated.contract;
 
     const db = extractDb(driver);
     const liveIR = await introspectSchema(db);
-    const expectedIR = contractToMongoSchemaIR(contract);
 
-    const { root, issues, counts } = diffMongoSchemas(liveIR, expectedIR, strict);
-
-    const ok = counts.fail === 0;
-
-    return {
-      ok,
-      ...ifDefined('code', ok ? undefined : VERIFY_CODE_SCHEMA_FAILURE),
-      summary: ok ? 'Schema matches contract' : `Schema verification found ${counts.fail} issue(s)`,
-      contract: {
-        storageHash: contract.storage.storageHash,
-        ...ifDefined('profileHash', contract.profileHash),
-      },
-      target: { expected: contract.target },
-      schema: { issues, root, counts },
-      meta: {
-        ...ifDefined('contractPath', contractPath),
+    return verifyMongoSchema({
+      contract,
+      schema: liveIR,
+      strict,
+      frameworkComponents: options.frameworkComponents,
+      context: {
+        contractPath,
         ...ifDefined('configPath', configPath),
-        strict,
       },
-      timings: { total: Date.now() - startTime },
-    };
+    });
   }
 
   async sign(options: {

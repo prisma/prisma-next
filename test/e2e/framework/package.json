@@ -34,6 +34,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/ids": "workspace:*",
     "@prisma-next/integration-tests": "workspace:*",
+    "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",

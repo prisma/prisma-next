@@ -243,12 +243,11 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
   /**
    * Produce an empty `migration.ts` authoring surface for `migration new`.
    *
-   * Mongo is a class-flow target, so the "empty migration" is a
-   * `PlannerProducedMongoMigration` with no operations; `renderTypeScript()`
-   * emits a stub class with the correct `from`/`to` metadata that the user
-   * then fills in with operations. The contract path on the context is
-   * unused — Mongo's emitted source does not import from the generated
-   * contract `.d.ts`.
+   * The "empty migration" is a `PlannerProducedMongoMigration` with no
+   * operations; `renderTypeScript()` emits a stub class with the correct
+   * `from`/`to` metadata that the user then fills in with operations. The
+   * contract path on the context is unused — Mongo's emitted source does
+   * not import from the generated contract `.d.ts`.
    */
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
     return new PlannerProducedMongoMigration([], {

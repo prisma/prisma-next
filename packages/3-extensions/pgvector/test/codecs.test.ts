@@ -2,6 +2,21 @@ import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
+// The pgvector codec authors `encode`/`decode` synchronously, but the
+// `codec()` factory in `relational-core` lifts both methods to
+// `Promise`-returning at the boundary. The tests below cast through the
+// Promise-returning shape and `await` every call so unit-level coverage
+// stays aligned with the codec contract:
+//   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
+type AsyncVectorCodec = {
+  readonly encode: (value: number[]) => Promise<string>;
+  readonly decode: (wire: string) => Promise<number[]>;
+};
+
+function asAsyncCodec(): AsyncVectorCodec {
+  return codecDefinitions.vector.codec as unknown as AsyncVectorCodec;
+}
+
 describe('pgvector codecs', () => {
   it(
     'has vector codec registered',
@@ -14,73 +29,73 @@ describe('pgvector codecs', () => {
     timeouts.default,
   );
 
-  it('encodes number array to PostgreSQL vector format', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('encodes number array to PostgreSQL vector format', async () => {
+    const vectorCodec = asAsyncCodec();
 
     const value = [0.1, 0.2, 0.3, 0.4];
-    const encoded = vectorCodec.encode!(value);
+    const encoded = await vectorCodec.encode(value);
     expect(encoded).toBe('[0.1,0.2,0.3,0.4]');
     expect(typeof encoded).toBe('string');
   });
 
-  it('decodes PostgreSQL vector format string', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('decodes PostgreSQL vector format string', async () => {
+    const vectorCodec = asAsyncCodec();
 
     const wire = '[0.1,0.2,0.3,0.4]';
-    const decoded = vectorCodec.decode(wire);
+    const decoded = await vectorCodec.decode(wire);
     expect(decoded).toEqual([0.1, 0.2, 0.3, 0.4]);
   });
 
-  it('round-trip encode/decode preserves values', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('round-trip encode/decode preserves values', async () => {
+    const vectorCodec = asAsyncCodec();
 
     const original = [0.1, 0.2, 0.3, 0.4, 0.5];
-    const encoded = vectorCodec.encode!(original);
+    const encoded = await vectorCodec.encode(original);
     expect(typeof encoded).toBe('string');
     expect(encoded).toBe('[0.1,0.2,0.3,0.4,0.5]');
-    const decoded = vectorCodec.decode(encoded);
+    const decoded = await vectorCodec.decode(encoded);
     expect(decoded).toEqual(original);
   });
 
-  it('handles empty vector', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('handles empty vector', async () => {
+    const vectorCodec = asAsyncCodec();
 
     const original: number[] = [];
-    const encoded = vectorCodec.encode!(original);
+    const encoded = await vectorCodec.encode(original);
     expect(encoded).toBe('[]');
-    const decoded = vectorCodec.decode(encoded);
+    const decoded = await vectorCodec.decode(encoded);
     expect(decoded).toEqual([]);
   });
 
-  it('throws error when encoding non-array', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('rejects when encoding non-array', async () => {
+    const vectorCodec = asAsyncCodec();
 
-    expect(() => {
-      vectorCodec.encode!('not an array' as unknown as number[]);
-    }).toThrow('Vector value must be an array of numbers');
+    await expect(vectorCodec.encode('not an array' as unknown as number[])).rejects.toThrow(
+      'Vector value must be an array of numbers',
+    );
   });
 
-  it('throws error when encoding array with non-numbers', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('rejects when encoding array with non-numbers', async () => {
+    const vectorCodec = asAsyncCodec();
 
-    expect(() => {
-      vectorCodec.encode!([1, 2, 'three'] as unknown as number[]);
-    }).toThrow('Vector value must contain only numbers');
+    await expect(vectorCodec.encode([1, 2, 'three'] as unknown as number[])).rejects.toThrow(
+      'Vector value must contain only numbers',
+    );
   });
 
-  it('throws error when decoding invalid string format', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('rejects when decoding invalid string format', async () => {
+    const vectorCodec = asAsyncCodec();
 
-    expect(() => {
-      vectorCodec.decode('not a vector format');
-    }).toThrow('Invalid vector format: expected "[...]", got "not a vector format"');
+    await expect(vectorCodec.decode('not a vector format')).rejects.toThrow(
+      'Invalid vector format: expected "[...]", got "not a vector format"',
+    );
   });
 
-  it('throws error when decoding non-string', () => {
-    const vectorCodec = codecDefinitions.vector.codec;
+  it('rejects when decoding non-string', async () => {
+    const vectorCodec = asAsyncCodec();
 
-    expect(() => {
-      vectorCodec.decode(123 as unknown as string);
-    }).toThrow('Vector wire value must be a string');
+    await expect(vectorCodec.decode(123 as unknown as string)).rejects.toThrow(
+      'Vector wire value must be a string',
+    );
   });
 });

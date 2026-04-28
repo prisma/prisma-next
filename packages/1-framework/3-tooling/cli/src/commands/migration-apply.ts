@@ -1,8 +1,8 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findPathWithDecision } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
+import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
-import type { AttestedMigrationBundle } from '@prisma-next/migration-tools/types';
-import { MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 
@@ -17,11 +17,11 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllBundles,
-  type MigrationBundleSet,
+  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -63,7 +63,7 @@ export interface MigrationApplyResult {
     readonly refName?: string;
     readonly selectedPath: readonly {
       readonly dirName: string;
-      readonly migrationId: string | null;
+      readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
     }[];
@@ -71,19 +71,6 @@ export interface MigrationApplyResult {
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredErrorType {
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration apply: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType {
@@ -94,12 +81,12 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: AttestedMigrationBundle): MigrationApplyStep {
+function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
-    from: pkg.manifest.from,
-    to: pkg.manifest.to,
-    toContract: pkg.manifest.toContract,
+    from: pkg.metadata.from,
+    to: pkg.metadata.to,
+    toContract: pkg.metadata.toContract,
     operations: pkg.ops,
   };
 }
@@ -111,7 +98,7 @@ async function executeMigrationApplyCommand(
   startTime: number,
 ): Promise<Result<MigrationApplyResult, CliStructuredErrorType>> {
   const config = await loadConfig(options.config);
-  const { configPath, migrationsDir, migrationsRelative, refsPath } = resolveMigrationPaths(
+  const { configPath, migrationsDir, migrationsRelative, refsDir } = resolveMigrationPaths(
     options.config,
     config,
   );
@@ -148,8 +135,8 @@ async function executeMigrationApplyCommand(
   if (options.ref) {
     refName = options.ref;
     try {
-      const refs = await readRefs(refsPath);
-      destinationHash = resolveRef(refs, refName);
+      const refs = await readRefs(refsDir);
+      destinationHash = resolveRef(refs, refName).hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -195,15 +182,9 @@ async function executeMigrationApplyCommand(
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
-  let migrations: MigrationBundleSet;
+  let migrations: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
-    migrations = await loadAllBundles(migrationsDir);
-    if (migrations.drafts.length > 0 && !flags.quiet) {
-      ui.warn(
-        `${migrations.drafts.length} draft migration(s) found: ${migrations.drafts.map((d) => d.dirName).join(', ')}. ` +
-          "Run 'prisma-next migration emit --dir <path>' to attest before applying.",
-      );
-    }
+    migrations = await loadMigrationPackages(migrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
@@ -223,12 +204,12 @@ async function executeMigrationApplyCommand(
     await client.connect(dbConnection);
     const marker = await client.readMarker();
 
-    // --- No attested migrations on disk ---
-    if (migrations.attested.length === 0) {
+    // --- No migrations on disk ---
+    if (migrations.bundles.length === 0) {
       if (marker?.storageHash) {
         return notOk(
           errorRuntime('Database has state but no migrations exist', {
-            why: `The database marker hash "${marker.storageHash}" exists but no attested migrations were found in ${migrationsRelative}`,
+            why: `The database marker hash "${marker.storageHash}" exists but no migrations were found in ${migrationsRelative}`,
             fix: 'Ensure the migrations directory is correct. If the database was managed with `db init` or `db update`, run `prisma-next db sign` to update the marker.',
             meta: { markerHash: marker.storageHash, migrationsDir: migrationsRelative },
           }),
@@ -238,8 +219,8 @@ async function executeMigrationApplyCommand(
       if (destinationHash !== EMPTY_CONTRACT_HASH) {
         return notOk(
           errorRuntime('Current contract has no planned migrations', {
-            why: `No attested migrations were found in ${migrationsRelative}, but current contract hash is "${destinationHash}"`,
-            fix: 'Run `prisma-next migration plan` to create an attested migration for the current contract.',
+            why: `No migrations were found in ${migrationsRelative}, but current contract hash is "${destinationHash}"`,
+            fix: 'Run `prisma-next migration plan` to create a migration for the current contract.',
             meta: { destinationHash, migrationsDir: migrationsRelative },
           }),
         );
@@ -251,7 +232,7 @@ async function executeMigrationApplyCommand(
         migrationsTotal: 0,
         markerHash: EMPTY_CONTRACT_HASH,
         applied: [],
-        summary: 'No attested migrations found',
+        summary: 'No migrations found',
         timings: { total: Date.now() - startTime },
       });
     }
@@ -283,15 +264,10 @@ async function executeMigrationApplyCommand(
     }
 
     if (!migrations.graph.nodes.has(destinationHash)) {
-      const matchingDraft = migrations.drafts.find((d) => d.manifest.to === destinationHash);
       return notOk(
         errorRuntime('Current contract has no planned migration path', {
-          why: matchingDraft
-            ? `A draft migration exists at "${matchingDraft.dirName}" but has not been attested`
-            : `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
-          fix: matchingDraft
-            ? `Run 'prisma-next migration emit --dir "${migrationsRelative}/${matchingDraft.dirName}"' to attest, then re-run apply.`
-            : 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
+          why: `Current contract hash "${destinationHash}" is not present in the migration history at ${migrationsRelative}`,
+          fix: 'Run `prisma-next migration plan` to create a migration for the current contract, then re-run apply.',
           meta: { destinationHash, knownNodes: [...migrations.graph.nodes] },
         }),
       );
@@ -329,7 +305,7 @@ async function executeMigrationApplyCommand(
       });
     }
 
-    const bundleByDir = new Map(migrations.attested.map((b) => [b.dirName, b]));
+    const bundleByDir = new Map(migrations.bundles.map((b) => [b.dirName, b]));
     const pendingMigrations: MigrationApplyStep[] = [];
     for (const migration of pendingPath) {
       const pkg = bundleByDir.get(migration.dirName);

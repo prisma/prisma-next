@@ -19,7 +19,7 @@ describe('writeMigrationTs', () => {
 
   it('writes the rendered content after passing it through prettier', async () => {
     // Rendered source often comes in with loose spacing from a programmatic
-    // composer (e.g. the class-flow renderer). `writeMigrationTs` runs it
+    // composer (e.g. the migration renderer). `writeMigrationTs` runs it
     // through prettier so the on-disk file is canonically formatted — this
     // test locks that behaviour by giving it a deliberately under-quoted
     // statement and asserting the written file uses the house single-quote

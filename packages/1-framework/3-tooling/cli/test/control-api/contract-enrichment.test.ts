@@ -189,8 +189,8 @@ describe('enrichContract', () => {
             {
               id: 'pg/vector@1',
               targetTypes: ['vector'],
-              encode: (v: unknown) => v,
-              decode: (v: unknown) => v,
+              encode: async (v: unknown) => v,
+              decode: async (v: unknown) => v,
               encodeJson: () => null,
               decodeJson: () => null,
             },

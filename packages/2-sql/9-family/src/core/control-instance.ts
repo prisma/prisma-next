@@ -435,7 +435,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
       const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
 
-      const controlAdapter = adapter.create();
+      const controlAdapter = adapter.create(stack);
       if (!isSqlControlAdapter(controlAdapter)) {
         throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
       }
@@ -559,7 +559,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }): Promise<SqlSchemaIR> {
       const { driver, contract } = options;
 
-      const controlAdapter = adapter.create();
+      const controlAdapter = adapter.create(stack);
       if (!isSqlControlAdapter(controlAdapter)) {
         throw new Error('Adapter does not implement SqlControlAdapter.introspect()');
       }

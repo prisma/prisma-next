@@ -1,4 +1,4 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
+import { quoteIdentifier } from '../../sql-utils';
 import { qualifyTableName, toRegclassLiteral } from '../planner-sql-checks';
 import { type Op, step, targetDetails } from './shared';
 

@@ -19,7 +19,9 @@ export interface TelemetryMiddlewareOptions {
   readonly onEvent?: (event: TelemetryEvent) => void;
 }
 
-export function createTelemetryMiddleware(options?: TelemetryMiddlewareOptions): RuntimeMiddleware {
+export function createTelemetryMiddleware(
+  options?: TelemetryMiddlewareOptions,
+): RuntimeMiddleware & { readonly familyId?: undefined; readonly targetId?: undefined } {
   const emit = (event: TelemetryEvent, ctx: RuntimeMiddlewareContext) => {
     try {
       if (options?.onEvent) {

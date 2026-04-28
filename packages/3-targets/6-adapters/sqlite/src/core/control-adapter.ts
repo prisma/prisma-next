@@ -10,7 +10,7 @@ const sqliteControlAdapterDescriptor: ControlAdapterDescriptor<
   ControlAdapterInstance<'sql', 'sqlite'>
 > = {
   ...sqliteAdapterDescriptorMeta,
-  create(): ControlAdapterInstance<'sql', 'sqlite'> {
+  create(_stack): ControlAdapterInstance<'sql', 'sqlite'> {
     return { familyId: 'sql', targetId: 'sqlite' };
   },
 };

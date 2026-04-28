@@ -303,7 +303,7 @@ type UserIdColumn = UserColumns['id'];
       // Verify the contract.d.ts imports are correct
       const contractDtsContent = await readFile(contractDtsPath, 'utf-8');
       expect(contractDtsContent).toContain("from '@prisma-next/sql-contract/types'");
-      expect(contractDtsContent).toContain("from '@prisma-next/adapter-postgres/codec-types'");
+      expect(contractDtsContent).toContain("from '@prisma-next/target-postgres/codec-types'");
 
       // Create a comprehensive test file that uses all exported types
       const testFileContent = `import type { Contract, CodecTypes, Tables, Models } from './contract';
@@ -366,6 +366,9 @@ type CodecIntType = CodecTypes['pg/int4@1'];
             ],
             '@prisma-next/adapter-postgres/*': [
               `${relativeToWorkspace}/packages/3-targets/6-adapters/postgres/dist/*`,
+            ],
+            '@prisma-next/target-postgres/*': [
+              `${relativeToWorkspace}/packages/3-targets/3-targets/postgres/dist/*`,
             ],
             '@prisma-next/framework-components/codec': [
               `${relativeToWorkspace}/packages/1-framework/1-core/framework-components/dist/codec.d.mts`,

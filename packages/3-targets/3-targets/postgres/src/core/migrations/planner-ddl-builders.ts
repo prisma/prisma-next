@@ -1,4 +1,3 @@
-import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type {
   ForeignKey,
@@ -7,6 +6,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
+import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import type { PostgresColumnDefault } from '../types';
 import { qualifyTableName } from './planner-sql-checks';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';

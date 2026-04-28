@@ -2,7 +2,7 @@ import { Migration } from '@prisma-next/migration-tools/migration';
 import type { AnyMongoMigrationOperation } from '@prisma-next/mongo-query-ast/control';
 
 /**
- * Family-owned base class for class-flow Mongo migrations.
+ * Family-owned base class for Mongo migrations.
  *
  * Provides the fixed `targetId = 'mongo'` so that user-authored migrations
  * and renderer-generated scaffolds (e.g. the output of

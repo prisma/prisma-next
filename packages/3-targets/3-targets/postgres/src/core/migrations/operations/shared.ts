@@ -1,7 +1,7 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { quoteIdentifier } from '../../sql-utils';
 import type { OperationClass, PostgresPlanTargetDetails } from '../planner-target-details';
 
 export type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
@@ -13,7 +13,7 @@ export type Op = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
  *
  * - `typeSql` is the column's DDL type string (e.g. `"integer"`, `"SERIAL"`,
  *   `"varchar(100)"`), already produced by `buildColumnTypeSql` in the
- *   descriptor-flow wrapper.
+ *   call-factory wrapper.
  * - `defaultSql` is the full `DEFAULT …` clause (e.g. `"DEFAULT 42"`) or an
  *   empty string when the column has no default, matching
  *   `buildColumnDefaultSql`'s output.
@@ -27,8 +27,7 @@ export interface ColumnSpec {
 
 /**
  * Literal-args shape for a foreign key definition. The referenced table is
- * assumed to live in the same schema as the constrained table — this matches
- * the current descriptor-flow behavior.
+ * assumed to live in the same schema as the constrained table.
  */
 export interface ForeignKeySpec {
   readonly name: string;

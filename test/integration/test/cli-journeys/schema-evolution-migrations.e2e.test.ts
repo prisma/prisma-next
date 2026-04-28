@@ -28,6 +28,7 @@ import {
   runMigrationApply,
   runMigrationEmit,
   runMigrationPlan,
+  runMigrationPlanAndEmit,
   runMigrationShow,
   runMigrationStatus,
   setupJourney,
@@ -54,7 +55,7 @@ withTempDir(({ createTempDir }) => {
         // Precondition: emit base contract and plan initial migration (∅ → base)
         const emit0 = await runContractEmit(ctx);
         expect(emit0.exitCode, 'B.pre: emit base').toBe(0);
-        const planInit = await runMigrationPlan(ctx, ['--name', 'initial']);
+        const planInit = await runMigrationPlanAndEmit(ctx, ['--name', 'initial']);
         expect(planInit.exitCode, 'B.pre: plan initial').toBe(0);
         const applyInit = await runMigrationApply(ctx);
         expect(applyInit.exitCode, 'B.pre: apply initial').toBe(0);

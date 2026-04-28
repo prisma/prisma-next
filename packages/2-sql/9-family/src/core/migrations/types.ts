@@ -243,6 +243,15 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
+   * The "from" contract (state the planner assumes the database starts at).
+   * Only `migration plan` supplies this; `db update` / `db init` reconcile
+   * against the live schema with no old contract. Strategies that need
+   * from/to column-shape comparisons (unsafe type change, nullability
+   * tightening) use this to decide whether to emit `dataTransform`
+   * placeholders.
+   */
+  readonly fromContract?: Contract<SqlStorage> | null;
+  /**
    * Active framework components participating in this composition.
    * SQL targets can interpret this list to derive database dependencies.
    * All components must have matching familyId ('sql') and targetId.

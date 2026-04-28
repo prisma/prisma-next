@@ -1,12 +1,14 @@
 import { createContract } from '@prisma-next/contract/testing';
+import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   instantiateExecutionStack: vi.fn(),
   createRuntime: vi.fn(),
   createExecutionContext: vi.fn(),
   createSqlExecutionStack: vi.fn(),
+  withTransaction: vi.fn(),
   sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('@prisma-next/sql-runtime', () => ({
   createExecutionContext: mocks.createExecutionContext,
   createSqlExecutionStack: mocks.createSqlExecutionStack,
   createRuntime: mocks.createRuntime,
+  withTransaction: mocks.withTransaction,
 }));
 
 vi.mock('@prisma-next/sql-contract/validate', () => ({
@@ -61,7 +64,7 @@ vi.mock('pg', () => {
 });
 
 import { Client, Pool } from 'pg';
-import postgres from '../src/runtime/postgres';
+import postgres, { type PostgresClient } from '../src/runtime/postgres';
 
 const contract = createContract<SqlStorage>();
 
@@ -71,6 +74,7 @@ describe('postgres', () => {
     mocks.createRuntime.mockReset();
     mocks.createExecutionContext.mockReset();
     mocks.createSqlExecutionStack.mockReset();
+    mocks.withTransaction.mockReset();
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
     mocks.validateContract.mockReset();
@@ -95,6 +99,45 @@ describe('postgres', () => {
     mocks.createRuntime.mockReturnValue({ id: 'runtime-instance' });
     mocks.validateContract.mockReturnValue(contract);
     mocks.sqlBuilder.mockReturnValue({ lane: 'sql' });
+    mocks.withTransaction.mockImplementation(
+      async (_runtime: unknown, fn: (ctx: unknown) => unknown) => {
+        const mockTxCtx = {
+          invalidated: false,
+          execute: vi.fn(),
+        };
+        return fn(mockTxCtx);
+      },
+    );
+  });
+
+  // Regression: postgres({...}) must remain synchronous (it only consumes
+  // build-time codec methods via validateContract / type maps). If construction
+  // becomes Promise-returning, this assignment loses its synchronous type and
+  // every call site needs `await postgres(...)`.
+  it('returns a synchronous client (sync regression)', () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const thenable = db as unknown as { then?: unknown };
+    expect(typeof thenable.then).toBe('undefined');
+    expect(db.sql).toBeDefined();
+  });
+
+  it('binds to a synchronous PostgresClient at the call site', () => {
+    // Symmetric to the Mongo-side createMongoAdapter regression: assert the
+    // return type of postgres({...}) directly so a future drift to
+    // Promise-shaped construction fails the test-file typecheck rather than
+    // surfacing only when call sites silently lose `.sql` / `.orm`.
+    type CallShape = (options: {
+      contract: Contract<SqlStorage>;
+      url: string;
+    }) => PostgresClient<Contract<SqlStorage>>;
+    expectTypeOf<ReturnType<CallShape>>().toEqualTypeOf<PostgresClient<Contract<SqlStorage>>>();
+    expectTypeOf<ReturnType<CallShape>>().not.toEqualTypeOf<
+      Promise<PostgresClient<Contract<SqlStorage>>>
+    >();
   });
 
   it('sql is constructed eagerly without runtime; runtime and pool are deferred until runtime() is accessed', () => {
@@ -387,5 +430,85 @@ describe('postgres', () => {
         pg: { query: () => {} } as unknown as Client,
       }),
     ).toThrow('Unable to determine pg binding type from pg input');
+  });
+
+  it('transaction() delegates to withTransaction with the lazy runtime', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    const result = await db.transaction(async () => 'tx-value');
+
+    expect(mocks.withTransaction).toHaveBeenCalledOnce();
+    expect(mocks.withTransaction).toHaveBeenCalledWith(
+      mocks.createRuntime.mock.results[0]?.value,
+      expect.any(Function),
+    );
+    expect(result).toBe('tx-value');
+  });
+
+  it('transaction() provides sql on the transaction context', async () => {
+    const txSqlProxy = { lane: 'tx-sql' };
+    let callCount = 0;
+    mocks.sqlBuilder.mockImplementation(() => {
+      callCount++;
+      if (callCount === 1) return { lane: 'sql' };
+      return txSqlProxy;
+    });
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    let receivedTx: { sql?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.sql).toBe(txSqlProxy);
+    expect(mocks.sqlBuilder).toHaveBeenCalledTimes(2);
+  });
+
+  it('transaction() provides orm on the transaction context', async () => {
+    const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
+    const txOrmProxy = { lane: 'tx-orm' };
+    let ormCallCount = 0;
+    vi.mocked(ormMock).mockImplementation((() => {
+      ormCallCount++;
+      if (ormCallCount === 1) return { lane: 'orm' };
+      return txOrmProxy;
+    }) as typeof ormMock);
+
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    let receivedTx: { orm?: unknown } | undefined;
+    await db.transaction(async (tx) => {
+      receivedTx = tx;
+    });
+
+    expect(receivedTx).toBeDefined();
+    expect(receivedTx!.orm).toBe(txOrmProxy);
+    expect(ormCallCount).toBe(2);
+  });
+
+  it('transaction() lazily creates runtime before connect()', async () => {
+    const db = postgres({
+      contract,
+      url: 'postgres://localhost:5432/db',
+    });
+
+    expect(mocks.instantiateExecutionStack).not.toHaveBeenCalled();
+    expect(mocks.createRuntime).not.toHaveBeenCalled();
+
+    await db.transaction(async () => 'value');
+
+    expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
   });
 });

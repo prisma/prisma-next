@@ -28,6 +28,7 @@
     "lint:rules:footprint": "node scripts/rules-footprint.mjs --check",
     "rules:footprint": "node scripts/rules-footprint.mjs",
     "lint:docs": "node scripts/validate-package-readmes.mjs",
+    "check:publish-deps": "node scripts/check-publish-deps.mjs",
     "fixtures:emit": "pnpm --filter @prisma-next/sql-builder --filter @prisma-next/sql-orm-client --filter @prisma-next/e2e-tests --filter @prisma-next/e2e-sqlite-tests --filter @prisma-next/integration-tests --filter prisma-next-demo -r emit",
     "fixtures:check": "pnpm fixtures:emit && git diff --exit-code -- packages/2-sql/4-lanes/sql-builder/test/fixtures/generated/ packages/3-extensions/sql-orm-client/test/fixtures/generated/ test/e2e/framework/test/fixtures/generated/ test/e2e/sqlite/test/fixtures/generated/ test/integration/test/fixtures/ examples/prisma-next-demo/src/prisma/contract.json examples/prisma-next-demo/src/prisma/contract.d.ts",
     "typecheck": "turbo run typecheck",

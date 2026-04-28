@@ -105,8 +105,8 @@ describe('Postgres adapter join rendering', () => {
     ],
   ] as const)('renders %s joins correctly', (joinType, join) => {
     const lowered = adapter.lower(selectWithJoin(join), { contract, params: [] });
-    expect(lowered.body.sql).toContain(`${joinType.toUpperCase()} JOIN "post"`);
-    expect(lowered.body.sql).toContain('"user"."id" = "post"."userId"');
+    expect(lowered.sql).toContain(`${joinType.toUpperCase()} JOIN "post"`);
+    expect(lowered.sql).toContain('"user"."id" = "post"."userId"');
   });
 
   it('renders multiple chained joins and WHERE predicates', () => {
@@ -126,9 +126,9 @@ describe('Postgres adapter join rendering', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 
-    expect(lowered.body.sql).toContain('INNER JOIN "post"');
-    expect(lowered.body.sql).toContain('LEFT JOIN "comment"');
-    expect(lowered.body.sql).toContain('WHERE "user"."email" = "post"."title"');
+    expect(lowered.sql).toContain('INNER JOIN "post"');
+    expect(lowered.sql).toContain('LEFT JOIN "comment"');
+    expect(lowered.sql).toContain('WHERE "user"."email" = "post"."title"');
   });
 
   it('renders lateral derived-table joins', () => {
@@ -143,8 +143,8 @@ describe('Postgres adapter join rendering', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 
-    expect(lowered.body.sql).toContain('LEFT JOIN LATERAL');
-    expect(lowered.body.sql).toContain(
+    expect(lowered.sql).toContain('LEFT JOIN LATERAL');
+    expect(lowered.sql).toContain(
       '(SELECT "post"."userId" AS "userId" FROM "post") AS "post_rows"',
     );
   });

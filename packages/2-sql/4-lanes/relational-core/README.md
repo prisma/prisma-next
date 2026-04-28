@@ -91,6 +91,36 @@ flowchart TD
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
 - Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
 
+### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
+
+- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. `encode` may be omitted (identity default); `decode` is required.
+- Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
+- This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
+
+```ts
+// Sync authoring:
+const textCodec = codec({
+  typeId: 'pg/text@1',
+  targetTypes: ['text'],
+  encode: (v: string) => v,
+  decode: (w: string) => w,
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+
+// Async authoring (e.g. KMS-backed encryption): same factory, same shape.
+const secretCodec = codec({
+  typeId: 'pg/secret@1',
+  targetTypes: ['text'],
+  encode: async (v: string) => encrypt(v, await getKey()),
+  decode: async (w: string) => decrypt(w, await getKey()),
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+```
+
+See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
+
 ### AST Surface (`ast/*` via `exports/ast.ts`)
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
 - Expressions: `ColumnRef`, `ParamRef`, `LiteralExpr`, `OperationExpr`, `ListExpression`

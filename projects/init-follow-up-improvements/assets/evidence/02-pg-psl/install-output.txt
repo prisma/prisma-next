@@ -1,0 +1,17 @@
+=== retry with @latest ===
+../../..                                 | Progress: resolved 1, reused 0, downloaded 0, added 0
+../../..                                 | Progress: resolved 57, reused 57, downloaded 0, added 0, done
+
+dependencies:
++ @prisma-next/postgres 0.3.0 (0.4.1 is available)
++ dotenv 16.6.1
+
+Done in 603ms using pnpm v10.27.0
+---
+../../..                                 | Progress: resolved 1, reused 0, downloaded 0, added 0
+ ERR_PNPM_WORKSPACE_PKG_NOT_FOUND  In ../../..: "@prisma-next/core-control-plane@workspace:*" is in the dependencies but no package named "@prisma-next/core-control-plane" is present in the workspace
+
+This error happened while installing the dependencies of prisma-next@0.0.1
+ at @prisma-next/migration-tools@0.0.1
+
+Packages found in the workspace: 

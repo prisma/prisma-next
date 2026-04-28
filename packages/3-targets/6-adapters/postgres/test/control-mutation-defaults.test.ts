@@ -232,6 +232,54 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     });
     expect(result).toMatchObject({ ok: false });
   });
+
+  it('rejects now() with arguments', () => {
+    const handler = registry.get('now')!;
+    const result = handler.lower({
+      call: makeCall('now', [arg('1')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false });
+  });
+
+  it('rejects ulid() with arguments', () => {
+    const handler = registry.get('ulid')!;
+    const result = handler.lower({
+      call: makeCall('ulid', [arg('1')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false });
+  });
+
+  it('lowers uuid(4) explicitly to uuidv4 execution generator', () => {
+    const handler = registry.get('uuid')!;
+    const result = handler.lower({
+      call: makeCall('uuid', [arg('4')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({
+      ok: true,
+      value: { kind: 'execution', generated: { kind: 'generator', id: 'uuidv4' } },
+    });
+  });
+
+  it('rejects uuid with non-numeric version literal', () => {
+    const handler = registry.get('uuid')!;
+    const result = handler.lower({
+      call: makeCall('uuid', [arg('foo')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false });
+  });
+
+  it('rejects nanoid with non-integer size literal', () => {
+    const handler = registry.get('nanoid')!;
+    const result = handler.lower({
+      call: makeCall('nanoid', [arg('"sixteen"')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false });
+  });
 });
 
 describe('createPostgresMutationDefaultGeneratorDescriptors', () => {

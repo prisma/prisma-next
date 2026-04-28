@@ -1,6 +1,6 @@
 # Summary
 
-Data migrations are data transformation operations that execute as part of a migration edge in the graph. All migrations — structural and data — are authored in TypeScript as operation chains, lowered to SQL at verification time via the target adapter, and stored as `{ sql, params }` in `ops.json`. At apply time, the runner executes the SQL directly. Data transforms are first-class operations in the chain, positioned by the planner at the correct point between structural ops. The system tracks data migrations as named invariants on graph edges, enabling invariant-aware routing.
+Data migrations are data transformation operations that execute as part of a migration edge in the graph. All migrations — structural and data — are authored in TypeScript as target-agnostic operation chains. At verification time the target adapter lowers the chain into a serialized target-native operation form and stores it in `ops.json` (for SQL targets this takes a `{ sql, params }` shape; document targets serialize their operations with a comparable shape appropriate to that target). At apply time the runner hands the serialized operations to the target adapter for execution — no TypeScript is loaded. Data transforms are first-class operations in the chain, positioned by the planner at the correct point between structural ops. Data transforms can opt into being routing-visible via `invariantId`; the routing layer (path selection on refs, marker-side applied-invariant storage, structured errors) is specced separately in `invariant-aware-routing.spec.md`.
 
 # Description
 
@@ -8,7 +8,7 @@ Prisma Next's graph-based migration system models schema evolution as a directed
 
 Data migrations solve this by allowing data transform operations to be part of the operation chain on graph edges. The system doesn't reason about what the transforms do; it tracks that named data migrations were applied, and routes through paths that satisfy required invariants. This preserves the graph model's flexibility for structural routing while adding data-awareness without collapsing to linear history.
 
-The primary user is a backend developer who knows SQL but doesn't think about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the appropriate operations, and let the user fill in the data transformation logic.
+The primary user is a backend developer comfortable writing database queries (SQL for SQL targets, the target-native query shape for document targets) but not thinking about migration theory. They want to describe what should happen and have the system handle safety. The system should detect when data migrations are needed, scaffold the appropriate operations, and let the user fill in the data transformation logic.
 
 # Requirements
 
@@ -16,7 +16,7 @@ These are the problems the system must solve. The Solution section describes how
 
 ## R0. No arbitrary code execution at apply time
 
-Migrations must not involve executing arbitrary TypeScript at apply time. The authoring surface is TypeScript, but the output is lowered SQL stored in `ops.json` that can be inspected, audited, and shipped to a SaaS runner without trusting user code. This is critical because: (1) migrations will eventually be serialized and shipped to a hosted service, where executing arbitrary code is a non-starter, (2) even locally, importing a TypeScript module executes top-level code, which is a security risk in team settings, (3) lowered SQL enables plan-time visibility — reviewers see exactly what will execute.
+Migrations must not involve executing arbitrary TypeScript at apply time. The authoring surface is TypeScript, but the output is the target-native serialized operation form stored in `ops.json` (e.g. `{ sql, params }` for SQL targets; an equivalent operation payload for document targets) that can be inspected, audited, and shipped to a SaaS runner without trusting user code. This is critical because: (1) migrations will eventually be serialized and shipped to a hosted service, where executing arbitrary code is a non-starter, (2) even locally, importing a TypeScript module executes top-level code, which is a security risk in team settings, (3) the lowered form enables plan-time visibility — reviewers see exactly what will execute.
 
 ## R1. Users can express data transformations during schema migration
 
@@ -256,15 +256,7 @@ The transaction model is composable — the user annotates individual operations
 
 ## Graph integration (R7, R8)
 
-The invariant carried by the system is "named data migration X was applied." This is recorded in the ledger when the migration edge completes successfully. The name comes from the `dataTransform`'s first argument.
-
-The router finds candidate paths via DFS, collecting data migration names along each path. Path selection:
-
-1. Filter to paths that satisfy required invariants (from environment refs)
-2. Prefer paths with more invariants (do the most complete migration)
-3. Tie-break by shortest path / deterministic ordering
-
-Environment refs declare desired state as target contract hash + required data migration names. A ref update is explicit and reviewable.
+Graph integration and invariant-aware routing are specced in `invariant-aware-routing.spec.md`. In brief: data transforms opt into routing visibility via `invariantId?: string`; `migration.json` carries the attestation-covered aggregate `providedInvariants`; the marker table stores the applied-invariants set; and `migration apply --ref` / `migration status --ref` route through the shortest path covering the ref's required invariants minus what's already applied. Per-invariant ledger provenance is deferred (see that spec's Deferred section).
 
 ## Operation builder API
 
@@ -338,11 +330,15 @@ dropIndex(tableName, indexName)
 
 ```typescript
 dataTransform(name, {
+  invariantId?: string,
   check: (client) => QueryAST | boolean,
   run: (client) => QueryAST | QueryAST[],
 })
 // → operationClass: 'data'
-// name becomes the invariant identity recorded in the ledger
+// name is the retry/ledger identity — used by the runner's check to decide whether a
+// transform has already run against a database. invariantId, when set, is the opt-in
+// routing key — the identity refs reference and the routing layer reads. See
+// invariant-aware-routing.spec.md §D4.
 ```
 
 ### Type operations
@@ -410,6 +406,8 @@ These document the major design choices, the alternatives considered, and why we
 **Why unified chain**: One authoring surface for everything. The planner produces TS that includes both structural ops and data transforms in the correct order. Strategies encapsulate common patterns. Manual authoring (`migration new`) uses the same surface. No need for a separate partitioning framework.
 
 ## D2. Name over semantic postconditions; honest about what invariants are
+
+> **Refined by `invariant-aware-routing.spec.md` §D4.** `name` retains its retry/ledger-identity role described below. The routing-visible invariant identity is now a separate, opt-in `invariantId?: string` field on `DataTransformOperation`. The discussion here remains a valid design note on identity-by-name vs. semantic postconditions.
 
 **Decision**: The system tracks data migrations by **name** (identity, human-readable). The invariant is "named data migration X was applied."
 
@@ -486,10 +484,9 @@ These document the major design choices, the alternatives considered, and why we
 
 ## Graph integration
 
-- [ ] Data migration name (from `dataTransform`) is recorded in ledger on edge completion
-- [ ] Router selects path satisfying required invariants from environment ref
-- [ ] When no invariants are required, router prefers path with more data migrations
-- [ ] Environment ref can declare required data migration names alongside target contract hash
+- [ ] Migration application is recorded in the ledger on edge completion (retry/apply history — ledger semantics not owned by this spec)
+
+See `invariant-aware-routing.spec.md` for acceptance criteria covering ref-declared required invariants, path selection, and marker-side applied-invariants storage.
 
 ## Rollback
 
@@ -505,7 +502,7 @@ These document the major design choices, the alternatives considered, and why we
 - **Runtime no-op detection**: Mock-style verification that transforms actually modified data. Future safety layer.
 - **Content hash drift detection**: Descoped — the `migration.ts` is not part of `edgeId`, serialized ASTs have integrity via `edgeId`, and cross-environment comparison requires shared state.
 - **Question-tree UX**: Interactive diff-driven authoring. Future layer.
-- **Invariant management CLI**: The ref format supports invariants but there's no CLI surface for managing them yet. For v1, edit ref JSON files directly.
+- **Invariant routing**: Specced and scoped in `invariant-aware-routing.spec.md`. Ref management (`migration ref set/list/rm`) already landed; CLI surface for editing a ref's `invariants` array remains deferred in that spec.
 
 # Open Questions
 
@@ -552,7 +549,7 @@ These document the major design choices, the alternatives considered, and why we
 ## Observability
 
 - The runner logs data migration start/completion/failure with the migration name and transaction mode.
-- The ledger records which named data migrations have been applied to which database instance.
+- The ledger records migration applications (retry/apply history). The applied-invariants set (what `invariantId`s the database has seen) lives on the marker; see `invariant-aware-routing.spec.md`.
 
 # References
 

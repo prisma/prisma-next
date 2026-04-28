@@ -1,3 +1,4 @@
+import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import { dataTransform } from '@prisma-next/target-mongo/migration';
@@ -45,4 +46,4 @@ class BackfillProductStatus extends Migration {
 }
 
 export default BackfillProductStatus;
-Migration.run(import.meta.url, BackfillProductStatus);
+MigrationCLI.run(import.meta.url, BackfillProductStatus);

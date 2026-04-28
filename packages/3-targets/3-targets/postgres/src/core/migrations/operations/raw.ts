@@ -5,7 +5,7 @@ import type { Op } from './shared';
  *
  * The planner uses this via `liftOpToCall` to carry ops produced by SQL
  * family methods, codec control hooks, and component database dependencies
- * alongside class-flow IR without reverse-engineering them. Users writing
+ * alongside migration IR without reverse-engineering them. Users writing
  * raw migrations can pass a full op shape directly — typically built by
  * composing SQL family helpers — to author a migration that bypasses the
  * structured call classes.

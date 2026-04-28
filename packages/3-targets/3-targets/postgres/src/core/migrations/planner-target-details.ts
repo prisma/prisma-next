@@ -17,12 +17,6 @@ export interface PostgresPlanTargetDetails {
   readonly table?: string;
 }
 
-export interface PlanningMode {
-  readonly includeExtraObjects: boolean;
-  readonly allowWidening: boolean;
-  readonly allowDestructive: boolean;
-}
-
 export function buildTargetDetails(
   objectType: OperationClass,
   name: string,

@@ -115,11 +115,11 @@ describe('Postgres rich AST lowering', () => {
 
     const lowered = adapter.lower(ast, { contract });
 
-    expect(lowered.body.sql).toContain('LEFT JOIN LATERAL');
-    expect(lowered.body.sql).toContain('json_agg(json_build_object');
-    expect(lowered.body.sql).toContain('ORDER BY "post_rows"."title" ASC');
-    expect(lowered.body.sql).toContain('LIMIT 10 OFFSET 5');
-    expect(lowered.body.sql).toContain('WHERE "user"."id" = $1');
+    expect(lowered.sql).toContain('LEFT JOIN LATERAL');
+    expect(lowered.sql).toContain('json_agg(json_build_object');
+    expect(lowered.sql).toContain('ORDER BY "post_rows"."title" ASC');
+    expect(lowered.sql).toContain('LIMIT 10 OFFSET 5');
+    expect(lowered.sql).toContain('WHERE "user"."id" = $1');
   });
 
   it('lowers typed operations and casts vector parameters', () => {
@@ -142,8 +142,8 @@ describe('Postgres rich AST lowering', () => {
 
     const lowered = adapter.lower(ast, { contract });
 
-    expect(lowered.body.sql).toContain('"user"."vector" <=> $1::vector');
-    expect(lowered.body.sql).toContain('COUNT(*) AS "count"');
+    expect(lowered.sql).toContain('"user"."vector" <=> $1::vector');
+    expect(lowered.sql).toContain('COUNT(*) AS "count"');
   });
 
   it('lowers scalar subquery expressions in projections', () => {
@@ -158,7 +158,7 @@ describe('Postgres rich AST lowering', () => {
 
     const lowered = adapter.lower(ast, { contract, params: [] });
 
-    expect(lowered.body.sql).toContain(
+    expect(lowered.sql).toContain(
       '(SELECT COUNT(*) AS "cnt" FROM "post" WHERE "post"."user_id" = "user"."id") AS "post_count"',
     );
   });
@@ -182,7 +182,7 @@ describe('Postgres rich AST lowering', () => {
       )
       .withReturning([ColumnRef.of('user', 'id'), ColumnRef.of('user', 'email')]);
 
-    const insertSql = adapter.lower(insertAst, { contract }).body.sql;
+    const insertSql = adapter.lower(insertAst, { contract }).sql;
     expect(insertSql).toContain(
       'INSERT INTO "user" ("id", "email") VALUES ($1, $2), ($3, DEFAULT)',
     );
@@ -198,7 +198,7 @@ describe('Postgres rich AST lowering', () => {
         ),
       )
       .withReturning([ColumnRef.of('user', 'id')]);
-    const updateSql = adapter.lower(updateAst, { contract }).body.sql;
+    const updateSql = adapter.lower(updateAst, { contract }).sql;
     expect(updateSql).toBe(
       'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id"',
     );
@@ -211,7 +211,7 @@ describe('Postgres rich AST lowering', () => {
         ),
       )
       .withReturning([ColumnRef.of('user', 'id')]);
-    const deleteSql = adapter.lower(deleteAst, { contract }).body.sql;
+    const deleteSql = adapter.lower(deleteAst, { contract }).sql;
     expect(deleteSql).toBe('DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"');
   });
 });

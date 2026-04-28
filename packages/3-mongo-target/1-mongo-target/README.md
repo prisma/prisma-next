@@ -14,6 +14,8 @@ MongoDB target pack for Prisma Next.
 - `./pack`: pure target pack ref used by `@prisma-next/family-mongo` and `@prisma-next/mongo-contract-ts`
 - `./codec-types`: base Mongo codec type map
 - `./migration`: factory functions (the `Migration` base class is in `@prisma-next/family-mongo/migration`)
+- `./control`: `MongoMigrationRunner` and `createMongoRunnerDeps` for runtime migration execution
+- `./schema-verify`: pure `verifyMongoSchema(...)` (no DB I/O); composes `contractToMongoSchemaIR` and `diffMongoSchemas` so the runner's post-apply verify step and `MongoFamilyInstance.schemaVerify` agree on "matches the contract" by construction
 
 ## Usage
 
@@ -33,6 +35,7 @@ const contract = defineContract({
 ### Migration authoring
 
 ```typescript
+import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex, createCollection } from '@prisma-next/target-mongo/migration';
 
@@ -49,7 +52,7 @@ class UsersMigration extends Migration {
 }
 
 export default UsersMigration;
-Migration.run(import.meta.url, UsersMigration)
+MigrationCLI.run(import.meta.url, UsersMigration);
 ```
 
 Run `tsx migration.ts` to produce `ops.json` and `migration.json` (when `describe()` is implemented). Use `--dry-run` to preview without writing.

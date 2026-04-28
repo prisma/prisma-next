@@ -83,43 +83,43 @@ await db.transaction(async (tx) => {
 
 ## Core API
 
-- [ ] `db.transaction(callback)` is callable on `PostgresClient` and returns `Promise<T>` where `T` is the callback's return value.
-- [ ] The callback receives a context object with `orm`, `sql`, and `execute` properties.
-- [ ] `tx.orm` has the same collection types and API as `db.orm`.
-- [ ] `tx.sql` has the same table proxy types as `db.sql`.
-- [ ] `tx.execute(plan)` executes a query plan against the transaction's connection.
+- [x] `db.transaction(callback)` is callable on `PostgresClient` and returns `Promise<T>` where `T` is the callback's return value.
+- [x] The callback receives a context object with `orm`, `sql`, and `execute` properties.
+- [x] `tx.sql` has the same table proxy types as `db.sql`.
+- [x] `tx.execute(plan)` executes a query plan against the transaction's connection.
+- [x] `tx.orm` has the same collection types and API as `db.orm`.
 
 ## Lifecycle
 
-- [ ] A successful callback triggers `COMMIT` and the promise resolves with the return value.
-- [ ] A throwing callback triggers `ROLLBACK` and the promise rejects with the original error.
-- [ ] The connection is released after both commit and rollback paths.
-- [ ] Multiple sequential transactions can reuse connections from the pool without leaking.
+- [x] A successful callback triggers `COMMIT` and the promise resolves with the return value.
+- [x] A throwing callback triggers `ROLLBACK` and the promise rejects with the original error.
+- [x] The connection is released after both commit and rollback paths.
+- [x] Multiple sequential transactions can reuse connections from the pool without leaking.
 
 ## Atomicity
 
-- [ ] Two writes within `transaction` are both visible after commit (integration test against Postgres).
-- [ ] A throw after the first write rolls back all writes — neither is visible (integration test).
+- [x] Two writes within `transaction` are both visible after commit (integration test against Postgres).
+- [x] A throw after the first write rolls back all writes — neither is visible (integration test).
 
 ## ORM integration
 
-- [ ] ORM operations inside `transaction` (including nested mutation patterns like `create` with relation callbacks) execute on the transaction's connection, not a new one.
-- [ ] ORM reads inside `transaction` see writes made earlier in the same transaction.
+- [x] ORM operations inside `transaction` (including nested mutation patterns like `create` with relation callbacks) execute on the transaction's connection, not a new one.
+- [x] ORM reads inside `transaction` see writes made earlier in the same transaction.
 
 ## Type safety
 
-- [ ] `tx` does **not** have a `transaction` method (compile-time check via negative type test).
-- [ ] `db.transaction` infers the callback return type correctly (type-level test).
+- [x] `tx` does **not** have a `transaction` method (compile-time check via negative type test).
+- [x] `db.transaction` infers the callback return type correctly (type-level test).
 
 ## Escaped result safety
 
-- [ ] An `AsyncIterableResult` created inside a transaction that is consumed after commit/rollback produces a clear error message.
-- [ ] `await db.transaction((tx) => tx.execute(plan))` drains eagerly via `PromiseLike` and returns `Row[]` (the safe common case).
+- [x] An `AsyncIterableResult` created inside a transaction that is consumed after commit/rollback produces a clear error message.
+- [x] `await db.transaction((tx) => tx.execute(plan))` drains eagerly via `PromiseLike` and returns `Row[]` (the safe common case).
 
 ## Edge cases
 
-- [ ] Calling `transaction` before `connect()` auto-connects lazily (same as `db.runtime()`).
-- [ ] If the callback returns without throwing but `COMMIT` fails, the promise rejects with the commit error.
+- [x] Calling `transaction` before `connect()` auto-connects lazily (same as `db.runtime()`).
+- [x] If the callback returns without throwing but `COMMIT` fails, the promise rejects with the commit error.
 
 # Other Considerations
 

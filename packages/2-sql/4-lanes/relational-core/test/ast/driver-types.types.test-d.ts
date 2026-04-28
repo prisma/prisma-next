@@ -34,6 +34,7 @@ test('mock driver implementing SqlDriver<TestBinding> compiles and accepts bindi
       ({
         ...queryable,
         release: async () => {},
+        destroy: async (_reason?: unknown) => {},
         beginTransaction: async () => ({
           ...queryable,
           commit: async () => {},

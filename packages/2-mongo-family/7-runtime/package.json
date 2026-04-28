@@ -18,12 +18,12 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
-    "@prisma-next/mongo-query-ast": "workspace:*"
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-wire": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
     "@prisma-next/middleware-telemetry": "workspace:*",
-    "@prisma-next/runtime-executor": "workspace:*",
     "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/mongo-query-builder": "workspace:*",

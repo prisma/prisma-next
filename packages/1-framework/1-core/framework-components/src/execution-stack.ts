@@ -136,7 +136,7 @@ export function instantiateExecutionStack<
   return {
     stack,
     target: stack.target.create(),
-    adapter: stack.adapter.create(),
+    adapter: stack.adapter.create(stack),
     driver,
     extensionPacks: stack.extensionPacks.map((descriptor) => descriptor.create()),
   };

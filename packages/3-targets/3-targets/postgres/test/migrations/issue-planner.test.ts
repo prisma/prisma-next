@@ -581,7 +581,7 @@ describe('planIssues', () => {
 
       expect(ts).toContain('export default class M extends Migration');
       expect(ts).toContain('addColumn(');
-      expect(ts).toContain('dataTransform(');
+      expect(ts).toContain('this.dataTransform(');
       expect(ts).toContain('placeholder(');
       expect(ts).toContain('setNotNull(');
       expect(ts).toContain("from '@prisma-next/target-postgres/migration'");

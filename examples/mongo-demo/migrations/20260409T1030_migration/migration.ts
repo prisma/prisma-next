@@ -1,3 +1,4 @@
+import { MigrationCLI } from '@prisma-next/cli/migration-cli';
 import { Migration } from '@prisma-next/family-mongo/migration';
 import { createIndex } from '@prisma-next/target-mongo/migration';
 
@@ -15,4 +16,4 @@ class InitialMigration extends Migration {
 }
 
 export default InitialMigration;
-Migration.run(import.meta.url, InitialMigration);
+MigrationCLI.run(import.meta.url, InitialMigration);

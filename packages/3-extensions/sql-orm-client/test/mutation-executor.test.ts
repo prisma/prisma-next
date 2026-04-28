@@ -656,4 +656,39 @@ describe('mutation-executor', () => {
       }),
     ).rejects.toThrow(/requires parent field "id"/);
   });
+
+  it('executeNestedCreateMutation() reuses scope directly when runtime lacks transaction and connection', async () => {
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@test.com' }]]);
+
+    const executeSpy = vi.spyOn(runtime, 'execute');
+
+    const created = await executeNestedCreateMutation({
+      context: getTestContext(),
+      runtime,
+      modelName: 'User',
+      data: { id: 1, name: 'Alice', email: 'alice@test.com' } as never,
+    });
+
+    expect(created).toEqual({ id: 1, name: 'Alice', email: 'alice@test.com' });
+    expect(executeSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it('withMutationScope reuses runtime directly when no transaction or connection method exists', async () => {
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@test.com' }]]);
+
+    expect(runtime.transaction).toBeUndefined();
+    expect(runtime.connection).toBeUndefined();
+
+    const created = await executeNestedCreateMutation({
+      context: getTestContext(),
+      runtime,
+      modelName: 'User',
+      data: { id: 1, name: 'Alice', email: 'alice@test.com' } as never,
+    });
+
+    expect(created).toEqual({ id: 1, name: 'Alice', email: 'alice@test.com' });
+    expect(runtime.executions).toHaveLength(1);
+  });
 });

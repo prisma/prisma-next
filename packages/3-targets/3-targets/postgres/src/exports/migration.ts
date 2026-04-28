@@ -1,3 +1,9 @@
+// Re-exported so a Postgres `migration.ts` only needs the single
+// `@prisma-next/target-postgres/migration` import for its base class
+// and the CLI entrypoint, mirroring how `placeholder` is surfaced
+// here. The renderer emits the entrypoint call as
+// `MigrationCLI.run(import.meta.url, M)`.
+export { MigrationCLI } from '@prisma-next/cli/migration-cli';
 // Re-exported so user-edited migration.ts files only need to depend on
 // `@prisma-next/target-postgres/migration` to fill in planner-emitted
 // `placeholder("…")` slots, instead of pulling in `@prisma-next/errors`
@@ -33,8 +39,8 @@ export {
 export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
 export { rawSql } from '../core/migrations/operations/raw';
 export { createTable, dropTable } from '../core/migrations/operations/tables';
-// Target-owned base class for class-flow migrations. Aliased to `Migration`
-// so user-edited migration.ts files (and the class-flow renderer's
-// scaffold) read as `class M extends Migration { … }` without having to
-// thread the target-details generic or redeclare `targetId`.
+// Target-owned base class for migrations. Aliased to `Migration` so
+// user-edited migration.ts files (and the renderer's scaffold) read as
+// `class M extends Migration { … }` without having to thread the
+// target-details generic or redeclare `targetId`.
 export { PostgresMigration as Migration } from '../core/migrations/postgres-migration';

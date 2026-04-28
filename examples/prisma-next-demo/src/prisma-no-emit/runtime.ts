@@ -1,12 +1,12 @@
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
 import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
-import { budgets, createRuntime, type Middleware, type Runtime } from '@prisma-next/sql-runtime';
+import { budgets, createRuntime, type Runtime, type SqlMiddleware } from '@prisma-next/sql-runtime';
 import { Pool } from 'pg';
 import { context, stack } from './context';
 
 export async function getRuntime(
   databaseUrl: string,
-  middleware: Middleware<typeof context.contract>[] = [
+  middleware: SqlMiddleware[] = [
     createTelemetryMiddleware(),
     budgets({
       maxRows: 10_000,

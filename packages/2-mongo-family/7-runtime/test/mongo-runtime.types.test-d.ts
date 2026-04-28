@@ -15,8 +15,8 @@ test('MongoRuntime satisfies RuntimeExecutor<MongoQueryPlan> structurally', () =
   expectTypeOf<MongoRuntime['close']>().toExtend<MongoExecutor['close']>();
 });
 
-test('MongoMiddleware has familyId: mongo', () => {
-  expectTypeOf<MongoMiddleware['familyId']>().toEqualTypeOf<'mongo'>();
+test('MongoMiddleware narrows familyId to optional `mongo`', () => {
+  expectTypeOf<MongoMiddleware['familyId']>().toEqualTypeOf<'mongo' | undefined>();
 });
 
 test('MongoMiddlewareContext extends RuntimeMiddlewareContext', () => {

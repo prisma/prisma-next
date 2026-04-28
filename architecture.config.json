@@ -55,12 +55,6 @@
       "plane": "migration"
     },
     {
-      "glob": "packages/1-framework/4-runtime/**",
-      "domain": "framework",
-      "layer": "runtime-executor",
-      "plane": "runtime"
-    },
-    {
       "glob": "packages/2-sql/1-core/**",
       "domain": "sql",
       "layer": "core",
@@ -536,7 +530,7 @@
   },
   "crossDomainExceptions": [],
   "layerOrder": {
-    "framework": ["foundation", "core", "authoring", "tooling", "runtime-executor"],
+    "framework": ["foundation", "core", "authoring", "tooling"],
     "sql": ["core", "authoring", "tooling", "lanes", "runtime", "adapters", "drivers", "family"],
     "mongo": [
       "foundation",

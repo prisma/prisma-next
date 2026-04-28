@@ -1,7 +1,3 @@
-import {
-  normalizeSchemaNativeType,
-  parsePostgresDefault,
-} from '@prisma-next/adapter-postgres/control';
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
@@ -22,6 +18,8 @@ import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
+import { parsePostgresDefault } from '../default-normalizer';
+import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,

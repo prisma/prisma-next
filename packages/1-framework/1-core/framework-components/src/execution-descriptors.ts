@@ -5,6 +5,7 @@ import type {
   RuntimeFamilyInstance,
   RuntimeTargetInstance,
 } from './execution-instances';
+import type { ExecutionStack } from './execution-stack';
 import type {
   AdapterDescriptor,
   DriverDescriptor,
@@ -44,7 +45,14 @@ export interface RuntimeAdapterDescriptor<
     TTargetId
   >,
 > extends AdapterDescriptor<TFamilyId, TTargetId> {
-  create(): TAdapterInstance;
+  /**
+   * Construct a runtime adapter instance for this execution stack.
+   *
+   * Mirrors `ControlAdapterDescriptor.create(stack)` so that adapter
+   * implementations may inspect stack-assembled metadata (e.g. codecs
+   * contributed by extension packs) when constructing the instance.
+   */
+  create(stack: ExecutionStack<TFamilyId, TTargetId>): TAdapterInstance;
 }
 
 export interface RuntimeDriverDescriptor<

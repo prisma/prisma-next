@@ -141,6 +141,24 @@ function isCliErrorDomain(value: unknown): value is CliErrorDomain {
 }
 
 // ============================================================================
+// Numeric range conventions for `PN-CLI-NNNN`
+// ============================================================================
+//
+// Sub-clustering inside the `CLI` domain uses the numeric prefix:
+//
+// - `4xxx` — generic / cross-command CLI errors authored here (config
+//   missing, file not found, contract validation, etc.).
+// - `5xxx` — command-specific CLI errors authored alongside the command
+//   itself (e.g. `init` errors live in
+//   `packages/1-framework/3-tooling/cli/src/commands/init/errors.ts`).
+//   The 5xxx range avoids collisions with the shared 4xxx pool while
+//   still belonging to the `CLI` domain — consumers branch on the full
+//   `PN-CLI-5007` form, so the prefix is purely an authoring guide.
+//
+// See [`docs/CLI Style Guide.md` § Errors](../../../../../docs/CLI%20Style%20Guide.md#errors)
+// and the per-command error file for the live reservation list.
+
+// ============================================================================
 // Config Errors (PN-CLI-4001-4007)
 // ============================================================================
 
@@ -355,6 +373,28 @@ export function errorTargetMigrationNotSupported(options?: {
     why: options?.why ?? 'The configured target does not provide migration planner/runner',
     fix: 'Select a target that provides migrations (it must export `target.migrations` for db init)',
     docsUrl: 'https://prisma-next.dev/docs/cli/db-init',
+  });
+}
+
+/**
+ * The migration-file CLI received `--config` without a path argument (either
+ * a bare trailing `--config`, or `--config` followed by another flag like
+ * `--config --dry-run`). Surfacing this as a structured error fails fast
+ * rather than silently consuming the next flag as the config path or
+ * falling back to default discovery against the wrong project.
+ */
+export function errorMigrationCliInvalidConfigArg(options?: {
+  readonly nextToken?: string;
+}): CliStructuredError {
+  const why =
+    options?.nextToken !== undefined
+      ? `\`--config\` was followed by another flag (\`${options.nextToken}\`) instead of a path argument.`
+      : '`--config` was passed without a following path argument.';
+  return new CliStructuredError('4012', '--config flag requires a path argument', {
+    domain: 'CLI',
+    why,
+    fix: 'Pass a config path: `--config <path>` or `--config=<path>`.',
+    meta: options?.nextToken !== undefined ? { nextToken: options.nextToken } : {},
   });
 }
 

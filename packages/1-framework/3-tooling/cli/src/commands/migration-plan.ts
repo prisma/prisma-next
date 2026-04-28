@@ -1,23 +1,26 @@
 import { readFile } from 'node:fs/promises';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
-import { createControlStack } from '@prisma-next/framework-components/control';
+import {
+  createControlStack,
+  type MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { findLatestMigration } from '@prisma-next/migration-tools/dag';
+import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   copyFilesWithRename,
   formatMigrationDirName,
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import { findLatestMigration } from '@prisma-next/migration-tools/migration-graph';
 import { writeMigrationTs } from '@prisma-next/migration-tools/migration-ts';
-import { type MigrationManifest, MigrationToolsError } from '@prisma-next/migration-tools/types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
 import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
-import { emitMigration } from '../lib/migration-emit';
-import { migrationStrategy } from '../lib/migration-strategy';
 import {
   type CliErrorConflict,
   CliStructuredError,
@@ -27,11 +30,12 @@ import {
   errorRuntime,
   errorTargetMigrationNotSupported,
   errorUnexpected,
+  mapMigrationToolsError,
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   getTargetMigrations,
-  loadAllBundles,
+  loadMigrationPackages,
   resolveContractPath,
   resolveMigrationPaths,
   setCommandDescriptions,
@@ -55,7 +59,6 @@ export interface MigrationPlanResult {
   readonly noOp: boolean;
   readonly from: string;
   readonly to: string;
-  readonly migrationId?: string;
   readonly dir?: string;
   readonly operations: readonly {
     readonly id: string;
@@ -67,28 +70,12 @@ export interface MigrationPlanResult {
   /**
    * When true, `migration.ts` was written but contains unfilled
    * `placeholder(...)` calls. The user must edit the file and then run
-   * `migration emit` to finalize `ops.json` / `migration.json`.
+   * `node migration.ts` to self-emit `ops.json` / `migration.json`.
    */
   readonly pendingPlaceholders?: boolean;
   readonly timings: {
     readonly total: number;
   };
-}
-
-function mapMigrationToolsError(error: unknown): CliStructuredError {
-  if (CliStructuredError.is(error)) {
-    return error;
-  }
-  if (MigrationToolsError.is(error)) {
-    return errorRuntime(error.message, {
-      why: error.why,
-      fix: error.fix,
-      meta: { code: error.code, ...(error.details ?? {}) },
-    });
-  }
-  return errorUnexpected(error instanceof Error ? error.message : String(error), {
-    why: `Unexpected error during migration plan: ${error instanceof Error ? error.message : String(error)}`,
-  });
 }
 
 async function executeMigrationPlanCommand(
@@ -176,18 +163,7 @@ async function executeMigrationPlanCommand(
   let fromContractSourceDir: string | null = null;
 
   try {
-    const { attested: bundles, drafts, graph } = await loadAllBundles(migrationsDir);
-
-    // Check if a draft migration already targets this contract
-    const existingDraft = drafts.find((d) => d.manifest.to === toStorageHash);
-    if (existingDraft) {
-      return notOk(
-        errorRuntime('A draft migration to this contract already exists', {
-          why: `Draft migration at "${existingDraft.dirName}" already targets ${toStorageHash}`,
-          fix: `Run 'prisma-next migration emit --dir ${migrationsRelative}/${existingDraft.dirName}' to attest it, or delete it and re-plan.`,
-        }),
-      );
-    }
+    const { bundles, graph } = await loadMigrationPackages(migrationsDir);
 
     if (options.from) {
       const resolved = resolveBundleByPrefix(bundles, options.from);
@@ -205,16 +181,18 @@ async function executeMigrationPlanCommand(
               }),
         );
       }
-      fromHash = resolved.value.manifest.to;
-      fromContract = resolved.value.manifest.toContract;
+      fromHash = resolved.value.metadata.to;
+      fromContract = resolved.value.metadata.toContract;
       fromContractSourceDir = resolved.value.dirPath;
     } else {
       const latestMigration = findLatestMigration(graph);
       if (latestMigration) {
         fromHash = latestMigration.to;
-        const leafPkg = bundles.find((p) => p.manifest.migrationId === latestMigration.migrationId);
+        const leafPkg = bundles.find(
+          (p) => p.metadata.migrationHash === latestMigration.migrationHash,
+        );
         if (leafPkg) {
-          fromContract = leafPkg.manifest.toContract;
+          fromContract = leafPkg.metadata.toContract;
           fromContractSourceDir = leafPkg.dirPath;
         }
       }
@@ -223,7 +201,16 @@ async function executeMigrationPlanCommand(
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
     }
-    throw error;
+    // Wrap unexpected (non-MigrationToolsError) failures from the migration
+    // load phase in a structured CLI envelope. Letting them throw would
+    // bypass `handleResult()` and crash the command — see CLI structured-
+    // errors guideline (CliStructuredError + Result pattern).
+    const message = error instanceof Error ? error.message : String(error);
+    return notOk(
+      errorUnexpected(message, {
+        why: `Unexpected error while loading migrations: ${message}`,
+      }),
+    );
   }
 
   // Check for no-op (same hash means no changes)
@@ -255,18 +242,15 @@ async function executeMigrationPlanCommand(
     [config.target, config.adapter, ...(config.extensionPacks ?? [])],
   );
 
-  const strategy = migrationStrategy(migrations, config.target.targetId);
-
   // Build manifest and write migration package
   const timestamp = new Date();
   const slug = options.name ?? 'migration';
   const dirName = formatMigrationDirName(timestamp, slug);
   const packageDir = join(migrationsDir, dirName);
 
-  const manifest: MigrationManifest = {
+  const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    migrationId: null,
     kind: 'regular',
     fromContract,
     toContract: toContractJson,
@@ -274,42 +258,42 @@ async function executeMigrationPlanCommand(
       used: [],
       applied: [],
       plannerVersion: '2.0.0',
-      planningStrategy: strategy === 'descriptor' ? 'descriptors' : 'class-based',
     },
     labels: [],
     createdAt: timestamp.toISOString(),
   };
 
-  const scaffoldContext = {
-    packageDir,
-    contractJsonPath: contractPathAbsolute,
-    fromHash,
-    toHash: toStorageHash,
-  };
-
   try {
-    let migrationTsContent: string;
-    let hasPlaceholders = false;
+    const stack = createControlStack(config);
+    const familyInstance = config.family.create(stack);
+    const planner = migrations.createPlanner(familyInstance);
+    const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
+    const plannerResult = planner.plan({
+      contract: toContractJson,
+      schema: fromSchema,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      fromHash,
+      fromContract,
+      frameworkComponents,
+    });
+    if (plannerResult.kind === 'failure') {
+      return notOk(
+        errorMigrationPlanningFailed({
+          conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
+        }),
+      );
+    }
 
-    if (strategy === 'descriptor') {
-      if (!migrations.planWithDescriptors || !migrations.renderDescriptorTypeScript) {
-        throw errorTargetMigrationNotSupported({
-          why: `Target "${config.target.targetId}" advertises descriptor flow but is missing required hooks`,
-        });
-      }
-      const descriptorResult = migrations.planWithDescriptors({
-        fromContract,
-        toContract: toContractJson,
-        frameworkComponents,
-      });
-      if (!descriptorResult.ok) {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: descriptorResult.conflicts as readonly CliErrorConflict[],
-          }),
-        );
-      }
-      if (descriptorResult.descriptors.length === 0) {
+    // Accessing .operations triggers toOp() on each call. If any call
+    // is a DataTransformCall with an unfilled placeholder stub, toOp()
+    // throws PN-MIG-2001. We catch that here so the migration can still
+    // be scaffolded with `ops: []`; the user fills the placeholder, then
+    // re-runs `node migration.ts` to attest with the real ops.
+    let plannedOps: readonly MigrationPlanOperation[] = [];
+    let hasPlaceholders = false;
+    try {
+      plannedOps = plannerResult.plan.operations;
+      if (plannedOps.length === 0) {
         return notOk(
           errorMigrationPlanningFailed({
             conflicts: [
@@ -323,60 +307,28 @@ async function executeMigrationPlanCommand(
           }),
         );
       }
-      migrationTsContent = migrations.renderDescriptorTypeScript(
-        descriptorResult.descriptors,
-        scaffoldContext,
-      );
-    } else {
-      const stack = createControlStack(config);
-      const familyInstance = config.family.create(stack);
-      const planner = migrations.createPlanner(familyInstance);
-      const fromSchema = migrations.contractToSchema(fromContract, frameworkComponents);
-      const plannerResult = planner.plan({
-        contract: toContractJson,
-        schema: fromSchema,
-        policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-        fromHash,
-        fromContract,
-        frameworkComponents,
-      });
-      if (plannerResult.kind === 'failure') {
-        return notOk(
-          errorMigrationPlanningFailed({
-            conflicts: plannerResult.conflicts as readonly CliErrorConflict[],
-          }),
-        );
+    } catch (e) {
+      if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
+        hasPlaceholders = true;
+      } else {
+        throw e;
       }
-      // Accessing .operations triggers toOp() on each call. If any call
-      // is a DataTransformCall with an unfilled placeholder stub, toOp()
-      // throws PN-MIG-2001. That means there ARE operations — they just
-      // need the user to fill in the placeholder before emit can succeed.
-      try {
-        if (plannerResult.plan.operations.length === 0) {
-          return notOk(
-            errorMigrationPlanningFailed({
-              conflicts: [
-                {
-                  kind: 'unsupportedChange',
-                  summary:
-                    'Contract changed but planner produced no operations. ' +
-                    'This indicates unsupported or ignored changes.',
-                },
-              ],
-            }),
-          );
-        }
-      } catch (e) {
-        if (CliStructuredError.is(e) && e.domain === 'MIG' && e.code === '2001') {
-          hasPlaceholders = true;
-        } else {
-          throw e;
-        }
-      }
-      migrationTsContent = plannerResult.plan.renderTypeScript();
     }
 
-    await writeMigrationPackage(packageDir, manifest, []);
+    const migrationTsContent = plannerResult.plan.renderTypeScript();
+
+    // Always-attest: compute migrationHash over (metadata, ops). When
+    // placeholders blocked lowering, ops is `[]` and the hash is computed
+    // over the empty list — re-emitting after the user fills the placeholder
+    // produces a different hash (over the real ops). This is intentional;
+    // there is no on-disk "draft" state.
+    const opsForWrite = hasPlaceholders ? [] : plannedOps;
+    const metadata: MigrationMetadata = {
+      ...baseMetadata,
+      migrationHash: computeMigrationHash(baseMetadata, opsForWrite),
+    };
+
+    await writeMigrationPackage(packageDir, metadata, opsForWrite);
     const destinationArtifacts = getEmittedArtifactPaths(contractPathAbsolute);
     await copyFilesWithRename(packageDir, [
       { sourcePath: destinationArtifacts.jsonPath, destName: 'end-contract.json' },
@@ -403,38 +355,42 @@ async function executeMigrationPlanCommand(
         operations: [],
         pendingPlaceholders: true,
         summary:
-          'Planned migration with placeholder(s) — edit migration.ts then run `migration emit`',
+          'Planned migration with placeholder(s) — edit migration.ts then run `node migration.ts` to self-emit',
         timings: { total: Date.now() - startTime },
       };
       return ok(result);
     }
 
-    const { operations, migrationId } = await emitMigration(packageDir, {
-      targetId: config.target.targetId,
-      migrations,
-      frameworkComponents,
-    });
-
-    const sql = extractSqlDdl(operations);
+    const sql = extractSqlDdl(plannedOps);
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,
       from: fromHash,
       to: toStorageHash,
-      migrationId,
       dir: relative(process.cwd(), packageDir),
-      operations: operations.map((op) => ({
+      operations: plannedOps.map((op) => ({
         id: op.id,
         label: op.label,
         operationClass: op.operationClass,
       })),
       sql,
-      summary: `Planned ${operations.length} operation(s)`,
+      summary: `Planned ${plannedOps.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
     return ok(result);
   } catch (error) {
-    return notOk(mapMigrationToolsError(error));
+    if (CliStructuredError.is(error)) {
+      return notOk(error);
+    }
+    if (MigrationToolsError.is(error)) {
+      return notOk(mapMigrationToolsError(error));
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return notOk(
+      errorUnexpected(message, {
+        why: `Unexpected error during migration plan: ${message}`,
+      }),
+    );
   }
 }
 
@@ -503,9 +459,7 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
     lines.push(
       'Open migration.ts and replace each `placeholder(...)` call with your actual query.',
     );
-    lines.push(
-      `Then run: ${green_('prisma-next migration emit --dir ' + (result.dir ?? '<dir>'))}`,
-    );
+    lines.push(`Then run: ${green_(`node ${result.dir ?? '<dir>'}/migration.ts`)}`);
     return lines.join('\n');
   }
 
@@ -537,12 +491,14 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
 
   lines.push(dim_(`from:   ${result.from}`));
   lines.push(dim_(`to:     ${result.to}`));
-  if (result.migrationId) {
-    lines.push(dim_(`migrationId: ${result.migrationId}`));
-  }
   if (result.dir) {
     lines.push(dim_(`dir:    ${result.dir}`));
   }
+
+  lines.push('');
+  lines.push(
+    `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
+  );
 
   if (result.sql && result.sql.length > 0) {
     lines.push('');
@@ -569,24 +525,27 @@ export type PrefixResolutionFailure =
   | { reason: 'not-found' };
 
 /**
- * Resolve a migration bundle by exact hash or prefix match.
+ * Resolve a migration package by **target contract hash** (`metadata.to`)
+ * using exact match or prefix match.
  *
+ * Note: matches `metadata.to` (the contract hash this migration produces),
+ * not `metadata.migrationHash` (the package's content-addressed identity).
  * Tries exact match first, then prefix match (auto-prepending `sha256:` when
- * the needle omits the scheme). Returns the matched bundle on success, or a
+ * the needle omits the scheme). Returns the matched package on success, or a
  * discriminated failure indicating whether the prefix was ambiguous or simply
  * not found.
  *
  * @internal Exported for testing only.
  */
-export function resolveBundleByPrefix<T extends { manifest: { to: string } }>(
+export function resolveBundleByPrefix<T extends { metadata: { to: string } }>(
   bundles: readonly T[],
   needle: string,
 ): Result<T, PrefixResolutionFailure> {
-  const exact = bundles.find((p) => p.manifest.to === needle);
+  const exact = bundles.find((p) => p.metadata.to === needle);
   if (exact) return ok(exact);
 
   const prefixWithScheme = needle.startsWith('sha256:') ? needle : `sha256:${needle}`;
-  const candidates = bundles.filter((p) => p.manifest.to.startsWith(prefixWithScheme));
+  const candidates = bundles.filter((p) => p.metadata.to.startsWith(prefixWithScheme));
 
   if (candidates.length === 1) return ok(candidates[0]!);
   if (candidates.length > 1) return notOk({ reason: 'ambiguous', count: candidates.length });

@@ -3,6 +3,7 @@ const BASE_TIMEOUTS = {
   spinUpDbServer: 30000,
   spinUpMongoMemoryServer: 60000,
   typeScriptCompilation: 8000,
+  coldTransformImport: 30000,
   databaseOperation: 5000,
   default: 100,
 } as const;
@@ -79,6 +80,19 @@ export const timeouts = {
    */
   get typeScriptCompilation(): number {
     return Math.round(BASE_TIMEOUTS.typeScriptCompilation * getMultiplier());
+  },
+
+  /**
+   * Timeout for hooks (typically `beforeAll`) that perform a dynamic
+   * `import()` of a heavy module that is not statically imported by the
+   * test file. The first call pays vitest's full transform cost for the
+   * imported module graph, which can exceed the default 200ms hook
+   * timeout on cold CI workers — so use this for the hook timeout when
+   * a suite uses lazy `await import('…')` to avoid eager module side
+   * effects (e.g. pulling Commander into every test file).
+   */
+  get coldTransformImport(): number {
+    return Math.round(BASE_TIMEOUTS.coldTransformImport * getMultiplier());
   },
 
   /**

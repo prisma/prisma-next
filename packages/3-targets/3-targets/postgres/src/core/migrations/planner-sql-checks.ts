@@ -1,6 +1,6 @@
-import { escapeLiteral, quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { CodecControlHooks } from '@prisma-next/family-sql/control';
 import type { StorageColumn, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import { escapeLiteral, quoteIdentifier } from '../sql-utils';
 import { resolveColumnTypeMetadata } from './planner-type-resolution';
 
 export function qualifyTableName(schema: string, table: string): string {

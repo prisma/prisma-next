@@ -1,5 +1,5 @@
-import { quoteIdentifier } from '@prisma-next/adapter-postgres/control';
 import type { ReferentialAction } from '@prisma-next/sql-contract/types';
+import { quoteIdentifier } from '../../sql-utils';
 import { constraintExistsCheck, qualifyTableName } from '../planner-sql-checks';
 import { type ForeignKeySpec, type Op, step, targetDetails } from './shared';
 

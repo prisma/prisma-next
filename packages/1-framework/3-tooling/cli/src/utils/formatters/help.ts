@@ -137,7 +137,6 @@ function getCommandDocsUrl(commandPath: string): string | undefined {
     'migration apply': 'https://pris.ly/migration-apply',
     'migration show': 'https://pris.ly/migration-show',
     'migration status': 'https://pris.ly/migration-status',
-    'migration emit': 'https://pris.ly/migration-emit',
   };
   return docsMap[commandPath];
 }

@@ -1,5 +1,5 @@
 /**
- * Per-class unit coverage for the Mongo class-flow IR:
+ * Per-class unit coverage for the Mongo migration IR:
  *
  * - Every `*Call` class constructs with literal args, is frozen, computes its
  *   label + operationClass, lowers to the matching runtime op via `toOp()`,

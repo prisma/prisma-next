@@ -28,7 +28,7 @@ import {
   PG_VARBIT_CODEC_ID,
   SQL_CHAR_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
-} from '../core/codec-ids';
+} from '@prisma-next/target-postgres/codec-ids';
 import {
   extractStandardSchemaOutputJsonSchema,
   extractStandardSchemaTypeExpression,

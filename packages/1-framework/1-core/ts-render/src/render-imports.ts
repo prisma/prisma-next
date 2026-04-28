@@ -2,7 +2,7 @@ import type { ImportRequirement } from './ts-expression';
 
 /**
  * Render an aggregated `import` block from a flat list of
- * `ImportRequirement`s. Each target's class-flow renderer collects
+ * `ImportRequirement`s. Each target's migration renderer collects
  * requirements polymorphically from its call nodes and pipes them here.
  *
  * The emitter invariants:

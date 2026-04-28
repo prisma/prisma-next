@@ -4,7 +4,7 @@ This project uses **Prisma Next** with **PostgreSQL** via `@prisma-next/postgres
 
 ## Files
 
-- **Contract**: `{{schemaPath}}` — the user's data models. Edit this to add or change models.
+- **Contract**: `{{schemaPath}}` ({{authoringLabel}} authoring) — the user's data models. Edit this to add or change models.
 - **Config**: `prisma-next.config.ts` — tells the CLI where the contract is and how to connect to the database. Loads `.env` via `dotenv/config`.
 - **Database client**: `{{schemaDir}}/db.ts` — `import { db } from '{{dbImportPath}}'`. This is the entry point for all queries.
 - **Generated files** (do not edit by hand):

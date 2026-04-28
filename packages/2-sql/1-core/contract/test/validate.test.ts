@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
 
@@ -850,6 +850,46 @@ describe('validateContract', () => {
         },
       };
       expect(() => validateContract(contract, emptyCodecLookup)).not.toThrow();
+    });
+  });
+
+  // Regression: validateContract must remain synchronous (it consumes only
+  // build-time codec methods). If the signature ever drifts to Promise,
+  // the type-level assertion below fails and `await` becomes required at
+  // every call site (including `postgres({...})`).
+  describe('synchronous return (regression)', () => {
+    it('returns a non-Promise value at runtime', () => {
+      const result = validateContract<Contract<SqlStorage>>(
+        structuredClone(baseContract),
+        emptyCodecLookup,
+      );
+      expect(result).toBeDefined();
+      const thenable = result as unknown as { then?: unknown };
+      expect(typeof thenable.then).toBe('undefined');
+    });
+
+    it('binds to a synchronous type at the call site', () => {
+      // Type-level regression: this must compile without `await`. The let
+      // binding has the synchronous Contract<SqlStorage> type; if
+      // validateContract becomes Promise-returning, this assignment fails.
+      const result: Contract<SqlStorage> = validateContract<Contract<SqlStorage>>(
+        structuredClone(baseContract),
+        emptyCodecLookup,
+      );
+      expect(result.target).toBe('postgres');
+    });
+
+    it('binds to a synchronous return type symbol-for-symbol', () => {
+      // Symmetric to the Mongo-side createMongoAdapter regression: assert the
+      // return type of validateContract directly so a future drift to
+      // Promise-shaped output fails the test-file typecheck rather than
+      // surfacing only at downstream call sites.
+      expectTypeOf<ReturnType<typeof validateContract<Contract<SqlStorage>>>>().toEqualTypeOf<
+        Contract<SqlStorage>
+      >();
+      expectTypeOf<ReturnType<typeof validateContract<Contract<SqlStorage>>>>().not.toEqualTypeOf<
+        Promise<Contract<SqlStorage>>
+      >();
     });
   });
 });
