@@ -11,12 +11,21 @@ import type { MigrationEdge, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
 import type { MigrationPackage } from './package';
 
-/** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
+/** Forward-edge neighbours: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
   return (graph.forwardChain.get(node) ?? []).map((edge) => ({ next: edge.to, edge }));
 }
 
-/** Reverse-edge neighbours for BFS: edge `e` from `n` visits `e.from` next. */
+/**
+ * Forward-edge neighbours, sorted by the deterministic tie-break.
+ * Used by path-finding so the resulting shortest path is stable across runs.
+ */
+function sortedForwardNeighbours(graph: MigrationGraph, node: string) {
+  const edges = graph.forwardChain.get(node) ?? [];
+  return [...edges].sort(compareTieBreak).map((edge) => ({ next: edge.to, edge }));
+}
+
+/** Reverse-edge neighbours: edge `e` from `n` visits `e.from` next. */
 function reverseNeighbours(graph: MigrationGraph, node: string) {
   return (graph.reverseChain.get(node) ?? []).map((edge) => ({ next: edge.from, edge }));
 }
@@ -67,8 +76,8 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
 
 // ---------------------------------------------------------------------------
 // Deterministic tie-breaking for BFS neighbour order.
-// Used by `findPath` and `findPathWithDecision` only; not a general-purpose
-// utility. Ordering: label priority → createdAt → to → migrationHash.
+// Used by path-finders only; not a general-purpose utility.
+// Ordering: label priority → createdAt → to → migrationHash.
 // ---------------------------------------------------------------------------
 
 const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
@@ -96,13 +105,6 @@ function sortedNeighbors(edges: readonly MigrationEdge[]): readonly MigrationEdg
   return [...edges].sort(compareTieBreak);
 }
 
-/** Ordering adapter for `bfs` — sorts `{next, edge}` pairs by tie-break. */
-function bfsOrdering(
-  items: readonly { next: string; edge: MigrationEdge }[],
-): readonly { next: string; edge: MigrationEdge }[] {
-  return items.slice().sort((a, b) => compareTieBreak(a.edge, b.edge));
-}
-
 /**
  * Find the shortest path from `fromHash` to `toHash` using BFS over the
  * contract-hash graph. Returns the ordered list of edges, or null if no path
@@ -119,11 +121,11 @@ export function findPath(
   if (fromHash === toHash) return [];
 
   const parents = new Map<string, { parent: string; edge: MigrationEdge }>();
-  for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n), bfsOrdering)) {
+  for (const step of bfs([fromHash], (n) => sortedForwardNeighbours(graph, n))) {
     if (step.parent !== null && step.incomingEdge !== null) {
-      parents.set(step.node, { parent: step.parent, edge: step.incomingEdge });
+      parents.set(step.state, { parent: step.parent, edge: step.incomingEdge });
     }
-    if (step.node === toHash) {
+    if (step.state === toHash) {
       const path: MigrationEdge[] = [];
       let cur = toHash;
       let p = parents.get(cur);
@@ -151,19 +153,23 @@ export function findPath(
  * reimplementing `findPath` atop this primitive — delegation keeps the F8
  * guarantee trivial to reason about.
  *
- * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup.
- * The covered subset is encoded as a 30-bit unsigned mask over a sorted
- * enumeration of `required`; this is a constant-factor speed-up over the
- * spec's suggested sorted-`join('\0')` string key for the typical k ≤ 16
- * case. The 30-bit cap is enforced at entry — k beyond that is far outside
- * the spec's "single-digit realistic" expectation (N1/N2) and we'd rather
- * fail loudly than silently misbehave from JS's signed 32-bit bitwise ops.
+ * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup,
+ * implemented as the generic `bfs` generator in graph-ops.ts with a
+ * composite-state overload. The covered subset is encoded as a 30-bit
+ * unsigned mask over a sorted enumeration of `required`; this is a
+ * constant-factor speed-up over the spec's suggested sorted-`join('\0')`
+ * string key for the typical k ≤ 16 case. The 30-bit cap is enforced at
+ * entry — k beyond that is far outside the spec's "single-digit realistic"
+ * expectation (N1/N2) and we'd rather fail loudly than silently misbehave
+ * from JS's signed 32-bit bitwise ops.
  *
  * Neighbour ordering when `required ≠ ∅` (D11): edges covering ≥1
  * still-needed invariant come first, with the existing
  * `labelPriority → createdAt → to → migrationHash` order as the secondary
- * key. The heuristic steers BFS toward the satisfying path; correctness
- * (shortest, deterministic) does not depend on it.
+ * key. Done inside the neighbours closure where the source state — and
+ * therefore the still-needed mask — is in scope. The heuristic steers BFS
+ * toward the satisfying path; correctness (shortest, deterministic) does
+ * not depend on it.
  */
 export function findPathWithInvariants(
   graph: MigrationGraph,
@@ -200,91 +206,77 @@ export function findPathWithInvariants(
     return m;
   };
 
-  // State key: `${node}${mask}`. Hash format never contains 
-  // (it's `sha256:…` or `h:…` in tests), so collisions are impossible.
-  const stateKey = (node: string, mask: number) => `${node}${mask}`;
-
-  interface ParentLink {
-    readonly parentKey: string;
-    readonly edge: MigrationEdge;
-  }
-  const parents = new Map<string, ParentLink>();
-  const visited = new Set<string>();
-
-  const startKey = stateKey(fromHash, 0);
-  visited.add(startKey);
-
-  // Inline BFS frontier with a head-index cursor. We can't reuse the generic
-  // `bfs` generator in graph-ops.ts because its visited set is keyed on node
-  // alone; this primitive needs state-level dedup (counter-example in
-  // spec §Pathfinder algorithm).
-  interface Frontier {
+  interface InvState {
     readonly node: string;
     readonly mask: number;
-    readonly key: string;
   }
-  const queue: Frontier[] = [{ node: fromHash, mask: 0, key: startKey }];
-  let head = 0;
+  // State key: `${node}${mask}`. Hash format never contains  (it's
+  // `sha256:…` or `h:…` in tests), so collisions are impossible.
+  const stateKey = (s: InvState) => `${s.node}${s.mask}`;
 
-  while (head < queue.length) {
-    // biome-ignore lint/style/noNonNullAssertion: head < queue.length guarantees defined
-    const cur = queue[head++]!;
+  // Cache edgeMaskOf per edge — outgoing edges are visited many times during
+  // BFS and each visit also calls the comparator, so naive recomputation is
+  // O(k) per edge per visit. WeakMap keyed on edge identity.
+  const edgeMaskCache = new WeakMap<MigrationEdge, number>();
+  const memoEdgeMask = (edge: MigrationEdge): number => {
+    const cached = edgeMaskCache.get(edge);
+    if (cached !== undefined) return cached;
+    const m = edgeMaskOf(edge);
+    edgeMaskCache.set(edge, m);
+    return m;
+  };
 
-    if (cur.node === toHash && cur.mask === fullMask) {
-      return reconstructInvariantPath(parents, cur.key);
+  const neighbours = (s: InvState): Iterable<{ next: InvState; edge: MigrationEdge }> => {
+    const outgoing = graph.forwardChain.get(s.node) ?? [];
+    if (outgoing.length === 0) return [];
+    const remainingMask = fullMask & ~s.mask;
+    // Annotate once, sort by precomputed keys. D11: invariant-covering edges
+    // first, then the existing tie-break.
+    const annotated = outgoing.map((edge) => {
+      const provided = memoEdgeMask(edge);
+      return {
+        edge,
+        provided,
+        useful: (provided & remainingMask) !== 0 ? 1 : 0,
+      };
+    });
+    annotated.sort((a, b) => {
+      if (a.useful !== b.useful) return b.useful - a.useful;
+      return compareTieBreak(a.edge, b.edge);
+    });
+    return annotated.map(({ edge, provided }) => ({
+      next: { node: edge.to, mask: s.mask | provided },
+      edge,
+    }));
+  };
+
+  // Path reconstruction is consumer-side, keyed on stateKey, same shape as
+  // findPath's parents map.
+  const parents = new Map<string, { parentKey: string; edge: MigrationEdge }>();
+  for (const step of bfs<InvState, MigrationEdge>(
+    [{ node: fromHash, mask: 0 }],
+    neighbours,
+    stateKey,
+  )) {
+    const curKey = stateKey(step.state);
+    if (step.parent !== null && step.incomingEdge !== null) {
+      parents.set(curKey, { parentKey: stateKey(step.parent), edge: step.incomingEdge });
     }
-
-    const outgoing = graph.forwardChain.get(cur.node);
-    if (!outgoing || outgoing.length === 0) continue;
-
-    const remainingMask = fullMask & ~cur.mask;
-    const ordered = sortNeighboursByInvariantUtility(outgoing, remainingMask, edgeMaskOf);
-
-    for (const edge of ordered) {
-      const provided = edgeMaskOf(edge);
-      const nextMask = cur.mask | provided;
-      const nextKey = stateKey(edge.to, nextMask);
-      if (visited.has(nextKey)) continue;
-      visited.add(nextKey);
-      parents.set(nextKey, { parentKey: cur.key, edge });
-      queue.push({ node: edge.to, mask: nextMask, key: nextKey });
+    if (step.state.node === toHash && step.state.mask === fullMask) {
+      const path: MigrationEdge[] = [];
+      let cur: string | undefined = curKey;
+      while (cur !== undefined) {
+        const p = parents.get(cur);
+        if (!p) break;
+        path.push(p.edge);
+        cur = p.parentKey;
+      }
+      path.reverse();
+      return path;
     }
   }
 
   return null;
-}
-
-function reconstructInvariantPath(
-  parents: ReadonlyMap<string, { parentKey: string; edge: MigrationEdge }>,
-  endKey: string,
-): MigrationEdge[] {
-  const path: MigrationEdge[] = [];
-  let cur: string | undefined = endKey;
-  while (cur !== undefined) {
-    const p = parents.get(cur);
-    if (!p) break;
-    path.push(p.edge);
-    cur = p.parentKey;
-  }
-  path.reverse();
-  return path;
-}
-
-function sortNeighboursByInvariantUtility(
-  edges: readonly MigrationEdge[],
-  remainingMask: number,
-  edgeMaskOf: (e: MigrationEdge) => number,
-): readonly MigrationEdge[] {
-  const annotated = edges.map((edge) => ({
-    edge,
-    useful: (edgeMaskOf(edge) & remainingMask) !== 0 ? 1 : 0,
-  }));
-  annotated.sort((a, b) => {
-    const u = b.useful - a.useful;
-    if (u !== 0) return u;
-    return compareTieBreak(a.edge, b.edge);
-  });
-  return annotated.map((a) => a.edge);
 }
 
 /**
@@ -294,7 +286,7 @@ function sortNeighboursByInvariantUtility(
 function collectNodesReachingTarget(graph: MigrationGraph, toHash: string): Set<string> {
   const reached = new Set<string>();
   for (const step of bfs([toHash], (n) => reverseNeighbours(graph, n))) {
-    reached.add(step.node);
+    reached.add(step.state);
   }
   return reached;
 }
@@ -380,7 +372,7 @@ function findDivergencePoint(
   const ancestorSets = leaves.map((leaf) => {
     const ancestors = new Set<string>();
     for (const step of bfs([leaf], (n) => reverseNeighbours(graph, n))) {
-      ancestors.add(step.node);
+      ancestors.add(step.state);
     }
     return ancestors;
   });
@@ -409,8 +401,8 @@ function findDivergencePoint(
 export function findReachableLeaves(graph: MigrationGraph, fromHash: string): readonly string[] {
   const leaves: string[] = [];
   for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n))) {
-    if (!graph.forwardChain.get(step.node)?.length) {
-      leaves.push(step.node);
+    if (!graph.forwardChain.get(step.state)?.length) {
+      leaves.push(step.state);
     }
   }
   return leaves;
@@ -557,7 +549,7 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationEdge[] {
   }
 
   for (const step of bfs(startNodes, (n) => forwardNeighbours(graph, n))) {
-    reachable.add(step.node);
+    reachable.add(step.state);
   }
 
   const orphans: MigrationEdge[] = [];

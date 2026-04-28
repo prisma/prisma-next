@@ -35,11 +35,11 @@ const sampleEdges: readonly TestEdge[] = [
   { from: 'D', to: 'E' },
 ];
 
-describe('bfs', () => {
+describe('bfs (string-keyed overload)', () => {
   it('visits every reachable node exactly once starting from a single root', () => {
     const visited: string[] = [];
     for (const step of bfs(['A'], forward(sampleEdges))) {
-      visited.push(step.node);
+      visited.push(step.state);
     }
     expect(visited.sort()).toEqual(['A', 'B', 'C', 'D', 'E']);
   });
@@ -48,14 +48,14 @@ describe('bfs', () => {
     const first = bfs(['A'], forward(sampleEdges)).next();
     expect(first.done).toBe(false);
     if (first.done) return;
-    expect(first.value.node).toBe('A');
+    expect(first.value.state).toBe('A');
     expect(first.value.parent).toBeNull();
     expect(first.value.incomingEdge).toBeNull();
   });
 
   it('yields parent and incomingEdge for non-start nodes', () => {
     const steps = [...bfs(['A'], forward(sampleEdges))];
-    const b = steps.find((s) => s.node === 'B');
+    const b = steps.find((s) => s.state === 'B');
     expect(b?.parent).toBe('A');
     expect(b?.incomingEdge).toEqual({ from: 'A', to: 'B' });
   });
@@ -68,7 +68,7 @@ describe('bfs', () => {
     ];
     const visited = new Set<string>();
     for (const step of bfs(['A', 'X'], forward(edges))) {
-      visited.add(step.node);
+      visited.add(step.state);
     }
     expect(visited).toEqual(new Set(['A', 'B', 'X', 'Y']));
   });
@@ -77,32 +77,29 @@ describe('bfs', () => {
     // Start at E and walk back to A via reverse edges.
     const visited: string[] = [];
     for (const step of bfs(['E'], reverse(sampleEdges))) {
-      visited.push(step.node);
+      visited.push(step.state);
     }
     expect(visited.sort()).toEqual(['A', 'B', 'C', 'D', 'E']);
   });
 
-  it('reaches target via shortest path when ordering is applied', () => {
-    // Diamond A→B→D and A→C→D. Ordering prefers edges labelled 'main'.
+  it('respects neighbour order when the closure pre-sorts', () => {
+    // Diamond A→B→D and A→C→D. The neighbours closure pre-sorts so edges
+    // labelled 'main' are visited first; D's parent must be C (via main).
     const edges: readonly TestEdge[] = [
       { from: 'A', to: 'B', label: 'feature' },
       { from: 'A', to: 'C', label: 'main' },
       { from: 'B', to: 'D' },
       { from: 'C', to: 'D' },
     ];
-    const preferMain = (
-      items: readonly { next: string; edge: TestEdge }[],
-    ): readonly { next: string; edge: TestEdge }[] =>
-      items.slice().sort((a, b) => {
+    const preferMain = (node: string): Iterable<{ next: string; edge: TestEdge }> =>
+      [...forward(edges)(node)].sort((a, b) => {
         if (a.edge.label === 'main' && b.edge.label !== 'main') return -1;
         if (b.edge.label === 'main' && a.edge.label !== 'main') return 1;
         return 0;
       });
 
-    const steps = [...bfs(['A'], forward(edges), preferMain)];
-    const dStep = steps.find((s) => s.node === 'D');
-    // D's parent must be C (via main), not B (via feature), because main was
-    // pushed first.
+    const steps = [...bfs(['A'], preferMain)];
+    const dStep = steps.find((s) => s.state === 'D');
     expect(dStep?.parent).toBe('C');
   });
 
@@ -114,7 +111,7 @@ describe('bfs', () => {
     ];
     const visited: string[] = [];
     for (const step of bfs(['A'], forward(edges))) {
-      visited.push(step.node);
+      visited.push(step.state);
     }
     expect(visited).toEqual(['A', 'B', 'C']);
   });
@@ -122,11 +119,9 @@ describe('bfs', () => {
   it('supports early termination via break', () => {
     const visited: string[] = [];
     for (const step of bfs(['A'], forward(sampleEdges))) {
-      visited.push(step.node);
-      if (step.node === 'B') break;
+      visited.push(step.state);
+      if (step.state === 'B') break;
     }
-    // We should have seen A and then B (or A, C, B depending on order) —
-    // but certainly not D or E.
     expect(visited).toContain('A');
     expect(visited).toContain('B');
     expect(visited).not.toContain('D');
@@ -136,7 +131,7 @@ describe('bfs', () => {
   it('yields nothing when starts is empty', () => {
     const visited: string[] = [];
     for (const step of bfs([], forward(sampleEdges))) {
-      visited.push(step.node);
+      visited.push(step.state);
     }
     expect(visited).toEqual([]);
   });
@@ -144,9 +139,68 @@ describe('bfs', () => {
   it('deduplicates start nodes', () => {
     const visited: string[] = [];
     for (const step of bfs(['A', 'A', 'A'], forward(sampleEdges))) {
-      visited.push(step.node);
+      visited.push(step.state);
     }
-    // A should appear exactly once at the start.
     expect(visited.filter((n) => n === 'A')).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Composite-state overload — caller supplies a `key` function to dedup on a
+// derived equality. The case the migration code uses is `(node, mask)` for
+// invariant-aware path-finding; here we test the simpler `(node, depth)`
+// shape so the test stays focused on the BFS plumbing rather than the
+// invariant logic.
+// ---------------------------------------------------------------------------
+
+describe('bfs (composite-state overload)', () => {
+  interface Composite {
+    readonly node: string;
+    readonly depth: number;
+  }
+  const compositeKey = (s: Composite) => `${s.node}@${s.depth}`;
+
+  it('dedups on the composite key, not the node alone', () => {
+    // Graph: A → B with one edge. From state (A,0) we visit both
+    // (B,1) and (B,2) by emitting two distinct depth-tagged transitions
+    // out of A. Node-keyed dedup would visit B once; composite-keyed
+    // dedup visits it twice (different states).
+    const edges: readonly TestEdge[] = [{ from: 'A', to: 'B' }];
+    const neighbours = (s: Composite): Iterable<{ next: Composite; edge: TestEdge }> => {
+      // Emit two transitions to B at different depths to force composite
+      // dedup to admit both.
+      if (s.node !== 'A') return [];
+      const e = edges[0]!;
+      return [
+        { next: { node: e.to, depth: 1 }, edge: e },
+        { next: { node: e.to, depth: 2 }, edge: e },
+      ];
+    };
+    const visited: Composite[] = [];
+    for (const step of bfs<Composite, TestEdge>(
+      [{ node: 'A', depth: 0 }],
+      neighbours,
+      compositeKey,
+    )) {
+      visited.push(step.state);
+    }
+    expect(visited).toEqual([
+      { node: 'A', depth: 0 },
+      { node: 'B', depth: 1 },
+      { node: 'B', depth: 2 },
+    ]);
+  });
+
+  it('parent state is the full composite, not just the node', () => {
+    const edges: readonly TestEdge[] = [{ from: 'A', to: 'B' }];
+    const neighbours = (s: Composite): Iterable<{ next: Composite; edge: TestEdge }> => {
+      if (s.node !== 'A') return [];
+      return [{ next: { node: 'B', depth: s.depth + 1 }, edge: edges[0]! }];
+    };
+    const steps = [
+      ...bfs<Composite, TestEdge>([{ node: 'A', depth: 0 }], neighbours, compositeKey),
+    ];
+    const b = steps.find((s) => s.state.node === 'B');
+    expect(b?.parent).toEqual({ node: 'A', depth: 0 });
   });
 });
