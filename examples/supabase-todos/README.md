@@ -47,7 +47,7 @@ Run from the **repo root** unless noted otherwise.
    pnpm --filter supabase-todos contract:emit
    ```
 
-5. **Apply the initial PN migration.** Runs [`migrations/20260427T1530_initial/migration.ts`](migrations/20260427T1530_initial/migration.ts) via `MigrationCLI`. Creates `profiles`, `todos`, `public_messages`; enables RLS on each; installs the role-targeted policies that scope reads/writes to `auth.uid()`.
+5. **Apply the initial PN migration.** Runs [`migrations/20260428T0354_initial/migration.ts`](migrations/20260428T0354_initial/migration.ts) via `MigrationCLI`. Creates `profiles`, `todos`, `public_messages`; enables RLS on each; installs the role-targeted policies that scope reads/writes to `auth.uid()`.
 
    ```bash
    pnpm --filter supabase-todos migrate:up

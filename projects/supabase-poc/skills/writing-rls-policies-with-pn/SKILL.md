@@ -88,7 +88,7 @@ createRlsPolicy({
 
 If you only set `using` and leave `withCheck` unset, Postgres **defaults `WITH CHECK` to `USING`** — but in this case you should still write both explicitly so the intent is unambiguous to the next reader. The pattern "only `using` set" is a code-review smell on `UPDATE` policies.
 
-Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) — both `using` and `withCheck` set explicitly, expressions identical because there's no ownership transfer permitted.
+Worked example in the PoC: the `todos_update_own` policy in [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) — both `using` and `withCheck` set explicitly, expressions identical because there's no ownership transfer permitted.
 
 > _TODO: populate during M4 — link to the example test that covers the asymmetric-policy case once it's written._
 
@@ -107,7 +107,7 @@ Always set `to`. Common values for Supabase-style apps:
 
 Don't use `to: undefined` (which renders as `PUBLIC`). It applies to every role, including roles that don't exist yet, which makes the policy's blast radius unauditable.
 
-Worked example in the PoC: `public_messages_select_public` in [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) targets `['anon', 'authenticated']` for a public read; the paired `public_messages_insert_own` targets `['authenticated']` only and `withCheck`s `(author_id = (auth.uid())::text)`. Two roles for the read, one for the write — that's the standard "publicly readable, authored-by-account" shape.
+Worked example in the PoC: `public_messages_select_public` in [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) targets `['anon', 'authenticated']` for a public read; the paired `public_messages_insert_own` targets `['authenticated']` only and `withCheck`s `(author_id = (auth.uid())::text)`. Two roles for the read, one for the write — that's the standard "publicly readable, authored-by-account" shape.
 
 ---
 
@@ -215,7 +215,19 @@ Each entry below is a footgun observed either in the wild or during this PoC. Re
 
 ## 10. Where to write it (PN-specific)
 
-Author RLS in PN migration files using the migration factories, not as raw `supabase/migrations/*.sql`:
+Author RLS in PN migration files using the migration factories, not as raw `supabase/migrations/*.sql`. Use the **scaffold-and-edit** workflow — let the framework do what it can from the contract, then append the RLS bolt-on by hand.
+
+### The scaffold-and-edit workflow
+
+1. **Scaffold from the contract.** From the example root, run `pnpm exec prisma-next migration plan --name <slug>`. The planner reads the emitted contract and writes `migrations/<ts>_<slug>/migration.ts` populated with the `createTable` / `addColumn` / `addForeignKey` / etc. ops it can derive. No hand-typing of column shapes.
+2. **Edit to add the RLS bolt-on.** Open the scaffolded `migration.ts` and append calls to `enableRowLevelSecurity` and `createRlsPolicy` for the affected tables. RLS metadata is invisible to the contract IR (FL-01, planner-side facet), so the planner cannot emit these — the author does. Cross-link FL-01 in the migration's docblock so the next reviewer knows why the migration has hand-edits past the planner-emitted ops.
+3. **Re-attest.** Run `pnpm exec tsx migrations/<ts>_<slug>/migration.ts` (or `pnpm migrate:up` which goes through `prisma-next migration apply`) to re-derive `ops.json` and `migration.json` from the edited body. Use `tsx`, not `node` directly — the file is TypeScript and Node's ESM loader doesn't compile `.ts` (`ERR_MODULE_NOT_FOUND`).
+
+For migrations that exist purely to add or change RLS (no contract change), use `pnpm exec prisma-next migration new --name <slug>` instead — it scaffolds an empty `migration.ts` ready for hand-authored ops only.
+
+### File shape after step 2
+
+The scaffolded file already has the `Migration` class, `MigrationCLI.run(...)` footer, and the planner-derived ops. Your edits add the RLS imports and the bolt-on ops:
 
 ```ts
 import { createTable, addForeignKey, Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
@@ -236,9 +248,9 @@ export default class M extends Migration {
 MigrationCLI.run(import.meta.url, M);
 ```
 
-Run with `pnpm --filter <example> migrate:up`. Use the **service-role** URL for `migrate:up` (RLS bypass needed to `ALTER TABLE … ENABLE ROW LEVEL SECURITY`).
+Apply with `pnpm --filter <example> migrate:up`. Use the **service-role** URL for `migrate:up` (RLS bypass needed to `ALTER TABLE … ENABLE ROW LEVEL SECURITY`).
 
-Working reference: [`examples/supabase-todos/migrations/20260427T1530_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260427T1530_initial/migration.ts) — three `createTable`s, three `enableRowLevelSecurity`s, eight `createRlsPolicy`s. The docblock at the top of that file documents the two intentional non-features (no `alterColumnType` to native `uuid`, no FK to `auth.users`) and cross-links FL-02 and FL-03.
+Working reference: [`examples/supabase-todos/migrations/20260428T0354_initial/migration.ts`](../../../examples/supabase-todos/migrations/20260428T0354_initial/migration.ts) — three `createTable`s scaffolded by `migration plan`, three `enableRowLevelSecurity`s and eight `createRlsPolicy`s appended by hand. The docblock at the top documents the workflow narrative (which ops are CLI-derived, which are the hand-authored bolt-on) and the two intentional non-features (no `alterColumnType` to native `uuid`, no FK to `auth.users`), with cross-links to FL-01 / FL-02 / FL-03.
 
 ---
 

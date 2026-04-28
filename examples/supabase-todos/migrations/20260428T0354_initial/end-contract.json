@@ -1,0 +1,365 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:8329c21fc617189c08798ddf93d0e82a90f7ac26771bb561e41a3f5f622511ff",
+  "roots": {
+    "profiles": "Profile",
+    "public_messages": "PublicMessage",
+    "todos": "Todo"
+  },
+  "models": {
+    "Profile": {
+      "fields": {
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
+        },
+        "displayName": {
+          "nullable": true,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "email": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "createdAt": {
+            "column": "created_at"
+          },
+          "displayName": {
+            "column": "display_name"
+          },
+          "email": {
+            "column": "email"
+          },
+          "id": {
+            "column": "id"
+          }
+        },
+        "table": "profiles"
+      }
+    },
+    "PublicMessage": {
+      "fields": {
+        "authorId": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "body": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "authorId": {
+            "column": "author_id"
+          },
+          "body": {
+            "column": "body"
+          },
+          "createdAt": {
+            "column": "created_at"
+          },
+          "id": {
+            "column": "id"
+          }
+        },
+        "table": "public_messages"
+      }
+    },
+    "Todo": {
+      "fields": {
+        "completed": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/bool@1",
+            "kind": "scalar"
+          }
+        },
+        "createdAt": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/timestamptz@1",
+            "kind": "scalar"
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "title": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/text@1",
+            "kind": "scalar"
+          }
+        },
+        "userId": {
+          "nullable": false,
+          "type": {
+            "codecId": "sql/char@1",
+            "kind": "scalar",
+            "typeParams": {
+              "length": 36
+            }
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "completed": {
+            "column": "completed"
+          },
+          "createdAt": {
+            "column": "created_at"
+          },
+          "id": {
+            "column": "id"
+          },
+          "title": {
+            "column": "title"
+          },
+          "userId": {
+            "column": "user_id"
+          }
+        },
+        "table": "todos"
+      }
+    }
+  },
+  "storage": {
+    "storageHash": "sha256:fe91b8eca8cca26d430660e7659b53f9db1dfb6601a0b74b111460b6bf53940c",
+    "tables": {
+      "profiles": {
+        "columns": {
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "display_name": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": true
+          },
+          "email": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": []
+      },
+      "public_messages": {
+        "columns": {
+          "author_id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "body": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": []
+      },
+      "todos": {
+        "columns": {
+          "completed": {
+            "codecId": "pg/bool@1",
+            "nativeType": "bool",
+            "nullable": false
+          },
+          "created_at": {
+            "codecId": "pg/timestamptz@1",
+            "default": {
+              "expression": "now()",
+              "kind": "function"
+            },
+            "nativeType": "timestamptz",
+            "nullable": false
+          },
+          "id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          },
+          "title": {
+            "codecId": "pg/text@1",
+            "nativeType": "text",
+            "nullable": false
+          },
+          "user_id": {
+            "codecId": "sql/char@1",
+            "nativeType": "character",
+            "nullable": false,
+            "typeParams": {
+              "length": 36
+            }
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": []
+      }
+    }
+  },
+  "execution": {
+    "executionHash": "sha256:c6c3cea5c2b12ac00338b4b921ca0f7d8586d278e3bd3ca07b857198ab4c6563",
+    "mutations": {
+      "defaults": [
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "public_messages"
+          }
+        },
+        {
+          "onCreate": {
+            "id": "uuidv4",
+            "kind": "generator"
+          },
+          "ref": {
+            "column": "id",
+            "table": "todos"
+          }
+        }
+      ]
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "defaults.now": true,
+      "defaults.uuidv4": true,
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {},
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}
