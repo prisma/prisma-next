@@ -21,8 +21,7 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllMigrationPackages,
-  type MigrationPackageSet,
+  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -183,9 +182,9 @@ async function executeMigrationApplyCommand(
   }
 
   // Read migrations and build migration chain model (offline — no DB needed)
-  let migrations: MigrationPackageSet;
+  let migrations: Awaited<ReturnType<typeof loadMigrationPackages>>;
   try {
-    migrations = await loadAllMigrationPackages(migrationsDir);
+    migrations = await loadMigrationPackages(migrationsDir);
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));

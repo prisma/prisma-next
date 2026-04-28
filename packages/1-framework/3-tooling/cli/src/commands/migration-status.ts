@@ -25,7 +25,7 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
-  loadAllMigrationPackages,
+  loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
   resolveMigrationPaths,
@@ -422,7 +422,7 @@ async function executeMigrationStatusCommand(
   let bundles: readonly MigrationPackage[];
   let graph: MigrationGraph;
   try {
-    ({ bundles, graph } = await loadAllMigrationPackages(migrationsDir));
+    ({ bundles, graph } = await loadMigrationPackages(migrationsDir));
   } catch (error) {
     if (MigrationToolsError.is(error)) {
       return notOk(mapMigrationToolsError(error));
