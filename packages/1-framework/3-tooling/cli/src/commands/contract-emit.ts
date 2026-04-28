@@ -1,18 +1,13 @@
-import { mkdirSync, writeFileSync } from 'node:fs';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { errorContractConfigMissing } from '@prisma-next/errors/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { createControlClient } from '../control-api/client';
-import type { EmitFailure } from '../control-api/types';
-import {
-  CliStructuredError,
-  errorContractValidationFailed,
-  errorRuntime,
-  errorUnexpected,
-} from '../utils/cli-errors';
+import { executeContractEmit } from '../control-api/operations/contract-emit';
+import type { ContractEmitResult } from '../control-api/types';
+import { CliStructuredError, errorUnexpected } from '../utils/cli-errors';
 import {
   addGlobalOptions,
   setCommandDescriptions,
@@ -34,74 +29,29 @@ interface ContractEmitOptions extends CommonCommandOptions {
   readonly config?: string;
 }
 
-function mapDiagnosticsToIssues(
-  failure: EmitFailure,
-): ReadonlyArray<{ kind: string; message: string }> {
-  const diagnostics = failure.diagnostics?.diagnostics ?? [];
-  return diagnostics.map((diagnostic) => {
-    const location =
-      diagnostic.sourceId && diagnostic.span
-        ? ` (${diagnostic.sourceId}:${diagnostic.span.start.line}:${diagnostic.span.start.column})`
-        : diagnostic.sourceId
-          ? ` (${diagnostic.sourceId})`
-          : '';
-    return {
-      kind: diagnostic.code,
-      message: `${diagnostic.message}${location}`,
-    };
-  });
+interface HeaderPaths {
+  readonly displayConfigPath: string;
+  readonly outputJsonPath: string;
+  readonly outputDtsPath: string;
 }
 
 /**
- * Maps an EmitFailure to a CliStructuredError for consistent error handling.
+ * Pre-load the config just to compute display paths for the styled header. The
+ * actual emit work goes through `executeContractEmit`, which loads the config
+ * itself; the redundant load here is bounded and lets the header render before
+ * the emit spans start.
  */
-function mapEmitFailure(
-  failure: EmitFailure,
-  context?: { readonly configPath?: string },
-): CliStructuredError {
-  if (failure.code === 'CONTRACT_SOURCE_INVALID') {
-    const issues = mapDiagnosticsToIssues(failure);
-    return errorRuntime(failure.summary, {
-      why: failure.why ?? 'Contract source provider failed',
-      fix: 'Check your contract source provider in prisma-next.config.ts and ensure it returns Result<Contract, Diagnostics>',
-      ...(issues.length > 0 ? { meta: { issues } } : {}),
-    });
-  }
+async function resolveHeaderPaths(
+  configOption: string | undefined,
+): Promise<Result<HeaderPaths, CliStructuredError>> {
+  const displayConfigPath = configOption
+    ? relative(process.cwd(), resolve(configOption))
+    : 'prisma-next.config.ts';
 
-  if (failure.code === 'CONTRACT_VALIDATION_FAILED') {
-    return errorContractValidationFailed(
-      failure.why ?? 'Contract validation failed while emitting',
-      context?.configPath ? { where: { path: context.configPath } } : undefined,
-    );
-  }
-
-  if (failure.code === 'EMIT_FAILED') {
-    return errorRuntime(failure.summary, {
-      why: failure.why ?? 'Failed to emit contract',
-      fix: 'Check your contract configuration and ensure the source is valid',
-    });
-  }
-
-  // Exhaustive check - TypeScript will error if a new code is added but not handled
-  const exhaustive: never = failure.code;
-  throw new Error(`Unhandled EmitFailure code: ${exhaustive}`);
-}
-
-/**
- * Executes the contract emit command and returns a structured Result.
- */
-async function executeContractEmitCommand(
-  options: ContractEmitOptions,
-  flags: GlobalFlags,
-  ui: TerminalUI,
-  startTime: number,
-): Promise<Result<EmitContractResult, CliStructuredError>> {
-  // Load config
   let config: Awaited<ReturnType<typeof loadConfig>>;
   try {
-    config = await loadConfig(options.config);
+    config = await loadConfig(configOption);
   } catch (error) {
-    // Convert thrown CliStructuredError to Result
     if (error instanceof CliStructuredError) {
       return notOk(error);
     }
@@ -112,33 +62,19 @@ async function executeContractEmitCommand(
     );
   }
 
-  const configPath = options.config
-    ? relative(process.cwd(), resolve(options.config))
-    : 'prisma-next.config.ts';
-
-  // Resolve contract from config
-  if (!config.contract) {
+  if (!config.contract?.output) {
     return notOk(
       errorContractConfigMissing({
-        why: 'Config.contract is required for emit. Define it in your config: contract: { source: ..., output: ... }',
+        why: 'Config.contract.output is required for emit. Define it in your config: contract: { source: ..., output: ... }',
       }),
     );
   }
 
-  // Contract config is already normalized by defineConfig() with defaults applied
-  const contractConfig = config.contract;
-
-  // Resolve artifact paths from config (already normalized by defineConfig() with defaults)
-  if (!contractConfig.output) {
-    return notOk(
-      errorContractConfigMissing({
-        why: 'Contract config must have output path. This should not happen if defineConfig() was used.',
-      }),
-    );
-  }
-  let outputPaths: ReturnType<typeof getEmittedArtifactPaths>;
   try {
-    outputPaths = getEmittedArtifactPaths(contractConfig.output);
+    const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = getEmittedArtifactPaths(
+      config.contract.output,
+    );
+    return ok({ displayConfigPath, outputJsonPath, outputDtsPath });
   } catch (error) {
     return notOk(
       errorContractConfigMissing({
@@ -146,96 +82,65 @@ async function executeContractEmitCommand(
       }),
     );
   }
-  const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
+}
 
-  // Output header to stderr (decoration)
+async function executeContractEmitCommand(
+  options: ContractEmitOptions,
+  flags: GlobalFlags,
+  ui: TerminalUI,
+  startTime: number,
+): Promise<Result<EmitContractResult, CliStructuredError>> {
+  const headerPathsResult = await resolveHeaderPaths(options.config);
+  if (!headerPathsResult.ok) {
+    return headerPathsResult;
+  }
+  const { displayConfigPath, outputJsonPath, outputDtsPath } = headerPathsResult.value;
+
   if (!flags.json && !flags.quiet) {
-    const contractPath = relative(process.cwd(), outputJsonPath);
-    const typesPath = relative(process.cwd(), outputDtsPath);
-    const header = formatStyledHeader({
-      command: 'contract emit',
-      description: 'Emit your contract artifacts',
-      url: 'https://pris.ly/contract-emit',
-      details: [
-        { label: 'config', value: configPath },
-        { label: 'contract', value: contractPath },
-        { label: 'types', value: typesPath },
-      ],
-      flags,
-    });
-    ui.stderr(header);
+    ui.stderr(
+      formatStyledHeader({
+        command: 'contract emit',
+        description: 'Emit your contract artifacts',
+        url: 'https://pris.ly/contract-emit',
+        details: [
+          { label: 'config', value: displayConfigPath },
+          { label: 'contract', value: relative(process.cwd(), outputJsonPath) },
+          { label: 'types', value: relative(process.cwd(), outputDtsPath) },
+        ],
+        flags,
+      }),
+    );
   }
 
-  // Create control client (no driver needed for emit)
-  const client = createControlClient({
-    family: config.family,
-    target: config.target,
-    adapter: config.adapter,
-    extensionPacks: config.extensionPacks ?? [],
-  });
-
-  // Create progress adapter
   const onProgress = createProgressAdapter({ ui, flags });
+  const configPath = options.config ? resolve(options.config) : 'prisma-next.config.ts';
 
+  let result: ContractEmitResult;
   try {
-    // Call emit with progress callback
-    const result = await client.emit({
-      contractConfig: {
-        source: contractConfig.source,
-        output: outputJsonPath,
-      },
-      onProgress,
-    });
-
-    // Handle failures by mapping to CLI structured error
-    if (!result.ok) {
-      return notOk(mapEmitFailure(result.failure, { configPath }));
-    }
-
-    // Create directories if needed
-    mkdirSync(dirname(outputJsonPath), { recursive: true });
-    mkdirSync(dirname(outputDtsPath), { recursive: true });
-
-    // Write the results to files
-    writeFileSync(outputJsonPath, result.value.contractJson, 'utf-8');
-    writeFileSync(outputDtsPath, result.value.contractDts, 'utf-8');
-
-    // Validate that contract.d.ts type imports are resolvable
-    const { validateContractDeps } = await import('../utils/validate-contract-deps');
-    const depsValidation = validateContractDeps(result.value.contractDts, dirname(outputDtsPath));
-    if (depsValidation.warning) {
-      ui.warn(depsValidation.warning);
-    }
-
-    // Convert success result to CLI output format
-    const emitResult: EmitContractResult = {
-      storageHash: result.value.storageHash,
-      ...(result.value.executionHash ? { executionHash: result.value.executionHash } : {}),
-      profileHash: result.value.profileHash,
-      outDir: dirname(outputJsonPath),
-      files: {
-        json: outputJsonPath,
-        dts: outputDtsPath,
-      },
-      timings: { total: Date.now() - startTime },
-    };
-
-    return ok(emitResult);
+    result = await executeContractEmit({ configPath, onProgress });
   } catch (error) {
-    // Use static type guard to work across module boundaries
     if (CliStructuredError.is(error)) {
       return notOk(error);
     }
-
-    // Wrap unexpected errors
     return notOk(
       errorUnexpected('Unexpected error during contract emit', {
         why: error instanceof Error ? error.message : String(error),
       }),
     );
-  } finally {
-    await client.close();
   }
+
+  if (result.validationWarning) {
+    ui.warn(result.validationWarning);
+  }
+
+  return ok({
+    storageHash: result.storageHash,
+    ...ifDefined('executionHash', result.executionHash),
+    profileHash: result.profileHash,
+    outDir: dirname(result.files.json),
+    files: result.files,
+    timings: { total: Date.now() - startTime },
+  });
 }
 
 export function createContractEmitCommand(): Command {
@@ -260,7 +165,6 @@ export function createContractEmitCommand(): Command {
 
       const result = await executeContractEmitCommand(options, flags, ui, startTime);
 
-      // Handle result - formats output and returns exit code
       const exitCode = handleResult(result, flags, ui, (emitResult) => {
         if (flags.json) {
           ui.output(formatEmitJson(emitResult));

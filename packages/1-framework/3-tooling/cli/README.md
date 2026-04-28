@@ -1092,23 +1092,57 @@ flowchart TD
     CMD_EMIT[Emit Command]
     CMD_DB[DB Commands]
     CMD_MIG[Migration Commands]
-    LOAD[TS Contract Loader]
+    EXEC_EMIT[executeContractEmit]
+    PUBLISH[publishContractArtifactPair]
     EMIT[Emitter]
     CTRL[Control Client]
     MIG_TOOLS["@prisma-next/migration-tools"]
     FS[File System]
+    VITE["@prisma-next/vite-plugin-contract-emit"]
 
     CLI --> CMD_EMIT
     CLI --> CMD_DB
     CLI --> CMD_MIG
-    CMD_EMIT --> LOAD
-    LOAD --> EMIT
+    CMD_EMIT --> EXEC_EMIT
+    VITE --> EXEC_EMIT
+    EXEC_EMIT --> EMIT
+    EXEC_EMIT --> PUBLISH
+    PUBLISH --> FS
     CMD_DB --> CTRL
     CMD_MIG --> CTRL
     CMD_MIG --> MIG_TOOLS
     MIG_TOOLS --> FS
     CTRL --> FS
 ```
+
+## Canonical Contract Emit Path
+
+> **For agents/contributors**: `executeContractEmit` is the SINGLE publication path
+> for `contract.json` + `contract.d.ts`. The CLI command (`prisma-next contract
+> emit`) and the Vite plugin (`@prisma-next/vite-plugin-contract-emit`) both
+> call into it. Do NOT re-implement the load → emit → publish dance in a new
+> caller; if you need additional behavior, extend `ContractEmitOptions` /
+> `ContractEmitResult` and update `executeContractEmit` itself.
+
+How it composes:
+
+- The whole flow (load config → resolve source → emit bytes → publish) is
+  serialized per output JSON path via `queueEmitByOutput`
+  (`src/utils/emit-queue.ts`). Concurrent calls for the same output line up
+  FIFO; concurrent calls for distinct outputs run in parallel. Last submission
+  wins on disk.
+- Within a single emit, `publishContractArtifactPair`
+  (`src/utils/publish-contract-artifact-pair.ts`) stages temp files, renames
+  `contract.d.ts` before `contract.json`, and attempts to restore the previous
+  pair if either rename fails — so type-only consumers never observe a
+  mismatched pair.
+- Long-lived hosts (Vite dev server, watch CLIs) must call `disposeEmitQueue`
+  on shutdown to drop the per-output queue state, otherwise the module-global
+  queue map leaks one entry per unique output path.
+
+The `validateContractDeps` warning is returned in `ContractEmitResult.validationWarning`
+rather than written to stderr by the operation — callers (CLI, Vite plugin) decide
+how to render it (`ui.warn`, plugin logger, etc.).
 
 ## Config Validation and Normalization
 

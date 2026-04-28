@@ -1,19 +1,41 @@
+import { resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import { executeContractEmit } from '@prisma-next/cli/control-api';
-import { resolve } from 'pathe';
+import { disposeEmitQueue, executeContractEmit } from '@prisma-next/cli/control-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
 vi.mock('@prisma-next/cli/control-api', () => ({
   executeContractEmit: vi.fn(),
+  disposeEmitQueue: vi.fn(),
 }));
 
 vi.mock('@prisma-next/cli/config-loader', () => ({
   loadConfig: vi.fn(),
 }));
 
+vi.mock('@prisma-next/emitter', () => ({
+  getEmittedArtifactPaths: (outputJsonPath: string) => ({
+    jsonPath: outputJsonPath,
+    dtsPath: outputJsonPath.replace(/\.json$/, '.d.ts'),
+  }),
+}));
+
+vi.mock('pathe', async () => {
+  const path = await vi.importActual<typeof import('node:path')>('node:path');
+  return {
+    extname: path.extname,
+    resolve: path.resolve,
+  };
+});
+
 const mockedExecuteContractEmit = vi.mocked(executeContractEmit);
+const mockedDisposeEmitQueue = vi.mocked(disposeEmitQueue);
 const mockedLoadConfig = vi.mocked(loadConfig);
+const successfulEmitResult = {
+  storageHash: 'abc123',
+  profileHash: 'def456',
+  files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
+} satisfies Awaited<ReturnType<typeof executeContractEmit>>;
 
 type LoadedConfig = Awaited<ReturnType<typeof loadConfig>>;
 type SourceInputs = NonNullable<LoadedConfig['contract']>['source']['inputs'];
@@ -27,6 +49,22 @@ interface MockModuleNode {
 const unusedContractLoad: NonNullable<LoadedConfig['contract']>['source']['load'] = async () => {
   throw new Error('unused in tests');
 };
+
+function createDeferred<T>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
+async function flushMicrotasks(turns = 8): Promise<void> {
+  for (let index = 0; index < turns; index += 1) {
+    await Promise.resolve();
+  }
+}
 
 function toAbsolutePath(path: string): string {
   return resolve('/project', path);
@@ -110,15 +148,41 @@ function getWatcherHandler(
     | undefined;
 }
 
+async function configurePlugin({
+  options = { logLevel: 'silent', debounceMs: 100 },
+  moduleGraph = { '/project/prisma-next.config.ts': {} },
+}: {
+  options?: Parameters<typeof prismaVitePlugin>[1];
+  moduleGraph?: Record<string, { file?: string; imports?: readonly string[] }>;
+} = {}): Promise<{
+  readonly mockServer: ReturnType<typeof createMockServer>;
+  readonly handleHotUpdate: (ctx: { file: string }) => void;
+}> {
+  const plugin = prismaVitePlugin('prisma-next.config.ts', options);
+  const mockServer = createMockServer();
+
+  applyModuleGraph(mockServer, moduleGraph);
+
+  const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+  configResolved({ root: '/project' });
+
+  const configureServer = plugin.configureServer as unknown as (
+    server: ReturnType<typeof createMockServer>,
+  ) => Promise<void>;
+  await configureServer(mockServer);
+
+  return {
+    mockServer,
+    handleHotUpdate: plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void,
+  };
+}
+
 describe('prismaVitePlugin', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     mockedExecuteContractEmit.mockReset();
-    mockedExecuteContractEmit.mockResolvedValue({
-      storageHash: 'abc123',
-      profileHash: 'def456',
-      files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
-    });
+    mockedExecuteContractEmit.mockResolvedValue(successfulEmitResult);
+    mockedDisposeEmitQueue.mockReset();
     mockedLoadConfig.mockReset();
     mockedLoadConfig.mockResolvedValue(createLoadedConfig());
   });
@@ -387,6 +451,23 @@ describe('prismaVitePlugin', () => {
       expect(mockServer.watcher.on).toHaveBeenCalledWith('change', expect.any(Function));
       expect(mockServer.watcher.on).toHaveBeenCalledWith('add', expect.any(Function));
       expect(mockServer.watcher.on).toHaveBeenCalledWith('unlink', expect.any(Function));
+    });
+
+    it('disposes the per-output emit queue on server close', async () => {
+      mockedLoadConfig.mockResolvedValue(
+        createLoadedConfig({ output: 'src/prisma/contract.json' }),
+      );
+      const { mockServer } = await configurePlugin();
+
+      // The httpServer 'close' listener is the cleanup hook the plugin registers.
+      const closeHandler = mockServer.httpServer.on.mock.calls.find(
+        ([event]) => event === 'close',
+      )?.[1] as (() => void) | undefined;
+      expect(closeHandler).toEqual(expect.any(Function));
+
+      closeHandler?.();
+
+      expect(mockedDisposeEmitQueue).toHaveBeenCalledWith('/project/src/prisma/contract.json');
     });
 
     it('does not warn when provider omits inputs', async () => {
@@ -691,27 +772,8 @@ describe('prismaVitePlugin', () => {
         }),
       );
 
-      const plugin = prismaVitePlugin('prisma-next.config.ts', {
-        logLevel: 'silent',
-        debounceMs: 100,
-      });
-      const mockServer = createMockServer();
-
-      applyModuleGraph(mockServer, {
-        '/project/prisma-next.config.ts': {},
-      });
-
-      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
-      configResolved({ root: '/project' });
-
-      const configureServer = plugin.configureServer as unknown as (
-        server: ReturnType<typeof createMockServer>,
-      ) => Promise<void>;
-      await configureServer(mockServer);
-
+      const { handleHotUpdate } = await configurePlugin();
       mockedExecuteContractEmit.mockClear();
-
-      const handleHotUpdate = plugin.handleHotUpdate as unknown as (ctx: { file: string }) => void;
 
       handleHotUpdate({ file: '/project/prisma-next.config.ts' });
       await vi.advanceTimersByTimeAsync(50);
@@ -721,6 +783,96 @@ describe('prismaVitePlugin', () => {
       await vi.advanceTimersByTimeAsync(100);
 
       expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+    });
+
+    it('waits for an in-flight emit before starting the queued re-emit', async () => {
+      const { handleHotUpdate } = await configurePlugin();
+      mockedExecuteContractEmit.mockReset();
+
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      let firstSignal: AbortSignal | undefined;
+      mockedExecuteContractEmit.mockImplementationOnce(async ({ signal }) => {
+        firstSignal = signal;
+        return firstEmit.promise;
+      });
+      mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+      expect(firstSignal?.aborted).toBe(false);
+
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+      expect(firstSignal?.aborted).toBe(false);
+    });
+
+    it('coalesces multiple queued changes while an emit is in flight', async () => {
+      const { handleHotUpdate } = await configurePlugin();
+      mockedExecuteContractEmit.mockReset();
+
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
+      mockedExecuteContractEmit.mockResolvedValueOnce(successfulEmitResult);
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(1);
+
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+    });
+
+    it('defers full reload while a newer queued emit is still pending', async () => {
+      const { handleHotUpdate, mockServer } = await configurePlugin();
+      mockedExecuteContractEmit.mockReset();
+      mockServer.ws.send.mockClear();
+
+      const firstEmit = createDeferred<Awaited<ReturnType<typeof executeContractEmit>>>();
+      mockedExecuteContractEmit.mockImplementationOnce(async () => firstEmit.promise);
+      mockedExecuteContractEmit.mockRejectedValueOnce(new Error('latest source invalid'));
+
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+      handleHotUpdate({ file: '/project/prisma-next.config.ts' });
+      await vi.advanceTimersByTimeAsync(100);
+
+      firstEmit.resolve(successfulEmitResult);
+      await firstEmit.promise;
+      await flushMicrotasks();
+
+      expect(mockedExecuteContractEmit).toHaveBeenCalledTimes(2);
+      expect(mockServer.ws.send).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'error',
+          err: expect.objectContaining({
+            message: expect.stringContaining('latest source invalid'),
+          }),
+        }),
+      );
+      expect(mockServer.ws.send).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'full-reload' }),
+      );
     });
   });
 

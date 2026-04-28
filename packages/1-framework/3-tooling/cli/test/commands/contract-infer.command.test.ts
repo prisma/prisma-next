@@ -107,7 +107,7 @@ describe('createContractInferCommand', () => {
     cleanupMocks();
     rmSync(testDir, { recursive: true, force: true });
     vi.clearAllMocks();
-  });
+  }, timeouts.typeScriptCompilation);
 
   it('writes to a custom output path when --output is provided', async () => {
     process.chdir(testDir);

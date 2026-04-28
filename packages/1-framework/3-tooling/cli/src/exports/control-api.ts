@@ -23,7 +23,6 @@ export { enrichContract } from '../control-api/contract-enrichment';
 
 // Standalone operations (for tooling that doesn't need full client)
 export { executeContractEmit } from '../control-api/operations/contract-emit';
-
 // CLI-specific types
 export type {
   ContractEmitOptions,
@@ -54,3 +53,5 @@ export type {
   SignOptions,
   VerifyOptions,
 } from '../control-api/types';
+// Lifecycle helpers for hosts that publish to many output paths
+export { disposeEmitQueue } from '../utils/emit-queue';

@@ -512,18 +512,31 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
 
 /**
  * Options for the standalone executeContractEmit function.
- * Used by tooling (e.g., Vite plugin) that needs to emit contracts
- * without the full ControlClient infrastructure.
+ *
+ * `executeContractEmit` is the canonical publication path for both the
+ * `prisma-next contract emit` CLI command and the `@prisma-next/vite-plugin-contract-emit`
+ * Vite plugin. Do not duplicate the load → emit → publish dance elsewhere; if a
+ * caller needs additional behavior, extend this options shape and update the
+ * single implementation rather than building a parallel publication path.
+ *
+ * Concurrent calls for the same output JSON path are serialized per-output via
+ * a FIFO queue; concurrent calls for distinct outputs run in parallel.
  */
 export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
-  /** Optional AbortSignal for cancellation support */
+  /** Optional AbortSignal for cancelling the in-flight emit */
   readonly signal?: AbortSignal;
+  /** Optional progress callback for observing source-resolution and emit spans */
+  readonly onProgress?: OnControlProgress;
 }
 
 /**
  * Result from the standalone executeContractEmit function.
+ *
+ * Always describes the bytes that were just published to disk. Failures throw
+ * (config / source-resolution / emit / publish) — callers do not need to
+ * branch on a result discriminator.
  */
 export interface ContractEmitResult {
   /** Hash of the storage contract (schema-level) */
@@ -539,6 +552,12 @@ export interface ContractEmitResult {
     /** Path to the emitted contract.d.ts file */
     readonly dts: string;
   };
+  /**
+   * Warning surfaced by `validateContractDeps` after a successful publication.
+   * Callers (CLI, Vite plugin) decide how to render this; the operation does
+   * not write to stderr itself. Undefined when no warning was raised.
+   */
+  readonly validationWarning?: string;
 }
 
 // ============================================================================
