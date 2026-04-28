@@ -1,6 +1,7 @@
+import { escapeLiteral } from '../../sql-utils';
 import { buildCreateIndexSql, buildDropIndexSql } from '../planner-ddl-builders';
 import { buildTargetDetails } from '../planner-target-details';
-import { esc, type Op, step } from './shared';
+import { type Op, step } from './shared';
 
 export function createIndex(tableName: string, indexName: string, columns: readonly string[]): Op {
   return {
@@ -12,7 +13,7 @@ export function createIndex(tableName: string, indexName: string, columns: reado
     precheck: [
       step(
         `ensure index "${indexName}" is missing`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'index' AND name = '${esc(indexName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'index' AND name = '${escapeLiteral(indexName)}'`,
       ),
     ],
     execute: [
@@ -21,7 +22,7 @@ export function createIndex(tableName: string, indexName: string, columns: reado
     postcheck: [
       step(
         `verify index "${indexName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'index' AND name = '${esc(indexName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'index' AND name = '${escapeLiteral(indexName)}'`,
       ),
     ],
   };
@@ -37,14 +38,14 @@ export function dropIndex(tableName: string, indexName: string): Op {
     precheck: [
       step(
         `ensure index "${indexName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'index' AND name = '${esc(indexName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'index' AND name = '${escapeLiteral(indexName)}'`,
       ),
     ],
     execute: [step(`drop index "${indexName}"`, buildDropIndexSql(indexName))],
     postcheck: [
       step(
         `verify index "${indexName}" is gone`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'index' AND name = '${esc(indexName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'index' AND name = '${escapeLiteral(indexName)}'`,
       ),
     ],
   };

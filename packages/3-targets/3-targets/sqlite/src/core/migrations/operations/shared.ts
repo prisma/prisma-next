@@ -9,10 +9,6 @@ export function step(description: string, sql: string): { description: string; s
   return { description, sql };
 }
 
-export function esc(value: string): string {
-  return value.replace(/'/g, "''");
-}
-
 /**
  * Flat, fully-resolved column shape consumed by `createTable`, `addColumn`,
  * and `recreateTable`. Codec / `typeRef` / default expansion happens at the

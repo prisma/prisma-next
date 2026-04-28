@@ -1,11 +1,10 @@
 import type { MigrationOperationClass } from '@prisma-next/family-sql/control';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import { stripOuterParens } from '../../default-normalizer';
-import { quoteIdentifier } from '../../sql-utils';
+import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { buildCreateIndexSql } from '../planner-ddl-builders';
 import { buildTargetDetails } from '../planner-target-details';
 import {
-  esc,
   type Op,
   renderColumnDefinition,
   renderForeignKeyClause,
@@ -54,14 +53,14 @@ export function createTable(tableName: string, spec: SqliteTableSpec): Op {
     precheck: [
       step(
         `ensure table "${tableName}" does not exist`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
     ],
     execute: [step(`create table "${tableName}"`, renderCreateTableSql(tableName, spec))],
     postcheck: [
       step(
         `verify table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
     ],
   };
@@ -77,14 +76,14 @@ export function dropTable(tableName: string): Op {
     precheck: [
       step(
         `ensure table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
     ],
     execute: [step(`drop table "${tableName}"`, `DROP TABLE ${quoteIdentifier(tableName)}`)],
     postcheck: [
       step(
         `verify table "${tableName}" is gone`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
     ],
   };
@@ -160,11 +159,11 @@ export function recreateTable(args: RecreateTableArgs): Op {
     precheck: [
       step(
         `ensure table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
       step(
         `ensure temp table "${tempName}" does not exist`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tempName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tempName)}'`,
       ),
     ],
     execute: [
@@ -183,11 +182,11 @@ export function recreateTable(args: RecreateTableArgs): Op {
     postcheck: [
       step(
         `verify table "${tableName}" exists`,
-        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tableName)}'`,
+        `SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tableName)}'`,
       ),
       step(
         `verify temp table "${tempName}" is gone`,
-        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${esc(tempName)}'`,
+        `SELECT COUNT(*) = 0 FROM sqlite_master WHERE type = 'table' AND name = '${escapeLiteral(tempName)}'`,
       ),
       ...postchecks,
     ],
@@ -220,13 +219,13 @@ export function buildRecreatePostchecks(
   columns: readonly SqliteColumnSpec[],
 ): Array<{ description: string; sql: string }> {
   const checks: Array<{ description: string; sql: string }> = [];
-  const t = esc(tableName);
+  const t = escapeLiteral(tableName);
   const byName = new Map(columns.map((c) => [c.name, c]));
 
   for (const issue of issues) {
     if (issue.kind === 'enum_values_changed') continue;
     if (!issue.column) continue;
-    const c = esc(issue.column);
+    const c = escapeLiteral(issue.column);
     if (issue.kind === 'nullability_mismatch') {
       // `expected` carries the contract's nullable flag as a string. We only
       // emit a postcheck when the value is recognized — anything else
@@ -254,7 +253,7 @@ export function buildRecreatePostchecks(
       if (expectedRaw) {
         checks.push({
           description: `verify "${issue.column}" default on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${esc(expectedRaw)}'`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND dflt_value = '${escapeLiteral(expectedRaw)}'`,
         });
       }
     }
@@ -263,7 +262,7 @@ export function buildRecreatePostchecks(
       if (spec) {
         checks.push({
           description: `verify "${issue.column}" type on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${esc(spec.typeSql.toLowerCase())}'`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(spec.typeSql.toLowerCase())}'`,
         });
       }
     }

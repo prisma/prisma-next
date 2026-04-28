@@ -103,6 +103,39 @@ describe('SQLite Migration E2E - Widening operations (recreate-table)', () => {
     );
   });
 
+  it('round-trips a string default with an apostrophe through recreate-table', async () => {
+    await applyMigration(
+      {
+        origin: defineContract({
+          ...pack,
+          models: {
+            User: model('User', {
+              fields: { id: int.id(), nickname: text.default('old') },
+            }),
+          },
+        }),
+        destination: defineContract({
+          ...pack,
+          models: {
+            User: model('User', {
+              fields: { id: int.id(), nickname: text.default("It's") },
+            }),
+          },
+        }),
+        policy: WIDENING,
+      },
+      async ({ schema, driver }) => {
+        expect(schema.tables['User']!.columns['nickname']!.default).toBe("'It''s'");
+
+        await driver.query('INSERT INTO "User" (id) VALUES (?)', [1]);
+        const row = (
+          await driver.query<{ nickname: string }>('SELECT nickname FROM "User" WHERE id = ?', [1])
+        ).rows[0];
+        expect(row?.nickname).toBe("It's");
+      },
+    );
+  });
+
   it('preserves existing data through recreate-table', async () => {
     await applyMigration(
       {

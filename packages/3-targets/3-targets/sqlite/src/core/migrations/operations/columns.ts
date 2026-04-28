@@ -1,6 +1,6 @@
-import { quoteIdentifier } from '../../sql-utils';
+import { escapeLiteral, quoteIdentifier } from '../../sql-utils';
 import { buildTargetDetails } from '../planner-target-details';
-import { esc, type Op, type SqliteColumnSpec, step } from './shared';
+import { type Op, type SqliteColumnSpec, step } from './shared';
 
 export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
   const parts = [
@@ -20,14 +20,14 @@ export function addColumn(tableName: string, column: SqliteColumnSpec): Op {
     precheck: [
       step(
         `ensure column "${column.name}" is missing`,
-        `SELECT COUNT(*) = 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(column.name)}'`,
+        `SELECT COUNT(*) = 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(column.name)}'`,
       ),
     ],
     execute: [step(`add column "${column.name}"`, addSql)],
     postcheck: [
       step(
         `verify column "${column.name}" exists`,
-        `SELECT COUNT(*) > 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(column.name)}'`,
+        `SELECT COUNT(*) > 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(column.name)}'`,
       ),
     ],
   };
@@ -43,7 +43,7 @@ export function dropColumn(tableName: string, columnName: string): Op {
     precheck: [
       step(
         `ensure column "${columnName}" exists on "${tableName}"`,
-        `SELECT COUNT(*) > 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(columnName)}'`,
+        `SELECT COUNT(*) > 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(columnName)}'`,
       ),
     ],
     execute: [
@@ -55,7 +55,7 @@ export function dropColumn(tableName: string, columnName: string): Op {
     postcheck: [
       step(
         `verify column "${columnName}" is gone from "${tableName}"`,
-        `SELECT COUNT(*) = 0 FROM pragma_table_info('${esc(tableName)}') WHERE name = '${esc(columnName)}'`,
+        `SELECT COUNT(*) = 0 FROM pragma_table_info('${escapeLiteral(tableName)}') WHERE name = '${escapeLiteral(columnName)}'`,
       ),
     ],
   };
