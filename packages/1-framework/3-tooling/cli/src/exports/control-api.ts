@@ -54,4 +54,4 @@ export type {
   VerifyOptions,
 } from '../control-api/types';
 // Lifecycle helpers for hosts that publish to many output paths
-export { disposeEmitOutputQueue } from '../utils/publish-contract-artifact-pair-serialized';
+export { disposeEmitQueue } from '../utils/emit-queue';

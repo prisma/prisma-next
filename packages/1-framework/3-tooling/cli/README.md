@@ -1093,7 +1093,7 @@ flowchart TD
     CMD_DB[DB Commands]
     CMD_MIG[Migration Commands]
     EXEC_EMIT[executeContractEmit]
-    PUBLISH[publishContractArtifactPairSerialized]
+    PUBLISH[publishContractArtifactPair]
     EMIT[Emitter]
     CTRL[Control Client]
     MIG_TOOLS["@prisma-next/migration-tools"]
@@ -1124,21 +1124,21 @@ flowchart TD
 > caller; if you need additional behavior, extend `ContractEmitOptions` /
 > `ContractEmitResult` and update `executeContractEmit` itself.
 
-Why this matters:
+How it composes:
 
-- Atomic publication (`.d.ts` renamed before `.json`, rollback on failure) lives in
-  `src/utils/publish-contract-artifact-pair.ts`. Bypassing `executeContractEmit`
-  bypasses atomicity — type-only consumers can observe a mismatched pair.
-- Per-output supersession (a slower older emit cannot overwrite a newer one) lives
-  in `src/utils/publish-contract-artifact-pair-serialized.ts`. Bypassing the
-  serialized helper races with concurrent emits.
-- Long-lived hosts (Vite dev server, watch CLIs) must call `disposeEmitOutputQueue`
+- The whole flow (load config → resolve source → emit bytes → publish) is
+  serialized per output JSON path via `queueEmitByOutput`
+  (`src/utils/emit-queue.ts`). Concurrent calls for the same output line up
+  FIFO; concurrent calls for distinct outputs run in parallel. Last submission
+  wins on disk.
+- Within a single emit, `publishContractArtifactPair`
+  (`src/utils/publish-contract-artifact-pair.ts`) stages temp files, renames
+  `contract.d.ts` before `contract.json`, and attempts to restore the previous
+  pair if either rename fails — so type-only consumers never observe a
+  mismatched pair.
+- Long-lived hosts (Vite dev server, watch CLIs) must call `disposeEmitQueue`
   on shutdown to drop the per-output queue state, otherwise the module-global
   queue map leaks one entry per unique output path.
-
-`ContractEmitResult.publication === 'superseded'` is a successful no-op, NOT an
-error: the bytes already on disk are at least as fresh as the request's bytes.
-Callers must not map it to a non-zero exit code or a thrown error.
 
 The `validateContractDeps` warning is returned in `ContractEmitResult.validationWarning`
 rather than written to stderr by the operation — callers (CLI, Vite plugin) decide

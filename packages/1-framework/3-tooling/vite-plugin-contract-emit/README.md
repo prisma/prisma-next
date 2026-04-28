@@ -98,20 +98,15 @@ graph TD
 
 > **For agents/contributors**: this plugin must publish through
 > `executeContractEmit` from `@prisma-next/cli/control-api`. Do NOT call
-> `publishContractArtifactPair` / `publishContractArtifactPairSerialized`
-> directly, do NOT re-implement the load → emit → publish dance, and do NOT add
-> a parallel "fast path" for any reason. The atomic-rename and per-output
-> supersession invariants live in one place; bypassing them races with the CLI
-> command and other callers.
+> `publishContractArtifactPair` directly, do NOT re-implement the load → emit
+> → publish dance, and do NOT add a parallel "fast path" for any reason. The
+> atomic-rename invariant and the per-output FIFO queue live in one place;
+> bypassing them races with the CLI command and other callers.
 >
 > Lifecycle: track every `outputJsonPath` you publish to and call
-> `disposeEmitOutputQueue(outputJsonPath)` from your server-close cleanup hook.
-> The publication queue is module-global; not disposing leaks one entry per
-> unique output path for the lifetime of the process.
->
-> `ContractEmitResult.publication === 'superseded'` is a successful no-op (the
-> bytes already on disk are at least as fresh as the request's bytes). Do NOT
-> trigger a full reload, log an error, or surface it as a failure in this case.
+> `disposeEmitQueue(outputJsonPath)` from your server-close cleanup hook. The
+> per-output queue is module-global; not disposing leaks one entry per unique
+> output path for the lifetime of the process.
 >
 > `ContractEmitResult.validationWarning` is the dependency-validation message
 > from the operation; render it through your plugin's logger when present.
@@ -119,8 +114,8 @@ graph TD
 ## Dependencies
 
 - **@prisma-next/cli**: Uses the control-api `executeContractEmit` and
-  `disposeEmitOutputQueue` exports — the canonical publish path
-- **vite**: Peer dependency (>=5.0.0)
+  `disposeEmitQueue` exports — the canonical publish path
+- **vite**: Peer dependency (`^7.0.0 || ^8.0.0`)
 
 ## Example
 

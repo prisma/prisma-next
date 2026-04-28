@@ -1,12 +1,12 @@
 import { resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import { disposeEmitOutputQueue, executeContractEmit } from '@prisma-next/cli/control-api';
+import { disposeEmitQueue, executeContractEmit } from '@prisma-next/cli/control-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
 vi.mock('@prisma-next/cli/control-api', () => ({
   executeContractEmit: vi.fn(),
-  disposeEmitOutputQueue: vi.fn(),
+  disposeEmitQueue: vi.fn(),
 }));
 
 vi.mock('@prisma-next/cli/config-loader', () => ({
@@ -29,12 +29,11 @@ vi.mock('pathe', async () => {
 });
 
 const mockedExecuteContractEmit = vi.mocked(executeContractEmit);
-const mockedDisposeEmitOutputQueue = vi.mocked(disposeEmitOutputQueue);
+const mockedDisposeEmitQueue = vi.mocked(disposeEmitQueue);
 const mockedLoadConfig = vi.mocked(loadConfig);
 const successfulEmitResult = {
   storageHash: 'abc123',
   profileHash: 'def456',
-  publication: 'written' as const,
   files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
 } satisfies Awaited<ReturnType<typeof executeContractEmit>>;
 
@@ -91,11 +90,10 @@ function createLoadedConfig({
   } as LoadedConfig;
 }
 
-function createContractEmitResult(publication: 'written' | 'superseded' = 'written') {
+function createContractEmitResult() {
   return {
     storageHash: 'abc123',
     profileHash: 'def456',
-    publication,
     files: { json: '/out/contract.json', dts: '/out/contract.d.ts' },
   };
 }
@@ -192,7 +190,7 @@ describe('prismaVitePlugin', () => {
     vi.useFakeTimers();
     mockedExecuteContractEmit.mockReset();
     mockedExecuteContractEmit.mockResolvedValue(successfulEmitResult);
-    mockedDisposeEmitOutputQueue.mockReset();
+    mockedDisposeEmitQueue.mockReset();
     mockedLoadConfig.mockReset();
     mockedLoadConfig.mockResolvedValue(createLoadedConfig());
   });
@@ -477,9 +475,7 @@ describe('prismaVitePlugin', () => {
 
       closeHandler?.();
 
-      expect(mockedDisposeEmitOutputQueue).toHaveBeenCalledWith(
-        '/project/src/prisma/contract.json',
-      );
+      expect(mockedDisposeEmitQueue).toHaveBeenCalledWith('/project/src/prisma/contract.json');
     });
 
     it('does not warn when provider omits inputs', async () => {
@@ -886,16 +882,6 @@ describe('prismaVitePlugin', () => {
   });
 
   describe('error handling', () => {
-    it('does not reload or log success when emit publication is superseded', async () => {
-      mockedExecuteContractEmit.mockResolvedValue(createContractEmitResult('superseded'));
-
-      const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-      const { mockServer } = await configurePlugin({ options: { logLevel: 'info' } });
-
-      expect(mockServer.ws.send).not.toHaveBeenCalledWith({ type: 'full-reload' });
-      expect(consoleLogSpy).not.toHaveBeenCalledWith(expect.stringContaining('Emitted contract'));
-    });
-
     it('logs error when emit fails', async () => {
       mockedExecuteContractEmit.mockRejectedValue(new Error('Emit failed'));
 

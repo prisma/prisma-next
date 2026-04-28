@@ -1,6 +1,6 @@
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
-import { disposeEmitOutputQueue, executeContractEmit } from '@prisma-next/cli/control-api';
+import { disposeEmitQueue, executeContractEmit } from '@prisma-next/cli/control-api';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { extname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
@@ -119,11 +119,6 @@ export function prismaVitePlugin(
         configPath: absoluteConfigPath,
         signal,
       });
-
-      if (result.publication === 'superseded') {
-        log('Emit publication superseded before artifacts were written', 'debug');
-        return null;
-      }
 
       log(`Emitted contract (storageHash: ${result.storageHash.slice(0, 8)}...)`);
       log(`  → ${result.files.json}`, 'debug');
@@ -409,7 +404,7 @@ export function prismaVitePlugin(
         viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
         ignoredOutputFiles.clear();
         for (const outputJsonPath of ownedOutputJsonPaths) {
-          disposeEmitOutputQueue(outputJsonPath);
+          disposeEmitQueue(outputJsonPath);
         }
         ownedOutputJsonPaths.clear();
         didWarnConfigWatchFallback = false;

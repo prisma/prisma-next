@@ -7,11 +7,9 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { dirname } from 'pathe';
 import { loadConfig } from '../../config-loader';
 import { errorContractConfigMissing, errorRuntime } from '../../utils/cli-errors';
+import { queueEmitByOutput } from '../../utils/emit-queue';
 import { assertFrameworkComponentsCompatible } from '../../utils/framework-components';
-import {
-  issueContractArtifactGeneration,
-  publishContractArtifactPairSerialized,
-} from '../../utils/publish-contract-artifact-pair-serialized';
+import { publishContractArtifactPair } from '../../utils/publish-contract-artifact-pair';
 import { validateContractDeps } from '../../utils/validate-contract-deps';
 import { enrichContract } from '../contract-enrichment';
 import type {
@@ -139,23 +137,14 @@ function validateProviderResult(providerResult: unknown): ValidatedProviderResul
  * (`@prisma-next/vite-plugin-contract-emit`). New callers must go through this
  * function rather than re-implementing load → emit → publish.
  *
- * Publication is serialized per output JSON path. Each emit stages temp files,
- * renames `contract.d.ts` before `contract.json`, and attempts to restore the
- * previous pair if publication fails after either path has been replaced.
- *
- * If a newer generation has been *issued* for the same output path by the time
- * this request reaches publication, the operation returns successfully with
- * `publication: 'superseded'` and leaves the on-disk artifacts unchanged.
- * Callers must treat that outcome as a successful no-op, not as an error.
- *
- * Note: supersession tracks request *issue* order, not publish outcomes. If the
- * superseding request later fails during `load()` or `emit()`, the disk retains
- * whatever pair was there before either request — so 'superseded' does *not*
- * guarantee that fresher bytes have actually been written. This is intentional
- * for rapid-save hosts (Vite watch mode): each save issues a new generation, and
- * only the latest one's outcome should reach disk. Callers that need a strict
- * "newest bytes always on disk" invariant must cancel older requests before
- * issuing a new generation.
+ * The whole flow (load config → resolve source → emit bytes → atomic publish)
+ * is serialized per output JSON path via `queueEmitByOutput`. Concurrent calls
+ * for the same output line up FIFO; the user-visible outcome is "last
+ * submission wins on disk" without any supersession bookkeeping. Within a
+ * single emit, `publishContractArtifactPair` stages temp files, renames
+ * `contract.d.ts` before `contract.json`, and attempts to restore the previous
+ * pair if either rename fails — so type-only consumers never observe a
+ * mismatched pair.
  *
  * @throws {CliStructuredError} on config/source/validation problems
  * @throws {DOMException} `AbortError` if cancelled via `signal`
@@ -197,86 +186,85 @@ export async function executeContractEmit(
     });
   }
   const { jsonPath: outputJsonPath, dtsPath: outputDtsPath } = outputPaths;
-  const generation = issueContractArtifactGeneration(outputJsonPath);
 
-  const stack = createControlStack(config);
+  return queueEmitByOutput(outputJsonPath, async () => {
+    const stack = createControlStack(config);
 
-  const sourceContext = {
-    composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
-    scalarTypeDescriptors: stack.scalarTypeDescriptors,
-    authoringContributions: stack.authoringContributions,
-    codecLookup: stack.codecLookup,
-    controlMutationDefaults: stack.controlMutationDefaults,
-    resolvedInputs: contractConfig.source.inputs ?? [],
-  };
+    const sourceContext = {
+      composedExtensionPacks: stack.extensionPacks.map((p) => p.id),
+      scalarTypeDescriptors: stack.scalarTypeDescriptors,
+      authoringContributions: stack.authoringContributions,
+      codecLookup: stack.codecLookup,
+      controlMutationDefaults: stack.controlMutationDefaults,
+      resolvedInputs: contractConfig.source.inputs ?? [],
+    };
 
-  startSpan(onProgress, 'resolveSource', 'Resolving contract source...');
-  let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
-  try {
-    providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
-  } catch (error) {
-    endSpan(onProgress, 'resolveSource', 'error');
-    if (signal.aborted || (isRecord(error) && error['name'] === 'AbortError')) {
+    startSpan(onProgress, 'resolveSource', 'Resolving contract source...');
+    let providerResult: Awaited<ReturnType<typeof contractConfig.source.load>>;
+    try {
+      providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
+    } catch (error) {
+      endSpan(onProgress, 'resolveSource', 'error');
+      if (signal.aborted || (isRecord(error) && error['name'] === 'AbortError')) {
+        throw error;
+      }
+      throw failedToResolveContractSource(
+        error instanceof Error ? error.message : String(error),
+        'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
+      );
+    }
+
+    const validatedContract = validateProviderResult(providerResult);
+    if (!validatedContract.ok) {
+      endSpan(onProgress, 'resolveSource', 'error');
+      throw validatedContract.error;
+    }
+    endSpan(onProgress, 'resolveSource', 'ok');
+
+    startSpan(onProgress, 'emit', 'Emitting contract...');
+    let emitResult: Awaited<ReturnType<typeof emit>>;
+    try {
+      const familyInstance = config.family.create(stack);
+      const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
+      const frameworkComponents = assertFrameworkComponentsCompatible(
+        config.family.familyId,
+        config.target.targetId,
+        rawComponents,
+      );
+      const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
+      familyInstance.validateContract(enrichedIR);
+      emitResult = await unlessAborted(
+        emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),
+      );
+    } catch (error) {
+      endSpan(onProgress, 'emit', 'error');
       throw error;
     }
-    throw failedToResolveContractSource(
-      error instanceof Error ? error.message : String(error),
-      'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
-    );
-  }
+    endSpan(onProgress, 'emit', 'ok');
 
-  const validatedContract = validateProviderResult(providerResult);
-  if (!validatedContract.ok) {
-    endSpan(onProgress, 'resolveSource', 'error');
-    throw validatedContract.error;
-  }
-  endSpan(onProgress, 'resolveSource', 'ok');
+    await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
+    await publishContractArtifactPair({
+      outputJsonPath,
+      outputDtsPath,
+      contractJson: emitResult.contractJson,
+      contractDts: emitResult.contractDts,
+      publicationToken: String(process.hrtime.bigint()),
+    });
 
-  startSpan(onProgress, 'emit', 'Emitting contract...');
-  let emitResult: Awaited<ReturnType<typeof emit>>;
-  try {
-    const familyInstance = config.family.create(stack);
-    const rawComponents = [config.target, config.adapter, ...(config.extensionPacks ?? [])];
-    const frameworkComponents = assertFrameworkComponentsCompatible(
-      config.family.familyId,
-      config.target.targetId,
-      rawComponents,
-    );
-    const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
-    familyInstance.validateContract(enrichedIR);
-    emitResult = await unlessAborted(
-      emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),
-    );
-  } catch (error) {
-    endSpan(onProgress, 'emit', 'error');
-    throw error;
-  }
-  endSpan(onProgress, 'emit', 'ok');
+    const validationWarning = validateContractDeps(
+      emitResult.contractDts,
+      dirname(outputDtsPath),
+    ).warning;
 
-  await unlessAborted(mkdir(dirname(outputJsonPath), { recursive: true }));
-  const publication = await publishContractArtifactPairSerialized({
-    outputJsonPath,
-    outputDtsPath,
-    generation,
-    signal,
-    contractJson: emitResult.contractJson,
-    contractDts: emitResult.contractDts,
+    return {
+      storageHash: emitResult.storageHash,
+      ...ifDefined('executionHash', emitResult.executionHash),
+      profileHash: emitResult.profileHash,
+      files: {
+        json: outputJsonPath,
+        dts: outputDtsPath,
+      },
+      ...ifDefined('validationWarning', validationWarning),
+    };
   });
-
-  const validationWarning =
-    publication === 'written'
-      ? validateContractDeps(emitResult.contractDts, dirname(outputDtsPath)).warning
-      : undefined;
-
-  return {
-    storageHash: emitResult.storageHash,
-    ...ifDefined('executionHash', emitResult.executionHash),
-    profileHash: emitResult.profileHash,
-    publication,
-    files: {
-      json: outputJsonPath,
-      dts: outputDtsPath,
-    },
-    ...ifDefined('validationWarning', validationWarning),
-  };
 }

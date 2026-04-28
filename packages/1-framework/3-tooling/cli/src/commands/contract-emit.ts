@@ -133,7 +133,6 @@ async function executeContractEmitCommand(
     ui.warn(result.validationWarning);
   }
 
-  // 'superseded' is a successful no-op: bytes already on disk are at least as fresh as ours.
   return ok({
     storageHash: result.storageHash,
     ...ifDefined('executionHash', result.executionHash),

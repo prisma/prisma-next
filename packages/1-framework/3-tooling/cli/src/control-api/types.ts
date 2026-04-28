@@ -519,15 +519,13 @@ export type MigrationApplyResult = Result<MigrationApplySuccess, MigrationApplyF
  * caller needs additional behavior, extend this options shape and update the
  * single implementation rather than building a parallel publication path.
  *
- * Callers that may issue overlapping emits for the same output should pass a
- * signal and cancel the older request before starting the newer one. Publication
- * is serialized per output path, but a newer failed emit can still supersede an
- * older successful emit that reaches the queue later.
+ * Concurrent calls for the same output JSON path are serialized per-output via
+ * a FIFO queue; concurrent calls for distinct outputs run in parallel.
  */
 export interface ContractEmitOptions {
   /** Path to the prisma-next.config.ts file */
   readonly configPath: string;
-  /** Optional AbortSignal for cancelling in-flight emits before publication */
+  /** Optional AbortSignal for cancelling the in-flight emit */
   readonly signal?: AbortSignal;
   /** Optional progress callback for observing source-resolution and emit spans */
   readonly onProgress?: OnControlProgress;
@@ -536,11 +534,9 @@ export interface ContractEmitOptions {
 /**
  * Result from the standalone executeContractEmit function.
  *
- * The returned hashes always describe the emitted bytes for this request. When
- * `publication` is `'superseded'`, those bytes were not written to disk because
- * a newer generation claimed the output path before publication. Callers should
- * treat `'superseded'` as a successful no-op, not an error: the bytes already on
- * disk are at least as fresh as this request's bytes.
+ * Always describes the bytes that were just published to disk. Failures throw
+ * (config / source-resolution / emit / publish) — callers do not need to
+ * branch on a result discriminator.
  */
 export interface ContractEmitResult {
   /** Hash of the storage contract (schema-level) */
@@ -549,8 +545,6 @@ export interface ContractEmitResult {
   readonly executionHash?: string;
   /** Hash of the profile (target+extensions) */
   readonly profileHash: string;
-  /** Whether this emit published artifacts or was superseded before publication */
-  readonly publication: 'written' | 'superseded';
   /** Paths to the emitted files */
   readonly files: {
     /** Path to the emitted contract.json file */

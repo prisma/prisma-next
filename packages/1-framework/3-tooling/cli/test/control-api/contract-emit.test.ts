@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Contract } from '@prisma-next/contract/types';
@@ -7,6 +7,7 @@ import { emit as emitFn } from '@prisma-next/emitter';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as configLoader from '../../src/config-loader';
 import { executeContractEmit } from '../../src/control-api/operations/contract-emit';
+import { disposeEmitQueue } from '../../src/utils/emit-queue';
 
 vi.mock('@prisma-next/emitter', async () => {
   const actual =
@@ -28,7 +29,6 @@ vi.mock('node:fs/promises', async () => {
 });
 
 type FsModule = typeof import('node:fs/promises');
-type FsWriteFile = FsModule['writeFile'];
 
 const mockedEmit = vi.mocked(emitFn);
 const mockedRename = vi.mocked(rename);
@@ -52,9 +52,7 @@ function createSourceProvider(load: () => Promise<unknown>): {
   readonly inputs?: readonly string[];
   load: () => Promise<unknown>;
 } {
-  return {
-    load,
-  };
+  return { load };
 }
 
 function createMockContract(): Contract {
@@ -144,55 +142,6 @@ describe('executeContractEmit', () => {
     }
   }
 
-  function createOutputPaths(): {
-    readonly outputJsonPath: string;
-    readonly outputDtsPath: string;
-  } {
-    return {
-      outputJsonPath: join(tmpDir, 'src/prisma/contract.json'),
-      outputDtsPath: join(tmpDir, 'src/prisma/contract.d.ts'),
-    };
-  }
-
-  /**
-   * Issues two `executeContractEmit` calls back-to-back, deterministically
-   * waiting for each call to reach the mocked `emit()` before issuing the next.
-   * The caller supplies the two `emit()` return values via `firstEntry` /
-   * `secondEntry` deferreds so test ordering does not depend on microtask
-   * scheduling.
-   */
-  async function withStartedOverlappingEmits<T>(
-    outputJsonPath: string,
-    options: {
-      readonly firstEmit: Promise<EmitResult>;
-      readonly secondEmit: Promise<EmitResult>;
-    },
-    run: (emits: {
-      readonly first: ReturnType<typeof executeContractEmit>;
-      readonly second: ReturnType<typeof executeContractEmit>;
-    }) => Promise<T>,
-  ): Promise<T> {
-    const firstEntered = Promise.withResolvers<void>();
-    const secondEntered = Promise.withResolvers<void>();
-    mockedEmit
-      .mockImplementationOnce(() => {
-        firstEntered.resolve();
-        return options.firstEmit;
-      })
-      .mockImplementationOnce(() => {
-        secondEntered.resolve();
-        return options.secondEmit;
-      });
-
-    return await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
-      const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      await firstEntered.promise;
-      const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
-      await secondEntered.promise;
-      return await run({ first, second });
-    });
-  }
-
   it('throws when configPath does not exist', async () => {
     await expect(executeContractEmit({ configPath: '/nonexistent/config.ts' })).rejects.toThrow();
   });
@@ -276,83 +225,39 @@ describe('executeContractEmit', () => {
     });
   });
 
-  it('keeps the newer generation on disk when an older emit finishes later', async () => {
-    const { outputJsonPath, outputDtsPath } = createOutputPaths();
+  it('serializes overlapping emits per output path so the last submission wins on disk', async () => {
+    const outputJsonPath = join(tmpDir, 'src/prisma/contract.json');
+    const outputDtsPath = join(tmpDir, 'src/prisma/contract.d.ts');
     const firstEmit = Promise.withResolvers<EmitResult>();
-    const secondEmit = Promise.withResolvers<EmitResult>();
+    const firstEntered = Promise.withResolvers<void>();
 
-    await withStartedOverlappingEmits(
-      outputJsonPath,
-      { firstEmit: firstEmit.promise, secondEmit: secondEmit.promise },
-      async ({ first, second }) => {
-        secondEmit.resolve(createEmitResult('newer'));
-        const secondResult = await second;
+    mockedEmit
+      .mockImplementationOnce(() => {
+        firstEntered.resolve();
+        return firstEmit.promise;
+      })
+      .mockResolvedValueOnce(createEmitResult('newer'));
+
+    try {
+      await withMockedConfig(createSuccessfulConfig(outputJsonPath), async () => {
+        const first = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+        await firstEntered.promise;
+        const second = executeContractEmit({ configPath: join(tmpDir, 'prisma-next.config.ts') });
+
+        // Second is queued behind first — emit() must not be called for second yet.
+        expect(mockedEmit).toHaveBeenCalledTimes(1);
 
         firstEmit.resolve(createEmitResult('older'));
-        const firstResult = await first;
+        await Promise.all([first, second]);
 
-        expect(secondResult.publication).toBe('written');
-        expect(firstResult.publication).toBe('superseded');
-      },
-    );
+        expect(mockedEmit).toHaveBeenCalledTimes(2);
+      });
 
-    expect(await readFile(outputJsonPath, 'utf-8')).toBe(JSON.stringify({ generation: 'newer' }));
-    expect(await readFile(outputDtsPath, 'utf-8')).toBe("export type Generation = 'newer';\n");
-  });
-
-  it('keeps the last good artifacts when a newer request fails after superseding an older emit', async () => {
-    const { outputJsonPath, outputDtsPath } = createOutputPaths();
-    const previousJson = JSON.stringify({ generation: 'previous' });
-    const previousDts = "export type Generation = 'previous';\n";
-    const firstEmit = Promise.withResolvers<EmitResult>();
-
-    await mkdir(join(tmpDir, 'src/prisma'), { recursive: true });
-    await writeFile(outputJsonPath, previousJson, 'utf-8');
-    await writeFile(outputDtsPath, previousDts, 'utf-8');
-
-    // The first emit is parked in `mockedEmit` waiting on `firstEmit.promise`,
-    // so it cannot reach `publishContractArtifactPair` and never writes a
-    // `.next.tmp` file before we trip this mock. The second (newer) emit's
-    // `mockedEmit` resolves immediately, so the *first* two `.next.tmp` writes
-    // (json + dts) both belong to the second emit's publication. Failing the
-    // second write therefore fails the second emit's dts stage. Matched on the
-    // naming *shape* rather than a hardcoded token so this stays valid if
-    // `createTempArtifactPath`'s phase slug evolves.
-    const NEXT_TMP_SUFFIX = /\.next\.tmp$/;
-    let nextTmpWriteCount = 0;
-    const localFs = await vi.importActual<FsModule>('node:fs/promises');
-    mockedWriteFile.mockImplementation(async (...args: Parameters<FsWriteFile>) => {
-      const [path] = args;
-      if (NEXT_TMP_SUFFIX.test(String(path))) {
-        nextTmpWriteCount += 1;
-        if (nextTmpWriteCount === 2) {
-          throw new Error('simulated newer generation write failure');
-        }
-      }
-      return localFs.writeFile(...args);
-    });
-
-    await withStartedOverlappingEmits(
-      outputJsonPath,
-      { firstEmit: firstEmit.promise, secondEmit: Promise.resolve(createEmitResult('newer')) },
-      async ({ first, second }) => {
-        await expect(second).rejects.toThrow('simulated newer generation write failure');
-
-        firstEmit.resolve({
-          ...createEmitResult('older'),
-          contractDts: [
-            "import type { Missing } from '@example/missing-types';",
-            "export type Generation = 'older';",
-            '',
-          ].join('\n'),
-        });
-        const firstResult = await first;
-        expect(firstResult.publication).toBe('superseded');
-        expect(firstResult.validationWarning).toBeUndefined();
-      },
-    );
-
-    expect(await readFile(outputJsonPath, 'utf-8')).toBe(previousJson);
-    expect(await readFile(outputDtsPath, 'utf-8')).toBe(previousDts);
+      // Last submission wins on disk.
+      expect(await readFile(outputJsonPath, 'utf-8')).toBe(JSON.stringify({ generation: 'newer' }));
+      expect(await readFile(outputDtsPath, 'utf-8')).toBe("export type Generation = 'newer';\n");
+    } finally {
+      disposeEmitQueue(outputJsonPath);
+    }
   });
 });

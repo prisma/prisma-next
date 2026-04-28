@@ -66,7 +66,6 @@ describe('contract emit command', () => {
     return {
       storageHash: 'storage-hash',
       profileHash: 'profile-hash',
-      publication: 'written' as const,
       files: {
         json: join(tmpDir, 'contract.json'),
         dts: join(tmpDir, 'contract.d.ts'),
@@ -89,23 +88,6 @@ describe('contract emit command', () => {
         onProgress: expect.any(Function),
       }),
     );
-  });
-
-  it("treats publication: 'superseded' as success rather than an error envelope", async () => {
-    const outputPath = join(tmpDir, 'contract.json');
-    mocks.loadConfigMock.mockResolvedValue(configWithOutput(outputPath));
-    mocks.executeContractEmitMock.mockResolvedValue(emitResult({ publication: 'superseded' }));
-
-    const command = createContractEmitCommand();
-    await expect(executeCommand(command, ['--json'])).resolves.toBe(0);
-
-    const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
-    expect(jsonLine).toBeDefined();
-    const parsed = JSON.parse(jsonLine!);
-    expect(parsed).toMatchObject({
-      storageHash: 'storage-hash',
-      profileHash: 'profile-hash',
-    });
   });
 
   it('surfaces validationWarning via the terminal UI', async () => {
