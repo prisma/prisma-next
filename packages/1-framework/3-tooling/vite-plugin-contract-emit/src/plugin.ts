@@ -1,6 +1,6 @@
 import { loadConfig } from '@prisma-next/cli/config-loader';
 import type { ContractEmitResult } from '@prisma-next/cli/control-api';
-import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { disposeEmitOutputQueue, executeContractEmit } from '@prisma-next/cli/control-api';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { extname, resolve } from 'pathe';
 import type { Plugin, ViteDevServer } from 'vite';
@@ -59,6 +59,9 @@ export function prismaVitePlugin(
   // Vite watches the project root, so writes to emitted artifacts can still surface as change
   // events even when those files are excluded from watchedFiles.
   const ignoredOutputFiles = new Set<string>();
+  // Output JSON paths whose serialization queue this plugin instance owns. Disposed on cleanup
+  // so long-lived dev sessions don't accumulate per-process queue state across config edits.
+  const ownedOutputJsonPaths = new Set<string>();
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let lifecycleAbortController = new AbortController();
   let server: ViteDevServer | null = null;
@@ -215,6 +218,7 @@ export function prismaVitePlugin(
       return new Set();
     }
     const { jsonPath, dtsPath } = getEmittedArtifactPaths(contractOutput);
+    ownedOutputJsonPaths.add(jsonPath);
     return new Set<string>([jsonPath, dtsPath]);
   }
 
@@ -404,6 +408,10 @@ export function prismaVitePlugin(
         viteServer.watcher.off?.('add', onTrackedWatcherEvent);
         viteServer.watcher.off?.('unlink', onTrackedWatcherEvent);
         ignoredOutputFiles.clear();
+        for (const outputJsonPath of ownedOutputJsonPaths) {
+          disposeEmitOutputQueue(outputJsonPath);
+        }
+        ownedOutputJsonPaths.clear();
         didWarnConfigWatchFallback = false;
         server = null;
         watchedFiles.clear();

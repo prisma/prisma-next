@@ -1,11 +1,12 @@
 import { resolve } from 'node:path';
 import { loadConfig } from '@prisma-next/cli/config-loader';
-import { executeContractEmit } from '@prisma-next/cli/control-api';
+import { disposeEmitOutputQueue, executeContractEmit } from '@prisma-next/cli/control-api';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { prismaVitePlugin } from '../src/plugin';
 
 vi.mock('@prisma-next/cli/control-api', () => ({
   executeContractEmit: vi.fn(),
+  disposeEmitOutputQueue: vi.fn(),
 }));
 
 vi.mock('@prisma-next/cli/config-loader', () => ({
@@ -28,6 +29,7 @@ vi.mock('pathe', async () => {
 });
 
 const mockedExecuteContractEmit = vi.mocked(executeContractEmit);
+const mockedDisposeEmitOutputQueue = vi.mocked(disposeEmitOutputQueue);
 const mockedLoadConfig = vi.mocked(loadConfig);
 const successfulEmitResult = {
   storageHash: 'abc123',
@@ -190,6 +192,7 @@ describe('prismaVitePlugin', () => {
     vi.useFakeTimers();
     mockedExecuteContractEmit.mockReset();
     mockedExecuteContractEmit.mockResolvedValue(successfulEmitResult);
+    mockedDisposeEmitOutputQueue.mockReset();
     mockedLoadConfig.mockReset();
     mockedLoadConfig.mockResolvedValue(createLoadedConfig());
   });
@@ -458,6 +461,25 @@ describe('prismaVitePlugin', () => {
       expect(mockServer.watcher.on).toHaveBeenCalledWith('change', expect.any(Function));
       expect(mockServer.watcher.on).toHaveBeenCalledWith('add', expect.any(Function));
       expect(mockServer.watcher.on).toHaveBeenCalledWith('unlink', expect.any(Function));
+    });
+
+    it('disposes the per-output emit queue on server close', async () => {
+      mockedLoadConfig.mockResolvedValue(
+        createLoadedConfig({ output: 'src/prisma/contract.json' }),
+      );
+      const { mockServer } = await configurePlugin();
+
+      // The httpServer 'close' listener is the cleanup hook the plugin registers.
+      const closeHandler = mockServer.httpServer.on.mock.calls.find(
+        ([event]) => event === 'close',
+      )?.[1] as (() => void) | undefined;
+      expect(closeHandler).toEqual(expect.any(Function));
+
+      closeHandler?.();
+
+      expect(mockedDisposeEmitOutputQueue).toHaveBeenCalledWith(
+        '/project/src/prisma/contract.json',
+      );
     });
 
     it('does not warn when provider omits inputs', async () => {

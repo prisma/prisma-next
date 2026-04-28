@@ -27,6 +27,27 @@ export function issueContractArtifactGeneration(outputJsonPath: string): number 
   return state.nextGeneration;
 }
 
+/**
+ * Drops the queue state for a given output path. Long-lived hosts (Vite dev
+ * server, watch-mode CLIs) should call this when they stop publishing to a
+ * path, otherwise `emitOutputQueues` accumulates one entry per unique path
+ * for the lifetime of the process.
+ *
+ * After disposal, the next `issueContractArtifactGeneration` call for the
+ * same path starts a fresh queue at generation 1.
+ *
+ * Safe to call between publications. Calling while a publication for the
+ * same path is in flight does not abort it; the in-flight publication keeps
+ * its own captured `state` reference (so its supersession check still works
+ * against any newer generation issued before disposal), but a *new* generation
+ * issued after disposal starts at 1 and will not order correctly against the
+ * in-flight publication. Hosts must guarantee no concurrent publication for
+ * the path being disposed.
+ */
+export function disposeEmitOutputQueue(outputJsonPath: string): void {
+  emitOutputQueues.delete(outputJsonPath);
+}
+
 function isSuperseded(state: EmitOutputQueueState, generation: number): boolean {
   return generation < state.nextGeneration;
 }
