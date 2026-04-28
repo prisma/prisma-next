@@ -4,14 +4,14 @@ Delivers the design in [spec.md](spec.md) across six milestones. Each milestone 
 
 For mechanism detail, see the design docs:
 
-- [design/codec-interface-and-brand.md](design/codec-interface-and-brand.md)
+- [design/codec-interface-and-output-types.md](design/codec-interface-and-output-types.md)
 - [design/authoring-ergonomics.md](design/authoring-ergonomics.md)
 - [design/runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md)
 
 ## Milestone graph
 
 ```text
-M0 (shaping) ──► M1 (interface + brand) ──► M2 (no-emit type resolver) ─┐
+M0 (shaping) ──► M1 (interface + OutputType fn) ──► M2 (no-emit resolver) ─┐
                        │                                                 │
                        └────────────► M3 (columnFor + jsonCodec) ────────┤
                                                                           │
@@ -53,19 +53,19 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 ---
 
-## M1 — Codec interface split + brand mechanism
+## M1 — Codec interface split + output-type function mechanism
 
-**Goal:** Add `Codec`, `ParameterizedCodec`, `CodecBrand`, `Apply`, and the `parameterizedCodec({…})` factory. Production codecs unchanged. Types exist alongside the existing optional fields on base `Codec`; cleanup happens at M5.
+**Goal:** Add `Codec`, `ParameterizedCodec`, `CodecOutputTypeFn`, `Apply`, and the `parameterizedCodec({…})` factory. Production codecs unchanged. Types exist alongside the existing optional fields on base `Codec`; cleanup happens at M5.
 
-**Spec AC:** [AC-1](spec.md#ac-1-brand-mechanism-works-at-the-type-level), [AC-6](spec.md#ac-6-initparams-instancemeta-signature-is-locked).
+**Spec AC:** [AC-1](spec.md#ac-1-output-type-function-mechanism-works-at-the-type-level), [AC-6](spec.md#ac-6-initparams-instancemeta-signature-is-locked).
 
 ### Tasks
 
-1. **Add `CodecBrand` and `Apply` to `@prisma-next/framework-components`.** Co-located with the existing `Codec` interface. Type tests for `Apply` as a type-level function. — [design](design/codec-interface-and-brand.md#brand-mechanism)
-2. **Add `ParameterizedCodec` interface.** Required `paramsSchema` (typed `StandardSchemaV1<Params>`), `renderOutputType`, `Brand`. Optional `init?(params, instance)`. — [design](design/codec-interface-and-brand.md#the-parameterizedcodec-interface)
-3. **Add `parameterizedCodec({…})` factory.** Compile-time enforcement of required fields. Houses the single justified `as unknown as Brand` cast (or codec body — open question 3 in spec). — [design](design/codec-interface-and-brand.md#the-factory-parameterizedcodec)
+1. **Add `CodecOutputTypeFn` and `Apply` to `@prisma-next/framework-components`.** Co-located with the existing `Codec` interface. Type tests for `Apply` as a type-level function. — [design](design/codec-interface-and-output-types.md#output-type-function-mechanism)
+2. **Add `ParameterizedCodec` interface.** Required `paramsSchema` (typed `StandardSchemaV1<Params>`), `renderOutputType`, `OutputType`. Optional `init?(params, instance)`. — [design](design/codec-interface-and-output-types.md#the-parameterizedcodec-interface)
+3. **Add `parameterizedCodec({…})` factory.** Compile-time enforcement of required fields. Houses the single justified `as unknown as <PerCodecOutputType>` cast (or codec body — open question 3 in spec). — [design](design/codec-interface-and-output-types.md#the-factory-parameterizedcodec)
 4. **Widen `paramsSchema` validation entry points.** Anything currently typed against arktype `Type<…>` accepts `StandardSchemaV1<…>`. No behavior change (Arktype implements Standard Schema).
-5. **Type tests** for `Apply<VectorBrand, { length: 1536 }>` ≡ `Vector<1536>` against a synthetic brand fixture (no production codec yet).
+5. **Type tests** for `Apply<VectorOutputType, { length: 1536 }>` ≡ `Vector<1536>` against a synthetic fixture (no production codec yet).
 
 ### Acceptance gate
 
@@ -78,24 +78,24 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 ## M2 — No-emit `FieldOutputType` rewrite
 
-**Goal:** Rewrite the type-level resolver against the brand. A synthetic fixture proves the wiring; no production codec is migrated yet.
+**Goal:** Rewrite the type-level resolver against `codec.OutputType`. A synthetic fixture proves the wiring; no production codec is migrated yet.
 
 **Spec AC:** [AC-2](spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly).
 
 ### Tasks
 
-1. **Synthetic test fixture** under `packages/2-sql/2-authoring/contract-ts/src/__tests__/fixtures/`: a `ParameterizedCodec` with a known brand, used to assert resolution without depending on pgvector or any other extension.
+1. **Synthetic test fixture** under `packages/2-sql/2-authoring/contract-ts/src/__tests__/fixtures/`: a `ParameterizedCodec` with a known `OutputType`, used to assert resolution without depending on pgvector or any other extension.
 2. **Rewrite `FieldOutputType`** in [packages/2-sql/2-authoring/contract-ts/src/contract-types.ts](../../packages/2-sql/2-authoring/contract-ts/src/contract-types.ts):
    - Resolve `typeRef` indirection through `storage.types` first.
-   - When the codec entry has a `Brand`, apply `Apply<Brand, typeParams>`; otherwise fall through to the codec's base output.
+   - When the codec entry has an `OutputType` field, apply `Apply<OutputType, typeParams>`; otherwise fall through to the codec's base output.
    - Preserve nullability uniformly.
-   - Detail and pseudo-code: [design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype](design/codec-interface-and-brand.md#rewriting-the-no-emit-fieldoutputtype).
+   - Detail and pseudo-code: [design/codec-interface-and-output-types.md#rewriting-the-no-emit-fieldoutputtype](design/codec-interface-and-output-types.md#rewriting-the-no-emit-fieldoutputtype).
 3. **Type tests**:
-   - Inline `typeParams` resolves to brand.
-   - `typeRef` resolves to brand.
+   - Inline `typeParams` resolves through `OutputType`.
+   - `typeRef` resolves through `OutputType`.
    - Non-parameterized columns unchanged.
    - Nullability preserved.
-   - `ComputeColumnJsType` resolves to brand transparently.
+   - `ComputeColumnJsType` resolves through `OutputType` transparently.
 
 ### Acceptance gate
 
@@ -114,7 +114,7 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 ### Tasks
 
 1. **`columnFor(codec)`** in `@prisma-next/contract-ts` (or `@prisma-next/framework-components`; see open question 2). Type-discriminated; runtime validation against `paramsSchema`. — [design](design/authoring-ergonomics.md#the-columnfor-helper)
-2. **`jsonCodec(schema)`** built on `parameterizedCodec`; brand projects `StandardSchemaV1.InferOutput<S>`. — [design](design/authoring-ergonomics.md#jsoncodec-helper)
+2. **`jsonCodec(schema)`** built on `parameterizedCodec`; its `OutputType` projects `StandardSchemaV1.InferOutput<S>`. — [design](design/authoring-ergonomics.md#jsoncodec-helper)
 3. **Tests**:
    - Type tests for both modes of `columnFor`.
    - Type tests for `jsonCodec` inference flowing from a user-provided schema.
@@ -130,14 +130,14 @@ Capture pre-change build perf so [AC-7](spec.md#ac-7-build-performance-acceptabl
 
 ## M4 — Migrate parameterized codecs
 
-**Goal:** Move every codec that currently implements optional `renderOutputType?` to `parameterizedCodec({…})` with a co-located brand and a `columnFor(codec)` factory export.
+**Goal:** Move every codec that currently implements optional `renderOutputType?` to `parameterizedCodec({…})` with a co-located `OutputType` and a `columnFor(codec)` factory export.
 
 **Spec AC:** [AC-2](spec.md#ac-2-no-emit-fieldoutputtype-resolves-correctly) (now with production codecs), [AC-4](spec.md#ac-4-existing-parameterized-codecs-migrated).
 
 ### Tasks (independently mergeable)
 
-1. **pgvector** — define `VectorBrand`; migrate `pgVectorCodec` to `parameterizedCodec`; replace `vector(length)` with `columnFor(pgVectorCodec)` (or alias).
-2. **postgres-core** — for each parameterized codec (numeric, timestamp, timestamptz, char if present, json/jsonb): define brand, migrate, replace factory.
+1. **pgvector** — define `VectorOutputType`; migrate `pgVectorCodec` to `parameterizedCodec`; replace `vector(length)` with `columnFor(pgVectorCodec)` (or alias).
+2. **postgres-core** — for each parameterized codec (numeric, timestamp, timestamptz, char if present, json/jsonb): define `<…>OutputType`, migrate, replace factory.
 3. **mongo codecs** — same pattern.
 4. **Examples and integration tests** — update demo schemas to use `columnFor(codec)`; verify integration tests stay green.
 5. **Emit-snapshot diff** — re-emit every contract; assert byte-identical against M0.3 snapshots.
@@ -200,8 +200,8 @@ If the diff in any sub-task balloons, split into separate PRs by codec family.
 
 ## Risks and mitigations
 
-- **Brand cast scope creep.** A single `as unknown as Brand` per parameterized codec is the only allowed cast. The design docs enumerate this rule; reviewers veto wider casts.
-- **TS depth limits with deep brand chains.** Brand application is a `&`-then-index conditional; cheap. Deep `StandardSchemaV1.InferOutput` chains for large schemas may hit TS recursion limits — this is a TS limitation users hit independently of this project. Fall-back: `renderOutputType` can return `'unknown'` for the emit path while the no-emit path keeps the precise inference.
+- **`OutputType` cast scope creep.** A single `as unknown as <PerCodecOutputType>` per parameterized codec is the only allowed cast. The design docs enumerate this rule; reviewers veto wider casts.
+- **TS depth limits with deep `Apply` chains.** `Apply<F, P>` is an intersection-then-index conditional; cheap. Deep `StandardSchemaV1.InferOutput` chains for large schemas may hit TS recursion limits — this is a TS limitation users hit independently of this project. Fall-back: `renderOutputType` can return `'unknown'` for the emit path while the no-emit path keeps the precise inference.
 - **Emit-path regression.** AC-4 and AC-5 enforce byte-identical snapshots verified against the M0.3 baseline.
 - **`init` signature locks something we'd want to change.** Mitigated by keeping `instanceMeta` to the minimum necessary for known consumers (CipherStash G1) and by leaving the runtime contract documented in [design/runtime-contract-and-compatibility.md](design/runtime-contract-and-compatibility.md), not enforced.
 - **Standard Schema validator wiring.** Existing arktype validators implement Standard Schema; M1 task 4 is a type widening only.

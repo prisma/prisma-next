@@ -1,6 +1,6 @@
 # Design — Runtime contract and compatibility
 
-**Audience:** future implementers (especially of [TML-2330](https://linear.app/prisma-company/issue/TML-2330)) and reviewers concerned with how this project fits with downstream extension work. Companion to [codec-interface-and-brand.md](codec-interface-and-brand.md) and [authoring-ergonomics.md](authoring-ergonomics.md).
+**Audience:** future implementers (especially of [TML-2330](https://linear.app/prisma-company/issue/TML-2330)) and reviewers concerned with how this project fits with downstream extension work. Companion to [codec-interface-and-output-types.md](codec-interface-and-output-types.md) and [authoring-ergonomics.md](authoring-ergonomics.md).
 
 **What this doc covers:** the per-instance materialization contract we declare without implementing, the [Case C — CipherStash column-scoped encryption](#case-c--cipherstash-column-scoped-encryption) study that drives the contract's shape, the explicit out-of-scope extension points, and the rebase strategy off [PR #374](https://github.com/prisma/prisma-next/pull/374).
 
@@ -17,7 +17,7 @@ This project ships a **declared but unimplemented** runtime materialization cont
 > 3. **`usedAt` lists every column referencing the instance.** Single-element is the common case; multi-element when columns share an instance.
 > 4. **Encode/decode dispatch via the named instance.** A column with `typeRef: 'Foo'` (or inline params resolved to an anonymous instance) routes through the helper returned by `init` for that instance.
 
-We ship the signature, the keying convention (`storage.types` instance), the documentation, and the brand mechanism that codecs need *now* to be forward-compatible. We do **not** wire the context builder to call `init` per instance, nor route encode/decode through the helper, nor add caching/lifecycle management — those are [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+We ship the signature, the keying convention (`storage.types` instance), the documentation, and the output-type-function mechanism that codecs need *now* to be forward-compatible. We do **not** wire the context builder to call `init` per instance, nor route encode/decode through the helper, nor add caching/lifecycle management — those are [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
 
 We also **resolve open question 1** in the spec: inline-`typeParams` columns produce **anonymous instances** with deterministic names (one entry in `usedAt`). Sharing requires explicit opt-in via `storage.types`.
 
@@ -96,9 +96,9 @@ const cipherTextParams = type({
   mode:    "'deterministic' | 'randomized'",
 });
 
-// 2. Brand: ciphertext is opaque at the wire, but the column's *plaintext* type
-//    is what users see. Encryption is invisible at the type level.
-interface CipherTextBrand extends CodecBrand<typeof cipherTextParams.infer> {
+// 2. OutputType: ciphertext is opaque at the wire, but the column's *plaintext*
+//    type is what users see. Encryption is invisible at the type level.
+interface CipherTextOutputType extends CodecOutputTypeFn<typeof cipherTextParams.infer> {
   readonly Input:  typeof cipherTextParams.infer;
   readonly Output: string;  // plaintext
 }
@@ -110,7 +110,7 @@ export const cipherStashTextCodec = parameterizedCodec({
   traits: ['equality'],   // mode === 'deterministic' allows equality
   paramsSchema: cipherTextParams,
   renderOutputType: () => 'string',
-  Brand: undefined as unknown as CipherTextBrand,
+  OutputType: undefined as unknown as CipherTextOutputType,
 
   // 4. init is the *whole point* of Case C.
   init: (params, instance) => {
@@ -156,13 +156,13 @@ const contract = {
 
 `User.email` and `Invite.email` share an `init` call: when the runtime side lands, `init` runs once for `EmailCipher` with `instance.usedAt = [{ table: 'User', column: 'email' }, { table: 'Invite', column: 'email' }]`.
 
-The compound subcase **`encryptedJson<T>(schema)`** combines this case with [Case J](authoring-ergonomics.md#case-j--json-with-schema): the brand projects `StandardSchemaV1.InferOutput<S>` as the plaintext type, while `init` derives a column-scoped key. CipherStash gets a JSON-typed encrypted column without the framework knowing anything about JSON or encryption.
+The compound subcase **`encryptedJson<T>(schema)`** combines this case with [Case J](authoring-ergonomics.md#case-j--json-with-schema): the `OutputType` projects `StandardSchemaV1.InferOutput<S>` as the plaintext type, while `init` derives a column-scoped key. CipherStash gets a JSON-typed encrypted column without the framework knowing anything about JSON or encryption.
 
 ### What this case pins
 
 - `init`'s second arg is `(params, instance: { name, usedAt })`. Without `usedAt`, key derivation can't bind to columns.
 - Keying by `storage.types` instance: shared keys for shared types (`typeRef`), distinct keys for distinct types. Anonymous instances for inline params keep one-off ergonomics.
-- The brand mechanism applies even when the codec output type is the *plaintext* type — encryption invisible at the type level.
+- The `OutputType` mechanism applies even when the codec output type is the *plaintext* type — encryption invisible at the type level.
 - The signature must be locked **before** the runtime side ships, so CipherStash and other extension authors don't have to migrate when the runtime catches up.
 
 ### What this project ships vs. defers
@@ -172,7 +172,7 @@ The compound subcase **`encryptedJson<T>(schema)`** combines this case with [Cas
 | `init(params, instance)` signature | ✓ locked | — |
 | `instance.name`, `instance.usedAt` semantics | ✓ documented | — |
 | `storage.types`-instance keying | ✓ documented | — |
-| Brand resolution for `cipherStashTextCodec`-typed columns | ✓ no-emit path correct | — |
+| `OutputType` resolution for `cipherStashTextCodec`-typed columns | ✓ no-emit path correct | — |
 | Runtime calling `init` once per instance | — | ✓ |
 | Encode/decode routed through `init`'s helper | — | ✓ |
 | Helper lifecycle (caching, async construction, errors) | — | ✓ |
@@ -187,7 +187,7 @@ The following CipherStash gaps describe additions to the codec interface or surr
 | Gap | Description | Why out of scope |
 |---|---|---|
 | **G4** | `bulkEncode` for network-backed codecs (one network round-trip per `Promise.all` wave). | New slot on `ParameterizedCodec` (or base `Codec`). The interface split makes it straightforward to add later. |
-| **G10** | `AbortSignal` plumbed into `encode`/`decode`. | Touches the runtime more than the interface. The brand mechanism doesn't depend on encode/decode shape, so this addition is clean. |
+| **G10** | `AbortSignal` plumbed into `encode`/`decode`. | Touches the runtime more than the interface. The `OutputType` mechanism doesn't depend on encode/decode shape, so this addition is clean. |
 | **G9** | Trait-gated wire redaction (omit wire payload from error envelopes for codecs carrying `redactWire`). | Trait-only addition; tracked as [TML-2329](https://linear.app/prisma-company/issue/TML-2329). |
 | **G6** | `preferParam` planner hint (codec signals the planner to lift literals to query parameters; encrypted literals must be parameterized). | New slot orthogonal to parameterization — goes on base `Codec` since both kinds of codec may want it. The interface split makes adding it later clean. |
 | **G2, G3** | Migration-planner inputs (`(table, column)` plumbing on the migration plane). | Same architectural pattern as G1, different plane. Addressed when the migration planner gets its own pass. |
@@ -209,7 +209,7 @@ The following CipherStash gaps describe additions to the codec interface or surr
 
 ### As the type-resolution seam in the no-emit path
 
-`FieldOutputType` resolves `typeRef` through `storage.types` first, then applies the brand. So a column with `typeRef: 'Embedding1536'` and a column with inline `typeParams: { length: 1536 }` both resolve to `Vector<1536>`. The user experience is unified; the contract chooses sharing semantics.
+`FieldOutputType` resolves `typeRef` through `storage.types` first, then applies the codec's `OutputType` function. So a column with `typeRef: 'Embedding1536'` and a column with inline `typeParams: { length: 1536 }` both resolve to `Vector<1536>`. The user experience is unified; the contract chooses sharing semantics.
 
 ### What we don't change
 
@@ -228,14 +228,14 @@ This project is currently branched from `origin/worktree/op-registry-ts` ([PR #3
 ### Why we branched off #374
 
 - #374 establishes patterns for TS-as-authoring-surface (`Expression<T>`, codec-typed expressions, the operations registry).
-- The codec-typed expression machinery in #374 reads `CodecTypes` for `output` types — the same place this project's brand mechanism plugs into.
-- Branching off #374 lets us co-evolve the brand-aware path without merge churn.
+- The codec-typed expression machinery in #374 reads `CodecTypes` for `output` types — the same place this project's `OutputType` mechanism plugs into.
+- Branching off #374 lets us co-evolve the `OutputType`-aware path without merge churn.
 
 ### Rebase plan
 
 - **During the project**: rebase on top of `origin/worktree/op-registry-ts` if #374 receives review-driven changes.
 - **Once #374 merges to `main`**: rebase this branch onto `origin/main`. The parameterization fields removed from base `Codec` (M5) line up naturally with #374's merged state.
-- **During the rebase**: the brand mechanism is additive on top of #374's expression types; no semantic conflict expected. The interface-removal at M5 may have small textual conflicts; resolve in favor of the post-M5 shape.
+- **During the rebase**: the `OutputType` mechanism is additive on top of #374's expression types; no semantic conflict expected. The interface-removal at M5 may have small textual conflicts; resolve in favor of the post-M5 shape.
 
 ### What we will not do
 
@@ -247,8 +247,8 @@ This project is currently branched from `origin/worktree/op-registry-ts` ([PR #3
 ## Cross-references
 
 - Spec: [spec.md — Decision](../spec.md#decision), [How it works §6](../spec.md#how-it-works), [AC-6](../spec.md#ac-6-initparams-instancemeta-signature-is-locked), [Non-goals](../spec.md#non-goals).
-- Plan: [plan.md M1, M5](../plan.md#m1--codec-interface-split--brand-mechanism).
-- Mechanism: [codec-interface-and-brand.md#init-signature](codec-interface-and-brand.md#init-signature).
+- Plan: [plan.md M1, M5](../plan.md#m1--codec-interface-split--output-type-function-mechanism).
+- Mechanism: [codec-interface-and-output-types.md#init-signature](codec-interface-and-output-types.md#init-signature).
 - Authoring impact: [authoring-ergonomics.md](authoring-ergonomics.md).
 - CipherStash analysis: [assets/cipherstash-ext-framework-gaps.md](../assets/cipherstash-ext-framework-gaps.md).
 - Follow-ups: [TML-2329](https://linear.app/prisma-company/issue/TML-2329) (G9), [TML-2330](https://linear.app/prisma-company/issue/TML-2330) (G1, G4).
