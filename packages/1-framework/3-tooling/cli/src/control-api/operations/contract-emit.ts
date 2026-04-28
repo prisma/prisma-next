@@ -23,24 +23,8 @@ import type {
 
 const EMIT_ACTION: ControlActionName = 'emit';
 
-interface ProviderFailureLike {
-  readonly summary: string;
-  readonly diagnostics: readonly unknown[];
-  readonly meta?: unknown;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
-}
-
-function isAbortError(error: unknown): boolean {
-  return isRecord(error) && typeof error['name'] === 'string' && error['name'] === 'AbortError';
-}
-
-function isProviderFailureLike(value: unknown): value is ProviderFailureLike {
-  return (
-    isRecord(value) && typeof value['summary'] === 'string' && Array.isArray(value['diagnostics'])
-  );
 }
 
 function startSpan(onProgress: OnControlProgress | undefined, spanId: string, label: string): void {
@@ -53,6 +37,69 @@ function endSpan(
   outcome: 'ok' | 'error',
 ): void {
   onProgress?.({ action: EMIT_ACTION, kind: 'spanEnd', spanId, outcome });
+}
+
+function failedToResolveContractSource(why: string, fix: string, meta?: Record<string, unknown>) {
+  return errorRuntime('Failed to resolve contract source', {
+    why,
+    fix,
+    ...ifDefined('meta', meta),
+  });
+}
+
+type ValidatedProviderResult =
+  | { readonly ok: true; readonly value: unknown }
+  | { readonly ok: false; readonly error: ReturnType<typeof errorRuntime> };
+
+function validateProviderResult(providerResult: unknown): ValidatedProviderResult {
+  if (!isRecord(providerResult) || typeof providerResult['ok'] !== 'boolean') {
+    return {
+      ok: false,
+      error: failedToResolveContractSource(
+        'Contract source provider returned malformed result shape.',
+        'Ensure contract.source.load resolves to ok(Contract) or notOk({ summary, diagnostics }).',
+      ),
+    };
+  }
+
+  if (providerResult['ok']) {
+    if (!('value' in providerResult)) {
+      return {
+        ok: false,
+        error: failedToResolveContractSource(
+          'Contract source provider returned malformed success result: missing value.',
+          'Ensure contract.source.load success payload is ok(Contract).',
+        ),
+      };
+    }
+    return { ok: true, value: providerResult['value'] };
+  }
+
+  const failure = providerResult['failure'];
+  if (
+    !isRecord(failure) ||
+    typeof failure['summary'] !== 'string' ||
+    !Array.isArray(failure['diagnostics'])
+  ) {
+    return {
+      ok: false,
+      error: failedToResolveContractSource(
+        'Contract source provider returned malformed failure result: expected summary and diagnostics.',
+        'Ensure contract.source.load failure payload is notOk({ summary, diagnostics, meta? }).',
+      ),
+    };
+  }
+  return {
+    ok: false,
+    error: failedToResolveContractSource(
+      String(failure['summary']),
+      'Fix contract source diagnostics and return ok(Contract).',
+      {
+        diagnostics: failure['diagnostics'],
+        ...ifDefined('providerMeta', failure['meta']),
+      },
+    ),
+  };
 }
 
 /**
@@ -132,49 +179,19 @@ export async function executeContractEmit(
     providerResult = await unlessAborted(contractConfig.source.load(sourceContext));
   } catch (error) {
     endSpan(onProgress, 'resolveSource', 'error');
-    if (signal.aborted || isAbortError(error)) {
+    if (signal.aborted || (isRecord(error) && error['name'] === 'AbortError')) {
       throw error;
     }
-    throw errorRuntime('Failed to resolve contract source', {
-      why: error instanceof Error ? error.message : String(error),
-      fix: 'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
-    });
+    throw failedToResolveContractSource(
+      error instanceof Error ? error.message : String(error),
+      'Ensure contract.source.load resolves to ok(Contract) or returns structured diagnostics.',
+    );
   }
 
-  if (!isRecord(providerResult) || typeof providerResult.ok !== 'boolean') {
+  const validatedContract = validateProviderResult(providerResult);
+  if (!validatedContract.ok) {
     endSpan(onProgress, 'resolveSource', 'error');
-    throw errorRuntime('Failed to resolve contract source', {
-      why: 'Contract source provider returned malformed result shape.',
-      fix: 'Ensure contract.source.load resolves to ok(Contract) or notOk({ summary, diagnostics }).',
-    });
-  }
-
-  if (providerResult.ok && !('value' in providerResult)) {
-    endSpan(onProgress, 'resolveSource', 'error');
-    throw errorRuntime('Failed to resolve contract source', {
-      why: 'Contract source provider returned malformed success result: missing value.',
-      fix: 'Ensure contract.source.load success payload is ok(Contract).',
-    });
-  }
-
-  if (!providerResult.ok && !isProviderFailureLike(providerResult.failure)) {
-    endSpan(onProgress, 'resolveSource', 'error');
-    throw errorRuntime('Failed to resolve contract source', {
-      why: 'Contract source provider returned malformed failure result: expected summary and diagnostics.',
-      fix: 'Ensure contract.source.load failure payload is notOk({ summary, diagnostics, meta? }).',
-    });
-  }
-
-  if (!providerResult.ok) {
-    endSpan(onProgress, 'resolveSource', 'error');
-    throw errorRuntime('Failed to resolve contract source', {
-      why: providerResult.failure.summary,
-      fix: 'Fix contract source diagnostics and return ok(Contract).',
-      meta: {
-        diagnostics: providerResult.failure.diagnostics,
-        ...ifDefined('providerMeta', providerResult.failure.meta),
-      },
-    });
+    throw validatedContract.error;
   }
   endSpan(onProgress, 'resolveSource', 'ok');
 
@@ -188,7 +205,7 @@ export async function executeContractEmit(
       config.target.targetId,
       rawComponents,
     );
-    const enrichedIR = enrichContract(providerResult.value as Contract, frameworkComponents);
+    const enrichedIR = enrichContract(validatedContract.value as Contract, frameworkComponents);
     familyInstance.validateContract(enrichedIR);
     emitResult = await unlessAborted(
       emit(enrichedIR, stack, config.family.emission, { outputJsonPath }),

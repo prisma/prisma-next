@@ -164,8 +164,8 @@ describe('executeContractEmit', () => {
   async function withStartedOverlappingEmits<T>(
     outputJsonPath: string,
     options: {
-      readonly firstEmit: PromiseLike<EmitResult>;
-      readonly secondEmit: PromiseLike<EmitResult>;
+      readonly firstEmit: Promise<EmitResult>;
+      readonly secondEmit: Promise<EmitResult>;
     },
     run: (emits: {
       readonly first: ReturnType<typeof executeContractEmit>;
