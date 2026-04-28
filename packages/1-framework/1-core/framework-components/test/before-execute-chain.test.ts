@@ -27,6 +27,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {} },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime',
     ...overrides,
   };
 }

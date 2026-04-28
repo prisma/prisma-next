@@ -63,6 +63,7 @@ function createCtx(overrides?: Partial<SqlMiddlewareContext>): SqlMiddlewareCont
       error: vi.fn(),
     },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime',
     ...overrides,
   };
 }

@@ -1,6 +1,5 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
@@ -29,7 +28,6 @@ export async function createClient(connectionUri: string, dbName: string) {
   const runtime = createMongoRuntime({
     context,
     driver,
-    middleware: [createTelemetryMiddleware()],
   });
   const orm = mongoOrm({ contract, executor: runtime });
 

@@ -65,7 +65,7 @@ Lands the additions to `@prisma-next/framework-components/runtime`. Because `int
 
 - [ ] **1.6 Mongo parity test.** Extend `test/integration/test/cross-package/cross-family-middleware.test.ts` (the cross-family proof from TML-2255) with a generic mock interceptor that returns canned rows. Run it through both SQL and Mongo runtimes. Assert: driver not invoked in either family; `afterExecute` sees `source: 'middleware'` in both; rows match canned. No production code change required — Mongo inherits `intercept` via `runWithMiddleware`.
 
-- [ ] **1.7 Implement `defineAnnotation` helper with applicability.** Add `packages/1-framework/1-core/framework-components/src/annotations.ts`. Export `OperationKind = 'read' | 'write'`. `defineAnnotation<Payload, Kinds extends OperationKind>({ namespace: string, applicableTo: readonly Kinds[] }): AnnotationHandle<Payload, Kinds>`. Handle has `namespace`, `applicableTo: ReadonlySet<Kinds>` (frozen), `apply(value: Payload): AnnotationValue<Payload, Kinds>`, `read(plan: { meta: { annotations?: Record<string, unknown> } }): Payload | undefined`. `AnnotationValue` carries `__annotation: true`, `namespace`, `value`, `applicableTo`. Export from `exports/runtime.ts`.
+- [ ] **1.7 Implement `defineAnnotation` helper with applicability.** Add `packages/1-framework/1-core/framework-components/src/annotations.ts`. Export `OperationKind = 'read' | 'write'`. **Curried two-step signature:** `defineAnnotation<Payload>(): <const Kinds extends OperationKind>(options: { namespace: string; applicableTo: readonly Kinds[] }) => AnnotationHandle<Payload, Kinds>`. The first call takes only `Payload` as an explicit type argument; the second call takes the runtime options and infers `Kinds` from `applicableTo` via a `const` type parameter, so the operation kinds appear once at the call site rather than being repeated as a type argument. Currying is required because TypeScript does not support partial type-argument inference: with a single-step `defineAnnotation<Payload, const Kinds>` form, callers would still have to pass both type arguments explicitly (TS2558) since `Payload` is not inferable from anywhere. The returned handle is a **callable function** (not a plain object): `handle(value: Payload)` produces an `AnnotationValue<Payload, Kinds>`. The function also carries `namespace: string`, `applicableTo: ReadonlySet<Kinds>` (frozen), and `read(plan: { meta: { annotations?: Record<string, unknown> } }): Payload | undefined` as attached properties. Implementation pattern: outer factory returns an inner generic factory; the inner factory defines a local `function handle(value: Payload) { … }`, then `Object.assign(handle, { namespace, applicableTo, read })` and freezes the result before returning. Type the return value as a hybrid `AnnotationHandle<Payload, Kinds>` interface that combines a call signature with the property bag. There is intentionally no `.apply(...)` method — calling the handle directly is the sole construction path. `AnnotationValue` carries `__annotation: true`, `namespace`, `value`, `applicableTo`. Export from `exports/runtime.ts`.
 
 - [ ] **1.7a Define `ValidAnnotations<K, As>` mapped tuple.** In the same module. `type ValidAnnotations<K extends OperationKind, As extends readonly AnnotationValue<unknown, OperationKind>[]> = { readonly [I in keyof As]: As[I] extends AnnotationValue<infer P, infer Kinds> ? K extends Kinds ? AnnotationValue<P, Kinds> : never : never }`. Export. This is the gate type lane terminals consume.
 
@@ -74,7 +74,9 @@ Lands the additions to `@prisma-next/framework-components/runtime`. Because `int
 - [ ] **1.8 Unit + type tests for `defineAnnotation` and `ValidAnnotations`.** In `framework-components/test/annotations.test.ts` and `annotations.types.test-d.ts`:
   - Two handles with different namespaces do not interfere.
   - `read` returns `Payload | undefined` with preserved type (negative test on wrong payload).
-  - `apply` produces an `AnnotationValue<Payload, Kinds>` with the `__annotation` brand and frozen `applicableTo`.
+  - Calling the handle (e.g. `handle({ ttl: 60 })`) produces an `AnnotationValue<Payload, Kinds>` with the `__annotation` brand and frozen `applicableTo`.
+  - Handle is callable as a function (typeof handle === 'function') and exposes `namespace`, `applicableTo`, and `read` as own properties.
+  - Handle does **not** expose a `.apply` method (negative test: `'apply' extends keyof typeof handle` is `false`, or equivalently `handle.apply` is the inherited `Function.prototype.apply` rather than the construction entry point).
   - `read` of an absent annotation returns `undefined`.
   - `read` ignores annotations applied via a different handle even when the namespace string matches (sanity check on the brand).
   - `ValidAnnotations<'read', [readOnly, both]>` resolves all elements to live `AnnotationValue` types.
@@ -111,7 +113,7 @@ Adds the user-facing `.annotate(...)` surface on both query lanes. After this mi
   - A write-only annotation accepted on `InsertQueryImpl` / `UpdateQueryImpl` / `DeleteQueryImpl`.
   - A write-only annotation on `SelectQueryImpl` fails to compile (negative).
   - A `'read' | 'write'` annotation accepted on every builder kind.
-  - `defineAnnotation<{ ttl: number }, 'read'>({...}).apply({ ttl: 60 })` accepts only the typed payload; wrong payload shape fails to compile (negative).
+  - A handle defined as `defineAnnotation<{ ttl: number }>()({ namespace, applicableTo: ['read'] })` accepts only the typed payload when called (`handle({ ttl: 60 })` typechecks; `handle({ ttl: 'sixty' })` fails to compile — negative). `Kinds` is inferred from `applicableTo` (`'read'` here) — verify by asserting the handle's static type is `AnnotationHandle<{ ttl: number }, 'read'>`, not `AnnotationHandle<{ ttl: number }, OperationKind>`.
   - `.annotate()` does not widen the resulting plan's `Row` type.
 
 - [ ] **2.5 Add variadic annotation arg to ORM read terminals.** In `packages/3-extensions/sql-orm-client/src/collection.ts` and `model-accessor.ts`, extend each read terminal's signature with a variadic last argument `<As extends readonly AnnotationValue<unknown, OperationKind>[]>(...annotations: As & ValidAnnotations<'read', As>)`: `first`, `find`, `all`, `take().all`, `count`, aggregate methods, and any `findMany`-equivalent terminals. **Use the `As & ValidAnnotations<...>` intersection** — without it the type-level gate silently lets inapplicable annotations through (see Open Items). The terminal calls `assertAnnotationsApplicable(annotations, 'read', '<terminalName>')` before plan construction and merges annotations into `meta.annotations` via the existing plan-builder path (`query-plan-select.ts`, `query-plan-aggregate.ts`). Enumerate the exhaustive terminal list during implementation; if `orm-consolidation` reshapes terminals mid-project, rebase mechanically.
@@ -121,17 +123,17 @@ Adds the user-facing `.annotate(...)` surface on both query lanes. After this mi
 - [ ] **2.7 Drop chainable `Collection.annotate()` if any draft survives.** Belt-and-suspenders: confirm no `.annotate()` survives on `Collection` itself or on grouped/include collection types. Annotations only attach via terminal arguments. `Collection<Row>` should be type-identical to its pre-annotation shape minus terminal signatures.
 
 - [ ] **2.8 Unit tests for ORM annotations.** In `sql-orm-client/test/`:
-  - `db.User.first({ id }, cacheAnnotation.apply({ ttl: 60 }))` produces a plan with `meta.annotations.cache`.
-  - `db.User.where({active: true}).take(10).all(cacheAnnotation.apply({ ttl: 60 }))` likewise.
-  - `db.User.create(input, writeAnnotation.apply(...))` produces a plan with the annotation.
+  - `db.User.first({ id }, cacheAnnotation({ ttl: 60 }))` produces a plan with `meta.annotations.cache`.
+  - `db.User.where({active: true}).take(10).all(cacheAnnotation({ ttl: 60 }))` likewise.
+  - `db.User.create(input, writeAnnotation(...))` produces a plan with the annotation.
   - Annotation survives `.include(...)` (relation queries) and grouped paths when attached at the appropriate terminal.
   - Multiple annotations on a single terminal call coexist; duplicate namespace last-wins.
   - Runtime check: a write-only annotation cast through `as any` and passed to `first()` throws `RUNTIME.ANNOTATION_INAPPLICABLE` at the lane.
   - Runtime check: read-only annotation via cast on `create()` throws likewise.
 
 - [ ] **2.9 Type tests for ORM annotations.** In `sql-orm-client/test/`:
-  - `db.User.first({ id }, cacheAnnotation.apply({ ttl: 60 }))` typechecks.
-  - `db.User.create(input, cacheAnnotation.apply({ ttl: 60 }))` does not compile (negative).
+  - `db.User.first({ id }, cacheAnnotation({ ttl: 60 }))` typechecks.
+  - `db.User.create(input, cacheAnnotation({ ttl: 60 }))` does not compile (negative).
   - Read-only annotation accepted on `first` / `find` / `all` / `count` / aggregates; rejected on `create` / `update` / `delete` / `upsert` (one negative case per write terminal).
   - Write-only annotation: mirror image.
   - `'read' | 'write'` annotation accepted on every terminal.
@@ -152,13 +154,13 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
 
 - [ ] **3.3 Scaffold `@prisma-next/middleware-cache`.** Create `packages/3-extensions/middleware-cache/` following the `middleware-telemetry` layout (`package.json`, `tsconfig.json`, `tsconfig.prod.json`, `tsdown.config.ts`, `vitest.config.ts`, `biome.jsonc`, `src/exports/index.ts`, `README.md` stub). Add to `pnpm-workspace` if needed. Run `pnpm lint:deps` after scaffold (before adding real code) to verify clean baseline.
 
-- [ ] **3.4 Define `cacheAnnotation` handle and `CachePayload` type.** In `src/cache-annotation.ts`: `cacheAnnotation = defineAnnotation<CachePayload, 'read'>({ namespace: 'cache', applicableTo: ['read'] })`. `CachePayload = { ttl?: number; skip?: boolean; key?: string }`. Export from `exports/index.ts`.
+- [ ] **3.4 Define `cacheAnnotation` handle and `CachePayload` type.** In `src/cache-annotation.ts`: `cacheAnnotation = defineAnnotation<CachePayload>()({ namespace: 'cache', applicableTo: ['read'] })` (curried form: `Payload` explicit, `Kinds` inferred as `'read'` from `applicableTo`). `CachePayload = { ttl?: number; skip?: boolean; key?: string }`. Export from `exports/index.ts`.
 
 - [ ] **3.5 Define `CacheStore` interface and in-memory LRU default.** In `src/cache-store.ts`: `CacheStore` interface (`get`, `set`), `CachedEntry = { rows: readonly Record<string, unknown>[]; storedAt: number }`, `createInMemoryCacheStore({ maxEntries }: { maxEntries: number })` factory producing an LRU-with-TTL store. Injectable clock (`now: () => number`) for TTL testing. Export interface, factory, and `CachedEntry`.
 
 - [ ] **3.6 Implement `createCacheMiddleware`.** In `src/cache-middleware.ts`. Returns a cross-family `RuntimeMiddleware` (no `familyId`) with `intercept` / `onRow` / `afterExecute` wired. Private `WeakMap<object, { key: string; buffer: Record<string, unknown>[] }>` keyed on the post-lowering plan object identity. Options: `{ store?: CacheStore; maxEntries?: number; clock?: () => number }`. Default `maxEntries`: 1000. The package depends only on `@prisma-next/framework-components/runtime` — no SQL or Mongo runtime dependency.
 
-- [ ] **3.7 Resolve cache keys via `contentHash`.** Two-tier resolution: per-query `cacheAnnotation.apply({ key })` overrides everything; otherwise `ctx.contentHash(exec)` from the family runtime. The resolved string is an opaque, bounded SHA-512 digest (literal prefix `sha512:` plus 128 lowercase hex chars, 135 chars total) produced by the family runtime via `hashContent` (`@prisma-next/utils/hash-content`, which wraps `crypto.subtle.digest` and is async); the cache middleware awaits `ctx.contentHash(exec)` and uses the resolved string as the `Map<string, …>` key as-is. The cache middleware itself never reads `exec.sql`, `exec.command`, or any other family-specific field. No `keyFn` option, no structural probe, no error path for non-SQL plans — Mongo and any future family work day one as long as their runtime populates `contentHash`. The cache package itself does not import `node:crypto`; hashing is the family runtime's responsibility, and the cache package depends only on `@prisma-next/framework-components/runtime`. User-supplied `cacheAnnotation.apply({ key })` is **not** rehashed — that's the user's responsibility (document in M3.20 README that user keys are stored as-is).
+- [ ] **3.7 Resolve cache keys via `contentHash`.** Two-tier resolution: per-query `cacheAnnotation({ key })` overrides everything; otherwise `ctx.contentHash(exec)` from the family runtime. The resolved string is an opaque, bounded SHA-512 digest (literal prefix `sha512:` plus 128 lowercase hex chars, 135 chars total) produced by the family runtime via `hashContent` (`@prisma-next/utils/hash-content`, which wraps `crypto.subtle.digest` and is async); the cache middleware awaits `ctx.contentHash(exec)` and uses the resolved string as the `Map<string, …>` key as-is. The cache middleware itself never reads `exec.sql`, `exec.command`, or any other family-specific field. No `keyFn` option, no structural probe, no error path for non-SQL plans — Mongo and any future family work day one as long as their runtime populates `contentHash`. The cache package itself does not import `node:crypto`; hashing is the family runtime's responsibility, and the cache package depends only on `@prisma-next/framework-components/runtime`. User-supplied `cacheAnnotation({ key })` is **not** rehashed — that's the user's responsibility (document in M3.20 README that user keys are stored as-is).
 
 - [ ] **3.8 ~~Mutation guard.~~** **Dropped.** Lane-level applicability gate (M2) makes a separate in-middleware mutation guard redundant. The cache middleware's `intercept` does not classify operation kind.
 
@@ -170,8 +172,8 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
 
 - [ ] **3.12 Unit tests — opt-in semantics.** In `middleware-cache/test/cache-middleware.test.ts`:
   - Un-annotated query: store never called.
-  - `cacheAnnotation.apply({ skip: true })`: store never called.
-  - `cacheAnnotation.apply({ })` (no `ttl`): store never called.
+  - `cacheAnnotation({ skip: true })`: store never called.
+  - `cacheAnnotation({ })` (no `ttl`): store never called.
   - Presence of annotation alone without `ttl` does not cache.
 
 - [ ] **3.13 Unit tests — store mechanics.** In `middleware-cache/test/cache-store.test.ts`:
@@ -190,7 +192,7 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
   - Default path: `ctx.contentHash(exec)` is invoked and its return value is used directly as the `Map` key (no further transformation in the cache middleware; the family runtime is responsible for hashing inside `contentHash`).
   - Different `storageHash` → different keys for otherwise-identical SQL (validates SQL `contentHash` impl from 1.0b end-to-end).
   - Different params → different keys.
-  - User-supplied `cacheAnnotation.apply({ key })` short-circuits `ctx.contentHash` (assert `contentHash` is not invoked when annotation `key` is supplied). User-supplied keys are stored as-is — no rehashing.
+  - User-supplied `cacheAnnotation({ key })` short-circuits `ctx.contentHash` (assert `contentHash` is not invoked when annotation `key` is supplied). User-supplied keys are stored as-is — no rehashing.
   - (Canonicalization stability across object-key order is covered by `canonicalStringify` tests in 1.0a; hash output format / opacity / bounded size are covered by `hashContent` tests in 1.0a'; not duplicated here.)
 
 - [ ] **3.16 Integration test — stop condition.** In `test/integration/test/cross-package/middleware-cache.test.ts`. Real Postgres (per `cross-family-middleware.test.ts` pattern) + ORM. Execute the same annotated ORM query twice. Assert: driver invocation count is 1 (mock-spy or driver-level counter); decoded rows equivalent on both calls; second call's `afterExecute` event sees `source: 'middleware'`.
@@ -203,7 +205,7 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
 
 - [ ] **3.19a Cross-family unit tests — key resolution and Mongo parity.** In `middleware-cache/test/cache-key.test.ts`:
   - Default path: `ctx.contentHash(exec)` is invoked; the returned string is used as the cache key.
-  - Per-query `cacheAnnotation.apply({ key })` overrides `ctx.contentHash` (assert `contentHash` is not invoked when annotation `key` is supplied).
+  - Per-query `cacheAnnotation({ key })` overrides `ctx.contentHash` (assert `contentHash` is not invoked when annotation `key` is supplied).
   - Mongo parity: with a mock `RuntimeMiddlewareContext` whose `contentHash` returns a Mongo-style string, the cache middleware works end-to-end against a non-SQL mock plan (no SQL fields present). Demonstrates the package is genuinely family-agnostic.
   - Two distinct `contentHash` returns produce two distinct cache entries.
 
@@ -233,7 +235,8 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
 | `hashContent` is deterministic and discriminating | Unit | 1.0a' | Trailing chars + separator placement |
 | `hashContent` output does not embed raw input (opacity) | Unit | 1.0a' | Sensitive-data isolation |
 | `OperationKind = 'read' \| 'write'` exported | Type test | 1.7 | Binary kind for April |
-| `defineAnnotation<P, Kinds>({namespace, applicableTo})` signature | Type test | 1.7 | Generic over `Payload` + `Kinds` |
+| `defineAnnotation<P>()({namespace, applicableTo})` signature | Type test | 1.7 | Curried; `Payload` explicit, `Kinds` inferred from `applicableTo` via `const` |
+| `Kinds` inferred narrowly (not widened to `OperationKind`) | Type test | 1.8 | `applicableTo: ['read']` ⇒ `Kinds = 'read'`, not `'read' \| 'write'` |
 | `AnnotationHandle.applicableTo` is `ReadonlySet<Kinds>` | Unit | 1.7 | Frozen at construction |
 | `ValidAnnotations<K, As>` resolves matching elements | Type test | 1.8 | Positive |
 | `ValidAnnotations<K, As>` resolves mismatched elements to `never` | Type test | 1.8 | Negative both directions |
@@ -276,7 +279,8 @@ Delivers `@prisma-next/middleware-cache`. Exit: integration test proves a repeat
 | Mixed chain: A passthrough, B intercepts → only B's intercept | Unit | 1.4 | A's `beforeExecute` not called (it was a hit) |
 | Intercepted rows go through codec decoding | Integration | 1.5 | Raw → decoded row assertion via SQL runtime |
 | Mongo runtime observes `intercept` via inherited helper | Integration | 1.6 | Cross-family proof extension |
-| `defineAnnotation<P, Kinds>` preserves `P` across apply/read | Type test | 1.8 | Negative test for wrong payload |
+| `defineAnnotation<P, Kinds>` preserves `P` across call signature and read | Type test | 1.8 | Negative test for wrong payload |
+| Handle is callable; no `.apply` method on the handle | Unit + Type | 1.8 | `typeof handle === 'function'`; `handle({...})` is the sole construction path |
 | Different namespaces do not interfere | Unit | 1.8 | Two handles, disjoint reads |
 | `read` ignores cross-handle namespace match | Unit | 1.8 | Brand check |
 | SQL DSL `.annotate()` merges into `meta.annotations` (read + write) | Unit | 2.3 | All five builder kinds |

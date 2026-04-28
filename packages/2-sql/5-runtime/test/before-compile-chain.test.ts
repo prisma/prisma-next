@@ -37,6 +37,7 @@ function createContext(): SqlMiddlewareContext & {
       debug,
     },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime' as const,
   };
 }
 

@@ -1,4 +1,3 @@
-import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import postgresServerless from '@prisma-next/postgres/serverless';
 import { budgets, lints } from '@prisma-next/sql-runtime';
 import type { Contract } from './contract.d';
@@ -12,7 +11,6 @@ import contractJson from './contract.json' with { type: 'json' };
 export const db = postgresServerless<Contract>({
   contractJson,
   middleware: [
-    createTelemetryMiddleware(),
     lints(),
     budgets({
       maxRows: 10_000,

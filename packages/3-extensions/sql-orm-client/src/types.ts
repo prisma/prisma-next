@@ -1,4 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
   ExtractQueryOperationTypes,
@@ -72,6 +73,14 @@ export interface CollectionState {
   readonly limit: number | undefined;
   readonly offset: number | undefined;
   readonly variantName: string | undefined;
+  /**
+   * Annotations attached to this query at terminal-call time.
+   * Populated transiently by terminal methods (`first`, `all`, `create`,
+   * etc.) just before dispatch — `Collection` itself has no chainable
+   * `.annotate()`. Stored as a `Map<namespace, AnnotationValue>` so
+   * duplicate namespaces last-write-win. Empty on a fresh state.
+   */
+  readonly annotations: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>;
 }
 
 export function emptyState(): CollectionState {
@@ -86,6 +95,7 @@ export function emptyState(): CollectionState {
     limit: undefined,
     offset: undefined,
     variantName: undefined,
+    annotations: new Map(),
   };
 }
 

@@ -1,4 +1,10 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type {
+  AnnotationValue,
+  MetaBuilder,
+  OperationKind,
+} from '@prisma-next/framework-components/runtime';
+import { createMetaBuilder } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -13,7 +19,7 @@ import { createAggregateBuilder, isAggregateSelector } from './aggregate-builder
 import { getFieldToColumnMap } from './collection-contract';
 import { mapStorageRowToModelFields } from './collection-runtime';
 import { executeQueryPlan } from './execute-query-plan';
-import { compileGroupedAggregate } from './query-plan';
+import { compileGroupedAggregate, mergeAnnotations } from './query-plan';
 import type {
   AggregateBuilder,
   AggregateResult,
@@ -82,8 +88,16 @@ export class GroupedCollection<
     }) as GroupedCollection<TContract, ModelName, GroupFields>;
   }
 
+  /**
+   * Read terminal: run a grouped aggregate query.
+   *
+   * Accepts an optional `configure` callback that receives a
+   * `MetaBuilder<'read'>` for attaching typed annotations.
+   * Annotations are merged into the compiled plan's `meta.annotations`.
+   */
   async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
+    configure?: (meta: MetaBuilder<'read'>) => void,
   ): Promise<
     Array<
       SimplifyDeep<
@@ -103,13 +117,25 @@ export class GroupedCollection<
       }
     }
 
-    const compiled = compileGroupedAggregate(
-      this.contract,
-      this.tableName,
-      this.baseFilters,
-      this.groupByColumns,
-      aggregateSpec,
-      combineWhereExprs(this.havingFilters),
+    let annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined;
+    if (configure !== undefined) {
+      const meta = createMetaBuilder('read', 'groupBy.aggregate');
+      configure(meta);
+      if (meta.annotations.size > 0) {
+        annotationsMap = meta.annotations;
+      }
+    }
+
+    const compiled = mergeAnnotations(
+      compileGroupedAggregate(
+        this.contract,
+        this.tableName,
+        this.baseFilters,
+        this.groupByColumns,
+        aggregateSpec,
+        combineWhereExprs(this.havingFilters),
+      ),
+      annotationsMap,
     );
     const rows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,

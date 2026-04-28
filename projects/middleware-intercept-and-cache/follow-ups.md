@@ -90,6 +90,8 @@ Land after TML-2143 M1 merges. Doesn't block M2 or M3.
 
 ### What landed in M2
 
+> **Status update.** The variadic shape described below shipped in M2 and is the current behavior. It is being replaced by a meta-callback configurator (`(meta) => meta.annotate(...)`); see `api-revision-meta-callback.md` for the delta spec. The threading paths described here (state-driven for `all`/`first`, post-wrap for aggregates and writes) carry over unchanged — only the call-site shape and the per-terminal entry-point methods change.
+
 The variadic annotation argument is now available on every user-facing query-issuing terminal of `Collection` and `GroupedCollection`:
 
 - **Read terminals (state-driven):** `all`, `first`. Annotations flow via `state.userAnnotations`, which `compileSelect` and `compileSelectWithIncludeStrategy` thread to `buildOrmQueryPlan`.

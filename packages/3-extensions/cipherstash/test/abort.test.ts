@@ -117,6 +117,7 @@ function makeMiddlewareCtx(signal: AbortSignal | undefined): SqlMiddlewareContex
     now: () => Date.now(),
     log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime',
     ...(signal === undefined ? {} : { signal }),
   };
 }

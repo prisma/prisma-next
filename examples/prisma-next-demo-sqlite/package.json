@@ -21,7 +21,6 @@
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/ids": "workspace:*",
-    "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/sqlite": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

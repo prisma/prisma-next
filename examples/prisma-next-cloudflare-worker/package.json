@@ -25,7 +25,6 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
-    "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/postgres": "workspace:*",
     "@prisma-next/sql-builder": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",

@@ -30,6 +30,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
       error: vi.fn(),
     },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime' as const,
     ...overrides,
   };
 }

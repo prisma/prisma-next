@@ -181,7 +181,7 @@
       "plane": "runtime"
     },
     {
-      "glob": "packages/3-extensions/middleware-telemetry/**",
+      "glob": "packages/3-extensions/middleware-cache/**",
       "domain": "extensions",
       "layer": "integrations",
       "plane": "runtime"

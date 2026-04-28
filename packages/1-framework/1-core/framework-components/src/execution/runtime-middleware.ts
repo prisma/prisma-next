@@ -58,6 +58,27 @@ export interface RuntimeMiddlewareContext {
    * cancels.
    */
   readonly signal?: AbortSignal;
+  /**
+   * Identifies the queryable scope this execution is running under.
+   *
+   * - `'runtime'` — top-level `runtime.execute(plan)`. The default scope
+   *   used by the standard read/write paths.
+   * - `'connection'` — `connection.execute(plan)` after
+   *   `runtime.connection()` checked out a connection from the pool.
+   * - `'transaction'` — `transaction.execute(plan)` inside an explicit
+   *   transaction, or a query routed through `withTransaction`.
+   *
+   * Middleware that should only act at the top level read this field to
+   * bypass non-runtime scopes. The cache middleware uses it to skip
+   * caching inside transactions (where read-after-write coherence is the
+   * caller's expectation) and dedicated connections (where the user has
+   * explicitly stepped outside the shared cache surface). Observers that
+   * don't care about the scope can ignore the field.
+   *
+   * Family runtimes populate this at context-construction time per
+   * scope. Existing middleware that ignore the field are unaffected.
+   */
+  readonly scope: 'runtime' | 'connection' | 'transaction';
 }
 
 export interface AfterExecuteResult {
@@ -202,6 +223,33 @@ export interface RuntimeMiddleware<
 }
 
 /**
+ * Cross-family middleware — one that doesn't constrain `familyId` or
+ * `targetId` and is therefore compatible with any family runtime's
+ * middleware array (`SqlMiddleware[]`, `MongoMiddleware[]`, etc.).
+ *
+ * The intersection `RuntimeMiddleware & { familyId?: undefined; targetId?: undefined }`
+ * pins both optional properties to exactly `undefined` (intersecting
+ * `string | undefined` with `undefined` collapses to `undefined`). Under
+ * `exactOptionalPropertyTypes: true`, the plain `RuntimeMiddleware` shape
+ * — with `familyId?: string` — is *not* assignable to `SqlMiddleware`
+ * (which narrows `familyId?: 'sql'`) because `string` is wider than
+ * `'sql'`. Pinning the property to `undefined` makes the value a subtype
+ * of every narrowed variant: `undefined` extends both `'sql' | undefined`
+ * and `'mongo' | undefined`, so a `CrossFamilyMiddleware` value drops
+ * into a SQL or Mongo middleware slot without a cast.
+ *
+ * Cross-family middleware factories (`createCacheMiddleware`, future
+ * `audit` / OTel middleware) declare this as their return type so the
+ * cross-family typing is named once rather than re-spelled at every call
+ * site.
+ */
+export type CrossFamilyMiddleware<TPlan extends QueryPlan = QueryPlan> =
+  RuntimeMiddleware<TPlan> & {
+    readonly familyId?: undefined;
+    readonly targetId?: undefined;
+  };
+
+/**
  * Optional per-`execute` options accepted by every family runtime.
  *
  * `signal` is the per-query cancellation signal. The runtime threads the
@@ -212,6 +260,7 @@ export interface RuntimeMiddleware<
  */
 export interface RuntimeExecuteOptions {
   readonly signal?: AbortSignal;
+  readonly scope?: 'runtime' | 'connection' | 'transaction';
 }
 
 /**

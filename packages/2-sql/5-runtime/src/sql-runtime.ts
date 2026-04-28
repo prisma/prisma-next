@@ -10,6 +10,7 @@ import {
   RuntimeCore,
   type RuntimeExecuteOptions,
   type RuntimeLog,
+  type RuntimeMiddlewareContext,
   runBeforeExecuteChain,
   runtimeError,
   runWithMiddleware,
@@ -162,6 +163,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       log: log ?? noopLog,
       // ctx is only invoked by runWithMiddleware with execs this runtime lowered; the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
+      scope: 'runtime',
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });
@@ -282,13 +284,26 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
     const self = this;
     const signal = options?.signal;
+    const scope = options?.scope ?? 'runtime';
     // One ctx per execute() call — the same reference is shared by encodeParams (lower), decodeRow (per-row), and the stream loop's between-row checks. Per-cell ctx allocations inside decodeField add `column` for resolvable cells without re-wrapping the signal. The ctx object is always allocated; the `signal` field is only included when a signal was supplied (exactOptionalPropertyTypes).
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+
     // Per-execute view of the middleware ctx that carries the per-query
     // signal. `self.ctx` is allocated once at construction (no signal); we
     // shallow-clone it here so middleware sees the same `AbortSignal`
     // reference threaded into `codecCtx.signal` (ADR 207 identity).
-    const execMiddlewareCtx = signal === undefined ? self.ctx : { ...self.ctx, signal };
+    //
+    // The middleware context for this execution is also scope-narrowed: the
+    // top-level runtime path uses the constructor-time `'runtime'` ctx as-is;
+    // `connection.execute` and `transaction.execute` produce a derived ctx
+    // with the appropriate scope. Middleware that observe `ctx.scope`
+    // (e.g. the cache middleware, which only intercepts at `'runtime'`)
+    // see the right value without any out-of-band signaling.
+    const execMiddlewareCtx: RuntimeMiddlewareContext = {
+      ...self.ctx,
+      ...ifDefined('signal', signal),
+      ...(scope !== 'runtime' ? { scope } : {}),
+    };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
@@ -418,7 +433,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
         options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverConn, options);
+        return self.executeAgainstQueryable<Row>(plan, driverConn, {
+          ...options,
+          scope: 'connection',
+        });
       },
     };
 
@@ -438,7 +456,10 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
         options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverTx, options);
+        return self.executeAgainstQueryable<Row>(plan, driverTx, {
+          ...options,
+          scope: 'transaction',
+        });
       },
     };
   }

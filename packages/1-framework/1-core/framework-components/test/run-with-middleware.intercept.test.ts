@@ -28,6 +28,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {} },
     contentHash: async () => 'mock-hash',
+    scope: 'runtime',
     ...overrides,
   };
 }
@@ -233,6 +234,7 @@ describe('runWithMiddleware — intercept', () => {
         // No `debug` field — this is the optional case.
         log: { info: () => {}, warn: () => {}, error: () => {} },
         contentHash: async () => 'mock-hash',
+        scope: 'runtime',
       };
 
       const interceptor: RuntimeMiddleware<MockExec> = {

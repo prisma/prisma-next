@@ -26,7 +26,6 @@
   },
   "devDependencies": {
     "@prisma-next/adapter-mongo": "workspace:*",
-    "@prisma-next/middleware-telemetry": "workspace:*",
     "@prisma-next/mongo-contract-ts": "workspace:*",
     "@prisma-next/family-mongo": "workspace:*",
     "@prisma-next/mongo-query-builder": "workspace:*",

@@ -1,6 +1,6 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
+import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
@@ -28,7 +28,13 @@ export async function createClient(connectionUri: string, dbName: string) {
   const runtime = createMongoRuntime({
     context,
     driver,
-    middleware: [createTelemetryMiddleware()],
+    // Cross-family cache middleware. The package depends only on
+    // `@prisma-next/framework-components/runtime` — cache keys come from
+    // `ctx.contentHash(exec)`, which `MongoRuntimeImpl` populates the same
+    // way `SqlRuntimeImpl` does, so the middleware works against Mongo
+    // out of the box. See `scripts/cache-demo.ts` for an annotated read
+    // that exercises this end-to-end.
+    middleware: [createCacheMiddleware({ maxEntries: 1_000 })],
   });
   const orm = mongoOrm({ contract, executor: runtime });
 

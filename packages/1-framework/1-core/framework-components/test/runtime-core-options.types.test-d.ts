@@ -38,6 +38,7 @@ test('execute accepts an optional second argument carrying { signal }', () => {
       now: () => 0,
       log: { info: () => {}, warn: () => {}, error: () => {} },
       contentHash: async () => 'mock-hash',
+      scope: 'runtime',
     },
   });
   const plan: FixturePlan = { draftId: 'd', meta };
@@ -51,5 +52,8 @@ test('execute accepts an optional second argument carrying { signal }', () => {
 test('RuntimeExecutor.execute accepts options arg', () => {
   type Executor = RuntimeExecutor<FixturePlan>;
   type ExecuteParams = Parameters<Executor['execute']>;
-  expectTypeOf<ExecuteParams[1]>().toEqualTypeOf<{ readonly signal?: AbortSignal } | undefined>();
+  expectTypeOf<ExecuteParams[1]>().toEqualTypeOf<
+    | { readonly signal?: AbortSignal; readonly scope?: 'runtime' | 'connection' | 'transaction' }
+    | undefined
+  >();
 });

@@ -80,7 +80,7 @@ import { cacheAnnotation } from '@prisma-next/middleware-cache'
 // annotations; Insert/Update/DeleteQueryBuilder accepts write annotations.
 const plan = db.sql
   .from(tables.user)
-  .annotate(cacheAnnotation.apply({ ttl: 60 }))   // ✓ select builder, read annotation
+  .annotate(cacheAnnotation({ ttl: 60 }))   // ✓ select builder, read annotation
   .select({ id: tables.user.columns.id })
   .build()
 
@@ -88,12 +88,12 @@ const plan = db.sql
 // constrains the accepted annotations to the kinds applicable to it.
 const user = await db.orm.User.first(
   { id },
-  cacheAnnotation.apply({ ttl: 60 })              // ✓ read annotation on read terminal
+  cacheAnnotation({ ttl: 60 })              // ✓ read annotation on read terminal
 )
 
 const created = await db.orm.User.create(
   { email: 'a@b.com' },
-  cacheAnnotation.apply({ ttl: 60 })              // ✗ type error: write terminal rejects read-only annotation
+  cacheAnnotation({ ttl: 60 })              // ✗ type error: write terminal rejects read-only annotation
 )
 ```
 
@@ -110,13 +110,13 @@ const db = postgres<Contract, TypeMaps>({
 
 // First call: hits the database, caches raw rows.
 const a = await db.orm.User
-  .annotate(cacheAnnotation.apply({ ttl: 60 }))
+  .annotate(cacheAnnotation({ ttl: 60 }))
   .where({ active: true })
   .all()
 
 // Second call with identical plan: served from cache, driver not invoked.
 const b = await db.orm.User
-  .annotate(cacheAnnotation.apply({ ttl: 60 }))
+  .annotate(cacheAnnotation({ ttl: 60 }))
   .where({ active: true })
   .all()
 
@@ -154,7 +154,7 @@ const c = await db.orm.User.all()  // always hits DB
 
 1. **`OperationKind`.** `type OperationKind = 'read' | 'write'`. Exported from `@prisma-next/framework-components/runtime`. Read = `SELECT` / `find` / `first` / `all` / `count` / aggregates. Write = `INSERT` / `UPDATE` / `DELETE` / `create` / `update` / `delete` / `upsert`. Finer-grained kinds (`'select' | 'insert' | 'update' | 'delete' | 'upsert'`) are deferred; if an annotation appears that needs them, we widen.
 
-2. **`defineAnnotation` helper.** Exported from `@prisma-next/framework-components/runtime`. Signature: `defineAnnotation<Payload, Kinds extends OperationKind>({ namespace: string; applicableTo: readonly Kinds[] }): AnnotationHandle<Payload, Kinds>`. The returned handle exposes `namespace`, `applicableTo: ReadonlySet<Kinds>`, `apply(value)`, and `read(plan)`. Handles are the only supported public entry point for reading/writing annotations.
+2. **`defineAnnotation` helper.** Exported from `@prisma-next/framework-components/runtime`. Two-step call form: `defineAnnotation<Payload>()({ namespace: string; applicableTo: readonly Kinds[] }): AnnotationHandle<Payload, Kinds>`. The first step takes only `Payload` as an explicit type argument; the second step takes the runtime options and infers `Kinds` from the `applicableTo` array via a `const` type parameter, so the operation kinds appear once at the call site rather than being repeated in the type-argument list. (TypeScript does not support partial type-argument inference within a single call: a single-step `defineAnnotation<Payload, const Kinds>` would still require both type arguments be passed explicitly because `Payload` cannot be inferred from anywhere; currying separates the explicit-from-inferred step. The cost is one extra `()` at definition; once defined, handles are used identically.) The returned handle is **callable**: invoking `handle(value)` produces an `AnnotationValue<Payload, Kinds>` ready to pass to a lane terminal's variadic `annotations` argument. The handle also exposes `namespace`, `applicableTo: ReadonlySet<Kinds>`, and `read(plan)` as properties on the function. Handles are the only supported public entry point for reading/writing annotations. (No `.apply(...)` method — calling the handle directly is the sole construction path; this keeps user-facing call sites compact: `cacheAnnotation({ ttl: 60 })` rather than `cacheAnnotation.apply({ ttl: 60 })`.)
 
 3. **Applicability gate type.** `ValidAnnotations<K extends OperationKind, As extends readonly AnnotationValue<unknown, OperationKind>[]>` mapped tuple type that resolves each element of `As` to `never` when its declared `Kinds` does not include `K`. Lane terminals use this to constrain their variadic annotation argument.
 
@@ -162,17 +162,17 @@ const c = await db.orm.User.all()  // always hits DB
 
 5. **SQL DSL `.annotate()`.** Chainable builder method, typed per builder kind. `SelectQueryImpl` / `GroupedQueryImpl` (in `packages/2-sql/4-lanes/sql-builder/src/runtime/query-impl.ts`) accept `ValidAnnotations<'read', As>`; `InsertQueryImpl` / `UpdateQueryImpl` / `DeleteQueryImpl` (in `mutation-impl.ts`) accept `ValidAnnotations<'write', As>`. Annotations merge into `plan.meta.annotations` at `.build()` time. Multiple `.annotate()` calls compose; duplicate namespaces use last-write-wins.
 
-6. **ORM terminal-argument annotations.** Each terminal method on `Collection` (`packages/3-extensions/sql-orm-client/src/collection.ts`) accepts a variadic last argument `...annotations: ValidAnnotations<K, As>` where `K` is the terminal's operation kind. Read terminals (`first`, `find`, `all`, `take().all`, `count`, aggregate methods, `get`, `findMany`-equivalents): `K = 'read'`. Write terminals (`create`, `update`, `delete`, `upsert`, and any in-place mutation entry points): `K = 'write'`. There is **no** chainable `.annotate()` on `Collection`; this is an intentional scope cut from earlier drafts (it would have required a separate mutation-classifier in the cache middleware).
+6. **ORM terminal-argument annotations.** Each terminal method on `Collection` (`packages/3-extensions/sql-orm-client/src/collection.ts`) accepts a variadic last argument `...annotations: ValidAnnotations<K, As>` where `K` is the terminal's operation kind. Read terminals (`first`, `find`, `all`, `take().all`, `count`, aggregate methods, `get`, `findMany`-equivalents): `K = 'read'`. Write terminals (`create`, `update`, `delete`, `upsert`, and any in-place mutation entry points): `K = 'write'`. There is **no** chainable `.annotate()` on `Collection`; this is an intentional scope cut from earlier drafts (it would have required a separate mutation-classifier in the cache middleware). *(Superseded post-M2 by `api-revision-meta-callback.md`: the variadic last argument is replaced by an optional `configure: (meta: MetaBuilder<K>) => void` callback. The applicability gate `K` and its semantics carry over; see the revision spec for the call-site shape and the rationale.)*
 
 7. **Runtime applicability check at the lane.** Each lane terminal walks its variadic `annotations` array and rejects any whose `applicableTo` set does not include the terminal's operation kind, throwing a clear `runtimeError` (e.g. `RUNTIME.ANNOTATION_INAPPLICABLE`) naming the annotation namespace and the terminal. The runtime check is belt-and-suspenders: the type system fails closed for type-aware callers, and the runtime check fails closed for casts / `any` / dynamic invocations.
 
-8. **Type safety.** `defineAnnotation<Payload, Kinds>` preserves `Payload` and `Kinds` across `apply` and `read`. Reading an absent annotation returns `undefined`. No `any` or unchecked casts in the public surface.
+8. **Type safety.** `defineAnnotation<Payload, Kinds>` preserves `Payload` and `Kinds` across the handle's call signature and `read`. Reading an absent annotation returns `undefined`. No `any` or unchecked casts in the public surface.
 
 ### Cache middleware (`@prisma-next/middleware-cache`, new package)
 
-1. **Opt-in by annotation.** `cacheAnnotation = defineAnnotation<CachePayload, 'read'>({ namespace: 'cache', applicableTo: ['read'] })`. Payload: `{ ttl?: number; skip?: boolean; key?: string }`. A query without `cacheAnnotation`, or with `skip: true`, or without a `ttl`, passes through untouched. Because `cacheAnnotation` declares `applicableTo: ['read']`, the lane gate (type-level + runtime) rejects passing it to a write terminal — there is no in-middleware mutation guard.
+1. **Opt-in by annotation.** `cacheAnnotation = defineAnnotation<CachePayload>()({ namespace: 'cache', applicableTo: ['read'] })` (`Kinds` inferred as `'read'`). Payload: `{ ttl?: number; skip?: boolean; key?: string }`. A query without `cacheAnnotation`, or with `skip: true`, or without a `ttl`, passes through untouched. Because `cacheAnnotation` declares `applicableTo: ['read']`, the lane gate (type-level + runtime) rejects passing it to a write terminal — there is no in-middleware mutation guard.
 
-2. **Cache key resolution.** Two-tier priority: per-query `cacheAnnotation.apply({ key })` overrides everything; otherwise `ctx.contentHash(exec)` from the family runtime. The cache middleware itself never reads `exec.sql`, `exec.command`, or any other family-specific field — it depends only on `@prisma-next/framework-components/runtime`.
+2. **Cache key resolution.** Two-tier priority: per-query `cacheAnnotation({ key })` overrides everything; otherwise `ctx.contentHash(exec)` from the family runtime. The cache middleware itself never reads `exec.sql`, `exec.command`, or any other family-specific field — it depends only on `@prisma-next/framework-components/runtime`.
 
 3. **Cache hit path.** On lookup hit, `intercept` returns the cached raw rows. The SQL runtime decodes them through its normal codec pass (which wraps the orchestrator output). `afterExecute` observes `source: 'middleware'`.
 
@@ -215,7 +215,7 @@ const c = await db.orm.User.all()  // always hits DB
 - **`ctx.state` per-query scratch space.** Not needed for the cache middleware; not added opportunistically. Middleware that need correlation use per-instance `WeakMap<TExec, …>` keyed on plan identity.
 - **Middleware ordering metadata (`dependsOn`, `conflictsWith`).** Registration order remains the sole source of truth.
 - **Cache invalidation strategies beyond TTL and storage-hash keying.** No event-based invalidation, no tag-based invalidation, no `db.orm.User.invalidate()`. Deferred to May.
-- **Chainable ORM `.annotate()`.** Annotations attach via the variadic last argument on terminal methods only. The original draft proposed a chainable `Collection.annotate()`; that was dropped because it forced an in-middleware mutation guard and fought the applicability-gate design. May reconsider if a real ergonomic problem surfaces.
+- **Chainable ORM `.annotate()`.** Annotations attach via the variadic last argument on terminal methods only. The original draft proposed a chainable `Collection.annotate()`; that was dropped because it forced an in-middleware mutation guard and fought the applicability-gate design. May reconsider if a real ergonomic problem surfaces. *(Update: a real ergonomic problem did surface — variadic-on-terminal forecloses on adding any future per-call options. The replacement is not a chainable `Collection.annotate()` but a meta-callback configurator: `db.orm.User.find({ id }, (meta) => meta.annotate(cacheAnnotation({ ttl })))`. See `api-revision-meta-callback.md` for the delta spec. The "no chainable on `Collection`" cut still holds — the chainable would have lived on `Collection`; the configurator lives on a `MetaBuilder<K>` constructed by the terminal.)*
 - **Finer-grained `OperationKind`.** `'read' | 'write'` for April. No `'select' | 'insert' | 'update' | 'delete' | 'upsert'`, no per-aggregate distinctions. Widening is additive — handles already accept a `Kinds` set, so a future split keeps existing handles compiling.
 - **`contentHash` API surface beyond what the cache middleware needs.** The method returns `Promise<string>` (resolving to a `sha512:HEX128` digest). No structured (`{statement, params}`) shape and no batch variant. Future content-hash-keyed middleware (request coalescing, single-flight) consume the same string.
 - **Annotation validation at contract-emit time.** Annotations are runtime metadata only; they do not affect the Contract or its hashes.
@@ -243,7 +243,7 @@ const c = await db.orm.User.all()  // always hits DB
 ## Annotation surface
 
 - [ ] `OperationKind` exported from `@prisma-next/framework-components/runtime` as `'read' | 'write'` (type test).
-- [ ] `defineAnnotation<Payload, Kinds>({ namespace, applicableTo })` exists in `@prisma-next/framework-components/runtime`, typed as described.
+- [ ] `defineAnnotation<Payload>()({ namespace, applicableTo })` exists in `@prisma-next/framework-components/runtime`, typed as described (curried; `Kinds` inferred from `applicableTo` via a `const` type parameter on the inner call).
 - [ ] `read` returns `Payload | undefined` with full type preservation (type-level test).
 - [ ] Handle exposes `applicableTo: ReadonlySet<Kinds>` for runtime checks (unit test).
 - [ ] Two handles with different namespaces do not interfere (unit test).
@@ -252,9 +252,9 @@ const c = await db.orm.User.all()  // always hits DB
 - [ ] SQL DSL `InsertQueryImpl.annotate(...)` accepts a write-only annotation; the same call against `SelectQueryImpl` fails to compile (type test).
 - [ ] SQL DSL `.annotate(...)` merges into `plan.meta.annotations[namespace]` at `.build()` time across all five builder kinds (unit test).
 - [ ] Multiple `.annotate()` calls compose; duplicate namespace = last-write-wins (unit test).
-- [ ] ORM read-terminal call `db.User.first(where, cacheAnnotation.apply({ ttl: 60 }))` typechecks; `db.User.create(input, cacheAnnotation.apply({ ttl: 60 }))` does not (type test, both directions).
+- [ ] ORM read-terminal call `db.User.first(where, cacheAnnotation({ ttl: 60 }))` typechecks; `db.User.create(input, cacheAnnotation({ ttl: 60 }))` does not (type test, both directions).
 - [ ] ORM write-only annotation accepted on `create` / `update` / `delete` / `upsert`; rejected on `first` / `find` / `all` / `count` (type test).
-- [ ] Annotations applicable to both kinds (e.g. `defineAnnotation<P, 'read' | 'write'>(...)`) accepted on every terminal (type test).
+- [ ] Annotations applicable to both kinds (e.g. `defineAnnotation<P>()({ namespace, applicableTo: ['read', 'write'] })`) accepted on every terminal (type test).
 - [ ] An annotated ORM read produces a `SqlQueryPlan` whose `meta.annotations[namespace]` carries the payload (integration test).
 - [ ] An annotated SQL DSL query produces a `SqlQueryPlan` whose `meta.annotations[namespace]` carries the payload (integration test).
 - [ ] Lane runtime check rejects an annotation whose `applicableTo` set does not include the terminal's kind, with `RUNTIME.ANNOTATION_INAPPLICABLE` naming the annotation and terminal (unit test, exercised via cast bypass of the type gate).
@@ -265,7 +265,7 @@ const c = await db.orm.User.all()  // always hits DB
 - [ ] `@prisma-next/middleware-cache` package exists under `packages/3-extensions/`, following the layering conventions validated by `pnpm lint:deps`.
 - [ ] `cacheAnnotation` handle is exported; payload shape matches the spec.
 - [ ] `CacheStore` interface is exported; default in-memory LRU implementation is exported.
-- [ ] `createCacheMiddleware(options)` returns a cross-family `RuntimeMiddleware` with `intercept` / `onRow` / `afterExecute` wired. The middleware reads cache keys from `ctx.contentHash(exec)` (or `cacheAnnotation.apply({ key })` when supplied per-query). The package depends only on `@prisma-next/framework-components/runtime` — no SQL or Mongo runtime dependency.
+- [ ] `createCacheMiddleware(options)` returns a cross-family `RuntimeMiddleware` with `intercept` / `onRow` / `afterExecute` wired. The middleware reads cache keys from `ctx.contentHash(exec)` (or `cacheAnnotation({ key })` when supplied per-query). The package depends only on `@prisma-next/framework-components/runtime` — no SQL or Mongo runtime dependency.
 - [ ] Un-annotated queries are never cached (unit test).
 - [ ] Queries with `skip: true` are never cached (unit test).
 - [ ] Queries with no `ttl` are never cached (unit test).
