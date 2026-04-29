@@ -44,6 +44,17 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   version: pgvectorPackMeta.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
+  // Mirror `pgvectorPackMeta.types.codecTypes.codecInstances` here so that
+  // runtime-plane assemblers driven by `extractCodecLookup` (which reads
+  // `descriptor.types?.codecTypes?.codecInstances`) discover `pg/vector@1`.
+  // Without this, the Postgres adapter's runtime-plane codec lookup misses
+  // the vector codec and `$N::vector` would silently disappear once the
+  // renderer switches to lookup-driven cast policy.
+  types: {
+    codecTypes: {
+      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+    },
+  },
   codecs: createPgvectorCodecRegistry,
   queryOperations: () => pgvectorQueryOperations(),
   parameterizedCodecs: () => parameterizedCodecDescriptors,
