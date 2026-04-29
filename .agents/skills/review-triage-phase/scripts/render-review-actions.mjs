@@ -70,7 +70,7 @@ function parseCliArgs(argv) {
   if (result.inPath === '-') {
     throw { code: EXIT_CLI, message: 'error: --in - is not supported' };
   }
-  if (result.inPath !== '-' && !result.inPath.endsWith('.json')) {
+  if (!result.inPath.endsWith('.json')) {
     throw { code: EXIT_CLI, message: 'error: --in file path must end with .json' };
   }
   if (result.outPath !== null && result.outPath !== '-' && !result.outPath.endsWith('.md')) {
@@ -154,7 +154,7 @@ export function renderReviewActionsMarkdown(payload, { sourcePath }) {
         target,
         escapeTableCell(link),
         escapeTableCell(summary || '(pending triage)'),
-        escapeTableCell(targetFiles),
+        targetFiles,
         escapeTableCell(acceptance || ''),
         escapeTableCell(status),
       ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'),
