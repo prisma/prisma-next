@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "skills": {
+    "drive-create-plan": {
+      "source": "prisma/ignite",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/drive-create-plan/SKILL.md",
+      "computedHash": "f1194ee30c6d7c518ca2bd9b674bf03ff2f3050620258679f1694c04eb2960da"
+    },
+    "drive-orchestrate-plan": {
+      "source": "prisma/ignite",
+      "sourceType": "github",
+      "skillPath": "skills/.experimental/drive-orchestrate-plan/SKILL.md",
+      "computedHash": "59f8882efac3f170c31287ff261c960bada4f56f0c0d94d872bf354c1e89987f"
+    },
+    "drive-pr-description": {
+      "source": "prisma/ignite",
+      "sourceType": "github",
+      "skillPath": "skills/.curated/drive-pr-description/SKILL.md",
+      "computedHash": "b8870bee3069b1e8adc286cf62ccb847d25ee0981a3fdf78b1a49b41aed176fe"
+    }
+  }
+}
