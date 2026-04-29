@@ -20,15 +20,7 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 
 ## Cursor Cloud Agents
 
-When the Cursor Cloud Agent VM boots, [`.cursor/environment.json`](.cursor/environment.json) clones the [Prisma Ignite](https://github.com/prisma/ignite) repo to a known location so its skills and cross-cutting docs are available on every instance:
-
-- **Path:** `$HOME/ignite` (i.e. `~/ignite`)
-- Skills/scripts that need Ignite content should resolve it in this order:
-  1. `$IGNITE_REPO` if set
-  2. `$HOME/ignite` (cloud agent default)
-  3. `$HOME/Projects/prisma/ignite` (common local checkout)
-
-Locally, clone Ignite yourself to one of the paths above (or export `IGNITE_REPO`). Skills should never assume Ignite is a sibling of this workspace.
+`.cursor/environment.json` clones Prisma Ignite to `$HOME/ignite` on cloud-agent boot. Skills should resolve Ignite as: `$IGNITE_REPO`, then `$HOME/ignite`, then `$HOME/Projects/prisma/ignite`. Do not assume Ignite is a workspace sibling.
 
 ## Project Overview
 
