@@ -34,7 +34,7 @@ I will halt and leave the branch in a recoverable state if:
 
 ## Entry format
 
-```
+```markdown
 ### N. <Decision title — what was decided, in plain language>
 
 **Context.** One paragraph. What was happening in the project when this decision came up. Reference files, symbols, behaviors — never finding IDs (`F17`), action IDs (`A02a`), round labels as the trigger (`Milestone 5 R2 triage`), or pointers into review artifacts that may not survive close-out. The reader should understand the situation without consulting any other document.
