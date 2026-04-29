@@ -6,8 +6,8 @@
  * codec the curried factory returns at runtime so the emit and no-emit
  * paths stay structurally aligned.
  *
- * The output type is intentionally `unknown` here — the precise inference
- * is column-site-local (the no-emit `FieldOutputType` resolver reads the
+ * The output type is intentionally `unknown` — the precise inference is
+ * column-site-local (the no-emit `FieldOutputType` resolver reads the
  * factory's return type from the column descriptor's `type` slot, which
  * carries `(ctx) => Codec<…, S['infer']>`). The emit path renders the
  * descriptor's `expression` as the column's TS type (per the descriptor's

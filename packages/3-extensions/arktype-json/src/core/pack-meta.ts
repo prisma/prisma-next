@@ -30,7 +30,7 @@ const arktypeJsonPackMetaBase = {
       // `codecInstances` array stays empty.
       codecInstances: [] as const,
       import: {
-        package: '@prisma-next/extension-arktype-json/codecs',
+        package: '@prisma-next/extension-arktype-json/codec-types',
         named: 'CodecTypes',
         alias: 'ArktypeJsonTypes',
       },

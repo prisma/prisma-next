@@ -36,6 +36,7 @@
     "src"
   ],
   "exports": {
+    "./codec-types": "./dist/codec-types.mjs",
     "./codecs": "./dist/codecs.mjs",
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",

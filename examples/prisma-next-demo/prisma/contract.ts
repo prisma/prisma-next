@@ -1,3 +1,4 @@
+import type {} from '@prisma-next/extension-arktype-json/codec-types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
 import pgvector from '@prisma-next/extension-pgvector/pack';
