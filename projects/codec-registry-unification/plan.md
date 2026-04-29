@@ -7,11 +7,35 @@
 - **Phase 1 — pgvector file consolidation.** ✅ Landed at `161f7f1c4`. SATISFIED.
 - **Phase 2 — emit-path typeRef bug fix.** ✅ Landed at `ee82929f3` + `e94962675`. SATISFIED.
 - **Phase 3 — `ContractCodecRegistry.forColumn` dispatch interface.** ✅ Substantive landed at `245c8610c` + `8a9311c93` + `ba07ad166`. SATISFIED with deferred T3.4 (the deferred deletion is what Phase 3.5 does).
-- **Phase 3.5 — unified `CodecDescriptor` migration.** Pending (this is where the design decision recorded in spec.md lands).
+- **Phase 3.5a — read-surface unification.** ✅ Landed at `637c8ccc0` + `fde001888` + `d4a37e4b7` + `8b8099f58`. SATISFIED with **8 tasks deferred to TML-2357** (mechanical-but-voluminous registration-side migration). The read surface is non-branching (`descriptorFor`, `forColumn`); the registration model still ships codec instances through the legacy `codecs:` slot and auto-lifts via the synthesis bridge.
 - **Phase 4 — `@prisma-next/extension-arktype-json` extension.** Pending.
 - **Phase 5 — ADR 205 update + close-out.** Pending.
 
-## Phase 3.5 — Unified `CodecDescriptor` migration
+## Phase 3.5a — Read-surface unification (LANDED; partial)
+
+The substantive deliverable: **codec-id-keyed metadata reads stop branching on whether the codec is parameterized.** A unified descriptor map is built at context-construction; non-parameterized codecs auto-lift into descriptors via a synthesis bridge. `descriptorFor(codecId)` and `forColumn(table, column)` both resolve through this single map.
+
+### What landed (4 commits)
+
+- **T3.5.1** — `CodecDescriptor<P = void>` defined in `@prisma-next/framework-components/codec`.
+- **T3.5.5** — Descriptor map built at context-construction. `synthesizeNonParameterizedDescriptor` bridges legacy codec instances into descriptors.
+- **T3.5.6** — `ContractCodecRegistry.forColumn` resolves through the unified descriptor map.
+- **T3.5.7** — sql-orm-client metadata reads (`traitsOf`, `values`, `getByScalar`, `getDefaultCodec`) consult `descriptorFor(codecId)` non-branching.
+- **T3.5.8** — `validateCodecRegistryCompleteness` consults the descriptor map.
+- **T3.5.14** — Tests cover both the parameterized and non-parameterized read paths.
+
+### What deferred to TML-2357
+
+- **T3.5.2** — Narrow the runtime `Codec` instance type (remove `id`, `traits`, `targetTypes`, `meta`).
+- **T3.5.3** — Migrate every codec to ship a native descriptor (~50 codecs across postgres / sqlite / sql-family / mongo / pgvector). The `aliasCodec` pattern needs structural rework.
+- **T3.5.4** — Delete `parameterizedCodecs:` slot; delete the synthesis bridge; contributors ship descriptors directly.
+- **T3.5.9 / T3.5.10 / T3.5.11** — `ParamRef.refs` plumbing through 7 production `ParamRef.of()` sites; encode-side `forColumn` dispatch via column refs.
+- **T3.5.12** — Delete `JsonSchemaValidatorRegistry`; move validation into resolved codec's `decode` body.
+- **T3.5.13** — Delete `pgVectorRepresentativeCodec` (blocked on T3.5.9-11).
+
+These deferrals are tracked under [TML-2357](https://linear.app/prisma-company/issue/TML-2357). The work is mechanical-but-voluminous and is the right shape for a separate PR series, not a single phase.
+
+## Phase 3.5 — Unified `CodecDescriptor` migration (HISTORICAL — superseded by 3.5a + TML-2357)
 
 **Goal**: Subsume `ParameterizedCodecDescriptor` and the legacy `Codec`-as-registration-record model under a single `CodecDescriptor<P = void>` type. Migrate every codec in every contributor package. Eliminate the parameterized/non-parameterized branching from every read site. Delete the `JsonSchemaValidatorRegistry` workaround.
 

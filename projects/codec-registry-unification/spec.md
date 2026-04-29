@@ -89,13 +89,11 @@ What this case pins:
 
 - The unified `CodecDescriptor<P = void>` type exists in `@prisma-next/framework-components/codec`.
 - `ParameterizedCodecDescriptor` is renamed or aliased to `CodecDescriptor`; its previous shape is preserved as a special case (parameterized).
-- Every codec in every adapter and extension package (postgres, sqlite, mongo, pgvector, the new arktype-json extension) ships a descriptor. No raw `Codec` object is registered through any contributor slot.
+- **Deferred to TML-2357**: every codec in every adapter and extension package ships a native descriptor (no synthesis bridge). This project ships the synthesis bridge (`synthesizeNonParameterizedDescriptor`) as the read-surface unification; the registration-side migration is mechanical-but-voluminous and lands separately.
 
 ### AC-2. Single registration slot
 
-- `SqlStaticContributions.codecs` and the analogous Mongo / framework slots return `ReadonlyArray<CodecDescriptor>`.
-- The `parameterizedCodecs` slot deletes.
-- The `codecs: () => CodecRegistry` shape (returning the legacy registry) is gone from contributor protocols.
+- **Deferred to TML-2357**: `SqlStaticContributions.codecs` returns `ReadonlyArray<CodecDescriptor>`; `parameterizedCodecs:` slot deletes; legacy `codecs: () => CodecRegistry` shape gone from contributor protocols. Depends on AC-1's native descriptor migration.
 
 ### AC-3. Descriptor map is the codec-id-keyed source of truth
 
@@ -167,6 +165,7 @@ Branched from `tml-2229-no-emit-path-restore-parameterized-output-types-in` dire
 
 ## Forward-looking work captured but out of scope
 
+- **TML-2357** — Complete the unified `CodecDescriptor` migration. Tracks the deferred Phase 3.5b work: narrow the runtime `Codec` instance type (T3.5.2), migrate every codec to a native descriptor (T3.5.3), delete the synthesis bridge and the `parameterizedCodecs:` slot (T3.5.4), thread `ParamRef.refs` through column-bound construction sites (T3.5.9-11), delete `pgVectorRepresentativeCodec` (T3.5.13), delete the `JsonSchemaValidatorRegistry` workaround (T3.5.12). ACs 1, 2, 5, 6 from this spec land under TML-2357 rather than under this project.
 - Future schema libraries (zod, valibot) ship as parallel extensions when each has a clean serialize/rehydrate story.
 - Mongo runtime's `forColumn` plumbing if Mongo gains more parameterized codecs.
 - TML-2330 (KMS dispatch concurrency) addressed under its own ticket.
