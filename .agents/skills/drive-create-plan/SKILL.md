@@ -228,9 +228,9 @@ If the engineer accepts:
 
 Linear is an observability mechanism for execution health. If the plan changes after Linear has been created (re-sequencing tasks, splitting work, new constraints), keep Linear in sync:
 
-- Update the Linear project using `save_project` (use `id` to update) to reflect the latest summary and to link to the current spec/plan paths.
-- Update milestones using `save_milestone` (use `id` to update) if milestone names/descriptions/order change.
-- Update issues using `update_issue` as tasks change (title/description/milestone/project). Move issues into in-progress / in-review states during execution if it helps visibility, but **don't manually transition issues to a completed state** — that happens automatically when the linked PR merges, provided the PR or branch references the issue identifier.
+- Use `save_project` (with `id` to update) to refresh the Linear project's summary and link it to the current spec/plan paths.
+- When milestone names, descriptions, or ordering change, apply the change via `save_milestone` (with `id` to update).
+- For task-level changes, call `update_issue` to keep title/description/milestone/project in sync. Move issues into in-progress / in-review states during execution if it helps visibility, but **don't manually transition issues to a completed state** — that happens automatically when the linked PR merges, provided the PR or branch references the issue identifier.
 
 ## Plan Template
 
