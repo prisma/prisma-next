@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { CodecRegistry } from './ast/codec-types';
+import type { CodecRegistry, ContractCodecRegistry } from './ast/codec-types';
 
 /**
  * Registry of initialized type helpers from storage.types.
@@ -73,7 +73,23 @@ export type MutationDefaultsOptions = {
  */
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
+  /**
+   * Codec registry indexed by codec id. Source of shared, non-parameterized
+   * codec instances; also used by the SQL builder and ORM client for codec-
+   * level metadata (traits, scalar mapping, iteration).
+   */
   readonly codecs: CodecRegistry;
+  /**
+   * Contract-bound codec registry built once at context-construction time
+   * by walking the contract's columns and resolving each to its per-instance
+   * codec (parameterized columns) or the shared codec from the legacy
+   * registry (non-parameterized columns). The dispatch path
+   * (`encodeParam` / `decodeRow`) consults `forColumn(table, column)` when
+   * the call site has the ref, falling back to `forCodecId(codecId)`
+   * otherwise. See ADR 205 + Phase 3 of the codec-registry-unification
+   * project.
+   */
+  readonly contractCodecs: ContractCodecRegistry;
   readonly queryOperations: SqlOperationRegistry;
   /**
    * Type helper registry for parameterized types.

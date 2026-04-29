@@ -2,7 +2,7 @@ import type { Contract, ExecutionPlan, ParamDescriptor } from '@prisma-next/cont
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { CodecRegistry, ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   JsonSchemaValidateFn,
@@ -271,6 +271,18 @@ function createTestPlan(overrides?: Partial<ExecutionPlan>): ExecutionPlan {
   };
 }
 
+// Wraps a `CodecRegistry` as a `ContractCodecRegistry` for tests that only
+// exercise codec-id-keyed dispatch (no per-instance state, no `(table,
+// column)`-aware lookups). The dispatch interface is unified at Phase 3,
+// but the encode-side path of these tests exercises the codec-id fallback,
+// not the column-aware lookup.
+function asContractCodecRegistry(registry: CodecRegistry): ContractCodecRegistry {
+  return {
+    forColumn: () => undefined,
+    forCodecId: (id) => registry.get(id),
+  };
+}
+
 // =============================================================================
 // Tests: Validator Registry via createExecutionContext
 // =============================================================================
@@ -379,7 +391,7 @@ describe('JSON Schema validator registry', () => {
 // =============================================================================
 
 describe('JSON Schema encoding validation', () => {
-  const codecRegistry = createTestCodecRegistry();
+  const codecRegistry = asContractCodecRegistry(createTestCodecRegistry());
 
   it('encodes JSON values via codec', () => {
     const plan = createTestPlan({
@@ -428,7 +440,7 @@ describe('JSON Schema encoding validation', () => {
 // =============================================================================
 
 describe('JSON Schema decoding validation', () => {
-  const codecRegistry = createTestCodecRegistry();
+  const codecRegistry = asContractCodecRegistry(createTestCodecRegistry());
 
   it('passes valid decoded JSON values', () => {
     const plan = createTestPlan({

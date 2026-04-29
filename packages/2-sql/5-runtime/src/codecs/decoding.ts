@@ -1,35 +1,10 @@
 import type { ExecutionPlan } from '@prisma-next/contract/types';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, ContractCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
 
-function resolveRowCodec(
-  alias: string,
-  plan: ExecutionPlan,
-  registry: CodecRegistry,
-): Codec | null {
-  const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
-  if (planCodecId) {
-    const codec = registry.get(planCodecId);
-    if (codec) {
-      return codec;
-    }
-  }
-
-  if (plan.meta.projectionTypes) {
-    const typeId = plan.meta.projectionTypes[alias];
-    if (typeId) {
-      const codec = registry.get(typeId);
-      if (codec) {
-        return codec;
-      }
-    }
-  }
-
-  return null;
-}
-
-type ColumnRefIndex = Map<string, { table: string; column: string }>;
+type ColumnRef = { table: string; column: string };
+type ColumnRefIndex = Map<string, ColumnRef>;
 
 /**
  * Builds a lookup index from column name → { table, column } ref.
@@ -46,7 +21,7 @@ function buildColumnRefIndex(plan: ExecutionPlan): ColumnRefIndex | null {
   return index;
 }
 
-function parseProjectionRef(value: string): { table: string; column: string } | null {
+function parseProjectionRef(value: string): ColumnRef | null {
   if (value.startsWith('include:') || value.startsWith('operation:')) {
     return null;
   }
@@ -66,7 +41,7 @@ function resolveColumnRefForAlias(
   alias: string,
   projection: ExecutionPlan['meta']['projection'],
   fallbackColumnRefIndex: ColumnRefIndex | null,
-): { table: string; column: string } | undefined {
+): ColumnRef | undefined {
   if (projection && !Array.isArray(projection)) {
     const mappedRef = (projection as Record<string, string>)[alias];
     if (typeof mappedRef !== 'string') {
@@ -78,18 +53,64 @@ function resolveColumnRefForAlias(
   return fallbackColumnRefIndex?.get(alias);
 }
 
+function resolveRowCodec(
+  alias: string,
+  plan: ExecutionPlan,
+  registry: ContractCodecRegistry,
+  ref: ColumnRef | undefined,
+): Codec | null {
+  // Prefer the column-aware lookup so parameterized columns dispatch through
+  // their per-instance codec. For typeRef columns the registry returns the
+  // shared per-instance codec the named storage type materialized; for
+  // inline-typeParams columns it returns the per-instance codec the
+  // descriptor's factory built; for non-parameterized columns it returns
+  // the shared codec from the legacy registry. See ADR 205 + Phase 3 of
+  // the codec-registry-unification project.
+  if (ref) {
+    const codec = registry.forColumn(ref.table, ref.column);
+    if (codec) {
+      return codec;
+    }
+  }
+
+  // Fallback for plans that carry only a codec-id annotation on the alias
+  // (e.g. operation outputs, raw queries, projections that don't map back
+  // to a column). Equivalent to the pre-Phase-3 dispatch.
+  const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
+  if (planCodecId) {
+    const codec = registry.forCodecId(planCodecId);
+    if (codec) {
+      return codec;
+    }
+  }
+
+  if (plan.meta.projectionTypes) {
+    const typeId = plan.meta.projectionTypes[alias];
+    if (typeId) {
+      const codec = registry.forCodecId(typeId);
+      if (codec) {
+        return codec;
+      }
+    }
+  }
+
+  return null;
+}
+
 export function decodeRow(
   row: Record<string, unknown>,
   plan: ExecutionPlan,
-  registry: CodecRegistry,
+  registry: ContractCodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Record<string, unknown> {
   const decoded: Record<string, unknown> = {};
   const projection = plan.meta.projection;
 
-  // Fallback for plans that do not provide projection alias -> table.column mapping.
+  // The column ref index is needed both for column-aware codec lookup
+  // (`forColumn`) and for the JSON-validator key. Build it once per row
+  // so the lookup is O(1) per alias.
   const fallbackColumnRefIndex =
-    jsonValidators && (!projection || Array.isArray(projection)) ? buildColumnRefIndex(plan) : null;
+    !projection || Array.isArray(projection) ? buildColumnRefIndex(plan) : null;
 
   let aliases: readonly string[];
   if (projection && !Array.isArray(projection)) {
@@ -158,7 +179,8 @@ export function decodeRow(
       continue;
     }
 
-    const codec = resolveRowCodec(alias, plan, registry);
+    const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
+    const codec = resolveRowCodec(alias, plan, registry, ref);
 
     if (!codec) {
       decoded[alias] = wireValue;
@@ -169,18 +191,8 @@ export function decodeRow(
       const decodedValue = codec.decode(wireValue);
 
       // Validate decoded JSON value against schema
-      if (jsonValidators) {
-        const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
-        if (ref) {
-          validateJsonValue(
-            jsonValidators,
-            ref.table,
-            ref.column,
-            decodedValue,
-            'decode',
-            codec.id,
-          );
-        }
+      if (jsonValidators && ref) {
+        validateJsonValue(jsonValidators, ref.table, ref.column, decodedValue, 'decode', codec.id);
       }
 
       decoded[alias] = decodedValue;

@@ -66,6 +66,51 @@ export interface CodecRegistry {
 }
 
 /**
+ * Contract-bound codec registry.
+ *
+ * The dispatch interface for encode/decode at runtime: pre-built once at
+ * `ExecutionContext` construction time by walking the contract's
+ * `storage.tables[].columns[]` and resolving each column to either a per-
+ * instance parameterized codec (via `descriptor.factory(typeParams)(ctx)`,
+ * for columns whose codec is parameterized) or the shared codec instance
+ * from the legacy `CodecRegistry` (for non-parameterized codecs). The
+ * dispatch path calls `forColumn(table, column).encode/decode(...)` and
+ * doesn't know whether the codec is parameterized.
+ *
+ * `forCodecId(codecId)` is a fallback for sites that don't carry the
+ * `(table, column)` ref through to the encode/decode call site — primarily
+ * the param-encoding path, where `ParamDescriptor.refs` is not populated by
+ * the SQL builder today (every `ParamRef` carries `codecId` but not the
+ * column it relates to). For the parameterized codecs shipped at Phase 3,
+ * encode is per-instance-stateless (pgvector formats `[v1,v2,v3]`
+ * regardless of length; JSON's `encode` is `JSON.stringify` regardless of
+ * schema), so a codec-id-keyed lookup yields a structurally equivalent
+ * encoder; the fallback is the bridge that lets the legacy `codecs:`
+ * registration retire from the dispatch path while staying as the
+ * codec-id-only source for now. See ADR 205 and Phase 3 of the
+ * codec-registry-unification project.
+ */
+export interface ContractCodecRegistry {
+  /**
+   * Resolve the codec for `(table, column)`. Returns the per-instance
+   * parameterized codec for parameterized columns, the shared codec for
+   * non-parameterized columns, or `undefined` if the column is unknown
+   * or the codec isn't registered.
+   */
+  forColumn(table: string, column: string): Codec | undefined;
+
+  /**
+   * Resolve a codec by id. Returns the same codec instance the legacy
+   * `CodecRegistry.get(codecId)` would return — for non-parameterized
+   * codecs that's the shared instance; for parameterized codecs that's
+   * the registration the descriptor's `factory` produces with a
+   * representative ctx. Used by sites that don't carry `(table, column)`
+   * through to the encode/decode call site.
+   */
+  forCodecId(codecId: string): Codec | undefined;
+}
+
+/**
  * Implementation of CodecRegistry.
  */
 class CodecRegistryImpl implements CodecRegistry {

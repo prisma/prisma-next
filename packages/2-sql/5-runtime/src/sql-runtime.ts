@@ -19,6 +19,7 @@ import type {
   Adapter,
   AnyQueryAst,
   CodecRegistry,
+  ContractCodecRegistry,
   LoweredStatement,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
@@ -100,6 +101,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly contract: TContract;
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
   private readonly codecRegistry: CodecRegistry;
+  private readonly contractCodecs: ContractCodecRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
 
@@ -108,6 +110,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.contract = context.contract;
     this.adapter = adapter;
     this.codecRegistry = context.codecs;
+    this.contractCodecs = context.contractCodecs;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
 
@@ -161,7 +164,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const iterator = async function* (
       self: SqlRuntimeImpl<TContract>,
     ): AsyncGenerator<Row, void, unknown> {
-      const encodedParams = encodeParams(executablePlan, self.codecRegistry);
+      const encodedParams = encodeParams(executablePlan, self.contractCodecs);
       const planWithEncodedParams: ExecutionPlan<Row> = {
         ...executablePlan,
         params: encodedParams,
@@ -173,7 +176,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         const decodedRow = decodeRow(
           rawRow as Record<string, unknown>,
           executablePlan,
-          self.codecRegistry,
+          self.contractCodecs,
           self.jsonSchemaValidators,
         );
         yield decodedRow as Row;

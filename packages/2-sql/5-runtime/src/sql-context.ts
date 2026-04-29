@@ -23,7 +23,9 @@ import {
 import type {
   Adapter,
   AnyQueryAst,
+  Codec,
   CodecRegistry,
+  ContractCodecRegistry,
   LoweredStatement,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
@@ -348,65 +350,107 @@ function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined 
 }
 
 /**
- * Builds a registry of compiled JSON Schema validators by scanning the contract
- * for columns whose codec descriptor's curried factory yields a Codec instance with
- * a `validate` JSON-schema hook. Replaces the pre-M1 `init` consultation: per the
- * spec's "the factory IS what `init` was", per-instance state now lives on the
- * Codec the factory returns.
+ * Walk the contract's `storage.tables[].columns[]` and resolve each column to
+ * a `Codec` — the per-instance parameterized codec for parameterized columns
+ * (via `descriptor.factory(typeParams)(ctx)` for inline-typeParams columns;
+ * via `types[ref]` for typeRef columns), or the shared codec from the legacy
+ * `CodecRegistry` for non-parameterized columns. Index by `${table}.${column}`.
  *
- * Handles both:
- * - `typeRef` → `storage.types[ref]` with the resolved codec already in `types`.
- * - Inline `typeParams` on columns → call `factory(typeParams)(ctx)` once and read
- *   `validate` off the returned codec.
+ * Combines what `initializeTypeHelpers` (named-instance walk) and
+ * `buildJsonSchemaValidatorRegistry` (per-column walk) used to do separately:
+ * one walk over all columns, one resolved codec per column, one trait-gated
+ * validator extraction per column. The result drives both the dispatch
+ * registry (`ContractCodecRegistry.forColumn`) and the validator registry.
+ *
+ * The returned object exposes:
+ * - `forColumn`/`forCodecId` for the dispatch registry.
+ * - `jsonValidators` for the JSON-schema validator registry (derived from
+ *   the same per-column resolved codecs via the `'json-validator'` trait).
  */
-function buildJsonSchemaValidatorRegistry(
+function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
+  codecRegistry: CodecRegistry,
   types: TypeHelperRegistry,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
-): JsonSchemaValidatorRegistry | undefined {
+): {
+  readonly registry: ContractCodecRegistry;
+  readonly jsonValidators: JsonSchemaValidatorRegistry | undefined;
+} {
+  const byColumn = new Map<string, Codec>();
   const validators = new Map<string, JsonSchemaValidateFn>();
-
-  if (codecDescriptors.size === 0) {
-    return undefined;
-  }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
+      const columnKey = `${tableName}.${columnName}`;
       const descriptor = codecDescriptors.get(column.codecId);
-      if (!descriptor) continue;
 
-      const key = `${tableName}.${columnName}`;
+      let resolvedCodec: Codec | undefined;
 
-      if (column.typeRef) {
-        const validate = extractValidator(types[column.typeRef]);
-        if (validate) {
-          validators.set(key, validate);
+      if (descriptor) {
+        if (column.typeRef) {
+          // The named instance was already materialized once by
+          // `initializeTypeHelpers`; reuse it so multiple columns sharing
+          // the same typeRef share one codec instance (and any per-instance
+          // helper state on it).
+          const helper = types[column.typeRef];
+          // The TypeHelperRegistry stores either the resolved Codec or, when
+          // no descriptor matched the named instance, the StorageTypeInstance
+          // verbatim. The Codec branch is identified by its `id` field.
+          if (helper && typeof helper === 'object' && 'id' in helper && 'decode' in helper) {
+            resolvedCodec = helper as Codec;
+          }
+        } else if (column.typeParams) {
+          const validatedParams = validateTypeParams(column.typeParams, descriptor, {
+            tableName,
+            columnName,
+          });
+          resolvedCodec = descriptor.factory(validatedParams)({
+            name: `<anon:${tableName}.${columnName}>`,
+            usedAt: [{ table: tableName, column: columnName }],
+          });
         }
-        continue;
       }
 
-      if (column.typeParams) {
-        const validatedParams = validateTypeParams(column.typeParams, descriptor, {
-          tableName,
-          columnName,
-        });
-        const codec = descriptor.factory(validatedParams)({
-          name: `<anon:${tableName}.${columnName}>`,
-          usedAt: [{ table: tableName, column: columnName }],
-        });
-        const validate = extractValidator(codec);
+      // Non-parameterized columns (or parameterized columns whose descriptor
+      // hasn't been registered) fall back to the legacy registry. The legacy
+      // registry is the source of shared codec instances for non-
+      // parameterized codec ids; for parameterized ids it carries the
+      // representative instance the runtime descriptor still registers
+      // (Phase 3 keeps that registration as a `forCodecId` fallback for
+      // sites that don't carry `(table, column)` through to the dispatch
+      // call site).
+      if (!resolvedCodec) {
+        resolvedCodec = codecRegistry.get(column.codecId);
+      }
+
+      if (resolvedCodec) {
+        byColumn.set(columnKey, resolvedCodec);
+        const validate = extractValidator(resolvedCodec);
         if (validate) {
-          validators.set(key, validate);
+          validators.set(columnKey, validate);
         }
       }
     }
   }
 
-  if (validators.size === 0) return undefined;
-  return {
-    get: (key: string) => validators.get(key),
-    size: validators.size,
+  const registry: ContractCodecRegistry = {
+    forColumn(table, column) {
+      return byColumn.get(`${table}.${column}`);
+    },
+    forCodecId(codecId) {
+      return codecRegistry.get(codecId);
+    },
   };
+
+  const jsonValidators: JsonSchemaValidatorRegistry | undefined =
+    validators.size > 0
+      ? {
+          get: (key: string) => validators.get(key),
+          size: validators.size,
+        }
+      : undefined;
+
+  return { registry, jsonValidators };
 }
 
 function collectMutationDefaultGenerators(
@@ -540,15 +584,13 @@ export function createExecutionContext<
 
   const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
-  const jsonSchemaValidators = buildJsonSchemaValidatorRegistry(
-    contract,
-    types,
-    parameterizedCodecDescriptors,
-  );
+  const { registry: contractCodecs, jsonValidators: jsonSchemaValidators } =
+    buildContractCodecRegistry(contract, codecRegistry, types, parameterizedCodecDescriptors);
 
   return {
     contract,
     codecs: codecRegistry,
+    contractCodecs,
     queryOperations: queryOperationRegistry,
     types,
     ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),
