@@ -316,7 +316,7 @@ _Decisions deferred to execution, known risks, or dependencies that need monitor
 - Flag scope creep explicitly. If a task doesn't trace back to the spec, call it out.
 - Carry forward unresolved open questions from the spec into the plan's Open Items.
 - Close appropriate linear issues in the previous milestone before starting a new one. If any remain open, confirm with the engineer before closing them.
-- Publish Linear project status updates at milestone boundaries: at the end of a milestone (work complete, ready for merge/review) and at the start of the next (previous milestone closed, new milestone scope). Use `drive-post-update` to compose and post these updates.
+- Publish Linear project status updates at milestone boundaries: at the end of a milestone (work complete, ready for merge/review) and at the start of the next (previous milestone closed, new milestone scope). Compose these updates by hand for now (a dedicated `drive-post-update` skill is not yet available locally).
 
 **Don't:**
 
