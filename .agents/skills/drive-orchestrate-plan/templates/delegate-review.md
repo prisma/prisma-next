@@ -107,7 +107,7 @@ Begin.
 
 > Use this trimmed shape on rounds where the reviewer subagent is being **resumed** via your harness's resume mechanism (every round after the first by default). The subagent retains its prior transcript including the AC scoreboard, every F-numbered finding, and every prior verdict; you don't need to re-state the persona, spec/plan, milestone identifier, or scoreboard format.
 
-```markdown
+````markdown
 ## Resume — `<project-name>`, `<milestone-id>` `<round-id>` (e.g. m3 R2)
 
 > You are being resumed. You retain your full prior transcript including the AC scoreboard you maintain, every finding you filed, every verdict you issued, and every refresh of `system-design-review.md` and `walkthrough.md`. Trust your prior transcript; reconcile from on-disk `code-review.md` only where the orchestrator made between-round edits visible under `## Orchestrator notes` (orchestrator wins on those reconciliations).
@@ -143,7 +143,6 @@ Pull the diff via `git show <sha>` or `git diff <prior-head>..HEAD`.
 - Findings must be addressable in this PR (see § Findings discipline). No `informational` severity.
 
 Begin.
-
-```
+````
 
 Drop any of the resume-mode sections that don't apply this round.
