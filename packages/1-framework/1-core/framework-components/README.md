@@ -94,6 +94,17 @@ The function's signature is what the no-emit `FieldOutputType` resolver reads (`
 
 The descriptor lookup is assembled by `extractParameterizedCodecLookup` from each component's `types.codecTypes.parameterizedCodecs` contribution; the runtime reads `descriptor.factory(params)(ctx)` once per instance and indexes the resulting `Codec`. See [ADR 205 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the full design rationale.
 
+### Multiple descriptors per `codecId`
+
+For codecs whose authoring-time params (e.g. a live `StandardSchemaV1`) cannot
+round-trip through `contract.json`, register a separate
+`ParameterizedCodecDescriptor` per resolution surface (column-author / emit-
+path / runtime). Each descriptor registers through a different framework slot,
+so there is no dynamic dispatch — surface segregation, not selection. See the
+JSON / JSONB descriptor block comment in
+`@prisma-next/adapter-postgres/codecs/postgres-codec-descriptors.ts` for a
+worked example, and [ADR 205 § Open questions](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md#open-questions) for the unification roadmap.
+
 ### Inline `typeParams` vs `storage.types` `typeRef`
 
 A parameterized column can be authored two ways:
