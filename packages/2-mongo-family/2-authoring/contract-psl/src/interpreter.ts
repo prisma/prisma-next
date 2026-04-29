@@ -348,8 +348,9 @@ function resolvePolymorphism(input: {
       const withoutUnscopedVariants = existingIndexes.filter((idx) => !variantIndexSet.has(idx));
       const mergedIndexes = [...withoutUnscopedVariants];
       for (const idx of scopedVariantIndexes) {
+        const idxKey = canonicalJson(idx);
         const isDuplicate = withoutUnscopedVariants.some(
-          (existing) => JSON.stringify(existing) === JSON.stringify(idx),
+          (existing) => canonicalJson(existing) === idxKey,
         );
         if (!isDuplicate) {
           mergedIndexes.push(idx);
@@ -371,6 +372,24 @@ function resolvePolymorphism(input: {
   }
 
   return { models: patched, roots, collections, diagnostics };
+}
+
+// Property-order-stable serialization for structural equality of plain
+// JSON-compatible values. Used for comparing MongoStorageIndex shapes in
+// the variant-merge dedup path where a future change to the spread order
+// would otherwise produce JSON-stringify mismatches even though the
+// indexes are structurally identical.
+function canonicalJson(value: unknown): string {
+  if (Array.isArray(value)) {
+    return `[${value.map(canonicalJson).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalJson(entry)}`)
+      .join(',')}}`;
+  }
+  return JSON.stringify(value);
 }
 
 function parseIndexDirection(raw: string | undefined): MongoIndexKeyDirection {
