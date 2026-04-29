@@ -44,7 +44,9 @@ describe('jsonRuntimeParamsSchema', () => {
 });
 
 describe('pgJsonRuntimeFactory', () => {
-  it('produces a JsonCodecInstance carrying a validate function', () => {
+  // The first compileJsonSchemaValidator call cold-loads Ajv; allow the cold
+  // path the same headroom the json-schema-validator suite uses.
+  it('produces a JsonCodecInstance carrying a validate function', { timeout: 2000 }, () => {
     const codec = pgJsonRuntimeFactory({ schemaJson: productJsonSchema })(ctx);
     expect(codec.id).toBe('pg/json@1');
     expect(codec.targetTypes).toEqual(['json']);
@@ -55,17 +57,15 @@ describe('pgJsonRuntimeFactory', () => {
   it('validate accepts payloads matching the JSON schema', () => {
     const codec = pgJsonRuntimeFactory({ schemaJson: productJsonSchema })(ctx);
     const result = codec.validate({ name: 'pen', price: 1.5 });
-    // The validator returns a normalized result; treat truthy / undefined-issues as accept.
-    if (typeof result === 'object' && result !== null && 'issues' in result) {
-      expect(result.issues).toBeFalsy();
-    }
+    expect(result.valid).toBe(true);
   });
 
   it('validate rejects payloads that violate the JSON schema', () => {
     const codec = pgJsonRuntimeFactory({ schemaJson: productJsonSchema })(ctx);
     const result = codec.validate({ name: 'pen' });
-    if (typeof result === 'object' && result !== null && 'issues' in result) {
-      expect(result.issues).toBeTruthy();
+    expect(result.valid).toBe(false);
+    if (result.valid === false) {
+      expect(result.errors.length).toBeGreaterThan(0);
     }
   });
 
