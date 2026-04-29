@@ -273,21 +273,27 @@ describe('dataTransform factory (user-authored)', () => {
 });
 
 describe('DataTransformCall', () => {
+  const makeCall = () =>
+    new DataTransformCall(
+      'data_migration.backfill-user-email',
+      'Backfill NULLs in "user"."email" before NOT NULL tightening',
+      'user',
+      'email',
+    );
+
   it('toOp() throws PN-MIG-2001 (unfilled placeholder)', () => {
-    const call = new DataTransformCall('user', 'email');
-    expect(() => call.toOp()).toThrowError(/PN-MIG-2001|unfilled/i);
+    expect(() => makeCall().toOp()).toThrowError(/PN-MIG-2001|unfilled/i);
   });
 
   it('renderTypeScript() emits a dataTransform({...}) call with a placeholder run slot', () => {
-    const call = new DataTransformCall('user', 'email');
-    const ts = call.renderTypeScript();
+    const ts = makeCall().renderTypeScript();
     expect(ts).toContain('dataTransform({');
     expect(ts).toContain('placeholder("user-email-backfill-sql")');
     expect(ts).toContain('"data_migration.backfill-user-email"');
   });
 
   it('importRequirements() pulls dataTransform + placeholder from the migration module', () => {
-    const reqs = new DataTransformCall('user', 'email').importRequirements();
+    const reqs = makeCall().importRequirements();
     expect(reqs).toEqual([
       { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'dataTransform' },
       { moduleSpecifier: '@prisma-next/target-sqlite/migration', symbol: 'placeholder' },

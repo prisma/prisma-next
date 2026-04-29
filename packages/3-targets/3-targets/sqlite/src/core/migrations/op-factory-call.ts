@@ -264,11 +264,12 @@ export class DropIndexCall extends SqliteOpFactoryCallNode {
 // ============================================================================
 
 /**
- * A planner-generated data-transform stub. Emitted by
- * `nullabilityTighteningBackfillStrategy` when the policy allows `'data'`
- * and the contract tightens a column's nullability — the user must fill in
- * the backfill before the subsequent recreate-table op copies data into the
- * NOT NULL-constrained temp table.
+ * A planner-generated data-transform stub. The current default strategy
+ * (`nullabilityTighteningBackfillStrategy`) emits one of these with a
+ * backfill-flavored `id`/`label` when the policy allows `'data'` and the
+ * contract tightens a column's nullability, but the op itself is generic —
+ * any future strategy that needs a placeholder data step can construct one
+ * with its own id/label.
  *
  * `toOp()` always throws `PN-MIG-2001`: the planner cannot lower a stubbed
  * transform to a runtime op — the user must edit the rendered
@@ -278,16 +279,16 @@ export class DataTransformCall extends SqliteOpFactoryCallNode {
   readonly factoryName = 'dataTransform' as const;
   readonly operationClass = 'data' as const;
   readonly id: string;
+  readonly label: string;
   readonly tableName: string;
   readonly columnName: string;
-  readonly label: string;
 
-  constructor(tableName: string, columnName: string) {
+  constructor(id: string, label: string, tableName: string, columnName: string) {
     super();
-    this.id = `data_migration.backfill-${tableName}-${columnName}`;
+    this.id = id;
+    this.label = label;
     this.tableName = tableName;
     this.columnName = columnName;
-    this.label = `Backfill NULLs in "${tableName}"."${columnName}" before NOT NULL tightening`;
     this.freeze();
   }
 

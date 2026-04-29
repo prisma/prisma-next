@@ -38,7 +38,8 @@ async function main() {
       const [id] = args;
       if (!id) {
         console.error('Usage: pnpm start -- repo-user <id>');
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       const user = await ormClientFindUserById(id, runtime);
       console.log(JSON.stringify(user, null, 2));
@@ -46,7 +47,8 @@ async function main() {
       const [id, limitStr] = args;
       if (!id) {
         console.error('Usage: pnpm start -- repo-user-posts <id> [limit]');
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       const limit = limitStr ? Number.parseInt(limitStr, 10) : 10;
       const result = await ormClientGetUserPosts(id, limit, runtime);
@@ -55,7 +57,8 @@ async function main() {
       const [id, email, displayName] = args;
       if (!id || !email || !displayName) {
         console.error('Usage: pnpm start -- repo-create-user <id> <email> <displayName>');
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       const user = await ormClientCreateUser(
         { id, email, displayName, createdAt: new Date() },
@@ -66,7 +69,8 @@ async function main() {
       const [email, displayName] = args;
       if (!email || !displayName) {
         console.error('Usage: pnpm start -- insert-user <email> <displayName>');
-        process.exit(1);
+        process.exitCode = 1;
+        return;
       }
       const user = await insertUser(email, displayName);
       console.log(JSON.stringify(user, null, 2));
@@ -75,11 +79,12 @@ async function main() {
         'Usage: pnpm start -- [users [limit] | repo-user <id> | repo-user-posts <id> [limit] | ' +
           'repo-create-user <id> <email> <displayName> | insert-user <email> <displayName>]',
       );
-      process.exit(1);
+      process.exitCode = 1;
+      return;
     }
   } catch (error) {
     console.error('Error:', error);
-    process.exit(1);
+    process.exitCode = 1;
   } finally {
     await runtime.close();
   }

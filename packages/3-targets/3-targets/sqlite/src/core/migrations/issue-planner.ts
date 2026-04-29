@@ -407,11 +407,16 @@ function mapIssueToCall(
     }
 
     // SQLite has no enum types (capability `sql.enums: false`). The verifier
-    // should never emit `enum_values_changed` against a SQLite schema, but if
-    // it does we explicitly drop the issue rather than letting it fall into
-    // the `default` branch with a generic "unsupported operation" message.
+    // should never emit `enum_values_changed` against a SQLite schema, so if
+    // we receive one it is a verifier bug — surface it as an explicit
+    // conflict rather than silently dropping it.
     case 'enum_values_changed':
-      return ok([]);
+      return notOk(
+        issueConflict(
+          'unsupportedOperation',
+          'Received enum_values_changed against a SQLite schema (sql.enums: false) — verifier bug',
+        ),
+      );
 
     // Everything below is absorbed by recreateTableStrategy. If it falls
     // through here, policy or context didn't allow the recreate — surface as

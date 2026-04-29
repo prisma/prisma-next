@@ -1,1 +1,1 @@
-export { parseContractMarkerRow } from '../core/verify';
+export { type ContractMarkerRow, parseContractMarkerRow } from '../core/verify';

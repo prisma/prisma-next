@@ -205,7 +205,14 @@ export const nullabilityTighteningBackfillStrategy: CallMigrationStrategy = (iss
     const column = ctx.toContract.storage.tables[issue.table]?.columns[issue.column];
     if (!column || column.nullable === true) continue;
 
-    calls.push(new DataTransformCall(issue.table, issue.column));
+    calls.push(
+      new DataTransformCall(
+        `data_migration.backfill-${issue.table}-${issue.column}`,
+        `Backfill NULLs in "${issue.table}"."${issue.column}" before NOT NULL tightening`,
+        issue.table,
+        issue.column,
+      ),
+    );
   }
 
   if (calls.length === 0) return { kind: 'no_match' };

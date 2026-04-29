@@ -27,6 +27,36 @@ function parseMeta(meta: unknown): Record<string, unknown> {
   return result as Record<string, unknown>;
 }
 
+/**
+ * SQLite stores `contract_json` as TEXT, so the wire shape is a JSON string;
+ * Postgres uses `jsonb` and returns an already-parsed value. Normalize both
+ * here so `ContractMarkerRecord.contractJson` is always the structured form.
+ */
+function parseContractJson(value: unknown): unknown {
+  if (value === null || value === undefined) return null;
+  if (typeof value !== 'string') return value;
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Wire shape of a `prisma_contract.marker` row as it comes out of a SQL
+ * driver. Snake-cased to match the on-disk column names. Shared by every
+ * SQL target's `readMarker` so each runner doesn't redeclare it inline.
+ */
+export type ContractMarkerRow = {
+  core_hash: string;
+  profile_hash: string;
+  contract_json: unknown | null;
+  canonical_version: number | null;
+  updated_at: Date | string;
+  app_tag: string | null;
+  meta: unknown | null;
+};
+
 const ContractMarkerRowSchema = type({
   core_hash: 'string',
   profile_hash: 'string',
@@ -58,7 +88,7 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
   return {
     storageHash: result.core_hash,
     profileHash: result.profile_hash,
-    contractJson: result.contract_json ?? null,
+    contractJson: parseContractJson(result.contract_json),
     canonicalVersion: result.canonical_version ?? null,
     updatedAt,
     appTag: result.app_tag ?? null,

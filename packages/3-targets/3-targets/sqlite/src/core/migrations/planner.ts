@@ -34,11 +34,11 @@ export type SqlitePlanResult =
  * SQLite migration planner — a thin wrapper over `planIssues`.
  *
  * `plan()` verifies the live schema against the target contract (producing
- * `SchemaIssue[]`) and delegates to `planIssues` with
- * `sqlitePlannerStrategies`. The only strategy is `recreateTableStrategy`,
- * which absorbs type/nullability/default/constraint mismatches for each
- * table into a single recreate-table operation. Everything else (creates,
- * adds, drops) flows through `mapIssueToCall` in the issue planner.
+ * `SchemaIssue[]`) and delegates to `planIssues` with the registered
+ * strategies. Strategies absorb groups of related issues into composite
+ * recipes (e.g. recreating a table to apply type/nullability/default/
+ * constraint changes at once); anything not absorbed by a strategy flows
+ * through `mapIssueToCall` in the issue planner as a one-off call.
  *
  * FK-backing indexes are surfaced by `verifySqlSchema`'s index expansion
  * (see `verify-sql-schema.ts:459-469`), so `mapIssueToCall` handles them

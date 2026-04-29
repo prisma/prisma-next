@@ -92,7 +92,11 @@ const META = {
 } as const;
 
 describe('TypeScriptRenderableSqliteMigration round-trip', () => {
-  let tmpDir: string;
+  // Definite-assignment assertion: `beforeEach` populates this. The runtime
+  // check in `afterEach` covers the case where setup throws before the
+  // assignment runs — without that guard the teardown would mask the real
+  // setup error with a `rm(undefined)` failure.
+  let tmpDir!: string;
 
   beforeEach(async () => {
     tmpDir = await mkdtemp(join(tmpdir(), 'sqlite-render-roundtrip-'));
@@ -101,7 +105,9 @@ describe('TypeScriptRenderableSqliteMigration round-trip', () => {
   });
 
   afterEach(async () => {
-    await rm(tmpDir, { recursive: true, force: true });
+    if (typeof tmpDir === 'string') {
+      await rm(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it(

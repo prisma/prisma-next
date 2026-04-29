@@ -12,6 +12,7 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
+import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
@@ -255,32 +256,10 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
   ): Promise<ContractMarkerRecord | null> {
     const stmt = readMarkerStatement();
     try {
-      const result = await driver.query<{
-        core_hash: string;
-        profile_hash: string;
-        contract_json: string | null;
-        canonical_version: number | null;
-        updated_at: string;
-        app_tag: string | null;
-        meta: string | null;
-      }>(stmt.sql, stmt.params);
-
-      if (result.rows.length === 0) {
-        return null;
-      }
+      const result = await driver.query<ContractMarkerRow>(stmt.sql, stmt.params);
       const row = result.rows[0];
-      if (!row) {
-        return null;
-      }
-      return {
-        storageHash: row.core_hash,
-        profileHash: row.profile_hash,
-        contractJson: row.contract_json ? JSON.parse(row.contract_json) : null,
-        canonicalVersion: row.canonical_version,
-        updatedAt: new Date(row.updated_at),
-        appTag: row.app_tag,
-        meta: row.meta ? JSON.parse(row.meta) : {},
-      };
+      if (!row) return null;
+      return parseContractMarkerRow(row);
     } catch (error) {
       // Table might not exist yet
       if (error instanceof Error && error.message.includes('no such table')) {
