@@ -444,4 +444,61 @@ describe('SQLite Migration E2E - FK preservation through recreate-table', () => 
       ),
     ).rejects.toThrow(/FOREIGN_KEY_VIOLATION/);
   });
+
+  it('introduces a new FK on an existing column (exercises recreate FK postcheck)', async () => {
+    // Origin: Post.author_id is a plain INT with no FK.
+    // Destination: Post.author_id gains a FK → User.id.
+    // This emits `foreign_key_mismatch`, which `recreateTableStrategy`
+    // absorbs into a destructive recreate. The new FK postcheck (added by
+    // `buildRecreatePostchecks`) verifies that `pragma_foreign_key_list`
+    // reports the FK after recreate — if the postcheck SQL is wrong, the
+    // runner fails before the harness's `verifySqlSchema` would have caught
+    // it.
+    const DESTRUCTIVE = { allowedOperationClasses: ['additive', 'destructive'] } as const;
+    const User = model('User', { fields: { id: int.id(), name: text } });
+    const PostNoFk = model('Post', {
+      fields: { id: int.id(), title: text, authorId: int.column('author_id') },
+    });
+    const PostWithFk = model('Post', {
+      fields: { id: int.id(), title: text, authorId: int.column('author_id') },
+    }).sql((ctx) => ({
+      foreignKeys: [
+        ctx.constraints.foreignKey(ctx.cols.authorId, ctx.constraints.ref('User', 'id'), {
+          onDelete: 'cascade',
+        }),
+      ],
+    }));
+
+    await applyMigration(
+      {
+        origin: defineContract({ ...pack, models: { User, Post: PostNoFk } }),
+        destination: defineContract({ ...pack, models: { User, Post: PostWithFk } }),
+        policy: DESTRUCTIVE,
+        seed: async (driver) => {
+          await driver.query('INSERT INTO "User" (id, name) VALUES (?, ?)', [1, 'Alice']);
+          await driver.query('INSERT INTO "Post" (id, title, author_id) VALUES (?, ?, ?)', [
+            1,
+            'P1',
+            1,
+          ]);
+        },
+      },
+      async ({ driver, schema, plannedOperationIds }) => {
+        expect(plannedOperationIds).toContain('recreateTable.Post');
+        expect(schema.tables['Post']!.foreignKeys).toHaveLength(1);
+        const fk = schema.tables['Post']!.foreignKeys[0]!;
+        expect([...fk.columns]).toEqual(['author_id']);
+        expect(fk.referencedTable).toBe('User');
+        expect([...fk.referencedColumns]).toEqual(['id']);
+        // Existing data preserved through the recreate copy step.
+        expect(
+          (
+            await driver.query<{ id: number; author_id: number }>(
+              'SELECT id, author_id FROM "Post"',
+            )
+          ).rows,
+        ).toEqual([{ id: 1, author_id: 1 }]);
+      },
+    );
+  });
 });

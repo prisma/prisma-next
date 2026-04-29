@@ -150,7 +150,7 @@ export const recreateTableStrategy: CallMigrationStrategy = (issues, ctx) => {
         schemaColumnNames: Object.keys(schemaTable.columns),
         indexes,
         summary: buildRecreateSummary(tableName, entry.issues),
-        postchecks: buildRecreatePostchecks(tableName, entry.issues, tableSpec.columns),
+        postchecks: buildRecreatePostchecks(tableName, entry.issues, tableSpec),
         operationClass,
       }),
     );

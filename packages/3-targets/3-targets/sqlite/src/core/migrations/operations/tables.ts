@@ -8,7 +8,6 @@ import {
   type Op,
   renderColumnDefinition,
   renderForeignKeyClause,
-  type SqliteColumnSpec,
   type SqliteIndexSpec,
   type SqliteTableSpec,
   step,
@@ -205,25 +204,63 @@ export function buildRecreateSummary(tableName: string, issues: readonly SchemaI
   return `Recreates table ${tableName} to apply schema changes: ${messages}`;
 }
 
+const COLUMN_LEVEL_ISSUE_KINDS = new Set<SchemaIssue['kind']>([
+  'nullability_mismatch',
+  'default_mismatch',
+  'default_missing',
+  'extra_default',
+  'type_mismatch',
+]);
+
+const PK_ISSUE_KINDS = new Set<SchemaIssue['kind']>(['primary_key_mismatch', 'extra_primary_key']);
+
+const UNIQUE_ISSUE_KINDS = new Set<SchemaIssue['kind']>([
+  'unique_constraint_mismatch',
+  'extra_unique_constraint',
+]);
+
+const FK_ISSUE_KINDS = new Set<SchemaIssue['kind']>(['foreign_key_mismatch', 'extra_foreign_key']);
+
 /**
- * Per-issue postchecks verifying the recreated table's column shape. Reads
- * expectations from the flat `SqliteColumnSpec`s embedded in the spec —
- * `typeSql` is the upper-cased native type and `defaultSql` is the
- * pre-rendered DEFAULT clause. Exported so the planner can pre-build the
- * postcheck list at construction time and `RecreateTableCall` doesn't
- * have to carry `SchemaIssue` objects through to render time.
+ * Returns the columns the contract expects as the table's primary key. Picks
+ * up SQLite's inline `INTEGER PRIMARY KEY AUTOINCREMENT` form when no
+ * explicit `primaryKey` clause is set on the spec.
+ */
+function expectedPrimaryKeyColumns(spec: SqliteTableSpec): readonly string[] {
+  if (spec.primaryKey) return spec.primaryKey.columns;
+  const inlinePk = spec.columns.find((c) => c.inlineAutoincrementPrimaryKey);
+  return inlinePk ? [inlinePk.name] : [];
+}
+
+function quoteSqlList(values: readonly string[]): string {
+  return values.map((v) => `'${escapeLiteral(v)}'`).join(', ');
+}
+
+/**
+ * Per-issue postchecks verifying the recreated table's shape against the
+ * contract spec. Column-level issues (`nullability_mismatch`,
+ * `default_mismatch`, …) emit one targeted check each; constraint-level
+ * issues (`primary_key_mismatch`, `unique_constraint_mismatch`,
+ * `foreign_key_mismatch`, plus their `extra_*` siblings) emit one
+ * `pragma_*`-driven check per declared constraint in the contract spec, so
+ * a recreated table with the right columns but the wrong PK / unique / FK
+ * shape fails the postcheck instead of passing silently. Exported so the
+ * planner can pre-build the list at construction time and
+ * `RecreateTableCall` doesn't have to carry `SchemaIssue` objects through
+ * to render time.
  */
 export function buildRecreatePostchecks(
   tableName: string,
   issues: readonly SchemaIssue[],
-  columns: readonly SqliteColumnSpec[],
+  spec: SqliteTableSpec,
 ): Array<{ description: string; sql: string }> {
   const checks: Array<{ description: string; sql: string }> = [];
   const t = escapeLiteral(tableName);
-  const byName = new Map(columns.map((c) => [c.name, c]));
+  const byName = new Map(spec.columns.map((c) => [c.name, c]));
 
   for (const issue of issues) {
     if (issue.kind === 'enum_values_changed') continue;
+    if (!COLUMN_LEVEL_ISSUE_KINDS.has(issue.kind)) continue;
     if (!issue.column) continue;
     const c = escapeLiteral(issue.column);
     if (issue.kind === 'nullability_mismatch') {
@@ -242,13 +279,13 @@ export function buildRecreatePostchecks(
       }
     }
     if (issue.kind === 'default_mismatch' || issue.kind === 'default_missing') {
-      const spec = byName.get(issue.column);
-      const expectedRaw = spec?.defaultSql.startsWith('DEFAULT ')
+      const colSpec = byName.get(issue.column);
+      const expectedRaw = colSpec?.defaultSql.startsWith('DEFAULT ')
         ? // SQLite's pragma_table_info.dflt_value strips outer parens for
           // expression defaults (per the SQLite docs), so `(datetime('now'))`
           // is stored as `datetime('now')`. Strip them here so the postcheck
           // matches.
-          stripOuterParens(spec.defaultSql.slice('DEFAULT '.length))
+          stripOuterParens(colSpec.defaultSql.slice('DEFAULT '.length))
         : null;
       if (expectedRaw) {
         checks.push({
@@ -258,11 +295,11 @@ export function buildRecreatePostchecks(
       }
     }
     if (issue.kind === 'type_mismatch') {
-      const spec = byName.get(issue.column);
-      if (spec) {
+      const colSpec = byName.get(issue.column);
+      if (colSpec) {
         checks.push({
           description: `verify "${issue.column}" type on "${tableName}"`,
-          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(spec.typeSql.toLowerCase())}'`,
+          sql: `SELECT COUNT(*) > 0 FROM pragma_table_info('${t}') WHERE name = '${c}' AND LOWER(type) = '${escapeLiteral(colSpec.typeSql.toLowerCase())}'`,
         });
       }
     }
@@ -273,5 +310,79 @@ export function buildRecreatePostchecks(
       });
     }
   }
+
+  // Constraint-level issues — emit one postcheck per declared constraint in
+  // the contract spec when *any* issue of that kind fires, since recreate
+  // rebuilds the entire table at once.
+  const hasPkIssue = issues.some((i) => PK_ISSUE_KINDS.has(i.kind));
+  const hasUniqueIssue = issues.some((i) => UNIQUE_ISSUE_KINDS.has(i.kind));
+  const hasFkIssue = issues.some((i) => FK_ISSUE_KINDS.has(i.kind));
+
+  if (hasPkIssue) {
+    const pkColumns = expectedPrimaryKeyColumns(spec);
+    // Verify pragma_table_info reports exactly these columns as PK members
+    // (count + named membership); zero columns expected ⇒ no PK at all.
+    const colCount = pkColumns.length;
+    if (colCount === 0) {
+      checks.push({
+        description: `verify "${tableName}" has no primary key`,
+        sql: `SELECT (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0) = 0`,
+      });
+    } else {
+      checks.push({
+        description: `verify primary key on "${tableName}"`,
+        sql:
+          `SELECT (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0) = ${colCount}` +
+          ` AND (SELECT COUNT(*) FROM pragma_table_info('${t}') WHERE pk > 0 AND name IN (${quoteSqlList(pkColumns)})) = ${colCount}`,
+      });
+    }
+  }
+
+  if (hasUniqueIssue) {
+    for (const u of spec.uniques ?? []) {
+      const colCount = u.columns.length;
+      const description = u.name
+        ? `verify unique constraint "${u.name}" on "${tableName}"`
+        : `verify unique constraint (${u.columns.join(', ')}) on "${tableName}"`;
+      // Match any unique index whose covered columns are exactly the expected
+      // set. Order is intentionally not checked — SQLite's unique-index
+      // identity is column-set, not column-sequence.
+      checks.push({
+        description,
+        sql:
+          `SELECT EXISTS (SELECT 1 FROM pragma_index_list('${t}') l` +
+          ` WHERE l."unique" = 1` +
+          ` AND (SELECT COUNT(*) FROM pragma_index_info(l.name)) = ${colCount}` +
+          ` AND (SELECT COUNT(*) FROM pragma_index_info(l.name) WHERE name IN (${quoteSqlList(u.columns)})) = ${colCount})`,
+      });
+    }
+  }
+
+  if (hasFkIssue) {
+    for (const fk of spec.foreignKeys ?? []) {
+      const refTable = escapeLiteral(fk.references.table);
+      const colCount = fk.columns.length;
+      // Build a `SUM(CASE WHEN ("from","to") IN ((…)) …)` so the check works
+      // for both single- and multi-column FKs without depending on FK row
+      // ordering inside `pragma_foreign_key_list`.
+      const tuples = fk.columns
+        .map((from, i) => {
+          const to = fk.references.columns[i] ?? from;
+          return `('${escapeLiteral(from)}', '${escapeLiteral(to)}')`;
+        })
+        .join(', ');
+      const description = `verify foreign key (${fk.columns.join(', ')}) → ${fk.references.table}(${fk.references.columns.join(', ')}) on "${tableName}"`;
+      checks.push({
+        description,
+        sql:
+          `SELECT EXISTS (SELECT 1 FROM pragma_foreign_key_list('${t}') f` +
+          ` WHERE f."table" = '${refTable}'` +
+          ' GROUP BY f.id' +
+          ` HAVING COUNT(*) = ${colCount}` +
+          ` AND SUM(CASE WHEN (f."from", f."to") IN (${tuples}) THEN 1 ELSE 0 END) = ${colCount})`,
+      });
+    }
+  }
+
   return checks;
 }
