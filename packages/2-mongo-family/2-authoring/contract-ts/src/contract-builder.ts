@@ -1242,10 +1242,10 @@ function findMissingIndexField(
 
 function resolveVariantScope(
   modelBuilder: AnyModelBuilder,
-  modelMap: Record<string, AnyModelBuilder>,
+  modelsByName: Record<string, AnyModelBuilder>,
 ): { discriminatorField: string; discriminatorValue: string } | undefined {
   if (!modelBuilder.__base) return undefined;
-  const baseBuilder = modelMap[modelBuilder.__base];
+  const baseBuilder = modelsByName[modelBuilder.__base];
   if (!baseBuilder) return undefined;
   const discriminatorField = baseBuilder.__discriminator?.field;
   const variantValue = baseBuilder.__variants?.[modelBuilder.__name]?.value;
@@ -1275,6 +1275,10 @@ function buildCollections(
   const collections: Record<string, MongoStorageCollection> = {};
   const declaredIndexOwners = new Map<string, string>();
   const modelMap = models ?? {};
+  const modelsByName: Record<string, AnyModelBuilder> = {};
+  for (const builder of Object.values(modelMap)) {
+    modelsByName[builder.__name] = builder;
+  }
 
   for (const modelBuilder of Object.values(modelMap)) {
     if (!modelBuilder.__collection) {
@@ -1322,7 +1326,7 @@ function buildCollections(
       declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
     }
 
-    const polymorphicScope = resolveVariantScope(modelBuilder, modelMap);
+    const polymorphicScope = resolveVariantScope(modelBuilder, modelsByName);
     const rawStorageIndexes = (modelBuilder.__indexes ?? []).map(toStorageIndex);
     const storageIndexes = polymorphicScope
       ? rawStorageIndexes.map((idx, i) =>
