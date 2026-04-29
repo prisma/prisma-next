@@ -255,7 +255,11 @@ describe('mongo contract builder', () => {
       tasks: {
         indexes: [
           { keys: [{ field: 'title', direction: 1 }], unique: true },
-          { keys: [{ field: 'expiresAt', direction: 1 }], expireAfterSeconds: 3600 },
+          {
+            keys: [{ field: 'expiresAt', direction: 1 }],
+            expireAfterSeconds: 3600,
+            partialFilterExpression: { type: 'derived' },
+          },
         ],
       },
     });

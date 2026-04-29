@@ -14,6 +14,7 @@ import type {
   TargetPackRef,
 } from '@prisma-next/framework-components/components';
 import {
+  applyPolymorphicScopeToMongoIndex,
   type MongoCollectionOptions,
   type MongoContract,
   type MongoContractWithTypeMaps,
@@ -1223,13 +1224,43 @@ function toStorageCollectionOptions(opts: MongoCollectionOptions): MongoStorageC
   return result as unknown as MongoStorageCollectionOptions;
 }
 
+function resolveVariantScope(
+  modelBuilder: AnyModelBuilder,
+  modelMap: Record<string, AnyModelBuilder>,
+): { discriminatorField: string; discriminatorValue: string } | undefined {
+  if (!modelBuilder.__base) return undefined;
+  const baseBuilder = modelMap[modelBuilder.__base];
+  if (!baseBuilder) return undefined;
+  const discriminatorField = baseBuilder.__discriminator?.field;
+  const variantValue = baseBuilder.__variants?.[modelBuilder.__name]?.value;
+  if (!discriminatorField || variantValue === undefined) return undefined;
+  return { discriminatorField, discriminatorValue: variantValue };
+}
+
+function scopeVariantIndex(
+  storageIndex: MongoStorageIndex,
+  scope: { discriminatorField: string; discriminatorValue: string },
+  variantName: string,
+  authoredIndex: MongoIndex | undefined,
+): MongoStorageIndex {
+  const result = applyPolymorphicScopeToMongoIndex(storageIndex, scope);
+  if (result.kind === 'conflict') {
+    const indexLabel = authoredIndex ? stableStringify(authoredIndex) : '<unknown>';
+    throw new Error(
+      `Variant model "${variantName}" index ${indexLabel} conflicts with discriminator scope: ${result.reason}`,
+    );
+  }
+  return result.index;
+}
+
 function buildCollections(
   models: Record<string, AnyModelBuilder> | undefined,
 ): Record<string, MongoStorageCollection> {
   const collections: Record<string, MongoStorageCollection> = {};
   const declaredIndexOwners = new Map<string, string>();
+  const modelMap = models ?? {};
 
-  for (const modelBuilder of Object.values(models ?? {})) {
+  for (const modelBuilder of Object.values(modelMap)) {
     if (!modelBuilder.__collection) {
       if (modelBuilder.__indexes && modelBuilder.__indexes.length > 0) {
         throw new Error(
@@ -1267,7 +1298,18 @@ function buildCollections(
       declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
     }
 
-    const storageIndexes = (modelBuilder.__indexes ?? []).map(toStorageIndex);
+    const polymorphicScope = resolveVariantScope(modelBuilder, modelMap);
+    const rawStorageIndexes = (modelBuilder.__indexes ?? []).map(toStorageIndex);
+    const storageIndexes = polymorphicScope
+      ? rawStorageIndexes.map((idx, i) =>
+          scopeVariantIndex(
+            idx,
+            polymorphicScope,
+            modelBuilder.__name,
+            modelBuilder.__indexes?.[i],
+          ),
+        )
+      : rawStorageIndexes;
     const storageOptions = modelBuilder.__collectionOptions
       ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
       : undefined;
