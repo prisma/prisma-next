@@ -275,7 +275,7 @@ describe('family instance sign', () => {
             contractPath: './contract.json',
           });
 
-          const marker = await readMarker(driver);
+          const marker = await familyInstance.readMarker({ driver });
           expect(marker?.storageHash).toBe(validatedContract.storage.storageHash);
           expect(marker?.invariants).toEqual(['email-verified', 'phone-backfill']);
         } finally {

@@ -24,7 +24,8 @@ export const ensureMarkerTableStatement: SqlStatement = {
     canonical_version INTEGER,
     updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     app_tag TEXT,
-    meta TEXT NOT NULL DEFAULT '{}'
+    meta TEXT NOT NULL DEFAULT '{}',
+    invariants TEXT NOT NULL DEFAULT '[]'
   )`,
   params: [],
 };
@@ -53,7 +54,8 @@ export function readMarkerStatement(): SqlStatement {
       canonical_version,
       updated_at,
       app_tag,
-      meta
+      meta,
+      invariants
     FROM _prisma_marker
     WHERE id = ?`,
     params: [1],
@@ -67,6 +69,14 @@ export interface WriteMarkerInput {
   readonly canonicalVersion?: number | null;
   readonly appTag?: string | null;
   readonly meta?: Record<string, unknown>;
+  /**
+   * Invariants to write into `marker.invariants`. Stored as a JSON-encoded
+   * TEXT array — SQLite has no native array type. The runner is responsible
+   * for merging with the existing column (no SQL-side merge here, unlike
+   * Postgres) before passing them in: BEGIN EXCLUSIVE on the migration
+   * transaction makes the read-then-merge-then-write sequence safe.
+   */
+  readonly invariants: readonly string[];
 }
 
 export function buildWriteMarkerStatements(input: WriteMarkerInput): {
@@ -81,6 +91,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
     input.canonicalVersion ?? null,
     input.appTag ?? null,
     jsonParam(input.meta ?? {}),
+    jsonParam(input.invariants),
   ];
 
   return {
@@ -93,7 +104,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version,
         updated_at,
         app_tag,
-        meta
+        meta,
+        invariants
       ) VALUES (
         ?,
         ?,
@@ -101,6 +113,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         ?,
         ?,
         datetime('now'),
+        ?,
         ?,
         ?
       )`,
@@ -114,7 +127,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version = ?,
         updated_at = datetime('now'),
         app_tag = ?,
-        meta = ?
+        meta = ?,
+        invariants = ?
       WHERE id = ?`,
       params: [
         input.storageHash,
@@ -123,6 +137,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         input.canonicalVersion ?? null,
         input.appTag ?? null,
         jsonParam(input.meta ?? {}),
+        jsonParam(input.invariants),
         1,
       ],
     },

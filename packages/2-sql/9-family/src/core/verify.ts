@@ -55,6 +55,10 @@ export type ContractMarkerRow = {
   updated_at: Date | string;
   app_tag: string | null;
   meta: unknown | null;
+  // SQLite stores arrays as JSON-TEXT, so this is `string` on the wire from
+  // a SQLite driver and `string[]` from a Postgres driver. Targets normalize
+  // before passing to `parseContractMarkerRow`.
+  invariants: unknown;
 };
 
 const ContractMarkerRowSchema = type({

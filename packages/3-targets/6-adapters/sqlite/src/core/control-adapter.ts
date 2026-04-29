@@ -108,6 +108,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
       updated_at: Date | string;
       app_tag: string | null;
       meta: unknown | null;
+      invariants: unknown;
     }>(
       `SELECT
          core_hash,
@@ -116,7 +117,8 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          canonical_version,
          updated_at,
          app_tag,
-         meta
+         meta,
+         invariants
        FROM _prisma_marker
        WHERE id = ?`,
       [1],
@@ -124,7 +126,12 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
 
     const row = result.rows[0];
     if (!row) return null;
-    return parseContractMarkerRow(row);
+    // SQLite stores arrays as JSON-encoded TEXT (no native array type), so
+    // the driver returns `invariants` as a string. Decode before delegating
+    // to the shared row schema, which expects `string[]`.
+    const invariants =
+      typeof row.invariants === 'string' ? (JSON.parse(row.invariants) as unknown) : row.invariants;
+    return parseContractMarkerRow({ ...row, invariants });
   }
 
   async introspect(

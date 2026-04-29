@@ -259,7 +259,14 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       const result = await driver.query<ContractMarkerRow>(stmt.sql, stmt.params);
       const row = result.rows[0];
       if (!row) return null;
-      return parseContractMarkerRow(row);
+      // SQLite stores arrays as JSON-encoded TEXT (no native array type), so
+      // the driver returns `invariants` as a string. Decode before delegating
+      // to the shared row schema, which expects `string[]`.
+      const invariants =
+        typeof row.invariants === 'string'
+          ? (JSON.parse(row.invariants) as unknown)
+          : row.invariants;
+      return parseContractMarkerRow({ ...row, invariants });
     } catch (error) {
       // Table might not exist yet
       if (error instanceof Error && error.message.includes('no such table')) {
@@ -496,6 +503,12 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     options: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
+    // SQLite has no native array type, so we can't merge invariants in SQL
+    // the way Postgres does. Merge client-side under the runner's
+    // BEGIN EXCLUSIVE — sort + dedupe so the JSON-encoded value is stable.
+    const merged = new Set<string>(existingMarker?.invariants ?? []);
+    for (const inv of options.invariants ?? []) merged.add(inv);
+    const invariants = Array.from(merged).sort();
     const writeStatements = buildWriteMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:
@@ -505,6 +518,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
       contractJson: options.destinationContract,
       canonicalVersion: null,
       meta: {},
+      invariants,
     });
     const statement = existingMarker ? writeStatements.update : writeStatements.insert;
     await this.executeStatement(driver, statement);

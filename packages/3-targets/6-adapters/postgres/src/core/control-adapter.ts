@@ -1,7 +1,7 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
@@ -102,6 +102,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       updated_at: Date | string;
       app_tag: string | null;
       meta: unknown | null;
+      invariants: readonly string[];
     }>(
       `select
          core_hash,
@@ -110,7 +111,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          canonical_version,
          updated_at,
          app_tag,
-         meta
+         meta,
+         invariants
        from prisma_contract.marker
        where id = $1`,
       [1],

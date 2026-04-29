@@ -31,3 +31,4 @@ export default postgresAdapterDescriptor;
 export { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 export { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 export { escapeLiteral, qualifyName, quoteIdentifier, SqlEscapeError };
+export { PostgresControlAdapter } from '../core/control-adapter';
