@@ -193,7 +193,7 @@ projects/{project}/
 └── learnings.md                     # patterns surfaced this run (orchestrator-maintained; see § Project learnings)
 ```
 
-`code-review.md` carries a § Subagent IDs section directly under the AC scoreboard recording the persistent implementer + reviewer IDs (see § Subagent continuity). The reviewer maintains the IDs section under the same RW grant as the rest of `code-review.md`.
+`code-review.md` carries a § Subagent IDs section directly under the AC scoreboard recording the persistent implementer + reviewer IDs (see § Subagent continuity). The orchestrator owns this section under the write carve-out documented in the read/write matrix below; the reviewer treats it as read-only.
 
 **All three review artifacts are produced or refreshed on every round.** None of the three may be deferred or skipped — including the first round. The reviewer's first round bootstraps all three; subsequent rounds refresh them with the round's delta.
 
@@ -259,6 +259,8 @@ Each milestone in `plan.md` should declare a **validation gate**: the explicit s
 - Build command, if the milestone changes anything that could break the build.
 
 Surface the inferred gate to the user for confirmation, then write it back into the milestone definition in `plan.md` so subsequent rounds and milestones inherit it. Inferred-without-confirmation gates are a foot-gun: the user often has tacit harness knowledge that doesn't surface until you propose a wrong gate.
+
+**Unattended fallback.** When operating in unattended mode (see § Unattended mode), no user is available to confirm the gate. Pick the most defensible gate from the project's harness (typecheck + the closest test/lint/build commands the milestone touches), validate it by running it once before delegating implementation, then write the chosen gate back into the milestone definition in `plan.md` so subsequent rounds inherit it. Log the choice and the validation result as an unattended decision so the user can audit on return; if the validation fails, that is a stop condition (see § Stop conditions) and the gate is not adopted.
 
 **Cross-package gates.** When a milestone deletes or renames a public export, a package-scoped test gate alone misses consumer surfaces. Always extend the gate with the project's workspace-wide test command and a grep for the deleted-or-renamed symbol across consumer directories (e.g. `test/`, `examples/`, sibling packages). This guards against the recurring class of escapees where a deletion compiles cleanly inside the owning package but breaks an integration test elsewhere.
 
@@ -388,7 +390,7 @@ When stopping, write a stop entry in the decisions log with the trigger and the 
 
 ### The decisions log
 
-**Location.** A gitignored scratch file under the repo's scratch convention (e.g. `wip/unattended-decisions.md`, or whatever local gitignored directory the repo uses for transient work). The file **must be gitignored** — it is the user's personal review surface, not a shipped artifact. Confirm the location with the user when entering unattended mode if the convention isn't already established.
+**Location.** A gitignored scratch file under the repo's scratch convention (e.g. `wip/unattended-decisions.md`, or whatever local gitignored directory the repo uses for transient work). The file **must be gitignored** — it is the user's personal review surface, not a shipped artifact. Confirm the location with the user when entering unattended mode if the convention isn't already established. When no user is available to confirm (the unattended-mode case itself), default to the repo's most-conventional gitignored scratch path — typically `wip/unattended-decisions.md` if `wip/` is gitignored, otherwise the first gitignored scratch directory the repo declares — verify the path is gitignored before writing, and log the chosen path as the first decision in the file so the user can audit and relocate it later if needed.
 
 **Lifecycle.**
 - On entering unattended mode, scaffold the file from `./templates/unattended-decisions.template.md` (preamble + operating rules + entry format reference) if it doesn't already exist.
