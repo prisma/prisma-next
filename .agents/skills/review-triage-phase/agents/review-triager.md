@@ -25,18 +25,18 @@ You do **not** implement code changes in this role. You **decide what to do** by
 
 1. **Fetch current review state**
    - Confirm output directory artifact paths are git-ignored before writing:
-    - `node ../review-fetch-phase/scripts/guard-review-artifacts-ignored.mjs --dir <output-dir>`
-  - Use `node ../review-fetch-phase/scripts/fetch-review-state.mjs --pr <url> --out-json <review-state.json>` to write canonical JSON.
+     - `node ../review-fetch-phase/scripts/guard-review-artifacts-ignored.mjs --dir <output-dir>`
+   - Use `node ../review-fetch-phase/scripts/fetch-review-state.mjs --pr <url> --out-json <review-state.json>` to write canonical JSON.
    - Validate and generate derived files using pure scripts:
-    - `node ../review-fetch-phase/scripts/validate-review-state.mjs --in <review-state.json>`
-    - `node ../review-fetch-phase/scripts/render-review-state.mjs --in <review-state.json> --out <review-state.md>`
-    - `node ../review-fetch-phase/scripts/summarize-review-state.mjs --in <review-state.json> --format text --out <summary.txt>`
-    - `node ../review-fetch-phase/scripts/extract-review-targets.mjs --in <review-state.json> --out <review-targets.json>`
+     - `node ../review-fetch-phase/scripts/validate-review-state.mjs --in <review-state.json>`
+     - `node ../review-fetch-phase/scripts/render-review-state.mjs --in <review-state.json> --out <review-state.md>`
+     - `node ../review-fetch-phase/scripts/summarize-review-state.mjs --in <review-state.json> --format text --out <summary.txt>`
+     - `node ../review-fetch-phase/scripts/extract-review-targets.mjs --in <review-state.json> --out <review-targets.json>`
    - Treat `review-state.json` as source of truth; markdown is derived.
 
 2. **Bootstrap action scaffold**
    - Generate scaffold with one ordered action per review target:
-    - `node ./scripts/bootstrap-review-actions.mjs --in <review-state.json> --out <review-actions.json>`
+     - `node ./scripts/bootstrap-review-actions.mjs --in <review-state.json> --out <review-actions.json>`
    - Do not rewrite structure manually when scaffold exists. Edit action fields in place.
 
 3. **Triage each review thread/comment**
@@ -52,7 +52,7 @@ You do **not** implement code changes in this role. You **decide what to do** by
    Decide one of for each finding:
      - **TRIAGE PENDING** (initial scaffold placeholder; must be resolved before handoff)
      - **WILL ADDRESS** (needs a code/doc/test change now)
-    - **DEFER** (valid, but intentionally postponed; create Linear follow-up and reply with ticket)
+     - **DEFER** (valid, but intentionally postponed; create Linear follow-up and reply with ticket)
      - **OUT OF SCOPE** (belongs in a follow-up PR or different ownership area)
      - **ALREADY FIXED / OUTDATED** (no longer applies)
      - **NOT ACTIONABLE** (opinion-only with no clear improvement)
@@ -66,10 +66,10 @@ You do **not** implement code changes in this role. You **decide what to do** by
      - Reply: explain politely and concretely why it will not be addressed now (or how it will be deferred).
      - React with 👎 if it will not be addressed in this PR (use sparingly but consistently).
      - Resolve the thread when appropriate (outdated/out-of-scope/not-addressed).
-  - For **DEFER** specifically:
-    - Create a Linear follow-up issue (group related deferred comments where logical).
-    - Include the Linear issue URL in the defer reply.
-    - Record the Linear issue identifier in `review-actions.json` as `linearIssue`.
+   - For **DEFER** specifically:
+     - Create a Linear follow-up issue (group related deferred comments where logical).
+     - Include the Linear issue URL in the defer reply.
+     - Record the Linear issue identifier in `review-actions.json` as `linearIssue`.
 
 5. **Finalize action plan**
    - Keep `review-actions.json` and `review-actions.md` colocated with `review-state.json`.
@@ -78,8 +78,8 @@ You do **not** implement code changes in this role. You **decide what to do** by
    - Preserve `actions[]` order intentionally.
    - Resolve every `triage_pending` decision before finishing.
    - Run validation before rendering:
-    - `node ./scripts/validate-review-actions.mjs --in <review-actions.json> --require-final`
-  - `review-actions.md` is derived with `node ./scripts/render-review-actions.mjs --in <review-actions.json> --out <review-actions.md>`.
+     - `node ./scripts/validate-review-actions.mjs --in <review-actions.json> --require-final`
+   - `review-actions.md` is derived with `node ./scripts/render-review-actions.mjs --in <review-actions.json> --out <review-actions.md>`.
 
 ## Output formats
 
