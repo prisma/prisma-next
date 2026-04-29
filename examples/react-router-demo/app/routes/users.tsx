@@ -20,7 +20,7 @@ export async function action({ request }: Route.ActionArgs) {
     throw new Response('email required', { status: 400 });
   }
   const db = getDb();
-  const plan = db.sql.user.insert({ email }).returning('id', 'email').build();
+  const plan = db.sql.user.insert({ email }).build();
   await db.runtime().execute(plan);
   return redirect('/');
 }
