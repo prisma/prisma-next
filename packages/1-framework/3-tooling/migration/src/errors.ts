@@ -242,11 +242,20 @@ export function errorProvidedInvariantsMismatch(
   const derivedSet = new Set(derived);
   const missing = [...derivedSet].filter((id) => !storedSet.has(id));
   const extra = [...storedSet].filter((id) => !derivedSet.has(id));
+  // When sets agree but arrays don't, the only difference is ordering — call
+  // it out so the reader doesn't stare at two visually-identical arrays.
+  // Canonical providedInvariants is sorted ascending; a manifest with the
+  // same ids in a different order is still a mismatch (the hash check would
+  // also fail), but the human-readable diagnostic is otherwise unhelpful.
+  const orderingOnly = missing.length === 0 && extra.length === 0;
+  const why = orderingOnly
+    ? `migration.json at "${filePath}" stores providedInvariants ${JSON.stringify(stored)}, but the canonical value derived from ops.json is ${JSON.stringify(derived)} — same ids, different order. Canonical providedInvariants is sorted ascending.`
+    : `migration.json at "${filePath}" stores providedInvariants ${JSON.stringify(stored)}, but the value derived from ops.json is ${JSON.stringify(derived)}. The manifest copy was likely hand-edited without re-emitting.`;
   return new MigrationToolsError(
     'MIGRATION.PROVIDED_INVARIANTS_MISMATCH',
     'providedInvariants on migration.json disagrees with ops.json',
     {
-      why: `migration.json at "${filePath}" stores providedInvariants ${JSON.stringify(stored)}, but the value derived from ops.json is ${JSON.stringify(derived)}. The manifest copy was likely hand-edited without re-emitting.`,
+      why,
       fix: reemitHint(dirname(filePath), 'or restore the directory from version control.'),
       details: { filePath, stored, derived, difference: { missing, extra } },
     },

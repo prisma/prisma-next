@@ -371,6 +371,51 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
+  it('PROVIDED_INVARIANTS_MISMATCH calls out ordering when stored has the same ids in a different order', async () => {
+    const dir = join(tmpDir, '20260225T1430_invariants_unsorted');
+    const ops = [
+      ...createTestOps(),
+      {
+        id: 'data.alpha',
+        label: 'Data: alpha',
+        operationClass: 'data' as const,
+        name: 'alpha',
+        invariantId: 'alpha',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+      {
+        id: 'data.zebra',
+        label: 'Data: zebra',
+        operationClass: 'data' as const,
+        name: 'zebra',
+        invariantId: 'zebra',
+        source: 'migration.ts',
+        check: null,
+        run: null,
+      },
+    ];
+    await writeTestPackage(dir, { providedInvariants: ['alpha', 'zebra'] }, ops);
+
+    const manifestPath = join(dir, 'migration.json');
+    const content = JSON.parse(await readFile(manifestPath, 'utf-8'));
+    content.providedInvariants = ['zebra', 'alpha'];
+    const { computeMigrationHash } = await import('../src/hash');
+    content.migrationHash = computeMigrationHash(content, ops);
+    await writeFile(manifestPath, JSON.stringify(content, null, 2));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.PROVIDED_INVARIANTS_MISMATCH');
+      const mte = e as MigrationToolsError;
+      expect(mte.why).toContain('different order');
+      expect(mte.details).toMatchObject({
+        difference: { missing: [], extra: [] },
+      });
+      return true;
+    });
+  });
+
   it('throws MIGRATION.INVALID_INVARIANT_ID when ops.json carries a malformed invariantId', async () => {
     const dir = join(tmpDir, '20260225T1430_invalid_invariant_id');
     const badId = 'has a space';
