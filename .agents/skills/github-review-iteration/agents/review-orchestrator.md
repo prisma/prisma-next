@@ -25,7 +25,12 @@ Run commands from this skill's directory. All script paths below are relative to
      - 👍 + “will address” for items that will be implemented (leave unresolved)
      - 👎 + explanation + resolve for items not addressed in this PR
 
-3. **Implement**
+3. **Inspect action state**
+   - Read `review-actions.json` after triage.
+   - If no `will_address` actions remain with `pending` or `in_progress` status, stop and report completion.
+   - Only delegate implementation when at least one pending `will_address` action exists.
+
+4. **Implement**
    - Delegate to **review-implementer** to execute `review-actions.md`.
    - Enforce granular commits and explicit staging.
    - Ensure the implementer updates `review-actions.json` statuses and `done` completion records.
@@ -33,7 +38,7 @@ Run commands from this skill's directory. All script paths below are relative to
      - “On it” + 👍 when starting
      - “Done” + resolve when finished
 
-4. **Re-fetch and verify**
+5. **Re-fetch and verify**
    - Re-run fetch-review-state.
    - If unresolved actionable threads remain, loop.
    - If none remain, stop and report completion.

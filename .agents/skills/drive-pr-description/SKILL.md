@@ -105,7 +105,7 @@ Analyzes the git diff between the current branch and the default branch to gener
 Provide two separate outputs:
 
 1. The title as plain text (not in a markdown block)
-2. The PR description body in a single markdown code block
+2. The PR description body in a single Markdown code block
 
 **Format:**
 

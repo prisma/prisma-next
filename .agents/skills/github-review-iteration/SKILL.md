@@ -53,8 +53,8 @@ Store artifacts under:
 
 Canonical artifacts:
 
-- `review-state.json` (canonical v1)
-- `review-actions.json` (canonical v1)
+- `review-state.json` (canonical v2)
+- `review-actions.json` (canonical v2)
 
 Derived artifacts:
 
@@ -131,11 +131,11 @@ node ../review-triage-phase/scripts/render-review-actions.mjs --in <review-dir>/
 
 `review-actions.json` is the contract between the triager and implementer.
 
-Minimum v1 shape:
+Minimum v2 shape:
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "pr": { "url": "https://github.com/OWNER/REPO/pull/123", "nodeId": "PR_kw..." },
   "reviewState": { "path": "review-state.json", "fetchedAt": "..." },
   "actions": [
@@ -221,7 +221,7 @@ Repeat delegated `triage` → delegated `implement` until there are no remaining
 Loop contract:
 
 1. Run `triage` delegation and read resulting `review-actions.json`.
-2. If no pending `will_address` actions remain, stop and report completion.
+2. Inspect `review-actions.json`; if no `will_address` actions remain with `pending` or `in_progress` status, stop and report completion.
 3. Run `implement` delegation.
 4. Re-run `triage` delegation to refresh state and determine next iteration.
 5. Continue until clear.

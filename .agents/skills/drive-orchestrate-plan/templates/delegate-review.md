@@ -143,6 +143,7 @@ Pull the diff via `git show <sha>` or `git diff <prior-head>..HEAD`.
 - Findings must be addressable in this PR (see § Findings discipline). No `informational` severity.
 
 Begin.
+
 ```
 
 Drop any of the resume-mode sections that don't apply this round.

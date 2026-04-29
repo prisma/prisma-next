@@ -71,9 +71,9 @@ If missing, instruct user to run:
      - For `review_thread` targets, always reply using **thread replies** (never inline PR review comments).
        - If you only have the thread node id, first fetch the thread’s primary comment node id, then call `addPullRequestReviewThreadReply`.
      - For `pull_request_review` targets (review-body findings, `PRR_…` node ids), inline replies are not possible. `post-review-thread-reply.mjs` auto-detects this and posts a top-level PR issue comment instead (response `kind: "issue_comment"`); there is no thread to resolve, so the implementer skips `resolve-review-thread.mjs` for these and records the issue-comment id in the action's `done` record.
-3. Delegate implementation to:
+4. Delegate implementation to:
   - `./agents/review-implementer.md`
-4. Require implementer responsibilities:
+5. Require implementer responsibilities:
    - make code changes
    - run relevant checks
    - create focused commits
@@ -87,7 +87,7 @@ If missing, instruct user to run:
    - never use inline parser snippets (for example: `python -c`, `node -e`, `ruby -e`, ad-hoc awk/sed JSON parsing)
    - only set `status: done` after Done + resolve succeeds
    - update `review-actions.json` (`status`, `done.doneAt`, `done.summary`, `done.commits`) in the same completion step
-5. Render latest action markdown:
+6. Render latest action markdown:
 
 ```bash
 node ../review-triage-phase/scripts/render-review-actions.mjs --in <output-dir>/review-actions.json --out <output-dir>/review-actions.md
