@@ -6,7 +6,6 @@ import type {
   RuntimeTargetDescriptor,
 } from '@prisma-next/framework-components/execution';
 import postgresTargetControlDescriptor from '@prisma-next/target-postgres/control';
-import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import postgresAdapterControlDescriptor from '../../src/exports/control';
 import postgresRuntimeAdapterDescriptor from '../../src/exports/runtime';
 
@@ -41,11 +40,12 @@ export function createComposedPostgresAdapter(options: {
 
 /**
  * Build a stack-composed Postgres control adapter for tests that exercise
- * extension codecs. Mirrors `exports/control.ts`: the control descriptor's
- * `create(stack)` reads `stack.codecLookup` and constructs the
- * `PostgresControlAdapter` with it. Compose against the real SQL family /
- * postgres target / postgres adapter control descriptors so the codec
- * lookup is assembled from the same metadata sources production uses.
+ * extension codecs. Goes through the public `create(stack)` factory on the
+ * adapter's control descriptor (same path `exports/control.ts` uses in
+ * production) to keep the test helper aligned with the codebase's
+ * "factories not classes" coding convention. Composes against the real SQL
+ * family / postgres target / postgres adapter control descriptors so the
+ * codec lookup is assembled from the same metadata sources production uses.
  */
 export function createComposedPostgresControlAdapter(options: {
   readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
@@ -56,5 +56,5 @@ export function createComposedPostgresControlAdapter(options: {
     adapter: postgresAdapterControlDescriptor,
     extensionPacks: options.extensionPacks,
   });
-  return new PostgresControlAdapter(stack.codecLookup);
+  return postgresAdapterControlDescriptor.create(stack);
 }
