@@ -258,10 +258,9 @@ function collectParameterizedCodecDescriptors(
  * Build the unified descriptor map. Combines parameterized descriptors (which
  * already ship as `CodecDescriptor`s) with synthesized descriptors for non-
  * parameterized codecs registered through the legacy `codecs:` slot. Codec ids
- * that ship a parameterized descriptor take precedence — the legacy registry
- * may still register a representative codec under the same id (e.g.
- * pgvector's `pgVectorRepresentativeCodec`), but the parameterized descriptor
- * is the authoritative source.
+ * that ship a parameterized descriptor take precedence — even when the legacy
+ * registry registers a representative codec under the same id, the
+ * parameterized descriptor is the authoritative source.
  *
  * Codec-registry-unification spec § Decision: every codec resolves through one
  * descriptor map; reads are non-branching.
@@ -411,10 +410,18 @@ function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined 
 
 /**
  * Walk the contract's `storage.tables[].columns[]` and resolve each column to
- * a `Codec` — the per-instance parameterized codec for parameterized columns
- * (via `descriptor.factory(typeParams)(ctx)` for inline-typeParams columns;
- * via `types[ref]` for typeRef columns), or the shared codec from the legacy
- * `CodecRegistry` for non-parameterized columns. Index by `${table}.${column}`.
+ * a `Codec` through the unified descriptor map. Index by `${table}.${column}`.
+ *
+ * Per-instance behavior:
+ * - **typeRef columns**: reuse the resolved codec materialized once by
+ *   `initializeTypeHelpers` for the `storage.types` entry. Multiple columns
+ *   sharing one typeRef share one codec instance.
+ * - **inline-typeParams columns**: call `descriptor.factory(typeParams)(ctx)`
+ *   once per column (per-column anonymous instance).
+ * - **non-parameterized columns**: call `descriptor.factory()(ctx)` once.
+ *   The descriptor's factory is constant — every call returns the same
+ *   shared codec instance — so columns sharing a non-parameterized codec id
+ *   share one resolved codec without explicit caching.
  *
  * Combines what `initializeTypeHelpers` (named-instance walk) and
  * `buildJsonSchemaValidatorRegistry` (per-column walk) used to do separately:
@@ -426,27 +433,33 @@ function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined 
  * - `forColumn`/`forCodecId` for the dispatch registry.
  * - `jsonValidators` for the JSON-schema validator registry (derived from
  *   the same per-column resolved codecs via the `'json-validator'` trait).
+ *
+ * Codec-registry-unification spec § AC-4: every column resolves through one
+ * descriptor map without branching on parameterization.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
-  codecRegistry: CodecRegistry,
+  codecDescriptors: CodecDescriptorRegistry,
+  legacyCodecRegistry: CodecRegistry,
   types: TypeHelperRegistry,
-  codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): {
   readonly registry: ContractCodecRegistry;
   readonly jsonValidators: JsonSchemaValidatorRegistry | undefined;
 } {
   const byColumn = new Map<string, Codec>();
+  const byCodecId = new Map<string, Codec>();
   const validators = new Map<string, JsonSchemaValidateFn>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
       const columnKey = `${tableName}.${columnName}`;
-      const descriptor = codecDescriptors.get(column.codecId);
+      const descriptor = codecDescriptors.descriptorFor(column.codecId);
 
       let resolvedCodec: Codec | undefined;
 
       if (descriptor) {
+        const isParameterized = parameterizedDescriptors.has(column.codecId);
         if (column.typeRef) {
           // The named instance was already materialized once by
           // `initializeTypeHelpers`; reuse it so multiple columns sharing
@@ -459,28 +472,43 @@ function buildContractCodecRegistry(
           if (helper && typeof helper === 'object' && 'id' in helper && 'decode' in helper) {
             resolvedCodec = helper as Codec;
           }
-        } else if (column.typeParams) {
-          const validatedParams = validateTypeParams(column.typeParams, descriptor, {
-            tableName,
-            columnName,
-          });
-          resolvedCodec = descriptor.factory(validatedParams)({
-            name: `<anon:${tableName}.${columnName}>`,
-            usedAt: [{ table: tableName, column: columnName }],
-          });
+        } else if (column.typeParams && isParameterized) {
+          // Inline-typeParams column with a parameterized descriptor.
+          const parameterizedDescriptor = parameterizedDescriptors.get(column.codecId);
+          if (parameterizedDescriptor) {
+            const validatedParams = validateTypeParams(column.typeParams, parameterizedDescriptor, {
+              tableName,
+              columnName,
+            });
+            resolvedCodec = parameterizedDescriptor.factory(validatedParams)({
+              name: `<anon:${tableName}.${columnName}>`,
+              usedAt: [{ table: tableName, column: columnName }],
+            });
+          }
+        } else if (!isParameterized) {
+          // Non-parameterized column. Cache the resolved codec by codec id —
+          // the descriptor's factory is constant for non-parameterized
+          // codecs, so columns sharing this codec id share one resolved
+          // instance.
+          let cached = byCodecId.get(column.codecId);
+          if (!cached) {
+            // The synthesized non-parameterized descriptor takes `void` params
+            // and ignores the ctx; pass `undefined` and a synthetic ctx
+            // listing the column that triggered the materialization.
+            cached = descriptor.factory(undefined as never)({
+              name: `<shared:${column.codecId}>`,
+              usedAt: [{ table: tableName, column: columnName }],
+            });
+            byCodecId.set(column.codecId, cached);
+          }
+          resolvedCodec = cached;
         }
-      }
-
-      // Non-parameterized columns (or parameterized columns whose descriptor
-      // hasn't been registered) fall back to the legacy registry. The legacy
-      // registry is the source of shared codec instances for non-
-      // parameterized codec ids; for parameterized ids it carries the
-      // representative instance the runtime descriptor still registers
-      // (Phase 3 keeps that registration as a `forCodecId` fallback for
-      // sites that don't carry `(table, column)` through to the dispatch
-      // call site).
-      if (!resolvedCodec) {
-        resolvedCodec = codecRegistry.get(column.codecId);
+        // else: parameterized codec id with no typeRef and no typeParams.
+        // The column is missing the params the descriptor needs to
+        // instantiate. Leave `resolvedCodec` undefined; encode/decode for
+        // this column will produce raw values. This was the behavior pre-
+        // Phase-3.5 via the legacy `pgVectorRepresentativeCodec` fallback;
+        // post-Phase-3.5 we treat the column as having no resolved codec.
       }
 
       if (resolvedCodec) {
@@ -488,6 +516,19 @@ function buildContractCodecRegistry(
         const validate = extractValidator(resolvedCodec);
         if (validate) {
           validators.set(columnKey, validate);
+        }
+        // Track a representative codec per codec id for the `forCodecId`
+        // fallback path. Non-parameterized codec ids cache their shared
+        // singleton; parameterized codec ids capture the first resolved
+        // instance — encode-equivalent for parameterized codecs whose
+        // encoder is per-instance-stateless (pgvector formats `[v1,v2,...]`
+        // independent of length; JSON encoders are `JSON.stringify`-based).
+        // Sites that need per-instance behavior (e.g. decode, which
+        // validates against the schema for JSON-with-schema codecs) must
+        // dispatch through `forColumn` with a column ref. See ADR 205 +
+        // codec-registry-unification spec § AC-4.
+        if (!byCodecId.has(column.codecId)) {
+          byCodecId.set(column.codecId, resolvedCodec);
         }
       }
     }
@@ -498,7 +539,14 @@ function buildContractCodecRegistry(
       return byColumn.get(`${table}.${column}`);
     },
     forCodecId(codecId) {
-      return codecRegistry.get(codecId);
+      // Codec-id-only fallback for sites without a column ref (encode-side
+      // DSL params whose `ParamRef.refs` isn't populated). Prefer the
+      // contract-walk-derived shared codec; fall back to the legacy
+      // `codecRegistry.get` for parameterized codec ids whose contracts
+      // don't have a typeRef/typeParams column the walk could resolve
+      // through. The legacy fallback retires once `ParamRef.refs` is
+      // threaded everywhere (Phase 3.5 T3.5.9-T3.5.11).
+      return byCodecId.get(codecId) ?? legacyCodecRegistry.get(codecId);
     },
   };
 
@@ -649,7 +697,13 @@ export function createExecutionContext<
   const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
   const { registry: contractCodecs, jsonValidators: jsonSchemaValidators } =
-    buildContractCodecRegistry(contract, codecRegistry, types, parameterizedCodecDescriptors);
+    buildContractCodecRegistry(
+      contract,
+      codecDescriptors,
+      codecRegistry,
+      types,
+      parameterizedCodecDescriptors,
+    );
 
   return {
     contract,
