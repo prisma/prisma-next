@@ -9,12 +9,14 @@ let cached: { db: Db; pool: Pool } | undefined;
 
 export function getDb(): Db {
   if (!cached) {
-    // @prisma/dev (PGlite) rejects concurrent connections; cap the pool at 1 so the
-    // smoke test harness stays compatible. One connection is enough for this example,
-    // which runs requests serially in tests.
+    // PRISMA_NEXT_DEMO_PG_POOL_MAX, when set, caps the pool size. The smoke
+    // test sets it to '1' so the example cohabits with @prisma/dev (PGlite),
+    // which rejects concurrent connections. In production the pg default
+    // applies and the framework's own pool sizing wins.
+    const poolMaxRaw = process.env['PRISMA_NEXT_DEMO_PG_POOL_MAX'];
     const pool = new Pool({
       connectionString: process.env['DATABASE_URL'],
-      max: 1,
+      ...(poolMaxRaw === undefined ? {} : { max: Number(poolMaxRaw) }),
     });
     // pg emits 'error' on idle-client disconnects (e.g., the test harness
     // tearing down @prisma/dev while the pool is still around). Without a
