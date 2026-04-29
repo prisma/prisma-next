@@ -39,6 +39,7 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
+
 function aliasCodec<Id extends string, TTraits extends readonly CodecTrait[], TWire, TJs>(
   base: Codec<string, TTraits, TWire, TJs>,
   options: {

@@ -29,8 +29,9 @@
   "devDependencies": {
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
     "@prisma-next/tsdown": "workspace:*",
+    "@standard-schema/spec": "1.1.0",
+    "@types/node": "catalog:",
     "tsdown": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

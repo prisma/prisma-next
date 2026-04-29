@@ -8,9 +8,6 @@ import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeAdapterDescriptor,
 } from '@prisma-next/sql-runtime';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
-import { codecDefinitions } from '../core/codecs';
-import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import {
   type JsonRuntimeParams,
   jsonRuntimeParamsSchema,
@@ -18,6 +15,9 @@ import {
   pgJsonRuntimeFactory,
 } from '../codecs/json-runtime-factory';
 import { createPostgresAdapter } from '../core/adapter';
+import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
+import { codecDefinitions } from '../core/codecs';
+import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
 
 export type { JsonCodecHelper } from '../codecs/json-runtime-factory';

@@ -6,9 +6,11 @@ import type {
 import type {
   Codec,
   CodecLookup,
+  Ctx,
   ParameterizedCodecDescriptorLookup,
 } from '@prisma-next/framework-components/codec';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { describe, expect, it, vi } from 'vitest';
 import {
   deduplicateImports,
@@ -790,19 +792,34 @@ function stubCodecLookup(codecs: Record<string, Codec>): CodecLookup {
 function stubParameterizedCodecLookup(
   renderers: Record<string, (typeParams: Record<string, unknown>) => string>,
 ): ParameterizedCodecDescriptorLookup {
+  // The descriptor type carries a heterogeneous params shape per codec id;
+  // the test only exercises `renderOutputType` so the params schema and
+  // factory placeholders are stubbed at the typed `Record<string, unknown>`
+  // boundary. The factory throws if invoked, which it never is on the emit
+  // path the tests exercise.
+  const stubParamsSchema: StandardSchemaV1<Record<string, unknown>> = {
+    '~standard': {
+      version: 1,
+      vendor: 'test',
+      validate: (value) => ({ value: value as Record<string, unknown> }),
+    },
+  };
+  const stubFactory =
+    (_params: Record<string, unknown>): ((ctx: Ctx) => Codec) =>
+    () => {
+      throw new Error(
+        'stubParameterizedCodecLookup: factory must not be invoked from the emit path',
+      );
+    };
   return {
     get: (codecId) => {
       const renderer = renderers[codecId];
       if (!renderer) return undefined;
       return {
         codecId,
-        // biome-ignore lint/suspicious/noExplicitAny: stub paramsSchema; the test only exercises renderOutputType.
-        paramsSchema: {
-          '~standard': { version: 1, vendor: 'test', validate: (v: unknown) => ({ value: v }) },
-        } as any,
+        paramsSchema: stubParamsSchema,
         renderOutputType: renderer,
-        // biome-ignore lint/suspicious/noExplicitAny: stub factory; never invoked at emit time.
-        factory: (() => () => ({}) as never) as any,
+        factory: stubFactory,
       };
     },
   };

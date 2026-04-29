@@ -11,9 +11,12 @@
  * Codec-model-unification project, M4 cleanup F01.
  */
 
-import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';
+import type {
+  Codec,
+  Ctx,
+  ParameterizedCodecDescriptor,
+} from '@prisma-next/framework-components/codec';
 import { type as arktype } from 'arktype';
-import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import {
   PG_BIT_CODEC_ID,
   PG_CHAR_CODEC_ID,
