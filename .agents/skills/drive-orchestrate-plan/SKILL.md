@@ -300,7 +300,7 @@ For each milestone in `plan.md` (or the single milestone named in `iterate <mile
 
 When the reviewer or implementer surfaces items requiring user decision, the orchestrator presents them in a uniform shape:
 
-```
+```markdown
 **N. <Finding ID and short title>** — <one-paragraph problem statement>.
 
 <Optional context: severity, prior decisions, related findings.>
