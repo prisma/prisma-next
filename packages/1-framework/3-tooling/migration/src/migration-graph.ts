@@ -189,6 +189,7 @@ export function findPathWithInvariants(
   const requiredArr = [...required].sort();
   const requiredBit = new Map<string, number>();
   for (let i = 0; i < requiredArr.length; i++) {
+    // biome-ignore lint/style/noNonNullAssertion: i < requiredArr.length so requiredArr[i] is defined
     requiredBit.set(requiredArr[i]!, 1 << i);
   }
   const fullMask = (1 << requiredArr.length) - 1;
