@@ -21,8 +21,8 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
     defaultFunctionRegistry: createPostgresDefaultFunctionRegistry(),
     generatorDescriptors: createPostgresMutationDefaultGeneratorDescriptors(),
   },
-  create(_stack): SqlControlAdapter<'postgres'> {
-    return new PostgresControlAdapter();
+  create(stack): SqlControlAdapter<'postgres'> {
+    return new PostgresControlAdapter(stack.codecLookup);
   },
 };
 

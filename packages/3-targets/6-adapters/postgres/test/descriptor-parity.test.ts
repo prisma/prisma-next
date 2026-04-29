@@ -8,8 +8,15 @@ describe('adapter descriptor / instance codec parity', () => {
       [...postgresRuntimeAdapterDescriptor.codecs().values()].map((c) => c.id),
     );
 
-    // The adapter doesn't read the stack today; pass an empty stub.
-    const stack = {} as unknown as ExecutionStack<'sql', 'postgres'>;
+    // The adapter reads stack metadata to derive a `codecLookup` for the
+    // renderer; minimal stub that satisfies that path. Codec contents come
+    // from the adapter descriptor itself, so the inner `target` need only
+    // expose its `id` for `extractCodecLookup`'s ownership tracking.
+    const stack = {
+      target: { id: 'postgres' },
+      adapter: postgresRuntimeAdapterDescriptor,
+      extensionPacks: [],
+    } as unknown as ExecutionStack<'sql', 'postgres'>;
     const adapterInstance = postgresRuntimeAdapterDescriptor.create(stack);
     const instanceCodecIds = new Set(
       [...adapterInstance.profile.codecs().values()].map((c) => c.id),

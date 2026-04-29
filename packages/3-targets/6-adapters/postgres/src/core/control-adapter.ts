@@ -1,4 +1,5 @@
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
@@ -19,6 +20,7 @@ import type {
 import { parsePostgresDefault } from '@prisma-next/target-postgres/default-normalizer';
 import { normalizeSchemaNativeType } from '@prisma-next/target-postgres/native-type-normalizer';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { pgEnumControlHooks } from './enum-control-hooks';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresContract } from './types';
@@ -30,6 +32,19 @@ import type { PostgresContract } from './types';
 export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
   readonly familyId = 'sql' as const;
   readonly targetId = 'postgres' as const;
+
+  private readonly codecLookup: CodecLookup;
+
+  /**
+   * @param codecLookup - Codec lookup used by the SQL renderer to resolve
+   *   per-codec metadata at lower-time. Defaults to a Postgres-builtins-only
+   *   lookup when omitted. Stack-aware callers
+   *   (`SqlControlAdapterDescriptor.create(stack)`) supply
+   *   `stack.codecLookup` so extension codecs are visible to the renderer.
+   */
+  constructor(codecLookup?: CodecLookup) {
+    this.codecLookup = codecLookup ?? createPostgresBuiltinCodecLookup();
+  }
 
   /**
    * Target-specific normalizer for raw Postgres default expressions.
@@ -53,7 +68,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
    * without instantiating the runtime adapter.
    */
   lower(ast: AnyQueryAst, context: LowererContext<unknown>): LoweredStatement {
-    return renderLoweredSql(ast, context.contract as PostgresContract);
+    return renderLoweredSql(ast, context.contract as PostgresContract, this.codecLookup);
   }
 
   /**
