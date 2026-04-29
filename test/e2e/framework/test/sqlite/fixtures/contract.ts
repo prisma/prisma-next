@@ -1,5 +1,4 @@
 import {
-  booleanColumn,
   datetimeColumn,
   integerColumn,
   jsonColumn,
@@ -46,7 +45,7 @@ const Profile = model('Profile', {
 const TypedRow = model('TypedRow', {
   fields: {
     id: field.column(integerColumn).id(),
-    active: field.column(booleanColumn),
+    active: field.column(integerColumn),
     createdAt: field.column(datetimeColumn).column('created_at'),
     metadata: field.column(jsonColumn).optional(),
     label: field.column(textColumn),

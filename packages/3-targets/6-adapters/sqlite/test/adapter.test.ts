@@ -46,7 +46,6 @@ const contract = validateContract<SqliteContract>(
           columns: {
             id: { codecId: 'sqlite/integer@1', nativeType: 'integer', nullable: false },
             email: { codecId: 'sqlite/text@1', nativeType: 'text', nullable: false },
-            active: { codecId: 'sqlite/boolean@1', nativeType: 'integer', nullable: false },
             metadata: { codecId: 'sqlite/json@1', nativeType: 'text', nullable: true },
           },
           uniques: [],

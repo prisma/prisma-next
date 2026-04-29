@@ -212,7 +212,7 @@
         "active": {
           "nullable": false,
           "type": {
-            "codecId": "sqlite/boolean@1",
+            "codecId": "sqlite/integer@1",
             "kind": "scalar"
           }
         },
@@ -344,7 +344,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:bed424149c5b0236f0aff35c54e17abc4b25de1cd82fc43b49f60cfd4685864e",
+    "storageHash": "sha256:ef60397fa7c54ebec35f413b333aff536c8236c28a97a179f3f6c120e5d167ac",
     "tables": {
       "comments": {
         "columns": {
@@ -466,7 +466,7 @@
       "typed_rows": {
         "columns": {
           "active": {
-            "codecId": "sqlite/boolean@1",
+            "codecId": "sqlite/integer@1",
             "nativeType": "integer",
             "nullable": false
           },

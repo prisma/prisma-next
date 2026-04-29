@@ -188,7 +188,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
         await ormClient.TypedRow.create({
           id: 10,
-          active: true,
+          active: 1,
           createdAt: new Date('2024-03-15T10:30:00.000Z'),
           metadata: { tags: ['a', 'b'], count: 42 },
           label: 'test',
@@ -201,7 +201,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
 
         expectTypeOf(found).toEqualTypeOf<{
           id: number;
-          active: boolean;
+          active: number;
           createdAt: Date;
           metadata: JsonValue | null;
           label: string;
@@ -215,7 +215,7 @@ describe('e2e: ORM on SQLite', { timeout: timeouts.databaseOperation }, () => {
       await withSqliteTestRuntime<Contract>(contractJsonPath, async ({ ormClient }) => {
         const created = await ormClient.TypedRow.create({
           id: 12,
-          active: true,
+          active: 1,
           createdAt: new Date('2024-01-01T00:00:00.000Z'),
           label: 'no-meta',
         });

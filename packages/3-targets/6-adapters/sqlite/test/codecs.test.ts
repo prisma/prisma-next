@@ -1,7 +1,6 @@
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
-  SQLITE_BOOLEAN_CODEC_ID,
   SQLITE_DATETIME_CODEC_ID,
   SQLITE_INTEGER_CODEC_ID,
   SQLITE_JSON_CODEC_ID,
@@ -70,34 +69,6 @@ describe('SQLite codecs', () => {
     it('handles empty Uint8Array', async () => {
       const input = new Uint8Array([]);
       expect(await codec.decode(await codec.encode!(input))).toEqual(input);
-    });
-  });
-
-  describe('boolean codec', () => {
-    const codec = codecDefinitions.boolean.codec;
-
-    it('has correct id', () => {
-      expect(codec.id).toBe(SQLITE_BOOLEAN_CODEC_ID);
-    });
-
-    it('encodes true as 1', async () => {
-      expect(await codec.encode!(true)).toBe(1);
-    });
-
-    it('encodes false as 0', async () => {
-      expect(await codec.encode!(false)).toBe(0);
-    });
-
-    it('decodes 1 as true', async () => {
-      expect(await codec.decode(1)).toBe(true);
-    });
-
-    it('decodes 0 as false', async () => {
-      expect(await codec.decode(0)).toBe(false);
-    });
-
-    it('decodes nonzero as true', async () => {
-      expect(await codec.decode(42)).toBe(true);
     });
   });
 
@@ -201,7 +172,6 @@ describe('SQLite codecs', () => {
       expect(keys).toContain('integer');
       expect(keys).toContain('real');
       expect(keys).toContain('blob');
-      expect(keys).toContain('boolean');
       expect(keys).toContain('datetime');
       expect(keys).toContain('json');
       expect(keys).toContain('bigint');

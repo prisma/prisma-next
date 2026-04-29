@@ -163,9 +163,9 @@ describe('parseSqliteDefault', () => {
     expect(parseSqliteDefault('NULL')).toEqual({ kind: 'literal', value: null });
   });
 
-  it('returns string for integer nativeType', () => {
-    expect(parseSqliteDefault('42', 'integer')).toEqual({ kind: 'literal', value: '42' });
-    expect(parseSqliteDefault('0', 'integer')).toEqual({ kind: 'literal', value: '0' });
+  it('returns number for safe-range integers and falls back to string for 64-bit values', () => {
+    expect(parseSqliteDefault('42', 'integer')).toEqual({ kind: 'literal', value: 42 });
+    expect(parseSqliteDefault('0', 'integer')).toEqual({ kind: 'literal', value: 0 });
     const big = '9999999999999999999';
     expect(parseSqliteDefault(big, 'integer')).toEqual({ kind: 'literal', value: big });
   });

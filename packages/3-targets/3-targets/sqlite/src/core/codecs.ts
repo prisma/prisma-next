@@ -2,7 +2,6 @@ import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relat
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
-  SQLITE_BOOLEAN_CODEC_ID,
   SQLITE_DATETIME_CODEC_ID,
   SQLITE_INTEGER_CODEC_ID,
   SQLITE_JSON_CODEC_ID,
@@ -62,14 +61,6 @@ const sqliteBlobCodec = codec({
   },
 });
 
-const sqliteBooleanCodec = codec({
-  typeId: SQLITE_BOOLEAN_CODEC_ID,
-  targetTypes: ['integer'],
-  traits: ['equality', 'boolean'],
-  encode: (value: boolean): number => (value ? 1 : 0),
-  decode: (wire: number): boolean => wire !== 0,
-});
-
 const sqliteDatetimeCodec = codec({
   typeId: SQLITE_DATETIME_CODEC_ID,
   targetTypes: ['text'],
@@ -118,7 +109,6 @@ const codecs = defineCodecs()
   .add('integer', sqliteIntegerCodec)
   .add('real', sqliteRealCodec)
   .add('blob', sqliteBlobCodec)
-  .add('boolean', sqliteBooleanCodec)
   .add('datetime', sqliteDatetimeCodec)
   .add('json', sqliteJsonCodec)
   .add('bigint', sqliteBigintCodec);

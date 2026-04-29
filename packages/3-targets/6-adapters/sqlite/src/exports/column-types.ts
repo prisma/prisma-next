@@ -1,7 +1,6 @@
 export {
   bigintColumn,
   blobColumn,
-  booleanColumn,
   datetimeColumn,
   integerColumn,
   jsonColumn,

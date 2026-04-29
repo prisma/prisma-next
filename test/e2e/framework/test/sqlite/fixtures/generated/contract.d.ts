@@ -15,7 +15,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:bed424149c5b0236f0aff35c54e17abc4b25de1cd82fc43b49f60cfd4685864e'>;
+  StorageHashBase<'sha256:ef60397fa7c54ebec35f413b333aff536c8236c28a97a179f3f6c120e5d167ac'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:213031a5ce861b455f22bc065769080ea0357fabcb999de0190524ecd32531f7'>;
@@ -52,7 +52,7 @@ export type FieldOutputTypes = {
   };
   readonly TypedRow: {
     readonly id: CodecTypes['sqlite/integer@1']['output'];
-    readonly active: CodecTypes['sqlite/boolean@1']['output'];
+    readonly active: CodecTypes['sqlite/integer@1']['output'];
     readonly createdAt: CodecTypes['sqlite/datetime@1']['output'];
     readonly metadata: CodecTypes['sqlite/json@1']['output'] | null;
     readonly label: CodecTypes['sqlite/text@1']['output'];
@@ -64,11 +64,48 @@ export type FieldOutputTypes = {
     readonly invitedById: CodecTypes['sqlite/integer@1']['output'] | null;
   };
 };
+export type FieldInputTypes = {
+  readonly Comment: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly body: CodecTypes['sqlite/text@1']['input'];
+    readonly postId: CodecTypes['sqlite/integer@1']['input'];
+  };
+  readonly Item: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly name: CodecTypes['sqlite/text@1']['input'];
+    readonly label: CodecTypes['sqlite/text@1']['input'];
+  };
+  readonly Post: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly title: CodecTypes['sqlite/text@1']['input'];
+    readonly userId: CodecTypes['sqlite/integer@1']['input'];
+    readonly views: CodecTypes['sqlite/integer@1']['input'];
+  };
+  readonly Profile: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly userId: CodecTypes['sqlite/integer@1']['input'];
+    readonly bio: CodecTypes['sqlite/text@1']['input'];
+  };
+  readonly TypedRow: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly active: CodecTypes['sqlite/integer@1']['input'];
+    readonly createdAt: CodecTypes['sqlite/datetime@1']['input'];
+    readonly metadata: CodecTypes['sqlite/json@1']['input'] | null;
+    readonly label: CodecTypes['sqlite/text@1']['input'];
+  };
+  readonly User: {
+    readonly id: CodecTypes['sqlite/integer@1']['input'];
+    readonly name: CodecTypes['sqlite/text@1']['input'];
+    readonly email: CodecTypes['sqlite/text@1']['input'];
+    readonly invitedById: CodecTypes['sqlite/integer@1']['input'] | null;
+  };
+};
 export type TypeMaps = TypeMapsType<
   CodecTypes,
   OperationTypes,
   QueryOperationTypes,
-  FieldOutputTypes
+  FieldOutputTypes,
+  FieldInputTypes
 >;
 
 type ContractBase = ContractType<
@@ -184,7 +221,7 @@ type ContractBase = ContractType<
           };
           readonly active: {
             readonly nativeType: 'integer';
-            readonly codecId: 'sqlite/boolean@1';
+            readonly codecId: 'sqlite/integer@1';
             readonly nullable: false;
           };
           readonly created_at: {
@@ -371,7 +408,7 @@ type ContractBase = ContractType<
         };
         readonly active: {
           readonly nullable: false;
-          readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/boolean@1' };
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'sqlite/integer@1' };
         };
         readonly createdAt: {
           readonly nullable: false;
