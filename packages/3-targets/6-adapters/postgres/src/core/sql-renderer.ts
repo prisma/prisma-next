@@ -21,63 +21,117 @@ import {
   type ParamRef,
   type ProjectionItem,
   type SelectAst,
+  type Codec as SqlCodec,
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '@prisma-next/target-postgres/codec-ids';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-postgres/sql-utils';
 import type { PostgresContract } from './types';
 
-// Mirrors `VECTOR_CODEC_ID` in `@prisma-next/extension-pgvector/core/constants`.
-// Duplicated here rather than imported because the canonical export is not
-// part of the extension's public subpath surface, and `@prisma-next/adapter-postgres`
-// does not (and should not) take a runtime dependency on the extension package
-// just for one constant. The whole `getCodecParamCast` switch is slated for
-// removal under TML-2310 ("Move SQL param-cast metadata onto codec descriptors"),
-// at which point this and the JSON/JSONB IDs below also disappear.
-const VECTOR_CODEC_ID = 'pg/vector@1' as const;
+/**
+ * Postgres native types whose unknown-OID parameter inference is reliable in
+ * arbitrary expression positions. Parameters bound to a codec whose
+ * `meta.db.sql.postgres.nativeType` falls in this set are emitted as plain
+ * `$N`; everything else (including `json`, `jsonb`, extension types like
+ * `vector`, and unknown user types) is emitted as `$N::<nativeType>` so the
+ * planner picks an unambiguous overload.
+ *
+ * `json` / `jsonb` are intentionally excluded despite being Postgres builtins:
+ * their operator overloads make context inference unreliable in expression
+ * positions (e.g. `$1 -> 'key'` is ambiguous between the two).
+ *
+ * Spellings match the on-disk `meta.db.sql.postgres.nativeType` values in
+ * `@prisma-next/target-postgres`'s codec definitions, not the `udt_name`
+ * abbreviations that ADR 205 used as illustrative shorthand. The lookup-based
+ * cast policy compares against these strings directly.
+ */
+const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
+  // Numeric
+  'integer',
+  'smallint',
+  'bigint',
+  'real',
+  'double precision',
+  'numeric',
+  // Boolean
+  'boolean',
+  // Strings
+  'text',
+  'character',
+  'character varying',
+  // Temporal
+  'timestamp',
+  'timestamp without time zone',
+  'timestamp with time zone',
+  'time',
+  'timetz',
+  'interval',
+  // Bit strings
+  'bit',
+  'bit varying',
+]);
 
 /**
- * Map a codec ID to its `::cast` suffix, if Postgres requires one for
- * parameterized values (e.g. `$1::vector`, `$1::jsonb`).
- *
- * NOTE: hardcoded codec IDs here are a known wart, tracked separately by
- * TML-2310 ("Move SQL param-cast metadata onto codec descriptors").
- * Until that lands the cast lives on the renderer rather than the codec.
+ * Read the optional `meta.db.sql.postgres.nativeType` field that SQL codecs
+ * carry. The framework `CodecLookup.get` returns the framework base codec,
+ * which doesn't declare `meta`; the SQL `Codec` extends the base with an
+ * optional `meta: CodecMeta`. Every codec actually registered into a SQL
+ * codec lookup conforms to `SqlCodec`, so it's safe to narrow on the
+ * `meta` shape directly.
  */
-function getCodecParamCast(codecId: string | undefined): string | undefined {
-  if (codecId === VECTOR_CODEC_ID) {
-    return 'vector';
-  }
-  if (codecId === PG_JSON_CODEC_ID) {
-    return 'json';
-  }
-  if (codecId === PG_JSONB_CODEC_ID) {
-    return 'jsonb';
-  }
-  return undefined;
+function getCodecPostgresNativeType(codec: SqlCodec | undefined): string | undefined {
+  return codec?.meta?.db?.sql?.postgres?.nativeType;
 }
 
 function renderTypedParam(
   index: number,
   codecId: string | undefined,
-  // codecLookup will drive the cast policy in M2; for M1 the threading is in
-  // place but the existing `getCodecParamCast` switch still decides emission.
-  _codecLookup: CodecLookup,
+  codecLookup: CodecLookup,
+  contractNativeTypes: ReadonlyMap<string, string>,
 ): string {
-  const cast = getCodecParamCast(codecId);
-  return cast ? `$${index}::${cast}` : `$${index}`;
+  if (codecId === undefined) {
+    return `$${index}`;
+  }
+  // Primary source: the codec's `meta.db.sql.postgres.nativeType`. If the
+  // codec isn't registered in the lookup at all (lookup miss), fall back to
+  // the contract-storage map: contracts carry `codecId → nativeType` for
+  // every column, and the contract is itself a stack-derived artifact, so
+  // it's a sound metadata source when the runtime didn't compose a stack
+  // (e.g. `createPostgresAdapter()` without extension packs).
+  const codec = codecLookup.get(codecId) as SqlCodec | undefined;
+  let nativeType = getCodecPostgresNativeType(codec);
+  if (nativeType === undefined && codec === undefined) {
+    nativeType = contractNativeTypes.get(codecId);
+  }
+  if (nativeType !== undefined && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
+    return `$${index}::${nativeType}`;
+  }
+  return `$${index}`;
 }
 
 /**
  * Per-render carrier threaded through every helper. Bundles the param-index
- * map (for `$N` numbering) and the assembled-stack `codecLookup` (for
- * cast policy at the `renderTypedParam` chokepoint). Carrying both on a
- * single value keeps helper signatures stable across M1/M2.
+ * map (for `$N` numbering), the assembled-stack `codecLookup`, and a
+ * contract-derived `codecId → nativeType` fallback used when the lookup
+ * misses entirely. Carrying these on a single value keeps helper signatures
+ * stable.
  */
 interface ParamIndexMap {
   readonly indexMap: Map<ParamRef, number>;
   readonly codecLookup: CodecLookup;
+  readonly contractNativeTypes: ReadonlyMap<string, string>;
+}
+
+function buildContractNativeTypeMap(contract: PostgresContract): ReadonlyMap<string, string> {
+  const byCodecId = new Map<string, string>();
+  for (const table of Object.values(contract.storage.tables)) {
+    for (const column of Object.values(table.columns)) {
+      if (!byCodecId.has(column.codecId)) {
+        byCodecId.set(column.codecId, column.nativeType);
+      }
+    }
+  }
+  return byCodecId;
 }
 
 /**
@@ -102,7 +156,11 @@ export function renderLoweredSql(
     indexMap.set(ref, params.length + 1);
     params.push(ref.value);
   }
-  const pim: ParamIndexMap = { indexMap, codecLookup };
+  const pim: ParamIndexMap = {
+    indexMap,
+    codecLookup,
+    contractNativeTypes: buildContractNativeTypeMap(contract),
+  };
 
   const node = ast;
   let sql: string;
@@ -479,7 +537,7 @@ function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
-  return renderTypedParam(index, ref.codecId, pim.codecLookup);
+  return renderTypedParam(index, ref.codecId, pim.codecLookup, pim.contractNativeTypes);
 }
 
 function renderLiteral(expr: LiteralExpr): string {
