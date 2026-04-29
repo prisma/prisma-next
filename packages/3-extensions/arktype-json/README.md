@@ -77,5 +77,4 @@ The demo's contract (`examples/prisma-next-demo/prisma/contract.ts`) carries thi
 
 ## See also
 
-- [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale
-- [codec-registry-unification spec § Case J](../../../projects/codec-registry-unification/spec.md) — JSON-with-schema as a pinning case for the descriptor model
+- [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale, including JSON-with-schema as a pinning case for the per-library extension pattern.
