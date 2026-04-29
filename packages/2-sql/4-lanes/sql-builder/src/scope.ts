@@ -1,21 +1,24 @@
 import type { QueryOperationTypesBase, StorageTable } from '@prisma-next/sql-contract/types';
 import type { AnyFromSource, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type { ScopeField } from '@prisma-next/sql-relational-core/expression';
+
+export type { ScopeField };
+
+export type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
+
+export type TraitField = { traits: readonly string[]; nullable: boolean };
+export type FieldSpec = ScopeField | TraitField;
 
 export type GatedMethod<Capabilities, Required, Method> = Capabilities extends Required
   ? Method
   : never;
 
-type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
-export declare const ExpressionType: unique symbol;
 export declare const JoinOuterScope: unique symbol;
 export declare const SubqueryMarker: unique symbol;
 
 export type Expand<T> = { [K in keyof T]: T[K] } & unknown;
 export type EmptyRow = Record<never, ScopeField>;
 
-export type ScopeField = { codecId: string; nullable: boolean };
-export type TraitField = { traits: readonly string[]; nullable: boolean };
-export type FieldSpec = ScopeField | TraitField;
 export type ScopeTable = Record<string, ScopeField>;
 
 export type Scope = {
@@ -83,4 +86,4 @@ export type QueryContext = {
   readonly resolvedColumnOutputTypes: Record<string, unknown>;
 };
 
-export type { CodecTypesBase, StorageTable };
+export type { StorageTable };

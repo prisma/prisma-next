@@ -37,16 +37,28 @@ describe('extension operations only appear on fields whose codec matches', () =>
 });
 
 describe('extension operation argument types', () => {
-  test('cosineDistance accepts vector argument', () => {
+  test('cosineDistance accepts raw JS value, null, and another vector column', () => {
     type Fn = PostAccessor['embedding']['cosineDistance'];
     expectTypeOf<Fn>().toBeFunction();
-    expectTypeOf<Parameters<Fn>>().toEqualTypeOf<[number[] | null]>();
+    const fn = null as unknown as Fn;
+    // Raw JS vector literal
+    fn([1, 2, 3]);
+    // null (embedding is nullable)
+    fn(null);
+    // Another vector column — column handles implement Expression, so they
+    // satisfy the Expression arm of CodecExpression.
+    const otherPost = null as unknown as PostAccessor;
+    fn(otherPost.embedding);
   });
 
-  test('cosineSimilarity accepts vector argument', () => {
+  test('cosineSimilarity accepts raw JS value, null, and another vector column', () => {
     type Fn = PostAccessor['embedding']['cosineSimilarity'];
     expectTypeOf<Fn>().toBeFunction();
-    expectTypeOf<Parameters<Fn>>().toEqualTypeOf<[number[] | null]>();
+    const fn = null as unknown as Fn;
+    fn([1, 2, 3]);
+    fn(null);
+    const otherPost = null as unknown as PostAccessor;
+    fn(otherPost.embedding);
   });
 });
 

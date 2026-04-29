@@ -9,9 +9,13 @@ export interface ReturnSpec {
   readonly nullable: boolean;
 }
 
+export type SelfSpec =
+  | { readonly codecId: string; readonly traits?: never }
+  | { readonly traits: readonly string[]; readonly codecId?: never };
+
 export interface OperationEntry {
-  readonly args: readonly ParamSpec[];
-  readonly returns: ReturnSpec;
+  readonly self?: SelfSpec;
+  readonly impl: (...args: never[]) => unknown;
 }
 
 export type OperationDescriptor<T extends OperationEntry = OperationEntry> = T & {
@@ -33,18 +37,16 @@ export function createOperationRegistry<
       if (descriptor.method in operations) {
         throw new Error(`Operation "${descriptor.method}" is already registered`);
       }
-      descriptor.args.forEach((arg, i) => {
-        const hasCodecId = arg.codecId !== undefined;
-        const hasTraits = arg.traits !== undefined && arg.traits.length > 0;
+      if (descriptor.self) {
+        const hasCodecId = descriptor.self.codecId !== undefined;
+        const hasTraits = descriptor.self.traits !== undefined && descriptor.self.traits.length > 0;
         if (!hasCodecId && !hasTraits) {
-          throw new Error(
-            `Operation "${descriptor.method}" arg[${i}] has neither codecId nor traits`,
-          );
+          throw new Error(`Operation "${descriptor.method}" self has neither codecId nor traits`);
         }
         if (hasCodecId && hasTraits) {
-          throw new Error(`Operation "${descriptor.method}" arg[${i}] has both codecId and traits`);
+          throw new Error(`Operation "${descriptor.method}" self has both codecId and traits`);
         }
-      });
+      }
       const { method: _method, ...entry } = descriptor;
       // OperationDescriptor<T> = T & { method }, so stripping method yields T.
       // TypeScript can't prove Omit<T & { method }, 'method'> = T for generic T.

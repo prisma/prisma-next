@@ -167,18 +167,38 @@ export type OperationTypesOf<T> = [T] extends [never]
       : Record<string, never>
     : Record<string, never>;
 
-export type QueryOperationArgSpec = {
-  readonly codecId?: string;
-  readonly traits?: readonly CodecTrait[];
-  readonly nullable: boolean;
+/**
+ * Dispatch hint identifying the first-argument target of an operation.
+ *
+ * Used by ORM column helpers to decide whether an operation is reachable on a
+ * field. Either names a concrete codec identity or a set of capability traits
+ * that the field's codec must carry.
+ */
+export type QueryOperationSelfSpec =
+  | { readonly codecId: string; readonly traits?: never }
+  | { readonly traits: readonly CodecTrait[]; readonly codecId?: never };
+
+/**
+ * Structural shape an operation's impl must return: any value carrying a
+ * codec-exact `returnType` descriptor. `Expression<T>` (from
+ * `@prisma-next/sql-relational-core/expression`, with `T extends ScopeField`)
+ * extends this. Trait-targeted returns are deliberately excluded — predicate
+ * detection and result decoding both depend on knowing the concrete return
+ * codec.
+ */
+export type QueryOperationReturn = {
+  readonly returnType: { readonly codecId: string; readonly nullable: boolean };
 };
 
 export type QueryOperationTypeEntry = {
-  readonly args: readonly QueryOperationArgSpec[];
-  readonly returns: { readonly codecId: string; readonly nullable: boolean };
+  readonly self?: QueryOperationSelfSpec;
+  readonly impl: (...args: never[]) => QueryOperationReturn;
 };
 
-export type SqlQueryOperationTypes<T extends Record<string, QueryOperationTypeEntry>> = T;
+export type SqlQueryOperationTypes<
+  _CT extends Record<string, { readonly input: unknown; readonly output: unknown }>,
+  T extends Record<string, QueryOperationTypeEntry>,
+> = T;
 
 export type QueryOperationTypesBase = Record<string, QueryOperationTypeEntry>;
 

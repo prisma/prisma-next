@@ -1,19 +1,14 @@
 import type { QueryOperationTypesBase } from '@prisma-next/sql-contract/types';
 import type {
-  Expand,
-  ExpressionType,
-  FieldSpec,
-  QueryContext,
-  Scope,
-  ScopeField,
-  ScopeTable,
-  Subquery,
-} from './scope';
+  CodecExpression,
+  Expression,
+  TraitExpression,
+} from '@prisma-next/sql-relational-core/expression';
+import type { Expand, QueryContext, Scope, ScopeField, ScopeTable, Subquery } from './scope';
 
-export type Expression<T extends FieldSpec> = {
-  [ExpressionType]: T;
-  buildAst(): import('@prisma-next/sql-relational-core/ast').AnyExpression;
-};
+export type { CodecExpression, Expression, TraitExpression };
+
+export type BooleanCodecType = { codecId: 'pg/bool@1'; nullable: boolean };
 
 export type WithField<Source, Field extends ScopeField, Alias extends string> = Expand<
   Source & { [K in Alias]: Field }
@@ -39,13 +34,6 @@ export type FieldProxy<AvailableScope extends Scope> = {
   };
 };
 
-export type ExpressionOrValue<
-  T extends ScopeField,
-  CT extends Record<string, { readonly input: unknown }>,
-> = Expression<T> | (T['codecId'] extends keyof CT ? CT[T['codecId']]['input'] : never);
-
-export type BooleanCodecType = { codecId: 'pg/bool@1'; nullable: boolean };
-
 export type ExpressionBuilder<AvailableScope extends Scope, QC extends QueryContext> = (
   fields: FieldProxy<AvailableScope>,
   fns: Functions<QC>,
@@ -67,70 +55,37 @@ export type OrderByScope<
   namespaces: AvailableScope['namespaces'];
 };
 
-type CodecIdsWithTrait<
-  CT extends Record<string, { readonly input: unknown }>,
-  RequiredTraits extends readonly string[],
-> = {
-  [K in keyof CT & string]: CT[K] extends { readonly traits: infer T }
-    ? [RequiredTraits[number]] extends [T]
-      ? K
-      : never
-    : never;
-}[keyof CT & string];
-
-type ResolveExtArg<Arg, CT extends Record<string, { readonly input: unknown }>> = Arg extends {
-  readonly codecId: infer CId extends string;
-  readonly nullable: infer N extends boolean;
-}
-  ? ExpressionOrValue<{ codecId: CId; nullable: N }, CT>
-  : Arg extends {
-        readonly traits: infer T extends readonly string[];
-        readonly nullable: infer N extends boolean;
-      }
-    ? ExpressionOrValue<{ codecId: CodecIdsWithTrait<CT, T>; nullable: N }, CT>
-    : never;
-
-type ExtensionFunctionArgs<
-  Args extends readonly unknown[],
-  CT extends Record<string, { readonly input: unknown }>,
-> = { [I in keyof Args]: ResolveExtArg<Args[I], CT> };
-
-type DeriveExtFunctions<
-  OT extends QueryOperationTypesBase,
-  CT extends Record<string, { readonly input: unknown }>,
-> = {
-  [K in keyof OT]: (
-    ...args: ExtensionFunctionArgs<OT[K]['args'], CT>
-  ) => Expression<OT[K]['returns']>;
+type DeriveExtFunctions<OT extends QueryOperationTypesBase> = {
+  [K in keyof OT]: OT[K]['impl'];
 };
 
 export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown }>> = {
   eq: <CodecId extends string>(
-    a: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT> | null,
-    b: ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT> | null,
+    a: CodecExpression<CodecId, boolean, CT> | null,
+    b: CodecExpression<CodecId, boolean, CT> | null,
   ) => Expression<BooleanCodecType>;
-  ne: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT> | null,
-    b: ExpressionOrValue<T, CT> | null,
+  ne: <CodecId extends string, N extends boolean>(
+    a: CodecExpression<CodecId, N, CT> | null,
+    b: CodecExpression<CodecId, N, CT> | null,
   ) => Expression<BooleanCodecType>;
-  gt: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT>,
-    b: ExpressionOrValue<T, CT>,
+  gt: <CodecId extends string, N extends boolean>(
+    a: CodecExpression<CodecId, N, CT>,
+    b: CodecExpression<CodecId, N, CT>,
   ) => Expression<BooleanCodecType>;
-  gte: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT>,
-    b: ExpressionOrValue<T, CT>,
+  gte: <CodecId extends string, N extends boolean>(
+    a: CodecExpression<CodecId, N, CT>,
+    b: CodecExpression<CodecId, N, CT>,
   ) => Expression<BooleanCodecType>;
-  lt: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT>,
-    b: ExpressionOrValue<T, CT>,
+  lt: <CodecId extends string, N extends boolean>(
+    a: CodecExpression<CodecId, N, CT>,
+    b: CodecExpression<CodecId, N, CT>,
   ) => Expression<BooleanCodecType>;
-  lte: <T extends ScopeField>(
-    a: ExpressionOrValue<T, CT>,
-    b: ExpressionOrValue<T, CT>,
+  lte: <CodecId extends string, N extends boolean>(
+    a: CodecExpression<CodecId, N, CT>,
+    b: CodecExpression<CodecId, N, CT>,
   ) => Expression<BooleanCodecType>;
-  and: (...ands: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
-  or: (...ors: ExpressionOrValue<BooleanCodecType, CT>[]) => Expression<BooleanCodecType>;
+  and: (...ands: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
+  or: (...ors: CodecExpression<'pg/bool@1', boolean, CT>[]) => Expression<BooleanCodecType>;
 
   exists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
   notExists: (subquery: Subquery<Record<string, ScopeField>>) => Expression<BooleanCodecType>;
@@ -142,7 +97,7 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
     ): Expression<BooleanCodecType>;
     <CodecId extends string>(
       expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      values: Array<ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>>,
+      values: Array<CodecExpression<CodecId, boolean, CT>>,
     ): Expression<BooleanCodecType>;
   };
 
@@ -153,13 +108,13 @@ export type BuiltinFunctions<CT extends Record<string, { readonly input: unknown
     ): Expression<BooleanCodecType>;
     <CodecId extends string>(
       expr: Expression<{ codecId: CodecId; nullable: boolean }>,
-      values: Array<ExpressionOrValue<{ codecId: CodecId; nullable: boolean }, CT>>,
+      values: Array<CodecExpression<CodecId, boolean, CT>>,
     ): Expression<BooleanCodecType>;
   };
 };
 
 export type Functions<QC extends QueryContext> = BuiltinFunctions<QC['codecTypes']> &
-  DeriveExtFunctions<QC['queryOperationTypes'], QC['codecTypes']>;
+  DeriveExtFunctions<QC['queryOperationTypes']>;
 
 export type CountField = { codecId: 'pg/int8@1'; nullable: false };
 

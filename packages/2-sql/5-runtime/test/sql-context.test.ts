@@ -52,13 +52,8 @@ function createTestExtensionDescriptor(options?: {
     ? [
         {
           method: 'testOp',
-          args: [{ codecId: 'test/ext@1', nullable: false }],
-          returns: { codecId: 'test/ext@1', nullable: false },
-          lowering: {
-            targetFamily: 'sql' as const,
-            strategy: 'function' as const,
-            template: 'test()',
-          },
+          self: { codecId: 'test/ext@1' },
+          impl: () => undefined as never,
         },
       ]
     : [];
@@ -165,13 +160,8 @@ describe('comprehensive descriptor-based derivation', () => {
     const targetOps: SqlOperationDescriptor[] = [
       {
         method: 'targetOp',
-        args: [{ codecId: 'target/special@1', nullable: false }],
-        returns: { codecId: 'target/special@1', nullable: false },
-        lowering: {
-          targetFamily: 'sql' as const,
-          strategy: 'function' as const,
-          template: 'target_fn()',
-        },
+        self: { codecId: 'target/special@1' },
+        impl: () => undefined as never,
       },
     ];
 

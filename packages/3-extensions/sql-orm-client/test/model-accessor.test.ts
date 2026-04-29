@@ -82,6 +82,47 @@ describe('createModelAccessor', () => {
     expect(field['ilike']).toBeUndefined();
   });
 
+  it('cosineDistance accepts a raw vector value and produces a ParamRef on arg0', () => {
+    const post = createModelAccessor(context, 'Post');
+    const result = post['embedding']!.cosineDistance([1, 2, 3]) as unknown as Record<
+      string,
+      unknown
+    >;
+    // Non-predicate return → ComparisonMethods wrapper; the underlying AST is
+    // behind the comparison methods. Invoke a comparison to observe it.
+    const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
+    expect(gt).toBeInstanceOf(BinaryExpr);
+    const opExpr = gt.left as OperationExpr;
+    expect(opExpr).toBeInstanceOf(OperationExpr);
+    expect(opExpr.method).toBe('cosineDistance');
+    expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
+    expect(opExpr.args).toHaveLength(1);
+    expect(opExpr.args[0]).toBeInstanceOf(ParamRef);
+    expect((opExpr.args[0] as ParamRef).value).toEqual([1, 2, 3]);
+  });
+
+  it('cosineDistance accepts another vector column and produces a ColumnRef on arg0 (cross-column composition)', () => {
+    // Cross-column composition: the second argument is another column handle
+    // (an Expression with buildAst → ColumnRef), not a raw JS value.
+    // The factory must detect it as an Expression and emit a ColumnRef, not a
+    // ParamRef wrapping the accessor object.
+    const post = createModelAccessor(context, 'Post');
+    const otherPost = createModelAccessor(context, 'Post');
+
+    const result = post['embedding']!.cosineDistance(otherPost['embedding']!) as unknown as Record<
+      string,
+      unknown
+    >;
+    const gt = (result['gt'] as (value: number) => BinaryExpr)(0.5);
+    const opExpr = gt.left as OperationExpr;
+    expect(opExpr).toBeInstanceOf(OperationExpr);
+    expect(opExpr.method).toBe('cosineDistance');
+    expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
+    expect(opExpr.args).toHaveLength(1);
+    expect(opExpr.args[0]).toBeInstanceOf(ColumnRef);
+    expect(opExpr.args[0]).toEqual(ColumnRef.of('posts', 'embedding'));
+  });
+
   it('creates list literal, null check, and order directive helpers', () => {
     const accessor = createModelAccessor(context, 'Post');
 
@@ -172,12 +213,14 @@ describe('createModelAccessor', () => {
     const user = createModelAccessor(context, 'User');
     expect((user as Record<PropertyKey, unknown>)[Symbol.iterator]).toBeUndefined();
 
-    // Unknown fields have no codec → fail-closed → no eq method → throws
+    // Unknown fields in a shorthand predicate are surfaced loudly — silent
+    // skip would drop user intent (a typo'd filter would match every row).
     expect(() => user['posts']!.some({ unknown: 'value' })).toThrow(
-      /does not support equality comparisons/,
+      /Shorthand filter on "Post\.unknown": field is not defined on the model/,
     );
 
-    // Undefined values are skipped, so unknown fields with undefined still work
+    // Undefined values are skipped before the field lookup, so a shorthand
+    // with an unknown field and undefined value is a no-op.
     const someUndefined = user['posts']!.some({ unknown: undefined }) as ExistsExpr;
     expect(someUndefined.subquery.where).toEqual(
       BinaryExpr.eq(ColumnRef.of('posts', 'user_id'), ColumnRef.of('users', 'id')),
@@ -304,7 +347,7 @@ describe('createModelAccessor', () => {
     ]);
   });
 
-  it('falls back to storage metadata and model names when table mappings are missing', () => {
+  it('returns undefined for fields whose storage table is not declared', () => {
     const base = getTestContract();
     const storageFallbackContract = {
       ...base,
@@ -320,12 +363,20 @@ describe('createModelAccessor', () => {
       },
     };
 
-    expect(
-      createModelAccessor({ ...context, contract: storageFallbackContract } as never, 'User')[
-        'name'
-      ]!.isNull(),
-    ).toEqual(NullCheckExpr.isNull(ColumnRef.of('users_storage', 'name')));
+    // Contract claims the User model lives in `users_storage`, but
+    // storage.tables has no entry for it. The Proxy returns undefined for
+    // fields whose column cannot be resolved, matching plain JS object
+    // semantics. Downstream consumers (or TypeScript at compile time) are
+    // responsible for noticing the missing column.
+    const accessor = createModelAccessor(
+      { ...context, contract: storageFallbackContract } as never,
+      'User',
+    );
+    expect(accessor['name']).toBeUndefined();
+  });
 
+  it('resolves column when storage.table maps to a declared table with the field', () => {
+    const base = getTestContract();
     const modelNameFallbackContract = {
       ...base,
       models: {
@@ -529,9 +580,8 @@ describe('createModelAccessor', () => {
       const queryOperations = createSqlOperationRegistry();
       queryOperations.register({
         method: 'synthetic',
-        args: [{ traits: ['equality', 'textual'], nullable: false }],
-        returns: { codecId: 'pg/bool@1', nullable: false },
-        lowering: { targetFamily: 'sql', strategy: 'function', template: 'SYNTHETIC({{self}})' },
+        self: { traits: ['equality', 'textual'] },
+        impl: () => undefined as never,
       });
 
       const codecs = createCodecRegistry();

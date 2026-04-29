@@ -7,12 +7,11 @@ import {
   BinaryExpr,
   ColumnRef,
   ExistsExpr,
-  OperationExpr,
-  ParamRef,
   ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import type { Expression, ScopeField } from '@prisma-next/sql-relational-core/expression';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import {
   getFieldToColumnMap,
@@ -67,11 +66,12 @@ export function createModelAccessor<
   }
 
   for (const [name, entry] of Object.entries(context.queryOperations.entries())) {
-    const self = entry.args[0];
     const op: NamedOp = [name, entry];
-    if (self?.codecId) {
+    const self = entry.self;
+    if (!self) continue;
+    if (self.codecId !== undefined) {
       registerOp(self.codecId, op);
-    } else if (self?.traits) {
+    } else if (self.traits !== undefined) {
       for (const codec of context.codecs.values()) {
         const codecTraits: readonly string[] = codec.traits ?? [];
         if (self.traits.every((t) => codecTraits.includes(t))) {
@@ -93,96 +93,96 @@ export function createModelAccessor<
       }
 
       const columnName = fieldToColumn[prop] ?? prop;
-      const traits = resolveFieldTraits(contract, modelName, prop, context);
-      const codecId = resolveFieldCodecId(contract, tableName, columnName);
-      const operations = codecId ? (opsByCodecId.get(codecId) ?? []) : [];
-      return createScalarFieldAccessor(tableName, columnName, codecId, traits, operations, context);
+      const column = resolveColumn(contract, tableName, columnName);
+      // Unknown fields return `undefined`, matching plain JS object semantics.
+      // The `ModelAccessor<TContract, ModelName>` type already rejects typos
+      // at compile time for TS consumers, and contexts that iterate accessor
+      // keys (e.g. relation-shorthand predicates) can detect missing fields
+      // with an `undefined` check and raise their own, domain-specific error.
+      if (!column) {
+        return undefined;
+      }
+      const traits = context.codecs.traitsOf(column.codecId);
+      const operations = opsByCodecId.get(column.codecId) ?? [];
+      return createScalarFieldAccessor(
+        tableName,
+        columnName,
+        column.codecId,
+        column.nullable,
+        traits,
+        operations,
+        context,
+      );
     },
   });
 }
 
-function resolveFieldTraits(
-  contract: Contract<SqlStorage>,
-  modelName: string,
-  fieldName: string,
-  context: ExecutionContext,
-): readonly string[] {
-  const fieldType = modelOf(contract, modelName)?.fields?.[fieldName]?.type;
-  const codecId = fieldType?.kind === 'scalar' ? fieldType.codecId : undefined;
-  if (!codecId) return [];
-  return context.codecs.traitsOf(codecId);
-}
-
-function resolveFieldCodecId(
+function resolveColumn(
   contract: Contract<SqlStorage>,
   tableName: string,
   columnName: string,
-): string | undefined {
-  const table = contract.storage.tables?.[tableName];
-  return table?.columns?.[columnName]?.codecId;
+): { readonly codecId: string; readonly nullable: boolean } | undefined {
+  const column = contract.storage.tables?.[tableName]?.columns?.[columnName];
+  if (!column) return undefined;
+  return { codecId: column.codecId, nullable: column.nullable };
 }
 
 function createScalarFieldAccessor(
   tableName: string,
   columnName: string,
-  codecId: string | undefined,
+  codecId: string,
+  nullable: boolean,
   traits: readonly string[],
   operations: readonly NamedOp[],
   context: ExecutionContext,
 ): Partial<ComparisonMethodFns<unknown>> {
   const column = ColumnRef.of(tableName, columnName);
-  const methods: Record<string, unknown> = {};
-
+  const comparisonEntries: Array<[string, unknown]> = [];
   for (const [name, meta] of Object.entries(COMPARISON_METHODS_META)) {
-    if (meta.traits.some((t) => !traits.includes(t))) {
-      continue;
-    }
-    methods[name] = meta.create(column, codecId);
+    if (meta.traits.some((t) => !traits.includes(t))) continue;
+    comparisonEntries.push([name, meta.create(column, codecId)]);
   }
+
+  const accessor = {
+    returnType: { codecId, nullable },
+    buildAst: () => column,
+    ...Object.fromEntries(comparisonEntries),
+  } as Expression<ScopeField> & Record<string, unknown>;
 
   for (const [name, entry] of operations) {
-    methods[name] = createExtensionMethodFactory(column, name, entry, context);
+    accessor[name] = createExtensionMethodFactory(accessor, entry, context);
   }
 
-  return methods as Partial<ComparisonMethodFns<unknown>>;
+  return accessor as Partial<ComparisonMethodFns<unknown>>;
 }
 
 function createExtensionMethodFactory(
-  column: ColumnRef,
-  methodName: string,
+  selfExpr: Expression<ScopeField>,
   entry: SqlOperationEntry,
   context: ExecutionContext,
 ): (...args: unknown[]) => unknown {
-  const returnTraits = context.codecs.traitsOf(entry.returns.codecId);
-  const isPredicate = returnTraits.includes('boolean');
-
   return (...args: unknown[]) => {
-    const userArgSpecs = entry.args.slice(1);
-    const astArgs = userArgSpecs.map((argSpec, i) => {
-      return ParamRef.of(args[i], argSpec.codecId ? { codecId: argSpec.codecId } : undefined);
-    });
-
-    const opExpr = new OperationExpr({
-      method: methodName,
-      self: column,
-      args: astArgs,
-      returns: entry.returns,
-      lowering: entry.lowering,
-    });
+    // `entry.impl` is typed `(...args: never[]) => QueryOperationReturn` —
+    // `never[]` args block direct invocation with unknown values, and the
+    // declared return omits `buildAst` (sql-contract intentionally doesn't
+    // depend on relational-core). Cast here to the practical shape: authors
+    // always return Expression<ScopeField> via `buildOperation`.
+    const impl = entry.impl as (self: unknown, ...args: unknown[]) => Expression<ScopeField>;
+    const result = impl(selfExpr, ...args);
+    const returnCodecId = result.returnType.codecId;
+    const returnTraits = context.codecs.traitsOf(returnCodecId);
+    const isPredicate = returnTraits.includes('boolean');
 
     if (isPredicate) {
-      return opExpr;
+      return result.buildAst();
     }
 
+    const resultAst = result.buildAst();
     const methods: Record<string, unknown> = {};
-
     for (const [resultMethodName, meta] of Object.entries(COMPARISON_METHODS_META)) {
-      if (meta.traits.some((t) => !returnTraits.includes(t))) {
-        continue;
-      }
-      methods[resultMethodName] = meta.create(opExpr, entry.returns.codecId);
+      if (meta.traits.some((t) => !returnTraits.includes(t))) continue;
+      methods[resultMethodName] = meta.create(resultAst, returnCodecId);
     }
-
     return methods;
   };
 }
@@ -293,8 +293,14 @@ function toRelationWhereExpr<TContract extends Contract<SqlStorage>>(
     const fieldAccessor = (accessor as Record<string, Partial<ComparisonMethodFns<unknown>>>)[
       fieldName
     ];
+    // Unknown field in the shorthand predicate — the Proxy returns undefined
+    // for fields the contract doesn't declare. Surface it explicitly: silent
+    // skip would drop user intent (e.g. a typo'd `nmae: 'Alice'` filter would
+    // match every row).
     if (!fieldAccessor) {
-      continue;
+      throw new Error(
+        `Shorthand filter on "${relatedModelName}.${fieldName}": field is not defined on the model`,
+      );
     }
 
     if (value === null) {

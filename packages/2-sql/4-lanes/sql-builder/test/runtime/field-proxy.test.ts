@@ -13,7 +13,10 @@ describe('createFieldProxy', () => {
     const ref = idExpr.buildAst();
     expect(ref).toBeInstanceOf(IdentifierRef);
     expect((ref as IdentifierRef).name).toBe('id');
-    expect((idExpr as ExpressionImpl).field).toEqual({ codecId: 'pg/int4@1', nullable: false });
+    expect((idExpr as ExpressionImpl).returnType).toEqual({
+      codecId: 'pg/int4@1',
+      nullable: false,
+    });
   });
 
   it('namespaced field access produces ColumnRef', () => {
