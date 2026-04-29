@@ -53,4 +53,29 @@ const productColumn = arktypeJson(ProductSchema);
 - **Rehydration**: `ark.schema(typeParams.jsonIr)` produces a callable `Type` whose `~standard` interface drives validation in the codec's `decode` body.
 - **Validation**: failed validation throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` with `ArkErrors` summary as the issues payload.
 
-See [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) and the [codec-registry-unification spec](../../../projects/codec-registry-unification/spec.md) (§ Case J — JSON-with-schema) for the design rationale.
+## TS2742 portability workaround
+
+If your TypeScript build surfaces a `TS2742` portability warning at the contract definition site after adopting `arktypeJson`, e.g.:
+
+```
+The inferred type of 'contract' cannot be named without a reference to
+'../node_modules/@prisma-next/extension-arktype-json/dist/codec-types-XXXX.mjs'.
+This is likely not portable. A type annotation is necessary.
+```
+
+Add a one-line type-side-effect import for the `/codec-types` entrypoint in the same file:
+
+```ts
+import type {} from '@prisma-next/extension-arktype-json/codec-types';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
+// …
+```
+
+**Why**: the inferred contract type transitively references `arktypeJsonPackMeta.__codecTypes?: CodecTypes`, and `CodecTypes` lives in a private dist chunk that TypeScript can't name from the consumer site by default. The empty `import type {}` brings the public `/codec-types` entrypoint into the consumer's TS module graph, making the chunk-internal type nameable through that public path. The runtime cost is zero (it's a type-only import).
+
+The demo's contract (`examples/prisma-next-demo/prisma/contract.ts`) carries this workaround as a worked example.
+
+## See also
+
+- [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale
+- [codec-registry-unification spec § Case J](../../../projects/codec-registry-unification/spec.md) — JSON-with-schema as a pinning case for the descriptor model

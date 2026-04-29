@@ -247,17 +247,18 @@ export function intervalColumn<P extends number | undefined = undefined>(
  * Static raw-JSONB column descriptor. Used for JSON columns whose payload
  * is not validated against any schema — encode/decode are JSON identity.
  *
- * For schema-validated JSON columns, use a per-library extension:
- * `arktypeJson(schema)` from `@prisma-next/extension-arktype-json/column-types`.
- * Future libraries (zod, valibot) will ship parallel column-author factories
+ * For schema-validated JSON columns, use a per-library extension. The first
+ * such extension is `@prisma-next/extension-arktype-json`, which ships
+ * `arktypeJson(schema)` from its `/column-types` entrypoint. Future
+ * extensions (zod, valibot) will ship parallel column-author factories
  * with their own codec ids and serialize/rehydrate pipelines.
  *
- * Per Phase 4 of codec-registry-unification, the postgres adapter no longer
- * ships a schema-typed `json(schema)` / `jsonb(schema)` factory: the
- * generic Standard-Schema-driven design proved lossy for narrowed types
- * (custom narrows, branded types, …) and produced surprising behavior
- * for any library beyond the JSON Schema subset. Per-library extensions
- * are the cleaner answer.
+ * The postgres adapter previously bundled a generic Standard-Schema-driven
+ * `json(schema)` factory; per Phase 4 of codec-registry-unification it was
+ * removed because the generic shape was lossy for narrowed types (custom
+ * narrows, branded types, …) and produced surprising behavior for any
+ * library beyond the JSON Schema subset. Per-library extensions own the
+ * serialize / rehydrate pipeline end-to-end.
  */
 export const jsonColumn = {
   codecId: PG_JSON_CODEC_ID,

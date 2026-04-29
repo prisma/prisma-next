@@ -269,11 +269,14 @@ export function intervalCodecForPrecision<P extends number | undefined>(
 
 // ── JSON / JSONB ─────────────────────────────────────────────────────────
 //
-// The schema-typed `json(schema)` factory ships separately at
-// `../codecs/json-factory.ts` (M3) — that one carries an `InferOutput<S>` Js
-// slot and a runtime validator. The factories below are the no-schema
-// variants that today's `jsonColumn` / `jsonbColumn` static descriptors
-// resolve to; they preserve the JSON identity (no validation, JsonValue Js).
+// The factories below are the **no-schema** variants that today's
+// `jsonColumn` / `jsonbColumn` static descriptors resolve to; they preserve
+// the JSON identity (no validation, `JsonValue` Js).
+//
+// Schema-typed JSON columns ship from per-library extension packages
+// (e.g. `@prisma-next/extension-arktype-json`); the postgres adapter no
+// longer carries a schema-aware JSON factory. Per Phase 4 of
+// codec-registry-unification.
 
 export type PgJsonValueCodec<Id extends typeof PG_JSON_CODEC_ID | typeof PG_JSONB_CODEC_ID> = Codec<
   Id,

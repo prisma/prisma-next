@@ -1,3 +1,10 @@
+// TS2742 portability workaround. The inferred `contract` type below transitively
+// references `arktypeJsonPackMeta.__codecTypes?: CodecTypes`, where `CodecTypes`
+// lives in a private dist chunk of `@prisma-next/extension-arktype-json`. This
+// empty type-side-effect import brings the public `/codec-types` entrypoint
+// into TS's module graph so the chunk-internal type is nameable from the
+// consumer site without an explicit type annotation. Documented in
+// `packages/3-extensions/arktype-json/README.md`.
 import type {} from '@prisma-next/extension-arktype-json/codec-types';
 import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
