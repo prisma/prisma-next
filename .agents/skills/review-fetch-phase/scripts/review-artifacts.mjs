@@ -168,12 +168,16 @@ function normalizeIssueComment(comment) {
   if (typeof comment?.id !== 'string' || comment.id.length === 0) {
     return null;
   }
+  const body = normalizeBody(comment.body);
+  if (body.trim().length === 0) {
+    return null;
+  }
   return {
     nodeId: comment.id,
     url: typeof comment.url === 'string' ? comment.url : null,
     author: normalizeAuthor(comment.author),
     createdAt: typeof comment.createdAt === 'string' ? comment.createdAt : null,
-    body: normalizeBody(comment.body),
+    body,
     reactionGroups: normalizeReactionGroups(comment.reactionGroups),
     replies: [],
   };

@@ -12,7 +12,7 @@ import {
   formatCanonicalJson,
   normalizeReviewStateV1,
 } from './review-artifacts.mjs';
-import { renderReviewStateMarkdown } from './render-review-state.mjs';
+import { renderReviewStateMarkdown as renderReviewStateMarkdownImpl } from './render-review-state.mjs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -181,8 +181,15 @@ function parseCliArgs(argv) {
   ) {
     throw { code: EXIT_CLI, message: 'error: --out-json file path must end with .json' };
   }
+  if (result.outPath === '-' && result.outJsonPath === '-') {
+    throw { code: EXIT_CLI, message: 'error: --out - cannot be combined with --out-json -' };
+  }
 
   return result;
+}
+
+function renderReviewStateMarkdown(payload, options) {
+  return renderReviewStateMarkdownImpl(payload, options);
 }
 
 function parsePrUrl(url) {
@@ -212,12 +219,13 @@ function runSync(command, args, input) {
   return { stdout: result.stdout, stderr: result.stderr, status: result.status };
 }
 
-function checkPreconditions() {
-  const git = runSync('which', ['git']);
-  if (git.status !== 0) {
-    return { ok: false, code: EXIT_OPERATIONAL, message: 'error: git not found on PATH' };
+function checkPreconditions({ requireGit }) {
+  if (requireGit) {
+    const git = runSync('which', ['git']);
+    if (git.status !== 0) {
+      return { ok: false, code: EXIT_OPERATIONAL, message: 'error: git not found on PATH' };
+    }
   }
-
   const gh = runSync('which', ['gh']);
   if (gh.status !== 0) {
     return { ok: false, code: EXIT_OPERATIONAL, message: 'error: gh not found on PATH' };
@@ -291,7 +299,14 @@ function fetchGraphQL(query, variables) {
   }
 
   try {
-    return { data: JSON.parse(result.stdout) };
+    const parsed = JSON.parse(result.stdout);
+    if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
+      const messages = parsed.errors
+        .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+        .join('; ');
+      return { code: EXIT_OPERATIONAL, error: `error: GitHub GraphQL returned errors: ${messages}` };
+    }
+    return { data: parsed };
   } catch {
     return { code: EXIT_OPERATIONAL, error: 'error: GitHub API returned invalid JSON' };
   }
@@ -432,7 +447,7 @@ async function main() {
     process.exit(EXIT_SUCCESS);
   }
 
-  const preconditions = checkPreconditions();
+  const preconditions = checkPreconditions({ requireGit: !options.prUrl });
   if (!preconditions.ok) {
     process.stderr.write(`${preconditions.message}\n`);
     process.exit(preconditions.code);
@@ -477,7 +492,6 @@ async function main() {
 
   const fetchedAt = new Date().toISOString();
   const reviewState = normalizeReviewStateV1({
-    version: 2,
     fetchedAt,
     sourceBranch,
     pr: payload.pr,
