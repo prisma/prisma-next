@@ -1,8 +1,8 @@
-import { PostgresControlAdapter } from '@prisma-next/adapter-postgres/control';
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import {
   contract,
   createDriver,
