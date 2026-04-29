@@ -1,5 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
+import { defineAnnotation } from '../src/annotations';
 import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
 import { RuntimeCore } from '../src/runtime-core';
 import type { RuntimeMiddleware, RuntimeMiddlewareContext } from '../src/runtime-middleware';
@@ -208,5 +209,71 @@ describe('RuntimeCore', () => {
     expect(runtime.closeCalls).toBe(0);
     await runtime.close();
     expect(runtime.closeCalls).toBe(1);
+  });
+
+  describe('annotation registry assembly', () => {
+    const cacheAnnotation = defineAnnotation<{ ttl: number }, 'read'>({
+      name: 'cache',
+      applicableTo: ['read'],
+    });
+    const auditAnnotation = defineAnnotation<{ actor: string }, 'write'>({
+      name: 'audit',
+      applicableTo: ['write'],
+    });
+
+    function withAnnotations<A extends Record<string, unknown>>(
+      mw: RuntimeMiddleware<MockExec>,
+      annotations: A,
+    ): RuntimeMiddleware<MockExec> & { readonly annotations: A } {
+      return Object.assign({}, mw, { annotations });
+    }
+
+    it('exposes an annotation registry with no entries when middleware contributes none', () => {
+      const runtime = new MockRuntime([], ctx, []);
+      expect(runtime.annotationRegistry.entries()).toEqual({});
+    });
+
+    it('exposes an annotation registry with no entries when middleware are present but contribute no annotations', () => {
+      const observer: RuntimeMiddleware<MockExec> = {
+        name: 'observer',
+        async beforeExecute() {},
+      };
+      const runtime = new MockRuntime([observer], ctx, []);
+      expect(runtime.annotationRegistry.entries()).toEqual({});
+    });
+
+    it('aggregates annotations contributed by middleware into a single registry', () => {
+      const cache = withAnnotations({ name: 'cache' }, { cache: cacheAnnotation });
+      const audit = withAnnotations({ name: 'audit' }, { audit: auditAnnotation });
+      const runtime = new MockRuntime([cache, audit], ctx, []);
+
+      const entries = runtime.annotationRegistry.entries();
+      expect(Object.keys(entries).sort()).toEqual(['audit', 'cache']);
+      expect(entries['cache']).toBe(cacheAnnotation);
+      expect(entries['audit']).toBe(auditAnnotation);
+    });
+
+    it('treats two middleware contributing the same handle (identity) as a no-op', () => {
+      const cacheA = withAnnotations({ name: 'cache-a' }, { cache: cacheAnnotation });
+      const cacheB = withAnnotations({ name: 'cache-b' }, { cache: cacheAnnotation });
+      const runtime = new MockRuntime([cacheA, cacheB], ctx, []);
+
+      const entries = runtime.annotationRegistry.entries();
+      expect(Object.keys(entries)).toEqual(['cache']);
+      expect(entries['cache']).toBe(cacheAnnotation);
+    });
+
+    it('throws when two middleware contribute different handles under the same name', () => {
+      const cacheA = withAnnotations({ name: 'cache-a' }, { cache: cacheAnnotation });
+      const cacheBHandle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
+        applicableTo: ['read'],
+      });
+      const cacheB = withAnnotations({ name: 'cache-b' }, { cache: cacheBHandle });
+
+      expect(() => new MockRuntime([cacheA, cacheB], ctx, [])).toThrow(
+        'Annotation "cache" is already registered with a different handle',
+      );
+    });
   });
 });

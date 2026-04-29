@@ -5,6 +5,7 @@ export type {
   AnnotationHandle,
   AnnotationsOf,
   AnnotationValue,
+  AnyAnnotationHandle,
   DefineAnnotationOptions,
   OperationKind,
   RegistryFor,

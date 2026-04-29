@@ -1,3 +1,4 @@
+import { type AnnotationRegistry, createAnnotationRegistry } from './annotation-registry';
 import { AsyncIterableResult } from './async-iterable-result';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { runWithMiddleware } from './run-with-middleware';
@@ -52,10 +53,23 @@ export abstract class RuntimeCore<
 {
   protected readonly middleware: ReadonlyArray<TMiddleware>;
   protected readonly ctx: RuntimeMiddlewareContext;
+  /**
+   * Registry assembled from every middleware's `annotations` record.
+   * Built once at construction; the lane builder context (SQL
+   * `BuilderContext`, ORM `OrmExecutionContext`) and any callback-driven
+   * `.annotate(...)` site read from it via
+   * `createMetaBuilder(registry, kind)`.
+   *
+   * Two middleware contributing the same handle by identity is a
+   * no-op; two middleware contributing different handles under the
+   * same name throws — see `createAnnotationRegistry`.
+   */
+  readonly annotationRegistry: AnnotationRegistry;
 
   constructor(options: RuntimeCoreOptions<TMiddleware>) {
     this.middleware = options.middleware;
     this.ctx = options.ctx;
+    this.annotationRegistry = assembleAnnotationRegistry(options.middleware);
   }
 
   /**
@@ -106,4 +120,19 @@ export abstract class RuntimeCore<
 
     return new AsyncIterableResult(generator());
   }
+}
+
+function assembleAnnotationRegistry(
+  middleware: ReadonlyArray<RuntimeMiddleware<ExecutionPlan>>,
+): AnnotationRegistry {
+  const registry = createAnnotationRegistry();
+  for (const mw of middleware) {
+    if (!mw.annotations) {
+      continue;
+    }
+    for (const handle of Object.values(mw.annotations)) {
+      registry.register(handle);
+    }
+  }
+  return registry;
 }

@@ -1,4 +1,4 @@
-import type { AnnotationHandle, OperationKind } from './annotations';
+import type { AnnotationHandle, AnyAnnotationHandle, OperationKind } from './annotations';
 
 /**
  * Brand symbol used by `AnnotationBuilder` instances to distinguish
@@ -34,16 +34,11 @@ export const ANNOTATION_BUILDER: unique symbol = Symbol.for(
  *   conflicting registry key so the misconfiguration is immediately
  *   actionable.
  *
- * `register` is generic over the handle's `Payload` and `Kinds`
- * parameters. `AnnotationHandle<Payload, Kinds>` is a callable type, so
- * `Payload` is contravariant on the function-parameter side; widening
- * `AnnotationHandle<{ ttl: number }, 'read'>` to
- * `AnnotationHandle<unknown, OperationKind>` is structurally rejected
- * by TypeScript. The generic `register` keeps the call site's typing
- * intact; storage internally uses the loose `AnnotationHandle<unknown,
- * OperationKind>` shape via a one-time cast (the cast is safe because
- * the registry never invokes a handle on its own — callers that invoke
- * a stored handle only ever pass it `unknown` payloads).
+ * `register` accepts the storage-friendly `AnyAnnotationHandle`. Every
+ * concrete `AnnotationHandle<Payload, Kinds>` is structurally assignable
+ * to `AnyAnnotationHandle` (its widened parameter / return positions
+ * accommodate any `Payload`/`Kinds`), so call sites can pass a typed
+ * handle without a cast.
  *
  * The framework owns assembly: `RuntimeCore` walks `options.middleware`
  * at construction time, calls `registry.register(handle)` for every
@@ -51,7 +46,7 @@ export const ANNOTATION_BUILDER: unique symbol = Symbol.for(
  * resulting registry as `this.annotationRegistry`.
  */
 export interface AnnotationRegistry {
-  register<P, K extends OperationKind>(handle: AnnotationHandle<P, K>): void;
+  register(handle: AnyAnnotationHandle): void;
   entries(): Readonly<Record<string, AnnotationHandle<unknown, OperationKind>>>;
 }
 
@@ -65,14 +60,13 @@ export function createAnnotationRegistry(): AnnotationRegistry {
   const handles: Record<string, AnnotationHandle<unknown, OperationKind>> = Object.create(null);
 
   return {
-    register<P, K extends OperationKind>(handle: AnnotationHandle<P, K>): void {
+    register(handle) {
       const name = handle.name;
-      // Cast widens AnnotationHandle<P, K> to AnnotationHandle<unknown,
-      // OperationKind> for uniform storage. AnnotationHandle's callable
-      // parameter is contravariant on Payload, so the widening cannot be
-      // expressed without `as unknown as`. Safe at runtime because
-      // JavaScript does not enforce parameter narrowing — the handle's
-      // closure body uses the original concrete `P` regardless.
+      // Cast widens the storage-friendly `AnyAnnotationHandle` to the
+      // entry-side `AnnotationHandle<unknown, OperationKind>` shape
+      // exposed via `entries()`. Reading consumers only call the handle
+      // with `unknown` payloads (the runtime layer treats payloads as
+      // opaque), so the wider entry-side type is sound.
       const stored = handle as unknown as AnnotationHandle<unknown, OperationKind>;
       const existing = handles[name];
       if (existing !== undefined) {

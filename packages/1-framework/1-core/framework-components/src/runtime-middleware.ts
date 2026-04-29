@@ -1,3 +1,4 @@
+import type { AnyAnnotationHandle } from './annotations';
 import type { AsyncIterableResult } from './async-iterable-result';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { runtimeError } from './runtime-error';
@@ -114,11 +115,21 @@ export interface InterceptResult {
  * middleware (e.g. cross-family telemetry) can be authored without
  * naming a family. Family-specific middleware (`SqlMiddleware`,
  * `MongoMiddleware`) narrow `TPlan` to their concrete plan type.
+ *
+ * Middleware may declare an `annotations` record listing the annotation
+ * handles they own (read-side: `cache`, etc.). `RuntimeCore` walks each
+ * middleware's `annotations` at construction time and assembles them
+ * into a single `AnnotationRegistry` exposed on the runtime; the
+ * registry drives the kind-filtered `AnnotationBuilder` that lane
+ * terminals pass to `.annotate(callback)` calls. Middleware that own
+ * no annotations omit the field; observers (telemetry, lints, budgets)
+ * are the typical examples.
  */
 export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
+  readonly annotations?: Readonly<Record<string, AnyAnnotationHandle>>;
   /**
    * Optional short-circuit hook. Runs inside `runWithMiddleware`, after
    * the orchestrator receives the lowered plan and before any

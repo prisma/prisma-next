@@ -70,6 +70,34 @@ export type AnnotationHandle<Payload, Kinds extends OperationKind> = ((
 };
 
 /**
+ * Maximally-widened handle shape used for storage / bulk-iteration
+ * positions — `RuntimeMiddleware.annotations` and the registry's
+ * internal map. Any concrete `AnnotationHandle<P, K>` is structurally
+ * assignable to this type:
+ *
+ * - The call signature's parameter is `never`, which every concrete
+ *   `Payload` is contravariantly assignable from (`never extends P`
+ *   for any `P`).
+ * - The call signature's return is the bare `__annotation` brand,
+ *   which every typed `AnnotationValue<P, K>` covariantly extends.
+ * - `applicableTo` and `read` use TypeScript method-shorthand variance
+ *   so kind- and payload-narrowings widen freely.
+ *
+ * This is the type the runtime sees when it iterates middleware-
+ * contributed annotations to populate the registry. Strict per-handle
+ * typing is preserved at authoring time (where users hold a typed
+ * `AnnotationHandle<P, K>`) and at consumption time through
+ * `AnnotationsOf<Mw>` and `RegistryFor<K, Reg>`.
+ */
+export type AnyAnnotationHandle = {
+  (payload: never): { readonly __annotation: true };
+  readonly name: string;
+  readonly namespace: string;
+  readonly applicableTo: ReadonlySet<OperationKind>;
+  read(plan: { readonly meta: { readonly annotations?: Record<string, unknown> } }): unknown;
+};
+
+/**
  * Options accepted by `defineAnnotation`.
  *
  * `name` is the registry key under which the handle is stored on the

@@ -1,5 +1,7 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { assertType, expectTypeOf, test } from 'vitest';
+import type { AnyAnnotationHandle } from '../src/annotations';
+import { defineAnnotation } from '../src/annotations';
 import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
 import type {
   InterceptResult,
@@ -172,4 +174,34 @@ test('RuntimeMiddleware familyId and targetId are optional', () => {
   void generic;
   void familyBound;
   void targetBound;
+});
+
+test('RuntimeMiddleware.annotations is optional and typed as a record of AnyAnnotationHandle', () => {
+  expectTypeOf<RuntimeMiddleware['annotations']>().toEqualTypeOf<
+    Readonly<Record<string, AnyAnnotationHandle>> | undefined
+  >();
+});
+
+test('A middleware satisfying { name, intercept, annotations: { cache } } is assignable to RuntimeMiddleware', () => {
+  const cacheAnnotation = defineAnnotation<{ ttl: number }, 'read'>({
+    name: 'cache',
+    applicableTo: ['read'],
+  });
+
+  const cacheMiddleware: RuntimeMiddleware = {
+    name: 'cache',
+    annotations: { cache: cacheAnnotation },
+    async intercept() {
+      return undefined;
+    },
+  };
+  void cacheMiddleware;
+});
+
+test('Middleware without `annotations` continue to satisfy RuntimeMiddleware (additive change)', () => {
+  const observer: RuntimeMiddleware = {
+    name: 'observer',
+    async beforeExecute() {},
+  };
+  void observer;
 });
