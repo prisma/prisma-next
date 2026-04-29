@@ -29,11 +29,11 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
    - Run the smallest relevant checks (package test/typecheck/lint as appropriate).
    - Create a focused commit (explicit staging; no `git add -A` / `git add .`; no amend).
    - Reply on the associated GitHub thread when you begin work (short “On it” + 👍) using:
-    - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
+     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
    - For `pull_request_review` targets (review-body findings, `PRR_…` node ids), the helper auto-detects the kind and posts a top-level PR issue comment (response `kind: "issue_comment"`). There is no inline thread, so **skip `resolve-review-thread.mjs`** for these targets and record the issue-comment id in the action's `done` record (`done.githubAdmin.issueCommentId`).
    - After the change lands (commit exists and checks pass), reply “Done” (or similar) and **resolve the thread** using:
-    - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
-    - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
+     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
+     - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
    - Never use inline parser snippets (`python -c`, `node -e`, `ruby -e`, ad-hoc awk/sed JSON parsing). Use the helper scripts above.
    - Update `review-actions.json` in-place:
      - set `status: in_progress` when starting
@@ -45,8 +45,8 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
        - optional `githubAdmin` apply metadata if available
 4. After all actions:
    - Re-fetch + derive view:
-    - `node ../review-fetch-phase/scripts/fetch-review-state.mjs --pr <url> --out-json <review-state.json>`
-    - `node ../review-fetch-phase/scripts/render-review-state.mjs --in <review-state.json> --out <review-state.md>`
+     - `node ../review-fetch-phase/scripts/fetch-review-state.mjs --pr <url> --out-json <review-state.json>`
+     - `node ../review-fetch-phase/scripts/render-review-state.mjs --in <review-state.json> --out <review-state.md>`
    - Confirm there are no unresolved actionable items.
 
 ## Action targeting rules
