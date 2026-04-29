@@ -302,3 +302,107 @@ describe('ContractCodecRegistry', () => {
     expect(context.contractCodecs.forCodecId('does-not-exist@1')).toBeUndefined();
   });
 });
+
+// Phase 3.5 of codec-registry-unification: descriptorFor is the codec-id-keyed
+// metadata read; it returns the registered descriptor for parameterized AND
+// non-parameterized codec ids without branching. The descriptor map is the
+// single source of truth for `traits`, `targetTypes`, and (via the descriptor's
+// factory) the resolved codec instances. See spec § Decision and AC-3.
+describe('CodecDescriptorRegistry (unified)', () => {
+  it('descriptorFor returns the parameterized descriptor for a parameterized codec id', () => {
+    const contract = createTestContract({
+      Doc: {
+        embedding: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 768 },
+        },
+      },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [createVectorExtensionDescriptor()],
+    });
+
+    const descriptor = context.codecDescriptors.descriptorFor('pg/vector@1');
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.codecId).toBe('pg/vector@1');
+    expect(descriptor?.traits).toEqual(['equality']);
+    expect(descriptor?.targetTypes).toEqual(['vector']);
+  });
+
+  it('descriptorFor returns the synthesized descriptor for a non-parameterized codec id', () => {
+    const contract = createTestContract({
+      User: { primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false } },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+    });
+
+    const descriptor = context.codecDescriptors.descriptorFor('test/scalar@1');
+    expect(descriptor).toBeDefined();
+    expect(descriptor?.codecId).toBe('test/scalar@1');
+    expect(descriptor?.targetTypes).toEqual(['scalar']);
+  });
+
+  it('descriptorFor reads use the same call shape for parameterized and non-parameterized codec ids', () => {
+    // The defining property of the unified descriptor map: callers don't
+    // need to know whether a codec id is parameterized to read its traits.
+    // This test asserts the non-branching read site (spec § Decision).
+    const contract = createTestContract({
+      Doc: {
+        embedding: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 384 },
+        },
+      },
+      User: {
+        primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false },
+      },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [
+        createVectorExtensionDescriptor(),
+        createNonParameterizedExtensionDescriptor(),
+      ],
+    });
+
+    const traitsByCodecId = (codecId: string): readonly string[] =>
+      context.codecDescriptors.descriptorFor(codecId)?.traits ?? [];
+
+    expect(traitsByCodecId('pg/vector@1')).toEqual(['equality']);
+    // Synthesized descriptors carry empty traits if the codec didn't declare
+    // any (the legacy `codec(...)` factory in this fixture omits the field).
+    expect(traitsByCodecId('test/scalar@1')).toEqual([]);
+  });
+
+  it('descriptorFor returns undefined for an unknown codec id', () => {
+    const contract = createTestContract({
+      User: { primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false } },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+    });
+
+    expect(context.codecDescriptors.descriptorFor('unknown/codec@1')).toBeUndefined();
+  });
+
+  it('values() iterates every registered descriptor', () => {
+    const contract = createTestContract({
+      User: { primary: { nativeType: 'scalar', codecId: 'test/scalar@1', nullable: false } },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [createNonParameterizedExtensionDescriptor()],
+    });
+
+    const codecIds = Array.from(context.codecDescriptors.values()).map((d) => d.codecId);
+    expect(codecIds).toContain('test/scalar@1');
+  });
+});
