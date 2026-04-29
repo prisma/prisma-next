@@ -57,6 +57,17 @@ describe('readMarker', () => {
     expect(marker?.invariants).toEqual([]);
   });
 
+  it('defaults updatedAt to a fresh Date when absent from document', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.updatedAt).toBeInstanceOf(Date);
+  });
+
   it('throws when invariants is present but not a string array (storage corruption)', async () => {
     // Mongo is schemaless, but spec §"Schema evolution" line 226 says:
     // "data corruption is not something we silently paper over." Mirrors the
