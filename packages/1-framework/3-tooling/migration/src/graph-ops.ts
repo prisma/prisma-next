@@ -47,9 +47,10 @@ export function bfs<S, E>(
 export function* bfs<S, E>(
   starts: Iterable<S>,
   neighbours: (state: S) => Iterable<{ next: S; edge: E }>,
-  // The string overload omits `key`; the implementation falls back to
-  // identity. The composite overload requires `key` (TypeScript enforces
-  // this), so the unsafe cast below is only ever exercised when S = string.
+  // Identity default for the string overload. TypeScript can't express
+  // "default applies only when S = string", so this cast bridges the
+  // generic implementation signature to the public overloads — which
+  // guarantee `key` is omitted only when S = string at the call site.
   key: (state: S) => string = (state) => state as unknown as string,
 ): Generator<BfsStep<S, E>> {
   // Queue entries carry the state alongside its key so we don't recompute
