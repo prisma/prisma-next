@@ -140,6 +140,65 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     expect(priorityIdx?.partialFilterExpression).toEqual({ type: 'feature' });
   });
 
+  it('allows sibling variants on the same collection to declare structurally identical indexes (deduped after scoping)', () => {
+    const Task = model('Task', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        type: field.string(),
+      },
+      discriminator: {
+        field: 'type',
+        variants: {
+          Bug: { value: 'bug' },
+          Feature: { value: 'feature' },
+        },
+      },
+    });
+
+    const Bug = model('Bug', {
+      collection: 'tasks',
+      base: Task,
+      fields: {
+        severity: field.string(),
+      },
+      indexes: [index({ severity: 1 }, { unique: true })],
+    });
+
+    const Feature = model('Feature', {
+      collection: 'tasks',
+      base: Task,
+      fields: {
+        severity: field.string(),
+      },
+      indexes: [index({ severity: 1 }, { unique: true })],
+    });
+
+    const contract = defineContract({
+      family: mongoFamilyPack,
+      target: mongoTargetPack,
+      models: { Task, Bug, Feature },
+    });
+
+    const collections = contract.storage.collections as unknown as Record<
+      string,
+      {
+        indexes?: Array<{
+          keys: Array<{ field: string; direction: number }>;
+          unique?: boolean;
+          partialFilterExpression?: Record<string, unknown>;
+        }>;
+      }
+    >;
+    const indexes = collections['tasks']?.indexes ?? [];
+    const severityIndexes = indexes.filter((i) => i.keys.some((k) => k.field === 'severity'));
+    expect(severityIndexes).toHaveLength(2);
+    expect(severityIndexes.every((i) => i.unique === true)).toBe(true);
+    const filters = severityIndexes.map((i) => i.partialFilterExpression);
+    expect(filters).toContainEqual({ type: 'bug' });
+    expect(filters).toContainEqual({ type: 'feature' });
+  });
+
   it('AND-merges a user-supplied partialFilterExpression on a variant index', () => {
     const Task = model('Task', {
       collection: 'tasks',

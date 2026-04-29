@@ -1314,16 +1314,6 @@ function buildCollections(
           `Model "${modelBuilder.__name}" index ${indexSignature} references unknown field "${missingField}".`,
         );
       }
-
-      const indexSignature = stableStringify(collectionIndex);
-      const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
-      const firstOwner = declaredIndexOwners.get(collectionIndexKey);
-      if (firstOwner) {
-        throw new Error(
-          `Collection "${modelBuilder.__collection}" defines duplicate index ${indexSignature}. First declared on model "${firstOwner}" and duplicated on model "${modelBuilder.__name}".`,
-        );
-      }
-      declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
     }
 
     const polymorphicScope = resolveVariantScope(modelBuilder, modelsByName);
@@ -1338,6 +1328,26 @@ function buildCollections(
           ),
         )
       : rawStorageIndexes;
+
+    // Dedup after scoping so sibling variants that authentically declare
+    // identical raw indexes (e.g. Bug and Feature both index severity) do
+    // not collide — their post-scoping storage indexes differ by
+    // partialFilterExpression and are correctly distinct on MongoDB.
+    for (let i = 0; i < storageIndexes.length; i++) {
+      const storageIndex = storageIndexes[i];
+      if (storageIndex === undefined) continue;
+      const indexSignature = stableStringify(storageIndex);
+      const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
+      const firstOwner = declaredIndexOwners.get(collectionIndexKey);
+      if (firstOwner) {
+        const authoredIndex = modelBuilder.__indexes?.[i];
+        const reportedSignature = authoredIndex ? stableStringify(authoredIndex) : indexSignature;
+        throw new Error(
+          `Collection "${modelBuilder.__collection}" defines duplicate index ${reportedSignature}. First declared on model "${firstOwner}" and duplicated on model "${modelBuilder.__name}".`,
+        );
+      }
+      declaredIndexOwners.set(collectionIndexKey, modelBuilder.__name);
+    }
     const storageOptions = modelBuilder.__collectionOptions
       ? toStorageCollectionOptions(modelBuilder.__collectionOptions)
       : undefined;
