@@ -81,7 +81,7 @@ describe('createCacheMiddleware — opt-in semantics', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000, skip: true }),
+      cache: cacheAnnotation({ ttl: 60_000, skip: true }),
     });
 
     const result = await mw.intercept!(exec, makeCtx());
@@ -94,7 +94,7 @@ describe('createCacheMiddleware — opt-in semantics', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({}),
+      cache: cacheAnnotation({}),
     });
 
     const result = await mw.intercept!(exec, makeCtx());
@@ -131,7 +131,7 @@ describe('createCacheMiddleware — hit path', () => {
 
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
 
     const result = await mw.intercept!(exec, makeCtx());
@@ -147,7 +147,7 @@ describe('createCacheMiddleware — hit path', () => {
     store.inner.set('key:select 1', { rows: [{ id: 1 }], storedAt: 0 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const debug = vi.fn();
     const ctx = makeCtx({
@@ -164,7 +164,7 @@ describe('createCacheMiddleware — hit path', () => {
     store.inner.set('key:select 1', { rows: [{ id: 1 }], storedAt: 0 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -187,7 +187,7 @@ describe('createCacheMiddleware — hit path', () => {
     store.inner.set('key:select 1', { rows: [{ id: 1 }], storedAt: 0 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx({
       // No debug field.
@@ -203,7 +203,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
 
     const result = await mw.intercept!(exec, makeCtx());
@@ -214,7 +214,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const debug = vi.fn();
     const ctx = makeCtx({
@@ -230,7 +230,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store, clock: () => 1_234 });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -258,7 +258,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -280,7 +280,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -303,7 +303,7 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -331,10 +331,10 @@ describe('createCacheMiddleware — miss path', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store, clock: () => 0 });
     const execA = makeExec('select A', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const execB = makeExec('select B', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -372,7 +372,7 @@ describe('createCacheMiddleware — scope guard', () => {
     store.inner.set('key:select 1', { rows: [{ id: 1 }], storedAt: 0 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
 
     const result = await mw.intercept!(exec, makeCtx({ scope: 'connection' }));
@@ -385,7 +385,7 @@ describe('createCacheMiddleware — scope guard', () => {
     store.inner.set('key:select 1', { rows: [{ id: 1 }], storedAt: 0 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
 
     const result = await mw.intercept!(exec, makeCtx({ scope: 'transaction' }));
@@ -397,7 +397,7 @@ describe('createCacheMiddleware — scope guard', () => {
     const store = spyStore();
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select 1', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx({ scope: 'connection' });
 
@@ -445,7 +445,7 @@ describe('createCacheMiddleware — middleware shape', () => {
   it('roundtrips a miss-then-hit through the default in-memory store', async () => {
     const mw = createCacheMiddleware({ maxEntries: 10 });
     const exec = makeExec('select roundtrip', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 
@@ -472,7 +472,7 @@ describe('createCacheMiddleware — middleware shape', () => {
     const store = createInMemoryCacheStore({ maxEntries: 5 });
     const mw = createCacheMiddleware({ store });
     const exec = makeExec('select custom', {
-      cache: cacheAnnotation.apply({ ttl: 60_000 }),
+      cache: cacheAnnotation({ ttl: 60_000 }),
     });
     const ctx = makeCtx();
 

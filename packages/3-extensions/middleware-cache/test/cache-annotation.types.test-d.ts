@@ -2,20 +2,21 @@ import type { AnnotationValue, OperationKind } from '@prisma-next/framework-comp
 import { assertType, expectTypeOf, test } from 'vitest';
 import { type CachePayload, cacheAnnotation } from '../src/cache-annotation';
 
-test('cacheAnnotation.apply preserves the CachePayload type', () => {
-  const applied = cacheAnnotation.apply({ ttl: 60 });
+test('cacheAnnotation is callable and returns an AnnotationValue<CachePayload, "read">', () => {
+  expectTypeOf(cacheAnnotation).toBeCallableWith({ ttl: 60 });
+  const applied = cacheAnnotation({ ttl: 60 });
   expectTypeOf(applied).toEqualTypeOf<AnnotationValue<CachePayload, 'read'>>();
 });
 
-test('cacheAnnotation.apply rejects non-CachePayload arguments', () => {
+test('calling cacheAnnotation rejects non-CachePayload arguments', () => {
   // @ts-expect-error - unknown field on payload
-  cacheAnnotation.apply({ ttl: 60, nonsense: true });
+  cacheAnnotation({ ttl: 60, nonsense: true });
 
   // @ts-expect-error - wrong field type
-  cacheAnnotation.apply({ ttl: '60' });
+  cacheAnnotation({ ttl: '60' });
 
   // @ts-expect-error - wrong field type
-  cacheAnnotation.apply({ skip: 'yes' });
+  cacheAnnotation({ skip: 'yes' });
 });
 
 test('cacheAnnotation.read returns CachePayload | undefined', () => {
@@ -33,10 +34,18 @@ test('cacheAnnotation.read returns CachePayload | undefined', () => {
   expectTypeOf(result).toEqualTypeOf<CachePayload | undefined>();
 });
 
+test('cacheAnnotation.name is the literal string "cache"', () => {
+  expectTypeOf(cacheAnnotation.name).toBeString();
+});
+
+test('cacheAnnotation.namespace is a string (defaults to name)', () => {
+  expectTypeOf(cacheAnnotation.namespace).toBeString();
+});
+
 test('cacheAnnotation declares applicableTo = "read" only', () => {
   // The handle's Kinds parameter is the literal type 'read', not the wider
   // OperationKind union. This is what gates write terminals from accepting
-  // it via ValidAnnotations<'write', As>.
+  // it via the structural `RegistryFor<'write', Reg>` filter.
   expectTypeOf(cacheAnnotation.applicableTo).toEqualTypeOf<ReadonlySet<'read'>>();
 });
 
@@ -69,11 +78,10 @@ test('cacheAnnotation is not applicable to write operations at the type level', 
   type WriteApplies = 'write' extends Kinds ? true : false;
   assertType<false>(false as WriteApplies);
 
-  // And the AnnotationValue produced by apply() carries 'read' specifically,
-  // so ValidAnnotations<'write', [typeof applied]> resolves to [never].
-  const applied = cacheAnnotation.apply({ ttl: 60 });
+  // The produced AnnotationValue carries 'read' specifically; it does
+  // not extend AnnotationValue<CachePayload, 'write'>.
+  const applied = cacheAnnotation({ ttl: 60 });
   expectTypeOf(applied).toExtend<AnnotationValue<CachePayload, 'read'>>();
-  // The applied value is NOT assignable to AnnotationValue<CachePayload, 'write'>.
   expectTypeOf(applied).not.toExtend<AnnotationValue<CachePayload, 'write'>>();
 });
 

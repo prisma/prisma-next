@@ -1,10 +1,15 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
-import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
+import {
+  ANNOTATION_BUILDER,
+  assertAnnotationsApplicable,
+  createAnnotationRegistry,
+  createMetaBuilder,
+} from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AggregateExpr,
@@ -48,6 +53,7 @@ export class GroupedCollection<
   TContract extends Contract<SqlStorage>,
   ModelName extends string,
   GroupFields extends readonly GroupByFieldName<TContract, ModelName>[],
+  Registry = {},
 > {
   readonly ctx: CollectionContext<TContract>;
   private readonly contract: TContract;
@@ -75,7 +81,7 @@ export class GroupedCollection<
 
   having(
     predicate: (having: HavingBuilder<TContract, ModelName>) => AnyExpression,
-  ): GroupedCollection<TContract, ModelName, GroupFields> {
+  ): GroupedCollection<TContract, ModelName, GroupFields, Registry> {
     const havingExpr = predicate(
       createHavingBuilder(this.contract, this.modelName, this.tableName),
     );
@@ -85,24 +91,24 @@ export class GroupedCollection<
       groupByFields: this.groupByFields,
       groupByColumns: this.groupByColumns,
       havingFilters: [...this.havingFilters, havingExpr],
-    }) as GroupedCollection<TContract, ModelName, GroupFields>;
+    }) as GroupedCollection<TContract, ModelName, GroupFields, Registry>;
   }
 
   /**
    * Read terminal: run a grouped aggregate query.
    *
-   * Accepts an optional variadic of read-typed user annotations after
-   * the builder callback. The `As & ValidAnnotations<'read', As>` gate
-   * rejects write-only annotations at the call site; the runtime check
-   * fails closed for callers that bypass the type gate. Annotations
-   * are merged into the compiled plan's `meta.annotations`.
+   * Accepts an optional trailing `annotateFn` callback that receives a
+   * kind-filtered `AnnotationBuilder<'read', Registry>` derived from
+   * the runtime's middleware-contributed annotation registry. Returns
+   * either the chained builder or a `readonly AnnotationValue[]` (the
+   * array escape hatch). The runtime gate
+   * `assertAnnotationsApplicable` catches cast-bypass.
    */
-  async aggregate<
-    Spec extends AggregateSpec,
-    As extends readonly AnnotationValue<unknown, OperationKind>[],
-  >(
+  async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
-    ...annotations: As & ValidAnnotations<'read', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<
     Array<
       SimplifyDeep<
@@ -122,16 +128,12 @@ export class GroupedCollection<
       }
     }
 
-    const annotationsAsValues = annotations as readonly AnnotationValue<unknown, OperationKind>[];
-    let annotationsMap: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined;
-    if (annotationsAsValues.length > 0) {
-      assertAnnotationsApplicable(annotationsAsValues, 'read', 'groupBy.aggregate');
-      const next = new Map<string, AnnotationValue<unknown, OperationKind>>();
-      for (const annotation of annotationsAsValues) {
-        next.set(annotation.namespace, annotation);
-      }
-      annotationsMap = next;
-    }
+    const annotationsMap = resolveGroupedAnnotationsToMap(
+      this.ctx,
+      annotateFn,
+      'read',
+      'groupBy.aggregate',
+    );
 
     const compiled = mergeUserAnnotations(
       compileGroupedAggregate(
@@ -161,6 +163,66 @@ export class GroupedCollection<
       >
     >;
   }
+}
+
+/**
+ * Resolves a `GroupedCollection.aggregate(callback)` invocation into a
+ * `userAnnotations` map ready for `mergeUserAnnotations`. Mirrors
+ * `Collection`'s `#resolveAnnotationsToMap`. See `Collection` in
+ * `./collection.ts` for the canonical pattern; the brand check is
+ * inlined here because `sql-orm-client` does not depend on
+ * `sql-builder` at runtime.
+ */
+function resolveGroupedAnnotationsToMap<Registry>(
+  ctx: CollectionContext<Contract<SqlStorage>>,
+  annotateFn:
+    | ((
+        meta: AnnotationBuilder<'read', Registry>,
+      ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[])
+    | undefined,
+  kind: 'read',
+  terminalName: string,
+): ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined {
+  if (annotateFn === undefined) {
+    return undefined;
+  }
+  const registry = ctx.annotationRegistry ?? createAnnotationRegistry();
+  const meta = createMetaBuilder<'read', Registry>(registry, kind);
+  const result = annotateFn(meta);
+  const values = extractAnnotationValuesFromCallback(result);
+  if (values.length === 0) {
+    return undefined;
+  }
+  assertAnnotationsApplicable(values, kind, terminalName);
+  const next = new Map<string, AnnotationValue<unknown, OperationKind>>();
+  for (const annotation of values) {
+    next.set(annotation.namespace, annotation);
+  }
+  return next;
+}
+
+/**
+ * Normalizes a callback return value into an array of `AnnotationValue`s.
+ * Accepts either a branded `AnnotationBuilder` (read its `values`) or a
+ * `readonly AnnotationValue[]` (use as-is).
+ */
+function extractAnnotationValuesFromCallback(
+  result:
+    | AnnotationBuilder<OperationKind, unknown>
+    | readonly AnnotationValue<unknown, OperationKind>[],
+): readonly AnnotationValue<unknown, OperationKind>[] {
+  if (Array.isArray(result)) {
+    return result;
+  }
+  if (result !== null && typeof result === 'object') {
+    const candidate = result as Record<symbol, unknown>;
+    if (candidate[ANNOTATION_BUILDER] === true) {
+      return (result as AnnotationBuilder<OperationKind, unknown>).values;
+    }
+  }
+  throw new Error(
+    '.annotate(callback) returned an unexpected value: expected the meta builder or a readonly array of AnnotationValues',
+  );
 }
 
 function createHavingBuilder<TContract extends Contract<SqlStorage>, ModelName extends string>(

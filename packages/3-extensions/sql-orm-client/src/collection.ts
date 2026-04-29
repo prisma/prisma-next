@@ -1,12 +1,15 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
 import {
+  ANNOTATION_BUILDER,
   AsyncIterableResult,
   assertAnnotationsApplicable,
+  createAnnotationRegistry,
+  createMetaBuilder,
 } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
@@ -171,6 +174,7 @@ export class Collection<
   ModelName extends string,
   Row = SimplifyDeep<InferRootRow<TContract, ModelName>>,
   State extends CollectionTypeState = DefaultCollectionTypeState,
+  Registry = {},
 > implements RowSelection<Row>
 {
   declare readonly [RowType]: Row;
@@ -205,21 +209,23 @@ export class Collection<
 
   where(
     fn: (model: ModelAccessor<TContract, ModelName>) => WhereDirectInput,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
-  where(input: WhereDirectInput): Collection<TContract, ModelName, Row, WithWhereState<State>>;
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>, Registry>;
+  where(
+    input: WhereDirectInput,
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>, Registry>;
   where(
     fn: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>, Registry>;
   where(
     filters: ShorthandWhereFilter<TContract, ModelName>,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>>;
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>, Registry>;
   where(
     input:
       | WhereDirectInput
       | ((model: ModelAccessor<TContract, ModelName>) => WhereDirectInput)
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
       | ShorthandWhereFilter<TContract, ModelName>,
-  ): Collection<TContract, ModelName, Row, WithWhereState<State>> {
+  ): Collection<TContract, ModelName, Row, WithWhereState<State>, Registry> {
     const whereArg =
       typeof input === 'function'
         ? input(createModelAccessor(this.ctx.context, this.modelName))
@@ -229,7 +235,7 @@ export class Collection<
     const filter = normalizeWhereArg(whereArg, { contract: this.contract });
 
     if (!filter) {
-      return this as Collection<TContract, ModelName, Row, WithWhereState<State>>;
+      return this as Collection<TContract, ModelName, Row, WithWhereState<State>, Registry>;
     }
 
     return this.#clone<WithWhereState<State>>({
@@ -243,7 +249,8 @@ export class Collection<
     TContract,
     ModelName,
     VariantModelRow<TContract, ModelName, V>,
-    WithVariantState<WithWhereState<State>, V>
+    WithVariantState<WithWhereState<State>, V>,
+    Registry
   > {
     type ReturnState = WithVariantState<WithWhereState<State>, V>;
     const model = this.contract.models[this.modelName] as Record<string, unknown> | undefined;
@@ -255,7 +262,8 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        ReturnState
+        ReturnState,
+        Registry
       >;
     }
 
@@ -265,7 +273,8 @@ export class Collection<
         TContract,
         ModelName,
         VariantModelRow<TContract, ModelName, V>,
-        ReturnState
+        ReturnState,
+        Registry
       >;
     }
 
@@ -338,7 +347,8 @@ export class Collection<
         >;
       }
     >,
-    State
+    State,
+    Registry
   > {
     const relation = resolveIncludeRelation(this.contract, this.modelName, relationName as string);
 
@@ -434,7 +444,8 @@ export class Collection<
       Pick<DefaultModelRow<TContract, ModelName>, Fields[number]> &
         IncludedRelationsForRow<TContract, ModelName, Row>
     >,
-    State
+    State,
+    Registry
   > {
     const selectedFields = mapFieldsToColumns(this.contract, this.modelName, fields);
 
@@ -453,7 +464,7 @@ export class Collection<
     selection:
       | ((model: ModelAccessor<TContract, ModelName>) => OrderByItem)
       | ReadonlyArray<(model: ModelAccessor<TContract, ModelName>) => OrderByItem>,
-  ): Collection<TContract, ModelName, Row, WithOrderByState<State>> {
+  ): Collection<TContract, ModelName, Row, WithOrderByState<State>, Registry> {
     const accessor = createModelAccessor(this.ctx.context, this.modelName);
     const selectors = Array.isArray(selection) ? selection : [selection];
     const nextOrders = selectors.map((selector) =>
@@ -522,14 +533,21 @@ export class Collection<
   combine<
     Spec extends Record<
       string,
-      Collection<TContract, ModelName, unknown, CollectionTypeState> | IncludeScalar<unknown>
+      | Collection<TContract, ModelName, unknown, CollectionTypeState, Registry>
+      | IncludeScalar<unknown>
     >,
   >(
     spec: Spec,
   ): IncludeCombine<{
     [K in keyof Spec]: Spec[K] extends IncludeScalar<infer ScalarResult>
       ? ScalarResult
-      : Spec[K] extends Collection<TContract, ModelName, infer BranchRow, CollectionTypeState>
+      : Spec[K] extends Collection<
+            TContract,
+            ModelName,
+            infer BranchRow,
+            CollectionTypeState,
+            Registry
+          >
         ? BranchRow[]
         : never;
   }> {
@@ -559,7 +577,13 @@ export class Collection<
     return createIncludeCombine(branches) as IncludeCombine<{
       [K in keyof Spec]: Spec[K] extends IncludeScalar<infer ScalarResult>
         ? ScalarResult
-        : Spec[K] extends Collection<TContract, ModelName, infer BranchRow, CollectionTypeState>
+        : Spec[K] extends Collection<
+              TContract,
+              ModelName,
+              infer BranchRow,
+              CollectionTypeState,
+              Registry
+            >
           ? BranchRow[]
           : never;
     }>;
@@ -569,7 +593,7 @@ export class Collection<
     cursorValues: State['hasOrderBy'] extends true
       ? Partial<Record<keyof DefaultModelRow<TContract, ModelName> & string, unknown>>
       : never,
-  ): Collection<TContract, ModelName, Row, State> {
+  ): Collection<TContract, ModelName, Row, State, Registry> {
     const mappedCursor = mapCursorValuesToColumns(
       this.contract,
       this.modelName,
@@ -590,7 +614,7 @@ export class Collection<
       keyof DefaultModelRow<TContract, ModelName> & string,
       ...(keyof DefaultModelRow<TContract, ModelName> & string)[],
     ],
-  >(...fields: Fields): Collection<TContract, ModelName, Row, State> {
+  >(...fields: Fields): Collection<TContract, ModelName, Row, State, Registry> {
     const distinctFields = mapFieldsToColumns(this.contract, this.modelName, fields);
 
     return this.#clone({
@@ -606,7 +630,7 @@ export class Collection<
     ],
   >(
     ...fields: State['hasOrderBy'] extends true ? Fields : never
-  ): Collection<TContract, ModelName, Row, State> {
+  ): Collection<TContract, ModelName, Row, State, Registry> {
     const distinctOnFields = mapFieldsToColumns(
       this.contract,
       this.modelName,
@@ -619,84 +643,62 @@ export class Collection<
     });
   }
 
-  take(n: number): Collection<TContract, ModelName, Row, State> {
+  take(n: number): Collection<TContract, ModelName, Row, State, Registry> {
     return this.#clone({ limit: n });
   }
 
-  skip(n: number): Collection<TContract, ModelName, Row, State> {
+  skip(n: number): Collection<TContract, ModelName, Row, State, Registry> {
     return this.#clone({ offset: n });
   }
 
   /**
    * Read terminal: stream all rows matching the current state.
    *
-   * Accepts an optional variadic of read-typed user annotations. The
-   * `As & ValidAnnotations<'read', As>` gate rejects write-only
-   * annotations at the call site; the runtime check fails closed for
-   * callers that bypass the type gate. Annotations are merged into
+   * Accepts an optional trailing `annotateFn` callback that receives a
+   * registry-derived `AnnotationBuilder<'read', Registry>` and returns
+   * either the chained builder or a `readonly AnnotationValue[]` (the
+   * array escape hatch for externally-imported handles). The framework
+   * normalizes the return value, runs `assertAnnotationsApplicable`
+   * (the runtime gate that catches cast-bypass), and merges the
+   * resulting annotations into `state.userAnnotations` so they land in
    * `plan.meta.annotations` at compile time.
    */
-  all<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'read', As>
+  all(
+    annotateFn?: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): AsyncIterableResult<Row> {
-    return this.#withAnnotations(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'read',
-      'all',
-    ).#dispatch();
+    return this.#resolveAnnotationsToState(annotateFn, 'read', 'all').#dispatch();
   }
 
-  async first(): Promise<Row | null>;
-  async first(
-    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
-  ): Promise<Row | null>;
-  async first(filter: ShorthandWhereFilter<TContract, ModelName>): Promise<Row | null>;
-  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'read', As>
-  ): Promise<Row | null>;
-  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    filter: (model: ModelAccessor<TContract, ModelName>) => WhereArg,
-    ...annotations: As & ValidAnnotations<'read', As>
-  ): Promise<Row | null>;
-  async first<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    filter: ShorthandWhereFilter<TContract, ModelName>,
-    ...annotations: As & ValidAnnotations<'read', As>
-  ): Promise<Row | null>;
   /**
    * Read terminal: return the first matching row, or `null`.
    *
-   * Accepts an optional `filter` (function, shorthand, or annotation),
-   * followed by an optional variadic of read-typed user annotations.
-   * The first positional arg is interpreted as a filter only when it is
-   * a function or a non-`AnnotationValue` shorthand record; an
-   * `AnnotationValue` first arg is treated as the leading annotation.
+   * Accepts an optional `filter` (function or shorthand) and an
+   * optional trailing `annotateFn` callback. To attach annotations
+   * without a filter, pass `undefined` for the first argument:
+   * `db.User.first(undefined, meta => meta.cache({ ttl: 60 }))`.
+   *
+   * See `all()` for the annotation callback semantics.
    */
   async first(
-    filterOrFirstAnnotation?:
+    filter?:
       | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
-      | ShorthandWhereFilter<TContract, ModelName>
-      | AnnotationValue<unknown, OperationKind>,
-    ...rest: readonly AnnotationValue<unknown, OperationKind>[]
+      | ShorthandWhereFilter<TContract, ModelName>,
+    annotateFn?: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<Row | null> {
-    let filter:
-      | ((model: ModelAccessor<TContract, ModelName>) => WhereArg)
-      | ShorthandWhereFilter<TContract, ModelName>
-      | undefined;
-    let annotations: readonly AnnotationValue<unknown, OperationKind>[];
-    if (isAnnotationValue(filterOrFirstAnnotation)) {
-      filter = undefined;
-      annotations = [filterOrFirstAnnotation, ...rest];
-    } else {
-      filter = filterOrFirstAnnotation;
-      annotations = rest;
-    }
+    // Narrow the union before calling `where()` — each `where` overload
+    // takes one shape, and TypeScript can't pick an overload from the
+    // union directly.
     const scoped =
       filter === undefined
         ? this
         : typeof filter === 'function'
           ? this.where(filter)
           : this.where(filter);
-    const limited = scoped.take(1).#withAnnotations(annotations, 'read', 'first');
+    const limited = scoped.take(1).#resolveAnnotationsToState(annotateFn, 'read', 'first');
     const rows = await limited.#dispatch().toArray();
     return rows[0] ?? null;
   }
@@ -705,18 +707,17 @@ export class Collection<
    * Read terminal: run an aggregate query (count, sum, avg, min, max)
    * built via the `AggregateBuilder` callback.
    *
-   * Accepts an optional variadic of read-typed user annotations after
-   * the builder callback. The `As & ValidAnnotations<'read', As>` gate
-   * rejects write-only annotations at the call site; the runtime check
-   * fails closed for callers that bypass the type gate. Annotations
-   * are merged into the compiled plan's `meta.annotations`.
+   * Accepts an optional trailing `annotateFn` callback after the
+   * builder callback. See `all()` for the annotation callback
+   * semantics. Annotations are merged into the compiled plan's
+   * `meta.annotations` via `mergeUserAnnotations` because
+   * `compileAggregate` doesn't take `state`.
    */
-  async aggregate<
-    Spec extends AggregateSpec,
-    As extends readonly AnnotationValue<unknown, OperationKind>[],
-  >(
+  async aggregate<Spec extends AggregateSpec>(
     fn: (aggregate: AggregateBuilder<TContract, ModelName>) => Spec,
-    ...annotations: As & ValidAnnotations<'read', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<AggregateResult<Spec>> {
     const aggregateSpec = fn(createAggregateBuilder(this.contract, this.modelName));
     const entries = Object.entries(aggregateSpec);
@@ -730,11 +731,7 @@ export class Collection<
       }
     }
 
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'read',
-      'aggregate',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'read', 'aggregate');
 
     const compiled = mergeUserAnnotations(
       compileAggregate(this.contract, this.tableName, this.state.filters, aggregateSpec),
@@ -747,22 +744,15 @@ export class Collection<
     return normalizeAggregateResult(aggregateSpec, rows[0] ?? {});
   }
 
-  async create<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    data: ResolvedCreateInput<TContract, ModelName, State['variantName']>,
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): Promise<Row>;
-  async create<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    data: MutationCreateInputWithRelations<TContract, ModelName>,
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): Promise<Row>;
   /**
    * Write terminal: insert one row and return it.
    *
-   * Accepts an optional variadic of write-typed user annotations after
-   * the input. The `As & ValidAnnotations<'write', As>` gate rejects
-   * read-only annotations at the call site; the runtime check fails
-   * closed for callers that bypass the type gate. Annotations are
-   * merged into the compiled mutation plan's `meta.annotations`.
+   * Accepts an optional trailing `annotateFn` callback that receives a
+   * registry-derived `AnnotationBuilder<'write', Registry>` and returns
+   * either the chained builder or a `readonly AnnotationValue[]` (the
+   * array escape hatch). See `all()` for the annotation callback
+   * semantics. Annotations are merged into the compiled mutation
+   * plan's `meta.annotations` via `mergeUserAnnotations`.
    *
    * Note: when the input contains nested-mutation callbacks, the
    * operation is executed as a graph of internal queries via
@@ -774,10 +764,12 @@ export class Collection<
     data:
       | ResolvedCreateInput<TContract, ModelName, State['variantName']>
       | MutationCreateInputWithRelations<TContract, ModelName>,
-    ...annotations: readonly AnnotationValue<unknown, OperationKind>[]
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'create()');
-    const annotationsMap = this.#buildAnnotationsMap(annotations, 'write', 'create');
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'create');
 
     if (
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
@@ -809,17 +801,15 @@ export class Collection<
     throw new Error(`create() for model "${this.modelName}" did not return a row`);
   }
 
-  createAll<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  createAll(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): AsyncIterableResult<Row> {
     return this.#createAllWithAnnotations(
       data,
-      this.#buildAnnotationsMap(
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-        'write',
-        'createAll',
-      ),
+      this.#resolveAnnotationsToMap(annotateFn, 'write', 'createAll'),
     );
   }
 
@@ -1034,20 +1024,18 @@ export class Collection<
     });
   }
 
-  async createCount<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  async createCount(
     data: readonly ResolvedCreateInput<TContract, ModelName, State['variantName']>[],
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<number> {
     if (data.length === 0) {
       return 0;
     }
 
     this.#assertNotMtiVariant('createCount()');
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'write',
-      'createCount',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'createCount');
 
     const rows = data as readonly Record<string, unknown>[];
     const mappedRows = this.#mapCreateRows(rows);
@@ -1076,21 +1064,19 @@ export class Collection<
    * On conflict, `ON CONFLICT DO NOTHING RETURNING ...` may return zero rows,
    * so this method may issue a follow-up reload query to return the existing row.
    */
-  async upsert<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  async upsert(
     input: {
       create: ResolvedCreateInput<TContract, ModelName, State['variantName']>;
       update: Partial<DefaultModelRow<TContract, ModelName>>;
       conflictOn?: UniqueConstraintCriterion<TContract, ModelName>;
     },
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<Row> {
     assertReturningCapability(this.contract, 'upsert()');
     this.#assertNotMtiVariant('upsert()');
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'write',
-      'upsert',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'upsert');
 
     const mappedCreateRows = this.#mapCreateRows([input.create as Record<string, unknown>]);
     const createValues = mappedCreateRows[0] ?? {};
@@ -1154,10 +1140,8 @@ export class Collection<
    * Write terminal: update matching rows and return the first one (or
    * null when no row matched).
    *
-   * Accepts an optional variadic of write-typed user annotations after
-   * the input. The `As & ValidAnnotations<'write', As>` gate rejects
-   * read-only annotations at the call site; the runtime check fails
-   * closed for callers that bypass the type gate.
+   * Accepts an optional trailing `annotateFn` callback after the
+   * input. See `all()` for the annotation callback semantics.
    *
    * Note: when the input contains nested-mutation callbacks, the
    * operation is executed as a graph of internal queries via
@@ -1165,16 +1149,14 @@ export class Collection<
    * `update()` call but do not currently flow into each constituent SQL
    * statement — see `projects/middleware-intercept-and-cache/follow-ups.md`.
    */
-  async update<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  async update(
     data: State['hasWhere'] extends true ? MutationUpdateInput<TContract, ModelName> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'update()');
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'write',
-      'update',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'update');
 
     if (
       hasNestedMutationCallbacks(this.contract, this.modelName, data as Record<string, unknown>)
@@ -1203,17 +1185,15 @@ export class Collection<
     return rows[0] ?? null;
   }
 
-  updateAll<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  updateAll(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): AsyncIterableResult<Row> {
     return this.#updateAllWithAnnotations(
       data,
-      this.#buildAnnotationsMap(
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-        'write',
-        'updateAll',
-      ),
+      this.#resolveAnnotationsToMap(annotateFn, 'write', 'updateAll'),
     );
   }
 
@@ -1255,9 +1235,11 @@ export class Collection<
     });
   }
 
-  async updateCount<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
+  async updateCount(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<number> {
     const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
@@ -1265,11 +1247,7 @@ export class Collection<
     }
 
     // Annotations attach to the write, not the matching read.
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'write',
-      'updateCount',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'updateCount');
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
@@ -1296,41 +1274,37 @@ export class Collection<
    * Write terminal: delete matching rows and return the first one (or
    * null when no row matched).
    *
-   * Accepts an optional variadic of write-typed user annotations.
-   * The `As & ValidAnnotations<'write', As>` gate rejects read-only
-   * annotations at the call site; the runtime check fails closed for
-   * callers that bypass the type gate.
+   * Accepts an optional trailing `annotateFn` callback. See `all()`
+   * for the annotation callback semantics.
    */
-  async delete<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+  async delete(
+    this: State['hasWhere'] extends true
+      ? Collection<TContract, ModelName, Row, State, Registry>
+      : never,
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<Row | null> {
     assertReturningCapability(this.contract, 'delete()');
     // The `this`-typed receiver narrows when the `where()` gate is
     // satisfied, so we can call `deleteAll()` on it directly.
-    const rows = await (this as Collection<TContract, ModelName, Row, State>)
-      .#deleteAllWithAnnotations(
-        this.#buildAnnotationsMap(
-          annotations as readonly AnnotationValue<unknown, OperationKind>[],
-          'write',
-          'delete',
-        ),
-      )
+    const rows = await (this as Collection<TContract, ModelName, Row, State, Registry>)
+      .#deleteAllWithAnnotations(this.#resolveAnnotationsToMap(annotateFn, 'write', 'delete'))
       .toArray();
     return rows[0] ?? null;
   }
 
-  deleteAll<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+  deleteAll(
+    this: State['hasWhere'] extends true
+      ? Collection<TContract, ModelName, Row, State, Registry>
+      : never,
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): AsyncIterableResult<Row> {
-    return (this as Collection<TContract, ModelName, Row, State>).#deleteAllWithAnnotations(
-      this.#buildAnnotationsMap(
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-        'write',
-        'deleteAll',
-      ),
-    );
+    return (
+      this as Collection<TContract, ModelName, Row, State, Registry>
+    ).#deleteAllWithAnnotations(this.#resolveAnnotationsToMap(annotateFn, 'write', 'deleteAll'));
   }
 
   #deleteAllWithAnnotations(
@@ -1358,16 +1332,16 @@ export class Collection<
     });
   }
 
-  async deleteCount<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
-    ...annotations: As & ValidAnnotations<'write', As>
+  async deleteCount(
+    this: State['hasWhere'] extends true
+      ? Collection<TContract, ModelName, Row, State, Registry>
+      : never,
+    annotateFn?: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): Promise<number> {
     // Annotations attach to the write, not the matching read.
-    const annotationsMap = this.#buildAnnotationsMap(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'write',
-      'deleteCount',
-    );
+    const annotationsMap = this.#resolveAnnotationsToMap(annotateFn, 'write', 'deleteCount');
 
     const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
     const countState: CollectionState = {
@@ -1458,7 +1432,7 @@ export class Collection<
 
   #clone<NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
-  ): Collection<TContract, ModelName, Row, NextState> {
+  ): Collection<TContract, ModelName, Row, NextState, Registry> {
     return this.#createSelf<Row, NextState>({
       ...this.state,
       ...overrides,
@@ -1467,7 +1441,7 @@ export class Collection<
 
   #cloneWithRow<NextRow, NextState extends CollectionTypeState = State>(
     overrides: Partial<CollectionState>,
-  ): Collection<TContract, ModelName, NextRow, NextState> {
+  ): Collection<TContract, ModelName, NextRow, NextState, Registry> {
     return this.#createSelf<NextRow, NextState>({
       ...this.state,
       ...overrides,
@@ -1476,14 +1450,14 @@ export class Collection<
 
   #createSelf<NextRow, NextState extends CollectionTypeState>(
     state: CollectionState,
-  ): Collection<TContract, ModelName, NextRow, NextState> {
+  ): Collection<TContract, ModelName, NextRow, NextState, Registry> {
     const Ctor = this.constructor as CollectionConstructor<TContract>;
     return new Ctor(this.ctx, this.modelName, {
       tableName: this.tableName,
       state,
       registry: this.registry,
       includeRefinementMode: this.includeRefinementMode,
-    }) as unknown as Collection<TContract, ModelName, NextRow, NextState>;
+    }) as unknown as Collection<TContract, ModelName, NextRow, NextState, Registry>;
   }
 
   #createCollection<
@@ -1493,7 +1467,7 @@ export class Collection<
   >(
     modelName: ModelNameInner,
     options: CollectionInit<TContract>,
-  ): Collection<TContract, ModelNameInner, RowInner, StateInner> {
+  ): Collection<TContract, ModelNameInner, RowInner, StateInner, Registry> {
     const Ctor =
       (this.registry.get(modelName) as CollectionConstructor<TContract> | undefined) ??
       (Collection as unknown as CollectionConstructor<TContract>);
@@ -1504,7 +1478,7 @@ export class Collection<
         options.registry ??
         (this.registry as ReadonlyMap<string, CollectionConstructor<TContract>>),
       includeRefinementMode: options.includeRefinementMode ?? this.includeRefinementMode,
-    }) as unknown as Collection<TContract, ModelNameInner, RowInner, StateInner>;
+    }) as unknown as Collection<TContract, ModelNameInner, RowInner, StateInner, Registry>;
   }
 
   #dispatch(): AsyncIterableResult<Row> {
@@ -1518,69 +1492,129 @@ export class Collection<
   }
 
   /**
-   * Validates the annotation kinds against the terminal's operation
-   * kind and returns a clone whose `state.userAnnotations` carries the
-   * accumulated map. The runtime gate fails closed via
-   * `assertAnnotationsApplicable` when callers bypass the type gate
-   * through casts or `any`.
+   * Resolves a terminal's `annotateFn` callback into a clone of the
+   * receiver whose `state.userAnnotations` carries the merged values.
+   * Used by read terminals (`all`, `first`) that flow annotations
+   * through `state` into the compiled plan via `compileSelect`.
    *
-   * Empty `annotations` returns the receiver unchanged.
+   * - When `annotateFn === undefined`, returns the receiver unchanged.
+   * - Constructs the kind-filtered `AnnotationBuilder` from
+   *   `this.ctx.annotationRegistry` (or an empty registry when omitted
+   *   — the array escape hatch with externally-imported handles still
+   *   works), invokes the callback, normalizes the return value
+   *   (branded builder or readonly array via
+   *   `#extractAnnotationValues`), and runs
+   *   `assertAnnotationsApplicable` (the runtime gate that catches
+   *   cast-bypass).
+   * - Last-write-wins on duplicate namespaces.
    */
-  #withAnnotations(
-    annotations: readonly AnnotationValue<unknown, OperationKind>[],
-    kind: OperationKind,
+  #resolveAnnotationsToState<K extends OperationKind>(
+    annotateFn:
+      | ((
+          meta: AnnotationBuilder<K, Registry>,
+        ) => AnnotationBuilder<K, Registry> | readonly AnnotationValue<unknown, OperationKind>[])
+      | undefined,
+    kind: K,
     terminalName: string,
   ): this {
-    if (annotations.length === 0) {
+    if (annotateFn === undefined) {
       return this;
     }
-    assertAnnotationsApplicable(annotations, kind, terminalName);
+    const meta = createMetaBuilder<K, Registry>(
+      this.ctx.annotationRegistry ?? createAnnotationRegistry(),
+      kind,
+    );
+    const result = annotateFn(meta);
+    const values = this.#extractAnnotationValues(result);
+    assertAnnotationsApplicable(values, kind, terminalName);
+    if (values.length === 0) {
+      return this;
+    }
     const next = new Map(this.state.userAnnotations);
-    for (const annotation of annotations) {
+    for (const annotation of values) {
       next.set(annotation.namespace, annotation);
     }
     return this.#clone({ userAnnotations: next }) as this;
   }
 
   /**
-   * Validates the annotation kinds against a terminal's operation kind
-   * and returns a `Map<namespace, AnnotationValue>` ready to be passed
-   * to `mergeUserAnnotations`. Returns `undefined` for an empty variadic
-   * so callers can skip the rewrap entirely.
+   * Resolves a terminal's `annotateFn` callback into a
+   * `Map<namespace, AnnotationValue>` ready to be passed to
+   * `mergeUserAnnotations`. Returns `undefined` when the callback is
+   * omitted or yields zero values so callers can skip the rewrap
+   * entirely.
    *
    * Used by terminals where annotations don't flow through `state` —
    * the compiled plan is post-wrapped with the annotations map
-   * instead. (Read terminals like `all` and `first` instead populate
-   * `state.userAnnotations` via `#withAnnotations`; aggregate is the
-   * one read terminal that uses the post-wrap path because its compile
-   * function doesn't take `state`.) The runtime gate fails closed via
-   * `assertAnnotationsApplicable`.
+   * instead. (Read terminals `all` and `first` instead populate
+   * `state.userAnnotations` via `#resolveAnnotationsToState`;
+   * aggregate and every write terminal use this post-wrap path because
+   * their compile functions don't take `state`.) Same normalization
+   * and runtime gate as `#resolveAnnotationsToState`.
    */
-  #buildAnnotationsMap(
-    annotations: readonly AnnotationValue<unknown, OperationKind>[],
-    kind: OperationKind,
+  #resolveAnnotationsToMap<K extends OperationKind>(
+    annotateFn:
+      | ((
+          meta: AnnotationBuilder<K, Registry>,
+        ) => AnnotationBuilder<K, Registry> | readonly AnnotationValue<unknown, OperationKind>[])
+      | undefined,
+    kind: K,
     terminalName: string,
   ): ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> | undefined {
-    if (annotations.length === 0) {
+    if (annotateFn === undefined) {
       return undefined;
     }
-    assertAnnotationsApplicable(annotations, kind, terminalName);
+    const meta = createMetaBuilder<K, Registry>(
+      this.ctx.annotationRegistry ?? createAnnotationRegistry(),
+      kind,
+    );
+    const result = annotateFn(meta);
+    const values = this.#extractAnnotationValues(result);
+    assertAnnotationsApplicable(values, kind, terminalName);
+    if (values.length === 0) {
+      return undefined;
+    }
     const next = new Map<string, AnnotationValue<unknown, OperationKind>>();
-    for (const annotation of annotations) {
+    for (const annotation of values) {
       next.set(annotation.namespace, annotation);
     }
     return next;
   }
-}
 
-/**
- * Type guard identifying branded `AnnotationValue` objects. Used by
- * terminals like `first()` whose leading argument may be either a
- * filter or an annotation.
- */
-function isAnnotationValue(value: unknown): value is AnnotationValue<unknown, OperationKind> {
-  if (value === null || typeof value !== 'object') {
-    return false;
+  /**
+   * Normalizes the return value of a terminal's `annotateFn`. Two
+   * shapes are accepted:
+   *
+   * 1. A branded `AnnotationBuilder` (carries the
+   *    `[ANNOTATION_BUILDER]: true` symbol) — the framework reads its
+   *    `values` array.
+   * 2. A `readonly AnnotationValue[]` — the array escape hatch for
+   *    callers that imported a handle directly and invoked it outside
+   *    the registry-driven builder.
+   *
+   * Anything else throws (defensive — the type system rejects it
+   * already, so this only fires on cast-bypass or dynamic invocation).
+   * Mirrors `extractAnnotationValues` in
+   * `@prisma-next/sql-builder/runtime`.
+   */
+  #extractAnnotationValues(
+    result:
+      | AnnotationBuilder<OperationKind, Registry>
+      | readonly AnnotationValue<unknown, OperationKind>[],
+  ): readonly AnnotationValue<unknown, OperationKind>[] {
+    if (Array.isArray(result)) {
+      return result;
+    }
+    if (
+      typeof result === 'object' &&
+      result !== null &&
+      (result as Record<symbol, unknown>)[ANNOTATION_BUILDER] === true
+    ) {
+      return (result as { readonly values: readonly AnnotationValue<unknown, OperationKind>[] })
+        .values;
+    }
+    throw new Error(
+      '.annotate(callback) returned an unexpected value: expected the meta builder or a readonly array of AnnotationValues',
+    );
   }
-  return (value as { readonly __annotation?: unknown }).__annotation === true;
 }

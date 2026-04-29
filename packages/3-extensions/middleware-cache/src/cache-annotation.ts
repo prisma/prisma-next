@@ -1,7 +1,7 @@
 import { defineAnnotation } from '@prisma-next/framework-components/runtime';
 
 /**
- * Payload accepted by `cacheAnnotation.apply(...)`.
+ * Payload accepted when calling `cacheAnnotation(...)`.
  *
  * - `ttl` — Time-to-live for the cached entry, in milliseconds. When
  *   omitted, the cache middleware passes the query through untouched —
@@ -27,35 +27,36 @@ export interface CachePayload {
 /**
  * Read-only annotation handle for the cache middleware.
  *
- * Declared with `applicableTo: ['read']`, which gates the type-level
- * `ValidAnnotations<'write', As>` and the runtime
- * `assertAnnotationsApplicable(annotations, 'write', ...)` checks at every
- * lane write terminal — making "cache a mutation" structurally
- * impossible without a `as any` cast bypass at both type *and* runtime
- * levels.
+ * Declared with `applicableTo: ['read']`, which gates the structural
+ * `AnnotationBuilder<'write', Registry>` filter (so write terminals'
+ * `meta` builder simply doesn't expose `meta.cache`) and the runtime
+ * `assertAnnotationsApplicable(annotations, 'write', ...)` checks at
+ * every lane write terminal — making "cache a mutation" structurally
+ * impossible without a cast bypass at both type *and* runtime levels.
  *
- * Stored under namespace `'cache'` in `plan.meta.annotations`. The cache
- * middleware reads it via `cacheAnnotation.read(plan)`.
+ * The handle is registered into the runtime's `AnnotationRegistry` via
+ * `createCacheMiddleware`'s `annotations: { cache: cacheAnnotation }`
+ * field. Mainline call sites use the registry-driven callback —
+ * `.annotate(meta => meta.cache({ ttl: 60_000 }))` — which never needs
+ * to import this handle directly. Direct import remains supported for
+ * tests, ad-hoc usage, and the array escape hatch on `.annotate(...)`.
  *
  * @example
  * ```typescript
  * import { cacheAnnotation } from '@prisma-next/middleware-cache';
  *
- * // ORM read terminal — accepts the read-only annotation.
- * const user = await db.User.first(
- *   { id },
- *   cacheAnnotation.apply({ ttl: 60_000 }),
- * );
+ * // Mainline: registry-driven callback (no import needed at the call site).
+ * const user = await db.User.first({ id }, meta => meta.cache({ ttl: 60_000 }));
  *
- * // SQL DSL select builder — chainable.
+ * // Array escape hatch (direct handle import):
  * const plan = db.sql
  *   .from(tables.user)
- *   .annotate(cacheAnnotation.apply({ ttl: 60_000 }))
+ *   .annotate(() => [cacheAnnotation({ ttl: 60_000 })])
  *   .select({ id: tables.user.columns.id })
  *   .build();
  * ```
  */
 export const cacheAnnotation = defineAnnotation<CachePayload, 'read'>({
-  namespace: 'cache',
+  name: 'cache',
   applicableTo: ['read'],
 });

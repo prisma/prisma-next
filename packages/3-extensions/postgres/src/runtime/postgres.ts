@@ -39,12 +39,14 @@ import {
 } from './binding';
 
 export type PostgresTargetId = 'postgres';
-type OrmClient<TContract extends Contract<SqlStorage>> = ReturnType<typeof ormBuilder<TContract>>;
+type OrmClient<TContract extends Contract<SqlStorage>, Registry = {}> = ReturnType<
+  typeof ormBuilder<TContract, Record<never, never>, Registry>
+>;
 
-export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>>
+export interface PostgresTransactionContext<TContract extends Contract<SqlStorage>, Registry = {}>
   extends TransactionContext {
-  readonly sql: Db<TContract>;
-  readonly orm: OrmClient<TContract>;
+  readonly sql: Db<TContract, Registry>;
+  readonly orm: OrmClient<TContract, Registry>;
 }
 
 /**
@@ -53,14 +55,14 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
  * The `Registry` generic carries the merged shape of every annotation
  * handle contributed by `options.middleware`. It is computed via
  * `AnnotationsOf<Mw>` from the const-captured middleware tuple at the
- * factory call site and projected here as a phantom field. Stage 4 will
- * thread `Registry` into `Db<TContract, Registry>` and the ORM surface
- * so the `.annotate(callback)` callback can derive its kind-filtered
- * `AnnotationBuilder` from `Registry` at the call site.
+ * factory call site and threaded through `Db<TContract, Registry>` and
+ * `OrmClient<TContract, Registry>` so the `.annotate(callback)` callback
+ * receives a kind-filtered `AnnotationBuilder<K, Registry>` derived from
+ * the runtime's middleware contributions.
  */
 export interface PostgresClient<TContract extends Contract<SqlStorage>, Registry = {}> {
   readonly sql: Db<TContract, Registry>;
-  readonly orm: OrmClient<TContract>;
+  readonly orm: OrmClient<TContract, Registry>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
   /**
@@ -73,7 +75,9 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>, Registry
 
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
-  transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
+  transaction<R>(
+    fn: (tx: PostgresTransactionContext<TContract, Registry>) => PromiseLike<R>,
+  ): Promise<R>;
 }
 
 export interface PostgresOptionsBase<
@@ -271,7 +275,11 @@ export default function postgres<
     return runtimeInstance;
   };
   const annotationRegistry = assembleAnnotationRegistry(options.middleware);
-  const orm: OrmClient<TContract> = ormBuilder({
+  const orm: OrmClient<TContract, AnnotationsOf<Mw>> = ormBuilder<
+    TContract,
+    Record<never, never>,
+    AnnotationsOf<Mw>
+  >({
     runtime: {
       execute(plan) {
         return getRuntime().execute(plan);
@@ -324,14 +332,20 @@ export default function postgres<
       return getRuntime();
     },
 
-    transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
+    transaction<R>(
+      fn: (tx: PostgresTransactionContext<TContract, AnnotationsOf<Mw>>) => PromiseLike<R>,
+    ): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract, AnnotationsOf<Mw>>({
+        const txSql: Db<TContract, AnnotationsOf<Mw>> = sqlBuilder<TContract, AnnotationsOf<Mw>>({
           context,
           annotationRegistry,
         });
 
-        const txOrm: OrmClient<TContract> = ormBuilder({
+        const txOrm: OrmClient<TContract, AnnotationsOf<Mw>> = ormBuilder<
+          TContract,
+          Record<never, never>,
+          AnnotationsOf<Mw>
+        >({
           runtime: {
             execute(plan) {
               return txCtx.execute(plan);
@@ -345,7 +359,7 @@ export default function postgres<
         // accessors (notably the `invalidated` getter, which reads a closure
         // variable in `withTransaction`) remain wired to the original object.
         // Spreading would evaluate the getter once and freeze its value.
-        const tx: PostgresTransactionContext<TContract> = Object.assign(
+        const tx: PostgresTransactionContext<TContract, AnnotationsOf<Mw>> = Object.assign(
           Object.create(txCtx) as TransactionContext,
           { sql: txSql, orm: txOrm },
         );

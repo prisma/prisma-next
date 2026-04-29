@@ -143,9 +143,11 @@ async function resolveCacheKey(
  * );
  * ```
  */
-export function createCacheMiddleware(
-  options?: CacheMiddlewareOptions,
-): RuntimeMiddleware & { readonly familyId?: undefined; readonly targetId?: undefined } {
+export function createCacheMiddleware(options?: CacheMiddlewareOptions): RuntimeMiddleware & {
+  readonly familyId?: undefined;
+  readonly targetId?: undefined;
+  readonly annotations: { readonly cache: typeof cacheAnnotation };
+} {
   const store =
     options?.store ??
     createInMemoryCacheStore({
@@ -229,6 +231,7 @@ export function createCacheMiddleware(
 
   return {
     name: 'cache',
+    annotations: { cache: cacheAnnotation },
     intercept,
     onRow,
     afterExecute,

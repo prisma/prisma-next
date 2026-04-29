@@ -64,7 +64,7 @@ describe('cache key resolution', () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
-        cache: cacheAnnotation.apply({ ttl: 60_000 }),
+        cache: cacheAnnotation({ ttl: 60_000 }),
       });
       const ctx = makeCtx();
 
@@ -85,7 +85,7 @@ describe('cache key resolution', () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
-        cache: cacheAnnotation.apply({ ttl: 60_000 }),
+        cache: cacheAnnotation({ ttl: 60_000 }),
       });
       const contentHash = vi.fn(async (e: ExecutionPlan) => `derived:${(e as MockExec).statement}`);
       const ctx = makeCtx({ contentHash });
@@ -101,10 +101,10 @@ describe('cache key resolution', () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store, clock: () => 0 });
       const execA = makeExec('A', {
-        cache: cacheAnnotation.apply({ ttl: 60_000 }),
+        cache: cacheAnnotation({ ttl: 60_000 }),
       });
       const execB = makeExec('B', {
-        cache: cacheAnnotation.apply({ ttl: 60_000 }),
+        cache: cacheAnnotation({ ttl: 60_000 }),
       });
       const ctx = makeCtx();
 
@@ -132,12 +132,12 @@ describe('cache key resolution', () => {
     });
   });
 
-  describe('per-query override: cacheAnnotation.apply({ key })', () => {
+  describe('per-query override: cacheAnnotation({ key })', () => {
     it('uses the user-supplied key in place of ctx.contentHash', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
-        cache: cacheAnnotation.apply({ ttl: 60_000, key: 'custom-key' }),
+        cache: cacheAnnotation({ ttl: 60_000, key: 'custom-key' }),
       });
       const ctx = makeCtx();
 
@@ -157,7 +157,7 @@ describe('cache key resolution', () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
-        cache: cacheAnnotation.apply({ ttl: 60_000, key: 'custom-key' }),
+        cache: cacheAnnotation({ ttl: 60_000, key: 'custom-key' }),
       });
       const contentHash = vi.fn(async () => 'should-not-be-used');
       const ctx = makeCtx({ contentHash });
@@ -174,7 +174,7 @@ describe('cache key resolution', () => {
       // mangle, hash, or otherwise transform it.
       const userKey = 'tenant=acme|user=alice|page=42';
       const exec = makeExec('select 1', {
-        cache: cacheAnnotation.apply({ ttl: 60_000, key: userKey }),
+        cache: cacheAnnotation({ ttl: 60_000, key: userKey }),
       });
       const ctx = makeCtx();
 
@@ -198,7 +198,7 @@ describe('cache key resolution', () => {
 
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select anything', {
-        cache: cacheAnnotation.apply({ ttl: 60_000, key: 'shared-key' }),
+        cache: cacheAnnotation({ ttl: 60_000, key: 'shared-key' }),
       });
       const ctx = makeCtx();
 
@@ -230,7 +230,7 @@ describe('cache key resolution', () => {
           target: 'mongo',
           targetFamily: 'mongo',
           annotations: {
-            cache: cacheAnnotation.apply({ ttl: 60_000 }),
+            cache: cacheAnnotation({ ttl: 60_000 }),
           },
         },
       });
@@ -261,7 +261,7 @@ describe('cache key resolution', () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store, clock: () => 0 });
       const exec = makeExec('shared statement', {
-        cache: cacheAnnotation.apply({ ttl: 60_000 }),
+        cache: cacheAnnotation({ ttl: 60_000 }),
       });
 
       // Same exec object but two different ctx.contentHash returns —

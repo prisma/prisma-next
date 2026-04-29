@@ -1,32 +1,25 @@
-import { defineAnnotation } from '@prisma-next/framework-components/runtime';
+import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
 import { describe, expect, it } from 'vitest';
+import type { GroupedCollection } from '../src/grouped-collection';
 import {
   createCollection,
   createCollectionFor,
   createReturningCollectionFor,
 } from './collection-fixtures';
-
-const cacheAnnotation = defineAnnotation<{ ttl: number; skip?: boolean }, 'read'>({
-  namespace: 'cache',
-  applicableTo: ['read'],
-});
-
-const otelAnnotation = defineAnnotation<{ traceId: string }, 'read' | 'write'>({
-  namespace: 'otel',
-  applicableTo: ['read', 'write'],
-});
-
-const auditAnnotation = defineAnnotation<{ actor: string }, 'write'>({
-  namespace: 'audit',
-  applicableTo: ['write'],
-});
+import type { TestContract } from './helpers';
+import {
+  auditAnnotation,
+  cacheAnnotation,
+  otelAnnotation,
+  type TestRegistry,
+} from './test-annotations';
 
 describe('Collection.all annotations', () => {
   it('writes the applied annotation under its namespace on the executed plan', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.all(cacheAnnotation.apply({ ttl: 60 })).toArray();
+    await collection.all((meta) => meta.cache({ ttl: 60 })).toArray();
 
     expect(runtime.executions).toHaveLength(1);
     const stored = runtime.executions[0]!.plan.meta.annotations?.['cache'];
@@ -41,7 +34,7 @@ describe('Collection.all annotations', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.all(cacheAnnotation.apply({ ttl: 60 })).toArray();
+    await collection.all((meta) => meta.cache({ ttl: 60 })).toArray();
 
     const plan = runtime.executions[0]!.plan;
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -61,16 +54,14 @@ describe('Collection.all annotations', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection
-      .all(cacheAnnotation.apply({ ttl: 60 }), otelAnnotation.apply({ traceId: 't-1' }))
-      .toArray();
+    await collection.all((meta) => meta.cache({ ttl: 60 }).otel({ traceId: 't-1' })).toArray();
 
     const plan = runtime.executions[0]!.plan;
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
   });
 
-  it('zero annotations is a no-op for user annotations (empty variadic)', async () => {
+  it('omitting the annotate callback is a no-op for user annotations', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
@@ -88,7 +79,7 @@ describe('Collection.all annotations', () => {
     await collection
       .where((user) => user.name.eq('Alice'))
       .take(10)
-      .all(cacheAnnotation.apply({ ttl: 60 }))
+      .all((meta) => meta.cache({ ttl: 60 }))
       .toArray();
 
     const plan = runtime.executions[0]!.plan;
@@ -97,8 +88,10 @@ describe('Collection.all annotations', () => {
 
   it('runtime gate rejects a write-only annotation forced through a cast', () => {
     const { collection } = createCollection();
-    const allFn = collection.all as unknown as (annotation: unknown) => unknown;
-    expect(() => allFn.call(collection, auditAnnotation.apply({ actor: 'system' }))).toThrow(
+    const allFn = collection.all as unknown as (
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
+    ) => unknown;
+    expect(() => allFn.call(collection, () => [auditAnnotation({ actor: 'system' })])).toThrow(
       expect.objectContaining({
         code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
         category: 'RUNTIME',
@@ -112,7 +105,7 @@ describe('Collection.first annotations', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.first(cacheAnnotation.apply({ ttl: 60 }));
+    await collection.first(undefined, (meta) => meta.cache({ ttl: 60 }));
 
     expect(runtime.executions).toHaveLength(1);
     const plan = runtime.executions[0]!.plan;
@@ -123,7 +116,10 @@ describe('Collection.first annotations', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.first((user) => user.name.eq('Alice'), cacheAnnotation.apply({ ttl: 60 }));
+    await collection.first(
+      (user) => user.name.eq('Alice'),
+      (meta) => meta.cache({ ttl: 60 }),
+    );
 
     const plan = runtime.executions[0]!.plan;
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -133,26 +129,23 @@ describe('Collection.first annotations', () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.first({ name: 'Alice' }, cacheAnnotation.apply({ ttl: 60 }));
+    await collection.first({ name: 'Alice' }, (meta) => meta.cache({ ttl: 60 }));
 
     const plan = runtime.executions[0]!.plan;
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
   });
 
-  it('disambiguates a leading AnnotationValue from a shorthand filter', async () => {
+  it('passing undefined for filter still applies the annotation callback', async () => {
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    // The leading argument is an AnnotationValue, not a filter. The terminal
-    // must treat it as the leading annotation, not as a where shorthand.
-    await collection.first(cacheAnnotation.apply({ ttl: 60 }));
+    // Explicit `undefined` for the filter slot: the only way to attach
+    // annotations without a filter under the new callback API.
+    await collection.first(undefined, (meta) => meta.cache({ ttl: 60 }));
 
     expect(runtime.executions).toHaveLength(1);
     const plan = runtime.executions[0]!.plan;
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
-    // No filter should have been derived from the annotation.
-    // (Verify indirectly: the executed plan should not contain a where
-    // clause derived from the annotation's payload.)
     const annotationKeys = Object.keys(plan.meta.annotations ?? {});
     expect(annotationKeys).toContain('cache');
   });
@@ -163,8 +156,7 @@ describe('Collection.first annotations', () => {
 
     await collection.first(
       (user) => user.name.eq('Alice'),
-      cacheAnnotation.apply({ ttl: 60 }),
-      otelAnnotation.apply({ traceId: 't-1' }),
+      (meta) => meta.cache({ ttl: 60 }).otel({ traceId: 't-1' }),
     );
 
     const plan = runtime.executions[0]!.plan;
@@ -174,9 +166,12 @@ describe('Collection.first annotations', () => {
 
   it('runtime gate rejects a write-only annotation forced through a cast', async () => {
     const { collection } = createCollection();
-    const firstFn = collection.first as unknown as (annotation: unknown) => Promise<unknown>;
+    const firstFn = collection.first as unknown as (
+      filter: undefined,
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
+    ) => Promise<unknown>;
     await expect(
-      firstFn.call(collection, auditAnnotation.apply({ actor: 'system' })),
+      firstFn.call(collection, undefined, () => [auditAnnotation({ actor: 'system' })]),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
       category: 'RUNTIME',
@@ -189,7 +184,7 @@ describe('Collection annotations alongside framework-internal codecs metadata', 
     const { collection, runtime } = createCollection();
     runtime.setNextResults([[]]);
 
-    await collection.all(cacheAnnotation.apply({ ttl: 60 })).toArray();
+    await collection.all((meta) => meta.cache({ ttl: 60 })).toArray();
 
     const plan = runtime.executions[0]!.plan;
     // User annotation lives under its own namespace.
@@ -208,9 +203,8 @@ describe('Collection.create annotations', () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
 
-    await collection.create(
-      { id: 1, name: 'Alice', email: 'a@b.com' },
-      auditAnnotation.apply({ actor: 'system' }),
+    await collection.create({ id: 1, name: 'Alice', email: 'a@b.com' }, (meta) =>
+      meta.audit({ actor: 'system' }),
     );
 
     expect(runtime.executions).toHaveLength(1);
@@ -222,16 +216,15 @@ describe('Collection.create annotations', () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
 
-    await collection.create(
-      { id: 1, name: 'Alice', email: 'a@b.com' },
-      otelAnnotation.apply({ traceId: 't-1' }),
+    await collection.create({ id: 1, name: 'Alice', email: 'a@b.com' }, (meta) =>
+      meta.otel({ traceId: 't-1' }),
     );
 
     const plan = runtime.executions[0]!.plan;
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
   });
 
-  it('zero annotations leaves the plan without user annotations', async () => {
+  it('omitting the annotate callback leaves the plan without user annotations', async () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
 
@@ -246,14 +239,12 @@ describe('Collection.create annotations', () => {
     const { collection } = createReturningCollectionFor('User');
     const createFn = collection.create as unknown as (
       data: unknown,
-      annotation: unknown,
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
     ) => Promise<unknown>;
     await expect(
-      createFn.call(
-        collection,
-        { id: 1, name: 'Alice', email: 'a@b.com' },
-        cacheAnnotation.apply({ ttl: 60 }),
-      ),
+      createFn.call(collection, { id: 1, name: 'Alice', email: 'a@b.com' }, () => [
+        cacheAnnotation({ ttl: 60 }),
+      ]),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
       category: 'RUNTIME',
@@ -275,7 +266,7 @@ describe('Collection.createAll annotations', () => {
           { id: 1, name: 'A', email: 'a@b.com' },
           { id: 2, name: 'B', email: 'b@b.com' },
         ],
-        auditAnnotation.apply({ actor: 'system' }),
+        (meta) => meta.audit({ actor: 'system' }),
       )
       .toArray();
 
@@ -291,9 +282,8 @@ describe('Collection.createCount annotations', () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[]]);
 
-    await collection.createCount(
-      [{ id: 1, name: 'A', email: 'a@b.com' }],
-      auditAnnotation.apply({ actor: 'system' }),
+    await collection.createCount([{ id: 1, name: 'A', email: 'a@b.com' }], (meta) =>
+      meta.audit({ actor: 'system' }),
     );
 
     expect(runtime.executions.length).toBeGreaterThan(0);
@@ -314,7 +304,7 @@ describe('Collection.upsert annotations', () => {
         update: { name: 'Alice' },
         conflictOn: { id: 1 },
       },
-      auditAnnotation.apply({ actor: 'system' }),
+      (meta) => meta.audit({ actor: 'system' }),
     );
 
     const plan = runtime.executions[0]!.plan;
@@ -325,7 +315,7 @@ describe('Collection.upsert annotations', () => {
     const { collection } = createReturningCollectionFor('User');
     const upsertFn = collection.upsert as unknown as (
       input: unknown,
-      annotation: unknown,
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
     ) => Promise<unknown>;
     await expect(
       upsertFn.call(
@@ -335,7 +325,7 @@ describe('Collection.upsert annotations', () => {
           update: { name: 'Alice' },
           conflictOn: { id: 1 },
         },
-        cacheAnnotation.apply({ ttl: 60 }),
+        () => [cacheAnnotation({ ttl: 60 })],
       ),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
@@ -350,7 +340,7 @@ describe('Collection.update annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .update({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }));
+      .update({ name: 'Alice' }, (meta) => meta.audit({ actor: 'system' }));
 
     const plan = runtime.executions[0]!.plan;
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
@@ -361,10 +351,10 @@ describe('Collection.update annotations', () => {
     const filtered = collection.where({ id: 1 });
     const updateFn = filtered.update as unknown as (
       data: unknown,
-      annotation: unknown,
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
     ) => Promise<unknown>;
     await expect(
-      updateFn.call(filtered, { name: 'Alice' }, cacheAnnotation.apply({ ttl: 60 })),
+      updateFn.call(filtered, { name: 'Alice' }, () => [cacheAnnotation({ ttl: 60 })]),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
     });
@@ -378,7 +368,7 @@ describe('Collection.updateAll annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .updateAll({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }))
+      .updateAll({ name: 'Alice' }, (meta) => meta.audit({ actor: 'system' }))
       .toArray();
 
     const plan = runtime.executions[0]!.plan;
@@ -394,7 +384,7 @@ describe('Collection.updateCount annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .updateCount({ name: 'Alice' }, auditAnnotation.apply({ actor: 'system' }));
+      .updateCount({ name: 'Alice' }, (meta) => meta.audit({ actor: 'system' }));
 
     expect(runtime.executions).toHaveLength(2);
     const matchingPlan = runtime.executions[0]!.plan;
@@ -411,7 +401,7 @@ describe('Collection.delete annotations', () => {
     const { collection, runtime } = createReturningCollectionFor('User');
     runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'a@b.com' }]]);
 
-    await collection.where({ id: 1 }).delete(auditAnnotation.apply({ actor: 'system' }));
+    await collection.where({ id: 1 }).delete((meta) => meta.audit({ actor: 'system' }));
 
     const plan = runtime.executions[0]!.plan;
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
@@ -420,12 +410,14 @@ describe('Collection.delete annotations', () => {
   it('runtime gate rejects a read-only annotation forced through a cast', async () => {
     const { collection } = createReturningCollectionFor('User');
     const filtered = collection.where({ id: 1 });
-    const deleteFn = filtered.delete as unknown as (annotation: unknown) => Promise<unknown>;
-    await expect(deleteFn.call(filtered, cacheAnnotation.apply({ ttl: 60 }))).rejects.toMatchObject(
-      {
-        code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
-      },
-    );
+    const deleteFn = filtered.delete as unknown as (
+      fn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
+    ) => Promise<unknown>;
+    await expect(
+      deleteFn.call(filtered, () => [cacheAnnotation({ ttl: 60 })]),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
+    });
   });
 });
 
@@ -436,7 +428,7 @@ describe('Collection.deleteAll annotations', () => {
 
     await collection
       .where({ id: 1 })
-      .deleteAll(auditAnnotation.apply({ actor: 'system' }))
+      .deleteAll((meta) => meta.audit({ actor: 'system' }))
       .toArray();
 
     const plan = runtime.executions[0]!.plan;
@@ -450,7 +442,7 @@ describe('Collection.deleteCount annotations', () => {
     // Two execute calls: matching select first, then the delete.
     runtime.setNextResults([[{ id: 1 }], []]);
 
-    await collection.where({ id: 1 }).deleteCount(auditAnnotation.apply({ actor: 'system' }));
+    await collection.where({ id: 1 }).deleteCount((meta) => meta.audit({ actor: 'system' }));
 
     expect(runtime.executions).toHaveLength(2);
     const matchingPlan = runtime.executions[0]!.plan;
@@ -469,7 +461,7 @@ describe('Collection.aggregate annotations', () => {
 
     await collection.aggregate(
       (aggregate) => ({ count: aggregate.count() }),
-      cacheAnnotation.apply({ ttl: 60 }),
+      (meta) => meta.cache({ ttl: 60 }),
     );
 
     expect(runtime.executions).toHaveLength(1);
@@ -483,14 +475,14 @@ describe('Collection.aggregate annotations', () => {
 
     await collection.aggregate(
       (aggregate) => ({ count: aggregate.count() }),
-      otelAnnotation.apply({ traceId: 't-1' }),
+      (meta) => meta.otel({ traceId: 't-1' }),
     );
 
     const plan = runtime.executions[0]!.plan;
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
   });
 
-  it('zero annotations leaves the plan without user annotations', async () => {
+  it('omitting the annotate callback leaves the plan without user annotations', async () => {
     const { collection, runtime } = createCollectionFor('Post');
     runtime.setNextResults([[{ count: '5' }]]);
 
@@ -505,13 +497,13 @@ describe('Collection.aggregate annotations', () => {
     const { collection } = createCollectionFor('Post');
     const aggregateFn = collection.aggregate as unknown as (
       fn: unknown,
-      annotation: unknown,
+      annotateFn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
     ) => Promise<unknown>;
     await expect(
       aggregateFn.call(
         collection,
         (aggregate: { count: () => unknown }) => ({ count: aggregate.count() }),
-        auditAnnotation.apply({ actor: 'system' }),
+        () => [auditAnnotation({ actor: 'system' })],
       ),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
@@ -525,9 +517,21 @@ describe('GroupedCollection.aggregate annotations', () => {
     const { collection, runtime } = createCollectionFor('Post');
     runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
 
-    await collection
-      .groupBy('userId')
-      .aggregate((aggregate) => ({ count: aggregate.count() }), cacheAnnotation.apply({ ttl: 60 }));
+    // `Collection.groupBy(...)` does not propagate the `Registry`
+    // generic; the resulting `GroupedCollection` has the default
+    // `Registry = {}`. The cast threads `TestRegistry` back in so the
+    // chained `meta.cache(...)` form typechecks. The runtime registry
+    // (populated by the fixture) is what actually drives the builder.
+    const grouped = collection.groupBy('userId') as unknown as GroupedCollection<
+      TestContract,
+      'Post',
+      ['userId'],
+      TestRegistry
+    >;
+    await grouped.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      (meta) => meta.cache({ ttl: 60 }),
+    );
 
     expect(runtime.executions).toHaveLength(1);
     const plan = runtime.executions[0]!.plan;
@@ -538,18 +542,22 @@ describe('GroupedCollection.aggregate annotations', () => {
     const { collection, runtime } = createCollectionFor('Post');
     runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
 
-    await collection
-      .groupBy('userId')
-      .aggregate(
-        (aggregate) => ({ count: aggregate.count() }),
-        otelAnnotation.apply({ traceId: 't-1' }),
-      );
+    const grouped = collection.groupBy('userId') as unknown as GroupedCollection<
+      TestContract,
+      'Post',
+      ['userId'],
+      TestRegistry
+    >;
+    await grouped.aggregate(
+      (aggregate) => ({ count: aggregate.count() }),
+      (meta) => meta.otel({ traceId: 't-1' }),
+    );
 
     const plan = runtime.executions[0]!.plan;
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
   });
 
-  it('zero annotations leaves the plan without user annotations', async () => {
+  it('omitting the annotate callback leaves the plan without user annotations', async () => {
     const { collection, runtime } = createCollectionFor('Post');
     runtime.setNextResults([[{ user_id: 1, count: '2' }]]);
 
@@ -563,12 +571,15 @@ describe('GroupedCollection.aggregate annotations', () => {
   it('runtime gate rejects a write-only annotation forced through a cast', async () => {
     const { collection } = createCollectionFor('Post');
     const grouped = collection.groupBy('userId') as unknown as {
-      aggregate(fn: unknown, annotation: unknown): Promise<unknown>;
+      aggregate(
+        fn: unknown,
+        annotateFn: (meta: unknown) => readonly AnnotationValue<unknown, OperationKind>[],
+      ): Promise<unknown>;
     };
     await expect(
       grouped.aggregate(
         (aggregate: { count: () => unknown }) => ({ count: aggregate.count() }),
-        auditAnnotation.apply({ actor: 'system' }),
+        () => [auditAnnotation({ actor: 'system' })],
       ),
     ).rejects.toMatchObject({
       code: 'RUNTIME.ANNOTATION_INAPPLICABLE',

@@ -15,7 +15,11 @@ function planWith(annotations: Record<string, unknown>): { readonly meta: PlanMe
 }
 
 describe('cacheAnnotation handle', () => {
-  it('declares namespace "cache"', () => {
+  it('declares name "cache"', () => {
+    expect(cacheAnnotation.name).toBe('cache');
+  });
+
+  it('declares namespace "cache" (defaults to name)', () => {
     expect(cacheAnnotation.namespace).toBe('cache');
   });
 
@@ -24,15 +28,15 @@ describe('cacheAnnotation handle', () => {
   });
 
   it('produces an applied annotation under namespace "cache" carrying the payload', () => {
-    const applied = cacheAnnotation.apply({ ttl: 60 });
+    const applied = cacheAnnotation({ ttl: 60 });
 
     expect(applied.namespace).toBe('cache');
     expect(applied.value).toEqual({ ttl: 60 });
     expect(Array.from(applied.applicableTo)).toEqual(['read']);
   });
 
-  it('round-trips a payload via apply -> read on a plan', () => {
-    const applied = cacheAnnotation.apply({ ttl: 60 });
+  it('round-trips a payload via call -> read on a plan', () => {
+    const applied = cacheAnnotation({ ttl: 60 });
     const plan = planWith({ cache: applied });
 
     const recovered = cacheAnnotation.read(plan);
@@ -51,14 +55,14 @@ describe('cacheAnnotation handle', () => {
 
   it('preserves all CachePayload fields (ttl, skip, key)', () => {
     const payload: CachePayload = { ttl: 120, skip: false, key: 'custom-key' };
-    const applied = cacheAnnotation.apply(payload);
+    const applied = cacheAnnotation(payload);
     const plan = planWith({ cache: applied });
 
     expect(cacheAnnotation.read(plan)).toEqual(payload);
   });
 
   it('accepts an empty payload', () => {
-    const applied = cacheAnnotation.apply({});
+    const applied = cacheAnnotation({});
     const plan = planWith({ cache: applied });
 
     expect(cacheAnnotation.read(plan)).toEqual({});

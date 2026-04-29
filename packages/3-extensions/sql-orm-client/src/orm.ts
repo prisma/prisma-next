@@ -49,26 +49,36 @@ type ModelCollection<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
   ModelName extends ModelNames<TContract>,
+  Registry,
 > = [CustomCollectionForKey<Collections, ModelName>] extends [never]
-  ? Collection<TContract, ModelName, InferRootRow<TContract, ModelName>>
+  ? Collection<
+      TContract,
+      ModelName,
+      InferRootRow<TContract, ModelName>,
+      CollectionTypeState,
+      Registry
+    >
   : CustomCollectionForKey<Collections, ModelName>;
 
 type ModelCollectionMap<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
+  Registry,
 > = {
-  [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K>;
+  [K in ModelNames<TContract>]: ModelCollection<TContract, Collections, K, Registry>;
 };
 
 type OrmClient<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>>,
-> = ModelCollectionMap<TContract, Collections>;
+  Registry,
+> = ModelCollectionMap<TContract, Collections, Registry>;
 
 export function orm<
   TContract extends Contract<SqlStorage>,
   Collections extends Partial<Record<string, AnyCollectionClass>> = Record<never, never>,
->(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
+  Registry = {},
+>(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections, Registry> {
   const { runtime, collections, context } = options;
   const contract = context.contract;
   const ctx: CollectionContext<TContract> = {
@@ -83,7 +93,7 @@ export function orm<
     Collection<TContract, string, unknown, CollectionTypeState>
   >();
 
-  return new Proxy({} as OrmClient<TContract, Collections>, {
+  return new Proxy({} as OrmClient<TContract, Collections, Registry>, {
     get(_target, prop: string | symbol): unknown {
       if (typeof prop !== 'string') {
         return undefined;
@@ -111,7 +121,7 @@ export function orm<
       ) => Collection<TContract, string, unknown, CollectionTypeState>;
       const collection = new CollectionCtor(ctx, modelName, {
         registry: collectionRegistry,
-      }) as ModelCollection<TContract, Collections, ModelNames<TContract>>;
+      }) as ModelCollection<TContract, Collections, ModelNames<TContract>, Registry>;
       cache.set(
         modelName,
         collection as unknown as Collection<TContract, string, unknown, CollectionTypeState>,
