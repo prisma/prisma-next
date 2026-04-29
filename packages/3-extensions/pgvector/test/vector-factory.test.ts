@@ -1,6 +1,6 @@
 import type { Ctx } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
-import { vectorCodecForLength } from '../src/core/vector-factory';
+import { vectorCodecForLength } from '../src/core/vector-codec';
 import { pgVectorCodec } from '../src/exports/codecs';
 
 const ctx: Ctx = { name: '<anon:Doc.embedding>', usedAt: [{ table: 'Doc', column: 'embedding' }] };

@@ -355,6 +355,18 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-extensions/pgvector/src/core/control-extension-descriptor.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-extensions/pgvector/src/core/runtime-extension-descriptor.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-extensions/pgvector/src/types/**",
       "domain": "extensions",
       "layer": "adapters",

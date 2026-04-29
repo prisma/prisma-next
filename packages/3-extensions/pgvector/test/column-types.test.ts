@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { VECTOR_MAX_DIM } from '../src/core/constants';
+import { VECTOR_MAX_DIM } from '../src/core/vector-codec';
 import { vector, vectorColumn } from '../src/exports/column-types';
 
 describe('pgvector column-types', () => {
