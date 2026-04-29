@@ -13,9 +13,11 @@ coverage
 packages/e2e-tests/.tmp-output
 /wip
 .pnpm-store
+.cursor/*
+!.cursor/rules-footprint.config.json
+!.cursor/environment.json
 .cursor/rules
 .cursor/commands
-.cursor
 .claude/settings.local.json
 .claude/worktrees
 CLAUDE.local.md

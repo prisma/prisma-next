@@ -18,6 +18,18 @@ Welcome. This is a contract‑first, agent‑friendly data layer.
 - [Testing](docs/onboarding/Testing.md) — Test commands, patterns, and organization
 - [Common Tasks Playbook](docs/onboarding/Common-Tasks-Playbook.md) — Add operation, split monolith, fix import
 
+## Cursor Cloud Agents
+
+When the Cursor Cloud Agent VM boots, [`.cursor/environment.json`](.cursor/environment.json) clones the [Prisma Ignite](https://github.com/prisma/ignite) repo to a known location so its skills and cross-cutting docs are available on every instance:
+
+- **Path:** `$HOME/ignite` (i.e. `~/ignite`)
+- Skills/scripts that need Ignite content should resolve it in this order:
+  1. `$IGNITE_REPO` if set
+  2. `$HOME/ignite` (cloud agent default)
+  3. `$HOME/Projects/prisma/ignite` (common local checkout)
+
+Locally, clone Ignite yourself to one of the paths above (or export `IGNITE_REPO`). Skills should never assume Ignite is a sibling of this workspace.
+
 ## Project Overview
 
 **Prisma Next** is a contract-first data access layer:
