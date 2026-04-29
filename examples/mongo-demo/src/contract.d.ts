@@ -13,7 +13,7 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:75b661bfd9821fea5cf1d87c416de45ea331e58ba65787c853bb1ee3642fa116'>;
+  StorageHashBase<'sha256:cea978351276ff06d725c817bb9b6405efa78c6b2d108f72d43628bee6f74821'>;
 export type ExecutionHash = ExecutionHashBase<string>;
 export type ProfileHash =
   ProfileHashBase<'sha256:840de65fba7eb950a31487f74ee420b9c21205f38bce58579026747e0264e840'>;
@@ -114,6 +114,13 @@ type ContractBase = ContractType<
         };
       };
       readonly posts: {
+        readonly indexes: readonly [
+          {
+            readonly keys: readonly [{ readonly field: 'summary'; readonly direction: 1 }];
+            readonly unique: true;
+            readonly partialFilterExpression: { readonly kind: 'article' };
+          },
+        ];
         readonly validator: {
           readonly jsonSchema: {
             readonly bsonType: 'object';
@@ -133,31 +140,23 @@ type ContractBase = ContractType<
               'kind',
               'title',
             ];
-          };
-          readonly validationLevel: 'strict';
-          readonly validationAction: 'error';
-        };
-      };
-      readonly article: {
-        readonly validator: {
-          readonly jsonSchema: {
-            readonly bsonType: 'object';
-            readonly properties: { readonly summary: { readonly bsonType: 'string' } };
-            readonly required: readonly ['summary'];
-          };
-          readonly validationLevel: 'strict';
-          readonly validationAction: 'error';
-        };
-      };
-      readonly tutorial: {
-        readonly validator: {
-          readonly jsonSchema: {
-            readonly bsonType: 'object';
-            readonly properties: {
-              readonly difficulty: { readonly bsonType: 'string' };
-              readonly duration: { readonly bsonType: 'int' };
-            };
-            readonly required: readonly ['difficulty', 'duration'];
+            readonly oneOf: readonly [
+              {
+                readonly properties: {
+                  readonly kind: { readonly enum: readonly ['article'] };
+                  readonly summary: { readonly bsonType: 'string' };
+                };
+                readonly required: readonly ['kind', 'summary'];
+              },
+              {
+                readonly properties: {
+                  readonly kind: { readonly enum: readonly ['tutorial'] };
+                  readonly difficulty: { readonly bsonType: 'string' };
+                  readonly duration: { readonly bsonType: 'int' };
+                };
+                readonly required: readonly ['difficulty', 'duration', 'kind'];
+              },
+            ];
           };
           readonly validationLevel: 'strict';
           readonly validationAction: 'error';
