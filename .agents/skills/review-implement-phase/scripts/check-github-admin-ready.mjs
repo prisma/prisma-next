@@ -57,6 +57,20 @@ function run(command, args) {
   return spawnSync(command, args, { encoding: 'utf8' });
 }
 
+function hasRepoScope(output) {
+  const scopeLine = output
+    .split(/\r?\n/)
+    .find((line) => line.includes('Token scopes:'));
+  if (!scopeLine) {
+    return false;
+  }
+  return scopeLine
+    .replace(/^.*Token scopes:\s*/u, '')
+    .split(',')
+    .map((scope) => scope.trim().replace(/^['"]|['"]$/g, ''))
+    .includes('repo');
+}
+
 function assertCommandAvailable(command, installHint) {
   const probe = run(command, ['--version']);
   if (probe.error || probe.status !== 0) {
@@ -75,13 +89,14 @@ function assertGhAuthAndScopes() {
     throw new Error('error: gh is not authenticated; run `gh auth login`.');
   }
   const output = `${auth.stdout}\n${auth.stderr}`;
-  if (!output.includes('Token scopes:') || !output.includes('repo')) {
+  if (!hasRepoScope(output)) {
     throw new Error('error: gh token is missing `repo` scope required for review thread admin.');
   }
 }
 
 function assertPrApiAccess(owner, repo, number) {
-  const query = `query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){id url state}}}`;
+  const query =
+    'query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){id url state}}}';
   const result = run('gh', [
     'api',
     'graphql',
