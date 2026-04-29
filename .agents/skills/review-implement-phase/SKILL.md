@@ -32,9 +32,8 @@ If output directory is omitted, derive:
 System dependencies required on PATH:
 
 - `gh` (GitHub CLI)
-- `jq`
 
-If either dependency is missing, halt immediately and ask the user to install it (for example `brew install jq`).
+If `gh` is missing, halt immediately and ask the user to install it. The implement-phase scripts no longer depend on `jq`.
 
 GitHub admin capability must be available before starting implementation:
 
