@@ -73,8 +73,16 @@ function getHelpText() {
     '  post-review-thread-reply.mjs --repo <OWNER/REPO> --pr <NUMBER> --comment-node-id <NODE_ID> (--body <TEXT> | --body-file <PATH>)',
     '',
     'Purpose:',
-    '  Post a reply to the top-level review comment for a review thread target.',
-    '  Resolves PullRequestReviewComment node ID to database ID using gh + jq.',
+    '  Post acknowledgement to a review-target node and exit with a JSON result.',
+    '',
+    '  Behaviour by node type (auto-detected via GraphQL):',
+    '    * PullRequestReviewComment (inline thread comment, PRRC_…): post an inline',
+    '      reply via repos/{repo}/pulls/{pr}/comments with in_reply_to.',
+    '    * PullRequestReview (review body, PRR_…): review bodies do not accept inline',
+    '      replies, so post a top-level PR issue comment via',
+    '      repos/{repo}/issues/{pr}/comments. The response kind is "issue_comment".',
+    '',
+    '  Anything else exits with a clear "unsupported node kind" error.',
   ].join('\n');
 }
 
@@ -101,30 +109,54 @@ function assertCommandAvailable(command, installHint) {
   }
 }
 
-function jqRead(jsonText, query) {
-  return run('jq', ['-r', query], jsonText).trim();
+function parseGraphQLResponse(jsonText, contextDescription) {
+  let parsed;
+  try {
+    parsed = JSON.parse(jsonText);
+  } catch (parseError) {
+    throw new Error(`error: failed to parse ${contextDescription}: ${parseError.message}`);
+  }
+  if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
+    const messages = parsed.errors
+      .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+      .join('; ');
+    throw new Error(`error: ${messages}`);
+  }
+  return parsed;
 }
 
-function resolveCommentDatabaseId(commentNodeId) {
+function resolveTargetNode(commentNodeId) {
   const query = [
     'query($id:ID!){',
     '  node(id:$id){',
-    '    ... on PullRequestReviewComment {',
-    '      databaseId',
-    '    }',
+    '    __typename',
+    '    ... on PullRequestReviewComment { databaseId }',
+    '    ... on PullRequestReview { databaseId }',
     '  }',
     '}',
   ].join('\n');
   const response = run('gh', ['api', 'graphql', '-f', `query=${query}`, '-F', `id=${commentNodeId}`]);
-  const databaseIdText = jqRead(response, '.data.node.databaseId // empty');
-  if (!databaseIdText) {
-    throw new Error('error: failed to resolve PullRequestReviewComment.databaseId from node ID');
+  const parsed = parseGraphQLResponse(response, 'GraphQL node lookup response');
+  const node = parsed?.data?.node;
+  if (!node || typeof node !== 'object') {
+    throw new Error(`error: GraphQL node lookup returned no node for id ${commentNodeId}`);
   }
-  const databaseId = Number.parseInt(databaseIdText, 10);
-  if (Number.isNaN(databaseId)) {
-    throw new Error(`error: invalid databaseId received from API: ${databaseIdText}`);
+  const typename = node.__typename;
+  const databaseId =
+    typeof node.databaseId === 'number'
+      ? node.databaseId
+      : typeof node.databaseId === 'string' && node.databaseId.length > 0
+        ? Number.parseInt(node.databaseId, 10)
+        : null;
+  if (typename !== 'PullRequestReviewComment' && typename !== 'PullRequestReview') {
+    throw new Error(
+      `error: unsupported node kind "${typename ?? 'unknown'}" for ${commentNodeId} (expected PullRequestReviewComment or PullRequestReview)`,
+    );
   }
-  return databaseId;
+  if (databaseId === null || Number.isNaN(databaseId)) {
+    throw new Error(`error: failed to resolve databaseId for ${typename} node ${commentNodeId}`);
+  }
+  return { kind: typename, databaseId };
 }
 
 function readBody(body, bodyFile) {
@@ -132,6 +164,40 @@ function readBody(body, bodyFile) {
     return body;
   }
   return readFileSync(resolve(bodyFile), 'utf8');
+}
+
+function postInlineReply(repo, prNumber, body, inReplyToDatabaseId) {
+  const response = run('gh', [
+    'api',
+    `repos/${repo}/pulls/${prNumber}/comments`,
+    '--method',
+    'POST',
+    '-f',
+    `body=${body}`,
+    '-F',
+    `in_reply_to=${inReplyToDatabaseId}`,
+  ]);
+  const parsed = parseGraphQLResponse(response, 'inline-reply REST response');
+  if (typeof parsed?.id !== 'number') {
+    throw new Error('error: reply was posted but response did not include a numeric comment id');
+  }
+  return parsed.id;
+}
+
+function postIssueComment(repo, prNumber, body) {
+  const response = run('gh', [
+    'api',
+    `repos/${repo}/issues/${prNumber}/comments`,
+    '--method',
+    'POST',
+    '-f',
+    `body=${body}`,
+  ]);
+  const parsed = parseGraphQLResponse(response, 'issue-comment REST response');
+  if (typeof parsed?.id !== 'number') {
+    throw new Error('error: top-level PR comment was posted but response did not include a numeric comment id');
+  }
+  return parsed.id;
 }
 
 async function main() {
@@ -142,33 +208,33 @@ async function main() {
   }
 
   assertCommandAvailable('gh', 'GitHub CLI (`gh`)');
-  assertCommandAvailable('jq', '`jq` (for example: `brew install jq`)');
 
-  const commentDatabaseId = resolveCommentDatabaseId(args.commentNodeId);
+  const target = resolveTargetNode(args.commentNodeId);
   const body = readBody(args.body, args.bodyFile);
 
-  const postResponse = run('gh', [
-    'api',
-    `repos/${args.repo}/pulls/${args.prNumber}/comments`,
-    '--method',
-    'POST',
-    '-f',
-    `body=${body}`,
-    '-F',
-    `in_reply_to=${commentDatabaseId}`,
-  ]);
-
-  const replyId = jqRead(postResponse, '.id // empty');
-  if (!replyId) {
-    throw new Error('error: reply was posted but response did not include a comment id');
+  if (target.kind === 'PullRequestReviewComment') {
+    const replyId = postInlineReply(args.repo, args.prNumber, body, target.databaseId);
+    process.stdout.write(
+      JSON.stringify({
+        ok: true,
+        kind: 'review_thread_reply',
+        replyCommentId: replyId,
+        inReplyTo: target.databaseId,
+        commentNodeId: args.commentNodeId,
+      }) + '\n',
+    );
+    return;
   }
 
+  const issueCommentId = postIssueComment(args.repo, args.prNumber, body);
   process.stdout.write(
     JSON.stringify({
       ok: true,
-      replyCommentId: Number.parseInt(replyId, 10),
-      inReplyTo: commentDatabaseId,
+      kind: 'issue_comment',
+      issueCommentId,
+      reviewDatabaseId: target.databaseId,
       commentNodeId: args.commentNodeId,
+      note: 'PullRequestReview targets do not accept inline replies; posted a top-level PR issue comment instead.',
     }) + '\n',
   );
 }

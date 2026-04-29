@@ -30,6 +30,7 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
    - Create a focused commit (explicit staging; no `git add -A` / `git add .`; no amend).
    - Reply on the associated GitHub thread when you begin work (short “On it” + 👍) using:
     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
+   - For `pull_request_review` targets (review-body findings, `PRR_…` node ids), the helper auto-detects the kind and posts a top-level PR issue comment (response `kind: "issue_comment"`). There is no inline thread, so **skip `resolve-review-thread.mjs`** for these targets and record the issue-comment id in the action's `done` record (`done.githubAdmin.issueCommentId`).
    - After the change lands (commit exists and checks pass), reply “Done” (or similar) and **resolve the thread** using:
     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
     - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
@@ -53,7 +54,7 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
 - Use `target.kind` + `target.nodeId` from `review-actions.json` as canonical target identifiers.
 - Do not rely on numeric `databaseId` fields directly; derive from `source.primaryCommentNodeId` via helper scripts.
 - Preserve `actions[]` ordering in `review-actions.json`; only update status/completion fields in place.
-- Do not mark an action `done` unless its GitHub thread has received a Done reply and is resolved.
+- Do not mark a `review_thread` action `done` unless its GitHub thread has received a Done reply and is resolved. For `pull_request_review` actions, mark `done` once the top-level Done issue comment has been posted (no thread to resolve).
 
 ## Git hygiene
 
