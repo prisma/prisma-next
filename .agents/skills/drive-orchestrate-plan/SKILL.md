@@ -181,7 +181,7 @@ This continuity rule applies to the **implementer and reviewer**, who participat
 
 The on-disk artifacts that decouple the three agents (each lives under `projects/{project}/`):
 
-```
+```text
 projects/{project}/
 ├── spec.md                          # intent, decisions, ACs (drive-create-spec)
 ├── plans/
