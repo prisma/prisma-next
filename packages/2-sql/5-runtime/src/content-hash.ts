@@ -41,6 +41,6 @@ import { hashIdentity } from '@prisma-next/utils/hash-identity';
  *
  * @internal
  */
-export function computeSqlContentHash(exec: SqlExecutionPlan): string {
+export function computeSqlContentHash(exec: SqlExecutionPlan): Promise<string> {
   return hashIdentity(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
 }

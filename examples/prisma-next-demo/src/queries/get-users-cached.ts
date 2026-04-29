@@ -10,9 +10,10 @@
  *
  * The cache key is computed by the runtime via
  * `RuntimeMiddlewareContext.contentHash(exec)` — the post-lowering
- * statement plus parameters, hashed to a bounded BLAKE2b-512 digest.
- * Subsequent calls with the same plan within the TTL window are
- * served from the cache without invoking the driver.
+ * statement plus parameters, hashed to a bounded SHA-512 digest via
+ * the Web Crypto API (so the runtime works on Node and edge runtimes
+ * alike). Subsequent calls with the same plan within the TTL window
+ * are served from the cache without invoking the driver.
  */
 import { cacheAnnotation } from '@prisma-next/middleware-cache';
 import { db } from '../prisma/db';

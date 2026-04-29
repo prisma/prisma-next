@@ -25,7 +25,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      contentHash: () => 'mock-hash',
+      contentHash: async () => 'mock-hash',
       scope: 'runtime' as const,
     };
 
@@ -47,7 +47,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      contentHash: () => 'mock-hash',
+      contentHash: async () => 'mock-hash',
       scope: 'runtime' as const,
     };
     const result = {
@@ -79,7 +79,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      contentHash: () => 'mock-hash',
+      contentHash: async () => 'mock-hash',
       scope: 'runtime' as const,
     };
     const result = {
@@ -111,7 +111,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info, warn: vi.fn(), error: vi.fn() },
-      contentHash: () => 'mock-hash',
+      contentHash: async () => 'mock-hash',
       scope: 'runtime' as const,
     };
 
@@ -136,7 +136,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn, error: vi.fn() },
-      contentHash: () => 'mock-hash',
+      contentHash: async () => 'mock-hash',
       scope: 'runtime' as const,
     };
 

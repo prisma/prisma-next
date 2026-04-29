@@ -30,10 +30,16 @@ export interface RuntimeMiddlewareContext {
    * - SQL: `meta.storageHash` + `exec.sql` + `canonicalStringify(exec.params)`
    * - Mongo: `meta.storageHash` + `canonicalStringify(exec.command)`
    *
-   * The returned string is intended to be consumed directly as a `Map` key
-   * — it is not (and should not be) further hashed by callers.
+   * Both pipe their canonical string through `hashIdentity`, which uses
+   * SHA-512 via the Web Crypto API (`crypto.subtle.digest`) so the
+   * runtime works on Node, Bun, Deno, Cloudflare Workers, Vercel Edge,
+   * and browsers. The resulting digest is asynchronous on every
+   * runtime, hence the `Promise<string>` return type.
+   *
+   * The resolved string is intended to be consumed directly as a `Map`
+   * key — it is not (and should not be) further hashed by callers.
    */
-  contentHash(exec: ExecutionPlan): string;
+  contentHash(exec: ExecutionPlan): Promise<string>;
   /**
    * Identifies the queryable scope this execution is running under.
    *

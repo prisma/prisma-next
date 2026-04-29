@@ -19,7 +19,7 @@ The package depends only on `@prisma-next/framework-components/runtime` — no S
 
 - `@prisma-next/framework-components/runtime` — the only production dependency. Provides `RuntimeMiddleware`, `RuntimeMiddlewareContext` (with `contentHash` and `scope`), `defineAnnotation`, `AfterExecuteResult`, and the orchestrator integration via `runWithMiddleware`.
 
-The package does **not** depend on `@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`, or any target adapter. It does not import `node:crypto` — hashing the canonical execution identity is the family runtime's responsibility (via `@prisma-next/utils/hash-identity` in the SQL and Mongo runtimes today).
+The package does **not** depend on `@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`, or any target adapter. It does no hashing itself — producing the canonical execution identity is the family runtime's responsibility (via `@prisma-next/utils/hash-identity`, which uses SHA-512 through the Web Crypto API in the SQL and Mongo runtimes today, so the cache stays portable across Node, Bun, Deno, Cloudflare Workers, Vercel Edge, and browsers).
 
 
 ## Quick start
@@ -90,7 +90,7 @@ const plan = db.sql
 Two-tier resolution:
 
 1. **Per-query override.** `cacheAnnotation.apply({ key })` — the supplied string is used verbatim. The cache middleware does **not** rehash user-supplied keys; the caller is responsible for keeping the string bounded in size and free of sensitive data they do not want flowing into debug logs, Redis `KEYS` output, persistence dumps, or any user-supplied `CacheStore`.
-2. **Default.** `RuntimeMiddlewareContext.contentHash(exec)` — the family runtime owns this. The SQL and Mongo runtimes today compose `meta.storageHash + '|' + …` and pipe the result through `hashIdentity` (BLAKE2b-512), producing a bounded, opaque digest of the form `blake2b512:HEXDIGEST`. The cache middleware uses the returned string directly as the `Map<string, …>` key.
+2. **Default.** `RuntimeMiddlewareContext.contentHash(exec)` — the family runtime owns this. The SQL and Mongo runtimes today compose `meta.storageHash + '|' + …'` and pipe the result through `hashIdentity` (SHA-512 via the Web Crypto API), producing a bounded, opaque digest of the form `sha512:HEXDIGEST`. The cache middleware `await`s the resolved string and uses it directly as the `Map<string, …>` key.
 
 Two consequences worth pinning:
 

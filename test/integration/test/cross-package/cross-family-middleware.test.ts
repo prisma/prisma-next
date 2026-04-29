@@ -96,7 +96,7 @@ const sqlCtx: RuntimeMiddlewareContext = {
   mode: 'strict',
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
-  contentHash: () => 'mock-hash',
+  contentHash: async () => 'mock-hash',
   scope: 'runtime',
 };
 

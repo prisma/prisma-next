@@ -76,18 +76,19 @@ function readCachePayload(plan: ExecutionPlan): CachePayload | undefined {
  *    string is used verbatim. Not rehashed; the user is responsible for
  *    keeping the string bounded and free of sensitive data.
  * 2. Default: `ctx.contentHash(exec)` — the family runtime owns this and
- *    returns an opaque, bounded digest (BLAKE2b-512 in the SQL and Mongo
- *    runtimes today).
+ *    returns an opaque, bounded digest (SHA-512 via Web Crypto in the
+ *    SQL and Mongo runtimes today, so the runtime works on Node and
+ *    edge runtimes alike).
  *
- * The returned string is consumed directly as the `Map<string, …>` key
+ * The resolved string is consumed directly as the `Map<string, …>` key
  * by the underlying `CacheStore`; the cache middleware does not perform
  * any further transformation.
  */
-function resolveCacheKey(
+async function resolveCacheKey(
   payload: CachePayload,
   exec: ExecutionPlan,
   ctx: RuntimeMiddlewareContext,
-): string {
+): Promise<string> {
   if (payload.key !== undefined) {
     return payload.key;
   }
@@ -178,7 +179,7 @@ export function createCacheMiddleware(
       return undefined;
     }
 
-    const key = resolveCacheKey(payload, exec, ctx);
+    const key = await resolveCacheKey(payload, exec, ctx);
     const hit = await store.get(key);
     if (hit !== undefined) {
       ctx.log.debug?.({ event: 'middleware.cache.hit', middleware: 'cache', key });

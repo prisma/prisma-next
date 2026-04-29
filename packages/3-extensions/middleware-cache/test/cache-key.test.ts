@@ -33,7 +33,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     mode: 'strict',
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
-    contentHash: (exec) => `id:${(exec as MockExec).statement}`,
+    contentHash: async (exec) => `id:${(exec as MockExec).statement}`,
     scope: 'runtime',
     ...overrides,
   };
@@ -87,7 +87,7 @@ describe('cache key resolution', () => {
       const exec = makeExec('select 1', {
         cache: cacheAnnotation.apply({ ttl: 60_000 }),
       });
-      const contentHash = vi.fn((e: ExecutionPlan) => `derived:${(e as MockExec).statement}`);
+      const contentHash = vi.fn(async (e: ExecutionPlan) => `derived:${(e as MockExec).statement}`);
       const ctx = makeCtx({ contentHash });
 
       await mw.intercept!(exec, ctx);
@@ -159,7 +159,7 @@ describe('cache key resolution', () => {
       const exec = makeExec('select 1', {
         cache: cacheAnnotation.apply({ ttl: 60_000, key: 'custom-key' }),
       });
-      const contentHash = vi.fn(() => 'should-not-be-used');
+      const contentHash = vi.fn(async () => 'should-not-be-used');
       const ctx = makeCtx({ contentHash });
 
       await mw.intercept!(exec, ctx);
@@ -236,7 +236,7 @@ describe('cache key resolution', () => {
       });
 
       const ctx = makeCtx({
-        contentHash: () => 'mongo:users:find:{active:true}',
+        contentHash: async () => 'mongo:users:find:{active:true}',
       });
 
       // Miss + commit.
@@ -268,8 +268,8 @@ describe('cache key resolution', () => {
       // simulating two calls where the family runtime computed different
       // canonical keys (e.g. a parameter changed but the AST/command is
       // structurally identical at this view).
-      const ctxA = makeCtx({ contentHash: () => 'key-A' });
-      const ctxB = makeCtx({ contentHash: () => 'key-B' });
+      const ctxA = makeCtx({ contentHash: async () => 'key-A' });
+      const ctxB = makeCtx({ contentHash: async () => 'key-B' });
 
       // Commit under key-A.
       await mw.intercept!(exec, ctxA);

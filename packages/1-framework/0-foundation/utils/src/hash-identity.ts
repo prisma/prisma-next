@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 /**
  * Hashes a canonical-string representation of an execution into a bounded,
  * opaque cache-key digest.
@@ -15,8 +13,8 @@ import { createHash } from 'node:crypto';
  * 1. **Bounded memory.** A raw canonical key includes concrete parameter
  *    values, so a query bound to a 10 MB JSON column or binary blob produces
  *    a 10 MB cache key. With `maxEntries = 1000`, that scales to gigabytes
- *    of cache keys alone. BLAKE2b-512 pins per-key cost at a fixed digest
- *    length regardless of input size.
+ *    of cache keys alone. SHA-512 pins per-key cost at a fixed digest length
+ *    regardless of input size.
  *
  * 2. **Sensitive-data isolation.** The canonical string contains parameter
  *    values verbatim. Cache keys flow into debug logs, Redis `KEYS`/`MONITOR`
@@ -25,19 +23,24 @@ import { createHash } from 'node:crypto';
  *    tokens that appear in query parameters from showing up in any of those
  *    surfaces.
  *
- * Algorithm choice — BLAKE2b-512 (`blake2b512` in Node's `crypto` module):
+ * Algorithm choice — SHA-512 via the Web Crypto API (`crypto.subtle.digest`):
  *
- * - **Speed.** BLAKE2b is faster than SHA-256 on modern hardware (designed
- *   to outperform MD5/SHA-1/SHA-2/SHA-3 on 64-bit platforms while remaining
- *   cryptographically strong).
+ * - **Portability.** Works on every JavaScript runtime that matters:
+ *   Node.js, Bun, Deno, Cloudflare Workers, Vercel Edge, browsers. The
+ *   Web Crypto API only exposes the SHA-1/256/384/512 family, so SHA-512
+ *   is the strongest portable option. BLAKE2 is a Node-only stdlib choice
+ *   and would force a pure-JS implementation on edge runtimes.
+ * - **Native backing.** Every runtime implements SHA-512 against its
+ *   underlying TLS / crypto library (BoringSSL, OpenSSL, etc.), often
+ *   with hardware acceleration where available.
  * - **Collision space.** 512 bits of output makes accidental collisions
- *   astronomically improbable — far beyond what a cache needs, but the
- *   incremental cost over 256-bit output is negligible and the headroom
- *   is free.
- * - **Stdlib.** No additional dependency.
+ *   astronomically improbable — far beyond what a cache needs.
  *
- * Output format: `blake2b512:HEXDIGEST` (128-char hex with the algorithm
- * tag prefix). Self-describing so a future migration to a different hash
+ * The function is async because `crypto.subtle.digest` is async on every
+ * runtime. `RuntimeMiddlewareContext.contentHash` is async to match.
+ *
+ * Output format: `sha512:HEXDIGEST` (128-char hex with the algorithm tag
+ * prefix). Self-describing so a future migration to a different hash
  * produces visibly distinct keys, and consistent with the
  * `sha256:HEXDIGEST` shape already used by `meta.storageHash`.
  *
@@ -45,9 +48,16 @@ import { createHash } from 'node:crypto';
  * ```typescript
  * const canonical = `${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`;
  * return hashIdentity(canonical);
- * // → 'blake2b512:8f3...e1c' (always 137 chars: 'blake2b512:' + 128 hex chars)
+ * // → 'sha512:8f3...e1c' (always 135 chars: 'sha512:' + 128 hex chars)
  * ```
  */
-export function hashIdentity(value: string): string {
-  return `blake2b512:${createHash('blake2b512').update(value).digest('hex')}`;
+export async function hashIdentity(value: string): Promise<string> {
+  const bytes = new TextEncoder().encode(value);
+  const buffer = await crypto.subtle.digest('SHA-512', bytes);
+  const view = new Uint8Array(buffer);
+  let hex = '';
+  for (let i = 0; i < view.length; i++) {
+    hex += view[i]!.toString(16).padStart(2, '0');
+  }
+  return `sha512:${hex}`;
 }

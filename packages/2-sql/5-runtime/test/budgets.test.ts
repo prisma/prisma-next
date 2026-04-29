@@ -28,7 +28,7 @@ function createMiddlewareContext(overrides?: Partial<SqlMiddlewareContext>): Sql
       warn: vi.fn(),
       error: vi.fn(),
     },
-    contentHash: () => 'mock-hash',
+    contentHash: async () => 'mock-hash',
     scope: 'runtime' as const,
     ...overrides,
   };

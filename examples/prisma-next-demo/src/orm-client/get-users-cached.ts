@@ -14,7 +14,8 @@
  * equivalent (e.g. the same user list rendered through two different
  * `select` shapes), but the trade-off is that you take responsibility
  * for keeping the key bounded and free of sensitive data — the
- * default `contentHash(exec)` digest is a BLAKE2b-512 hash with no
+ * default `contentHash(exec)` digest is a SHA-512 hash (via the Web
+ * Crypto API, so the runtime works on edge platforms too) with no
  * such risks.
  */
 

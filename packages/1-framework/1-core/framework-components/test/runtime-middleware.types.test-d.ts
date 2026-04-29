@@ -154,7 +154,7 @@ test('RuntimeMiddlewareContext has contract, mode, log, now, contentHash, scope'
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('now');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('contentHash');
   expectTypeOf<RuntimeMiddlewareContext['contentHash']>().toBeFunction();
-  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().returns.toBeString();
+  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().returns.toEqualTypeOf<Promise<string>>();
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('scope');
   expectTypeOf<RuntimeMiddlewareContext['scope']>().toEqualTypeOf<
     'runtime' | 'connection' | 'transaction'
