@@ -73,6 +73,8 @@ function renderPrecision(typeName: string, params: { readonly precision?: number
 
 export const sqlCharCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: SQL_CHAR_CODEC_ID,
+  traits: ['equality', 'order', 'textual'] as const,
+  targetTypes: ['char'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('Char', params),
   factory: ({ length }) => charCodecForLength(length),
@@ -80,6 +82,8 @@ export const sqlCharCodec: ParameterizedCodecDescriptor<{ readonly length: numbe
 
 export const sqlVarcharCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: SQL_VARCHAR_CODEC_ID,
+  traits: ['equality', 'order', 'textual'] as const,
+  targetTypes: ['varchar'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('Varchar', params),
   factory: ({ length }) => varcharCodecForLength(length),
@@ -87,6 +91,8 @@ export const sqlVarcharCodec: ParameterizedCodecDescriptor<{ readonly length: nu
 
 export const pgCharCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: PG_CHAR_CODEC_ID,
+  traits: ['equality', 'order', 'textual'] as const,
+  targetTypes: ['character'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('Char', params),
   factory: ({ length }) => charCodecForLength(length),
@@ -94,6 +100,8 @@ export const pgCharCodec: ParameterizedCodecDescriptor<{ readonly length: number
 
 export const pgVarcharCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: PG_VARCHAR_CODEC_ID,
+  traits: ['equality', 'order', 'textual'] as const,
+  targetTypes: ['character varying'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('Varchar', params),
   factory: ({ length }) => varcharCodecForLength(length),
@@ -103,6 +111,8 @@ export const pgVarcharCodec: ParameterizedCodecDescriptor<{ readonly length: num
 
 export const pgBitCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: PG_BIT_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['bit'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('Bit', params),
   factory: ({ length }) => bitCodecForLength(length),
@@ -110,6 +120,8 @@ export const pgBitCodec: ParameterizedCodecDescriptor<{ readonly length: number 
 
 export const pgVarbitCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: PG_VARBIT_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['bit varying'] as const,
   paramsSchema: lengthParamsSchema,
   renderOutputType: (params) => renderLength('VarBit', params),
   factory: ({ length }) => varbitCodecForLength(length),
@@ -122,6 +134,8 @@ export const pgNumericCodec: ParameterizedCodecDescriptor<{
   readonly scale?: number;
 }> = {
   codecId: PG_NUMERIC_CODEC_ID,
+  traits: ['equality', 'order', 'numeric'] as const,
+  targetTypes: ['numeric', 'decimal'] as const,
   paramsSchema: numericParamsSchema,
   renderOutputType: ({ precision, scale }) =>
     typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`,
@@ -132,6 +146,8 @@ export const pgNumericCodec: ParameterizedCodecDescriptor<{
 
 export const sqlTimestampCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: SQL_TIMESTAMP_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['timestamp'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Timestamp', params),
   factory: ({ precision }) => timestampCodecForPrecision(precision),
@@ -139,6 +155,8 @@ export const sqlTimestampCodec: ParameterizedCodecDescriptor<{ readonly precisio
 
 export const pgTimestampCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: PG_TIMESTAMP_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['timestamp'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Timestamp', params),
   factory: ({ precision }) => timestampCodecForPrecision(precision),
@@ -146,6 +164,8 @@ export const pgTimestampCodec: ParameterizedCodecDescriptor<{ readonly precision
 
 export const pgTimestamptzCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: PG_TIMESTAMPTZ_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['timestamptz'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Timestamptz', params),
   factory: ({ precision }) => timestamptzCodecForPrecision(precision),
@@ -153,6 +173,8 @@ export const pgTimestamptzCodec: ParameterizedCodecDescriptor<{ readonly precisi
 
 export const pgTimeCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: PG_TIME_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['time'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Time', params),
   factory: ({ precision }) => timeCodecForPrecision(precision),
@@ -160,6 +182,8 @@ export const pgTimeCodec: ParameterizedCodecDescriptor<{ readonly precision?: nu
 
 export const pgTimetzCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: PG_TIMETZ_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['timetz'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Timetz', params),
   factory: ({ precision }) => timetzCodecForPrecision(precision),
@@ -167,6 +191,8 @@ export const pgTimetzCodec: ParameterizedCodecDescriptor<{ readonly precision?: 
 
 export const pgIntervalCodec: ParameterizedCodecDescriptor<{ readonly precision?: number }> = {
   codecId: PG_INTERVAL_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['interval'] as const,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (params) => renderPrecision('Interval', params),
   factory: ({ precision }) => intervalCodecForPrecision(precision),
@@ -188,6 +214,8 @@ const enumPlaceholderFactory =
 
 export const pgEnumCodec: ParameterizedCodecDescriptor<{ readonly values: readonly string[] }> = {
   codecId: PG_ENUM_CODEC_ID,
+  traits: ['equality', 'order'] as const,
+  targetTypes: ['enum'] as const,
   paramsSchema: enumParamsSchema,
   renderOutputType: ({ values }) =>
     values
@@ -279,6 +307,8 @@ function jsonLegacyPlaceholderFactory(_params: JsonLegacyParams) {
 
 export const pgJsonLegacyCodec: ParameterizedCodecDescriptor<JsonLegacyParams> = {
   codecId: PG_JSON_CODEC_ID,
+  traits: [] as const,
+  targetTypes: ['json'] as const,
   paramsSchema: jsonLegacyParamsSchema,
   renderOutputType: renderJsonOutputType,
   factory: jsonLegacyPlaceholderFactory,
@@ -286,6 +316,8 @@ export const pgJsonLegacyCodec: ParameterizedCodecDescriptor<JsonLegacyParams> =
 
 export const pgJsonbLegacyCodec: ParameterizedCodecDescriptor<JsonLegacyParams> = {
   codecId: PG_JSONB_CODEC_ID,
+  traits: ['equality'] as const,
+  targetTypes: ['jsonb'] as const,
   paramsSchema: jsonLegacyParamsSchema,
   renderOutputType: renderJsonOutputType,
   factory: jsonLegacyPlaceholderFactory,

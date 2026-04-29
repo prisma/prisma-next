@@ -43,6 +43,8 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
   const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
     {
       codecId: 'pg/vector@1',
+      traits: ['equality'] as const,
+      targetTypes: ['vector'] as const,
       paramsSchema: {
         '~standard': {
           version: 1,

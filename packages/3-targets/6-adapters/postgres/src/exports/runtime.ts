@@ -47,11 +47,15 @@ function createPostgresMutationDefaultGenerators() {
 const parameterizedCodecDescriptors = [
   {
     codecId: PG_JSON_CODEC_ID,
+    traits: [] as const,
+    targetTypes: ['json'] as const,
     paramsSchema: jsonRuntimeParamsSchema,
     factory: pgJsonRuntimeFactory,
   },
   {
     codecId: PG_JSONB_CODEC_ID,
+    traits: ['equality'] as const,
+    targetTypes: ['jsonb'] as const,
     paramsSchema: jsonRuntimeParamsSchema,
     factory: pgJsonbRuntimeFactory,
   },

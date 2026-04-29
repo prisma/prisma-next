@@ -13,12 +13,12 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
+import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type {
   Codec,
   Ctx,
   ParameterizedCodecDescriptor,
 } from '@prisma-next/framework-components/codec';
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import { type as arktype } from 'arktype';
 import type { Vector } from '../types/codec-types';
 
@@ -197,6 +197,8 @@ const vectorParamsSchema = arktype({
  */
 export const pgVectorCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
   codecId: VECTOR_CODEC_ID,
+  traits: ['equality'] as const,
+  targetTypes: ['vector'] as const,
   paramsSchema: vectorParamsSchema,
   renderOutputType: ({ length }) => `Vector<${length}>`,
   factory: ({ length }) => vectorCodecForLength(length),

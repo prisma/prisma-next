@@ -73,6 +73,8 @@ export const mongoVectorParameterizedCodec: ParameterizedCodecDescriptor<{
   readonly length: number;
 }> = {
   codecId: MONGO_VECTOR_CODEC_ID,
+  traits: ['equality'] as const,
+  targetTypes: ['vector'] as const,
   paramsSchema: vectorParamsSchema,
   renderOutputType: ({ length }) => `Vector<${length}>`,
   factory: ({ length }) => mongoVectorCodecForLength(length),

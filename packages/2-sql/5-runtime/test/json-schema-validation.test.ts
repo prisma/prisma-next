@@ -209,6 +209,8 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
   const parameterizedCodecs: RuntimeParameterizedCodecDescriptor[] = [
     {
       codecId: 'pg/json@1',
+      traits: ['equality'] as const,
+      targetTypes: ['json'] as const,
       paramsSchema: jsonTypeParamsSchema,
       factory: makeJsonValidatorFactory(
         'pg/json@1',
@@ -217,6 +219,8 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     },
     {
       codecId: 'pg/jsonb@1',
+      traits: ['equality'] as const,
+      targetTypes: ['jsonb'] as const,
       paramsSchema: jsonTypeParamsSchema,
       factory: makeJsonValidatorFactory(
         'pg/jsonb@1',
@@ -367,6 +371,8 @@ describe('JSON Schema validator registry', () => {
         parameterizedCodecs: () => [
           {
             codecId: 'pg/jsonb@1',
+            traits: ['equality'] as const,
+            targetTypes: ['jsonb'] as const,
             paramsSchema: jsonTypeParamsSchema,
             factory: passthroughFactory,
           },

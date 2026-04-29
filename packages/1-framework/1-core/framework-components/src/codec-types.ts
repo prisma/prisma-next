@@ -92,29 +92,78 @@ export interface Ctx {
 }
 
 /**
- * Sister descriptor that registers a parameterized codec with the framework.
- *
- * A parameterized codec is a curried higher-order function `(params) => (ctx) => Codec`.
- * The function is the type-level surface and the runtime implementation. The
- * descriptor carries the framework-facing metadata (id, runtime params validator,
- * optional emit-path renderer) and a reference to the factory.
- *
- * @template P - The shape of the params accepted by the factory (e.g. `{ length: number }`).
+ * Family-agnostic codec metadata. Family-specific extensions augment the base
+ * `db.<family>.<target>` block with native-type information; the base shape is
+ * an empty object so non-relational codecs can carry no metadata.
  */
-export interface ParameterizedCodecDescriptor<P = Record<string, unknown>> {
-  /** The codec ID this descriptor applies to (e.g. `pg/vector@1`). */
+export interface CodecMeta {
+  readonly db?: Record<string, unknown>;
+}
+
+/**
+ * Unified codec descriptor. Every codec in the framework is registered through
+ * this shape — non-parameterized codecs use `P = void` and a constant factory
+ * that returns the same shared codec instance for every column;
+ * parameterized codecs use a non-empty `P` and a curried higher-order factory
+ * that returns a per-instance codec.
+ *
+ * The descriptor is the codec-id-keyed source of truth for static metadata
+ * (`traits`, `targetTypes`, `meta`) and registration concerns (`paramsSchema`
+ * for JSON-boundary validation; optional `renderOutputType` for the
+ * `contract.d.ts` emit path). The runtime `Codec` instance returned by
+ * `factory(params)(ctx)` carries only the conversion behavior (`encode`,
+ * `decode`, `encodeJson`, `decodeJson`); codec-id-keyed metadata reads
+ * consult the descriptor.
+ *
+ * Whether a codec id "is parameterized" stops being a registration-time
+ * distinction; it's a property of `P` on the descriptor. The descriptor
+ * map indexes every descriptor by `codecId`; both `descriptorFor(codecId)`
+ * and `forColumn(table, column)` resolve through the same map without
+ * branching on parameterization.
+ *
+ * @template P - The shape of the params accepted by the factory (`void` for
+ *   non-parameterized codecs; a record like `{ length: number }` for
+ *   parameterized codecs).
+ *
+ * Codec-registry-unification project § Decision.
+ */
+export interface CodecDescriptor<P = void> {
+  /** The codec ID this descriptor applies to (e.g. `pg/vector@1`, `pg/text@1`). */
   readonly codecId: string;
+  /** Semantic traits for operator gating (e.g. equality, order, numeric). */
+  readonly traits: readonly CodecTrait[];
+  /** Database-native type names this codec handles (e.g. `['timestamptz']`). */
+  readonly targetTypes: readonly string[];
+  /** Optional family-specific metadata (e.g. SQL-side `db.sql.postgres.nativeType`). */
+  readonly meta?: CodecMeta;
   /**
    * Standard Schema validator for the factory's params. Validates JSON-sourced
    * params at the contract boundary (PSL → IR; `contract.json` → runtime).
+   * For non-parameterized codecs (`P = void`), the schema validates `void`/
+   * `undefined` — the framework supplies no params at the call boundary.
    */
   readonly paramsSchema: StandardSchemaV1<P>;
   /**
    * Emit-path string renderer for `contract.d.ts`. Returns the TypeScript output
    * type expression for given params (e.g. `Vector<1536>`). Optional; absent
    * renderers cause the emitter to fall back to the codec's base output type.
+   * Non-parameterized codecs typically omit it.
    */
   readonly renderOutputType?: (params: P) => string;
-  /** The curried higher-order codec. The descriptor's only behavior; everything else is data. */
+  /**
+   * The curried higher-order codec. For non-parameterized codecs, the factory
+   * is constant — every call returns the same shared codec instance. For
+   * parameterized codecs, the factory is called once per `storage.types`
+   * instance (or once per inline-`typeParams` column), with `ctx` carrying
+   * the column set the resulting codec serves.
+   */
   readonly factory: (params: P) => (ctx: Ctx) => Codec;
 }
+
+/**
+ * @deprecated Renamed to `CodecDescriptor`. Kept as a transitional alias
+ * during Phase 3.5 of codec-registry-unification; will be removed once every
+ * external consumer migrates. The shape is unchanged — `P` is non-void by
+ * convention but the type is structurally identical.
+ */
+export type ParameterizedCodecDescriptor<P = Record<string, unknown>> = CodecDescriptor<P>;

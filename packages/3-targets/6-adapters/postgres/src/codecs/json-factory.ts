@@ -225,6 +225,8 @@ function renderSchemaOutputType(schema: StandardSchemaV1 | undefined): string {
  */
 export const pgJsonCodec: ParameterizedCodecDescriptor<{ readonly schema: StandardSchemaV1 }> = {
   codecId: PG_JSON_CODEC_ID,
+  traits: [] as const,
+  targetTypes: ['json'] as const,
   paramsSchema: jsonParamsSchema,
   renderOutputType: ({ schema }) => renderSchemaOutputType(schema),
   factory: ({ schema }) => json(schema),
@@ -233,6 +235,8 @@ export const pgJsonCodec: ParameterizedCodecDescriptor<{ readonly schema: Standa
 /** M4 jsonb sister descriptor. Same shape as `pgJsonCodec` keyed under jsonb. */
 export const pgJsonbCodec: ParameterizedCodecDescriptor<{ readonly schema: StandardSchemaV1 }> = {
   codecId: PG_JSONB_CODEC_ID,
+  traits: ['equality'] as const,
+  targetTypes: ['jsonb'] as const,
   paramsSchema: jsonParamsSchema,
   renderOutputType: ({ schema }) => renderSchemaOutputType(schema),
   factory: ({ schema }) => jsonb(schema),

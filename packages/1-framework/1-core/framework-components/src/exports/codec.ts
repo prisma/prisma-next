@@ -1,6 +1,8 @@
 export type {
   Codec,
+  CodecDescriptor,
   CodecLookup,
+  CodecMeta,
   CodecTrait,
   Ctx,
   ParameterizedCodecDescriptor,

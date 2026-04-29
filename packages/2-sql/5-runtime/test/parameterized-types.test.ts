@@ -121,6 +121,8 @@ describe('parameterized types', () => {
       const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
+          traits: ['equality'],
+          targetTypes: ['vector'],
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
           factory: passthroughFactory,
         },
@@ -264,6 +266,8 @@ describe('parameterized types', () => {
       const parameterizedCodecs = [
         {
           codecId: 'pg/vector@1',
+          traits: ['equality'] as const,
+          targetTypes: ['vector'] as const,
           paramsSchema: vectorParamsSchema,
           factory: factoryFn,
         },
@@ -327,6 +331,8 @@ describe('parameterized types', () => {
       const parameterizedCodecs = [
         {
           codecId: 'pg/vector@1',
+          traits: ['equality'] as const,
+          targetTypes: ['vector'] as const,
           paramsSchema: vectorParamsSchema,
           factory: factoryFn,
         },
@@ -402,6 +408,8 @@ describe('parameterized types', () => {
       const parameterizedCodecs = [
         {
           codecId: 'pg/vector@1',
+          traits: ['equality'] as const,
+          targetTypes: ['vector'] as const,
           paramsSchema: vectorParamsSchema,
           factory: passthroughFactory,
         },
@@ -461,6 +469,8 @@ describe('parameterized types', () => {
       const parameterizedCodecs = [
         {
           codecId: 'pg/vector@1',
+          traits: ['equality'] as const,
+          targetTypes: ['vector'] as const,
           paramsSchema: vectorParamsSchema,
           factory: passthroughFactory,
         },
@@ -526,6 +536,8 @@ describe('parameterized types', () => {
         const parameterizedCodecs = [
           {
             codecId: 'pg/vector@1',
+            traits: ['equality'] as const,
+            targetTypes: ['vector'] as const,
             paramsSchema: vectorParamsSchema,
             factory: passthroughFactory,
           },

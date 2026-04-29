@@ -69,6 +69,8 @@ test('AC-6: a fixture factory using ctx.usedAt typechecks', () => {
 test('AC-1: descriptor factory typing matches the function', () => {
   const fixtureDescriptor: ParameterizedCodecDescriptor<{ readonly length: number }> = {
     codecId: 'fixture/vector@1',
+    traits: ['equality'],
+    targetTypes: ['vector'],
     paramsSchema: makeStandardSchema<{ readonly length: number }>(),
     renderOutputType: ({ length }) => `VectorN<${length}>`,
     factory: (params) => vector(params.length),

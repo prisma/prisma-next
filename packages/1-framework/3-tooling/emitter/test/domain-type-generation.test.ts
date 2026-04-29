@@ -817,6 +817,8 @@ function stubParameterizedCodecLookup(
       if (!renderer) return undefined;
       return {
         codecId,
+        traits: [],
+        targetTypes: [],
         paramsSchema: stubParamsSchema,
         renderOutputType: renderer,
         factory: stubFactory,
