@@ -74,7 +74,7 @@ Downstream sibling skills:
 
 ## Subcommands
 
-```
+```text
 /drive-orchestrate-plan iterate [milestone-id]
 /drive-orchestrate-plan implement [milestone-id]
 /drive-orchestrate-plan review
