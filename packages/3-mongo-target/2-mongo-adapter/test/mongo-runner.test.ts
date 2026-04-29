@@ -316,13 +316,9 @@ describe('MongoMigrationRunner', () => {
   });
 
   it('proceeds when marker exists but plan has no origin (db update path)', async () => {
-    // The Mongo runner used to reject this combination with
-    // `MARKER_ORIGIN_MISMATCH`, which broke `db update` against any
-    // already-signed Mongo database. The runner now mirrors Postgres'
-    // permissive `ensureMarkerCompatibility`: when `plan.origin == null`,
-    // origin validation is skipped on the assumption that the caller
-    // (db update) has done its own correctness check via live-schema
-    // introspection. See `mongo-runner.ts ensureMarkerCompatibility`.
+    // `plan.origin == null` skips origin validation: the caller (`db update`)
+    // does its own correctness check via live-schema introspection, so
+    // marker continuity is not required.
     await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
@@ -494,10 +490,9 @@ describe('MongoMigrationRunner - invariants', () => {
     expect(first.ok).toBe(true);
     expect(await readMarkerInvariants()).toEqual(['alpha', 'delta']);
 
-    // Subsequent applies are empty plans against the same destination, with origin
-    // pointing at the existing marker — i.e., the `migration apply --ref` code path.
-    // This is the case the previous early-return regressed on (no ops + marker
-    // already at destination but new invariants to union in).
+    // Empty plan against the same destination with origin = existing
+    // marker (`migration apply --ref` code path): no ops, marker already
+    // at destination, new invariants must still union into the stored set.
     const second = await runner.execute({
       plan: emptyPlan('sha256:inv', 'sha256:inv'),
       destinationContract: contract,

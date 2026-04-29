@@ -617,9 +617,8 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    // Sort + dedupe the incoming set so the INSERT path writes a stable
-    // initial value. UPDATE merges server-side (see
-    // statement-builders.ts), so client-side union is no longer needed.
+    // Sort + dedupe so the INSERT path writes a stable initial value.
+    // UPDATE merges server-side, so no client-side union is needed.
     const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
     const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,

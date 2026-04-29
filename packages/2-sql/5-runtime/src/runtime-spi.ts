@@ -6,11 +6,7 @@ import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
  * Reader of the SQL contract marker. SQL runtimes verify the database's
  * `prisma_contract.marker` row against the runtime's contract by issuing
  * this statement before executing user queries (when `verify` is enabled).
- *
- * Structurally satisfied by `AdapterProfile`, which exposes both
- * `readMarkerStatement(): MarkerStatement` and the row parser. Each adapter
- * is responsible for target-specific row decoding (Postgres returns native
- * arrays; SQLite returns JSON-encoded TEXT for `invariants`) before
+ * Each adapter is responsible for any target-specific row decoding before
  * delegating to the shared row schema.
  */
 export interface MarkerReader {

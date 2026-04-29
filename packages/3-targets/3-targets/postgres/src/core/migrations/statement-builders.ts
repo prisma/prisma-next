@@ -49,8 +49,7 @@ export interface MergeMarkerInput {
    * Invariants to merge into `marker.invariants`. INSERT writes them as
    * the initial value (callers are expected to pass a sorted, deduped
    * array). UPDATE merges them with the existing column server-side via
-   * a single atomic SQL expression — see §"Concurrency: server-side
-   * merge for invariants" in the routing spec.
+   * a single atomic SQL expression.
    */
   readonly invariants: readonly string[];
 }
@@ -97,11 +96,9 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
     },
     update: {
       // `invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)`
-      // is a self-referential expression that reads the current column
-      // value under the UPDATE's row lock, unions with the incoming
-      // array, dedupes, and sorts ascending — single statement, atomic.
-      // Eliminates the read-then-write race that a client-side union
-      // would expose under concurrent runners.
+      // reads the current column value under the UPDATE's row lock, unions
+      // with the incoming array, dedupes, and sorts ascending — single
+      // statement, atomic, no read-then-write window.
       sql: `update prisma_contract.marker set
         core_hash = $2,
         profile_hash = $3,

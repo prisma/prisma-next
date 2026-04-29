@@ -28,11 +28,8 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
   /**
    * Parses a row returned by the adapter's `readMarkerStatement()` into a
    * `ContractMarkerRecord`. Each adapter is responsible for any
-   * target-specific decoding (e.g. SQLite stores `invariants` as a
-   * JSON-encoded TEXT column and decodes it before delegating to the shared
-   * row schema; Postgres rows already have `invariants` as a native array).
-   * Throws on shape violation — storage corruption surfaces as a hard error
-   * per spec F11.
+   * target-specific decoding before delegating to the shared row schema.
+   * Throws on shape violation.
    */
   parseMarkerRow(row: unknown): ContractMarkerRecord;
 }

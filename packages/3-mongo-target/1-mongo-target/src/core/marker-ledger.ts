@@ -10,15 +10,10 @@ import type { Db, Document, UpdateFilter } from 'mongodb';
 const COLLECTION = '_prisma_migrations';
 const MARKER_ID = 'marker';
 
-// Mirrors the Postgres `ContractMarkerRowSchema` shape (in
-// `family-sql/verify.ts` / `sql-runtime/marker.ts`) but with camelCase
-// fields and Mongo-native types: `Date` is BSON-hydrated, `meta` is
-// stored as a native object (not JSON-stringified), `_id` and any
-// extension fields are tolerated. `invariants?` is optional so pre-M1
-// docs without the field still parse — absent reads as `[]` per spec
-// §"Schema evolution" (natural schemaless behaviour); present-but-
-// malformed throws ("data corruption is not something we silently
-// paper over").
+// Same shape as the SQL marker row but camelCase + Mongo-native types:
+// `Date` is BSON-hydrated, `meta` is a native object (not JSON-stringified),
+// `_id` and any extension fields are tolerated. `invariants?` is optional —
+// absent reads as `[]` (schemaless default); present-but-malformed throws.
 const MongoMarkerDocSchema = type({
   storageHash: 'string',
   profileHash: 'string',
@@ -109,12 +104,10 @@ export async function initMarker(
  * Updates the marker doc atomically (CAS on `expectedFrom`).
  *
  * `destination.invariants`:
- * - `undefined` → existing field left untouched. Sign and
- *   verify-database paths use this; they don't accumulate invariants.
+ * - `undefined` → existing field left untouched.
  * - explicit value → merged into the existing field server-side via an
  *   aggregation pipeline (`$setUnion + $sortArray`), atomic at the
- *   document level. `[]` is a no-op merge. See §"Concurrency:
- *   server-side merge for invariants" in the routing spec.
+ *   document level. `[]` is a no-op merge.
  */
 export async function updateMarker(
   db: Db,

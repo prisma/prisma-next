@@ -304,12 +304,9 @@ describe(
       });
 
       it('preserves existing invariants when re-signing with a new contract', async () => {
-        // Mirror of the Postgres regression test in family.sign-database.test.ts.
         // Sign re-anchors the marker hashes; it must not clobber the
-        // applied-invariants set the migration runner has been accumulating.
-        // family-mongo's control-instance calls `updateMarker` without
-        // `invariants`, and `updateMarker`'s conditional `$set` keeps the
-        // field untouched when omitted — this test pins that contract.
+        // applied-invariants set. `updateMarker` called without
+        // `invariants` leaves the field untouched.
         await initMarker(db, {
           storageHash: baseContract.storage.storageHash,
           profileHash: baseContract.profileHash,

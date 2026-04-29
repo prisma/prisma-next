@@ -188,10 +188,8 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
-    // Sort + dedupe the incoming set so the initMarker path writes a
-    // stable initial value. updateMarker merges server-side via an
-    // aggregation pipeline (see marker-ledger.ts), so client-side union
-    // is no longer needed.
+    // Sort + dedupe so the initMarker path writes a stable initial value.
+    // updateMarker merges server-side, so no client-side union is needed.
     const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
     const existingInvariantSet = new Set(existingMarker?.invariants ?? []);
     const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
@@ -413,12 +411,9 @@ export class MongoMigrationRunner {
   ): MigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;
     if (!origin) {
-      // No origin assertion on the plan — the caller does not want origin
-      // validation. This is the case for `db update`, which introspects the
-      // live schema and does not rely on marker continuity. Mirrors the
-      // Postgres runner's `ensureMarkerCompatibility` behaviour; previously
-      // this branch errored when a marker existed, which broke `db update`
-      // against any already-signed Mongo database.
+      // No origin assertion on the plan — the caller has done its own
+      // correctness check (typically `db update` via live-schema
+      // introspection) and does not rely on marker continuity.
       return undefined;
     }
 

@@ -176,10 +176,9 @@ describe('marker parser', () => {
   });
 
   it('throws when invariants is missing (DDL guarantees the column is not null)', () => {
-    // The column ships `not null default '{}'` from the start; a row with
-    // no invariants field signals storage corruption or a schema downgrade,
-    // not a state we want to silently coerce to []. See spec F11 + the
-    // §"Schema evolution" section.
+    // The column ships `not null default '{}'`; a row missing the field
+    // signals storage corruption or a schema downgrade — don't silently
+    // coerce to [].
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
