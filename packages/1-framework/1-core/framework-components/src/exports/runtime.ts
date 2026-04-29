@@ -1,9 +1,13 @@
+export type { AnnotationRegistry } from '../annotation-registry';
+export { ANNOTATION_BUILDER, createAnnotationRegistry } from '../annotation-registry';
 export type {
+  AnnotationBuilder,
   AnnotationHandle,
+  AnnotationsOf,
   AnnotationValue,
   DefineAnnotationOptions,
   OperationKind,
-  ValidAnnotations,
+  RegistryFor,
 } from '../annotations';
 export { assertAnnotationsApplicable, defineAnnotation } from '../annotations';
 export { AsyncIterableResult } from '../async-iterable-result';

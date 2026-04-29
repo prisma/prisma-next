@@ -25,17 +25,35 @@ function makePlan(annotations?: Record<string, unknown>): {
 
 describe('defineAnnotation', () => {
   describe('handle metadata', () => {
-    it('exposes the namespace it was created with', () => {
+    it('exposes the name it was created with', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
+        applicableTo: ['read'],
+      });
+      expect(handle.name).toBe('cache');
+    });
+
+    it('defaults the namespace to the name when no namespace override is supplied', () => {
+      const handle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
         applicableTo: ['read'],
       });
       expect(handle.namespace).toBe('cache');
     });
 
+    it('uses an explicit namespace override when supplied', () => {
+      const handle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
+        namespace: 'custom-cache-ns',
+        applicableTo: ['read'],
+      });
+      expect(handle.name).toBe('cache');
+      expect(handle.namespace).toBe('custom-cache-ns');
+    });
+
     it('exposes a frozen ReadonlySet for applicableTo', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read' | 'write'>({
-        namespace: 'otel',
+        name: 'otel',
         applicableTo: ['read', 'write'],
       });
       expect(handle.applicableTo.has('read')).toBe(true);
@@ -45,77 +63,103 @@ describe('defineAnnotation', () => {
 
     it('handles do not share state across separate defineAnnotation calls', () => {
       const a = defineAnnotation<{ x: number }, 'read'>({
-        namespace: 'a',
+        name: 'a',
         applicableTo: ['read'],
       });
       const b = defineAnnotation<{ y: string }, 'write'>({
-        namespace: 'b',
+        name: 'b',
         applicableTo: ['write'],
       });
+      expect(a.name).toBe('a');
       expect(a.namespace).toBe('a');
+      expect(b.name).toBe('b');
       expect(b.namespace).toBe('b');
       expect(a.applicableTo.has('read')).toBe(true);
       expect(a.applicableTo.has('write' as 'read')).toBe(false);
       expect(b.applicableTo.has('write')).toBe(true);
     });
-  });
 
-  describe('apply', () => {
-    it('produces an AnnotationValue carrying the __annotation brand', () => {
+    it('handles do not expose a custom .apply member', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
-      const applied = handle.apply({ ttl: 60 });
+      // Functions inherit `Function.prototype.apply`, so the property is
+      // present from the prototype — that's expected and harmless. What
+      // matters is that the handle does not own an `apply` property that
+      // wraps the payload into an `AnnotationValue` (the old API). The
+      // closure form is callable directly: `handle({ ttl: 60 })`.
+      expect(Object.hasOwn(handle, 'apply')).toBe(false);
+    });
+  });
+
+  describe('calling the handle', () => {
+    it('returns an AnnotationValue carrying the __annotation brand', () => {
+      const handle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
+        applicableTo: ['read'],
+      });
+      const applied = handle({ ttl: 60 });
       expect(applied.__annotation).toBe(true);
     });
 
     it('embeds the namespace, payload, and applicableTo set on the value', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
-      const applied = handle.apply({ ttl: 60 });
+      const applied = handle({ ttl: 60 });
       expect(applied.namespace).toBe('cache');
       expect(applied.value).toEqual({ ttl: 60 });
       expect(applied.applicableTo.has('read')).toBe(true);
     });
 
-    it('produces a frozen value', () => {
+    it('returns an AnnotationValue whose namespace reflects an explicit namespace override', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
+        namespace: 'custom-cache-ns',
         applicableTo: ['read'],
       });
-      const applied = handle.apply({ ttl: 60 });
+      const applied = handle({ ttl: 60 });
+      expect(applied.namespace).toBe('custom-cache-ns');
+    });
+
+    it('produces a frozen value', () => {
+      const handle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
+        applicableTo: ['read'],
+      });
+      const applied = handle({ ttl: 60 });
       expect(Object.isFrozen(applied)).toBe(true);
     });
 
-    it('produces independent values across repeated apply calls', () => {
+    it('produces independent values across repeated calls to the handle', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
-      const a = handle.apply({ ttl: 60 });
-      const b = handle.apply({ ttl: 120 });
+      const a = handle({ ttl: 60 });
+      const b = handle({ ttl: 120 });
+      expect(a).not.toBe(b);
       expect(a.value).toEqual({ ttl: 60 });
       expect(b.value).toEqual({ ttl: 120 });
     });
   });
 
   describe('read', () => {
-    it('returns the payload when a value applied through the same handle is stored', () => {
+    it('returns the payload when a value created through the same handle is stored', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
-      const applied = handle.apply({ ttl: 60 });
+      const applied = handle({ ttl: 60 });
       const plan = makePlan({ cache: applied });
       expect(handle.read(plan)).toEqual({ ttl: 60 });
     });
 
     it('returns undefined when the annotation is absent', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
       expect(handle.read(makePlan())).toBeUndefined();
@@ -125,7 +169,7 @@ describe('defineAnnotation', () => {
 
     it('returns undefined when the stored value is not a branded AnnotationValue', () => {
       const handle = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
       // Framework-internal metadata stored under the same namespace key
@@ -140,35 +184,34 @@ describe('defineAnnotation', () => {
 
     it('two handles with different namespaces do not interfere', () => {
       const cache = defineAnnotation<{ ttl: number }, 'read'>({
-        namespace: 'cache',
+        name: 'cache',
         applicableTo: ['read'],
       });
       const audit = defineAnnotation<{ actor: string }, 'write'>({
-        namespace: 'audit',
+        name: 'audit',
         applicableTo: ['write'],
       });
       const plan = makePlan({
-        cache: cache.apply({ ttl: 60 }),
-        audit: audit.apply({ actor: 'system' }),
+        cache: cache({ ttl: 60 }),
+        audit: audit({ actor: 'system' }),
       });
 
       expect(cache.read(plan)).toEqual({ ttl: 60 });
       expect(audit.read(plan)).toEqual({ actor: 'system' });
     });
 
-    it('read ignores annotations applied via a different handle even when the namespace string matches', () => {
-      // Two handles claiming the same namespace string. Defensive:
+    it('read ignores annotations stored under the same namespace by a different handle', () => {
+      // Two handles that read from the same namespace string. Defensive:
       // read() compares the stored value's `namespace` field to the
-      // handle's, so a value applied through one handle does not surface
-      // through the other.
+      // handle's, so a value stored under the namespace string but
+      // produced through a different handle does not surface.
       const a = defineAnnotation<{ kind: 'a' }, 'read'>({
-        namespace: 'shared',
+        name: 'shared',
         applicableTo: ['read'],
       });
-      // Construct a value whose stored namespace differs from the
-      // handle that reads it. (Both handles share a namespace string,
-      // but the stored AnnotationValue.namespace would normally match
-      // whichever handle wrote it.)
+      // Construct a value whose stored namespace differs from the handle
+      // that reads it. Both handles share a namespace string at the key
+      // level, but the stored AnnotationValue.namespace points elsewhere.
       const stored: AnnotationValue<{ kind: 'b' }, 'read'> = Object.freeze({
         __annotation: true as const,
         namespace: 'mismatched-namespace',
@@ -185,11 +228,11 @@ describe('defineAnnotation', () => {
 
     it('preserves Payload identity (handle.read returns the same object reference stored)', () => {
       const handle = defineAnnotation<{ tags: string[] }, 'read'>({
-        namespace: 'tags',
+        name: 'tags',
         applicableTo: ['read'],
       });
       const payload = { tags: ['admin', 'staff'] };
-      const applied = handle.apply(payload);
+      const applied = handle(payload);
       const plan = makePlan({ tags: applied });
 
       const out = handle.read(plan);
@@ -200,15 +243,15 @@ describe('defineAnnotation', () => {
 
 describe('assertAnnotationsApplicable', () => {
   const cache = defineAnnotation<{ ttl: number }, 'read'>({
-    namespace: 'cache',
+    name: 'cache',
     applicableTo: ['read'],
   });
   const audit = defineAnnotation<{ actor: string }, 'write'>({
-    namespace: 'audit',
+    name: 'audit',
     applicableTo: ['write'],
   });
   const otel = defineAnnotation<{ traceId: string }, 'read' | 'write'>({
-    namespace: 'otel',
+    name: 'otel',
     applicableTo: ['read', 'write'],
   });
 
@@ -220,38 +263,32 @@ describe('assertAnnotationsApplicable', () => {
 
     it('when every annotation applies to the kind', () => {
       expect(() =>
-        assertAnnotationsApplicable([cache.apply({ ttl: 60 })], 'read', 'first'),
+        assertAnnotationsApplicable([cache({ ttl: 60 })], 'read', 'first'),
       ).not.toThrow();
       expect(() =>
-        assertAnnotationsApplicable([audit.apply({ actor: 'a' })], 'write', 'create'),
+        assertAnnotationsApplicable([audit({ actor: 'a' })], 'write', 'create'),
       ).not.toThrow();
     });
 
     it('when an annotation declares both kinds and is used on either', () => {
       expect(() =>
-        assertAnnotationsApplicable([otel.apply({ traceId: 't' })], 'read', 'first'),
+        assertAnnotationsApplicable([otel({ traceId: 't' })], 'read', 'first'),
       ).not.toThrow();
       expect(() =>
-        assertAnnotationsApplicable([otel.apply({ traceId: 't' })], 'write', 'create'),
+        assertAnnotationsApplicable([otel({ traceId: 't' })], 'write', 'create'),
       ).not.toThrow();
     });
 
     it('when multiple compatible annotations are passed together', () => {
       expect(() =>
-        assertAnnotationsApplicable(
-          [cache.apply({ ttl: 60 }), otel.apply({ traceId: 't' })],
-          'read',
-          'first',
-        ),
+        assertAnnotationsApplicable([cache({ ttl: 60 }), otel({ traceId: 't' })], 'read', 'first'),
       ).not.toThrow();
     });
   });
 
   describe('throws RUNTIME.ANNOTATION_INAPPLICABLE', () => {
     it('on a read-only annotation passed to a write terminal', () => {
-      expect(() =>
-        assertAnnotationsApplicable([cache.apply({ ttl: 60 })], 'write', 'create'),
-      ).toThrow(
+      expect(() => assertAnnotationsApplicable([cache({ ttl: 60 })], 'write', 'create')).toThrow(
         expect.objectContaining({
           code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
           category: 'RUNTIME',
@@ -261,7 +298,7 @@ describe('assertAnnotationsApplicable', () => {
 
     it('on a write-only annotation passed to a read terminal', () => {
       expect(() =>
-        assertAnnotationsApplicable([audit.apply({ actor: 'system' })], 'read', 'first'),
+        assertAnnotationsApplicable([audit({ actor: 'system' })], 'read', 'first'),
       ).toThrow(
         expect.objectContaining({
           code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
@@ -273,7 +310,7 @@ describe('assertAnnotationsApplicable', () => {
     it('on the first inapplicable annotation when several are passed', () => {
       expect(() =>
         assertAnnotationsApplicable(
-          [otel.apply({ traceId: 't' }), audit.apply({ actor: 'system' })],
+          [otel({ traceId: 't' }), audit({ actor: 'system' })],
           'read',
           'first',
         ),
@@ -286,7 +323,7 @@ describe('assertAnnotationsApplicable', () => {
 
     it('with a message naming the offending annotation namespace and the terminal', () => {
       try {
-        assertAnnotationsApplicable([cache.apply({ ttl: 60 })], 'write', 'create');
+        assertAnnotationsApplicable([cache({ ttl: 60 })], 'write', 'create');
         expect.fail('expected assertAnnotationsApplicable to throw');
       } catch (error) {
         expect(error).toBeInstanceOf(Error);
@@ -299,7 +336,7 @@ describe('assertAnnotationsApplicable', () => {
 
     it('with structured details including namespace, terminalName, kind, and applicableTo', () => {
       try {
-        assertAnnotationsApplicable([cache.apply({ ttl: 60 })], 'write', 'create');
+        assertAnnotationsApplicable([cache({ ttl: 60 })], 'write', 'create');
         expect.fail('expected assertAnnotationsApplicable to throw');
       } catch (error) {
         const envelope = error as Error & { details?: Record<string, unknown> };
@@ -316,11 +353,11 @@ describe('assertAnnotationsApplicable', () => {
   describe('does not require AnnotationValue typing on its parameter', () => {
     // The runtime helper takes readonly AnnotationValue<unknown, OperationKind>[]
     // so it can be called from lane terminals that have already passed
-    // the type gate via ValidAnnotations. The runtime check is the
-    // belt-and-suspenders that catches casts / `any` / dynamic
+    // the type gate via the structural registry filter. The runtime check
+    // is the belt-and-suspenders that catches casts / `any` / dynamic
     // invocations.
     it('rejects an opaquely-typed inapplicable annotation forced through a cast', () => {
-      const sneakyWriteAnnotation = audit.apply({ actor: 'system' });
+      const sneakyWriteAnnotation = audit({ actor: 'system' });
       // Imagine a caller bypassed the type gate via `as any` and handed
       // the runtime an annotation whose kinds do not match the terminal.
       const annotations: readonly AnnotationValue<unknown, OperationKind>[] = [

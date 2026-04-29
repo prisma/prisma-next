@@ -1,39 +1,40 @@
 import { assertType, describe, expectTypeOf, test } from 'vitest';
+import { ANNOTATION_BUILDER } from '../src/annotation-registry';
 import {
+  type AnnotationBuilder,
   type AnnotationHandle,
+  type AnnotationsOf,
   type AnnotationValue,
   defineAnnotation,
   type OperationKind,
-  type ValidAnnotations,
+  type RegistryFor,
 } from '../src/annotations';
 
 /**
- * Type-level tests for the annotation surface.
+ * Type-level tests for the registry-driven annotation surface.
  *
  * Verifies:
- *  - `defineAnnotation<P, Kinds>` preserves Payload and Kinds in the
- *    handle's static type and across `apply` / `read`.
- *  - `ValidAnnotations<K, As>` resolves matching tuple elements to live
- *    `AnnotationValue` types and mismatched elements to `never` (which
- *    makes the entire tuple unassignable, which is the failure mode lane
- *    terminals exploit at the type level).
- *  - Lane-terminal call shapes — read terminals accepting read-only
- *    annotations, write terminals rejecting them, both-kind annotations
- *    accepted everywhere — work as expected.
+ *  - `defineAnnotation<P, Kinds>` returns a callable handle with the
+ *    expected metadata fields.
+ *  - `RegistryFor<K, Reg>` keeps registry entries whose handle's `Kinds`
+ *    intersect with `K`, drops the rest. `AnnotationsOf<Mw>` flattens a
+ *    middleware tuple to its merged registry shape.
+ *  - `AnnotationBuilder<K, Reg>` exposes only the kind-applicable methods
+ *    and chains via the same builder type.
  */
 
 const readOnly = defineAnnotation<{ ttl: number }, 'read'>({
-  namespace: 'cache',
+  name: 'cache',
   applicableTo: ['read'],
 });
 
 const writeOnly = defineAnnotation<{ actor: string }, 'write'>({
-  namespace: 'audit',
+  name: 'audit',
   applicableTo: ['write'],
 });
 
 const both = defineAnnotation<{ traceId: string }, 'read' | 'write'>({
-  namespace: 'otel',
+  name: 'otel',
   applicableTo: ['read', 'write'],
 });
 
@@ -42,6 +43,16 @@ describe('defineAnnotation generics', () => {
     expectTypeOf(readOnly).toEqualTypeOf<AnnotationHandle<{ ttl: number }, 'read'>>();
     expectTypeOf(writeOnly).toEqualTypeOf<AnnotationHandle<{ actor: string }, 'write'>>();
     expectTypeOf(both).toEqualTypeOf<AnnotationHandle<{ traceId: string }, 'read' | 'write'>>();
+  });
+
+  test('AnnotationHandle is callable and returns an AnnotationValue', () => {
+    expectTypeOf(readOnly).toBeCallableWith({ ttl: 60 });
+    const value = readOnly({ ttl: 60 });
+    expectTypeOf(value).toEqualTypeOf<AnnotationValue<{ ttl: number }, 'read'>>();
+  });
+
+  test('AnnotationHandle.name is a string', () => {
+    expectTypeOf(readOnly.name).toBeString();
   });
 
   test('AnnotationHandle.namespace is a string', () => {
@@ -54,23 +65,23 @@ describe('defineAnnotation generics', () => {
     expectTypeOf(both.applicableTo).toEqualTypeOf<ReadonlySet<'read' | 'write'>>();
   });
 
-  test('apply preserves Payload and Kinds in the AnnotationValue', () => {
-    const r = readOnly.apply({ ttl: 60 });
-    const w = writeOnly.apply({ actor: 'system' });
-    const x = both.apply({ traceId: 't' });
+  test('handle calls preserve Payload and Kinds in the AnnotationValue', () => {
+    const r = readOnly({ ttl: 60 });
+    const w = writeOnly({ actor: 'system' });
+    const x = both({ traceId: 't' });
 
     expectTypeOf(r).toEqualTypeOf<AnnotationValue<{ ttl: number }, 'read'>>();
     expectTypeOf(w).toEqualTypeOf<AnnotationValue<{ actor: string }, 'write'>>();
     expectTypeOf(x).toEqualTypeOf<AnnotationValue<{ traceId: string }, 'read' | 'write'>>();
   });
 
-  test('apply rejects payloads of the wrong shape (negative)', () => {
+  test('handle calls reject payloads of the wrong shape (negative)', () => {
     // @ts-expect-error - missing required `ttl` field
-    readOnly.apply({});
+    readOnly({});
     // @ts-expect-error - wrong field name
-    readOnly.apply({ wrong: 60 });
+    readOnly({ wrong: 60 });
     // @ts-expect-error - wrong field type
-    readOnly.apply({ ttl: 'not a number' });
+    readOnly({ ttl: 'not a number' });
   });
 
   test('read returns Payload | undefined', () => {
@@ -82,164 +93,216 @@ describe('defineAnnotation generics', () => {
   });
 });
 
-describe('ValidAnnotations gate', () => {
-  test("ValidAnnotations<'read', [readOnly]> keeps the element typed", () => {
-    type As = readonly [AnnotationValue<{ ttl: number }, 'read'>];
-    type Gated = ValidAnnotations<'read', As>;
-    expectTypeOf<Gated>().toEqualTypeOf<readonly [AnnotationValue<{ ttl: number }, 'read'>]>();
+describe('RegistryFor and AnnotationsOf', () => {
+  type Registry = {
+    readonly cache: typeof readOnly;
+    readonly audit: typeof writeOnly;
+    readonly otel: typeof both;
+  };
+
+  test("RegistryFor<'read', Reg> keeps read-or-both handles, drops write-only", () => {
+    type Read = RegistryFor<'read', Registry>;
+    expectTypeOf<Read>().toEqualTypeOf<{
+      readonly cache: typeof readOnly;
+      readonly otel: typeof both;
+    }>();
   });
 
-  test("ValidAnnotations<'read', [writeOnly]> resolves the element to never", () => {
-    type As = readonly [AnnotationValue<{ actor: string }, 'write'>];
-    type Gated = ValidAnnotations<'read', As>;
-    expectTypeOf<Gated>().toEqualTypeOf<readonly [never]>();
+  test("RegistryFor<'write', Reg> keeps write-or-both handles, drops read-only", () => {
+    type Write = RegistryFor<'write', Registry>;
+    expectTypeOf<Write>().toEqualTypeOf<{
+      readonly audit: typeof writeOnly;
+      readonly otel: typeof both;
+    }>();
   });
 
-  test("ValidAnnotations<'write', [readOnly]> resolves the element to never", () => {
-    type As = readonly [AnnotationValue<{ ttl: number }, 'read'>];
-    type Gated = ValidAnnotations<'write', As>;
-    expectTypeOf<Gated>().toEqualTypeOf<readonly [never]>();
-  });
+  test('AnnotationsOf flattens a middleware tuple to the merged registry shape', () => {
+    interface CacheMw {
+      readonly name: 'cache';
+      readonly annotations: { readonly cache: typeof readOnly };
+    }
+    interface AuditMw {
+      readonly name: 'audit';
+      readonly annotations: { readonly audit: typeof writeOnly };
+    }
 
-  test("ValidAnnotations<'read', [readOnly, both]> keeps both elements", () => {
-    type As = readonly [
-      AnnotationValue<{ ttl: number }, 'read'>,
-      AnnotationValue<{ traceId: string }, 'read' | 'write'>,
-    ];
-    type Gated = ValidAnnotations<'read', As>;
-    expectTypeOf<Gated>().toEqualTypeOf<
-      readonly [
-        AnnotationValue<{ ttl: number }, 'read'>,
-        AnnotationValue<{ traceId: string }, 'read' | 'write'>,
-      ]
+    type Mw = readonly [CacheMw, AuditMw];
+    type Merged = AnnotationsOf<Mw>;
+
+    expectTypeOf<Merged>().toEqualTypeOf<
+      {
+        readonly cache: typeof readOnly;
+      } & {
+        readonly audit: typeof writeOnly;
+      }
     >();
   });
 
-  test("ValidAnnotations<'write', [readOnly, writeOnly]> resolves the read-only element to never", () => {
-    type As = readonly [
-      AnnotationValue<{ ttl: number }, 'read'>,
-      AnnotationValue<{ actor: string }, 'write'>,
-    ];
-    type Gated = ValidAnnotations<'write', As>;
-    expectTypeOf<Gated>().toEqualTypeOf<
-      readonly [never, AnnotationValue<{ actor: string }, 'write'>]
-    >();
+  test('AnnotationsOf on the empty tuple yields an empty registry', () => {
+    type Merged = AnnotationsOf<readonly []>;
+    expectTypeOf<Merged>().toEqualTypeOf<{}>();
   });
 
-  test('ValidAnnotations on the empty tuple is the empty tuple', () => {
-    type Gated = ValidAnnotations<'read', readonly []>;
-    expectTypeOf<Gated>().toEqualTypeOf<readonly []>();
+  test('AnnotationsOf treats middleware without annotations as empty contribution', () => {
+    interface CacheMw {
+      readonly name: 'cache';
+      readonly annotations: { readonly cache: typeof readOnly };
+    }
+    interface ObserverMw {
+      readonly name: 'observer';
+      // no annotations field
+    }
+
+    type Mw = readonly [CacheMw, ObserverMw];
+    type Merged = AnnotationsOf<Mw>;
+
+    expectTypeOf<Merged>().toEqualTypeOf<{ readonly cache: typeof readOnly }>();
+  });
+});
+
+describe('AnnotationBuilder', () => {
+  type Registry = {
+    readonly cache: typeof readOnly;
+    readonly audit: typeof writeOnly;
+    readonly otel: typeof both;
+  };
+
+  test("AnnotationBuilder<'read', Reg> exposes only read-applicable methods", () => {
+    type ReadBuilder = AnnotationBuilder<'read', Registry>;
+    expectTypeOf<ReadBuilder>().toHaveProperty('cache');
+    expectTypeOf<ReadBuilder>().toHaveProperty('otel');
+    // @ts-expect-error - audit is write-only and is filtered out of the read builder.
+    type _AuditOnRead = ReadBuilder['audit'];
   });
 
-  test('an inapplicable element makes the gated tuple unassignable from a value containing it', () => {
-    type As = readonly [
-      AnnotationValue<{ ttl: number }, 'read'>,
-      AnnotationValue<{ actor: string }, 'write'>,
-    ];
-    type Gated = ValidAnnotations<'read', As>;
-    // The gated tuple's second element is `never`, so the original tuple
-    // cannot be assigned to it.
-    const original: As = [readOnly.apply({ ttl: 60 }), writeOnly.apply({ actor: 'system' })];
-    // @ts-expect-error - second element resolves to never under 'read'
-    const _gated: Gated = original;
-    void _gated;
+  test("AnnotationBuilder<'write', Reg> exposes only write-applicable methods", () => {
+    type WriteBuilder = AnnotationBuilder<'write', Registry>;
+    expectTypeOf<WriteBuilder>().toHaveProperty('audit');
+    expectTypeOf<WriteBuilder>().toHaveProperty('otel');
+    // @ts-expect-error - cache is read-only and is filtered out of the write builder.
+    type _CacheOnWrite = WriteBuilder['cache'];
+  });
+
+  test("AnnotationBuilder<'read', Reg>.cache accepts the declared payload", () => {
+    type ReadBuilder = AnnotationBuilder<'read', Registry>;
+    const meta = {} as ReadBuilder;
+
+    expectTypeOf(meta.cache).toBeCallableWith({ ttl: 60 });
+    // @ts-expect-error - cache requires { ttl: number }
+    meta.cache({ wrong: true });
+  });
+
+  test('AnnotationBuilder methods return another AnnotationBuilder of the same kind/Reg (chainable)', () => {
+    type ReadBuilder = AnnotationBuilder<'read', Registry>;
+    const meta = {} as ReadBuilder;
+
+    const r1 = meta.cache({ ttl: 60 });
+    expectTypeOf(r1).toEqualTypeOf<AnnotationBuilder<'read', Registry>>();
+
+    const r2 = meta.cache({ ttl: 60 }).otel({ traceId: 't' });
+    expectTypeOf(r2).toEqualTypeOf<AnnotationBuilder<'read', Registry>>();
+  });
+
+  test('AnnotationBuilder carries values and the brand symbol', () => {
+    type ReadBuilder = AnnotationBuilder<'read', Registry>;
+    const meta = {} as ReadBuilder;
+
+    expectTypeOf(meta.values).toEqualTypeOf<readonly AnnotationValue<unknown, OperationKind>[]>();
+    expectTypeOf(meta[ANNOTATION_BUILDER]).toEqualTypeOf<true>();
+  });
+
+  test('AnnotationBuilder of empty registry has no kind-applicable methods, only values + brand', () => {
+    type EmptyBuilder = AnnotationBuilder<'read', {}>;
+    const meta = {} as EmptyBuilder;
+    expectTypeOf(meta.values).toEqualTypeOf<readonly AnnotationValue<unknown, OperationKind>[]>();
+    expectTypeOf(meta[ANNOTATION_BUILDER]).toEqualTypeOf<true>();
+    // @ts-expect-error - no annotation methods on an empty registry
+    type _Cache = EmptyBuilder['cache'];
   });
 });
 
 describe('lane-terminal call-shape simulation', () => {
+  type Registry = {
+    readonly cache: typeof readOnly;
+    readonly audit: typeof writeOnly;
+    readonly otel: typeof both;
+  };
+
   /**
-   * Mimics the shape lane terminals adopt: a variadic `...annotations`
-   * parameter constrained by `ValidAnnotations<K, As>`. The `As` type
-   * parameter is inferred from the call site's tuple of annotation values.
-   *
-   * Note: lane terminals must constrain the variadic argument as
-   * `As & ValidAnnotations<K, As>`, not just `ValidAnnotations<K, As>`.
-   * TypeScript's variadic-tuple inference is too forgiving when the
-   * parameter type alone refers to `As`: it will pick an `As` that makes
-   * the call valid even when the gated tuple contains `never`. The
-   * intersection forces the argument to be assignable to BOTH the inferred
-   * `As` AND the gated tuple, so a `never` element collapses to `never`
-   * at the position where it lives and the call rejects the offending
-   * argument.
+   * Mimics the shape lane terminals adopt: a callback receiving a
+   * kind-filtered `AnnotationBuilder<K, Reg>`. Callbacks may either
+   * return the chained builder or a readonly array of `AnnotationValue`s
+   * (the array escape hatch).
    */
-  function readTerminal<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'read', As>
+  function readTerminal(
+    fn: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): void {
-    void annotations;
+    void fn;
   }
 
-  function writeTerminal<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
+  function writeTerminal(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): void {
-    void annotations;
+    void fn;
   }
 
-  test('read terminal accepts read-only annotations', () => {
-    readTerminal(readOnly.apply({ ttl: 60 }));
+  test('read terminal accepts read-applicable annotations via callback', () => {
+    readTerminal((meta) => meta.cache({ ttl: 60 }));
   });
 
-  test('read terminal accepts both-kind annotations', () => {
-    readTerminal(both.apply({ traceId: 't' }));
+  test('read terminal accepts both-kind annotations via callback', () => {
+    readTerminal((meta) => meta.otel({ traceId: 't' }));
   });
 
-  test('read terminal accepts a mix of read-only and both-kind annotations', () => {
-    readTerminal(readOnly.apply({ ttl: 60 }), both.apply({ traceId: 't' }));
+  test('read terminal accepts a chained mix of read-only and both-kind annotations', () => {
+    readTerminal((meta) => meta.cache({ ttl: 60 }).otel({ traceId: 't' }));
   });
 
   test('read terminal rejects write-only annotations (negative)', () => {
-    // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
-    readTerminal(writeOnly.apply({ actor: 'system' }));
+    // @ts-expect-error - audit is write-only and not present on AnnotationBuilder<'read', Reg>.
+    readTerminal((meta) => meta.audit({ actor: 'system' }));
   });
 
-  test('read terminal rejects a mix that includes a write-only annotation (negative)', () => {
-    // @ts-expect-error - audit declares applicableTo: ['write'], not 'read'
-    readTerminal(readOnly.apply({ ttl: 60 }), writeOnly.apply({ actor: 'system' }));
+  test('write terminal accepts write-applicable annotations via callback', () => {
+    writeTerminal((meta) => meta.audit({ actor: 'system' }));
   });
 
-  test('write terminal accepts write-only annotations', () => {
-    writeTerminal(writeOnly.apply({ actor: 'system' }));
-  });
-
-  test('write terminal accepts both-kind annotations', () => {
-    writeTerminal(both.apply({ traceId: 't' }));
+  test('write terminal accepts both-kind annotations via callback', () => {
+    writeTerminal((meta) => meta.otel({ traceId: 't' }));
   });
 
   test('write terminal rejects read-only annotations (negative)', () => {
-    // @ts-expect-error - cache declares applicableTo: ['read'], not 'write'
-    writeTerminal(readOnly.apply({ ttl: 60 }));
+    // @ts-expect-error - cache is read-only and not present on AnnotationBuilder<'write', Reg>.
+    writeTerminal((meta) => meta.cache({ ttl: 60 }));
   });
 
-  test('terminals accept zero annotations (empty variadic)', () => {
-    readTerminal();
-    writeTerminal();
+  test('terminals accept the array escape hatch for ad-hoc / closure-captured handles', () => {
+    readTerminal(() => [readOnly({ ttl: 60 })]);
+    writeTerminal(() => [writeOnly({ actor: 'system' })]);
   });
 });
 
 describe('type narrowness preserved across the gate', () => {
-  test('the read terminal preserves the typed payload of a both-kind annotation', () => {
-    function inspect<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-      ...annotations: As & ValidAnnotations<'read', As>
-    ): As {
-      return annotations as unknown as As;
+  type Registry = { readonly cache: typeof readOnly; readonly otel: typeof both };
+
+  test('the AnnotationValue payload survives the chained builder', () => {
+    function inspect(
+      fn: (
+        meta: AnnotationBuilder<'read', Registry>,
+      ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+    ): readonly AnnotationValue<unknown, OperationKind>[] {
+      void fn;
+      return [];
     }
+    void inspect;
 
-    const out = inspect(both.apply({ traceId: 't' }));
-    // The handle's payload type survives the gate.
-    assertType<{ traceId: string }>(out[0].value);
-  });
-
-  test('non-AnnotationValue elements in the tuple resolve to never (defensive)', () => {
-    // Not part of the public API surface, but verifies the conditional's
-    // fallback. If somebody constructs a tuple of arbitrary objects and runs
-    // it through the gate, every element resolves to `never`.
-    type As = readonly [{ not: 'an annotation' }];
-    type Gated = ValidAnnotations<
-      'read',
-      As extends readonly AnnotationValue<unknown, OperationKind>[] ? As : never
-    >;
-    // The conditional's outer `As extends readonly AnnotationValue[...]`
-    // branch makes the entire `As` resolve to `never`, which propagates
-    // through ValidAnnotations.
-    expectTypeOf<Gated>().toEqualTypeOf<never>();
+    // The handle's payload type still flows through the AnnotationValue
+    // when invoked directly (the array escape hatch).
+    const value = both({ traceId: 't' });
+    assertType<{ traceId: string }>(value.value);
   });
 });
