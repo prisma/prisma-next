@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { join, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { realpathSync } from 'node:fs';
 
@@ -69,7 +69,13 @@ function ensureInsideRepo(path) {
   }
   const repoRoot = root.stdout.trim();
   const absolutePath = resolve(path);
-  if (!absolutePath.startsWith(repoRoot)) {
+  const relativePath = relative(repoRoot, absolutePath);
+  if (
+    relativePath === '' ||
+    relativePath === '..' ||
+    relativePath.startsWith(`..${sep}`) ||
+    isAbsolute(relativePath)
+  ) {
     throw new Error(`error: output dir must be inside repo: ${repoRoot}`);
   }
 }
