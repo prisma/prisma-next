@@ -1,9 +1,13 @@
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
-import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
+import {
+  assertAnnotationsApplicable,
+  createMetaBuilder,
+} from '@prisma-next/framework-components/runtime';
+import { extractAnnotationValues } from './annotation-callback';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import {
   type AnyExpression as AstExpression,
@@ -35,23 +39,32 @@ import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
 
 /**
- * Validates and merges a variadic annotations call into a builder's
- * accumulated user-annotations map. Used by `.annotate(...)` on each of
- * the three mutation builders (`InsertQueryImpl`, `UpdateQueryImpl`,
- * `DeleteQueryImpl`); the read builders share the same logic via
- * `QueryBase.annotate()` in `./query-impl.ts`.
- *
- * Runs `assertAnnotationsApplicable` at call time (not at `.build()`) so
- * inapplicable annotations forced through casts surface immediately
- * rather than at plan-construction time.
+ * Resolves a mutation builder's `.annotate(callback)` invocation into
+ * a merged `userAnnotations` map. Constructs the kind-filtered
+ * `AnnotationBuilder` from the builder's `ctx.annotationRegistry`,
+ * invokes the user callback, normalizes the return value (chained
+ * builder or array escape hatch), runs `assertAnnotationsApplicable`
+ * (the runtime gate that catches cast-bypass), and merges the resulting
+ * `AnnotationValue`s into the accumulated map. Last-write-wins on
+ * duplicate namespaces. The read-builder counterpart lives in
+ * `./query-impl.ts` (`QueryBase.annotate`).
  */
-function mergeWriteAnnotations(
+function resolveWriteAnnotations<Registry>(
+  ctx: BuilderContext,
   current: ReadonlyMap<string, AnnotationValue<unknown, OperationKind>>,
-  annotations: readonly AnnotationValue<unknown, OperationKind>[],
+  fn: (
+    meta: AnnotationBuilder<'write', Registry>,
+  ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
 ): ReadonlyMap<string, AnnotationValue<unknown, OperationKind>> {
-  assertAnnotationsApplicable(annotations, 'write', 'sql-dsl.annotate');
+  const meta = createMetaBuilder<'write', Registry>(ctx.annotationRegistry, 'write');
+  const result = fn(meta);
+  const values = extractAnnotationValues(result);
+  assertAnnotationsApplicable(values, 'write', 'sql-dsl.annotate');
+  if (values.length === 0) {
+    return current;
+  }
   const next = new Map(current);
-  for (const annotation of annotations) {
+  for (const annotation of values) {
     next.set(annotation.namespace, annotation);
   }
   return next;
@@ -97,9 +110,10 @@ export class InsertQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
     RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+    Registry = {},
   >
   extends BuilderBase<QC['capabilities']>
-  implements InsertQuery<QC, AvailableScope, RowType>
+  implements InsertQuery<QC, AvailableScope, RowType, Registry>
 {
   readonly #tableName: string;
   readonly #table: StorageTable;
@@ -129,40 +143,42 @@ export class InsertQueryImpl<
     this.#userAnnotations = userAnnotations;
   }
 
-  returning = this._gate<ReturningCapability, string[], InsertQuery<QC, AvailableScope, never>>(
-    { sql: { returning: true } },
-    'returning',
-    (...columns: string[]) => {
-      const newRowFields: Record<string, ScopeField> = {};
-      for (const col of columns) {
-        const field = this.#scope.topLevel[col];
-        if (!field) throw new Error(`Column "${col}" not found in scope`);
-        newRowFields[col] = field;
-      }
-      return new InsertQueryImpl(
-        this.#tableName,
-        this.#table,
-        this.#scope,
-        this.#values,
-        this.ctx,
-        columns,
-        newRowFields,
-        this.#userAnnotations,
-      ) as unknown as InsertQuery<QC, AvailableScope, never>;
-    },
-  );
+  returning = this._gate<
+    ReturningCapability,
+    string[],
+    InsertQuery<QC, AvailableScope, never, Registry>
+  >({ sql: { returning: true } }, 'returning', (...columns: string[]) => {
+    const newRowFields: Record<string, ScopeField> = {};
+    for (const col of columns) {
+      const field = this.#scope.topLevel[col];
+      if (!field) throw new Error(`Column "${col}" not found in scope`);
+      newRowFields[col] = field;
+    }
+    return new InsertQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      this.#values,
+      this.ctx,
+      columns,
+      newRowFields,
+      this.#userAnnotations,
+    ) as unknown as InsertQuery<QC, AvailableScope, never, Registry>;
+  });
 
   /**
-   * Attach one or more write-typed user annotations to this query plan.
-   * The type-level `As & ValidAnnotations<'write', As>` gate rejects
-   * read-only annotations at the call site; the runtime check fails
-   * closed for callers that bypass the type gate. See `QueryBase.annotate`
-   * in `./query-impl.ts` for the read-builder counterpart.
+   * Attach user annotations to this insert plan via a registry-driven
+   * callback. See `QueryBase.annotate` in `./query-impl.ts` for the
+   * read-builder counterpart. The callback receives
+   * `AnnotationBuilder<'write', …>`; read-only handles are filtered out
+   * structurally and the runtime gate catches cast-bypass.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): InsertQuery<QC, AvailableScope, RowType> {
-    return new InsertQueryImpl(
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): InsertQuery<QC, AvailableScope, RowType, Registry> {
+    return new InsertQueryImpl<QC, AvailableScope, RowType, Registry>(
       this.#tableName,
       this.#table,
       this.#scope,
@@ -170,10 +186,7 @@ export class InsertQueryImpl<
       this.ctx,
       this.#returningColumns,
       this.#rowFields,
-      mergeWriteAnnotations(
-        this.#userAnnotations,
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      ),
+      resolveWriteAnnotations<Registry>(this.ctx, this.#userAnnotations, fn),
     );
   }
 
@@ -205,9 +218,10 @@ export class UpdateQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
     RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+    Registry = {},
   >
   extends BuilderBase<QC['capabilities']>
-  implements UpdateQuery<QC, AvailableScope, RowType>
+  implements UpdateQuery<QC, AvailableScope, RowType, Registry>
 {
   readonly #tableName: string;
   readonly #table: StorageTable;
@@ -240,8 +254,10 @@ export class UpdateQueryImpl<
     this.#userAnnotations = userAnnotations;
   }
 
-  where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType> {
-    return new UpdateQueryImpl(
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC>,
+  ): UpdateQuery<QC, AvailableScope, RowType, Registry> {
+    return new UpdateQueryImpl<QC, AvailableScope, RowType, Registry>(
       this.#tableName,
       this.#table,
       this.#scope,
@@ -254,39 +270,40 @@ export class UpdateQueryImpl<
     );
   }
 
-  returning = this._gate<ReturningCapability, string[], UpdateQuery<QC, AvailableScope, never>>(
-    { sql: { returning: true } },
-    'returning',
-    (...columns: string[]) => {
-      const newRowFields: Record<string, ScopeField> = {};
-      for (const col of columns) {
-        const field = this.#scope.topLevel[col];
-        if (!field) throw new Error(`Column "${col}" not found in scope`);
-        newRowFields[col] = field;
-      }
-      return new UpdateQueryImpl(
-        this.#tableName,
-        this.#table,
-        this.#scope,
-        this.#setValues,
-        this.ctx,
-        this.#whereCallbacks,
-        columns,
-        newRowFields,
-        this.#userAnnotations,
-      ) as unknown as UpdateQuery<QC, AvailableScope, never>;
-    },
-  );
+  returning = this._gate<
+    ReturningCapability,
+    string[],
+    UpdateQuery<QC, AvailableScope, never, Registry>
+  >({ sql: { returning: true } }, 'returning', (...columns: string[]) => {
+    const newRowFields: Record<string, ScopeField> = {};
+    for (const col of columns) {
+      const field = this.#scope.topLevel[col];
+      if (!field) throw new Error(`Column "${col}" not found in scope`);
+      newRowFields[col] = field;
+    }
+    return new UpdateQueryImpl(
+      this.#tableName,
+      this.#table,
+      this.#scope,
+      this.#setValues,
+      this.ctx,
+      this.#whereCallbacks,
+      columns,
+      newRowFields,
+      this.#userAnnotations,
+    ) as unknown as UpdateQuery<QC, AvailableScope, never, Registry>;
+  });
 
   /**
-   * Attach one or more write-typed user annotations to this query plan.
-   * See `InsertQueryImpl.annotate` for semantics; the runtime check
-   * fails closed for callers that bypass the type-level gate.
+   * Attach user annotations to this update plan via a registry-driven
+   * callback. See `InsertQueryImpl.annotate` for semantics.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): UpdateQuery<QC, AvailableScope, RowType> {
-    return new UpdateQueryImpl(
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): UpdateQuery<QC, AvailableScope, RowType, Registry> {
+    return new UpdateQueryImpl<QC, AvailableScope, RowType, Registry>(
       this.#tableName,
       this.#table,
       this.#scope,
@@ -295,10 +312,7 @@ export class UpdateQueryImpl<
       this.#whereCallbacks,
       this.#returningColumns,
       this.#rowFields,
-      mergeWriteAnnotations(
-        this.#userAnnotations,
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      ),
+      resolveWriteAnnotations<Registry>(this.ctx, this.#userAnnotations, fn),
     );
   }
 
@@ -338,9 +352,10 @@ export class DeleteQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
     RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+    Registry = {},
   >
   extends BuilderBase<QC['capabilities']>
-  implements DeleteQuery<QC, AvailableScope, RowType>
+  implements DeleteQuery<QC, AvailableScope, RowType, Registry>
 {
   readonly #tableName: string;
   readonly #scope: Scope;
@@ -367,8 +382,10 @@ export class DeleteQueryImpl<
     this.#userAnnotations = userAnnotations;
   }
 
-  where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType> {
-    return new DeleteQueryImpl(
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC>,
+  ): DeleteQuery<QC, AvailableScope, RowType, Registry> {
+    return new DeleteQueryImpl<QC, AvailableScope, RowType, Registry>(
       this.#tableName,
       this.#scope,
       this.ctx,
@@ -379,46 +396,45 @@ export class DeleteQueryImpl<
     );
   }
 
-  returning = this._gate<ReturningCapability, string[], DeleteQuery<QC, AvailableScope, never>>(
-    { sql: { returning: true } },
-    'returning',
-    (...columns: string[]) => {
-      const newRowFields: Record<string, ScopeField> = {};
-      for (const col of columns) {
-        const field = this.#scope.topLevel[col];
-        if (!field) throw new Error(`Column "${col}" not found in scope`);
-        newRowFields[col] = field;
-      }
-      return new DeleteQueryImpl(
-        this.#tableName,
-        this.#scope,
-        this.ctx,
-        this.#whereCallbacks,
-        columns,
-        newRowFields,
-        this.#userAnnotations,
-      ) as unknown as DeleteQuery<QC, AvailableScope, never>;
-    },
-  );
+  returning = this._gate<
+    ReturningCapability,
+    string[],
+    DeleteQuery<QC, AvailableScope, never, Registry>
+  >({ sql: { returning: true } }, 'returning', (...columns: string[]) => {
+    const newRowFields: Record<string, ScopeField> = {};
+    for (const col of columns) {
+      const field = this.#scope.topLevel[col];
+      if (!field) throw new Error(`Column "${col}" not found in scope`);
+      newRowFields[col] = field;
+    }
+    return new DeleteQueryImpl(
+      this.#tableName,
+      this.#scope,
+      this.ctx,
+      this.#whereCallbacks,
+      columns,
+      newRowFields,
+      this.#userAnnotations,
+    ) as unknown as DeleteQuery<QC, AvailableScope, never, Registry>;
+  });
 
   /**
-   * Attach one or more write-typed user annotations to this query plan.
-   * See `InsertQueryImpl.annotate` for semantics.
+   * Attach user annotations to this delete plan via a registry-driven
+   * callback. See `InsertQueryImpl.annotate` for semantics.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): DeleteQuery<QC, AvailableScope, RowType> {
-    return new DeleteQueryImpl(
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): DeleteQuery<QC, AvailableScope, RowType, Registry> {
+    return new DeleteQueryImpl<QC, AvailableScope, RowType, Registry>(
       this.#tableName,
       this.#scope,
       this.ctx,
       this.#whereCallbacks,
       this.#returningColumns,
       this.#rowFields,
-      mergeWriteAnnotations(
-        this.#userAnnotations,
-        annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      ),
+      resolveWriteAnnotations<Registry>(this.ctx, this.#userAnnotations, fn),
     );
   }
 

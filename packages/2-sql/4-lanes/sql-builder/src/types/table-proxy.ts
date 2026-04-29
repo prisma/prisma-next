@@ -111,7 +111,7 @@ type ResolvedUpdateValues<
   FieldInputs extends Record<string, Record<string, unknown>>,
 > = ResolvedInsertValues<C, Table, TableName, CT, FieldInputs>;
 
-type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
+export type ContractToQC<C extends TableProxyContract, Name extends string = string> = {
   readonly codecTypes: ExtractCodecTypes<C>;
   readonly capabilities: C['capabilities'];
   readonly queryOperationTypes: ExtractQueryOperationTypes<C>;
@@ -124,12 +124,13 @@ export interface TableProxy<
   Alias extends string = Name,
   AvailableScope extends Scope = DefaultScope<Name, C['storage']['tables'][Name]>,
   QC extends QueryContext = ContractToQC<C, Name>,
+  Registry = {},
 > extends JoinSource<StorageTableToScopeTable<C['storage']['tables'][Name]>, Alias>,
-    WithSelect<QC, AvailableScope, EmptyRow>,
-    WithJoin<QC, AvailableScope, C['capabilities']> {
+    WithSelect<QC, AvailableScope, EmptyRow, Registry>,
+    WithJoin<QC, AvailableScope, C['capabilities'], Registry> {
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>>;
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC, Registry>;
 
   insert(
     values: ResolvedInsertValues<
@@ -139,7 +140,7 @@ export interface TableProxy<
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
     >,
-  ): InsertQuery<QC, AvailableScope, EmptyRow>;
+  ): InsertQuery<QC, AvailableScope, EmptyRow, Registry>;
 
   update(
     set: ResolvedUpdateValues<
@@ -149,7 +150,7 @@ export interface TableProxy<
       QC['codecTypes'],
       ExtractFieldInputTypes<C>
     >,
-  ): UpdateQuery<QC, AvailableScope, EmptyRow>;
+  ): UpdateQuery<QC, AvailableScope, EmptyRow, Registry>;
 
-  delete(): DeleteQuery<QC, AvailableScope, EmptyRow>;
+  delete(): DeleteQuery<QC, AvailableScope, EmptyRow, Registry>;
 }

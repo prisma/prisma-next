@@ -1,7 +1,7 @@
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
 import type {
   AggregateFunctions,
@@ -19,45 +19,45 @@ export interface GroupedQuery<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
+  Registry = {},
 > extends Subquery<RowType>,
     WithPagination,
     WithDistinct,
     WithAlias<RowType>,
     WithBuild<QC, RowType> {
   /**
-   * Attach one or more read-typed user annotations to this query plan.
-   * Annotations declare `applicableTo: ['read']` (or `['read', 'write']`)
-   * via `defineAnnotation`; write-only annotations fail to compile here.
-   * Annotations are merged into `plan.meta.annotations` at `.build()` time.
-   * Chainable in any position; multiple calls compose with last-write-wins
-   * on duplicate namespaces.
+   * Attach user annotations via a registry-driven callback.
+   * See `SelectQuery.annotate` for semantics; the same `'read'`-filtered
+   * `AnnotationBuilder<'read', Registry>` is supplied here.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'read', As>
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   groupBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: Functions<QC>,
     ) => Expression<ScopeField>,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   having(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: AggregateFunctions<QC>,
     ) => Expression<BooleanCodecType>,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   orderBy(
     expr: (
@@ -65,7 +65,7 @@ export interface GroupedQuery<
       fns: AggregateFunctions<QC>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
 
   distinctOn: GatedMethod<
     QC['capabilities'],
@@ -73,13 +73,13 @@ export interface GroupedQuery<
     {
       (
         ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-      ): GroupedQuery<QC, AvailableScope, RowType>;
+      ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
       (
         expr: (
           fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
           fns: Functions<QC>,
         ) => Expression<ScopeField>,
-      ): GroupedQuery<QC, AvailableScope, RowType>;
+      ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
     }
   >;
 }

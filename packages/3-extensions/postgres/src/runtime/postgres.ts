@@ -59,7 +59,7 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
  * `AnnotationBuilder` from `Registry` at the call site.
  */
 export interface PostgresClient<TContract extends Contract<SqlStorage>, Registry = {}> {
-  readonly sql: Db<TContract>;
+  readonly sql: Db<TContract, Registry>;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
@@ -70,16 +70,7 @@ export interface PostgresClient<TContract extends Contract<SqlStorage>, Registry
    * — the registry is wired into the lane builders automatically.
    */
   readonly annotationRegistry: AnnotationRegistry;
-  /**
-   * Phantom slot carrying the type-level merged annotation-registry shape
-   * derived from `options.middleware` via `AnnotationsOf<Mw>`. Stage 4
-   * threads this `Registry` through `Db<TContract, Registry>` and the ORM
-   * surface so the `.annotate(callback)` callback can structurally derive
-   * its kind-filtered `AnnotationBuilder` at the call site. The value is
-   * always `undefined` at runtime; it exists solely to keep the `Registry`
-   * generic referenced.
-   */
-  readonly _registry?: Registry;
+
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
   transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
@@ -293,7 +284,10 @@ export default function postgres<
     annotationRegistry,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context, annotationRegistry });
+  const sql: Db<TContract, AnnotationsOf<Mw>> = sqlBuilder<TContract, AnnotationsOf<Mw>>({
+    context,
+    annotationRegistry,
+  });
 
   return {
     sql,
@@ -332,7 +326,10 @@ export default function postgres<
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({ context, annotationRegistry });
+        const txSql: Db<TContract> = sqlBuilder<TContract, AnnotationsOf<Mw>>({
+          context,
+          annotationRegistry,
+        });
 
         const txOrm: OrmClient<TContract> = ormBuilder({
           runtime: {

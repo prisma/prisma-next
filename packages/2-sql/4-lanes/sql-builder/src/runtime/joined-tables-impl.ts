@@ -43,9 +43,9 @@ import { createFieldProxy } from './field-proxy';
 import { createFunctions } from './functions';
 import { SelectQueryImpl } from './query-impl';
 
-export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Scope>
+export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Scope, Registry = {}>
   extends BuilderBase<QC['capabilities']>
-  implements JoinedTables<QC, AvailableScope>
+  implements JoinedTables<QC, AvailableScope, Registry>
 {
   readonly #state: BuilderState;
 
@@ -59,10 +59,11 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     'lateralJoin',
     <Alias extends string, LateralRow extends Record<string, ScopeField>>(
       alias: Alias,
-      builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
+      builder: (lateral: LateralBuilder<QC, AvailableScope, Registry>) => Subquery<LateralRow>,
     ): JoinedTables<
       QC,
-      MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
+      MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>,
+      Registry
     > => {
       const { derivedSource, lateralScope } = this.#buildLateral(alias, builder);
       const resultScope = mergeScopes(
@@ -71,20 +72,21 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
       );
       return this.#addLateralJoin('inner', resultScope, derivedSource);
     },
-  ) as JoinedTables<QC, AvailableScope>['lateralJoin'];
+  ) as JoinedTables<QC, AvailableScope, Registry>['lateralJoin'];
 
   outerLateralJoin = this._gate(
     { sql: { lateral: true } },
     'outerLateralJoin',
     <Alias extends string, LateralRow extends Record<string, ScopeField>>(
       alias: Alias,
-      builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
+      builder: (lateral: LateralBuilder<QC, AvailableScope, Registry>) => Subquery<LateralRow>,
     ): JoinedTables<
       QC,
       MergeScopes<
         AvailableScope,
         NullableScope<{ topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
-      >
+      >,
+      Registry
     > => {
       const { derivedSource, lateralScope } = this.#buildLateral(alias, builder);
       const resultScope = mergeScopes(
@@ -95,21 +97,26 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
       );
       return this.#addLateralJoin('left', resultScope, derivedSource);
     },
-  ) as JoinedTables<QC, AvailableScope>['outerLateralJoin'];
+  ) as JoinedTables<QC, AvailableScope, Registry>['outerLateralJoin'];
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>;
+  ): SelectQuery<
+    QC,
+    AvailableScope,
+    WithFields<EmptyRow, AvailableScope['topLevel'], Columns>,
+    Registry
+  >;
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
     expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
-  ): SelectQuery<QC, AvailableScope, WithField<EmptyRow, Field, Alias>>;
+  ): SelectQuery<QC, AvailableScope, WithField<EmptyRow, Field, Alias>, Registry>;
   select<Result extends Record<string, Expression<ScopeField>>>(
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
-  ): SelectQuery<QC, AvailableScope, Expand<ExtractScopeFields<Result>>>;
+  ): SelectQuery<QC, AvailableScope, Expand<ExtractScopeFields<Result>>, Registry>;
   select(...args: unknown[]): unknown {
     const { projections, newRowFields } = resolveSelectArgs(args, this.#state.scope, this.ctx);
-    return new SelectQueryImpl<QC, AvailableScope>(
+    return new SelectQueryImpl<QC, AvailableScope, Record<string, ScopeField>, Registry>(
       cloneState(this.#state, {
         projections: [...this.#state.projections, ...projections],
         rowFields: { ...this.#state.rowFields, ...newRowFields },
@@ -121,7 +128,7 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>> {
+  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, Registry> {
     const targetScope = mergeScopes(
       this.#state.scope as AvailableScope,
       other.getJoinOuterScope() as Other[typeof JoinOuterScope],
@@ -132,7 +139,11 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
   outerLeftJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>> {
+  ): JoinedTables<
+    QC,
+    MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
+  > {
     const targetScope = mergeScopes(
       this.#state.scope as AvailableScope,
       nullableScope(other.getJoinOuterScope() as Other[typeof JoinOuterScope]),
@@ -143,7 +154,11 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
   outerRightJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>> {
+  ): JoinedTables<
+    QC,
+    MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>,
+    Registry
+  > {
     const targetScope = mergeScopes(
       nullableScope(this.#state.scope as AvailableScope),
       other.getJoinOuterScope() as Other[typeof JoinOuterScope],
@@ -156,7 +171,8 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
   ): JoinedTables<
     QC,
-    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
   > {
     const targetScope = mergeScopes(
       nullableScope(this.#state.scope as AvailableScope),
@@ -170,7 +186,7 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     joinType: 'inner' | 'left' | 'right' | 'full',
     resultScope: ResultScope,
     onExpr: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, ResultScope> {
+  ): JoinedTables<QC, ResultScope, Registry> {
     const fieldProxy = createFieldProxy(
       mergeScopes(
         this.#state.scope as AvailableScope,
@@ -181,7 +197,7 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     const onResult = onExpr(fieldProxy, fns);
     const joinAst = new JoinAst(joinType, other.buildAst(), onResult.buildAst());
 
-    return new JoinedTablesImpl(
+    return new JoinedTablesImpl<QC, ResultScope, Registry>(
       cloneState(this.#state, {
         joins: [...this.#state.joins, joinAst],
         scope: resultScope,
@@ -193,17 +209,17 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
   #buildLateral(
     alias: string,
     builderFn: (
-      lateral: LateralBuilder<QC, AvailableScope>,
+      lateral: LateralBuilder<QC, AvailableScope, Registry>,
     ) => Subquery<Record<string, ScopeField>>,
   ) {
-    const lateralBuilder: LateralBuilder<QC, AvailableScope> = {
+    const lateralBuilder: LateralBuilder<QC, AvailableScope, Registry> = {
       from: (other) => {
         const otherScope = other.getJoinOuterScope();
         const parentMerged = mergeScopes(this.#state.scope, otherScope);
         return new SelectQueryImpl(
           emptyState(other.buildAst() as TableSource, parentMerged),
           this.ctx,
-        ) as unknown as SelectQuery<QC, AvailableScope, EmptyRow>;
+        ) as unknown as SelectQuery<QC, AvailableScope, EmptyRow, Registry>;
       },
     };
 
@@ -223,11 +239,11 @@ export class JoinedTablesImpl<QC extends QueryContext, AvailableScope extends Sc
     joinType: 'inner' | 'left',
     resultScope: ResultScope,
     derivedSource: DerivedTableSource,
-  ): JoinedTables<QC, ResultScope> {
+  ): JoinedTables<QC, ResultScope, Registry> {
     const onExpr = AndExpr.of([]);
     const joinAst = new JoinAst(joinType, derivedSource, onExpr, true);
 
-    return new JoinedTablesImpl(
+    return new JoinedTablesImpl<QC, ResultScope, Registry>(
       cloneState(this.#state, {
         joins: [...this.#state.joins, joinAst],
         scope: resultScope,

@@ -1,9 +1,13 @@
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
-import { assertAnnotationsApplicable } from '@prisma-next/framework-components/runtime';
+import {
+  assertAnnotationsApplicable,
+  createMetaBuilder,
+} from '@prisma-next/framework-components/runtime';
+import { extractAnnotationValues } from './annotation-callback';
 import { DerivedTableSource, type SelectAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
@@ -52,6 +56,7 @@ abstract class QueryBase<
   QC extends QueryContext = QueryContext,
   AvailableScope extends Scope = Scope,
   RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+  Registry = {},
 > extends BuilderBase<QC['capabilities']> {
   protected readonly state: BuilderState;
 
@@ -88,32 +93,38 @@ abstract class QueryBase<
   }
 
   /**
-   * Attach one or more user annotations to this query plan.
+   * Attach user annotations to this query plan via a registry-driven
+   * callback.
    *
-   * Read builders (`SelectQueryImpl`, `GroupedQueryImpl`) accept
-   * annotations whose declared `applicableTo` includes `'read'`.
-   * The type-level `As & ValidAnnotations<'read', As>` gate rejects
-   * write-only annotations at the call site; the runtime check below
-   * fails closed for callers that bypass the type gate (cast / `any`).
+   * Read builders (`SelectQueryImpl`, `GroupedQueryImpl`) call this
+   * `annotate` method, which constructs a kind-filtered
+   * `AnnotationBuilder<'read', …>` from `this.ctx.annotationRegistry`
+   * and passes it to the user callback. The callback returns either the
+   * chained builder or a `readonly AnnotationValue[]` (the array escape
+   * hatch). The framework normalizes the return value, runs
+   * `assertAnnotationsApplicable` (the runtime gate that catches
+   * cast-bypass), and merges the annotations into
+   * `state.userAnnotations`. Duplicate namespaces use last-write-wins;
+   * multiple `.annotate(...)` calls compose.
    *
-   * Multiple `.annotate(...)` calls compose; duplicate namespaces use
-   * last-write-wins. The accumulated annotations are merged into
-   * `plan.meta.annotations` at `.build()` time, alongside any framework-
-   * internal metadata under reserved namespaces (e.g. `codecs`).
-   *
-   * Chainable in any position (before / after `.where`, `.select`,
-   * `.limit`, etc.); the returned builder has the same row type.
+   * The accumulated annotations land in `plan.meta.annotations` at
+   * `.build()` time, alongside any framework-internal metadata under
+   * reserved namespaces (e.g. `codecs`).
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'read', As>
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'read', Registry>,
+    ) => AnnotationBuilder<'read', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
   ): this {
-    assertAnnotationsApplicable(
-      annotations as readonly AnnotationValue<unknown, OperationKind>[],
-      'read',
-      'sql-dsl.annotate',
-    );
+    const meta = createMetaBuilder<'read', Registry>(this.ctx.annotationRegistry, 'read');
+    const result = fn(meta);
+    const values = extractAnnotationValues(result);
+    assertAnnotationsApplicable(values, 'read', 'sql-dsl.annotate');
+    if (values.length === 0) {
+      return this.clone(this.state);
+    }
     const next = new Map(this.state.userAnnotations);
-    for (const annotation of annotations as readonly AnnotationValue<unknown, OperationKind>[]) {
+    for (const annotation of values) {
       next.set(annotation.namespace, annotation);
     }
     return this.clone(cloneState(this.state, { userAnnotations: next }));
@@ -121,16 +132,16 @@ abstract class QueryBase<
 
   groupBy(
     ...fields: ((keyof RowType | keyof AvailableScope['topLevel']) & string)[]
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
   groupBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: Functions<QC>,
     ) => Expression<ScopeField>,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
   groupBy(...args: unknown[]): unknown {
     const exprs = resolveGroupBy(args, this.state.scope, this.state.rowFields, this.ctx);
-    return new GroupedQueryImpl<QC, AvailableScope, RowType>(
+    return new GroupedQueryImpl<QC, AvailableScope, RowType, Registry>(
       cloneState(this.state, { groupBy: [...this.state.groupBy, ...exprs] }),
       this.ctx,
     );
@@ -174,26 +185,32 @@ export class SelectQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
     RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+    Registry = {},
   >
-  extends QueryBase<QC, AvailableScope, RowType>
-  implements SelectQuery<QC, AvailableScope, RowType>
+  extends QueryBase<QC, AvailableScope, RowType, Registry>
+  implements SelectQuery<QC, AvailableScope, RowType, Registry>
 {
   declare readonly [SubqueryMarker]: RowType;
 
   protected clone(state: BuilderState): this {
-    return new SelectQueryImpl<QC, AvailableScope, RowType>(state, this.ctx) as this;
+    return new SelectQueryImpl<QC, AvailableScope, RowType, Registry>(state, this.ctx) as this;
   }
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<QC, AvailableScope, WithFields<RowType, AvailableScope['topLevel'], Columns>>;
+  ): SelectQuery<
+    QC,
+    AvailableScope,
+    WithFields<RowType, AvailableScope['topLevel'], Columns>,
+    Registry
+  >;
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
     expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
-  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>>;
+  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>, Registry>;
   select<Result extends Record<string, Expression<ScopeField>>>(
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
-  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
+  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>, Registry>;
   select(...args: unknown[]): unknown {
     const { projections, newRowFields } = resolveSelectArgs(args, this.state.scope, this.ctx);
     return new SelectQueryImpl(
@@ -205,11 +222,13 @@ export class SelectQueryImpl<
     );
   }
 
-  where(expr: ExpressionBuilder<AvailableScope, QC>): SelectQuery<QC, AvailableScope, RowType> {
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC>,
+  ): SelectQuery<QC, AvailableScope, RowType, Registry> {
     const fieldProxy = createFieldProxy(this.state.scope);
     const fns = createFunctions<QC>(this.ctx.queryOperationTypes);
     const result = (expr as ExpressionBuilder<Scope, QueryContext>)(fieldProxy, fns as never);
-    return new SelectQueryImpl(
+    return new SelectQueryImpl<QC, AvailableScope, RowType, Registry>(
       cloneState(this.state, {
         where: [...this.state.where, result.buildAst()],
       }),
@@ -220,14 +239,14 @@ export class SelectQueryImpl<
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): SelectQuery<QC, AvailableScope, RowType>;
+  ): SelectQuery<QC, AvailableScope, RowType, Registry>;
   orderBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: Functions<QC>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): SelectQuery<QC, AvailableScope, RowType>;
+  ): SelectQuery<QC, AvailableScope, RowType, Registry>;
   orderBy(arg: unknown, options?: OrderByOptions): unknown {
     const item = resolveOrderBy(
       arg,
@@ -245,14 +264,15 @@ export class GroupedQueryImpl<
     QC extends QueryContext = QueryContext,
     AvailableScope extends Scope = Scope,
     RowType extends Record<string, ScopeField> = Record<string, ScopeField>,
+    Registry = {},
   >
-  extends QueryBase<QC, AvailableScope, RowType>
-  implements GroupedQuery<QC, AvailableScope, RowType>
+  extends QueryBase<QC, AvailableScope, RowType, Registry>
+  implements GroupedQuery<QC, AvailableScope, RowType, Registry>
 {
   declare readonly [SubqueryMarker]: RowType;
 
   protected clone(state: BuilderState): this {
-    return new GroupedQueryImpl<QC, AvailableScope, RowType>(state, this.ctx) as this;
+    return new GroupedQueryImpl<QC, AvailableScope, RowType, Registry>(state, this.ctx) as this;
   }
 
   having(
@@ -260,27 +280,30 @@ export class GroupedQueryImpl<
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: AggregateFunctions<QC>,
     ) => Expression<BooleanCodecType>,
-  ): GroupedQuery<QC, AvailableScope, RowType> {
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry> {
     const combined = orderByScopeOf(
       this.state.scope as AvailableScope,
       this.state.rowFields as RowType,
     );
     const fns = createAggregateFunctions(this.ctx.queryOperationTypes);
     const result = expr(createFieldProxy(combined), fns);
-    return new GroupedQueryImpl(cloneState(this.state, { having: result.buildAst() }), this.ctx);
+    return new GroupedQueryImpl<QC, AvailableScope, RowType, Registry>(
+      cloneState(this.state, { having: result.buildAst() }),
+      this.ctx,
+    );
   }
 
   orderBy(
     field: (keyof RowType | keyof AvailableScope['topLevel']) & string,
     options?: OrderByOptions,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
   orderBy(
     expr: (
       fields: FieldProxy<OrderByScope<AvailableScope, RowType>>,
       fns: AggregateFunctions<QC>,
     ) => Expression<ScopeField>,
     options?: OrderByOptions,
-  ): GroupedQuery<QC, AvailableScope, RowType>;
+  ): GroupedQuery<QC, AvailableScope, RowType, Registry>;
   orderBy(arg: unknown, options?: OrderByOptions): unknown {
     const item = resolveOrderBy(
       arg,

@@ -26,53 +26,73 @@ import type {
 import type { JoinedTables } from './joined-tables';
 import type { SelectQuery } from './select-query';
 
-export interface LateralBuilder<QC extends QueryContext, ParentScope extends Scope> {
+export interface LateralBuilder<QC extends QueryContext, ParentScope extends Scope, Registry = {}> {
   from<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
-  ): SelectQuery<QC, MergeScopes<ParentScope, Other[typeof JoinOuterScope]>, EmptyRow>;
+  ): SelectQuery<QC, MergeScopes<ParentScope, Other[typeof JoinOuterScope]>, EmptyRow, Registry>;
 }
 
 export interface WithSelect<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField> = EmptyRow,
+  Registry = {},
 > {
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<QC, AvailableScope, WithFields<RowType, AvailableScope['topLevel'], Columns>>;
+  ): SelectQuery<
+    QC,
+    AvailableScope,
+    WithFields<RowType, AvailableScope['topLevel'], Columns>,
+    Registry
+  >;
 
   select<Alias extends string, Field extends ScopeField>(
     alias: Alias,
     expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
-  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>>;
+  ): SelectQuery<QC, AvailableScope, WithField<RowType, Field, Alias>, Registry>;
 
   select<Result extends Record<string, Expression<ScopeField>>>(
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
-  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>>;
+  ): SelectQuery<QC, AvailableScope, Expand<RowType & ExtractScopeFields<Result>>, Registry>;
 }
 
-export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope, Capabilities> {
+export interface WithJoin<
+  QC extends QueryContext,
+  AvailableScope extends Scope,
+  Capabilities,
+  Registry = {},
+> {
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>>;
+  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, Registry>;
 
   outerLeftJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>>;
+  ): JoinedTables<
+    QC,
+    MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
+  >;
 
   outerRightJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>>;
+  ): JoinedTables<
+    QC,
+    MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>,
+    Registry
+  >;
 
   outerFullJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
   ): JoinedTables<
     QC,
-    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
   >;
 
   lateralJoin: GatedMethod<
@@ -80,10 +100,11 @@ export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope,
     { sql: { lateral: true } },
     <Alias extends string, LateralRow extends Record<string, ScopeField>>(
       alias: Alias,
-      builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
+      builder: (lateral: LateralBuilder<QC, AvailableScope, Registry>) => Subquery<LateralRow>,
     ) => JoinedTables<
       QC,
-      MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
+      MergeScopes<AvailableScope, { topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>,
+      Registry
     >
   >;
 
@@ -92,13 +113,14 @@ export interface WithJoin<QC extends QueryContext, AvailableScope extends Scope,
     { sql: { lateral: true } },
     <Alias extends string, LateralRow extends Record<string, ScopeField>>(
       alias: Alias,
-      builder: (lateral: LateralBuilder<QC, AvailableScope>) => Subquery<LateralRow>,
+      builder: (lateral: LateralBuilder<QC, AvailableScope, Registry>) => Subquery<LateralRow>,
     ) => JoinedTables<
       QC,
       MergeScopes<
         AvailableScope,
         NullableScope<{ topLevel: LateralRow; namespaces: Record<Alias, LateralRow> }>
-      >
+      >,
+      Registry
     >
   >;
 }

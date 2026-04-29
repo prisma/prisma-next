@@ -1,5 +1,8 @@
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
-import { defineAnnotation } from '@prisma-next/framework-components/runtime';
+import {
+  createAnnotationRegistry,
+  defineAnnotation,
+} from '@prisma-next/framework-components/runtime';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { describe, expect, it } from 'vitest';
@@ -17,7 +20,50 @@ const stubBase = {
   applyMutationDefaults: () => [],
 };
 
+const cacheAnnotation = defineAnnotation<{ ttl: number; skip?: boolean }, 'read'>({
+  name: 'cache',
+  applicableTo: ['read'],
+});
+
+const otelAnnotation = defineAnnotation<{ traceId: string }, 'read' | 'write'>({
+  name: 'otel',
+  applicableTo: ['read', 'write'],
+});
+
+const auditAnnotation = defineAnnotation<{ actor: string }, 'write'>({
+  name: 'audit',
+  applicableTo: ['write'],
+});
+
+type TestRegistry = {
+  readonly cache: typeof cacheAnnotation;
+  readonly otel: typeof otelAnnotation;
+  readonly audit: typeof auditAnnotation;
+};
+
+/**
+ * Constructs a test `db` with all three annotation handles registered
+ * so the registry-driven `meta` builder exposes them on read / write
+ * builders.
+ */
 function db() {
+  const registry = createAnnotationRegistry();
+  registry.register(cacheAnnotation);
+  registry.register(otelAnnotation);
+  registry.register(auditAnnotation);
+  return sql<typeof sqlContract, TestRegistry>({
+    context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
+      typeof sqlContract
+    >,
+    annotationRegistry: registry,
+  });
+}
+
+/**
+ * Same shape but with no annotations registered \u2014 used to verify the
+ * array escape hatch works even when the registry is empty.
+ */
+function dbWithoutRegistry() {
   return sql({
     context: { ...stubBase, contract: sqlContract } as unknown as ExecutionContext<
       typeof sqlContract
@@ -25,26 +71,11 @@ function db() {
   });
 }
 
-const cacheAnnotation = defineAnnotation<{ ttl: number; skip?: boolean }, 'read'>({
-  namespace: 'cache',
-  applicableTo: ['read'],
-});
-
-const otelAnnotation = defineAnnotation<{ traceId: string }, 'read' | 'write'>({
-  namespace: 'otel',
-  applicableTo: ['read', 'write'],
-});
-
-const auditAnnotation = defineAnnotation<{ actor: string }, 'write'>({
-  namespace: 'audit',
-  applicableTo: ['write'],
-});
-
 describe('SelectQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .build();
 
     const stored = plan.meta.annotations?.['cache'];
@@ -58,7 +89,7 @@ describe('SelectQuery.annotate', () => {
   it('round-trips through the typed handle.read accessor', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -69,21 +100,21 @@ describe('SelectQuery.annotate', () => {
     expect(cacheAnnotation.read(plan)).toBeUndefined();
   });
 
-  it('multiple annotations under different namespaces coexist', () => {
+  it('multiple annotations under different namespaces coexist (separate calls)', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
-      .annotate(otelAnnotation.apply({ traceId: 't-1' }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
+      .annotate((meta) => meta.otel({ traceId: 't-1' }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
   });
 
-  it('multiple annotations passed in a single call coexist', () => {
+  it('multiple annotations chained in a single callback coexist', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }), otelAnnotation.apply({ traceId: 't-1' }))
+      .annotate((meta) => meta.cache({ ttl: 60 }).otel({ traceId: 't-1' }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -93,8 +124,8 @@ describe('SelectQuery.annotate', () => {
   it('duplicate namespace last-write-wins', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
-      .annotate(cacheAnnotation.apply({ ttl: 120 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 120 }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 120 });
@@ -102,7 +133,7 @@ describe('SelectQuery.annotate', () => {
 
   it('annotate does not mutate the original builder (immutability)', () => {
     const base = db().users.select('id');
-    const annotated = base.annotate(cacheAnnotation.apply({ ttl: 60 }));
+    const annotated = base.annotate((meta) => meta.cache({ ttl: 60 }));
     const basePlan = base.build();
     const annotatedPlan = annotated.build();
 
@@ -113,7 +144,7 @@ describe('SelectQuery.annotate', () => {
   it('chainable in any position: immediately after .select', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -122,7 +153,7 @@ describe('SelectQuery.annotate', () => {
   it('chainable in any position: between .select and .where', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .where((f, fns) => fns.eq(f.id, 1))
       .build();
 
@@ -133,7 +164,7 @@ describe('SelectQuery.annotate', () => {
     const plan = db()
       .users.select('id')
       .where((f, fns) => fns.eq(f.id, 1))
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .limit(10)
       .build();
 
@@ -148,33 +179,52 @@ describe('SelectQuery.annotate', () => {
 
     const annotatedAst = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .where((f, fns) => fns.eq(f.id, 1))
-      .annotate(otelAnnotation.apply({ traceId: 't-1' }))
+      .annotate((meta) => meta.otel({ traceId: 't-1' }))
       .buildAst();
 
     expect(annotatedAst).toEqual(baseAst);
   });
 
-  it('annotate with no arguments is a no-op for user annotations (empty variadic)', () => {
-    // The framework `codecs` map under the reserved namespace may still
-    // populate `plan.meta.annotations` — this is independent of user
-    // annotations. We verify only that no user annotation lands.
-    const plan = db().users.select('id').annotate().build();
+  it('array escape hatch lands user annotations exactly like the chained builder', () => {
+    const plan = db()
+      .users.select('id')
+      .annotate(() => [cacheAnnotation({ ttl: 60 })])
+      .build();
+
+    expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
+  });
+
+  it('array escape hatch works when the registry contributes nothing', () => {
+    // Useful for callers who hold a closure-captured handle that wasn't
+    // contributed by middleware.
+    const plan = dbWithoutRegistry()
+      .users.select('id')
+      .annotate(() => [cacheAnnotation({ ttl: 60 })])
+      .build();
+
+    expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
+  });
+
+  it('callback returning an empty array is a no-op for user annotations', () => {
+    const plan = db()
+      .users.select('id')
+      .annotate(() => [])
+      .build();
 
     expect(cacheAnnotation.read(plan)).toBeUndefined();
     expect(otelAnnotation.read(plan)).toBeUndefined();
-    // No user-namespaced keys.
     const annotations = plan.meta.annotations ?? {};
     const userKeys = Object.keys(annotations).filter((k) => k !== 'codecs');
     expect(userKeys).toEqual([]);
   });
 
-  it('runtime gate rejects a write-only annotation forced through a cast', () => {
+  it('runtime gate rejects a write-only annotation forced through a cast (array escape hatch)', () => {
     const builder = db().users.select('id') as unknown as {
-      annotate(annotation: unknown): unknown;
+      annotate(fn: (meta: unknown) => unknown): unknown;
     };
-    expect(() => builder.annotate(auditAnnotation.apply({ actor: 'system' }))).toThrow(
+    expect(() => builder.annotate(() => [auditAnnotation({ actor: 'system' })])).toThrow(
       expect.objectContaining({
         code: 'RUNTIME.ANNOTATION_INAPPLICABLE',
         category: 'RUNTIME',
@@ -188,7 +238,7 @@ describe('GroupedQuery.annotate', () => {
     const plan = db()
       .posts.select('user_id')
       .groupBy('user_id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
@@ -197,7 +247,7 @@ describe('GroupedQuery.annotate', () => {
   it('chainable in any position: between .select and .groupBy', () => {
     const plan = db()
       .posts.select('user_id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .groupBy('user_id')
       .build();
 
@@ -208,18 +258,18 @@ describe('GroupedQuery.annotate', () => {
     const plan = db()
       .posts.select('user_id')
       .groupBy('user_id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .orderBy('user_id')
       .build();
 
     expect(cacheAnnotation.read(plan)).toEqual({ ttl: 60 });
   });
 
-  it('runtime gate rejects a write-only annotation forced through a cast', () => {
+  it('runtime gate rejects a write-only annotation forced through a cast (array escape hatch)', () => {
     const builder = db().posts.select('user_id').groupBy('user_id') as unknown as {
-      annotate(annotation: unknown): unknown;
+      annotate(fn: (meta: unknown) => unknown): unknown;
     };
-    expect(() => builder.annotate(auditAnnotation.apply({ actor: 'system' }))).toThrow(
+    expect(() => builder.annotate(() => [auditAnnotation({ actor: 'system' })])).toThrow(
       expect.objectContaining({ code: 'RUNTIME.ANNOTATION_INAPPLICABLE' }),
     );
   });
@@ -229,7 +279,7 @@ describe('InsertQuery.annotate', () => {
   it('writes the applied annotation under its namespace on plan.meta.annotations', () => {
     const plan = db()
       .users.insert({ name: 'Alice' })
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .build();
 
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
@@ -238,7 +288,7 @@ describe('InsertQuery.annotate', () => {
   it('accepts both-kind annotations', () => {
     const plan = db()
       .users.insert({ name: 'Alice' })
-      .annotate(otelAnnotation.apply({ traceId: 't-1' }))
+      .annotate((meta) => meta.otel({ traceId: 't-1' }))
       .build();
 
     expect(otelAnnotation.read(plan)).toEqual({ traceId: 't-1' });
@@ -247,18 +297,18 @@ describe('InsertQuery.annotate', () => {
   it('survives across .returning(...) chaining', () => {
     const plan = db()
       .users.insert({ name: 'Alice' })
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .returning('id', 'name')
       .build();
 
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
   });
 
-  it('runtime gate rejects a read-only annotation forced through a cast', () => {
+  it('runtime gate rejects a read-only annotation forced through a cast (array escape hatch)', () => {
     const builder = db().users.insert({ name: 'Alice' }) as unknown as {
-      annotate(annotation: unknown): unknown;
+      annotate(fn: (meta: unknown) => unknown): unknown;
     };
-    expect(() => builder.annotate(cacheAnnotation.apply({ ttl: 60 }))).toThrow(
+    expect(() => builder.annotate(() => [cacheAnnotation({ ttl: 60 })])).toThrow(
       expect.objectContaining({ code: 'RUNTIME.ANNOTATION_INAPPLICABLE' }),
     );
   });
@@ -269,7 +319,7 @@ describe('UpdateQuery.annotate', () => {
     const plan = db()
       .users.update({ name: 'Alice' })
       .where((f, fns) => fns.eq(f.id, 1))
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .build();
 
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
@@ -278,7 +328,7 @@ describe('UpdateQuery.annotate', () => {
   it('survives across .where(...) and .returning(...) chaining', () => {
     const plan = db()
       .users.update({ name: 'Alice' })
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .where((f, fns) => fns.eq(f.id, 1))
       .returning('id', 'name')
       .build();
@@ -286,11 +336,11 @@ describe('UpdateQuery.annotate', () => {
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
   });
 
-  it('runtime gate rejects a read-only annotation forced through a cast', () => {
+  it('runtime gate rejects a read-only annotation forced through a cast (array escape hatch)', () => {
     const builder = db().users.update({ name: 'Alice' }) as unknown as {
-      annotate(annotation: unknown): unknown;
+      annotate(fn: (meta: unknown) => unknown): unknown;
     };
-    expect(() => builder.annotate(cacheAnnotation.apply({ ttl: 60 }))).toThrow(
+    expect(() => builder.annotate(() => [cacheAnnotation({ ttl: 60 })])).toThrow(
       expect.objectContaining({ code: 'RUNTIME.ANNOTATION_INAPPLICABLE' }),
     );
   });
@@ -301,7 +351,7 @@ describe('DeleteQuery.annotate', () => {
     const plan = db()
       .users.delete()
       .where((f, fns) => fns.eq(f.id, 1))
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .build();
 
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
@@ -310,7 +360,7 @@ describe('DeleteQuery.annotate', () => {
   it('survives across .where(...) and .returning(...) chaining', () => {
     const plan = db()
       .users.delete()
-      .annotate(auditAnnotation.apply({ actor: 'system' }))
+      .annotate((meta) => meta.audit({ actor: 'system' }))
       .where((f, fns) => fns.eq(f.id, 1))
       .returning('id')
       .build();
@@ -318,11 +368,11 @@ describe('DeleteQuery.annotate', () => {
     expect(auditAnnotation.read(plan)).toEqual({ actor: 'system' });
   });
 
-  it('runtime gate rejects a read-only annotation forced through a cast', () => {
+  it('runtime gate rejects a read-only annotation forced through a cast (array escape hatch)', () => {
     const builder = db().users.delete() as unknown as {
-      annotate(annotation: unknown): unknown;
+      annotate(fn: (meta: unknown) => unknown): unknown;
     };
-    expect(() => builder.annotate(cacheAnnotation.apply({ ttl: 60 }))).toThrow(
+    expect(() => builder.annotate(() => [cacheAnnotation({ ttl: 60 })])).toThrow(
       expect.objectContaining({ code: 'RUNTIME.ANNOTATION_INAPPLICABLE' }),
     );
   });
@@ -335,7 +385,7 @@ describe('annotate alongside framework-internal codecs metadata', () => {
   it('coexists with the framework codecs map under its reserved namespace', () => {
     const plan = db()
       .users.select('id')
-      .annotate(cacheAnnotation.apply({ ttl: 60 }))
+      .annotate((meta) => meta.cache({ ttl: 60 }))
       .build();
 
     // User annotation lives under its own namespace.

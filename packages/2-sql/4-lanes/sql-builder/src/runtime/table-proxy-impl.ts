@@ -41,9 +41,10 @@ export class TableProxyImpl<
     Alias extends string,
     AvailableScope extends Scope,
     QC extends QueryContext,
+    Registry = {},
   >
   extends BuilderBase<C['capabilities']>
-  implements TableProxy<C, Name, Alias, AvailableScope, QC>
+  implements TableProxy<C, Name, Alias, AvailableScope, QC, Registry>
 {
   declare readonly [JoinOuterScope]: JoinSource<
     StorageTableToScopeTable<C['storage']['tables'][Name]>,
@@ -75,7 +76,7 @@ export class TableProxyImpl<
     > => {
       return this.#toJoined().lateralJoin(alias, builder);
     },
-  ) as TableProxy<C, Name, Alias, AvailableScope, QC>['lateralJoin'];
+  ) as TableProxy<C, Name, Alias, AvailableScope, QC, Registry>['lateralJoin'];
 
   outerLateralJoin = this._gate(
     { sql: { lateral: true } },
@@ -92,7 +93,7 @@ export class TableProxyImpl<
     > => {
       return this.#toJoined().outerLateralJoin(alias, builder);
     },
-  ) as TableProxy<C, Name, Alias, AvailableScope, QC>['outerLateralJoin'];
+  ) as TableProxy<C, Name, Alias, AvailableScope, QC, Registry>['outerLateralJoin'];
 
   getJoinOuterScope(): Scope {
     return this.#scope;
@@ -104,20 +105,32 @@ export class TableProxyImpl<
 
   as<NewAlias extends string>(
     newAlias: NewAlias,
-  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>> {
-    return new TableProxyImpl(this.#tableName, this.#table, newAlias, this.ctx);
+  ): TableProxy<C, Name, NewAlias, RebindScope<AvailableScope, Alias, NewAlias>, QC, Registry> {
+    return new TableProxyImpl<
+      C,
+      Name,
+      NewAlias,
+      RebindScope<AvailableScope, Alias, NewAlias>,
+      QC,
+      Registry
+    >(this.#tableName, this.#table, newAlias, this.ctx);
   }
 
   select<Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
     ...columns: Columns
-  ): SelectQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>;
+  ): SelectQuery<
+    QC,
+    AvailableScope,
+    WithFields<EmptyRow, AvailableScope['topLevel'], Columns>,
+    Registry
+  >;
   select<LAlias extends string, Field extends ScopeField>(
     alias: LAlias,
     expr: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Expression<Field>,
-  ): SelectQuery<QC, AvailableScope, WithField<EmptyRow, Field, LAlias>>;
+  ): SelectQuery<QC, AvailableScope, WithField<EmptyRow, Field, LAlias>, Registry>;
   select<Result extends Record<string, Expression<ScopeField>>>(
     callback: (fields: FieldProxy<AvailableScope>, fns: AggregateFunctions<QC>) => Result,
-  ): SelectQuery<QC, AvailableScope, Expand<ExtractScopeFields<Result>>>;
+  ): SelectQuery<QC, AvailableScope, Expand<ExtractScopeFields<Result>>, Registry>;
   select(...args: unknown[]): unknown {
     return new SelectQueryImpl(emptyState(this.#fromSource, this.#scope), this.ctx).select(
       ...(args as string[]),
@@ -127,21 +140,29 @@ export class TableProxyImpl<
   innerJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>> {
+  ): JoinedTables<QC, MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, Registry> {
     return this.#toJoined().innerJoin(other, on);
   }
 
   outerLeftJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>> {
+  ): JoinedTables<
+    QC,
+    MergeScopes<AvailableScope, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
+  > {
     return this.#toJoined().outerLeftJoin(other, on);
   }
 
   outerRightJoin<Other extends JoinSource<ScopeTable, string | never>>(
     other: Other,
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
-  ): JoinedTables<QC, MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>> {
+  ): JoinedTables<
+    QC,
+    MergeScopes<NullableScope<AvailableScope>, Other[typeof JoinOuterScope]>,
+    Registry
+  > {
     return this.#toJoined().outerRightJoin(other, on);
   }
 
@@ -150,24 +171,25 @@ export class TableProxyImpl<
     on: ExpressionBuilder<MergeScopes<AvailableScope, Other[typeof JoinOuterScope]>, QC>,
   ): JoinedTables<
     QC,
-    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>
+    MergeScopes<NullableScope<AvailableScope>, NullableScope<Other[typeof JoinOuterScope]>>,
+    Registry
   > {
     return this.#toJoined().outerFullJoin(other, on);
   }
 
-  insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow> {
+  insert(values: Record<string, unknown>): InsertQuery<QC, AvailableScope, EmptyRow, Registry> {
     return new InsertQueryImpl(this.#tableName, this.#table, this.#scope, values, this.ctx);
   }
 
-  update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow> {
+  update(set: Record<string, unknown>): UpdateQuery<QC, AvailableScope, EmptyRow, Registry> {
     return new UpdateQueryImpl(this.#tableName, this.#table, this.#scope, set, this.ctx);
   }
 
-  delete(): DeleteQuery<QC, AvailableScope, EmptyRow> {
+  delete(): DeleteQuery<QC, AvailableScope, EmptyRow, Registry> {
     return new DeleteQueryImpl(this.#tableName, this.#scope, this.ctx);
   }
 
-  #toJoined(): JoinedTables<QC, AvailableScope> {
+  #toJoined(): JoinedTables<QC, AvailableScope, Registry> {
     return new JoinedTablesImpl(emptyState(this.#fromSource, this.#scope), this.ctx);
   }
 }

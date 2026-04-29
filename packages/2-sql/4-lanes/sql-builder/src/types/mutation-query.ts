@@ -1,7 +1,7 @@
 import type {
+  AnnotationBuilder,
   AnnotationValue,
   OperationKind,
-  ValidAnnotations,
 } from '@prisma-next/framework-components/runtime';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
@@ -34,24 +34,34 @@ export interface InsertQuery<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
+  Registry = {},
 > {
   /**
-   * Attach one or more write-typed user annotations to this query plan.
-   * Annotations declare `applicableTo: ['write']` (or `['read', 'write']`)
-   * via `defineAnnotation`; read-only annotations fail to compile here.
-   * Annotations are merged into `plan.meta.annotations` at `.build()` time.
-   * Chainable in any position; multiple calls compose with last-write-wins
-   * on duplicate namespaces.
+   * Attach user annotations via a registry-driven callback.
+   *
+   * The callback receives `meta: AnnotationBuilder<'write', Registry>`
+   * with one method per write-applicable annotation handle contributed
+   * by the runtime's middleware. Read-only handles are filtered out of
+   * `meta` structurally; the runtime gate (`assertAnnotationsApplicable`)
+   * catches cast-bypass. Multiple `.annotate(...)` calls compose;
+   * duplicate namespaces use last-write-wins.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): InsertQuery<QC, AvailableScope, RowType>;
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): InsertQuery<QC, AvailableScope, RowType, Registry>;
   returning: GatedMethod<
     QC['capabilities'],
     ReturningCapability,
     <Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
       ...columns: Columns
-    ) => InsertQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
+    ) => InsertQuery<
+      QC,
+      AvailableScope,
+      WithFields<EmptyRow, AvailableScope['topLevel'], Columns>,
+      Registry
+    >
   >;
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }
@@ -60,21 +70,31 @@ export interface UpdateQuery<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
+  Registry = {},
 > {
   /**
-   * Attach one or more write-typed user annotations to this query plan.
+   * Attach user annotations via a registry-driven callback.
    * See `InsertQuery.annotate` for semantics.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): UpdateQuery<QC, AvailableScope, RowType>;
-  where(expr: ExpressionBuilder<AvailableScope, QC>): UpdateQuery<QC, AvailableScope, RowType>;
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): UpdateQuery<QC, AvailableScope, RowType, Registry>;
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC>,
+  ): UpdateQuery<QC, AvailableScope, RowType, Registry>;
   returning: GatedMethod<
     QC['capabilities'],
     ReturningCapability,
     <Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
       ...columns: Columns
-    ) => UpdateQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
+    ) => UpdateQuery<
+      QC,
+      AvailableScope,
+      WithFields<EmptyRow, AvailableScope['topLevel'], Columns>,
+      Registry
+    >
   >;
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }
@@ -83,21 +103,31 @@ export interface DeleteQuery<
   QC extends QueryContext,
   AvailableScope extends Scope,
   RowType extends Record<string, ScopeField>,
+  Registry = {},
 > {
   /**
-   * Attach one or more write-typed user annotations to this query plan.
+   * Attach user annotations via a registry-driven callback.
    * See `InsertQuery.annotate` for semantics.
    */
-  annotate<As extends readonly AnnotationValue<unknown, OperationKind>[]>(
-    ...annotations: As & ValidAnnotations<'write', As>
-  ): DeleteQuery<QC, AvailableScope, RowType>;
-  where(expr: ExpressionBuilder<AvailableScope, QC>): DeleteQuery<QC, AvailableScope, RowType>;
+  annotate(
+    fn: (
+      meta: AnnotationBuilder<'write', Registry>,
+    ) => AnnotationBuilder<'write', Registry> | readonly AnnotationValue<unknown, OperationKind>[],
+  ): DeleteQuery<QC, AvailableScope, RowType, Registry>;
+  where(
+    expr: ExpressionBuilder<AvailableScope, QC>,
+  ): DeleteQuery<QC, AvailableScope, RowType, Registry>;
   returning: GatedMethod<
     QC['capabilities'],
     ReturningCapability,
     <Columns extends (keyof AvailableScope['topLevel'] & string)[]>(
       ...columns: Columns
-    ) => DeleteQuery<QC, AvailableScope, WithFields<EmptyRow, AvailableScope['topLevel'], Columns>>
+    ) => DeleteQuery<
+      QC,
+      AvailableScope,
+      WithFields<EmptyRow, AvailableScope['topLevel'], Columns>,
+      Registry
+    >
   >;
   build(): SqlQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>;
 }

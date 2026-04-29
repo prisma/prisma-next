@@ -22,7 +22,22 @@ export interface SqlOptions<C extends Contract<SqlStorage>> {
   readonly annotationRegistry?: AnnotationRegistry;
 }
 
-export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<C> {
+/**
+ * Constructs the typed `db.sql` surface from an `ExecutionContext` and
+ * (optionally) a runtime-built `AnnotationRegistry`.
+ *
+ * `Registry` is a phantom type parameter the caller supplies so the
+ * lane terminals' `.annotate(callback)` callback receives a structurally-
+ * typed `AnnotationBuilder<K, Registry>`. The `Registry` value is not
+ * inferred from `options.annotationRegistry` (the runtime registry is
+ * an opaque container of `AnyAnnotationHandle`); callers project the
+ * Registry shape explicitly via the type parameter, typically through
+ * `postgres()` which captures the middleware tuple via `const Mw` and
+ * passes `AnnotationsOf<Mw>` here.
+ */
+export function sql<C extends Contract<SqlStorage>, Registry = {}>(
+  options: SqlOptions<C>,
+): Db<C, Registry> {
   const { context } = options;
   const ctx: BuilderContext = {
     capabilities: context.contract.capabilities,
@@ -33,7 +48,7 @@ export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<
     annotationRegistry: options.annotationRegistry ?? createAnnotationRegistry(),
   };
 
-  return new Proxy({} as Db<C>, {
+  return new Proxy({} as Db<C, Registry>, {
     get(_target, prop: string) {
       const tables = context.contract.storage.tables;
       const table = Object.hasOwn(tables, prop) ? tables[prop] : undefined;
