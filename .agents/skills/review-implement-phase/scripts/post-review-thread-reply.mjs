@@ -109,7 +109,7 @@ function assertCommandAvailable(command, installHint) {
   }
 }
 
-function parseGraphQLResponse(jsonText, contextDescription) {
+function parseApiResponse(jsonText, contextDescription) {
   let parsed;
   try {
     parsed = JSON.parse(jsonText);
@@ -136,7 +136,7 @@ function resolveTargetNode(commentNodeId) {
     '}',
   ].join('\n');
   const response = run('gh', ['api', 'graphql', '-f', `query=${query}`, '-F', `id=${commentNodeId}`]);
-  const parsed = parseGraphQLResponse(response, 'GraphQL node lookup response');
+  const parsed = parseApiResponse(response, 'GraphQL node lookup response');
   const node = parsed?.data?.node;
   if (!node || typeof node !== 'object') {
     throw new Error(`error: GraphQL node lookup returned no node for id ${commentNodeId}`);
@@ -177,7 +177,7 @@ function postInlineReply(repo, prNumber, body, inReplyToDatabaseId) {
     '-F',
     `in_reply_to=${inReplyToDatabaseId}`,
   ]);
-  const parsed = parseGraphQLResponse(response, 'inline-reply REST response');
+  const parsed = parseApiResponse(response, 'inline-reply REST response');
   if (typeof parsed?.id !== 'number') {
     throw new Error('error: reply was posted but response did not include a numeric comment id');
   }
@@ -193,7 +193,7 @@ function postIssueComment(repo, prNumber, body) {
     '-f',
     `body=${body}`,
   ]);
-  const parsed = parseGraphQLResponse(response, 'issue-comment REST response');
+  const parsed = parseApiResponse(response, 'issue-comment REST response');
   if (typeof parsed?.id !== 'number') {
     throw new Error('error: top-level PR comment was posted but response did not include a numeric comment id');
   }
