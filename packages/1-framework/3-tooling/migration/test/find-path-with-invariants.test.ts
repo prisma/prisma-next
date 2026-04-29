@@ -199,14 +199,12 @@ describe('findPathWithInvariants — core correctness', () => {
     expect(dirNames(path)).toEqual(['m_AD_y', 'm_DE', 'm_EF']);
   });
 
-  it('state-key uses a separator that prevents node-vs-mask collisions', () => {
-    // Regression: under a separator-less stateKey scheme `${node}${mask}`,
-    //   node='H', mask=11   → key 'H11'
-    //   node='H1', mask=1   → key 'H11'
-    // collide. This test sets up a graph where the satisfying path runs
-    // through (H, mask=11) but BFS visits (H1, mask=1) earlier — without a
-    // separator, the H arrival would be dedup-discarded and the function
-    // would return null.
+  it('distinguishes (node, mask) states even when node and mask digits could concatenate ambiguously', () => {
+    // Two distinct states whose node names and mask digits could form the
+    // same string under naïve concatenation: (node='H', mask=11) and
+    // (node='H1', mask=1) would both yield "H11". BFS visits (H1, 1)
+    // before (H, 11); only the path through (H, 11) covers the required
+    // set, so the dedup key must distinguish the two states.
     //
     // Required: {a, b, c, d, e} (k=5). Layout:
     //   start → A   provides {a}        (mask 1 at A)

@@ -146,26 +146,19 @@ export function findPath(
  * Find the shortest path from `fromHash` to `toHash` whose edges collectively
  * cover every invariant in `required`. Returns `null` when no such path exists
  * (either `fromHash`→`toHash` is structurally unreachable, or every reachable
- * path leaves at least one required invariant uncovered).
+ * path leaves at least one required invariant uncovered). When `required` is
+ * empty, delegates to `findPath` so the result is byte-identical for that case.
  *
- * When `required` is empty we delegate to `findPath` so existing callers see
- * byte-identical behaviour (F8). The plan permits either delegating or
- * reimplementing `findPath` atop this primitive — delegation keeps the F8
- * guarantee trivial to reason about.
- *
- * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup,
- * implemented as the generic `bfs` generator in graph-ops.ts with a
- * composite-state overload. The covered subset is encoded as a 30-bit
- * unsigned mask over a sorted enumeration of `required` — fast for the
- * typical small-k case and capped at entry to fail loudly past 30 rather
- * than silently misbehave from JS's signed 32-bit bitwise ops.
+ * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup.
+ * The covered subset is encoded as a 30-bit unsigned mask over a sorted
+ * enumeration of `required` — fast for the typical small-k case and capped
+ * at entry to fail loudly past 30 rather than silently misbehave from JS's
+ * signed 32-bit bitwise ops.
  *
  * Neighbour ordering when `required ≠ ∅`: edges covering ≥1 still-needed
- * invariant come first, with `labelPriority → createdAt → to →
- * migrationHash` as the secondary key. Done inside the neighbours closure
- * where the source state — and therefore the still-needed mask — is in
- * scope. The heuristic steers BFS toward the satisfying path; correctness
- * (shortest, deterministic) does not depend on it.
+ * invariant come first, with `labelPriority → createdAt → to → migrationHash`
+ * as the secondary key. The heuristic steers BFS toward the satisfying path;
+ * correctness (shortest, deterministic) does not depend on it.
  */
 export function findPathWithInvariants(
   graph: MigrationGraph,
@@ -214,9 +207,8 @@ export function findPathWithInvariants(
   const stateKey = (s: InvState) => `${s.node}\0${s.mask}`;
 
   // Cache edgeMaskOf per edge — outgoing edges are visited many times during
-  // BFS and each visit also calls the comparator, so naive recomputation is
-  // O(k) per edge per visit. Map (not WeakMap) — the cache is per call and
-  // dies on function exit, so WeakMap's GC asymmetry buys nothing.
+  // BFS and the comparator calls edgeMaskOf each time, so naive recomputation
+  // is O(k) per edge per visit.
   const edgeMaskCache = new Map<MigrationEdge, number>();
   const memoEdgeMask = (edge: MigrationEdge): number => {
     const cached = edgeMaskCache.get(edge);

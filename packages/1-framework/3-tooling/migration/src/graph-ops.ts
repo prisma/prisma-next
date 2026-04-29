@@ -7,11 +7,10 @@ import { Queue } from './queue';
  * reached via any edge. For every other state they record the predecessor
  * state and the edge by which this state was first reached.
  *
- * `state` is the BFS state, which is most often the graph node identifier
- * (a string) but can be a composite object — e.g. `(node, coveredSubset)`
- * for invariant-aware path-finding. The string overload keeps the common
- * case ergonomic; the generic overload accepts a caller-supplied `key`
- * function that produces a stable equality key for dedup.
+ * `state` is the BFS state, most often a string (graph node identifier) but
+ * can be a composite object. The string overload keeps the common case
+ * ergonomic; the generic overload accepts a caller-supplied `key` function
+ * that produces a stable equality key for dedup.
  */
 export interface BfsStep<S, E> {
   readonly state: S;
