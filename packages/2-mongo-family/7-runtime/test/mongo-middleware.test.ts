@@ -293,12 +293,12 @@ describe('MongoRuntime middleware lifecycle', () => {
     expect(logWorks).toBe(true);
   });
 
-  it('exposes a working identityKey on the middleware context', async () => {
+  it('exposes a working contentHash on the middleware context', async () => {
     const observedKeys: string[] = [];
     const middleware: MongoMiddleware = {
-      name: 'identity-key-tester',
+      name: 'content-hash-tester',
       async beforeExecute(plan, ctx) {
-        observedKeys.push(ctx.identityKey(plan));
+        observedKeys.push(ctx.contentHash(plan));
       },
     };
 

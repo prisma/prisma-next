@@ -330,7 +330,7 @@ describe(
         expect(noRewrite.map((r) => r['id']).sort()).toEqual([1, 2, 3, 4]);
 
         // Second runtime (with rewriter) sees a *different* lowered SQL
-        // and therefore a different identityKey — it must miss and
+        // and therefore a different contentHash — it must miss and
         // hit the driver again.
         const withRewrite = await runtimeWithRewrite.execute(buildPlan()).toArray();
         expect(driverExecuteSpy.mock.calls.length).toBeGreaterThan(callsAfterNoRewrite);

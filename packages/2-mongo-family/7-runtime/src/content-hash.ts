@@ -3,7 +3,12 @@ import { hashIdentity } from '@prisma-next/utils/hash-identity';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 
 /**
- * Computes a stable identity key for a lowered Mongo execution plan.
+ * Computes a stable content hash for a lowered Mongo execution plan.
+ *
+ * The hash captures the post-lowering execution **content** (the wire
+ * command, scoped by storage hash). It is not a logical or rewrite-
+ * stable identity: a `beforeCompile` middleware that mutates the plan
+ * changes the command and therefore the hash.
  *
  * Internally composes two components separated by `|`:
  *
@@ -36,6 +41,6 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  *
  * @internal
  */
-export function computeMongoIdentityKey(exec: MongoExecutionPlan): string {
+export function computeMongoContentHash(exec: MongoExecutionPlan): string {
   return hashIdentity(`${exec.meta.storageHash}|${canonicalStringify(exec.command)}`);
 }

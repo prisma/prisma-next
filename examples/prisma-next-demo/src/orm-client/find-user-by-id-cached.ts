@@ -10,7 +10,7 @@
  * the second time.
  *
  * The cache key is composed by the runtime via
- * `RuntimeMiddlewareContext.identityKey(exec)`, which incorporates the
+ * `RuntimeMiddlewareContext.contentHash(exec)`, which incorporates the
  * post-lowering SQL plus parameters. Two lookups for different `id`
  * values therefore land in different cache slots; the same `id` hits.
  *
@@ -24,7 +24,7 @@
  *   `source: 'middleware'`. Telemetry is wired in front of the cache
  *   in `db.ts`, so observability still works for cached reads.
  * - Schema migrations rotate `meta.storageHash`, which feeds
- *   `identityKey`, so cached entries from a previous schema cannot
+ *   `contentHash`, so cached entries from a previous schema cannot
  *   accidentally serve queries against the new schema.
  */
 

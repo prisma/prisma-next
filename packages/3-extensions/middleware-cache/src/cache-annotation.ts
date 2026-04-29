@@ -12,7 +12,7 @@ import { defineAnnotation } from '@prisma-next/framework-components/runtime';
  *   the cache on a per-call basis without removing the annotation
  *   entirely (e.g. a "force refresh" knob in user code).
  * - `key` — Per-query override of the cache key. When supplied, replaces
- *   the default `RuntimeMiddlewareContext.identityKey(exec)` digest.
+ *   the default `RuntimeMiddlewareContext.contentHash(exec)` digest.
  *   The supplied string is stored as-is — the cache middleware does
  *   **not** rehash it, so the caller is responsible for ensuring the
  *   string is bounded in size and free of sensitive data they do not

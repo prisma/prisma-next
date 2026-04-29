@@ -4,20 +4,20 @@ A family-agnostic, opt-in caching middleware for Prisma Next runtimes.
 
 Built on the `intercept` hook on `RuntimeMiddleware` (added in TML-2143 M1): on a cache hit, the middleware short-circuits execution and returns the cached rows; the driver is never invoked. On a cache miss, the middleware buffers rows from the driver and commits them to the store on successful completion.
 
-The package depends only on `@prisma-next/framework-components/runtime` — no SQL or Mongo runtime dependency. Cache keys come from `RuntimeMiddlewareContext.identityKey(exec)`, which the family runtime populates, so SQL and Mongo runtimes both work out of the box.
+The package depends only on `@prisma-next/framework-components/runtime` — no SQL or Mongo runtime dependency. Cache keys come from `RuntimeMiddlewareContext.contentHash(exec)`, which the family runtime populates, so SQL and Mongo runtimes both work out of the box.
 
 ## Responsibilities
 
 - Provide an opt-in caching `RuntimeMiddleware` that short-circuits repeated reads via the `intercept` hook.
 - Define the `cacheAnnotation` handle (read-only) that lane terminals (SQL DSL `.annotate(...)`, ORM read terminals) use to attach per-query cache parameters (`ttl`, `skip`, `key`).
-- Resolve the cache key per execution: per-query `cacheAnnotation.apply({ key })` override, otherwise `RuntimeMiddlewareContext.identityKey(exec)` from the family runtime.
+- Resolve the cache key per execution: per-query `cacheAnnotation.apply({ key })` override, otherwise `RuntimeMiddlewareContext.contentHash(exec)` from the family runtime.
 - Buffer driver rows on a miss and commit to the `CacheStore` only on successful completion (`completed: true && source: 'driver'`).
 - Bypass the cache when `RuntimeMiddlewareContext.scope` is `'connection'` or `'transaction'`.
 - Ship a default in-memory LRU-with-TTL `CacheStore` and expose the `CacheStore` interface for pluggable backends (Redis, Memcached, etc.).
 
 ## Dependencies
 
-- `@prisma-next/framework-components/runtime` — the only production dependency. Provides `RuntimeMiddleware`, `RuntimeMiddlewareContext` (with `identityKey` and `scope`), `defineAnnotation`, `AfterExecuteResult`, and the orchestrator integration via `runWithMiddleware`.
+- `@prisma-next/framework-components/runtime` — the only production dependency. Provides `RuntimeMiddleware`, `RuntimeMiddlewareContext` (with `contentHash` and `scope`), `defineAnnotation`, `AfterExecuteResult`, and the orchestrator integration via `runWithMiddleware`.
 
 The package does **not** depend on `@prisma-next/sql-runtime`, `@prisma-next/mongo-runtime`, or any target adapter. It does not import `node:crypto` — hashing the canonical execution identity is the family runtime's responsibility (via `@prisma-next/utils/hash-identity` in the SQL and Mongo runtimes today).
 
@@ -90,12 +90,12 @@ const plan = db.sql
 Two-tier resolution:
 
 1. **Per-query override.** `cacheAnnotation.apply({ key })` — the supplied string is used verbatim. The cache middleware does **not** rehash user-supplied keys; the caller is responsible for keeping the string bounded in size and free of sensitive data they do not want flowing into debug logs, Redis `KEYS` output, persistence dumps, or any user-supplied `CacheStore`.
-2. **Default.** `RuntimeMiddlewareContext.identityKey(exec)` — the family runtime owns this. The SQL and Mongo runtimes today compose `meta.storageHash + '|' + …` and pipe the result through `hashIdentity` (BLAKE2b-512), producing a bounded, opaque digest of the form `blake2b512:HEXDIGEST`. The cache middleware uses the returned string directly as the `Map<string, …>` key.
+2. **Default.** `RuntimeMiddlewareContext.contentHash(exec)` — the family runtime owns this. The SQL and Mongo runtimes today compose `meta.storageHash + '|' + …` and pipe the result through `hashIdentity` (BLAKE2b-512), producing a bounded, opaque digest of the form `blake2b512:HEXDIGEST`. The cache middleware uses the returned string directly as the `Map<string, …>` key.
 
 Two consequences worth pinning:
 
-- **Storage-hash discrimination.** A schema migration changes `meta.storageHash`, which changes `identityKey`, which invalidates cached entries automatically. Stale-schema reads cannot leak across migrations.
-- **AST rewrites are part of the key.** Middleware that rewrite the plan via `beforeCompile` (e.g. soft-delete) run **upstream** of the cache. The cache sees the post-lowering plan, so the rewritten SQL is part of the identity key. Adding or removing a `beforeCompile` middleware changes which entries hit.
+- **Storage-hash discrimination.** A schema migration changes `meta.storageHash`, which changes `contentHash`, which invalidates cached entries automatically. Stale-schema reads cannot leak across migrations.
+- **AST rewrites are part of the key.** Middleware that rewrite the plan via `beforeCompile` (e.g. soft-delete) run **upstream** of the cache. The cache sees the post-lowering plan, so the rewritten SQL is part of the content hash. Adding or removing a `beforeCompile` middleware changes which entries hit.
 
 ## `CacheStore` pluggability
 

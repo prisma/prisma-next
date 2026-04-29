@@ -24,7 +24,7 @@ test('MongoMiddlewareContext extends RuntimeMiddlewareContext', () => {
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('mode');
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('log');
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('now');
-  expectTypeOf<MongoMiddlewareContext>().toHaveProperty('identityKey');
+  expectTypeOf<MongoMiddlewareContext>().toHaveProperty('contentHash');
   expectTypeOf<MongoMiddlewareContext>().toHaveProperty('scope');
   expectTypeOf<MongoMiddlewareContext['scope']>().toEqualTypeOf<
     'runtime' | 'connection' | 'transaction'

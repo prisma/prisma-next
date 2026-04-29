@@ -15,10 +15,16 @@ export interface RuntimeMiddlewareContext {
   readonly now: () => number;
   readonly log: RuntimeLog;
   /**
-   * Returns a stable string identifying the (storage, statement, params)
-   * tuple of an execution. Two semantically equivalent executions return
-   * the same string. Used by middleware that need per-execution identity
-   * (caching, request coalescing).
+   * Returns a stable, opaque digest of the (storage, statement, params)
+   * tuple of an execution — i.e. a content hash of the execution as it
+   * is about to be sent to the driver. Two semantically equivalent
+   * executions return the same string. Used by middleware that need
+   * per-execution content identity (caching, request coalescing).
+   *
+   * The hash reflects the post-lowering execution **content**, not a
+   * stable logical identity: a `beforeCompile` rewriter that mutates the
+   * plan changes the content and therefore the hash. Callers that want
+   * a rewrite-stable identity must derive it themselves.
    *
    * The family runtime owns the implementation:
    * - SQL: `meta.storageHash` + `exec.sql` + `canonicalStringify(exec.params)`
@@ -27,7 +33,7 @@ export interface RuntimeMiddlewareContext {
    * The returned string is intended to be consumed directly as a `Map` key
    * — it is not (and should not be) further hashed by callers.
    */
-  identityKey(exec: ExecutionPlan): string;
+  contentHash(exec: ExecutionPlan): string;
   /**
    * Identifies the queryable scope this execution is running under.
    *

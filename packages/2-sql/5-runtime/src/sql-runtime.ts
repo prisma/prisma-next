@@ -29,7 +29,7 @@ import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { computeSqlFingerprint } from './fingerprint';
-import { computeSqlIdentityKey } from './identity-key';
+import { computeSqlContentHash } from './content-hash';
 import { lowerSqlPlan } from './lower-sql-plan';
 import { runBeforeCompileChain } from './middleware/before-compile-chain';
 import type { SqlMiddleware, SqlMiddlewareContext } from './middleware/sql-middleware';
@@ -161,7 +161,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         warn: () => {},
         error: () => {},
       },
-      identityKey: (exec) => computeSqlIdentityKey(exec as SqlExecutionPlan),
+      contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
       scope: 'runtime',
     };
 

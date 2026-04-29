@@ -3,17 +3,22 @@ import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
 import { hashIdentity } from '@prisma-next/utils/hash-identity';
 
 /**
- * Computes a stable identity key for a lowered SQL execution plan.
+ * Computes a stable content hash for a lowered SQL execution plan.
+ *
+ * The hash captures the post-lowering execution **content** (the SQL plus
+ * its bound parameters, scoped by storage hash). It is not a logical or
+ * rewrite-stable identity: a `beforeCompile` middleware that mutates the
+ * plan changes the SQL and therefore the hash.
  *
  * Internally composes three components separated by `|`:
  *
  * 1. `meta.storageHash` — discriminates by schema. A migration changes the
  *    storage hash, which invalidates cached entries automatically.
  * 2. `exec.sql` — the raw lowered SQL text. Two queries with different
- *    structure produce different keys. Note that we deliberately do **not**
- *    use `computeSqlFingerprint` here: that helper strips literals to group
- *    executions by statement shape (used by telemetry), which is the
- *    opposite of what an identity key needs — we want per-execution
+ *    structure produce different hashes. Note that we deliberately do
+ *    **not** use `computeSqlFingerprint` here: that helper strips literals
+ *    to group executions by statement shape (used by telemetry), which is
+ *    the opposite of what a content hash needs — we want per-execution
  *    discrimination, not per-statement-shape grouping.
  * 3. `canonicalStringify(exec.params)` — a deterministic serialization of
  *    the bound parameters that is stable across object key insertion order
@@ -36,6 +41,6 @@ import { hashIdentity } from '@prisma-next/utils/hash-identity';
  *
  * @internal
  */
-export function computeSqlIdentityKey(exec: SqlExecutionPlan): string {
+export function computeSqlContentHash(exec: SqlExecutionPlan): string {
   return hashIdentity(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
 }

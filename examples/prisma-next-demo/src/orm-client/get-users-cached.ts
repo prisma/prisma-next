@@ -14,7 +14,7 @@
  * equivalent (e.g. the same user list rendered through two different
  * `select` shapes), but the trade-off is that you take responsibility
  * for keeping the key bounded and free of sensitive data — the
- * default `identityKey(exec)` digest is a BLAKE2b-512 hash with no
+ * default `contentHash(exec)` digest is a BLAKE2b-512 hash with no
  * such risks.
  */
 
@@ -26,7 +26,7 @@ export interface CachedListOptions {
   readonly ttlMs?: number;
   /**
    * Optional override for the cache key. When omitted, the runtime's
-   * `identityKey(exec)` is used (the default and recommended path).
+   * `contentHash(exec)` is used (the default and recommended path).
    */
   readonly key?: string;
 }

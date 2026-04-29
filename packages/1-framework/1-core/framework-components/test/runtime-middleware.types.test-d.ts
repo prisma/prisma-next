@@ -147,14 +147,14 @@ test('RuntimeMiddleware narrowed to a SQL plan sees the SQL fields', () => {
   void middleware;
 });
 
-test('RuntimeMiddlewareContext has contract, mode, log, now, identityKey, scope', () => {
+test('RuntimeMiddlewareContext has contract, mode, log, now, contentHash, scope', () => {
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('contract');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('mode');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('log');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('now');
-  expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('identityKey');
-  expectTypeOf<RuntimeMiddlewareContext['identityKey']>().toBeFunction();
-  expectTypeOf<RuntimeMiddlewareContext['identityKey']>().returns.toBeString();
+  expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('contentHash');
+  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().toBeFunction();
+  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().returns.toBeString();
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('scope');
   expectTypeOf<RuntimeMiddlewareContext['scope']>().toEqualTypeOf<
     'runtime' | 'connection' | 'transaction'

@@ -34,7 +34,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     mode: 'strict',
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
-    identityKey: (exec) => `key:${(exec as MockExec).statement}`,
+    contentHash: (exec) => `key:${(exec as MockExec).statement}`,
     scope: 'runtime',
     ...overrides,
   };

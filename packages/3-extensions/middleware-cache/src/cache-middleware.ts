@@ -75,7 +75,7 @@ function readCachePayload(plan: ExecutionPlan): CachePayload | undefined {
  * 1. Per-query override: `cacheAnnotation.apply({ key })` — the supplied
  *    string is used verbatim. Not rehashed; the user is responsible for
  *    keeping the string bounded and free of sensitive data.
- * 2. Default: `ctx.identityKey(exec)` — the family runtime owns this and
+ * 2. Default: `ctx.contentHash(exec)` — the family runtime owns this and
  *    returns an opaque, bounded digest (BLAKE2b-512 in the SQL and Mongo
  *    runtimes today).
  *
@@ -91,7 +91,7 @@ function resolveCacheKey(
   if (payload.key !== undefined) {
     return payload.key;
   }
-  return ctx.identityKey(exec);
+  return ctx.contentHash(exec);
 }
 
 /**
@@ -123,7 +123,7 @@ function resolveCacheKey(
  * Returns a cross-family `RuntimeMiddleware` (no `familyId` /
  * `targetId`). The package depends only on
  * `@prisma-next/framework-components/runtime`; cache keys come from
- * `ctx.identityKey(exec)`, populated by the family runtime, so SQL and
+ * `ctx.contentHash(exec)`, populated by the family runtime, so SQL and
  * Mongo runtimes both work out of the box.
  *
  * @example

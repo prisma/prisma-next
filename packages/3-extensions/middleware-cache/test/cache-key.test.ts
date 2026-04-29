@@ -33,7 +33,7 @@ function makeCtx(overrides?: Partial<RuntimeMiddlewareContext>): RuntimeMiddlewa
     mode: 'strict',
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {}, debug: () => {} },
-    identityKey: (exec) => `id:${(exec as MockExec).statement}`,
+    contentHash: (exec) => `id:${(exec as MockExec).statement}`,
     scope: 'runtime',
     ...overrides,
   };
@@ -59,8 +59,8 @@ async function drain<T>(iter: AsyncIterable<T>): Promise<T[]> {
 }
 
 describe('cache key resolution', () => {
-  describe('default path: ctx.identityKey(exec)', () => {
-    it('uses the identityKey return value as the cache map key (no rehashing)', async () => {
+  describe('default path: ctx.contentHash(exec)', () => {
+    it('uses the contentHash return value as the cache map key (no rehashing)', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
@@ -68,7 +68,7 @@ describe('cache key resolution', () => {
       });
       const ctx = makeCtx();
 
-      // Miss → store.get and store.set both called with the identityKey.
+      // Miss → store.get and store.set both called with the contentHash.
       await mw.intercept!(exec, ctx);
       await mw.onRow!({ id: 1 }, exec, ctx);
       await mw.afterExecute!(
@@ -81,23 +81,23 @@ describe('cache key resolution', () => {
       expect(store.setSpy).toHaveBeenCalledWith('id:select 1', expect.anything(), 60_000);
     });
 
-    it('invokes ctx.identityKey when no per-query key annotation is supplied', async () => {
+    it('invokes ctx.contentHash when no per-query key annotation is supplied', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
         cache: cacheAnnotation.apply({ ttl: 60_000 }),
       });
-      const identityKey = vi.fn((e: ExecutionPlan) => `derived:${(e as MockExec).statement}`);
-      const ctx = makeCtx({ identityKey });
+      const contentHash = vi.fn((e: ExecutionPlan) => `derived:${(e as MockExec).statement}`);
+      const ctx = makeCtx({ contentHash });
 
       await mw.intercept!(exec, ctx);
 
-      expect(identityKey).toHaveBeenCalledTimes(1);
-      expect(identityKey).toHaveBeenCalledWith(exec);
+      expect(contentHash).toHaveBeenCalledTimes(1);
+      expect(contentHash).toHaveBeenCalledWith(exec);
       expect(store.getSpy).toHaveBeenCalledWith('derived:select 1');
     });
 
-    it('produces distinct cache entries for two execs with distinct identityKey returns', async () => {
+    it('produces distinct cache entries for two execs with distinct contentHash returns', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store, clock: () => 0 });
       const execA = makeExec('A', {
@@ -133,7 +133,7 @@ describe('cache key resolution', () => {
   });
 
   describe('per-query override: cacheAnnotation.apply({ key })', () => {
-    it('uses the user-supplied key in place of ctx.identityKey', async () => {
+    it('uses the user-supplied key in place of ctx.contentHash', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
@@ -153,18 +153,18 @@ describe('cache key resolution', () => {
       expect(store.setSpy).toHaveBeenCalledWith('custom-key', expect.anything(), 60_000);
     });
 
-    it('does not invoke ctx.identityKey when an override key is supplied', async () => {
+    it('does not invoke ctx.contentHash when an override key is supplied', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store });
       const exec = makeExec('select 1', {
         cache: cacheAnnotation.apply({ ttl: 60_000, key: 'custom-key' }),
       });
-      const identityKey = vi.fn(() => 'should-not-be-used');
-      const ctx = makeCtx({ identityKey });
+      const contentHash = vi.fn(() => 'should-not-be-used');
+      const ctx = makeCtx({ contentHash });
 
       await mw.intercept!(exec, ctx);
 
-      expect(identityKey).not.toHaveBeenCalled();
+      expect(contentHash).not.toHaveBeenCalled();
     });
 
     it('stores user-supplied keys verbatim (no rehashing)', async () => {
@@ -211,10 +211,10 @@ describe('cache key resolution', () => {
   });
 
   describe('cross-family parity', () => {
-    it('works with a Mongo-style identityKey return value (no SQL fields read)', async () => {
+    it('works with a Mongo-style contentHash return value (no SQL fields read)', async () => {
       // The cache middleware must not read exec.sql, exec.command, or any
       // family-specific field. Use a "Mongo-shaped" mock plan and a
-      // Mongo-style identityKey to demonstrate the package is genuinely
+      // Mongo-style contentHash to demonstrate the package is genuinely
       // family-agnostic.
       interface MongoLikeExec extends ExecutionPlan {
         readonly command: { readonly kind: string; readonly filter: unknown };
@@ -236,7 +236,7 @@ describe('cache key resolution', () => {
       });
 
       const ctx = makeCtx({
-        identityKey: () => 'mongo:users:find:{active:true}',
+        contentHash: () => 'mongo:users:find:{active:true}',
       });
 
       // Miss + commit.
@@ -257,19 +257,19 @@ describe('cache key resolution', () => {
       expect(store.inner.has('mongo:users:find:{active:true}')).toBe(true);
     });
 
-    it('two distinct identityKey returns produce two distinct cache entries', async () => {
+    it('two distinct contentHash returns produce two distinct cache entries', async () => {
       const store = spyStore();
       const mw = createCacheMiddleware({ store, clock: () => 0 });
       const exec = makeExec('shared statement', {
         cache: cacheAnnotation.apply({ ttl: 60_000 }),
       });
 
-      // Same exec object but two different ctx.identityKey returns —
+      // Same exec object but two different ctx.contentHash returns —
       // simulating two calls where the family runtime computed different
       // canonical keys (e.g. a parameter changed but the AST/command is
       // structurally identical at this view).
-      const ctxA = makeCtx({ identityKey: () => 'key-A' });
-      const ctxB = makeCtx({ identityKey: () => 'key-B' });
+      const ctxA = makeCtx({ contentHash: () => 'key-A' });
+      const ctxB = makeCtx({ contentHash: () => 'key-B' });
 
       // Commit under key-A.
       await mw.intercept!(exec, ctxA);
