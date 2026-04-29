@@ -338,14 +338,6 @@ describe('runBeforeCompileChain', () => {
     timeouts.default,
   );
 
-  // End-to-end check that the AST is the only channel carrying codec info.
-  // The middleware here renames the projection alias from `id` to `user_id`
-  // while keeping the same `codecId` on the rewritten ProjectionItem. The
-  // test then runs the real `decodeRow` against a wire row keyed by the
-  // *new* alias and asserts the registered codec fired (decode adds 100, so
-  // wire 7 → decoded 107). If the decoder still looked up codecs by the
-  // original alias on a sidecar, the assertion would fail because no codec
-  // would resolve under `user_id`.
   it(
     'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
     async () => {
