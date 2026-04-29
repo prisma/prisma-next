@@ -6,6 +6,22 @@ export interface RuntimeErrorEnvelope extends Error {
 }
 
 /**
+ * Stable code emitted by the runtime when an in-flight `execute()`
+ * is cancelled via the per-query `AbortSignal`. The envelope's
+ * `details.phase` distinguishes where the abort was observed:
+ *
+ * - `'encode'` — abort fired during `encodeParams` (SQL) or
+ *   `resolveValue` (Mongo).
+ * - `'decode'` — abort fired during `decodeRow` / `decodeField`.
+ * - `'stream'` — abort fired between rows or before any codec call
+ *   (already-aborted at entry).
+ */
+export const RUNTIME_ABORTED = 'RUNTIME.ABORTED' as const;
+
+/** Discriminator placed in `details.phase` of a `RUNTIME.ABORTED` envelope. */
+export type RuntimeAbortedPhase = 'encode' | 'decode' | 'stream';
+
+/**
  * Type guard for the runtime-error envelope produced by `runtimeError`.
  *
  * Prefer this over duck-typing on `error.code` directly so consumers stay
@@ -52,4 +68,16 @@ function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
     default:
       return 'RUNTIME';
   }
+}
+
+/**
+ * Construct a `RUNTIME.ABORTED` envelope. Phase distinguishes where the
+ * abort was observed (encode / decode / stream); cause carries the native
+ * abort reason (typically `signal.reason`) — when undefined we synthesize
+ * an `AbortError` `DOMException` so the envelope always exposes a cause.
+ */
+export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown): RuntimeErrorEnvelope {
+  const resolvedCause = cause ?? new DOMException('The operation was aborted.', 'AbortError');
+  const envelope = runtimeError(RUNTIME_ABORTED, `Operation aborted during ${phase}`, { phase });
+  return Object.assign(envelope, { cause: resolvedCause });
 }
