@@ -18,6 +18,8 @@ const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
 const EXIT_CLI = 2;
 
+const SPAWN_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
+
 const THREADS_QUERY = `
   query($owner: String!, $repo: String!, $number: Int!, $threadsCursor: String) {
     repository(owner: $owner, name: $repo) {
@@ -215,7 +217,14 @@ function runSync(command, args, input) {
   const result = spawnSync(command, args, {
     encoding: 'utf-8',
     input: input ?? undefined,
+    maxBuffer: SPAWN_MAX_BUFFER_BYTES,
   });
+  if (result.error) {
+    const detail = result.error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
+      ? `${command} output exceeded ${SPAWN_MAX_BUFFER_BYTES} bytes; raise SPAWN_MAX_BUFFER_BYTES`
+      : `failed to execute ${command}: ${result.error.message}`;
+    return { stdout: '', stderr: detail, status: result.status ?? 1 };
+  }
   return { stdout: result.stdout, stderr: result.stderr, status: result.status };
 }
 

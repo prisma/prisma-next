@@ -9,7 +9,9 @@ const TARGET_KIND_VALUES = new Set([
 function compareNullableStringsAsc(a, b) {
   const left = a ?? '';
   const right = b ?? '';
-  return left.localeCompare(right);
+  if (left < right) return -1;
+  if (left > right) return 1;
+  return 0;
 }
 
 function compareNullableNumbersAsc(a, b) {
@@ -34,13 +36,21 @@ function normalizeReactionGroups(groups) {
   if (!Array.isArray(groups)) {
     return [];
   }
-  const normalized = groups.map((group) => ({
-    content: String(group?.content ?? ''),
-    users: {
-      totalCount: Number.isFinite(group?.users?.totalCount) ? group.users.totalCount : 0,
-    },
-  }));
-  normalized.sort((a, b) => a.content.localeCompare(b.content));
+  const normalized = groups.map((group) => {
+    const rawTotalCount = group?.users?.totalCount;
+    const totalCount = Number.isFinite(rawTotalCount)
+      ? Math.max(0, Math.trunc(rawTotalCount))
+      : 0;
+    return {
+      content: String(group?.content ?? ''),
+      users: { totalCount },
+    };
+  });
+  normalized.sort((a, b) => {
+    if (a.content < b.content) return -1;
+    if (a.content > b.content) return 1;
+    return 0;
+  });
   return normalized;
 }
 
