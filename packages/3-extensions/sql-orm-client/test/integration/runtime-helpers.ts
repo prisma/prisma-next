@@ -1,4 +1,3 @@
-import { createPostgresAdapter } from '@prisma-next/adapter-postgres/adapter';
 import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
@@ -59,7 +58,6 @@ export async function createPgIntegrationRuntime(
   await pool.query('select 1');
 
   const contract = getTestContract();
-  const adapter = createPostgresAdapter();
 
   const stack = createSqlExecutionStack({
     target: postgresTarget,
@@ -70,6 +68,15 @@ export async function createPgIntegrationRuntime(
 
   const context = createExecutionContext<TestContract>({ contract, stack });
   const stackInstance = instantiateExecutionStack(stack);
+  // Use the stack-composed adapter (carries `pg/vector@1` via the pgvector
+  // extension pack) for both lowering-for-assertion and execution. A bare
+  // `createPostgresAdapter()` here would fail at lower-time on any vector
+  // ParamRef because the renderer now throws when a codecId is absent from
+  // the assembled lookup (see ADR 205).
+  const adapter = stackInstance.adapter;
+  if (!adapter) {
+    throw new Error('Adapter descriptor missing from execution stack');
+  }
 
   const driver = stackInstance.driver;
   if (!driver) {
