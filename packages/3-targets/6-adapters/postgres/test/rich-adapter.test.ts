@@ -1,3 +1,4 @@
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -23,8 +24,8 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
+import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
 const contract = validateContract<PostgresContract>(
   {
@@ -67,7 +68,10 @@ const contract = validateContract<PostgresContract>(
 );
 
 describe('Postgres rich AST lowering', () => {
-  const adapter = createPostgresAdapter();
+  // Compose a stack with pgvector so the renderer's codec lookup contains
+  // `pg/vector@1`. Bare `createPostgresAdapter()` cannot see extension
+  // codecs by design (ADR 205).
+  const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
 
   it('lowers selects with derived lateral joins and rich JSON expressions', () => {
     const childRows = SelectAst.from(TableSource.named('post'))

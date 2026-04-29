@@ -1,3 +1,4 @@
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -12,8 +13,8 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../src/core/adapter';
 import type { PostgresContract } from '../src/core/types';
+import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
 const contract = validateContract<PostgresContract>(
   {
@@ -46,7 +47,10 @@ const contract = validateContract<PostgresContract>(
 );
 
 describe('Operation lowering', () => {
-  const adapter = createPostgresAdapter();
+  // The bare `createPostgresAdapter()` factory cannot see extension codecs
+  // (ADR 205); these tests use `pg/vector@1` which lives in pgvector, so we
+  // compose a stack with the pgvector runtime descriptor.
+  const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
 
   function distanceExpr() {
     return new OperationExpr({
