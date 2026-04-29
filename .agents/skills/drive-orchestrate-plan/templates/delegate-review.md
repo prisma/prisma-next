@@ -123,7 +123,7 @@ Pull the diff via `git show <sha>` or `git diff <prior-head>..HEAD`.
 
 **Implementer's structured report follows.** Use it for context and to know what to triage; do **not** use it as primary evidence.
 
-```
+```text
 <paste implementer's full report here>
 ```
 
