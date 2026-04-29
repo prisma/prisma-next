@@ -1,3 +1,5 @@
+import pgvectorControl from '@prisma-next/extension-pgvector/control';
+import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -16,9 +18,11 @@ import {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { createPostgresAdapter } from '../src/core/adapter';
-import { PostgresControlAdapter } from '../src/core/control-adapter';
 import type { PostgresContract } from '../src/core/types';
+import {
+  createComposedPostgresAdapter,
+  createComposedPostgresControlAdapter,
+} from './helpers/composed-adapter';
 
 const contract = validateContract<PostgresContract>(
   {
@@ -51,8 +55,11 @@ const contract = validateContract<PostgresContract>(
   emptyCodecLookup,
 );
 
-const runtimeAdapter = createPostgresAdapter();
-const controlAdapter = new PostgresControlAdapter();
+// Compose a stack with pgvector on both planes so the runtime and control
+// adapters' codec lookups both contain `pg/vector@1`. The parity assertion
+// requires both sides to see the same codec set.
+const runtimeAdapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+const controlAdapter = createComposedPostgresControlAdapter({ extensionPacks: [pgvectorControl] });
 
 function expectParity(ast: AnyQueryAst): void {
   const runtime = runtimeAdapter.lower(ast, { contract });
