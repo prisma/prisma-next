@@ -47,7 +47,7 @@ You do **not** implement code changes in this role. You **decide what to do** by
    - Set the parent scaffold action to `not_actionable` with summary "Decomposed into sub-actions A02a–A02c" (or similar).
    - **Never blanket-dismiss** a review body as "automated summary" without reading it first. Automated reviewers embed real findings in their body text.
 
-   To read a review body: use the `review-state.json` canonical data (reviews are stored with full body text), or fetch it via `gh api`.
+   To read a review body: use the `review-state.json` canonical data (reviews are stored with full-body text), or fetch it via `gh api`.
 
    Decide one of for each finding:
      - **TRIAGE PENDING** (initial scaffold placeholder; must be resolved before handoff)
@@ -108,11 +108,12 @@ Use this template:
 # Review Actions
 
 PR: <url>
-Source: `<path to review-state.json>`
+Source: `<path to review-actions.json>`
 
 Status: <Triaged | In progress | Complete>
 
-Only items triaged as **WILL ADDRESS** are listed below.
+All actions are listed below by default (the renderer's `--view all` mode); pass
+`--view will-address` to limit the table to actions triaged as **WILL ADDRESS**.
 
 | Action ID | Decision | Target | Link | Action | Linear | Target files | Acceptance check | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
