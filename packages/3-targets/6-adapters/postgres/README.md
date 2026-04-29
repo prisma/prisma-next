@@ -302,12 +302,32 @@ table('event', (t) =>
 
 `json(schema)` and `jsonb(schema)` accept Standard Schema values. Arktype schemas work out of the box via their Standard Schema adapter (`schema['~standard']`).
 
+## Higher-order codec authoring
+
+Every parameterized Postgres codec (`char(N)`, `varchar(N)`, `numeric(p, s?)`, `bit(N)`, `varbit(N)`, `timestamp(p?)`, `timestamptz(p?)`, `time(p?)`, `timetz(p?)`, `interval(p?)`, `json(schema)`, `jsonb(schema)`) is a *higher-order codec*: a curried `(params) => (ctx) => Codec<…, Brand<P>>` function whose TypeScript signature is the type-level surface and whose body is the runtime implementation. The brand (`Char<N>`, `Numeric<P, S>`, `InferOutput<S>` for schema-typed JSON, …) propagates through curried application — `charColumn(36)` resolves to `Char<36>` and `json(productSchema)` resolves to `StandardSchemaV1.InferOutput<typeof productSchema>` in the no-emit `FieldOutputType` path, with no `pnpm emit` step required.
+
+Two surfaces ship for each parameterized type:
+
+- **Column-author factory** (`@prisma-next/adapter-postgres/column-types`) — returns a `ColumnTypeDescriptor` whose `type` slot carries the curried factory for the no-emit resolver. Pack-author code uses these directly: `field.column(charColumn(36))`, `field.column(numericColumn(10, 2))`, `field.column(json(productSchema))`.
+- **Framework-registration descriptor** (`@prisma-next/adapter-postgres/codecs`) — exports the schema-typed JSON / JSONB factories (`json`, `jsonb`) and their `ParameterizedCodecDescriptor`s (`pgJsonCodec`, `pgJsonbCodec`). The control descriptor (`./control`) registers the broader set of parameterized descriptors (`allPostgresParameterizedCodecs` plus the legacy-typeParams JSON / JSONB renderers) through the framework's `parameterizedCodecs` slot for the emit path; the runtime descriptor (`./runtime`) registers the runtime JSON / JSONB factory through the runtime adapter's slot for contract-load materialization.
+
+`paramsSchema` (Standard Schema) on each descriptor validates `typeParams` arriving from a serialized contract before the framework hands them to the factory; `renderOutputType` is the emit-path renderer that stamps the brand into `contract.d.ts`. Pack authors don't validate inside the factory body and don't render types ad-hoc — both responsibilities live on the descriptor.
+
+For named storage type instances shared across multiple columns, declare an entry in `storage.types` and reference it via `typeRef`; the runtime aggregates every column referencing the entry into a single `Ctx.usedAt` (per-instance state derived from the column set). Inline calls (`field.column(charColumn(36))`) produce an anonymous instance per column.
+
+### Schema-typed JSON columns
+
+The schema-typed `json(schema)` / `jsonb(schema)` factories ship a curried HoC whose return type is `(ctx) => Codec<…, InferOutput<S>>`. The body uses the same schema for runtime validation in `decode`; failures throw `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` so the runtime error envelope stays uniform. The framework supplies the schema-derived TypeScript type to the no-emit resolver; the emit path's renderer reads `schema['~standard'].jsonSchema` (when the schema library exposes it) or falls back to `'unknown'`.
+
+See [ADR 205 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale; the `Ctx` and `ParameterizedCodecDescriptor` primitives are documented in `@prisma-next/framework-components`'s README.
+
 ## Exports
 
 - `./adapter`: Adapter implementation (`createPostgresAdapter`)
-- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`, `dataTypes`)
-- `./column-types`: Column type descriptors and authoring helpers (`json`, `jsonb`, `jsonColumn`, `jsonbColumn`, `enumType`, `enumColumn`, `textColumn`, `int4Column`, etc.)
+- `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`, `dataTypes`, brands such as `Char<N>` / `Numeric<P, S>` / `Vector<N>`)
+- `./codecs`: Schema-typed JSON / JSONB higher-order factories (`json`, `jsonb`) and their descriptors (`pgJsonCodec`, `pgJsonbCodec`)
+- `./column-types`: Column-author factories — parameterized helpers (`charColumn`, `varcharColumn`, `numericColumn`, `bitColumn`, `varbitColumn`, `timeColumn`, `timetzColumn`, `intervalColumn`, `json`, `jsonb`) plus static descriptors (`textColumn`, `int4Column`, `boolColumn`, `jsonColumn`, `jsonbColumn`, `timestampColumn`, `timestamptzColumn`, `enumColumn`, `enumType`, etc.)
 - `./types`: PostgreSQL-specific types
-- `./control`: Control-plane entry point (adapter descriptor)
-- `./runtime`: Runtime-plane entry point (runtime adapter descriptor)
+- `./control`: Control-plane entry point (adapter descriptor with parameterized codec descriptors registered through `types.codecTypes.parameterizedCodecs`)
+- `./runtime`: Runtime-plane entry point (runtime adapter descriptor with the JSON / JSONB runtime factory registered through `parameterizedCodecs`)
 

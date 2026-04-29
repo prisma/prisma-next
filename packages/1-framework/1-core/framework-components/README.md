@@ -40,3 +40,63 @@ See [ADR 185 — SPI types live at the lowest consuming layer](../../../../../do
 ## Relationship to other packages
 
 This package is the canonical source for framework component types, assembly logic, and emission SPI types. New code should import directly from `@prisma-next/framework-components`.
+
+## Higher-order codec primitives
+
+`@prisma-next/framework-components/codec` is the home of two primitives that pack authors writing parameterized codecs (`vector(N)`, `char(N)`, `json(schema)`, `cipherStashText(params)`, …) build against:
+
+- **`Ctx`** — the column context the framework supplies when it calls a curried higher-order codec factory:
+
+  ```ts
+  export interface Ctx {
+    readonly name: string;                     // storage.types instance name
+    readonly usedAt: ReadonlyArray<{
+      readonly table: string;
+      readonly column: string;
+    }>;
+  }
+  ```
+
+  Pack authors never construct it. The contract-authoring builder synthesizes it at column-evaluation time (`{ name: '<anon:Document.embedding>', usedAt: [{ table: 'Document', column: 'embedding' }] }`); the runtime synthesizes it again at contract-load time with `usedAt` aggregated across every column referencing the same `storage.types` instance.
+
+- **`ParameterizedCodecDescriptor<P>`** — the framework-registration descriptor that pairs a curried factory with its JSON-boundary metadata:
+
+  ```ts
+  export interface ParameterizedCodecDescriptor<P = Record<string, unknown>> {
+    readonly codecId: string;
+    readonly paramsSchema: StandardSchemaV1<P>;
+    readonly renderOutputType?: (params: P) => string;
+    readonly factory: (params: P) => (ctx: Ctx) => Codec;
+  }
+  ```
+
+  `paramsSchema` validates `typeParams` arriving from a serialized contract (PSL parse, `contract.json` load) before the framework hands them to the factory. `renderOutputType` is the emit-path hook: the emitter reads it to render the column's TypeScript type into `contract.d.ts`. Both are framework-facing metadata; the codec object itself stays free of parameterization slots.
+
+The pack-author surface is one curried function plus one descriptor:
+
+```ts
+// User-facing: the column-author writes `field.column(vector(1536))`.
+export function vector<N extends number>(
+  length: N,
+): (ctx: Ctx) => Codec<'pg/vector@1', readonly ['equality'], string, Vector<N>> { … }
+
+// Framework-facing: registered through the `parameterizedCodecs` slot on
+// the host package's control descriptor.
+export const pgVectorCodec: ParameterizedCodecDescriptor<{ readonly length: number }> = {
+  codecId: 'pg/vector@1',
+  paramsSchema: type({ length: 'number > 0' }),
+  renderOutputType: ({ length }) => `Vector<${length}>`,
+  factory: ({ length }) => vector(length),
+};
+```
+
+The function's signature is what the no-emit `FieldOutputType` resolver reads (`vector(1536)` resolves to `Vector<1536>`); its body is what the runtime invokes per `storage.types` instance to materialize the codec. They're the same artifact.
+
+The descriptor lookup is assembled by `extractParameterizedCodecLookup` from each component's `types.codecTypes.parameterizedCodecs` contribution; the runtime reads `descriptor.factory(params)(ctx)` once per instance and indexes the resulting `Codec`. See [ADR 205 — Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the full design rationale.
+
+### Inline `typeParams` vs `storage.types` `typeRef`
+
+A parameterized column can be authored two ways:
+
+- **Inline**: `field.column(vector(1536))` produces an *anonymous* `storage.types` instance (deterministic name `<anon:${table}.${column}>`); the runtime calls the factory once with `usedAt` listing the single column.
+- **Shared**: declare a named `storage.types` entry (e.g. `Embedding1536: vector(1536)`) and reference it via `typeRef` from each column. The runtime aggregates every column that references the entry into a single `Ctx.usedAt` and calls the factory once for the whole set. Use this when a stateful codec (CipherStash, future per-instance encoders) needs a single per-instance state shared across multiple columns.

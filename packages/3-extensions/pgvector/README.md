@@ -63,13 +63,13 @@ export default defineConfig({
 
 ### Contract Definition
 
-Add vector columns to your contract and enable the namespace via pack refs:
+Add vector columns to your contract and enable the namespace via pack refs. Use `vector(N)` for dimensioned vectors that infer to `Vector<N>` in TypeScript (no emit step required) and `vectorColumn` for un-dimensioned static vector columns:
 
 ```typescript
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import { vector, vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import postgres from '@prisma-next/target-postgres/pack';
 
@@ -82,7 +82,8 @@ export const contract = defineContract({
       fields: {
         id: field.column(int4Column).id(),
         title: field.column(textColumn),
-        embedding: field.column(vectorColumn).optional(),
+        embedding: field.column(vector(1536)).optional(),
+        //          ^? resolves to Vector<1536> | null in the no-emit path
       },
     }).sql({ table: 'post' }),
   },
@@ -195,10 +196,40 @@ The extension declares the following capabilities:
 
 - `pgvector.cosine`: Indicates support for cosine distance and similarity operations
 
+## Higher-order codec authoring
+
+`vector(N)` is a *higher-order codec*: a curried `(length) => (ctx) => Codec<…, Vector<N>>` function whose TypeScript signature is the type-level surface and whose body is the runtime implementation. The `Vector<N>` brand is preserved through curried application — `vector(1536)` resolves to `Vector<1536>` (literal `N`) in the no-emit `FieldOutputType` path, with no `pnpm emit` step required. The framework supplies the `Ctx = { name; usedAt }` argument; pack-author code never constructs it.
+
+Two surfaces ship from this extension:
+
+- **`vector(N)`** (`@prisma-next/extension-pgvector/column-types`) — the column-author factory. Returns a `ColumnTypeDescriptor` whose `type` slot carries the curried factory for the no-emit resolver.
+- **`pgVectorCodec`** (`@prisma-next/extension-pgvector/codecs`) — the framework-registration `ParameterizedCodecDescriptor<{ length: number }>` that pairs the factory with `paramsSchema` (Standard Schema validating `length` at the JSON boundary) and `renderOutputType` (the emit-path renderer that stamps `Vector<N>` into `contract.d.ts`).
+
+The control descriptor (`@prisma-next/extension-pgvector/control`) registers `pgVectorCodec` through the framework's `parameterizedCodecs` slot. The runtime descriptor (`@prisma-next/extension-pgvector/runtime`) registers it through the runtime adapter's parameterized-codecs slot for contract-load materialization.
+
+For named storage type instances shared across multiple columns, declare an entry in `storage.types` and reference it via `typeRef`:
+
+```typescript
+const types = {
+  Embedding1536: type.pgvector.Vector(1536),
+} as const;
+
+const Post = model('Post', {
+  fields: {
+    embedding: field.namedType(types.Embedding1536).optional(),
+  },
+});
+```
+
+The runtime aggregates every column referencing `Embedding1536` into a single `Ctx.usedAt` and calls the factory once for the whole set; inline `vector(1536)` produces an anonymous instance per column.
+
+See [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale; the `Ctx` and `ParameterizedCodecDescriptor` primitives are documented in `@prisma-next/framework-components`'s README.
+
 ## References
 
 - [pgvector documentation](https://github.com/pgvector/pgvector)
 - [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md)
 - [Extension Packs Guide](../../../docs/reference/Extension-Packs-Naming-and-Layout.md)
+- [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
 
 Pack refs (`@prisma-next/extension-pgvector/pack`) are pure data objects generated from the hydrated manifest (`src/core/manifest.ts`), so TypeScript contract builders can enable the pgvector namespace in both emit and no-emit workflows without touching the filesystem.
