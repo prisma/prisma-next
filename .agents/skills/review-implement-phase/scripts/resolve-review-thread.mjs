@@ -66,10 +66,6 @@ function assertCommandAvailable(command, installHint) {
   }
 }
 
-function jqRead(jsonText, query) {
-  return run('jq', ['-r', query], jsonText).trim();
-}
-
 function resolveThread(threadNodeId) {
   const mutation = [
     'mutation($threadId:ID!){',
@@ -83,13 +79,29 @@ function resolveThread(threadNodeId) {
   ].join('\n');
 
   const response = run('gh', ['api', 'graphql', '-f', `query=${mutation}`, '-F', `threadId=${threadNodeId}`]);
-  const isResolved = jqRead(response, '.data.resolveReviewThread.thread.isResolved // empty');
-  if (isResolved !== 'true') {
-    throw new Error(`error: thread was not resolved successfully (isResolved=${isResolved || 'null'})`);
+
+  let parsed;
+  try {
+    parsed = JSON.parse(response);
+  } catch (parseError) {
+    throw new Error(`error: failed to parse GraphQL response: ${parseError.message}`);
   }
 
-  const resolvedThreadId = jqRead(response, '.data.resolveReviewThread.thread.id // empty');
-  return { resolvedThreadId, isResolved: true };
+  if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
+    const messages = parsed.errors
+      .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+      .join('; ');
+    throw new Error(`error: ${messages}`);
+  }
+
+  const thread = parsed?.data?.resolveReviewThread?.thread;
+  if (thread?.isResolved !== true) {
+    throw new Error(
+      `error: thread was not resolved successfully (isResolved=${thread?.isResolved === undefined ? 'null' : String(thread.isResolved)})`,
+    );
+  }
+
+  return { resolvedThreadId: thread.id, isResolved: true };
 }
 
 async function main() {
@@ -100,7 +112,6 @@ async function main() {
   }
 
   assertCommandAvailable('gh', 'GitHub CLI (`gh`)');
-  assertCommandAvailable('jq', '`jq` (for example: `brew install jq`)');
 
   const result = resolveThread(args.threadNodeId);
   process.stdout.write(
