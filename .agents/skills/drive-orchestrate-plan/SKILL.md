@@ -406,8 +406,60 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 - **Honest implementer pushback is valuable.** When the implementer presents evidence that contradicts a reviewer finding (file paths, diffs, prior commits), the orchestrator should update the reviewer's record rather than insist the implementer comply.
 - **Validate every reviewer verdict against intent before triaging.** The reviewer's verdict is authoritative on artifact-match; intent fidelity is yours alone (see § Loop algorithm step 7). Skipping this step lets reviewer drift imprint into subsequent rounds, which is expensive to roll back. When intent-validation surfaces drift, prefer re-prompting the reviewer over silently absorbing the gap; verdict overrides are rare and must be visibly recorded in `code-review.md`.
 - **User decisions translate to plan/spec edits before re-delegating.** Any decision that affects future rounds belongs on disk, not in the orchestrator's working memory.
-- **Track deferred items in `plan.md § Open items`**, not in conversation. The plan is the durable surface.
+- **Track deferred items in `plan.md § Open items`**, not in conversation. The plan is the durable surface — until close-out. At close-out, items in `plan.md § Open items` must migrate to a durable post-close-out home (ADR § Open questions, package README § Known limitations, or a follow-up Linear ticket) before the plan is deleted; see § Project close-out checkpoint.
+- **Run the close-out checkpoint before authorizing the project-dir delete.** § Project close-out checkpoint is not optional. Two steps: (1) audit that every load-bearing decision in the rolling review artifacts has a durable home in the repo (ADR / subsystem doc / README / follow-up ticket); (2) delegate `drive-pr-local-review` for a branch-scoped final-state review (spawn fresh; do not resume the iterate-loop reviewer; output to `wip/<project>-close-out-review/`). Both steps must pass before the implementer's close-out tasks (migrate / strip / delete) are authorized.
 - **When operating unattended, log every otherwise-escalated decision.** The user has handed off interactivity in exchange for a written audit trail (see § Unattended mode). Each in-place decision goes in `wip/unattended-decisions.md` using the template at `./templates/unattended-decisions.template.md`. Entries must be self-contained: a reader who has not seen the round-by-round detail and cannot consult the (likely-deleted) review artifacts must still be able to understand the decision, evaluate its reasoning, and verify it on disk.
+
+## Project close-out checkpoint
+
+Before invoking the project's final close-out steps (migrating long-lived content into `docs/`, stripping repo-wide references to `projects/<project>/**`, deleting `projects/<project>/`), the orchestrator runs a **mandatory close-out checkpoint**. The checkpoint has three parts; all three must pass before the close-out tasks may proceed.
+
+### Why a checkpoint exists
+
+The rolling review artifacts maintained during the loop (`reviews/code-review.md`, `reviews/system-design-review.md`, `reviews/walkthrough.md`) live under `projects/<project>/reviews/` and are gitignored. The close-out commit deletes the project directory, which sweeps the rolling artifacts along with it. Two failure modes are possible if the orchestrator does not pause before the delete:
+
+1. **Lost institutional memory.** Decisions captured only in the rolling artifacts (round notes, severity calibrations, finding-closure narratives, design rationales) disappear with the directory. The ADR + subsystem doc + READMEs absorb the *durable* content during M5 / final-milestone work, but anything the close-out milestone forgets to migrate is gone.
+2. **Lost final-state review surface.** Per `<skill-dir>/learnings.md § The missing-narrative-artifact pattern`, the walkthrough is the user's primary review surface for the round. The close-out is itself a round; without explicit production of a final walkthrough, the user inherits a PR they cannot review at the round level — only at the cumulative diff level.
+
+The checkpoint addresses both failure modes deliberately rather than hoping the implementer remembers them as part of M5.
+
+### Step 1 — Migration audit of rolling artifacts
+
+Read `reviews/code-review.md`, `reviews/system-design-review.md`, and `reviews/walkthrough.md`. For every load-bearing decision recorded across rounds — design rationale, alternatives-considered, deferred items with destinations, severity calibrations whose reasoning matters — verify the durable home for that decision exists. Concretely:
+
+- Architectural decisions and design-trade-offs → ADR in `docs/architecture docs/adrs/` (extending or referencing prior ADRs as appropriate).
+- "How it works today" architectural picture → subsystem doc in `docs/architecture docs/subsystems/`.
+- Pack-author / consumer-facing surface → package READMEs.
+- Forward-looking work that wasn't completed → ADR § Open questions, package README § Known limitations, or a follow-up Linear ticket. Do not rely on `plan.md § Open items` because the plan is being deleted.
+- Severity calibration narratives that explain why the team decided a particular trade-off → either folded into the ADR's Consequences section or noted in the relevant package's `DEVELOPING.md`. Do not assume future maintainers will reconstruct them from the deleted finding logs.
+
+If something load-bearing has no durable home yet, **pause the close-out**. Either: (a) ask the implementer to add it during the close-out round (small additions to ADR or README); or (b) record it in the orchestrator's process notes (`wip/<project>-close-out-notes.md`, gitignored) for the user to triage post-close-out. (a) is preferred whenever the implementer can do it within the close-out scope without ballooning the round.
+
+### Step 2 — Branch-scoped close-out review (mandatory)
+
+Delegate the **`drive-pr-local-review` skill** with explicit branch-scoped framing. This is *not* the same as the iterate-loop reviewer's per-round refresh — it is a fresh, branch-scoped artifact set whose scope is **the entire project branch** (`origin/<base>..HEAD`), not the most recent round.
+
+The branch-scoped close-out review:
+
+- **Spawn fresh.** Do *not* resume the persistent iterate-loop reviewer for this. The iterate-loop reviewer has been carrying round-by-round per-milestone deltas; you want a clean reading of the branch as a whole, not a continuation of the per-round narrative. Spawning fresh forces the reviewer to read the cumulative diff from the project base and produce artifacts whose scope matches what a PR reviewer would see.
+- **Run `drive-pr-local-review`.** Pass the explicit base branch (the project's PR base, often the shaping branch or `main`) so the review range is `origin/<base>...HEAD`. The skill produces `system-design-review.md`, `code-review.md`, and `walkthrough.md` (plus `spec.md` if no in-repo canonical spec exists).
+- **Output location.** If the project's `spec.md` is still on-branch (close-out hasn't deleted it yet — which is the case if the checkpoint runs before the delete commit, which it should), the skill writes artifacts to the project's `reviews/` directory by its own convention. Override the output path to `wip/<project>-close-out-review/` so the artifacts survive the close-out delete. (`wip/` is gitignored; the artifacts are local-only, but they're the user's audit surface for the project as a whole.)
+- **Cross-check against migration audit.** Compare the close-out review's findings against Step 1's migration audit. If the review surfaces a finding whose substance was load-bearing in the rolling artifacts but isn't captured in the durable docs, that's a Step-1 miss; loop back to Step 1 and address.
+
+The close-out review's role is to verify that the *cumulative* branch is review-ready as a whole — the per-round verdicts said "this round's delta is SATISFIED," but they did not collectively assert "the branch as a project is SATISFIED." This step makes that assertion explicit, with fresh eyes.
+
+### Step 3 — Authorize close-out tasks
+
+Once Steps 1 and 2 pass — every load-bearing decision has a durable home, and the branch-scoped close-out review has SATISFIED — the orchestrator authorizes the implementer's close-out tasks (migrate long-lived content, strip repo-wide references, delete `projects/<project>/`). Record the checkpoint outcome in the orchestrator's process notes / unattended decisions log, including the path to the `wip/<project>-close-out-review/` artifacts.
+
+### When the checkpoint fails
+
+If Step 1 or Step 2 surfaces a blocker:
+
+- **Step 1 fails** (load-bearing decision without a durable home): pause the close-out, surface as a small in-PR scope addition (ADR / README extension), then re-run Step 1.
+- **Step 2 fails** (branch-scoped review issues a finding): treat as you would any other reviewer finding mid-loop — file it, route to the implementer, address, and re-run Step 2. The close-out delete is gated on Step 2's SATISFIED verdict.
+
+The checkpoint is not optional. Do not delete `projects/<project>/` until both steps have explicitly passed.
 
 ## Hand-off points
 
@@ -416,8 +468,8 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 | `drive-create-spec`            | this skill                        | Spec exists; plan is being generated.                                   |
 | `drive-generate-plan`          | this skill                        | Plan exists with phases + validation gates; ready to execute.           |
 | this skill                     | `commit-as-you-go`                | Implementer needs commit-shaping guidance.                              |
-| this skill                     | `drive-pr-local-review`           | `code-review.md` doesn't yet exist; scaffold via that skill's templates.|
-| this skill                     | `create-pr`                       | All phases SATISFIED; branch is review-clean; ready to open PR.         |
+| this skill                     | `drive-pr-local-review`           | (1) Bootstrap: `code-review.md` doesn't yet exist; scaffold via that skill's templates. (2) Close-out checkpoint: produce branch-scoped final-state review artifacts before authorizing the project-dir delete (see § Project close-out checkpoint). |
+| this skill                     | `create-pr`                       | All phases SATISFIED; close-out checkpoint passed; branch is review-clean; ready to open PR. |
 | this skill                     | `github-review-iteration`         | PR is open and has review comments to address.                          |
 
 ## Repo customization hooks

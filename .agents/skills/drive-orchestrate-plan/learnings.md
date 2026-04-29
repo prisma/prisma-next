@@ -116,6 +116,31 @@ Each was a case where intent visibility, applied at the review checkpoint, would
 
 ---
 
+## The close-out vacuum pattern
+
+**Shape:** The project reaches its final milestone with the rolling review artifacts (`reviews/code-review.md`, `reviews/system-design-review.md`, `reviews/walkthrough.md`) maintained per-round under `projects/<project>/reviews/`. The reviews directory is gitignored. The implementer's close-out commit deletes `projects/<project>/` per `drive-project-workflow.mdc`. The `rm -rf` sweeps the gitignored `reviews/` directory along with the rest of the project content. Two distinct losses follow:
+
+1. **Lost institutional memory.** Decisions captured only in the rolling artifacts (per-round notes, severity calibration narratives, finding-closure reasoning, design rationale that didn't make it into ADRs) disappear. The ADR + subsystem doc + READMEs absorb the *durable* content during the close-out milestone, but anything the close-out forgets to migrate is gone with no recovery path.
+2. **Lost final-state review surface.** The walkthrough is the user's primary review surface for any single round (see § The missing-narrative-artifact pattern). The close-out is itself a round, and without explicit production of a final walkthrough, the user inherits a PR they can read at the cumulative-diff level but not at the round-narrative level. Even if every per-round walkthrough was perfect, the cumulative branch story is *not* the sum of the per-round stories — it requires fresh-eyes synthesis against the project base.
+
+**Why this matters more than stale-artifact:** stale artifacts are a maintenance failure (the loop didn't refresh on every round). The close-out vacuum is an architectural failure — the artifacts were refreshed correctly every round, then deliberately deleted by a separate skill (`drive-project-workflow`) that doesn't know about the rolling-artifacts contract. The two skills compose poorly without an explicit coordination point.
+
+**Why the original SKILL.md was implicit about this:** the `drive-project-workflow` rule's close-out protocol was written assuming the reviewer's outputs are either (a) shipped artifacts under `docs/` or (b) per-PR comments — neither of which match `drive-orchestrate-plan`'s gitignored rolling artifacts. The composition gap surfaced only when both skills ran end-to-end on the same project.
+
+**Watch for:**
+- Any project where close-out is approaching and the orchestrator hasn't audited which load-bearing decisions live only in the rolling artifacts.
+- Any project where the close-out review (if one exists) is a per-round refresh of the iterate-loop reviewer's narrative rather than a fresh-eyes branch-scoped review.
+- The user re-engaging post-close-out and asking for "the review artifacts" — if the project dir is already deleted, you'll have to either reconstruct from process notes or accept the loss.
+
+**Orchestrator action:**
+- Run the close-out checkpoint codified in `SKILL.md § Project close-out checkpoint`. Two steps: (1) audit that every load-bearing decision in the rolling artifacts has a durable home in the repo (ADR / subsystem doc / README / follow-up ticket); (2) delegate `drive-pr-local-review` for a branch-scoped final-state review (spawn fresh; output to `wip/<project>-close-out-review/`). Both steps must pass before authorizing the project-dir delete.
+- The branch-scoped review is *not* a per-round refresh. Spawn a fresh subagent (deliberately breaking the persistent-reviewer continuity rule for this one delegation; document the break in the orchestrator's process notes per § Subagent continuity). The fresh subagent reads the cumulative diff against the project base and produces artifacts whose scope matches what a PR reviewer would see — which is what the user actually needs at close-out.
+- Output the close-out review to `wip/<project>-close-out-review/`, not `projects/<project>/reviews/`. The whole point is that the artifacts must survive the project-dir delete.
+
+**Origin:** codec-model-unification close-out — M5 R1's implementer correctly executed `drive-project-workflow`'s delete step, including the gitignored `projects/codec-model-unification/reviews/` directory. The reviewer regenerated M5 R1's three artifacts under `wip/` to capture the close-out specifics, but the M1-M4 rolling-artifact deltas were lost. ADR 205 absorbed the load-bearing design content so the loss was tolerable, but the user's process post-mortem flagged that it worked out by luck rather than by protocol — a more design-decision-heavy project would have lost institutional memory at close-out without the orchestrator noticing. The user's directive: "rather than copy the last-most review artifacts, have the reviewer produce a fresh set of artifacts whose scope is the entire branch using the drive-pr-local-review skill" — the codified version is `SKILL.md § Project close-out checkpoint`.
+
+---
+
 ## The noise-finding pattern
 
 **Shape:** A reviewer files a finding whose recommended action is "consider for a future phase," "address in m4 when X is reshaped," "out of scope but worth tracking," or "no action — surfacing for awareness." The finding is technically correct (the observation is real, the framing is fair) but its recommended action does not translate into an in-PR task for the implementer. The implementer's next delegation prompt now contains a finding they cannot act on.
