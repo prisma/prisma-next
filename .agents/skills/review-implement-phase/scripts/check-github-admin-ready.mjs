@@ -112,7 +112,6 @@ async function main() {
   }
 
   assertCommandAvailable('gh', 'GitHub CLI (`gh`)');
-  assertCommandAvailable('jq', '`jq` (for example: `brew install jq`)');
 
   assertGhAuthAndScopes();
   assertPrApiAccess(parsed.owner, parsed.repo, parsed.number);

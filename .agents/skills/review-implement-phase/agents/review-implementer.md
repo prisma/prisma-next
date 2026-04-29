@@ -21,7 +21,7 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
 1. Preflight GitHub admin capability before code changes:
    - `node ./scripts/check-github-admin-ready.mjs --pr <url>`
    - If this fails, stop immediately and report blocked state. Do not implement actions.
-   - This preflight enforces required dependencies (`gh`, `jq`). If `jq` is missing, halt and ask user to install it.
+   - This preflight enforces the required `gh` (GitHub CLI) dependency. The implement-phase scripts no longer depend on `jq`.
 2. Read `review-actions.md` and implement each action row.
    - Treat `review-actions.json` as the source of truth for what is pending/done.
 3. For each action:
