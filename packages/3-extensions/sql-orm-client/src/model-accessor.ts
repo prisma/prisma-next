@@ -72,10 +72,9 @@ export function createModelAccessor<
     if (self.codecId !== undefined) {
       registerOp(self.codecId, op);
     } else if (self.traits !== undefined) {
-      for (const codec of context.codecs.values()) {
-        const codecTraits: readonly string[] = codec.traits ?? [];
-        if (self.traits.every((t) => codecTraits.includes(t))) {
-          registerOp(codec.id, op);
+      for (const descriptor of context.codecDescriptors.values()) {
+        if (self.traits.every((t) => descriptor.traits.includes(t))) {
+          registerOp(descriptor.codecId, op);
         }
       }
     }
@@ -102,7 +101,7 @@ export function createModelAccessor<
       if (!column) {
         return undefined;
       }
-      const traits = context.codecs.traitsOf(column.codecId);
+      const traits = context.codecDescriptors.descriptorFor(column.codecId)?.traits ?? [];
       const operations = opsByCodecId.get(column.codecId) ?? [];
       return createScalarFieldAccessor(
         tableName,
@@ -170,7 +169,7 @@ function createExtensionMethodFactory(
     const impl = entry.impl as (self: unknown, ...args: unknown[]) => Expression<ScopeField>;
     const result = impl(selfExpr, ...args);
     const returnCodecId = result.returnType.codecId;
-    const returnTraits = context.codecs.traitsOf(returnCodecId);
+    const returnTraits = context.codecDescriptors.descriptorFor(returnCodecId)?.traits ?? [];
     const isPredicate = returnTraits.includes('boolean');
 
     if (isPredicate) {

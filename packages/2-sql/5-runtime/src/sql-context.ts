@@ -1,5 +1,9 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  ParameterizedCodecDescriptor,
+} from '@prisma-next/framework-components/codec';
+import { synthesizeNonParameterizedDescriptor } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -32,6 +36,7 @@ import type {
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   AppliedMutationDefault,
+  CodecDescriptorRegistry,
   ExecutionContext,
   JsonSchemaValidateFn,
   JsonSchemaValidatorRegistry,
@@ -247,6 +252,61 @@ function collectParameterizedCodecDescriptors(
   }
 
   return descriptors;
+}
+
+/**
+ * Build the unified descriptor map. Combines parameterized descriptors (which
+ * already ship as `CodecDescriptor`s) with synthesized descriptors for non-
+ * parameterized codecs registered through the legacy `codecs:` slot. Codec ids
+ * that ship a parameterized descriptor take precedence — the legacy registry
+ * may still register a representative codec under the same id (e.g.
+ * pgvector's `pgVectorRepresentativeCodec`), but the parameterized descriptor
+ * is the authoritative source.
+ *
+ * Codec-registry-unification spec § Decision: every codec resolves through one
+ * descriptor map; reads are non-branching.
+ */
+function buildCodecDescriptorRegistry(
+  codecRegistry: CodecRegistry,
+  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): CodecDescriptorRegistry {
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumers narrow per codec.
+  type AnyDescriptor = CodecDescriptor<any>;
+  const byId = new Map<string, AnyDescriptor>();
+  const byTargetType = new Map<string, Array<AnyDescriptor>>();
+
+  function registerInIndices(descriptor: AnyDescriptor): void {
+    byId.set(descriptor.codecId, descriptor);
+    for (const targetType of descriptor.targetTypes) {
+      const list = byTargetType.get(targetType);
+      if (list) {
+        list.push(descriptor);
+      } else {
+        byTargetType.set(targetType, [descriptor]);
+      }
+    }
+  }
+
+  for (const descriptor of parameterizedDescriptors.values()) {
+    registerInIndices(descriptor);
+  }
+
+  for (const codec of codecRegistry.values()) {
+    if (byId.has(codec.id)) continue;
+    registerInIndices(synthesizeNonParameterizedDescriptor(codec));
+  }
+
+  return {
+    descriptorFor(codecId: string): AnyDescriptor | undefined {
+      return byId.get(codecId);
+    },
+    *values(): IterableIterator<AnyDescriptor> {
+      yield* byId.values();
+    },
+    byTargetType(targetType: string): readonly AnyDescriptor[] {
+      return byTargetType.get(targetType) ?? Object.freeze([]);
+    },
+  };
 }
 
 function collectTypeRefSites(
@@ -576,6 +636,10 @@ export function createExecutionContext<
   }
 
   const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
+  const codecDescriptors = buildCodecDescriptorRegistry(
+    codecRegistry,
+    parameterizedCodecDescriptors,
+  );
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
 
   if (parameterizedCodecDescriptors.size > 0) {
@@ -591,6 +655,7 @@ export function createExecutionContext<
     contract,
     codecs: codecRegistry,
     contractCodecs,
+    codecDescriptors,
     queryOperations: queryOperationRegistry,
     types,
     ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),

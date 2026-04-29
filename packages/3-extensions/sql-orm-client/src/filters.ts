@@ -73,7 +73,7 @@ function assertFieldHasEqualityTrait(
 ): void {
   const fieldType = modelOf(context.contract, modelName)?.fields?.[fieldName]?.type;
   const codecId = fieldType?.kind === 'scalar' ? fieldType.codecId : undefined;
-  const traits = codecId ? context.codecs.traitsOf(codecId) : [];
+  const traits = codecId ? (context.codecDescriptors.descriptorFor(codecId)?.traits ?? []) : [];
   if (!traits.includes('equality')) {
     throw new Error(
       `Shorthand filter on "${modelName}.${fieldName}": field does not support equality comparisons`,

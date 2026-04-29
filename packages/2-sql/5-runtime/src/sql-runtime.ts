@@ -18,13 +18,15 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
   AnyQueryAst,
-  CodecRegistry,
   ContractCodecRegistry,
   LoweredStatement,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import type {
+  CodecDescriptorRegistry,
+  JsonSchemaValidatorRegistry,
+} from '@prisma-next/sql-relational-core/query-lane-context';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
@@ -100,7 +102,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly core: RuntimeCore<TContract, SqlDriver<unknown>>;
   private readonly contract: TContract;
   private readonly adapter: Adapter<AnyQueryAst, Contract<SqlStorage>, LoweredStatement>;
-  private readonly codecRegistry: CodecRegistry;
+  private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly contractCodecs: ContractCodecRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private codecRegistryValidated: boolean;
@@ -109,7 +111,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const { context, adapter, driver, verify, middleware, mode, log } = options;
     this.contract = context.contract;
     this.adapter = adapter;
-    this.codecRegistry = context.codecs;
+    this.codecDescriptors = context.codecDescriptors;
     this.contractCodecs = context.contractCodecs;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.codecRegistryValidated = false;
@@ -134,14 +136,14 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.core = createRuntimeCore(coreOptions);
 
     if (verify.mode === 'startup') {
-      validateCodecRegistryCompleteness(this.codecRegistry, context.contract);
+      validateCodecRegistryCompleteness(this.codecDescriptors, context.contract);
       this.codecRegistryValidated = true;
     }
   }
 
   private ensureCodecRegistryValidated(contract: Contract<SqlStorage>): void {
     if (!this.codecRegistryValidated) {
-      validateCodecRegistryCompleteness(this.codecRegistry, contract);
+      validateCodecRegistryCompleteness(this.codecDescriptors, contract);
       this.codecRegistryValidated = true;
     }
   }

@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
@@ -30,15 +30,21 @@ function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string,
   return codecIds;
 }
 
+/**
+ * Validates that every codec id referenced by a contract column has a
+ * registered descriptor. Consults the unified descriptor map (Phase 3.5 of
+ * codec-registry-unification) — non-branching for parameterized vs. non-
+ * parameterized codecs.
+ */
 export function validateContractCodecMappings(
-  registry: CodecRegistry,
+  codecDescriptors: CodecDescriptorRegistry,
   contract: Contract<SqlStorage>,
 ): void {
   const codecIds = extractCodecIdsFromColumns(contract);
   const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
 
   for (const [key, codecId] of codecIds.entries()) {
-    if (!registry.has(codecId)) {
+    if (codecDescriptors.descriptorFor(codecId) === undefined) {
       const parts = key.split('.');
       const table = parts[0] ?? '';
       const column = parts[1] ?? '';
@@ -61,8 +67,8 @@ export function validateContractCodecMappings(
 }
 
 export function validateCodecRegistryCompleteness(
-  registry: CodecRegistry,
+  codecDescriptors: CodecDescriptorRegistry,
   contract: Contract<SqlStorage>,
 ): void {
-  validateContractCodecMappings(registry, contract);
+  validateContractCodecMappings(codecDescriptors, contract);
 }

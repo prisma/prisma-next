@@ -167,3 +167,45 @@ export interface CodecDescriptor<P = void> {
  * convention but the type is structurally identical.
  */
 export type ParameterizedCodecDescriptor<P = Record<string, unknown>> = CodecDescriptor<P>;
+
+/**
+ * Standard Schema validator for `void` params. Accepts any input and returns
+ * `undefined`. Used by the framework-supplied non-parameterized descriptor
+ * synthesizer; library-supplied non-parameterized descriptors typically
+ * reuse this.
+ */
+export const voidParamsSchema: StandardSchemaV1<void> = {
+  '~standard': {
+    version: 1,
+    vendor: 'prisma-next',
+    validate: () => ({ value: undefined }),
+  },
+};
+
+/**
+ * Synthesize a `CodecDescriptor<void>` for a non-parameterized codec runtime
+ * instance. The factory is constant — every call returns the same shared
+ * codec instance — so columns sharing this codec id share one resolved codec.
+ *
+ * Codec-registry-unification spec § Decision (Case T — non-parameterized text
+ * codec). This is the bridge while non-parameterized codec contributors still
+ * register through the legacy `codecs:` slot; once they migrate to ship
+ * descriptors directly (Phase 3.5 T3.5.3), this synthesis steps aside.
+ */
+export function synthesizeNonParameterizedDescriptor(codec: Codec): CodecDescriptor<void> {
+  const resolvedCtxFactory: (ctx: Ctx) => Codec = () => codec;
+  const sharedFactory: (params: void) => (ctx: Ctx) => Codec = () => resolvedCtxFactory;
+  // Family-extended codecs (SQL `Codec`) carry an optional `meta` field that
+  // the base interface doesn't declare. Read it through a structural narrow
+  // so the synthesizer forwards it to the descriptor without losing type
+  // safety on the base shape.
+  const codecMeta = (codec as { readonly meta?: CodecMeta }).meta;
+  return {
+    codecId: codec.id,
+    traits: codec.traits ?? [],
+    targetTypes: codec.targetTypes,
+    paramsSchema: voidParamsSchema,
+    factory: sharedFactory,
+    ...(codecMeta !== undefined ? { meta: codecMeta } : {}),
+  };
+}

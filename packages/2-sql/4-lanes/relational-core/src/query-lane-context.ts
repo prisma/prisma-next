@@ -1,7 +1,34 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, ContractCodecRegistry } from './ast/codec-types';
+
+/**
+ * Codec-id-keyed accessor for descriptor metadata. The `descriptorFor` shape
+ * is the unified read API for codec-id-keyed metadata (`traits`, `targetTypes`,
+ * `meta`) — non-branching for parameterized vs. non-parameterized codecs since
+ * every codec ships as a `CodecDescriptor` (Phase 3.5 of codec-registry-
+ * unification). See spec § Decision and the project plan's Phase 3.5.
+ */
+export interface CodecDescriptorRegistry {
+  // biome-ignore lint/suspicious/noExplicitAny: descriptors carry distinct param shapes per codec; the registry is heterogeneous and the consumer narrows per codec.
+  descriptorFor(codecId: string): CodecDescriptor<any> | undefined;
+  /**
+   * All registered descriptors. Used by `validateCodecRegistryCompleteness`
+   * and other startup-time consumers that enumerate descriptors.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
+  values(): IterableIterator<CodecDescriptor<any>>;
+  /**
+   * Descriptors indexed by `targetTypes[i]` (each scalar type the codec
+   * advertises). Used by sql-orm-client's scalar→codec lookups in place of
+   * `CodecRegistry.getByScalar`. Multiple descriptors may map to the same
+   * scalar type; ordering reflects registration order.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
+  byTargetType(targetType: string): readonly CodecDescriptor<any>[];
+}
 
 /**
  * Registry of initialized type helpers from storage.types.
@@ -90,6 +117,13 @@ export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contr
    * project.
    */
   readonly contractCodecs: ContractCodecRegistry;
+  /**
+   * Codec-id-keyed descriptor map. Single source of truth for codec-id-keyed
+   * metadata (`traits`, `targetTypes`, `meta`) — every codec, parameterized or
+   * not, resolves through this map without branching. Per
+   * codec-registry-unification spec § Decision.
+   */
+  readonly codecDescriptors: CodecDescriptorRegistry;
   readonly queryOperations: SqlOperationRegistry;
   /**
    * Type helper registry for parameterized types.

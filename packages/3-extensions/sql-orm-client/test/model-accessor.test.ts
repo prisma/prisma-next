@@ -1,3 +1,4 @@
+import { synthesizeNonParameterizedDescriptor } from '@prisma-next/framework-components/codec';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -453,9 +454,24 @@ describe('createModelAccessor', () => {
       return registry;
     }
 
+    function makeDescriptorRegistry(codecs: CodecRegistry) {
+      const byId = new Map<string, ReturnType<typeof synthesizeNonParameterizedDescriptor>>();
+      for (const c of codecs.values()) {
+        byId.set(c.id, synthesizeNonParameterizedDescriptor(c));
+      }
+      return {
+        descriptorFor: (id: string) => byId.get(id),
+        *values() {
+          yield* byId.values();
+        },
+        byTargetType: () => Object.freeze([]),
+      };
+    }
+
     it('only creates equality methods when codec has equality trait', () => {
       const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
-      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+      const codecDescriptors = makeDescriptorRegistry(codecs);
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
       const field = accessor['id'] as unknown as Record<string, unknown>;
 
       expect(typeof field['eq']).toBe('function');
@@ -478,7 +494,8 @@ describe('createModelAccessor', () => {
       const codecs = makeRegistry({
         'pg/text@1': ['equality', 'order', 'textual'],
       });
-      const accessor = createModelAccessor({ ...context, codecs }, 'User');
+      const codecDescriptors = makeDescriptorRegistry(codecs);
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'User');
       const field = accessor['name'] as unknown as Record<string, unknown>;
 
       for (const method of [
@@ -502,7 +519,8 @@ describe('createModelAccessor', () => {
 
     it('throws when relation shorthand filter targets a field without equality trait', () => {
       const codecs = makeRegistry({ 'pg/int4@1': ['order'] });
-      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+      const codecDescriptors = makeDescriptorRegistry(codecs);
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,

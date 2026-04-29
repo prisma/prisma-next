@@ -11,4 +11,6 @@ export type {
 export {
   emptyCodecLookup,
   emptyParameterizedCodecDescriptorLookup,
+  synthesizeNonParameterizedDescriptor,
+  voidParamsSchema,
 } from '../codec-types';

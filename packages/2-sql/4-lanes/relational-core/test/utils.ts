@@ -49,6 +49,11 @@ export function createTestContext<TContract extends Contract<SqlStorage>>(
       forColumn: () => undefined,
       forCodecId: (id) => codecRegistry.get(id),
     },
+    codecDescriptors: {
+      descriptorFor: () => undefined,
+      *values() {},
+      byTargetType: () => Object.freeze([]),
+    },
     queryOperations: createSqlOperationRegistry(),
     types: {},
     applyMutationDefaults: () => [],
