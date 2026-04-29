@@ -4,6 +4,10 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    typecheck: {
+      enabled: true,
+      include: ['test/**/*.test-d.ts'],
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
