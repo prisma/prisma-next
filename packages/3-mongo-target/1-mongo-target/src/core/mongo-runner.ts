@@ -34,10 +34,15 @@ export interface MarkerOperations {
   initMarker(destination: {
     readonly storageHash: string;
     readonly profileHash: string;
+    readonly invariants?: readonly string[];
   }): Promise<void>;
   updateMarker(
     expectedFrom: string,
-    destination: { readonly storageHash: string; readonly profileHash: string },
+    destination: {
+      readonly storageHash: string;
+      readonly profileHash: string;
+      readonly invariants?: readonly string[];
+    },
   ): Promise<boolean>;
   writeLedgerEntry(entry: {
     readonly edgeId: string;
@@ -67,6 +72,12 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   readonly strictVerification?: boolean;
   readonly context?: OperationContext;
+  /**
+   * Invariant ids contributed by this apply (the migration's `providedInvariants`).
+   * The runner unions these into `marker.invariants` atomically with the marker write.
+   * Defaults to `[]` for marker-only flows.
+   */
+  readonly invariants?: readonly string[];
 }
 
 function runnerFailure(
@@ -177,11 +188,22 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
-    if (
-      operationsExecuted === 0 &&
-      existingMarker?.storageHash === destination.storageHash &&
-      existingMarker.profileHash === profileHash
-    ) {
+    // Sort + dedupe so the initMarker path writes a stable initial value.
+    // updateMarker merges server-side, so no client-side union is needed.
+    const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
+    const existingInvariantSet = new Set(existingMarker?.invariants ?? []);
+    const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
+      existingInvariantSet.has(id),
+    );
+    const markerAlreadyAtDestination =
+      existingMarker !== null &&
+      existingMarker.storageHash === destination.storageHash &&
+      existingMarker.profileHash === profileHash;
+
+    // Skip marker/ledger writes (and schema verification) only when the apply
+    // is a true no-op: no operations executed, marker already at destination,
+    // and every incoming invariant is already in the stored set.
+    if (operationsExecuted === 0 && markerAlreadyAtDestination && incomingIsSubsetOfExisting) {
       return ok({ operationsPlanned: operations.length, operationsExecuted });
     }
 
@@ -204,6 +226,7 @@ export class MongoMigrationRunner {
       const updated = await markerOps.updateMarker(existingMarker.storageHash, {
         storageHash: destination.storageHash,
         profileHash,
+        invariants: incomingInvariants,
       });
       if (!updated) {
         return runnerFailure(
@@ -221,6 +244,7 @@ export class MongoMigrationRunner {
       await markerOps.initMarker({
         storageHash: destination.storageHash,
         profileHash,
+        invariants: incomingInvariants,
       });
     }
 
@@ -387,13 +411,9 @@ export class MongoMigrationRunner {
   ): MigrationRunnerResult | undefined {
     const origin = plan.origin ?? null;
     if (!origin) {
-      if (marker) {
-        return runnerFailure(
-          'MARKER_ORIGIN_MISMATCH',
-          'Database already has a contract marker but the plan has no origin. This would silently overwrite the existing marker.',
-          { meta: { markerStorageHash: marker.storageHash } },
-        );
-      }
+      // No origin assertion on the plan — the caller has done its own
+      // correctness check (typically `db update` via live-schema
+      // introspection) and does not rely on marker continuity.
       return undefined;
     }
 

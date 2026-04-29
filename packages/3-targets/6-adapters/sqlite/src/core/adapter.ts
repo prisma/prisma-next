@@ -27,6 +27,7 @@ import {
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from './codecs';
 import { escapeLiteral, quoteIdentifier } from './sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
@@ -62,9 +63,20 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract_marker where id = ?',
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract_marker where id = ?',
         params: [1],
       }),
+      // SQLite stores arrays as JSON-encoded TEXT (no native array type),
+      // so the driver returns `invariants` as a string. Decode before
+      // delegating to the shared row schema, which expects `string[]`.
+      parseMarkerRow: (row: unknown) => {
+        const raw = row as Record<string, unknown>;
+        const invariants =
+          typeof raw['invariants'] === 'string'
+            ? (JSON.parse(raw['invariants']) as unknown)
+            : raw['invariants'];
+        return parseContractMarkerRow({ ...raw, invariants });
+      },
     });
   }
 

@@ -175,7 +175,8 @@ withTempDir(({ createTempDir }) => {
                   canonical_version INTEGER,
                   updated_at TIMESTAMPTZ DEFAULT NOW(),
                   app_tag TEXT,
-                  meta JSONB DEFAULT '{}'
+                  meta JSONB DEFAULT '{}',
+                  invariants TEXT[] NOT NULL DEFAULT '{}'
                 )
               `);
               await client.query(`

@@ -23,7 +23,7 @@ import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 import {
   buildLedgerInsertStatement,
-  buildWriteMarkerStatements,
+  buildMergeMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
@@ -617,7 +617,10 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    const writeStatements = buildWriteMarkerStatements({
+    // Sort + dedupe so the INSERT path writes a stable initial value.
+    // UPDATE merges server-side, so no client-side union is needed.
+    const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
+    const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:
         options.plan.destination.profileHash ??
@@ -626,6 +629,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       contractJson: options.destinationContract,
       canonicalVersion: null,
       meta: {},
+      invariants: incomingInvariants,
     });
     const statement = existingMarker ? writeStatements.update : writeStatements.insert;
     await this.executeStatement(driver, statement);

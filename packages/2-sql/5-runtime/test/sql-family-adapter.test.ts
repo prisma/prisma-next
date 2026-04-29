@@ -30,6 +30,9 @@ const testProfile: AdapterProfile = {
     sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE id = $1',
     params: [1],
   }),
+  parseMarkerRow: () => {
+    throw new Error('not needed in test');
+  },
 };
 
 describe('SqlFamilyAdapter', () => {

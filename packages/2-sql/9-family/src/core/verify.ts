@@ -36,6 +36,7 @@ const ContractMarkerRowSchema = type({
   'updated_at?': 'Date | string',
   'app_tag?': 'string | null',
   'meta?': 'unknown | null',
+  invariants: type('string').array(),
 });
 
 /**
@@ -49,30 +50,21 @@ export function parseContractMarkerRow(row: unknown): ContractMarkerRecord {
     throw new Error(`Invalid contract marker row: ${messages}`);
   }
 
-  const validatedRow = result as {
-    core_hash: string;
-    profile_hash: string;
-    contract_json?: unknown | null;
-    canonical_version?: number | null;
-    updated_at?: Date | string;
-    app_tag?: string | null;
-    meta?: unknown | null;
-  };
-
-  const updatedAt = validatedRow.updated_at
-    ? validatedRow.updated_at instanceof Date
-      ? validatedRow.updated_at
-      : new Date(validatedRow.updated_at)
+  const updatedAt = result.updated_at
+    ? result.updated_at instanceof Date
+      ? result.updated_at
+      : new Date(result.updated_at)
     : new Date();
 
   return {
-    storageHash: validatedRow.core_hash,
-    profileHash: validatedRow.profile_hash,
-    contractJson: validatedRow.contract_json ?? null,
-    canonicalVersion: validatedRow.canonical_version ?? null,
+    storageHash: result.core_hash,
+    profileHash: result.profile_hash,
+    contractJson: result.contract_json ?? null,
+    canonicalVersion: result.canonical_version ?? null,
     updatedAt,
-    appTag: validatedRow.app_tag ?? null,
-    meta: parseMeta(validatedRow.meta),
+    appTag: result.app_tag ?? null,
+    meta: parseMeta(result.meta),
+    invariants: result.invariants,
   };
 }
 
@@ -90,7 +82,8 @@ export function readMarkerSql(): { readonly sql: string; readonly params: readon
       canonical_version,
       updated_at,
       app_tag,
-      meta
+      meta,
+      invariants
     from prisma_contract.marker
     where id = $1`,
     params: [1],
@@ -149,6 +142,7 @@ export async function readMarker(
     updated_at: Date | string;
     app_tag: string | null;
     meta: unknown | null;
+    invariants: readonly string[];
   }>(markerStatement.sql, markerStatement.params);
 
   if (queryResult.rows.length === 0) {

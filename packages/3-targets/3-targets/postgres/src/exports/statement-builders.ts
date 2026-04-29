@@ -1,6 +1,6 @@
 export type { SqlStatement } from '../core/migrations/statement-builders';
 export {
-  buildWriteMarkerStatements,
+  buildMergeMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,

@@ -1,4 +1,5 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
+import { readMarker } from '@prisma-next/family-sql/verify';
 import type { PostgresPlanTargetDetails } from '@prisma-next/target-postgres/planner-target-details';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import {
@@ -156,6 +157,119 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           'select count(*)::text as count from prisma_contract.ledger',
         );
         expect(ledgerCount.rows[0]?.count).toBe('2');
+      },
+    );
+  });
+
+  describe('when applying with invariants', () => {
+    it(
+      'unions invariants monotonically across applies, sorts ascending, dedupes, and exercises both db-update and migration-apply code paths',
+      { timeout: testTimeout },
+      async () => {
+        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+        const initialPlan = planner.plan({
+          contract,
+          schema: emptySchema,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        if (initialPlan.kind !== 'success') {
+          throw new Error('expected initial planner success');
+        }
+
+        const dbUpdatePlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          operations: [],
+        });
+        const applyPlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          // origin set to current marker hash exercises the `migration apply --ref`
+          // code path (skipOperations=true, but marker write still happens).
+          origin: toPlanContractInfo(contract),
+          destination: toPlanContractInfo(contract),
+          operations: [],
+        });
+
+        const readInvariants = async (): Promise<readonly string[]> => {
+          const marker = await readMarker(driver!);
+          return marker?.invariants ?? [];
+        };
+
+        // First apply writes the schema and seeds invariants. Inputs are unsorted —
+        // the runner must sort them ascending before storage.
+        const firstResult = await runner.execute({
+          plan: initialPlan.plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['delta', 'alpha'],
+        });
+        expect(firstResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'delta']);
+
+        // db-update flow (origin=null): empty plan still unions invariants into the marker.
+        const secondResult = await runner.execute({
+          plan: dbUpdatePlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['beta'],
+        });
+        expect(secondResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta']);
+
+        // migration-apply flow (origin=current marker): empty plan + skipOperations
+        // path; marker write still runs and unions in the new invariant.
+        const thirdResult = await runner.execute({
+          plan: applyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['gamma'],
+        });
+        expect(thirdResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+        // Re-declaring an already-stored invariant stays deduped on the migration-apply path.
+        const fourthResult = await runner.execute({
+          plan: applyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+          invariants: ['alpha'],
+        });
+        expect(fourthResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+        // Apply with no invariants option preserves the existing set.
+        const fifthResult = await runner.execute({
+          plan: applyPlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        expect(fifthResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+        // db-update flow with invariants omitted: origin=null, no
+        // invariants option — the existing set is preserved.
+        const sixthResult = await runner.execute({
+          plan: dbUpdatePlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        expect(sixthResult.ok).toBe(true);
+        expect(await readInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
       },
     );
   });

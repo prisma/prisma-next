@@ -1,3 +1,4 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CodecRegistry } from './codec-types';
 import type { LoweredStatement } from './types';
 
@@ -24,6 +25,13 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
    * parameter placeholder style).
    */
   readMarkerStatement(): MarkerStatement;
+  /**
+   * Parses a row returned by the adapter's `readMarkerStatement()` into a
+   * `ContractMarkerRecord`. Each adapter is responsible for any
+   * target-specific decoding before delegating to the shared row schema.
+   * Throws on shape violation.
+   */
+  parseMarkerRow(row: unknown): ContractMarkerRecord;
 }
 
 export interface LowererContext<TContract = unknown> {

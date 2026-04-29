@@ -9,6 +9,7 @@ export {
   validateContractCodecMappings,
 } from '../codecs/validation';
 export { lowerSqlPlan } from '../lower-sql-plan';
+export { parseContractMarkerRow } from '../marker';
 export type { BudgetsOptions } from '../middleware/budgets';
 export { budgets } from '../middleware/budgets';
 export type { LintsOptions } from '../middleware/lints';

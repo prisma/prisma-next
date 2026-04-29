@@ -11,6 +11,7 @@ describe('marker parser', () => {
       updated_at: new Date('2024-01-01T00:00:00Z'),
       app_tag: 'my-app',
       meta: { key: 'value' },
+      invariants: ['alpha', 'beta'],
     };
 
     const result = parseContractMarkerRow(row);
@@ -23,6 +24,7 @@ describe('marker parser', () => {
       updatedAt: new Date('2024-01-01T00:00:00Z'),
       appTag: 'my-app',
       meta: { key: 'value' },
+      invariants: ['alpha', 'beta'],
     });
   });
 
@@ -30,6 +32,7 @@ describe('marker parser', () => {
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -42,6 +45,7 @@ describe('marker parser', () => {
       updatedAt: expect.any(Date),
       appTag: null,
       meta: {},
+      invariants: [],
     });
   });
 
@@ -50,6 +54,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       updated_at: '2024-01-01T00:00:00Z',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -62,6 +67,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: '{"key":"value"}',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -74,6 +80,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: { key: 'value' },
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -86,6 +93,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: null,
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -97,6 +105,7 @@ describe('marker parser', () => {
     const row = {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -109,6 +118,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: 'invalid json',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -121,6 +131,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: 'not an object',
+      invariants: [],
     };
 
     const result = parseContractMarkerRow(row);
@@ -135,6 +146,7 @@ describe('marker parser', () => {
       core_hash: 'sha256:abc123',
       profile_hash: 'sha256:def456',
       meta: '123', // JSON string that parses to a number
+      invariants: [],
     };
 
     // This tests the branch where MetaSchema validation fails (line 33)
@@ -158,6 +170,30 @@ describe('marker parser', () => {
     const row = {
       profile_hash: 'sha256:def456',
       // Missing core_hash
+    };
+
+    expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');
+  });
+
+  it('throws when invariants is missing (DDL guarantees the column is not null)', () => {
+    // The column ships `not null default '{}'`; a row missing the field
+    // signals storage corruption or a schema downgrade — don't silently
+    // coerce to [].
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+    };
+
+    expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');
+  });
+
+  it('throws when invariants is null (column is non-nullable)', () => {
+    // Same rationale as the missing-field case: a NULL would only appear
+    // under storage corruption.
+    const row = {
+      core_hash: 'sha256:abc123',
+      profile_hash: 'sha256:def456',
+      invariants: null,
     };
 
     expect(() => parseContractMarkerRow(row)).toThrow('Invalid contract marker row');

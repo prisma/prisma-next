@@ -315,7 +315,10 @@ describe('MongoMigrationRunner', () => {
     }
   });
 
-  it('returns MARKER_ORIGIN_MISMATCH when marker exists but plan has no origin', async () => {
+  it('proceeds when marker exists but plan has no origin (db update path)', async () => {
+    // `plan.origin == null` skips origin validation: the caller (`db update`)
+    // does its own correctness check via live-schema introspection, so
+    // marker continuity is not required.
     await initMarker(db, { storageHash: 'sha256:existing', profileHash: 'sha256:p1' });
 
     const contract = makeContract({
@@ -333,10 +336,7 @@ describe('MongoMigrationRunner', () => {
       frameworkComponents: [],
     });
 
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.failure.code).toBe('MARKER_ORIGIN_MISMATCH');
-    }
+    expect(result.ok).toBe(true);
   });
 
   it('returns MARKER_ORIGIN_MISMATCH when no marker but plan has origin', async () => {
@@ -442,6 +442,111 @@ describe('MongoMigrationRunner', () => {
       .find({ type: 'ledger' })
       .toArray();
     expect(ledgerEntries).toHaveLength(1);
+  });
+});
+
+describe('MongoMigrationRunner - invariants', () => {
+  async function readMarkerInvariants(): Promise<readonly string[]> {
+    const marker = await readMarker(db);
+    return marker?.invariants ?? [];
+  }
+
+  function emptyPlan(originHash: string, destinationHash: string): MigrationPlan {
+    return {
+      targetId: 'mongo',
+      operations: [],
+      origin: { storageHash: originHash },
+      destination: { storageHash: destinationHash },
+    };
+  }
+
+  function dbUpdatePlan(destinationHash: string): MigrationPlan {
+    // origin omitted = `db update` flow: runner skips origin validation,
+    // marker write still runs and merges invariants into the existing set.
+    return {
+      targetId: 'mongo',
+      operations: [],
+      destination: { storageHash: destinationHash },
+    };
+  }
+
+  it('unions invariants across repeated applies, sorts ascending, and dedupes', async () => {
+    const contract = makeContract(
+      { users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] } },
+      'sha256:inv',
+    );
+    const initialPlan = serializePlan(planForContract(contract));
+    const runner = makeRunner();
+
+    // First apply: real plan creates the collection. Invariants are intentionally
+    // unsorted on input — the runner is expected to sort them ascending before storage.
+    const first = await runner.execute({
+      plan: initialPlan,
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['delta', 'alpha'],
+    });
+    expect(first.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'delta']);
+
+    // Empty plan against the same destination with origin = existing
+    // marker (`migration apply --ref` code path): no ops, marker already
+    // at destination, new invariants must still union into the stored set.
+    const second = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['beta'],
+    });
+    expect(second.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta']);
+
+    // Re-declaring an already-stored invariant stays deduped; new ones extend.
+    const third = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['alpha', 'gamma'],
+    });
+    expect(third.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+    // Apply with no invariants option preserves the existing set
+    // (migration-apply path: origin=current marker hash).
+    const fourth = await runner.execute({
+      plan: emptyPlan('sha256:inv', 'sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+    expect(fourth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+
+    // db-update flow (origin omitted): explicit invariants merge into the
+    // existing set the same way as the migration-apply path.
+    const fifth = await runner.execute({
+      plan: dbUpdatePlan('sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+      invariants: ['epsilon'],
+    });
+    expect(fifth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'epsilon', 'gamma']);
+
+    // db-update flow with invariants omitted (the real `db update` caller's
+    // contract): preserves the existing set on the origin-skipped path.
+    const sixth = await runner.execute({
+      plan: dbUpdatePlan('sha256:inv'),
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      frameworkComponents: [],
+    });
+    expect(sixth.ok).toBe(true);
+    expect(await readMarkerInvariants()).toEqual(['alpha', 'beta', 'delta', 'epsilon', 'gamma']);
   });
 });
 

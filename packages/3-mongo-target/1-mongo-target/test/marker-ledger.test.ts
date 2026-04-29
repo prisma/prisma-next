@@ -44,6 +44,55 @@ describe('readMarker', () => {
     expect(marker).not.toBeNull();
     expect(marker?.meta).toEqual({});
   });
+
+  it('defaults invariants to empty array when the field is absent (natural schemaless behaviour)', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual([]);
+  });
+
+  it('defaults updatedAt to a fresh Date when absent from document', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it('throws when invariants is present but not a string array (storage corruption)', async () => {
+    // Absent is fine (schemaless default); present-but-malformed is a
+    // hard error — corruption shouldn't be silently coerced.
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+      invariants: [1, 2, 3], // numbers, not strings
+    });
+
+    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+  });
+
+  it('throws when invariants is present but not an array (storage corruption)', async () => {
+    await db.collection<{ _id: string; [key: string]: unknown }>('_prisma_migrations').insertOne({
+      _id: 'marker',
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      updatedAt: new Date(),
+      invariants: 'not-an-array',
+    });
+
+    await expect(readMarker(db)).rejects.toThrow(/Invalid marker doc.*invariants/);
+  });
 });
 
 describe('initMarker', () => {
@@ -62,6 +111,18 @@ describe('initMarker', () => {
     expect(marker?.contractJson).toBeNull();
     expect(marker?.canonicalVersion).toBeNull();
     expect(marker?.appTag).toBeNull();
+    expect(marker?.invariants).toEqual([]);
+  });
+
+  it('writes invariants to the marker document', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:abc',
+      profileHash: 'sha256:def',
+      invariants: ['alpha', 'beta'],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 });
 
@@ -99,6 +160,102 @@ describe('updateMarker', () => {
 
     const marker = await readMarker(db);
     expect(marker?.storageHash).toBe('sha256:v1');
+  });
+
+  it('merges caller-supplied invariants into the existing field server-side', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha'],
+    });
+
+    const updated = await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: ['beta', 'gamma'],
+    });
+
+    expect(updated).toBe(true);
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta', 'gamma']);
+  });
+
+  it('dedupes and sorts the merged set', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['gamma', 'alpha'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: ['delta', 'alpha', 'beta'],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta', 'delta', 'gamma']);
+  });
+
+  it('leaves existing invariants untouched when the caller omits the field', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha']);
+  });
+
+  it('treats [] as a no-op merge (does not clobber existing invariants)', async () => {
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: ['alpha', 'beta'],
+    });
+
+    await updateMarker(db, 'sha256:v1', {
+      storageHash: 'sha256:v2',
+      profileHash: 'sha256:p2',
+      invariants: [],
+    });
+
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
+  });
+
+  it('preserves both writers invariants under interleaved updates (server-side merge)', async () => {
+    // Each `findOneAndUpdate` runs its `$setUnion` against the doc's
+    // current value, so concurrent updates accumulate atomically.
+    await initMarker(db, {
+      storageHash: 'sha256:v1',
+      profileHash: 'sha256:p1',
+      invariants: [],
+    });
+
+    const [updatedA, updatedB] = await Promise.all([
+      updateMarker(db, 'sha256:v1', {
+        storageHash: 'sha256:v1',
+        profileHash: 'sha256:p1',
+        invariants: ['alpha'],
+      }),
+      updateMarker(db, 'sha256:v1', {
+        storageHash: 'sha256:v1',
+        profileHash: 'sha256:p1',
+        invariants: ['beta'],
+      }),
+    ]);
+
+    expect(updatedA).toBe(true);
+    expect(updatedB).toBe(true);
+    const marker = await readMarker(db);
+    expect(marker?.invariants).toEqual(['alpha', 'beta']);
   });
 });
 

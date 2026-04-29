@@ -17,7 +17,8 @@ export const ensureMarkerTableStatement: SqlStatement = {
     canonical_version int,
     updated_at timestamptz not null default now(),
     app_tag text,
-    meta jsonb not null default '{}'
+    meta jsonb not null default '{}',
+    invariants text[] not null default '{}'
   )`,
   params: [],
 };
@@ -37,16 +38,23 @@ export const ensureLedgerTableStatement: SqlStatement = {
   params: [],
 };
 
-export interface WriteMarkerInput {
+export interface MergeMarkerInput {
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
   readonly canonicalVersion?: number | null;
   readonly appTag?: string | null;
   readonly meta?: Record<string, unknown>;
+  /**
+   * Invariants to merge into `marker.invariants`. INSERT writes them as
+   * the initial value (callers are expected to pass a sorted, deduped
+   * array). UPDATE merges them with the existing column server-side via
+   * a single atomic SQL expression.
+   */
+  readonly invariants: readonly string[];
 }
 
-export function buildWriteMarkerStatements(input: WriteMarkerInput): {
+export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   readonly insert: SqlStatement;
   readonly update: SqlStatement;
 } {
@@ -58,6 +66,7 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
     input.canonicalVersion ?? null,
     input.appTag ?? null,
     jsonParam(input.meta ?? {}),
+    input.invariants,
   ];
 
   return {
@@ -70,7 +79,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version,
         updated_at,
         app_tag,
-        meta
+        meta,
+        invariants
       ) values (
         $1,
         $2,
@@ -79,11 +89,16 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         $5,
         now(),
         $6,
-        $7::jsonb
+        $7::jsonb,
+        $8::text[]
       )`,
       params,
     },
     update: {
+      // `invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)`
+      // reads the current column value under the UPDATE's row lock, unions
+      // with the incoming array, dedupes, and sorts ascending — single
+      // statement, atomic, no read-then-write window.
       sql: `update prisma_contract.marker set
         core_hash = $2,
         profile_hash = $3,
@@ -91,7 +106,8 @@ export function buildWriteMarkerStatements(input: WriteMarkerInput): {
         canonical_version = $5,
         updated_at = now(),
         app_tag = $6,
-        meta = $7::jsonb
+        meta = $7::jsonb,
+        invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)
       where id = $1`,
       params,
     },
