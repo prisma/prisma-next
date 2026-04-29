@@ -1,9 +1,9 @@
 {
-  "migrationHash": "sha256:88f7e0045a24623f71193e1dbb317df91474cc9efa838616bf5d6e1a7bd76b3c",
   "from": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "kind": "regular",
   "labels": ["add-posts-author-index"],
+  "providedInvariants": [],
   "createdAt": "2026-04-15T17:17:30.570Z",
   "fromContract": null,
   "toContract": {
@@ -14,7 +14,7 @@
   "hints": {
     "used": [],
     "applied": [],
-    "plannerVersion": "2.0.0",
-    "planningStrategy": "class-based"
-  }
+    "plannerVersion": "2.0.0"
+  },
+  "migrationHash": "sha256:f4a6b5f219e6d5f10af7f17ff23253281295d41f1f3573faf232e2ccce6023a7"
 }
