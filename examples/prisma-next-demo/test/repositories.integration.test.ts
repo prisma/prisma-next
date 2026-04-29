@@ -1,10 +1,16 @@
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import { sql } from '@prisma-next/sql-builder/runtime';
 import type { SqlDriver } from '@prisma-next/sql-relational-core/ast';
-import { type CreateRuntimeOptions, createRuntime, type Runtime } from '@prisma-next/sql-runtime';
+import {
+  type CreateRuntimeOptions,
+  createRuntime,
+  type Runtime,
+  type SqlMiddleware,
+} from '@prisma-next/sql-runtime';
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Pool } from 'pg';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { ormClientAggregateUsers } from '../src/orm-client/aggregate-users';
 import { ormClientCreateUser } from '../src/orm-client/create-user';
 import { ormClientCreateUserWithAddress } from '../src/orm-client/create-user-with-address';
@@ -12,6 +18,7 @@ import { ormClientDeleteUser } from '../src/orm-client/delete-user';
 import { ormClientFindSimilarPosts } from '../src/orm-client/find-similar-posts';
 import { ormClientFindUserByEmail } from '../src/orm-client/find-user-by-email';
 import { ormClientFindUserById } from '../src/orm-client/find-user-by-id';
+import { ormClientFindUserByIdCached } from '../src/orm-client/find-user-by-id-cached';
 import { ormClientGetAdminUsers } from '../src/orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from '../src/orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from '../src/orm-client/get-latest-user-per-kind';
@@ -22,6 +29,7 @@ import { ormClientGetUserPosts } from '../src/orm-client/get-user-posts';
 import { ormClientGetUsers } from '../src/orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from '../src/orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from '../src/orm-client/get-users-by-id-cursor';
+import { ormClientGetUsersCached } from '../src/orm-client/get-users-cached';
 import { ormClientSearchPostsByEmbedding } from '../src/orm-client/search-posts-by-embedding';
 import { ormClientUpdateUserEmail } from '../src/orm-client/update-user-email';
 import { ormClientUpsertUser } from '../src/orm-client/upsert-user';
@@ -58,6 +66,26 @@ async function getRuntime(connectionString: string): Promise<Runtime> {
     driver,
     verify: { mode: 'onFirstUse', requireMarker: false },
   });
+}
+
+/**
+ * Creates a runtime wired up with the supplied middleware. Used by
+ * cache-middleware tests below; each test owns its own cache instance
+ * so entries don't bleed between tests.
+ */
+async function getRuntimeWithMiddleware(
+  connectionString: string,
+  middleware: readonly SqlMiddleware[],
+): Promise<{ runtime: Runtime; driver: SqlDriver<unknown> }> {
+  const { stackInstance, driver } = await createTestDriver(connectionString);
+  const runtime = createRuntime({
+    stackInstance,
+    context,
+    driver,
+    verify: { mode: 'onFirstUse', requireMarker: false },
+    middleware,
+  });
+  return { runtime, driver };
 }
 
 const seededUserIds = {
@@ -769,6 +797,144 @@ describe('ORM client integration examples', () => {
             embeddingPostIds.similar1,
             embeddingPostIds.similar2,
           ]);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  // ---------------------------------------------------------------------------
+  // Cache middleware integration tests.
+  //
+  // The cache helpers under `src/orm-client/find-user-by-id-cached.ts` and
+  // `src/orm-client/get-users-cached.ts` opt their reads into the
+  // `@prisma-next/middleware-cache` middleware via `cacheAnnotation.apply(...)`.
+  // The middleware short-circuits repeated executions of the same plan via
+  // its `intercept` hook, so a cache hit means the SQL driver is *not*
+  // invoked again. We assert that contract by spying on `driver.execute`.
+  // ---------------------------------------------------------------------------
+
+  it(
+    'ormClientFindUserByIdCached serves the second call from the cache (driver.execute not invoked again)',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const cache = createCacheMiddleware({ maxEntries: 100 });
+        const { runtime, driver } = await getRuntimeWithMiddleware(connectionString, [cache]);
+
+        try {
+          await seedOrmClientData(runtime);
+
+          // Spy *after* seeding so we don't count seed inserts.
+          const driverExecuteSpy = vi.spyOn(driver, 'execute');
+
+          const first = await ormClientFindUserByIdCached(seededUserIds.admin, runtime);
+          const driverCallsAfterFirst = driverExecuteSpy.mock.calls.length;
+          expect(driverCallsAfterFirst).toBeGreaterThan(0);
+          expect(first).toMatchObject({ id: seededUserIds.admin, kind: 'admin' });
+
+          const second = await ormClientFindUserByIdCached(seededUserIds.admin, runtime);
+          // Cache hit: driver was not invoked again.
+          expect(driverExecuteSpy.mock.calls.length).toBe(driverCallsAfterFirst);
+          expect(second).toEqual(first);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientFindUserByIdCached forceRefresh: true bypasses the cache (skip annotation)',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const cache = createCacheMiddleware({ maxEntries: 100 });
+        const { runtime, driver } = await getRuntimeWithMiddleware(connectionString, [cache]);
+
+        try {
+          await seedOrmClientData(runtime);
+          const driverExecuteSpy = vi.spyOn(driver, 'execute');
+
+          // Prime the cache.
+          await ormClientFindUserByIdCached(seededUserIds.admin, runtime);
+          const callsAfterFirst = driverExecuteSpy.mock.calls.length;
+
+          // Same query but with skip — should hit the driver again.
+          await ormClientFindUserByIdCached(seededUserIds.admin, runtime, {
+            forceRefresh: true,
+          });
+          expect(driverExecuteSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUsersCached serves the second call from cache; different limits land in distinct slots',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const cache = createCacheMiddleware({ maxEntries: 100 });
+        const { runtime, driver } = await getRuntimeWithMiddleware(connectionString, [cache]);
+
+        try {
+          await seedOrmClientData(runtime);
+          const driverExecuteSpy = vi.spyOn(driver, 'execute');
+
+          const first = await ormClientGetUsersCached(2, runtime);
+          const callsAfterFirst = driverExecuteSpy.mock.calls.length;
+          expect(first).toHaveLength(2);
+
+          const second = await ormClientGetUsersCached(2, runtime);
+          // Same plan: cache hit, driver not invoked.
+          expect(driverExecuteSpy.mock.calls.length).toBe(callsAfterFirst);
+          expect(second).toEqual(first);
+
+          // Different plan (different limit → different params → different
+          // identity key): cache miss, driver invoked.
+          await ormClientGetUsersCached(3, runtime);
+          expect(driverExecuteSpy.mock.calls.length).toBeGreaterThan(callsAfterFirst);
+        } finally {
+          await runtime.close();
+        }
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
+    'ormClientGetUsersCached supports an explicit cache key for sharing entries across plans',
+    async () => {
+      await withDevDatabase(async ({ connectionString }) => {
+        await initTestDatabase({ connection: connectionString, contract });
+        const cache = createCacheMiddleware({ maxEntries: 100 });
+        const { runtime, driver } = await getRuntimeWithMiddleware(connectionString, [cache]);
+
+        try {
+          await seedOrmClientData(runtime);
+          const driverExecuteSpy = vi.spyOn(driver, 'execute');
+
+          // Prime the cache under an explicit key.
+          const first = await ormClientGetUsersCached(2, runtime, { key: 'user-list:demo' });
+          const callsAfterFirst = driverExecuteSpy.mock.calls.length;
+          expect(first).toHaveLength(2);
+
+          // Different limit (→ different identity key) but same explicit
+          // key: the entry is shared. The cache middleware uses the
+          // supplied key verbatim and serves the previously buffered
+          // rows even though the underlying SQL has changed. (Two-row
+          // rows from the first call — the explicit key takes precedence
+          // over the canonical identity key.)
+          const second = await ormClientGetUsersCached(5, runtime, { key: 'user-list:demo' });
+          expect(driverExecuteSpy.mock.calls.length).toBe(callsAfterFirst);
+          expect(second).toEqual(first);
         } finally {
           await runtime.close();
         }

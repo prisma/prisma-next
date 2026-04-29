@@ -106,6 +106,8 @@ The demo includes ORM client examples under `src/orm-client/`:
 - `ormClientGetUserInsights(limit, runtime)` — `include().combine()` metrics and latest related row
 - `ormClientGetUserKindBreakdown(minUsers, runtime)` — `groupBy().having().aggregate()` breakdown
 - `ormClientUpsertUser(data, runtime)` — `upsert()` for create-or-update by primary key
+- `ormClientFindUserByIdCached(id, runtime, options?)` — opt-in cached `first({ id })` lookup via `cacheAnnotation.apply({ ttl })` from `@prisma-next/middleware-cache`
+- `ormClientGetUsersCached(limit, runtime, options?)` — opt-in cached `User.all()` listing, with optional explicit cache-key override
 
 Run from the CLI:
 
@@ -122,6 +124,45 @@ pnpm start -- repo-user-insights 5
 pnpm start -- repo-kind-breakdown 1
 pnpm start -- repo-upsert-user 00000000-0000-0000-0000-000000000099 demo@example.com user
 ```
+
+## Cache Middleware Examples
+
+The demo wires `@prisma-next/middleware-cache` into the Postgres client in `src/prisma/db.ts`. The cache middleware is **opt-in per query** — it only acts on plans whose `meta.annotations` carry a `cacheAnnotation` payload with a `ttl` set. Three CLI commands run a query twice and report the latency of each call so the cache hit is visible:
+
+```bash
+# ORM client first({ id }) cached for 60s.
+pnpm start -- cache-demo-user 00000000-0000-0000-0000-000000000001
+
+# ORM client User.all() listing cached for 60s.
+pnpm start -- cache-demo-users 5
+
+# SQL DSL .annotate(cacheAnnotation.apply({ ttl })) on a select.
+pnpm start -- cache-demo-sql 5
+```
+
+A representative run looks like:
+
+```
+Demonstrating opt-in caching with cacheAnnotation...
+Calling User.first({ id: 00000000-... }) twice — second call should hit cache.
+
+First call (cache miss):  4.71ms
+Second call (cache hit):  0.18ms
+Speedup: 26.2x faster
+```
+
+The corresponding source files:
+
+- `src/orm-client/find-user-by-id-cached.ts` — `db.User.first({ id }, cacheAnnotation.apply({ ttl }))`
+- `src/orm-client/get-users-cached.ts` — `db.User.take(n).all(cacheAnnotation.apply({ ttl, key? }))`
+- `src/queries/get-users-cached.ts` — `db.sql.user.select(...).annotate(cacheAnnotation.apply({ ttl })).build()`
+
+Relevant points:
+
+- The `cacheAnnotation` handle declares `applicableTo: ['read']`. Passing it to a write terminal is rejected at both the type and runtime levels — a `as any` cast cannot smuggle it past one without failing at the other.
+- The default cache key is `RuntimeMiddlewareContext.identityKey(exec)`, a BLAKE2b-512 digest of the post-lowering SQL plus parameters. Different parameters land in different cache slots; identical executions hit. Schema migrations rotate `meta.storageHash`, which feeds into `identityKey`, so cached entries do not leak across migrations.
+- The default in-memory store is per-process. For shared caching across replicas, supply a custom `CacheStore` (for example a Redis-backed implementation) via `createCacheMiddleware({ store })`.
+- Connection-scoped (`runtime.connection().execute(...)`) and transaction-scoped (`runtime.transaction(...)`) executions bypass the cache regardless of annotation, so transactional read-after-write coherence is preserved.
 
 ## Setup
 

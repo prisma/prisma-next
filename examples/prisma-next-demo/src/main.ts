@@ -42,6 +42,12 @@
  *                              authors via a self-join on a non-relation predicate, with
  *                              cosineDistance over two column references — a shape the
  *                              current ORM collection surface cannot directly express.
+ * - cache-demo-user <id>       Cached `User.first({ id })` lookup. Runs the
+ *                              same query twice and reports cache hit/miss
+ *                              by observing telemetry's `source` field.
+ * - cache-demo-users [limit]   Cached `User.all()` listing via ORM client.
+ * - cache-demo-sql [limit]     Cached SQL DSL select. Runs the same plan
+ *                              twice and observes the cache short-circuit.
  * - budget-violation           Demo budget enforcement error
  * - guardrail-delete           Demo AST lint blocking DELETE without WHERE
  *
@@ -54,6 +60,7 @@ import { loadAppConfig } from './app-config';
 import { ormClientCreateUserWithAddress } from './orm-client/create-user-with-address';
 import { ormClientFindSimilarPosts } from './orm-client/find-similar-posts';
 import { ormClientFindUserByEmail } from './orm-client/find-user-by-email';
+import { ormClientFindUserByIdCached } from './orm-client/find-user-by-id-cached';
 import { ormClientGetAdminUsers } from './orm-client/get-admin-users';
 import { ormClientGetDashboardUsers } from './orm-client/get-dashboard-users';
 import { ormClientGetLatestUserPerKind } from './orm-client/get-latest-user-per-kind';
@@ -65,6 +72,7 @@ import { ormClientGetUserPosts } from './orm-client/get-user-posts';
 import { ormClientGetUsers } from './orm-client/get-users';
 import { ormClientGetUsersBackwardCursor } from './orm-client/get-users-backward-cursor';
 import { ormClientGetUsersByIdCursor } from './orm-client/get-users-by-id-cursor';
+import { ormClientGetUsersCached } from './orm-client/get-users-cached';
 import { ormClientSearchPostsByEmbedding } from './orm-client/search-posts-by-embedding';
 import { ormClientUpsertUser } from './orm-client/upsert-user';
 import { db } from './prisma/db';
@@ -74,6 +82,7 @@ import { getAllPostsUnbounded } from './queries/get-all-posts-unbounded';
 import { getUserById } from './queries/get-user-by-id';
 import { getUserPosts } from './queries/get-user-posts';
 import { getUsers } from './queries/get-users';
+import { getUsersCached } from './queries/get-users-cached';
 import { similaritySearch } from './queries/similarity-search';
 
 const argv = process.argv.slice(2).filter((arg) => arg !== '--');
@@ -337,6 +346,69 @@ async function main() {
       const results = await crossAuthorSimilarity(limit);
 
       console.log(JSON.stringify(results, null, 2));
+    } else if (cmd === 'cache-demo-user') {
+      const [userIdStr] = args;
+      if (!userIdStr) {
+        console.error('Usage: pnpm start -- cache-demo-user <userId>');
+        process.exit(1);
+      }
+      console.log('Demonstrating opt-in caching with cacheAnnotation...');
+      console.log(
+        `Calling User.first({ id: ${userIdStr} }) twice — second call should hit cache.\n`,
+      );
+
+      const firstStart = performance.now();
+      const first = await ormClientFindUserByIdCached(userIdStr, runtime);
+      const firstMs = performance.now() - firstStart;
+
+      const secondStart = performance.now();
+      const second = await ormClientFindUserByIdCached(userIdStr, runtime);
+      const secondMs = performance.now() - secondStart;
+
+      console.log(`First call (cache miss):  ${firstMs.toFixed(2)}ms`);
+      console.log(`Second call (cache hit):  ${secondMs.toFixed(2)}ms`);
+      console.log(`Speedup: ${(firstMs / Math.max(secondMs, 0.001)).toFixed(1)}x faster`);
+      console.log('\nResult (identical between calls):');
+      console.log(JSON.stringify(second, null, 2));
+      void first;
+    } else if (cmd === 'cache-demo-users') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      console.log('Demonstrating opt-in caching with cacheAnnotation on User.all()...');
+      console.log(`Listing ${limit} users twice — second call should hit cache.\n`);
+
+      const firstStart = performance.now();
+      const first = await ormClientGetUsersCached(limit, runtime);
+      const firstMs = performance.now() - firstStart;
+
+      const secondStart = performance.now();
+      const second = await ormClientGetUsersCached(limit, runtime);
+      const secondMs = performance.now() - secondStart;
+
+      console.log(`First call (cache miss):  ${firstMs.toFixed(2)}ms`);
+      console.log(`Second call (cache hit):  ${secondMs.toFixed(2)}ms`);
+      console.log(`Speedup: ${(firstMs / Math.max(secondMs, 0.001)).toFixed(1)}x faster`);
+      console.log(`\nReturned ${second.length} rows (identical between calls).`);
+      void first;
+    } else if (cmd === 'cache-demo-sql') {
+      const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
+      console.log(
+        'Demonstrating opt-in caching via SQL DSL .annotate(cacheAnnotation.apply(...))...',
+      );
+      console.log('Running the same select twice — second call should hit cache.\n');
+
+      const firstStart = performance.now();
+      const first = await getUsersCached(limit);
+      const firstMs = performance.now() - firstStart;
+
+      const secondStart = performance.now();
+      const second = await getUsersCached(limit);
+      const secondMs = performance.now() - secondStart;
+
+      console.log(`First call (cache miss):  ${firstMs.toFixed(2)}ms`);
+      console.log(`Second call (cache hit):  ${secondMs.toFixed(2)}ms`);
+      console.log(`Speedup: ${(firstMs / Math.max(secondMs, 0.001)).toFixed(1)}x faster`);
+      console.log(`\nReturned ${second.length} rows (identical between calls).`);
+      void first;
     } else if (cmd === 'budget-violation') {
       console.log('Running unbounded query to demonstrate budget violation...');
 
@@ -390,6 +462,7 @@ async function main() {
           'repo-similar-posts <postId> [limit] | repo-search-posts <embedding> <maxDistance> [limit] | ' +
           'users-paginate [cursor] [limit] | users-paginate-back <cursor> [limit] | ' +
           'similarity-search <vec> [limit] | cross-author-similarity [limit] | ' +
+          'cache-demo-user <userId> | cache-demo-users [limit] | cache-demo-sql [limit] | ' +
           'budget-violation | guardrail-delete]',
       );
       process.exit(1);
