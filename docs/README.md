@@ -21,3 +21,7 @@ This directory contains the primary documentation for the repository.
 - [Reference docs](./reference/) — conventions and patterns used across the codebase
 - [CLI Style Guide](./CLI%20Style%20Guide.md) — CLI UX conventions
 
+## Working with AI agents
+
+- [Cursor Cloud Agents](./onboarding/Cursor-Cloud-Agents.md) — how cloud agents run against this repo, where config lives, how to change it, how to debug a failed run
+
