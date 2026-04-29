@@ -82,7 +82,20 @@ describe('vectorCodecForLength', () => {
       expect(codec.id).toBe('pg/vector@1');
       expect(codec.targetTypes).toEqual(['vector']);
       expect(codec.traits).toEqual(['equality']);
-      expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe('vector');
+      // `meta` lives on the SQL `Codec` extension (not the framework base);
+      // the factory writes it and the SQL runtime registry reads it. Reach in
+      // via a structural lookup to avoid pulling the SQL extension type into
+      // a plain pgvector test.
+      const meta = (
+        codec as {
+          readonly meta?: {
+            readonly db?: {
+              readonly sql?: { readonly postgres?: { readonly nativeType?: string } };
+            };
+          };
+        }
+      ).meta;
+      expect(meta?.db?.sql?.postgres?.nativeType).toBe('vector');
     });
   });
 });
