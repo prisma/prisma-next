@@ -307,27 +307,21 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       indexes: [index({ title: 1 })],
     });
 
-    expect(() =>
+    let thrown: unknown;
+    try {
       defineContract({
         family: mongoFamilyPack,
         target: mongoTargetPack,
         models: { Task, Bug },
-      }),
-    ).toThrow(/Bug/);
-    expect(() =>
-      defineContract({
-        family: mongoFamilyPack,
-        target: mongoTargetPack,
-        models: { Task, Bug },
-      }),
-    ).toThrow(/title/);
-    expect(() =>
-      defineContract({
-        family: mongoFamilyPack,
-        target: mongoTargetPack,
-        models: { Task, Bug },
-      }),
-    ).toThrow(/unknown field|not a field|not declared/i);
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/Bug/);
+    expect(message).toMatch(/title/);
+    expect(message).toMatch(/unknown field|not a field|not declared/i);
   });
 
   it('throws an Error naming the model, discriminator field, user value, and variant value when the user filter conflicts', () => {
@@ -352,33 +346,21 @@ describe('mongo contract builder — polymorphic index scoping', () => {
       indexes: [index({ severity: 1 }, { partialFilterExpression: { type: 'feature' } })],
     });
 
-    expect(() =>
+    let thrown: unknown;
+    try {
       defineContract({
         family: mongoFamilyPack,
         target: mongoTargetPack,
         models: { Task, Bug },
-      }),
-    ).toThrow(/Bug/);
-    expect(() =>
-      defineContract({
-        family: mongoFamilyPack,
-        target: mongoTargetPack,
-        models: { Task, Bug },
-      }),
-    ).toThrow(/type/);
-    expect(() =>
-      defineContract({
-        family: mongoFamilyPack,
-        target: mongoTargetPack,
-        models: { Task, Bug },
-      }),
-    ).toThrow(/feature/);
-    expect(() =>
-      defineContract({
-        family: mongoFamilyPack,
-        target: mongoTargetPack,
-        models: { Task, Bug },
-      }),
-    ).toThrow(/bug/);
+      });
+    } catch (err) {
+      thrown = err;
+    }
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/Bug/);
+    expect(message).toMatch(/type/);
+    expect(message).toMatch(/feature/);
+    expect(message).toMatch(/bug/);
   });
 });
