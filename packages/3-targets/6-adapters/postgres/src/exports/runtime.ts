@@ -4,23 +4,11 @@ import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Adapter, AnyQueryAst, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import type {
-  RuntimeParameterizedCodecDescriptor,
-  SqlRuntimeAdapterDescriptor,
-} from '@prisma-next/sql-runtime';
-import {
-  type JsonRuntimeParams,
-  jsonRuntimeParamsSchema,
-  pgJsonbRuntimeFactory,
-  pgJsonRuntimeFactory,
-} from '../codecs/json-runtime-factory';
+import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
 import { createPostgresAdapter } from '../core/adapter';
-import { PG_JSON_CODEC_ID, PG_JSONB_CODEC_ID } from '../core/codec-ids';
 import { codecDefinitions } from '../core/codecs';
 import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
-
-export type { JsonCodecHelper } from '../codecs/json-runtime-factory';
 
 export interface SqlRuntimeAdapter
   extends RuntimeAdapterInstance<'sql', 'postgres'>,
@@ -44,28 +32,17 @@ function createPostgresMutationDefaultGenerators() {
   }));
 }
 
-const parameterizedCodecDescriptors = [
-  {
-    codecId: PG_JSON_CODEC_ID,
-    traits: [] as const,
-    targetTypes: ['json'] as const,
-    paramsSchema: jsonRuntimeParamsSchema,
-    factory: pgJsonRuntimeFactory,
-  },
-  {
-    codecId: PG_JSONB_CODEC_ID,
-    traits: ['equality'] as const,
-    targetTypes: ['jsonb'] as const,
-    paramsSchema: jsonRuntimeParamsSchema,
-    factory: pgJsonbRuntimeFactory,
-  },
-] as const satisfies ReadonlyArray<RuntimeParameterizedCodecDescriptor<JsonRuntimeParams>>;
-
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
   {
     ...postgresAdapterDescriptorMeta,
     codecs: createPostgresCodecRegistry,
-    parameterizedCodecs: () => parameterizedCodecDescriptors,
+    // Schema-typed JSON columns are owned by per-library extensions
+    // (e.g. `@prisma-next/extension-arktype-json`). The postgres adapter
+    // ships no parameterized codecs of its own — every parameterized
+    // codec id (char, varchar, numeric, …) is registered for the emit
+    // path through `./control.ts` and materialized at runtime through
+    // the descriptor's curried factory in `core/parameterized-codec-factories.ts`.
+    parameterizedCodecs: () => [],
     queryOperations: () => postgresQueryOperations(),
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(): SqlRuntimeAdapter {

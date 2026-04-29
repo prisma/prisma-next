@@ -20,8 +20,6 @@ import {
   PG_CHAR_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_INTERVAL_CODEC_ID,
-  PG_JSON_CODEC_ID,
-  PG_JSONB_CODEC_ID,
   PG_NUMERIC_CODEC_ID,
   PG_TIME_CODEC_ID,
   PG_TIMESTAMP_CODEC_ID,
@@ -33,7 +31,6 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '../core/codec-ids';
-import { renderTypeScriptTypeFromJsonSchema } from '../core/json-schema-type-expression';
 import {
   bitCodecForLength,
   charCodecForLength,
@@ -228,100 +225,13 @@ export const pgEnumCodec: ParameterizedCodecDescriptor<{ readonly values: readon
   factory: enumPlaceholderFactory,
 };
 
-// ── JSON / JSONB (legacy-typeParams emit-path renderer) ──────────────────
-//
-// The postgres adapter currently carries three coexisting representations of
-// the JSON / JSONB codecs, one per surface. They are wired by **surface
-// segregation** — each is registered with a different framework slot from a
-// different exports module — not by any dynamic dispatch at runtime:
-//
-//   1. `pgJsonCodec` / `pgJsonbCodec` (M3, schema-typed): live in
-//      `../codecs/json-factory.ts`, exported from `../exports/codecs.ts`.
-//      Column-author surface — users write `json(productSchema)` and the
-//      descriptor's `type` slot threads a `(ctx) => Codec<…, InferOutput<S>>`
-//      factory into `ColumnTypeDescriptor` for the no-emit `FieldOutputType`
-//      resolver. Their params shape is `{ schema: StandardSchemaV1 }` (live).
-//
-//   2. `pgJsonLegacyCodec` / `pgJsonbLegacyCodec` (M4, defined below):
-//      registered from `../exports/control.ts` via the
-//      `parameterizedCodecs` slot. Control / emit surface — the emitter reads
-//      `renderOutputType` off this descriptor to render `contract.d.ts` from
-//      the contract IR's serialized typeParams shape `{ schemaJson, type? }`.
-//      Their `factory` is a registration-only placeholder (the runtime side
-//      owns instantiation; see #3).
-//
-//   3. `pgJsonRuntimeFactory` / `pgJsonbRuntimeFactory`
-//      (`../codecs/json-runtime-factory.ts`): registered from
-//      `../exports/runtime.ts` via the runtime adapter's `parameterizedCodecs`
-//      slot. Runtime surface — at contract-load `sql-runtime` invokes
-//      `factory(typeParams)(ctx)` to materialize a `JsonCodecInstance`
-//      carrying the compiled `validate` function (gated by the
-//      `'json-validator'` `CodecTrait`).
-//
-// Why three: the IR's serialized `typeParams` shape (`{ schemaJson, type? }`)
-// can't reconstitute a live Standard Schema, so the schema-typed factory
-// (#1) is unsuitable for the emit and runtime surfaces; conversely, #2/#3
-// don't carry the schema's `InferOutput` at the type level. Each surface
-// picks the descriptor that matches its inputs.
-//
-// Future unification is tracked under TML-2330: collapse the IR `typeParams`
-// shape and the descriptor surfaces so a single descriptor handles
-// no-emit type inference, emit-time rendering, and runtime instantiation.
-
-function renderJsonOutputType(typeParams: {
-  readonly schemaJson?: unknown;
-  readonly type?: string;
-}): string {
-  const typeName = typeParams.type;
-  if (typeof typeName === 'string' && typeName.trim().length > 0) {
-    return typeName.trim();
-  }
-  const schema = typeParams.schemaJson;
-  if (schema && typeof schema === 'object') {
-    return renderTypeScriptTypeFromJsonSchema(schema);
-  }
-  return 'unknown';
-}
-
-type JsonLegacyParams = { readonly schemaJson?: Record<string, unknown>; readonly type?: string };
-
-const jsonLegacyArktype = arktype({
-  'schemaJson?': 'object',
-  'type?': 'string',
-});
-
-// arktype's inferred params shape uses plain `object`; the descriptor accepts
-// the more precise `Record<string, unknown>` for `schemaJson` to give the
-// `renderTypeScriptTypeFromJsonSchema` helper a typed input. Cast at the
-// boundary so runtime semantics are unchanged.
-const jsonLegacyParamsSchema =
-  jsonLegacyArktype as unknown as import('@standard-schema/spec').StandardSchemaV1<JsonLegacyParams>;
-
-function jsonLegacyPlaceholderFactory(_params: JsonLegacyParams) {
-  return (_ctx: Ctx): Codec => {
-    throw new Error(
-      'pgJsonLegacyCodec.factory is registration-only at M4; the runtime descriptor at exports/runtime.ts owns the JSON codec instantiation.',
-    );
-  };
-}
-
-export const pgJsonLegacyCodec: ParameterizedCodecDescriptor<JsonLegacyParams> = {
-  codecId: PG_JSON_CODEC_ID,
-  traits: [] as const,
-  targetTypes: ['json'] as const,
-  paramsSchema: jsonLegacyParamsSchema,
-  renderOutputType: renderJsonOutputType,
-  factory: jsonLegacyPlaceholderFactory,
-};
-
-export const pgJsonbLegacyCodec: ParameterizedCodecDescriptor<JsonLegacyParams> = {
-  codecId: PG_JSONB_CODEC_ID,
-  traits: ['equality'] as const,
-  targetTypes: ['jsonb'] as const,
-  paramsSchema: jsonLegacyParamsSchema,
-  renderOutputType: renderJsonOutputType,
-  factory: jsonLegacyPlaceholderFactory,
-};
+// JSON / JSONB columns with schema validation are handled by per-library
+// extension packages (e.g. `@prisma-next/extension-arktype-json`); they
+// register their own `arktype/json@1` (etc.) parameterized codec descriptor
+// with the control stack and the runtime. The postgres adapter ships only
+// the non-parameterized `pg/json@1` and `pg/jsonb@1` raw-JSONB codecs (in
+// `../core/codecs.ts`), used by the bare `jsonColumn` / `jsonbColumn` /
+// `json()` / `jsonb()` surfaces in `../exports/column-types.ts`.
 
 /** Every Postgres parameterized codec descriptor, ready to register with the framework. */
 // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor registry — each entry carries its own params shape.

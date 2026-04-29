@@ -1,4 +1,3 @@
-import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import {
   allPostgresParameterizedCodecs,
@@ -6,8 +5,6 @@ import {
   pgCharCodec,
   pgEnumCodec,
   pgIntervalCodec,
-  pgJsonbLegacyCodec,
-  pgJsonLegacyCodec,
   pgNumericCodec,
   pgTimeCodec,
   pgTimestampCodec,
@@ -120,39 +117,11 @@ describe('parameterized codec descriptor renderOutputType', () => {
     });
   });
 
-  describe('pg/jsonb@1 (legacy serialized typeParams)', () => {
-    it('renders type expression from schemaJson', () => {
-      const result = pgJsonbLegacyCodec.renderOutputType!({
-        schemaJson: {
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-        },
-      });
-      expect(result).toBe('{ name: string }');
-    });
-
-    it('renders type name from type param', () => {
-      expect(pgJsonbLegacyCodec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
-    });
-  });
-
-  describe('pg/json@1 (legacy serialized typeParams)', () => {
-    it(
-      'renders type expression from schemaJson',
-      () => {
-        const result = pgJsonLegacyCodec.renderOutputType!({
-          schemaJson: {
-            type: 'object',
-            properties: { action: { type: 'string' }, actorId: { type: 'number' } },
-            required: ['action', 'actorId'],
-          },
-        });
-        expect(result).toBe('{ action: string; actorId: number }');
-      },
-      timeouts.databaseOperation,
-    );
-  });
+  // JSON / JSONB schema-typed columns ship from per-library extension
+  // packages (e.g. `@prisma-next/extension-arktype-json`); the postgres
+  // adapter no longer registers a `pg/json@1` / `pg/jsonb@1` parameterized
+  // descriptor with a `renderOutputType`. Per Phase 4 of codec-registry-
+  // unification.
 
   describe('descriptor registry', () => {
     it('allPostgresParameterizedCodecs contains every parameterized Postgres codec id', () => {

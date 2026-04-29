@@ -46,7 +46,6 @@
   "exports": {
     "./adapter": "./dist/adapter.mjs",
     "./codec-types": "./dist/codec-types.mjs",
-    "./codecs": "./dist/codecs.mjs",
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./operation-types": "./dist/operation-types.mjs",

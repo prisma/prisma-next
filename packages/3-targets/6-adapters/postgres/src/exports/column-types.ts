@@ -12,8 +12,6 @@
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type { Ctx } from '@prisma-next/framework-components/codec';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { StandardSchemaV1 } from '@standard-schema/spec';
-import { jsonb as pgJsonbHoCFactory, json as pgJsonHoCFactory } from '../codecs/json-factory';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
@@ -58,12 +56,6 @@ import {
   varbitCodecForLength,
   varcharCodecForLength,
 } from '../core/parameterized-codec-factories';
-import {
-  extractStandardSchemaOutputJsonSchema,
-  extractStandardSchemaTypeExpression,
-  isStandardSchemaLike,
-  type StandardSchemaLike,
-} from '../core/standard-schema';
 
 export const textColumn = {
   codecId: PG_TEXT_CODEC_ID,
@@ -251,6 +243,22 @@ export function intervalColumn<P extends number | undefined = undefined>(
   } as const;
 }
 
+/**
+ * Static raw-JSONB column descriptor. Used for JSON columns whose payload
+ * is not validated against any schema — encode/decode are JSON identity.
+ *
+ * For schema-validated JSON columns, use a per-library extension:
+ * `arktypeJson(schema)` from `@prisma-next/extension-arktype-json/column-types`.
+ * Future libraries (zod, valibot) will ship parallel column-author factories
+ * with their own codec ids and serialize/rehydrate pipelines.
+ *
+ * Per Phase 4 of codec-registry-unification, the postgres adapter no longer
+ * ships a schema-typed `json(schema)` / `jsonb(schema)` factory: the
+ * generic Standard-Schema-driven design proved lossy for narrowed types
+ * (custom narrows, branded types, …) and produced surprising behavior
+ * for any library beyond the JSON Schema subset. Per-library extensions
+ * are the cleaner answer.
+ */
 export const jsonColumn = {
   codecId: PG_JSON_CODEC_ID,
   nativeType: 'json',
@@ -263,75 +271,22 @@ export const jsonbColumn = {
   type: pgJsonbValueFactory,
 } as const satisfies ColumnTypeDescriptor;
 
-type JsonSchemaTypeParams = {
-  readonly schemaJson: Record<string, unknown>;
-  readonly type?: string;
-};
-
-function createJsonTypeParams(schema: StandardSchemaLike): JsonSchemaTypeParams {
-  const outputSchema = extractStandardSchemaOutputJsonSchema(schema);
-  if (!outputSchema) {
-    throw new Error('JSON schema must expose ~standard.jsonSchema.output()');
-  }
-
-  const expression = extractStandardSchemaTypeExpression(schema);
-  if (expression) {
-    return { schemaJson: outputSchema, type: expression };
-  }
-
-  return { schemaJson: outputSchema };
+/**
+ * Raw-JSONB column factory. Returns the bare {@link jsonColumn} descriptor;
+ * payload is unvalidated. For schema-validated JSON columns, use
+ * `arktypeJson(schema)` from `@prisma-next/extension-arktype-json`.
+ */
+export function json(): ColumnTypeDescriptor {
+  return jsonColumn;
 }
 
-function createJsonColumnFactory(
-  codecId: typeof PG_JSON_CODEC_ID | typeof PG_JSONB_CODEC_ID,
-  nativeType: 'json' | 'jsonb',
-  staticDescriptor: ColumnTypeDescriptor,
-) {
-  // Schema-typed JSON columns delegate the runtime body to the M3
-  // `pgJsonHoCFactory` (an HoC factory carrying `Js = InferOutput<S>`); this
-  // legacy `json(schema?)` surface keeps the per-call wrapping that emits the
-  // serialized `{ schemaJson, type? }` typeParams the runtime descriptor
-  // expects. The two converge on the same `pg/json@1` codec id; the runtime
-  // descriptor at `./runtime.ts` rehydrates from the serialized form, while
-  // the column-author surface threads the live `(ctx) => Codec<…>` factory
-  // through `descriptor.type` for the no-emit `FieldOutputType`.
-  return (schema?: StandardSchemaLike): ColumnTypeDescriptor => {
-    if (!schema) {
-      return staticDescriptor;
-    }
-
-    if (!isStandardSchemaLike(schema)) {
-      throw new Error(`${nativeType}(schema) expects a Standard Schema value`);
-    }
-
-    const factory = codecId === PG_JSON_CODEC_ID ? pgJsonHoCFactory : pgJsonbHoCFactory;
-    // `StandardSchemaLike` is the legacy adapter-local schema type, which makes
-    // every `~standard` field optional; `StandardSchemaV1` (the M3 factory's
-    // input) requires them. The `isStandardSchemaLike` guard above narrowed
-    // `~standard` to be present at runtime, so the cast to `StandardSchemaV1`
-    // is sound; the legacy type cannot be widened in place without breaking
-    // pre-M4 callers of `extractStandardSchemaOutputJsonSchema` etc.
-    return {
-      codecId,
-      nativeType,
-      typeParams: createJsonTypeParams(schema),
-      // The factory is keyed off the schema for runtime validation. The
-      // descriptor's data part above stays serializable; `type` is type-level
-      // and authoring-time only (M2 resolver reads it, runtime IR ignores it).
-      type: factory(schema as unknown as StandardSchemaV1),
-    };
-  };
-}
-
-const _json = createJsonColumnFactory(PG_JSON_CODEC_ID, 'json', jsonColumn);
-const _jsonb = createJsonColumnFactory(PG_JSONB_CODEC_ID, 'jsonb', jsonbColumn);
-
-export function json(schema?: StandardSchemaLike): ColumnTypeDescriptor {
-  return _json(schema);
-}
-
-export function jsonb(schema?: StandardSchemaLike): ColumnTypeDescriptor {
-  return _jsonb(schema);
+/**
+ * Raw-JSONB column factory. Returns the bare {@link jsonbColumn} descriptor;
+ * payload is unvalidated. For schema-validated JSON columns, use
+ * `arktypeJson(schema)` from `@prisma-next/extension-arktype-json`.
+ */
+export function jsonb(): ColumnTypeDescriptor {
+  return jsonbColumn;
 }
 
 export function enumType<const Values extends readonly string[]>(

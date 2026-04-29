@@ -6,8 +6,6 @@ import {
   pgCharCodec,
   pgEnumCodec,
   pgIntervalCodec,
-  pgJsonbLegacyCodec,
-  pgJsonLegacyCodec,
   pgNumericCodec,
   pgTimeCodec,
   pgTimestampCodec,
@@ -157,56 +155,6 @@ describe('placeholder factories (registration-only)', () => {
   it('pgEnumCodec.factory throws when invoked (legacy registry owns enum runtime)', () => {
     const factory = pgEnumCodec.factory({ values: ['A', 'B'] });
     expect(() => factory(ctx)).toThrow(/registration-only/);
-  });
-
-  it('pgJsonLegacyCodec.factory throws when invoked (runtime descriptor owns instantiation)', () => {
-    const factory = pgJsonLegacyCodec.factory({ schemaJson: { type: 'object' } });
-    expect(() => factory(ctx)).toThrow(/registration-only/);
-  });
-
-  it('pgJsonbLegacyCodec.factory throws when invoked', () => {
-    const factory = pgJsonbLegacyCodec.factory({ schemaJson: { type: 'object' } });
-    expect(() => factory(ctx)).toThrow(/registration-only/);
-  });
-});
-
-describe('legacy JSON / JSONB renderer (handles serialized typeParams)', () => {
-  it('renders the `type` source string when present', () => {
-    expect(pgJsonLegacyCodec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
-  });
-
-  it('renders a TS type expression from the `schemaJson` when no `type` source is present', () => {
-    const rendered = pgJsonLegacyCodec.renderOutputType!({
-      schemaJson: {
-        type: 'object',
-        properties: { name: { type: 'string' } },
-        required: ['name'],
-      },
-    });
-    expect(rendered).toBe('{ name: string }');
-  });
-
-  it('returns "unknown" when neither `type` nor `schemaJson` are present', () => {
-    expect(pgJsonLegacyCodec.renderOutputType!({})).toBe('unknown');
-  });
-
-  it('jsonb legacy renderer handles the same shapes', () => {
-    expect(pgJsonbLegacyCodec.renderOutputType!({ type: 'Doc' })).toBe('Doc');
-  });
-
-  it('legacy paramsSchema accepts the serialized shape with both fields', () => {
-    const result = pgJsonLegacyCodec.paramsSchema['~standard'].validate({
-      schemaJson: { type: 'object' },
-      type: 'AuditPayload',
-    });
-    if (result instanceof Promise) throw new Error('expected sync validator');
-    expect(result.issues).toBeUndefined();
-  });
-
-  it('legacy paramsSchema accepts an empty params object', () => {
-    const result = pgJsonLegacyCodec.paramsSchema['~standard'].validate({});
-    if (result instanceof Promise) throw new Error('expected sync validator');
-    expect(result.issues).toBeUndefined();
   });
 });
 

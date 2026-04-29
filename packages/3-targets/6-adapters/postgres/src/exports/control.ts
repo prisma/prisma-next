@@ -1,10 +1,6 @@
 import type { SqlControlAdapterDescriptor } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
-import {
-  allPostgresParameterizedCodecs,
-  pgJsonbLegacyCodec,
-  pgJsonLegacyCodec,
-} from '../codecs/postgres-codec-descriptors';
+import { allPostgresParameterizedCodecs } from '../codecs/postgres-codec-descriptors';
 import { PostgresControlAdapter } from '../core/control-adapter';
 import {
   createPostgresDefaultFunctionRegistry,
@@ -20,23 +16,15 @@ const postgresAdapterDescriptor: SqlControlAdapterDescriptor<'postgres'> = {
     ...postgresAdapterDescriptorMeta.types,
     codecTypes: {
       ...postgresAdapterDescriptorMeta.types.codecTypes,
-      // M4 cleanups F03 + F01: register every parameterized Postgres codec
-      // descriptor with the control stack so the emitter resolves
-      // `renderOutputType` off the descriptor exclusively. Once the
-      // codec-object `renderOutputType` field is removed (F01), this is the
-      // sole emit-path source of truth.
+      // Register every parameterized Postgres codec descriptor with the
+      // control stack so the emitter resolves `renderOutputType` off the
+      // descriptor.
       //
-      // Note: the JSON / JSONB descriptors registered here are the *legacy*
-      // serialized-typeParams renderers (`{ schemaJson, type? }`), not the M3
-      // `pgJsonCodec` / `pgJsonbCodec` (which are runtime-load descriptors
-      // keyed off live Standard Schema instances). The emit path sees the
-      // serialized form; the M3 descriptors land in the runtime descriptor
-      // for contract-load-time materialization.
-      parameterizedCodecs: [
-        ...allPostgresParameterizedCodecs,
-        pgJsonLegacyCodec,
-        pgJsonbLegacyCodec,
-      ],
+      // The JSON / JSONB schema-typed columns are owned by per-library
+      // extensions (e.g. `@prisma-next/extension-arktype-json`); the
+      // postgres adapter ships only the non-parameterized `pg/json@1` /
+      // `pg/jsonb@1` raw-JSONB codecs through `../core/codecs.ts`.
+      parameterizedCodecs: [...allPostgresParameterizedCodecs],
     },
   },
   scalarTypeDescriptors: createPostgresScalarTypeDescriptors(),
