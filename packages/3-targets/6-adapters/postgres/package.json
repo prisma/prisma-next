@@ -31,8 +31,6 @@
     "@prisma-next/sql-runtime": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*",
-    "@standard-schema/spec": "1.1.0",
-    "ajv": "^8.18.0",
     "arktype": "^2.0.0"
   },
   "devDependencies": {
