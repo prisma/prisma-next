@@ -1,3 +1,4 @@
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   type Adapter,
   type AdapterProfile,
@@ -9,6 +10,7 @@ import {
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
 
@@ -59,8 +61,10 @@ class PostgresAdapterImpl
     }
     return registry;
   })();
+  private readonly codecLookup: CodecLookup;
 
   constructor(options?: PostgresAdapterOptions) {
+    this.codecLookup = options?.codecLookup ?? createPostgresBuiltinCodecLookup();
     this.profile = Object.freeze({
       id: options?.profileId ?? 'postgres/default@1',
       target: 'postgres',
@@ -81,7 +85,7 @@ class PostgresAdapterImpl
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {
-    return renderLoweredSql(ast, context.contract);
+    return renderLoweredSql(ast, context.contract, this.codecLookup);
   }
 }
 

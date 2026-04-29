@@ -1,3 +1,4 @@
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
   type AggregateExpr,
   type AnyExpression,
@@ -57,12 +58,27 @@ function getCodecParamCast(codecId: string | undefined): string | undefined {
   return undefined;
 }
 
-function renderTypedParam(index: number, codecId: string | undefined): string {
+function renderTypedParam(
+  index: number,
+  codecId: string | undefined,
+  // codecLookup will drive the cast policy in M2; for M1 the threading is in
+  // place but the existing `getCodecParamCast` switch still decides emission.
+  _codecLookup: CodecLookup,
+): string {
   const cast = getCodecParamCast(codecId);
   return cast ? `$${index}::${cast}` : `$${index}`;
 }
 
-type ParamIndexMap = Map<ParamRef, number>;
+/**
+ * Per-render carrier threaded through every helper. Bundles the param-index
+ * map (for `$N` numbering) and the assembled-stack `codecLookup` (for
+ * cast policy at the `renderTypedParam` chokepoint). Carrying both on a
+ * single value keeps helper signatures stable across M1/M2.
+ */
+interface ParamIndexMap {
+  readonly indexMap: Map<ParamRef, number>;
+  readonly codecLookup: CodecLookup;
+}
 
 /**
  * Render a SQL query AST to a Postgres-flavored `{ sql, params }` payload.
@@ -74,32 +90,34 @@ type ParamIndexMap = Map<ParamRef, number>;
 export function renderLoweredSql(
   ast: AnyQueryAst,
   contract: PostgresContract,
+  codecLookup: CodecLookup,
 ): { readonly sql: string; readonly params: readonly unknown[] } {
   const collectedParamRefs = ast.collectParamRefs();
-  const paramIndexMap: ParamIndexMap = new Map();
+  const indexMap = new Map<ParamRef, number>();
   const params: unknown[] = [];
   for (const ref of collectedParamRefs) {
-    if (paramIndexMap.has(ref)) {
+    if (indexMap.has(ref)) {
       continue;
     }
-    paramIndexMap.set(ref, params.length + 1);
+    indexMap.set(ref, params.length + 1);
     params.push(ref.value);
   }
+  const pim: ParamIndexMap = { indexMap, codecLookup };
 
   const node = ast;
   let sql: string;
   switch (node.kind) {
     case 'select':
-      sql = renderSelect(node, contract, paramIndexMap);
+      sql = renderSelect(node, contract, pim);
       break;
     case 'insert':
-      sql = renderInsert(node, contract, paramIndexMap);
+      sql = renderInsert(node, contract, pim);
       break;
     case 'update':
-      sql = renderUpdate(node, contract, paramIndexMap);
+      sql = renderUpdate(node, contract, pim);
       break;
     case 'delete':
-      sql = renderDelete(node, contract, paramIndexMap);
+      sql = renderDelete(node, contract, pim);
       break;
     // v8 ignore next 4
     default:
@@ -457,11 +475,11 @@ function renderExpr(expr: AnyExpression, contract: PostgresContract, pim: ParamI
 }
 
 function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
-  const index = pim.get(ref);
+  const index = pim.indexMap.get(ref);
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
-  return renderTypedParam(index, ref.codecId);
+  return renderTypedParam(index, ref.codecId, pim.codecLookup);
 }
 
 function renderLiteral(expr: LiteralExpr): string {
