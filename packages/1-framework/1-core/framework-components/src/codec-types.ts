@@ -11,7 +11,7 @@ export type CodecTrait =
    * The codec carries a per-instance `validate(value: unknown) => unknown`
    * function on the resolved codec object (one that the framework's
    * `JsonSchemaValidatorRegistry` consults at runtime). This trait is the
-   * gate that lets the runtime'"'"'s `extractValidator` cast resolve from
+   * gate that lets the runtime's `extractValidator` cast resolve from
    * structurally-typed (`unknown`) to a typed `JsonValidatorCodec` view.
    *
    * Codec-model-unification project, M4 cleanup F06.
@@ -63,7 +63,7 @@ export const emptyCodecLookup: CodecLookup = {
  * Lookup of `ParameterizedCodecDescriptor` by `codecId`. Built by the control
  * stack from `ComponentMetadata.types.codecTypes.parameterizedCodecs` and
  * threaded into the emit path so the emitter consults `descriptor.renderOutputType`
- * (the spec'"'"'s long-term home) rather than reading the optional field off the
+ * (the spec's long-term home) rather than reading the optional field off the
  * codec object via duck-typed cast.
  */
 export interface ParameterizedCodecDescriptorLookup {

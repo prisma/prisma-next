@@ -355,11 +355,11 @@ export function extractCodecLookup(
 }
 
 /**
- * Assemble a `ParameterizedCodecDescriptorLookup` from every component'"'"'s
+ * Assemble a `ParameterizedCodecDescriptorLookup` from every component's
  * `types.codecTypes.parameterizedCodecs` contributions. The emitter consults
- * this lookup for `renderOutputType` (M4 cleanup F03 — the spec'"'"'s long-term
+ * this lookup for `renderOutputType` (M4 cleanup F03 — the spec's long-term
  * home is `ParameterizedCodecDescriptor.renderOutputType`, not the codec
- * object'"'"'s pre-M4 transitional `renderOutputType` field).
+ * object's pre-M4 transitional `renderOutputType` field).
  *
  * Duplicate `codecId` registrations are an error; each codec id may have at
  * most one descriptor across the whole stack.

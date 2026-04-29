@@ -232,7 +232,7 @@ export function resolveFieldType(
   field: ContractField,
   // `_codecLookup` is unused now that the descriptor lookup is the sole emit-
   // path source of `renderOutputType` (M4 cleanup F01 retired the codec-object
-  // hook). Kept in the signature so downstream callers don'"'"'t need to thread a
+  // hook). Kept in the signature so downstream callers don't need to thread a
   // new tuple of arguments.
   _codecLookup?: CodecLookup,
   parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,

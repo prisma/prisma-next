@@ -54,7 +54,7 @@ export interface ComponentMetadata {
        *
        * The control stack assembles a lookup keyed by `codecId` and threads it
        * through the emit path so `renderOutputType` is read off the descriptor
-       * (the spec'"'"'s long-term home) rather than off the codec object.
+       * (the spec's long-term home) rather than off the codec object.
        *
        * Codec-model-unification project, M4 cleanup F03.
        */

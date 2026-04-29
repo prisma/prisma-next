@@ -198,7 +198,7 @@ export const pgEnumCodec: ParameterizedCodecDescriptor<{ readonly values: readon
   // The enum codec is registered through the legacy codec registry today
   // (see `core/codecs.ts`); the descriptor exists only to provide
   // `renderOutputType` to the emitter. The factory placeholder satisfies the
-  // descriptor shape; M4'"'"'s emit path never invokes it.
+  // descriptor shape; M4's emit path never invokes it.
   factory: enumPlaceholderFactory,
 };
 
