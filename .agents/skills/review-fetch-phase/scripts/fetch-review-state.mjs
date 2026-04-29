@@ -41,6 +41,7 @@ const THREADS_QUERY = `
             originalStartLine
             originalLine
             comments(first: 100) {
+              pageInfo { hasNextPage endCursor }
               nodes {
                 id
                 url
@@ -50,6 +51,26 @@ const THREADS_QUERY = `
                 reactionGroups { content users { totalCount } }
               }
             }
+          }
+        }
+      }
+    }
+  }
+`;
+
+const THREAD_COMMENTS_QUERY = `
+  query($threadId: ID!, $cursor: String) {
+    node(id: $threadId) {
+      ... on PullRequestReviewThread {
+        comments(first: 100, after: $cursor) {
+          pageInfo { hasNextPage endCursor }
+          nodes {
+            id
+            url
+            author { login }
+            createdAt
+            body
+            reactionGroups { content users { totalCount } }
           }
         }
       }
@@ -295,6 +316,18 @@ function paginateConnection(owner, repo, number, query, cursorVar, cursorValue) 
   return { pr };
 }
 
+function paginateThreadComments(threadId, cursor) {
+  const response = fetchGraphQL(THREAD_COMMENTS_QUERY, { threadId, cursor: cursor ?? null });
+  if (response.error) {
+    return response;
+  }
+  const connection = response.data?.data?.node?.comments;
+  if (!connection) {
+    return { code: EXIT_OPERATIONAL, error: 'error: thread comments connection missing in GraphQL response' };
+  }
+  return { connection };
+}
+
 function paginateAll(owner, repo, number) {
   let pr = null;
   let reviewThreads = [];
@@ -312,6 +345,19 @@ function paginateAll(owner, repo, number) {
       break;
     }
     threadCursor = connection.pageInfo.endCursor;
+  }
+
+  for (const thread of reviewThreads) {
+    let commentCursor = thread?.comments?.pageInfo?.endCursor ?? null;
+    while (thread?.comments?.pageInfo?.hasNextPage) {
+      const next = paginateThreadComments(thread.id, commentCursor);
+      if (next.error) {
+        return next;
+      }
+      thread.comments.nodes = (thread.comments.nodes ?? []).concat(next.connection.nodes ?? []);
+      thread.comments.pageInfo = next.connection.pageInfo ?? { hasNextPage: false, endCursor: null };
+      commentCursor = thread.comments.pageInfo.endCursor;
+    }
   }
 
   let reviews = [];
