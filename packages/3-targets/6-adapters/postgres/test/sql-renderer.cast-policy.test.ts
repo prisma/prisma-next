@@ -1,8 +1,5 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
-import type {
-  RuntimeExtensionDescriptor,
-  RuntimeTargetDescriptor,
-} from '@prisma-next/framework-components/execution';
+import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
@@ -16,7 +13,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { renderLoweredSql } from '../src/core/sql-renderer';
 import type { PostgresContract } from '../src/core/types';
-import postgresRuntimeAdapterDescriptor from '../src/exports/runtime';
+import { createComposedPostgresAdapter } from './helpers/composed-adapter';
 
 const baseContract = validateContract<PostgresContract>(
   {
@@ -160,17 +157,6 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
     });
 
-    const target: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql',
-      targetId: 'postgres',
-      create() {
-        return { familyId: 'sql', targetId: 'postgres' };
-      },
-    };
-
     const geographyExtension: RuntimeExtensionDescriptor<'sql', 'postgres'> = {
       kind: 'extension',
       id: 'app-geography',
@@ -187,12 +173,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       },
     };
 
-    const adapter = postgresRuntimeAdapterDescriptor.create({
-      target,
-      adapter: postgresRuntimeAdapterDescriptor,
-      driver: undefined,
-      extensionPacks: [geographyExtension],
-    });
+    const adapter = createComposedPostgresAdapter({ extensionPacks: [geographyExtension] });
     const ast = selectWithParam('geo', 'app/geography@1', 'POINT(0 0)');
     const lowered = adapter.lower(ast, { contract: baseContract });
 
@@ -208,23 +189,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     // emits the cast. Without the wiring fix this regresses to `$1`.
     const pgvectorRuntime = (await import('@prisma-next/extension-pgvector/runtime')).default;
 
-    const target: RuntimeTargetDescriptor<'sql', 'postgres'> = {
-      kind: 'target',
-      id: 'postgres',
-      version: '0.0.1',
-      familyId: 'sql',
-      targetId: 'postgres',
-      create() {
-        return { familyId: 'sql', targetId: 'postgres' };
-      },
-    };
-
-    const adapter = postgresRuntimeAdapterDescriptor.create({
-      target,
-      adapter: postgresRuntimeAdapterDescriptor,
-      driver: undefined,
-      extensionPacks: [pgvectorRuntime],
-    });
+    const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
 
     const vectorContract = validateContract<PostgresContract>(
       {
