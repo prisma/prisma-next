@@ -1,23 +1,22 @@
 /**
- * Higher-order codec factory for Postgres JSON columns with Standard-Schema-driven
- * type inference (M3 of the codec-model-unification project, AC-5).
+ * Higher-order codec factories for Postgres JSON / JSONB columns with
+ * Standard-Schema-driven type inference.
  *
- * Pack-author surface: users write `json(productSchema)` at a column site and the
- * column's TS type resolves to `StandardSchemaV1.InferOutput<typeof productSchema>`
- * via M2's no-emit `FieldOutputType` resolver. The same schema validates wire
- * payloads at runtime inside `decode`.
+ * Pack-author surface: users write `json(productSchema)` at a column site and
+ * the column's TS type resolves to `StandardSchemaV1.InferOutput<typeof
+ * productSchema>` via the no-emit `FieldOutputType` resolver. The same schema
+ * validates wire payloads at runtime inside `decode`.
  *
- * Two exports:
- * - `json<S>(schema)` — the curried higher-order codec factory.
- * - `pgJsonCodec` — the sister `ParameterizedCodecDescriptor` that registers
- *   the factory with the framework.
+ * Exports:
+ * - `json<S>(schema)` / `jsonb<S>(schema)` — the curried higher-order codec
+ *   factories (for `pg/json@1` and `pg/jsonb@1`).
+ * - `pgJsonCodec` / `pgJsonbCodec` — the sister `ParameterizedCodecDescriptor`s
+ *   that register the factories with the framework.
  *
- * The legacy `json(schema?)` helper at `../exports/column-types.ts` (a
- * `ColumnTypeDescriptor` factory pre-dating the higher-order model) stays in
- * place until M4 migrates production codecs to this shape; M3 ships the new
- * surface side-by-side without rewiring production. See
- * `projects/codec-model-unification/plan.md § M3` and
- * `projects/codec-model-unification/design/authoring-ergonomics.md § JSON factory`.
+ * Each surface is registered through a different framework slot — see the
+ * surface-segregation rationale in `./postgres-codec-descriptors.ts` (the
+ * legacy-typeParams emit-path renderer block) and [ADR 205 — Higher-order
+ * codecs for parameterized types](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

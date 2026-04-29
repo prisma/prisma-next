@@ -40,13 +40,11 @@ import type {
 /**
  * Runtime parameterized codec descriptor.
  *
- * M1 migrates the slot from the legacy `{codecId, paramsSchema, init?}` shape to the
- * curried-factory shape contributed by `ParameterizedCodecDescriptor`: the descriptor
- * carries `factory: (P) => (Ctx) => Codec` plus `paramsSchema: StandardSchemaV1<P>`
- * and an optional `renderOutputType`. There is no `init` hook — by spec
- * (`projects/codec-model-unification/spec.md` § Decision and § Rejected alternatives),
- * the higher-order factory IS what `init` was; per-instance state lives in the codec
- * the factory returns. Production codecs migrate to typed factories in M4 ([TML-2330]).
+ * Carries the curried-factory shape contributed by `ParameterizedCodecDescriptor`:
+ * `factory: (P) => (Ctx) => Codec` plus `paramsSchema: StandardSchemaV1<P>` and an
+ * optional `renderOutputType`. There is no separate `init` hook — the higher-order
+ * factory IS what `init` was; per-instance state lives on the codec the factory
+ * returns. See [ADR 205 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> =
   ParameterizedCodecDescriptor<P>;

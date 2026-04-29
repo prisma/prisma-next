@@ -243,8 +243,8 @@ type DescriptorTypeRef<Descriptor> = Descriptor extends {
  * Extract the partially-applied higher-order codec factory from a descriptor or
  * `storage.types` entry. The factory is the column-author-supplied expression
  * `vector(1536)`, `json(schema)`, `cipherStashText({...})` — typed as
- * `(ctx: Ctx) => Codec<…>`. Defined per the M2 design in
- * `projects/codec-model-unification/design/higher-order-codecs.md`.
+ * `(ctx: Ctx) => Codec<…>`. See [ADR 205 — Higher-order codecs for
+ * parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 type DescriptorTypeFactory<Descriptor> = Descriptor extends {
   readonly type: infer Factory extends (ctx: Ctx) => Codec;
@@ -554,8 +554,7 @@ type ResolveTypeRef<Definition, Col> = Col extends {
  * reads `Js` off the higher-order codec factory's return type when present, and
  * otherwise falls through to the codec registry's base `output`.
  *
- * See `projects/codec-model-unification/design/higher-order-codecs.md`
- * § "Rewriting the no-emit `FieldOutputType`" for the rationale.
+ * See [ADR 205 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 export type FieldOutputType<
   Definition,

@@ -70,11 +70,12 @@ const defaultCapabilities = Object.freeze({
   },
 });
 
-// Parameterized codec descriptors are now contributed by the runtime descriptor
-// (`packages/3-targets/6-adapters/postgres/src/exports/runtime.ts`) using the new
-// `ParameterizedCodecDescriptor` shape. Production codecs are migrated to the
-// curried-factory shape in M4 of the codec-model-unification project; until then
-// the adapter class exposes an empty list to keep the legacy SPI surface intact.
+// Parameterized codec descriptors are contributed by the runtime descriptor
+// (`packages/3-targets/6-adapters/postgres/src/exports/runtime.ts`) through
+// the framework's `parameterizedCodecs` slot. The adapter class itself
+// exposes an empty list to keep the legacy SPI surface intact; the SPI was
+// preserved to avoid touching unrelated call sites when descriptors moved
+// to the runtime descriptor under ADR 205.
 const parameterizedCodecs: ReadonlyArray<ParameterizedCodecDescriptor> = [];
 
 class PostgresAdapterImpl

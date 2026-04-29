@@ -26,13 +26,13 @@ export interface CodecMeta {
  * They provide deterministic conversion between database wire types and JS values,
  * and between JS values and contract JSON.
  *
- * Parameterization slots have all moved to `ParameterizedCodecDescriptor` (see
- * `@prisma-next/framework-components/codec`):
- * - `paramsSchema` and `init` were removed in M1 of the codec-model-unification
- *   project (descriptor + factory closure replace them).
- * - `renderOutputType` was held transitionally on this extension through M1-M3
- *   and is removed in M4 cleanup F01: `ParameterizedCodecDescriptor.renderOutputType`
- *   is now the sole emit-path source of truth.
+ * Parameterization is owned by `ParameterizedCodecDescriptor` (see
+ * `@prisma-next/framework-components/codec`): `paramsSchema` validates JSON-
+ * sourced params at the framework boundary; `renderOutputType` renders the
+ * column's TypeScript type into `contract.d.ts`; the curried factory holds
+ * any per-instance state in its closure. The base `Codec` interface carries
+ * none of these slots. See [ADR 205 — Higher-order codecs for parameterized
+ * types](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 export interface Codec<
   Id extends string = string,

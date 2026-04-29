@@ -7,14 +7,11 @@ import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
  * column author supplied.
  *
  * The `type` slot is read by the no-emit `FieldOutputType` resolver in
- * `@prisma-next/sql-contract-ts` (M2 of the codec-model-unification project) to
- * derive the column's resolved JS type from the factory's return signature
- * (`(ctx: Ctx) => Codec<…, Js>`). The data part (`codecId`, `nativeType`,
- * `typeParams`) is captured into the contract IR by the contract-authoring
- * builder by applying the factory to a synthesized `Ctx`. M4 of the project
- * promoted `type` from a structurally-tolerated extra field to a first-class
- * descriptor field; pre-M4 the M2 type-level resolver tolerated it via TS
- * structural typing alone.
+ * `@prisma-next/sql-contract-ts` to derive the column's resolved JS type from
+ * the factory's return signature (`(ctx: Ctx) => Codec<…, Js>`). The data part
+ * (`codecId`, `nativeType`, `typeParams`) is captured into the contract IR by
+ * the contract-authoring builder. See [ADR 205 — Higher-order codecs for
+ * parameterized types](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 export type ColumnTypeDescriptor<TCodecId extends string = string> = {
   readonly codecId: TCodecId;
