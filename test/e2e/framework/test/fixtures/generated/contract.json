@@ -95,25 +95,23 @@
         "profile": {
           "nullable": false,
           "type": {
-            "codecId": "pg/jsonb@1",
+            "codecId": "arktype/json@1",
             "kind": "scalar",
             "typeParams": {
-              "schemaJson": {
-                "properties": {
-                  "age": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
+              "expression": "{ age: number, name: string }",
+              "jsonIr": {
+                "domain": "object",
                 "required": [
-                  "name",
-                  "age"
-                ],
-                "type": "object"
-              },
-              "type": "{ name: string; age: number }"
+                  {
+                    "key": "age",
+                    "value": "number"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              }
             }
           }
         }
@@ -560,7 +558,7 @@
     }
   },
   "storage": {
-    "storageHash": "sha256:4b1c88cca257a21e91df7b3985253d0d88ed52cd9cc9b793a2328a5611f38075",
+    "storageHash": "sha256:46a85cfb733bccaef4e3fc232d9d4bbdff9f106e0d409293a38da165658c1105",
     "tables": {
       "comment": {
         "columns": {
@@ -627,26 +625,24 @@
             "nullable": false
           },
           "profile": {
-            "codecId": "pg/jsonb@1",
+            "codecId": "arktype/json@1",
             "nativeType": "jsonb",
             "nullable": false,
             "typeParams": {
-              "schemaJson": {
-                "properties": {
-                  "age": {
-                    "type": "number"
-                  },
-                  "name": {
-                    "type": "string"
-                  }
-                },
+              "expression": "{ age: number, name: string }",
+              "jsonIr": {
+                "domain": "object",
                 "required": [
-                  "name",
-                  "age"
-                ],
-                "type": "object"
-              },
-              "type": "{ name: string; age: number }"
+                  {
+                    "key": "age",
+                    "value": "number"
+                  },
+                  {
+                    "key": "name",
+                    "value": "string"
+                  }
+                ]
+              }
             }
           }
         },
@@ -1032,6 +1028,30 @@
     }
   },
   "extensionPacks": {
+    "arktype-json": {
+      "familyId": "sql",
+      "id": "arktype-json",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "codecTypes": {
+          "import": {
+            "alias": "ArktypeJsonTypes",
+            "named": "CodecTypes",
+            "package": "@prisma-next/extension-arktype-json/codec-types"
+          }
+        },
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "jsonb",
+            "targetId": "postgres",
+            "typeId": "arktype/json@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    },
     "pgvector": {
       "capabilities": {
         "postgres": {

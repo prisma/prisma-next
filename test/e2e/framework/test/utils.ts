@@ -5,6 +5,8 @@ import postgresAdapter from '@prisma-next/adapter-postgres/control';
 import { type ControlClient, createControlClient } from '@prisma-next/cli/control-api';
 import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/control';
+import arktypeJson from '@prisma-next/extension-arktype-json/control';
+import arktypeJsonRuntime from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/control';
 import pgvectorRuntime from '@prisma-next/extension-pgvector/runtime';
 import sql from '@prisma-next/family-sql/control';
@@ -37,7 +39,7 @@ function createControlClientForTests(connectionString: string): ControlClient {
     target: postgres,
     adapter: postgresAdapter,
     driver: postgresDriver,
-    extensionPacks: [pgvector],
+    extensionPacks: [pgvector, arktypeJson],
     connection: connectionString,
   });
 }
@@ -195,10 +197,10 @@ export async function withTestRuntime<TContract extends Contract<SqlStorage>>(
     await withClient(connectionString, async (client: Client) => {
       const adapter = createStubAdapter();
       const context = createTestContext(contract, adapter, {
-        extensionPacks: [pgvectorRuntime],
+        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
       });
       const runtime = await createTestRuntimeFromClient(contract, client, {
-        extensionPacks: [pgvectorRuntime],
+        extensionPacks: [pgvectorRuntime, arktypeJsonRuntime],
       });
 
       try {

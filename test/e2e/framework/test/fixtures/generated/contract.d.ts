@@ -15,6 +15,7 @@ import type { Timetz } from '@prisma-next/adapter-postgres/codec-types';
 import type { Interval } from '@prisma-next/adapter-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
+import type { CodecTypes as ArktypeJsonTypes } from '@prisma-next/extension-arktype-json/codec-types';
 import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
@@ -31,13 +32,13 @@ import type {
 } from '@prisma-next/contract/types';
 
 export type StorageHash =
-  StorageHashBase<'sha256:4b1c88cca257a21e91df7b3985253d0d88ed52cd9cc9b793a2328a5611f38075'>;
+  StorageHashBase<'sha256:46a85cfb733bccaef4e3fc232d9d4bbdff9f106e0d409293a38da165658c1105'>;
 export type ExecutionHash =
   ExecutionHashBase<'sha256:adc296c2bde14cd4e6a8a85ba202108dc7a320b5870a14d7dd8e2d2e2f5a7f27'>;
 export type ProfileHash =
   ProfileHashBase<'sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182'>;
 
-export type CodecTypes = PgTypes & PgVectorTypes;
+export type CodecTypes = PgTypes & PgVectorTypes & ArktypeJsonTypes;
 export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
@@ -57,7 +58,7 @@ export type FieldOutputTypes = {
   readonly Embedding: {
     readonly id: CodecTypes['pg/int4@1']['output'];
     readonly embedding: Vector<1536>;
-    readonly profile: { name: string; age: number };
+    readonly profile: { age: number; name: string };
   };
   readonly Event: {
     readonly id: Char<36>;
@@ -115,7 +116,7 @@ export type FieldInputTypes = {
   readonly Embedding: {
     readonly id: CodecTypes['pg/int4@1']['input'];
     readonly embedding: CodecTypes['pg/vector@1']['input'];
-    readonly profile: CodecTypes['pg/jsonb@1']['input'];
+    readonly profile: CodecTypes['arktype/json@1']['input'];
   };
   readonly Event: {
     readonly id: CodecTypes['sql/char@1']['input'];
@@ -224,18 +225,17 @@ type ContractBase = ContractType<
           };
           readonly profile: {
             readonly nativeType: 'jsonb';
-            readonly codecId: 'pg/jsonb@1';
+            readonly codecId: 'arktype/json@1';
             readonly nullable: false;
             readonly typeParams: {
-              readonly schemaJson: {
-                readonly type: 'object';
-                readonly properties: {
-                  readonly name: { readonly type: 'string' };
-                  readonly age: { readonly type: 'number' };
-                };
-                readonly required: readonly ['name', 'age'];
+              readonly expression: '{ age: number, name: string }';
+              readonly jsonIr: {
+                readonly required: readonly [
+                  { readonly key: 'age'; readonly value: 'number' },
+                  { readonly key: 'name'; readonly value: 'string' },
+                ];
+                readonly domain: 'object';
               };
-              readonly type: '{ name: string; age: number }';
             };
           };
         };
@@ -564,17 +564,16 @@ type ContractBase = ContractType<
           readonly nullable: false;
           readonly type: {
             readonly kind: 'scalar';
-            readonly codecId: 'pg/jsonb@1';
+            readonly codecId: 'arktype/json@1';
             readonly typeParams: {
-              readonly schemaJson: {
-                readonly type: 'object';
-                readonly properties: {
-                  readonly name: { readonly type: 'string' };
-                  readonly age: { readonly type: 'number' };
-                };
-                readonly required: readonly ['name', 'age'];
+              readonly expression: '{ age: number, name: string }';
+              readonly jsonIr: {
+                readonly required: readonly [
+                  { readonly key: 'age'; readonly value: 'number' },
+                  { readonly key: 'name'; readonly value: 'string' },
+                ];
+                readonly domain: 'object';
               };
-              readonly type: '{ name: string; age: number }';
             };
           };
         };
@@ -884,6 +883,31 @@ type ContractBase = ContractType<
     };
   };
   readonly extensionPacks: {
+    readonly 'arktype-json': {
+      readonly capabilities: {};
+      readonly familyId: 'sql';
+      readonly id: 'arktype-json';
+      readonly kind: 'extension';
+      readonly targetId: 'postgres';
+      readonly types: {
+        readonly codecTypes: {
+          readonly import: {
+            readonly alias: 'ArktypeJsonTypes';
+            readonly named: 'CodecTypes';
+            readonly package: '@prisma-next/extension-arktype-json/codec-types';
+          };
+        };
+        readonly storage: readonly [
+          {
+            readonly familyId: 'sql';
+            readonly nativeType: 'jsonb';
+            readonly targetId: 'postgres';
+            readonly typeId: 'arktype/json@1';
+          },
+        ];
+      };
+      readonly version: '0.0.1';
+    };
     readonly pgvector: {
       readonly capabilities: { readonly postgres: { readonly 'pgvector.cosine': true } };
       readonly familyId: 'sql';

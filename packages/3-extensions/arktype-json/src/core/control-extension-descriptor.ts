@@ -13,7 +13,8 @@
  */
 
 import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
-import { arktypeJsonCodec } from './arktype-json-codec';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonCodec } from './arktype-json-codec';
+import { arktypeJsonControlPlaneHooks } from './control-hooks';
 import { arktypeJsonPackMeta } from './pack-meta';
 
 export const arktypeJsonExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
@@ -23,7 +24,14 @@ export const arktypeJsonExtensionDescriptor: SqlControlExtensionDescriptor<'post
     codecTypes: {
       ...arktypeJsonPackMeta.types.codecTypes,
       // Register the parameterized codec descriptor with the control stack so
-      // the emitter can read `renderOutputType` off the descriptor.
+      // the emitter can read `renderOutputType` off the descriptor. The
+      // identity-only `controlPlaneHooks.expandNativeType` keeps the migration
+      // planner happy when a column carries typeParams (`jsonb` doesn't
+      // accept dimension-style params, so the native type renders as bare
+      // `jsonb`).
+      controlPlaneHooks: {
+        [ARKTYPE_JSON_CODEC_ID]: arktypeJsonControlPlaneHooks,
+      },
       parameterizedCodecs: [arktypeJsonCodec],
     },
   },
