@@ -12,6 +12,7 @@ import {
   formatCanonicalJson,
   normalizeReviewStateV1,
 } from './review-artifacts.mjs';
+import { renderReviewStateMarkdown } from './render-review-state.mjs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -408,21 +409,6 @@ function deriveOutJsonPath(outPath, outJsonPath) {
   return outPath.replace(/\.md$/i, '.json');
 }
 
-function renderReviewStateMarkdown(reviewState) {
-  const lines = [];
-  lines.push('# Review State');
-  lines.push('');
-  lines.push(`PR: ${reviewState.pr.url ?? ''}`);
-  lines.push(`FetchedAt: ${reviewState.fetchedAt}`);
-  lines.push(`SourceBranch: ${reviewState.sourceBranch ?? 'N/A'}`);
-  lines.push('');
-  lines.push(`Unresolved threads: ${reviewState.reviewThreads.length}`);
-  lines.push(`Reviews with body: ${reviewState.reviews.length}`);
-  lines.push(`Issue comments: ${reviewState.issueComments.length}`);
-  lines.push('');
-  return `${lines.join('\n')}\n`;
-}
-
 async function writeOutput(outPath, text) {
   if (!outPath || outPath === '-') {
     process.stdout.write(text);
@@ -501,9 +487,11 @@ async function main() {
   });
   assertReviewStateV1(reviewState);
 
-  const markdown = renderReviewStateMarkdown(reviewState);
   const jsonText = formatCanonicalJson(reviewState);
   const outJsonPath = deriveOutJsonPath(options.outPath, options.outJsonPath);
+  const markdown = renderReviewStateMarkdown(reviewState, {
+    sourcePath: outJsonPath && outJsonPath !== '-' ? outJsonPath : undefined,
+  });
 
   if (options.outPath !== null) {
     await writeOutput(options.outPath, markdown);
