@@ -573,6 +573,35 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       expect(conflict?.span?.start.offset).toBeGreaterThan(0);
       expect(conflict?.span?.end.offset).toBeGreaterThan(conflict?.span?.start.offset ?? 0);
     });
+
+    it('emits PSL_INDEX_FIELD_NOT_FOUND when a variant indexes a base-inherited field (AC-M3-07)', () => {
+      const result = interpret(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([title])
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/title/);
+      expect(diag?.message).toMatch(/Bug/);
+      expect(diag?.span?.start.offset).toBeGreaterThan(0);
+    });
   });
 
   describe('FL-10: polymorphic validators', () => {

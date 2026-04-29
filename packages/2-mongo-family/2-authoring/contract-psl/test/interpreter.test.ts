@@ -1351,6 +1351,98 @@ describe('interpretPslDocumentToMongoContract', () => {
         ).toBe(true);
       }
     });
+
+    it('rejects @@index that references an undeclared field', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([nonexistent])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/nonexistent/);
+      expect(diag?.message).toMatch(/User/);
+      expect(diag?.span?.start.offset).toBeGreaterThan(0);
+      expect(diag?.span?.end.offset).toBeGreaterThan(diag?.span?.start.offset ?? 0);
+    });
+
+    it('rejects @@unique that references an undeclared field', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@unique([nonexistent])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/nonexistent/);
+    });
+
+    it('rejects @@textIndex that references an undeclared field', () => {
+      const result = interpret(`
+        model Article {
+          id    ObjectId @id @map("_id")
+          title String
+          @@textIndex([nonexistent])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/nonexistent/);
+    });
+
+    it('rejects @@index wildcard scope referencing an undeclared field', () => {
+      const result = interpret(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard(nonexistent)])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/nonexistent/);
+    });
+
+    it('emits one diagnostic naming the missing field when one of multiple keys is undeclared', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          email String
+          @@index([email, nonexistent])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diags = result.failure.diagnostics.filter(
+        (d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND',
+      );
+      expect(diags).toHaveLength(1);
+      expect(diags[0]?.message).toMatch(/nonexistent/);
+      expect(diags[0]?.message).not.toMatch(/email/);
+    });
+
+    it('accepts @@index([wildcard()]) (unscoped wildcard) without a field-existence diagnostic', () => {
+      const ir = interpretOk(`
+        model Events {
+          id       ObjectId @id @map("_id")
+          metadata String
+          @@index([wildcard()])
+        }
+      `);
+      expect(ir).toBeDefined();
+    });
   });
 
   describe('validator derivation', () => {

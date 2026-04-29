@@ -581,6 +581,31 @@ function collectIndexes(
       continue;
     }
 
+    let missingField: string | undefined;
+    for (const pf of parsedFields) {
+      let fieldNameForLookup: string | undefined;
+      if (pf.isWildcard) {
+        const wildcardMatch = pf.name.match(/^(.+)\.\$\*\*$/);
+        fieldNameForLookup = wildcardMatch ? wildcardMatch[1] : undefined;
+      } else {
+        fieldNameForLookup = pf.name;
+      }
+      if (fieldNameForLookup === undefined || fieldNameForLookup.length === 0) continue;
+      if (!fieldMappings.pslNameToMapped.has(fieldNameForLookup)) {
+        missingField = fieldNameForLookup;
+        break;
+      }
+    }
+    if (missingField !== undefined) {
+      diagnostics.push({
+        code: 'PSL_INDEX_FIELD_NOT_FOUND',
+        message: `Index on model "${pslModel.name}" references unknown field "${missingField}"`,
+        sourceId,
+        span: attr.span,
+      });
+      continue;
+    }
+
     const keys = parsedFields.map((pf) => {
       const mappedName = pf.isWildcard
         ? pf.name.replace(/^(.+)\.\$\*\*$/, (_, prefix: string) => {
