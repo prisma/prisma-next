@@ -30,6 +30,7 @@ model Post {
 model Article {
   summary   String
   @@base(Post, "article")
+  @@unique([summary])
 }
 
 model Tutorial {
