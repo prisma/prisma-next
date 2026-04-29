@@ -356,10 +356,11 @@ describe('adapter-postgres codecs', () => {
       expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
     });
 
-    // M1: paramsSchema and init have moved off the codec object onto
-    // ParameterizedCodecDescriptor (framework-components) / SqlStaticContributions
-    // (sql-runtime). Production codecs migrate to the curried-factory shape in M4
-    // ([TML-2330]); presence-on-codec assertions are removed accordingly.
+    // paramsSchema and init have moved off the codec object onto
+    // CodecDescriptor (framework-components) / SqlStaticContributions
+    // (sql-runtime). Production codecs ship as descriptors with curried
+    // factories — see ADR 205. Presence-on-codec assertions are removed
+    // accordingly.
   });
 
   describe('encodeJson / decodeJson', () => {

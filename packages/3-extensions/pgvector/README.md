@@ -203,7 +203,7 @@ The extension declares the following capabilities:
 Two surfaces ship from this extension:
 
 - **`vector(N)`** (`@prisma-next/extension-pgvector/column-types`) — the column-author factory. Returns a `ColumnTypeDescriptor` whose `type` slot carries the curried factory for the no-emit resolver.
-- **`pgVectorCodec`** (`@prisma-next/extension-pgvector/codecs`) — the framework-registration `ParameterizedCodecDescriptor<{ length: number }>` that pairs the factory with `paramsSchema` (Standard Schema validating `length` at the JSON boundary) and `renderOutputType` (the emit-path renderer that stamps `Vector<N>` into `contract.d.ts`).
+- **`pgVectorCodec`** (`@prisma-next/extension-pgvector/codecs`) — the framework-registration `CodecDescriptor<{ length: number }>` that pairs the factory with codec-id-keyed metadata (`traits`, `targetTypes`), `paramsSchema` (Standard Schema validating `length` at the JSON boundary), and `renderOutputType` (the emit-path renderer that stamps `Vector<N>` into `contract.d.ts`).
 
 The control descriptor (`@prisma-next/extension-pgvector/control`) registers `pgVectorCodec` through the framework's `parameterizedCodecs` slot. The runtime descriptor (`@prisma-next/extension-pgvector/runtime`) registers it through the runtime adapter's parameterized-codecs slot for contract-load materialization.
 
@@ -223,7 +223,7 @@ const Post = model('Post', {
 
 The runtime aggregates every column referencing `Embedding1536` into a single `Ctx.usedAt` and calls the factory once for the whole set; inline `vector(1536)` produces an anonymous instance per column.
 
-See [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale; the `Ctx` and `ParameterizedCodecDescriptor` primitives are documented in `@prisma-next/framework-components`'s README.
+See [ADR 205 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the design rationale; the `Ctx` and `CodecDescriptor` primitives are documented in `@prisma-next/framework-components`'s README.
 
 ## References
 
