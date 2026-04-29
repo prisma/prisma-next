@@ -1,12 +1,12 @@
 # react-router-demo
 
-A minimal React Router v7 Framework Mode example that proves Prisma Next's Vite plugin re-emits contract artifacts on save, inside a real framework. Closes [April VP3](../../docs/planning/april-milestone.md).
+A minimal React Router v7 Framework Mode example that proves Prisma Next's Vite plugin re-emits contract artifacts on save, inside a real framework.
 
 ## What this demonstrates
 
 - `@prisma-next/vite-plugin-contract-emit` auto-emits `contract.json` + `contract.d.ts` on dev-server startup and on every contract edit.
 - A React Router `loader` and `action` on `/` exercise the Prisma Next runtime against Postgres via the emitted contract.
-- Editing `prisma/schema.prisma` (or `prisma/contract.ts`) while `pnpm dev` is running re-emits the artifacts — no manual `prisma-next contract emit`.
+- Editing `prisma/contract.prisma` (or `prisma/contract.ts`) while `pnpm dev` is running re-emits the artifacts — no manual `prisma-next contract emit`.
 
 ## Prerequisites
 
@@ -29,7 +29,7 @@ Open <http://localhost:5173>. Create a user via the form; the list revalidates a
 The same `prisma-next.config.ts` supports both PSL and TypeScript contract authoring, selected at dev-server startup by one env var:
 
 ```bash
-# PSL (default) — watches prisma/schema.prisma
+# PSL (default) — watches prisma/contract.prisma
 pnpm dev
 
 # TypeScript — watches prisma/contract.ts
@@ -38,11 +38,11 @@ PRISMA_NEXT_CONTRACT_SOURCE=ts pnpm dev
 
 Re-toggling mid-session requires restarting the dev server; the config is read once at startup.
 
-## Proving the VP3 stop condition by hand
+## Proving auto-emit by hand
 
 1. `pnpm dev`
 2. Load <http://localhost:5173> and submit the form once to confirm the runtime works.
-3. Edit `prisma/schema.prisma` — add a nullable column to `model User`, e.g. `nickname String?`.
+3. Edit `prisma/contract.prisma` — add a nullable column to `model User`, e.g. `nickname String?`.
 4. Save. The dev server emits a new `src/prisma/contract.json` and `src/prisma/contract.d.ts` without any command.
 5. Reload the page. The app still serves; types in your editor pick up the new field.
 
@@ -52,7 +52,7 @@ For the TypeScript path, start with `PRISMA_NEXT_CONTRACT_SOURCE=ts pnpm dev` an
 
 This example keeps a small module-local runtime cache in `app/lib/db.server.ts`. When Vite re-executes that module after a contract re-emit, the `import.meta.hot.dispose()` handler closes the old pool and clears the cached client so the next request rebuilds the runtime from the fresh `contract.json`.
 
-That is enough for this validation app, but it is still example-local and depends on Vite's module invalidation path. A future hash-keyed dev helper (tracked as APR-VP3-07 in Linear; not in this stack) will make stale-runtime avoidance explicit and reusable across frameworks.
+That is enough for this validation app, but it is still example-local and depends on Vite's module invalidation path. A future hash-keyed dev helper could make stale-runtime avoidance explicit and reusable across frameworks.
 
 ## Scripts
 

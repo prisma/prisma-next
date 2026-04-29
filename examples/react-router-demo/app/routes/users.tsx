@@ -4,7 +4,11 @@ import type { Route } from './+types/users';
 
 export async function loader() {
   const db = getDb();
-  const plan = db.sql.user.select('id', 'email', 'createdAt').limit(20).build();
+  const plan = db.sql.user
+    .select('id', 'email', 'createdAt')
+    .orderBy('createdAt', { direction: 'desc' })
+    .limit(20)
+    .build();
   const rows = await db.runtime().execute(plan);
   return { rows };
 }
