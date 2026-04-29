@@ -33,7 +33,7 @@ Pull the diff via `git show <sha>` or `git diff <base>..HEAD`.
 
 **Implementer's structured report follows.** Use it for context and to know what to triage; do **not** use it as primary evidence. Read code on disk.
 
-```
+```text
 <paste implementer's full report here>
 ```
 
