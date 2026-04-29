@@ -139,7 +139,7 @@ So this repo's `install` and `name` win for everyone. Snapshot references typica
 The snapshot ID is **not** committed in this repo. Reasoning:
 
 - Snapshots are tied to a Cursor account/workspace, not to git history. Pinning one user's snapshot ID in `environment.json` couples the repo config to that account.
-- The agent-driven setup flow writes the snapshot reference into personal or team config by default, and the resolution order above means team config wins for everyone unless overridden.
+- The agent-driven setup flow writes the snapshot reference into personal or team config by default. Per the resolution order above, your personal snapshot setting overrides the team setting when both are configured; the team setting applies as a fallback for accounts that have not set a personal snapshot.
 - The `install` command stays in the repo (reproducible, reviewable). The snapshot stays in team config (mutable infra detail, can be rebuilt on demand).
 
 If reproducibility-of-base-image ever matters more than account-portability, you can flip this by adding `"snapshot": "<id>"` to `environment.json`.
@@ -239,7 +239,7 @@ Cursor can be invoked from a failing CI workflow via the [CI autofix capability]
 - **Node version**: pinned to `>=24` via `engines.node` in [`package.json`](../../package.json). If the snapshot ships an older Node, install Node 24 once during the snapshot step at <https://cursor.com/onboard>; do not put Node installation in `install` (it should stay cheap).
 - **Sanity command**: `pnpm test:packages` is the cheapest end-to-end signal that the workspace is healthy — recommend it as a smoke test for any new snapshot.
 - **Heavier suites**: `pnpm test:integration` and `pnpm test:e2e` need outside resources (Postgres, etc.). Provide credentials via dashboard secrets and confirm before invoking from a cloud agent.
-- **Linting & layering**: prefer `pnpm lint`, `pnpm lint:deps`, `pnpm lint:rules`, `pnpm lint:docs`. Treat layering violations as errors to fix, never to bypass — see [`.cursor/rules/import-validation.mdc`](../../.cursor/rules/import-validation.mdc) (local-only file; rule is mirrored in `AGENTS.md`).
+- **Linting & layering**: prefer `pnpm lint`, `pnpm lint:deps`, `pnpm lint:rules`, `pnpm lint:docs`. Treat layering violations as errors to fix, never to bypass — see the layering rule under [`AGENTS.md` § Boundaries & Safety Rails](../../AGENTS.md#boundaries--safety-rails) (committed; the optional `.cursor/rules/import-validation.mdc` is a local-only mirror).
 - **Fixtures**: use `pnpm fixtures:check` rather than ad-hoc emit-and-diff.
 - **Codex parity**: when you change the install sequence in `environment.json`, update [`.codex/environments/environment.toml`](../../.codex/environments/environment.toml) to match. Both files describe the same bootstrap; we want them aligned.
 
