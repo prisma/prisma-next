@@ -335,6 +335,31 @@ export const sqlEmission = {
       "export type Models = Contract['models'];",
     ].join('\n');
   },
+
+  resolveFieldTypeParams(
+    _modelName: string,
+    fieldName: string,
+    model: ContractModel,
+    contract: Contract,
+  ): Record<string, unknown> | undefined {
+    // SQL columns authored via a named `storage.types` entry carry their
+    // typeRef on the storage column (`storage.tables[t].columns[c].typeRef`),
+    // not on the framework's domain `ContractField`. To render the column's
+    // parameterized output type, the framework emit path needs the typeParams
+    // from `storage.types[ref]`; this method walks that lookup.
+    const sqlStorage = contract.storage as unknown as SqlStorage | undefined;
+    const sqlModel = model as ContractModel<SqlModelStorage>;
+    const tableName = sqlModel.storage?.table;
+    const columnName = sqlModel.storage?.fields?.[fieldName]?.column;
+    if (!sqlStorage || !tableName || !columnName) return undefined;
+    const column = sqlStorage.tables?.[tableName]?.columns?.[columnName] as
+      | { readonly typeRef?: string }
+      | undefined;
+    const typeRef = column?.typeRef;
+    if (!typeRef) return undefined;
+    const typeInstance = sqlStorage.types?.[typeRef];
+    return typeInstance?.typeParams;
+  },
 } as const;
 
 function generateStorageTypesType(types: SqlStorage['types']): string {

@@ -915,6 +915,82 @@ describe('generateFieldOutputTypesMap', () => {
     expect(result).toContain("CodecTypes['pg/text@1']['output']");
   });
 
+  it('renders parameterized output type for typeRef fields via the resolver callback', () => {
+    // The defect: `field.type.typeParams` is undefined for typeRef'd columns
+    // (the typeParams live on the named `storage.types` entry the column
+    // points at). `generateFieldOutputTypesMap` must consult the family
+    // emitter's resolver to recover those typeParams; otherwise the field
+    // emits as the codec base output (`CodecTypes['…']['output']`) instead
+    // of the descriptor's rendered parameterized type. See ADR 205.
+    const codecLookup = stubCodecLookup({ 'pg/vector@1': stubCodec({ id: 'pg/vector@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/vector@1': (p) => `Vector<${p['length']}>`,
+    });
+    const models: Record<string, ContractModel> = {
+      Post: {
+        fields: {
+          // Authored as `field.namedType(types.Embedding1536)`; the IR omits
+          // typeParams on the model field.
+          embedding: {
+            nullable: true,
+            type: { kind: 'scalar', codecId: 'pg/vector@1' },
+          },
+        },
+        relations: {},
+        storage: { fields: { embedding: { column: 'embedding' } }, table: 'post' },
+      },
+    };
+    const resolveTypeParams = (modelName: string, fieldName: string) =>
+      modelName === 'Post' && fieldName === 'embedding' ? { length: 1536 } : undefined;
+    const result = generateFieldOutputTypesMap(
+      models,
+      codecLookup,
+      parameterizedLookup,
+      resolveTypeParams,
+    );
+    expect(result).toContain('Vector<1536>');
+    // Sanity: nullability still applied uniformly.
+    expect(result).toContain('Vector<1536> | null');
+    // Regression: when the resolver returns undefined, we still fall through
+    // to the codec base output (no false positive renderings).
+    const noResolverResult = generateFieldOutputTypesMap(models, codecLookup, parameterizedLookup);
+    expect(noResolverResult).toContain("CodecTypes['pg/vector@1']['output']");
+    expect(noResolverResult).not.toContain('Vector<');
+  });
+
+  it('inline-typeParams fields take precedence over the resolver callback', () => {
+    // Inline `typeParams` on a model field is the IR's self-contained shape;
+    // when present, the field should not consult the resolver callback. This
+    // is the regression guard for the existing inline path while the resolver
+    // is added for typeRef'd fields.
+    const codecLookup = stubCodecLookup({ 'pg/char@1': stubCodec({ id: 'pg/char@1' }) });
+    const parameterizedLookup = stubParameterizedCodecLookup({
+      'pg/char@1': (p) => `Char<${p['length']}>`,
+    });
+    const models: Record<string, ContractModel> = {
+      User: {
+        fields: {
+          id: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/char@1', typeParams: { length: 36 } },
+          },
+        },
+        relations: {},
+        storage: { fields: { id: { column: 'id' } }, table: 'user' },
+      },
+    };
+    const resolveTypeParams = vi.fn(() => ({ length: 999 }));
+    const result = generateFieldOutputTypesMap(
+      models,
+      codecLookup,
+      parameterizedLookup,
+      resolveTypeParams,
+    );
+    expect(result).toContain('Char<36>');
+    expect(result).not.toContain('Char<999>');
+    expect(resolveTypeParams).not.toHaveBeenCalled();
+  });
+
   it('returns Record<string, never> for empty models', () => {
     expect(generateFieldOutputTypesMap(undefined)).toBe('Record<string, never>');
     expect(generateFieldOutputTypesMap({})).toBe('Record<string, never>');

@@ -76,10 +76,29 @@ export function generateContractDts(
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
 
+  // Build a per-field typeParams resolver from the family emitter's optional
+  // `resolveFieldTypeParams` SPI method. Families that use named storage
+  // types (SQL) implement it; families that don't (Mongo) leave it
+  // undefined and the framework emit path falls through to the codec base
+  // output type as before.
+  const models = contract.models as Record<string, ContractModel>;
+  const resolveFieldTypeParams = emitter.resolveFieldTypeParams
+    ? (modelName: string, fieldName: string) => {
+        const model = models[modelName];
+        if (!model) return undefined;
+        // emitter is non-null inside the closure capture; readability:
+        // pull the method out so the optional-chaining noise is at the
+        // construction boundary rather than at every per-field call.
+        const resolver = emitter.resolveFieldTypeParams;
+        return resolver ? resolver(modelName, fieldName, model, contract) : undefined;
+      }
+    : undefined;
+
   const fieldTypesMaps = generateBothFieldTypesMaps(
-    contract.models as Record<string, ContractModel> | undefined,
+    models,
     codecLookup,
     parameterizedCodecLookup,
+    resolveFieldTypeParams,
   );
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
