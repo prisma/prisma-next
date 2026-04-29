@@ -1,7 +1,10 @@
 import { AsyncIterableResult } from './async-iterable-result';
+import type { CodecCallContext } from './codec-types';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { runWithMiddleware } from './run-with-middleware';
+import { runtimeAborted } from './runtime-error';
 import type {
+  RuntimeExecuteOptions,
   RuntimeExecutor,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
@@ -71,8 +74,13 @@ export abstract class RuntimeCore<
    * Lower a pre-lowering `TPlan` into the family's executable `TExec`.
    * Family-specific: SQL produces `{ sql, params, ast?, ... }`; Mongo
    * produces `{ command, ... }`.
+   *
+   * The optional `ctx` carries per-query cancellation (and any future
+   * fields on `CodecCallContext`); concrete subclasses forward it to the
+   * encode-side codec dispatch site (e.g. SQL's `encodeParams` in m2,
+   * Mongo's `resolveValue` in m3).
    */
-  protected abstract lower(plan: TPlan): TExec | Promise<TExec>;
+  protected abstract lower(plan: TPlan, ctx?: CodecCallContext): TExec | Promise<TExec>;
 
   /**
    * Drive the underlying transport for a lowered `TExec`. Yields raw rows
@@ -88,12 +96,23 @@ export abstract class RuntimeCore<
 
   abstract close(): Promise<void>;
 
-  execute<Row>(plan: TPlan & { readonly _row?: Row }): AsyncIterableResult<Row> {
+  execute<Row>(
+    plan: TPlan & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row> {
     const self = this;
+    const signal = options?.signal;
+    const codecCtx: CodecCallContext | undefined = signal ? { signal } : undefined;
 
     async function* generator(): AsyncGenerator<Row, void, unknown> {
+      // Pre-check the signal at entry so an already-aborted caller observes
+      // RUNTIME.ABORTED on the first `next()` without any work being done.
+      if (signal?.aborted) {
+        throw runtimeAborted('stream', signal.reason);
+      }
+
       const compiled = await self.runBeforeCompile(plan);
-      const exec = await self.lower(compiled);
+      const exec = await self.lower(compiled, codecCtx);
       // The driver yields raw `Record<string, unknown>`; we cast to `Row` here.
       // The Row contract is enforced by the caller via `plan._row`.
       yield* runWithMiddleware<TExec, Row>(
