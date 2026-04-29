@@ -41,16 +41,21 @@ flowchart LR
 {
   "$schema": "https://www.cursor.com/schemas/environment.schema.json",
   "name": "prisma-next",
-  "install": "corepack enable && pnpm install --frozen-lockfile && pnpm build && pnpm install"
+  "repositoryDependencies": [
+    "https://github.com/prisma/ignite"
+  ],
+  "install": "set -euo pipefail; corepack enable >/dev/null 2>&1 || true; pnpm install --frozen-lockfile; IGNITE_DIR=\"$HOME/ignite\"; if [ ! -d \"$IGNITE_DIR/.git\" ]; then git clone https://github.com/prisma/ignite \"$IGNITE_DIR\"; else git -C \"$IGNITE_DIR\" fetch --quiet origin && git -C \"$IGNITE_DIR\" reset --quiet --hard origin/HEAD; fi"
 }
 ```
 
 Walk-through of the install command:
 
-- `corepack enable` — activates the `packageManager`-pinned pnpm from `package.json` so the cloud VM uses the exact pnpm version we use locally.
+- `set -euo pipefail` — fails fast when any bootstrap step fails.
+- `corepack enable >/dev/null 2>&1 || true` — activates the `packageManager`-pinned pnpm from `package.json` when Corepack is available, while staying idempotent on images where Corepack is already enabled or unavailable.
 - `pnpm install --frozen-lockfile` — reproducible deps from `pnpm-lock.yaml`; fails if the lockfile is out of date.
-- `pnpm build` — Turbo build of all packages.
-- `pnpm install` (again) — refreshes `node_modules/<pkg>/dist/*.d.mts` symlinks in workspace consumers after Turbo has emitted declarations. Required by the "if you change exported types, run that package's `pnpm build` to refresh `dist/*.d.mts`" rule in [`AGENTS.md`](../../AGENTS.md#golden-rules).
+- `IGNITE_DIR="$HOME/ignite"; ...` — ensures the Ignite repository exists at the documented cloud-agent path. The command clones `https://github.com/prisma/ignite` on first boot and fetches plus hard-resets to `origin/HEAD` on later boots so the checkout stays current and idempotent.
+
+The `repositoryDependencies` entry declares the Ignite repository dependency to Cursor so cloud agents have the required repository access before the install command clones or refreshes it.
 
 The `install` command **must be idempotent** because Cursor re-runs it on every boot after restoring the snapshot.
 
