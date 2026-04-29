@@ -197,6 +197,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/extension-arktype-json':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/arktype-json
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../packages/3-extensions/pgvector
@@ -3093,6 +3096,9 @@ importers:
       '@prisma-next/driver-sqlite':
         specifier: workspace:*
         version: link:../../../packages/3-targets/7-drivers/sqlite
+      '@prisma-next/extension-arktype-json':
+        specifier: workspace:*
+        version: link:../../../packages/3-extensions/arktype-json
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../../packages/3-extensions/pgvector
@@ -3184,6 +3190,9 @@ importers:
       '@prisma-next/emitter':
         specifier: workspace:*
         version: link:../../packages/1-framework/3-tooling/emitter
+      '@prisma-next/extension-arktype-json':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/arktype-json
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../packages/3-extensions/pgvector

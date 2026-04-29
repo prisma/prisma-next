@@ -5,6 +5,7 @@ import {
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -391,7 +392,7 @@ test('contract structure type matches Contract', () => {
   expectTypeOf(contract).toHaveProperty('storage');
 });
 
-test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
+test('arktype-json column preserves JsonValue fallback in no-emit type path', () => {
   const payloadSchema = arktype({
     action: 'string',
     actorId: 'number',
@@ -404,7 +405,7 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
       Event: model('Event', {
         fields: {
           id: field.column(int4Column).id(),
-          payload: field.column(jsonb(payloadSchema)),
+          payload: field.column(arktypeJson(payloadSchema)),
           meta: field.column(jsonb()),
         },
       }).sql({ table: 'event' }),

@@ -17,6 +17,7 @@ import {
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
@@ -24,21 +25,11 @@ import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { type as arktype } from 'arktype';
 
 const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack]);
 
-const profileSchema = {
-  '~standard': {
-    jsonSchema: {
-      output: () => ({
-        type: 'object',
-        properties: { name: { type: 'string' }, age: { type: 'number' } },
-        required: ['name', 'age'],
-      }),
-    },
-  },
-  expression: '{ name: string; age: number }',
-};
+const profileSchema = arktype({ name: 'string', age: 'number' });
 
 export const contract = defineContract({
   family: sqlFamily,
@@ -133,7 +124,7 @@ export const contract = defineContract({
       fields: {
         id: field.column(int4Column).defaultSql('autoincrement()').id(),
         embedding: field.column(vector(1536)),
-        profile: field.column(jsonb(profileSchema)),
+        profile: field.column(arktypeJson(profileSchema)),
       },
     }).sql({ table: 'embedding' }),
   },

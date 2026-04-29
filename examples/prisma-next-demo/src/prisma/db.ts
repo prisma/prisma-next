@@ -1,3 +1,4 @@
+import arktypeJson from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import postgres from '@prisma-next/postgres/runtime';
@@ -7,7 +8,7 @@ import contractJson from './contract.json' with { type: 'json' };
 
 export const db = postgres<Contract>({
   contractJson,
-  extensions: [pgvector],
+  extensions: [pgvector, arktypeJson],
   middleware: [
     createTelemetryMiddleware(),
     lints(),

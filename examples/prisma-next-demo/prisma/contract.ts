@@ -1,13 +1,23 @@
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
+import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { type as arktype } from 'arktype';
+
+const addressSchema = arktype({
+  street: 'string',
+  city: 'string',
+  'zip?': 'string',
+  country: 'string',
+});
 
 export const contract = defineContract(
   {
     family: sqlFamily,
     target: postgresPack,
-    extensionPacks: { pgvector },
+    extensionPacks: { pgvector, arktypeJson: arktypeJsonPack },
     capabilities: {
       postgres: {
         lateral: true,
@@ -31,7 +41,10 @@ export const contract = defineContract(
         email: field.text(),
         createdAt: field.createdAt(),
         kind: field.namedType(types.user_type),
-        address: field.json().optional(),
+        // Schema-validated JSON column via the per-library extension. The
+        // column's TS type resolves to the schema's inferred output through
+        // arktype's `expression`-driven `renderOutputType`.
+        address: field.column(arktypeJson(addressSchema)).optional(),
       },
     });
 
