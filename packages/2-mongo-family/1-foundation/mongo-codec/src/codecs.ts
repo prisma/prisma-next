@@ -1,5 +1,9 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
+import type {
+  Codec as BaseCodec,
+  CodecCallContext,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type MongoCodecTrait = CodecTrait;
@@ -62,17 +66,28 @@ export function mongoCodec<
     typeId: Id;
     targetTypes: readonly string[];
     traits?: TTraits;
-    encode?: (value: TInput) => TWire | Promise<TWire>;
-    decode: (wire: TWire) => TInput | Promise<TInput>;
+    encode?:
+      | ((value: TInput) => TWire | Promise<TWire>)
+      | ((value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>);
+    decode:
+      | ((wire: TWire) => TInput | Promise<TInput>)
+      | ((wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>);
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   // The synchronous identity default is only safe when the author has
   // declared "the input is already the wire value" (i.e. TInput == TWire);
-  // it returns the value directly, never a Promise.
-  const userEncode = config.encode ?? ((value: TInput) => value as unknown as TWire);
-  const userDecode = config.decode;
+  // it returns the value directly, never a Promise. Authors who want the
+  // identity default never observe `ctx`, so the parameter is omitted here.
+  // The union typing on `config.encode` / `config.decode` (single- or two-
+  // arg authors) preserves TInput inference at call sites; widen to the
+  // two-arg shape inside the factory body so the lift can forward ctx.
+  type CtxEncode = (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
+  type CtxDecode = (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
+  const userEncode: CtxEncode =
+    (config.encode as CtxEncode | undefined) ?? ((value: TInput) => value as unknown as TWire);
+  const userDecode: CtxDecode = config.decode as CtxDecode;
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;
     decodeJson?: (json: JsonValue) => TInput;
@@ -85,16 +100,16 @@ export function mongoCodec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: (value) => {
+    encode: (value, ctx) => {
       try {
-        return Promise.resolve(userEncode(value));
+        return Promise.resolve(userEncode(value, ctx));
       } catch (error) {
         return Promise.reject(error);
       }
     },
-    decode: (wire) => {
+    decode: (wire, ctx) => {
       try {
-        return Promise.resolve(userDecode(wire));
+        return Promise.resolve(userDecode(wire, ctx));
       } catch (error) {
         return Promise.reject(error);
       }
