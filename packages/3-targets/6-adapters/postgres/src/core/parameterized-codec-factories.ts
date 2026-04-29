@@ -2,7 +2,7 @@
  * Curried higher-order codec factories for Postgres parameterized codecs.
  *
  * Each function produces a `(ctx) => Codec<…, BrandedJs<Param>>` keyed by the
- * literal type parameter so M2's no-emit `FieldOutputType` can derive the
+ * literal type parameter so the no-emit `FieldOutputType` can derive the
  * column's resolved JS type as the brand (e.g. `Char<36>`, `Numeric<10, 2>`).
  *
  * All Postgres parameterized codecs are stateless at the per-instance level
@@ -13,9 +13,7 @@
  * The framework-registration descriptors at `./codec-descriptors.ts` reuse
  * these factories via `(params) => factoryFor(params)`; the column-author
  * surfaces at `../exports/column-types.ts` reuse them via `type:
- * factoryFor(arg)`.
- *
- * Codec-model-unification project, M4 task T2.
+ * factoryFor(arg)`. See [ADR 205](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

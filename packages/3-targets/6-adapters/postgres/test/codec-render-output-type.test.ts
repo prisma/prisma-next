@@ -19,11 +19,10 @@ import {
   sqlVarcharCodec,
 } from '../src/codecs/postgres-codec-descriptors';
 
-// M4 cleanup F01: `renderOutputType` was retired from the codec object and
-// now lives on `ParameterizedCodecDescriptor.renderOutputType`. The
-// descriptor's `paramsSchema` validates inputs upstream; tests below assert
-// the renderer's output for valid inputs only (the throw-on-bad-input
-// assertions are obsolete because paramsSchema now guards the input).
+// `renderOutputType` lives on `ParameterizedCodecDescriptor.renderOutputType`
+// rather than on the codec object; the descriptor's `paramsSchema` validates
+// inputs upstream of the renderer, so tests below assert the renderer's output
+// for valid inputs only. See ADR 205.
 describe('parameterized codec descriptor renderOutputType', () => {
   describe('pg/char@1', () => {
     it('renders Char<length>', () => {

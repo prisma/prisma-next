@@ -74,9 +74,9 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
       controlPlaneHooks: {
         [PGVECTOR_CODEC_ID]: vectorControlPlaneHooks,
       },
-      // M4 cleanup F03: register the parameterized codec descriptor with the
-      // control stack so the emitter can read `renderOutputType` off the
-      // descriptor (the spec's long-term home).
+      // Register the parameterized codec descriptor with the control stack so
+      // the emitter can read `renderOutputType` off the descriptor (the long-
+      // term home for parameterized rendering; see ADR 205).
       parameterizedCodecs: [pgVectorCodec],
     },
   },

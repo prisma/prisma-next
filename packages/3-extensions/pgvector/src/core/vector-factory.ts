@@ -9,12 +9,10 @@
  *   (`pgVectorCodec.factory` unwraps `params.length` and delegates here).
  *
  * The factory's TS return signature carries the resolved JS type
- * (`Vector<N>`); M2's no-emit `FieldOutputType` reads the `Js` slot off
+ * (`Vector<N>`); the no-emit `FieldOutputType` reads the `Js` slot off
  * `Codec<…, Js>` directly. The runtime side calls `factory(params)(ctx)` once
- * per `storage.types` instance via `initializeTypeHelpers` (M1 R2 wiring) to
- * route per-instance state.
- *
- * Codec-model-unification project, M4 T1.
+ * per `storage.types` instance via `initializeTypeHelpers` to route per-
+ * instance state. See [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

@@ -5,9 +5,7 @@
  * SQL runtime via the `parameterizedCodecs` slot; `sql-runtime`'s
  * `initializeTypeHelpers` calls `pgVectorCodec.factory(typeParams)(ctx)` once
  * per `storage.types` instance keyed by `pg/vector@1` to materialize the
- * resolved codec for that instance.
- *
- * Codec-model-unification project, M4 T1.
+ * resolved codec for that instance. See [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { ParameterizedCodecDescriptor } from '@prisma-next/framework-components/codec';

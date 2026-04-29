@@ -114,11 +114,10 @@ describe('mongoVectorCodec', () => {
   });
 });
 
-// M4 cleanup F01: `renderOutputType` was retired from the Mongo `Codec`
-// extension and now lives on `mongoVectorParameterizedCodec` (a
-// `ParameterizedCodecDescriptor`). The descriptor's paramsSchema validates
-// upstream of the renderer; tests below assert the renderer's output for
-// valid inputs only.
+// `renderOutputType` lives on `mongoVectorParameterizedCodec` (a
+// `ParameterizedCodecDescriptor`) rather than on the Mongo `Codec` extension;
+// the descriptor's `paramsSchema` validates upstream of the renderer, so tests
+// below assert the renderer's output for valid inputs only. See ADR 205.
 describe('mongoVectorParameterizedCodec.renderOutputType', () => {
   it('renders Vector<length>', async () => {
     const { mongoVectorParameterizedCodec } = await import('../src/exports/codecs');

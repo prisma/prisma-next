@@ -54,9 +54,7 @@ export interface ComponentMetadata {
        *
        * The control stack assembles a lookup keyed by `codecId` and threads it
        * through the emit path so `renderOutputType` is read off the descriptor
-       * (the spec's long-term home) rather than off the codec object.
-       *
-       * Codec-model-unification project, M4 cleanup F03.
+       * rather than off the codec object. See [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
        */
       // biome-ignore lint/suspicious/noExplicitAny: descriptors carry distinct param shapes per codec; the registry is heterogeneous.
       readonly parameterizedCodecs?: ReadonlyArray<ParameterizedCodecDescriptor<any>>;

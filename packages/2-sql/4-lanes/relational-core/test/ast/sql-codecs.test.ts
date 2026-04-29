@@ -140,8 +140,8 @@ describe('sql-codecs', () => {
     expect(timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
   });
 
-  // M4 cleanup F01: `renderOutputType` was retired from the SQL `Codec`
-  // extension. Per-codec renderer assertions migrated to descriptor-level
-  // tests at `packages/3-targets/6-adapters/postgres/test/codec-render-output-type.test.ts`
-  // (where the descriptors live).
+  // `renderOutputType` is no longer carried on the SQL `Codec` extension; per-
+  // codec renderer assertions live next to the descriptors at
+  // `packages/3-targets/6-adapters/postgres/test/codec-render-output-type.test.ts`.
+  // See ADR 205.
 });

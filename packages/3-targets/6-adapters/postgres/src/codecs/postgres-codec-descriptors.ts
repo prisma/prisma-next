@@ -3,12 +3,10 @@
  *
  * Each descriptor pairs a codec id with a curried higher-order codec factory
  * (from `../core/parameterized-codec-factories.ts`), a Standard-Schema params
- * validator, and an emit-path renderer. The renderer logic was lifted from
- * the pre-M4 codec-object `renderOutputType` hooks so the emit path produces
- * byte-identical output once the codec-object hooks are retired (M4 cleanup
- * F01).
- *
- * Codec-model-unification project, M4 cleanup F01.
+ * validator, and an emit-path renderer. The renderer logic mirrors the brand
+ * each codec carries (`Char<N>`, `Numeric<P, S>`, `Timestamp<P>`, …) so the
+ * emit path stamps the same TypeScript source the no-emit resolver derives
+ * from the curried factory's return type. See [ADR 205](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type {

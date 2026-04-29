@@ -1,11 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { pgVectorCodec } from '../src/exports/codecs';
 
-// M4 cleanup F01: `renderOutputType` was retired from the codec object and now
-// lives on `pgVectorCodec` (a `ParameterizedCodecDescriptor`). The descriptor's
-// `paramsSchema` validates inputs upstream of `renderOutputType`, so the
-// renderer never sees malformed length values; tests below assert the
-// descriptor's render output for valid inputs.
+// `renderOutputType` lives on `pgVectorCodec` (a `ParameterizedCodecDescriptor`)
+// rather than on the codec object; `paramsSchema` validates inputs upstream of
+// the renderer, so the renderer never sees malformed length values. Tests
+// below assert the descriptor's render output for valid inputs. See ADR 205.
 describe('pgVectorCodec renderOutputType', () => {
   it('renders Vector<length>', () => {
     expect(pgVectorCodec.renderOutputType!({ length: 1536 })).toBe('Vector<1536>');

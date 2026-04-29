@@ -13,8 +13,7 @@ export type CodecTrait =
    * `JsonSchemaValidatorRegistry` consults at runtime). This trait is the
    * gate that lets the runtime's `extractValidator` cast resolve from
    * structurally-typed (`unknown`) to a typed `JsonValidatorCodec` view.
-   *
-   * Codec-model-unification project, M4 cleanup F06.
+   * See [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
    */
   | 'json-validator';
 

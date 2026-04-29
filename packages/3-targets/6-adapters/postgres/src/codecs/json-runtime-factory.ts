@@ -2,22 +2,19 @@
  * Runtime factory for the legacy serialized JSON / JSONB typeParams shape
  * (`{ schemaJson, type? }`).
  *
- * Pre-M3 contracts and pre-M4 user code authored JSON columns via
- * `json(schema)` / `jsonb(schema)` (see `../exports/column-types.ts`), which
- * serialized the schema into the contract IR as `{ schemaJson: <json schema>,
+ * The contract IR carries JSON-column schemas as `{ schemaJson: <json schema>,
  * type?: <ts source> }`. The runtime descriptor at `../exports/runtime.ts`
  * registers this factory under `pg/json@1` / `pg/jsonb@1` so contract-load
  * materializes a per-instance codec carrying the compiled JSON-schema
  * `validate` function — `sql-runtime`'s validator registry reads it directly
  * off the resolved codec.
  *
- * Lives next to the M3 schema-typed `json-factory.ts` (which uses the modern
+ * Lives next to the schema-typed `json-factory.ts` (which uses the modern
  * `{ schema }` typeParams shape with a live Standard Schema). The two paths
- * coexist: the column-author surface threads either factory onto the
- * descriptor's `type` slot for the no-emit `FieldOutputType` resolver; the
- * runtime descriptor below covers the emit-side rehydration.
- *
- * Codec-model-unification project, M4 cleanup F05.
+ * coexist by surface segregation: the column-author surface threads the
+ * schema-typed factory onto the descriptor's `type` slot for the no-emit
+ * `FieldOutputType` resolver; the runtime descriptor here covers contract-
+ * load rehydration. See [ADR 205](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { Codec, Ctx } from '@prisma-next/framework-components/codec';

@@ -4,10 +4,8 @@
  * Pack-author surface: users write `vector(1536)` at a column site. The factory
  * returns a `ColumnTypeDescriptor` carrying both the data part (`codecId`,
  * `nativeType`, `typeParams`) AND a curried higher-order codec factory in the
- * `type` slot so M2's no-emit `FieldOutputType` resolver derives the column's
- * resolved JS type as `Vector<N>`.
- *
- * Codec-model-unification project, M4 task T3.
+ * `type` slot so the no-emit `FieldOutputType` resolver derives the column's
+ * resolved JS type as `Vector<N>`. See [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

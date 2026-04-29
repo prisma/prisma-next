@@ -338,10 +338,10 @@ function hasJsonValidatorTrait(candidate: unknown): candidate is JsonValidatorCo
 }
 
 /**
- * M4 cleanup F06: gate the `validate` extraction on the `'json-validator'`
- * `CodecTrait`. Codecs that participate in the JSON-schema validator registry
- * must declare the trait; the runtime's read of `validate` is then a typed
- * field-access on `JsonValidatorCodec` rather than a generic `unknown` cast.
+ * Gate the `validate` extraction on the `'json-validator'` `CodecTrait`.
+ * Codecs that participate in the JSON-schema validator registry must declare
+ * the trait; the read of `validate` is then a typed field-access on
+ * `JsonValidatorCodec` rather than a generic `unknown` cast. See ADR 205.
  */
 function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined {
   return hasJsonValidatorTrait(candidate) ? candidate.validate : undefined;

@@ -231,9 +231,10 @@ function applyModifiers(base: string, field: ContractField): string {
 export function resolveFieldType(
   field: ContractField,
   // `_codecLookup` is unused now that the descriptor lookup is the sole emit-
-  // path source of `renderOutputType` (M4 cleanup F01 retired the codec-object
-  // hook). Kept in the signature so downstream callers don't need to thread a
-  // new tuple of arguments.
+  // path source of `renderOutputType` (the codec-object hook was retired in
+  // favour of `ParameterizedCodecDescriptor.renderOutputType`; see ADR 205).
+  // Kept in the signature so downstream callers don't need to thread a new
+  // tuple of arguments.
   _codecLookup?: CodecLookup,
   parameterizedCodecLookup?: ParameterizedCodecDescriptorLookup,
 ): ResolvedFieldType {
@@ -243,10 +244,10 @@ export function resolveFieldType(
     case 'scalar': {
       let outputResolved: string | undefined;
       if (type.typeParams && Object.keys(type.typeParams).length > 0) {
-        // M4 cleanup F03 + F01: the framework-blessed `renderOutputType` lives
-        // on `ParameterizedCodecDescriptor`. The codec-object hook is gone
-        // (cleanup F01); the descriptor lookup is now the sole source of the
-        // emit-path renderer.
+        // The framework-blessed `renderOutputType` lives on
+        // `ParameterizedCodecDescriptor`. The codec-object hook is gone; the
+        // descriptor lookup is the sole source of the emit-path renderer.
+        // See ADR 205.
         const descriptor = parameterizedCodecLookup?.get(type.codecId);
         if (descriptor?.renderOutputType) {
           const rendered = descriptor.renderOutputType(type.typeParams);

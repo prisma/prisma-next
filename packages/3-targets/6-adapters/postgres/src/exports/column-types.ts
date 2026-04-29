@@ -4,11 +4,9 @@
  * Pack-author surface for parameterized columns. Each parameterized factory
  * returns a `ColumnTypeDescriptor` carrying both the data part (`codecId`,
  * `nativeType`, `typeParams`) AND a curried higher-order codec factory in the
- * `type` slot so M2's no-emit `FieldOutputType` resolver derives the column's
+ * `type` slot so the no-emit `FieldOutputType` resolver derives the column's
  * resolved JS type as the brand (`Char<N>`, `Numeric<P, S>`, etc.) without
- * needing to infer through the codec registry.
- *
- * Codec-model-unification project, M4 task T2.
+ * needing to infer through the codec registry. See [ADR 205](../../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
  */
 
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';

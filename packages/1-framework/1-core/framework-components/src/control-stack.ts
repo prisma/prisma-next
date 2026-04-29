@@ -357,9 +357,8 @@ export function extractCodecLookup(
 /**
  * Assemble a `ParameterizedCodecDescriptorLookup` from every component's
  * `types.codecTypes.parameterizedCodecs` contributions. The emitter consults
- * this lookup for `renderOutputType` (M4 cleanup F03 — the spec's long-term
- * home is `ParameterizedCodecDescriptor.renderOutputType`, not the codec
- * object's pre-M4 transitional `renderOutputType` field).
+ * this lookup for `renderOutputType`; `ParameterizedCodecDescriptor.renderOutputType`
+ * is the long-term home for the renderer (see [ADR 205](../../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)).
  *
  * Duplicate `codecId` registrations are an error; each codec id may have at
  * most one descriptor across the whole stack.
