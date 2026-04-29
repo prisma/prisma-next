@@ -3,6 +3,33 @@ import type { JsonValue } from '@prisma-next/contract/types';
 export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual';
 
 /**
+ * Per-call context the runtime threads to every `codec.encode` /
+ * `codec.decode` invocation for a single `runtime.execute()` call.
+ *
+ * Two fields land in this version:
+ *
+ * - `signal?: AbortSignal` — per-query cancellation. The runtime returns a
+ *   `RUNTIME.ABORTED` envelope when the signal aborts; codec authors who
+ *   forward `signal` to their underlying SDK get true cancellation of
+ *   in-flight network calls.
+ * - `column?: { table, name }` — populated on **decode** call sites that can
+ *   resolve a single underlying column ref. Encode call sites currently
+ *   pass `undefined` (encode-time column context is the middleware's
+ *   domain). Codecs that require column identity must handle `undefined`
+ *   explicitly — the runtime never silently defaults this field.
+ *
+ * The interface is named explicitly (not inlined) so future fields can land
+ * additively without breaking codec author signatures.
+ */
+export interface CodecCallContext {
+  readonly signal?: AbortSignal;
+  readonly column?: {
+    readonly table: string;
+    readonly name: string;
+  };
+}
+
+/**
  * A codec is the contract between an application value and its on-wire and
  * on-contract-disk representations.
  *
@@ -43,10 +70,10 @@ export interface Codec<
   readonly targetTypes: readonly string[];
   /** Semantic traits for operator gating (e.g. equality, order, numeric). */
   readonly traits?: TTraits;
-  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. */
-  encode(value: TInput): Promise<TWire>;
-  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. */
-  decode(wire: TWire): Promise<TInput>;
+  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation and (on decode call sites only) column identity. */
+  encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>;
+  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation and column identity when the cell resolves to a single (table, name). */
+  decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>;
   /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
   /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `validateContract`. */
