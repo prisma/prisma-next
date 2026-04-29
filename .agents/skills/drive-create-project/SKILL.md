@@ -2,7 +2,7 @@
 name: drive-create-project
 description: >
   Create a new transient project workspace under projects/<project>/ (folders + optional stub docs),
-  then hand off to drive-create-spec / drive-generate-plan.
+  then hand off to drive-create-spec / drive-create-plan.
 metadata:
   version: "2026.3.1"
 ---
@@ -88,7 +88,7 @@ _Problem, users, scope. Replace this placeholder._
 
 ## Summary
 
-_Drafted via drive-generate-plan. Replace this placeholder._
+_Drafted via drive-create-plan. Replace this placeholder._
 
 **Spec:** `projects/{project}/spec.md`
 
@@ -113,5 +113,5 @@ _Drafted via drive-generate-plan. Replace this placeholder._
 If the developer wants to start shaping now (default), hand off immediately:
 
 - Run `drive-create-spec` targeting `projects/{project}/spec.md`
-- Then run `drive-generate-plan` targeting `projects/{project}/plan.md`
+- Then run `drive-create-plan` targeting `projects/{project}/plan.md`
 

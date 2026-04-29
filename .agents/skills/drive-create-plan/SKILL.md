@@ -14,9 +14,10 @@ Transform a spec into an execution plan by structuring milestones, decomposing t
 
 ## File Naming
 
-- **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plans/plan.md`
-- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}.plan.md`
-- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export.plan.md`).
+- **Project plan (from `projects/{project}/spec.md`)**: `projects/{project}/plan.md`
+- **Task/feature plan (from `projects/{project}/specs/{name}.spec.md`)**: `projects/{project}/plans/{name}-plan.md`
+- The plan name `{name}` matches the spec name (e.g. `pdf-export.spec.md` → `pdf-export-plan.md`).
+- Avoid filenames containing `.plan.` (Cursor treats them specially).
 
 ## Entry Points
 
@@ -111,6 +112,8 @@ Given a spec, generate the full plan:
    - Delete `projects/{project}/` (everything under it is transient)
    - If the project spec was merged, the close-out work is often done as a final PR that performs the doc migration + deletion
 
+   The close-out task **must not** include manually closing the Linear ticket. Linear's GitHub integration auto-transitions the linked issue to the team's completed state when the close-out PR merges, provided the PR references the issue identifier (e.g. `(TML-XXXX)` in the title or `Refs: TML-XXXX` in the body) or the branch name carries it. Manual closure is redundant and risks landing the issue in the wrong completed state (e.g. `Done` instead of `Ready to be merged`). See `.agents/rules/drive-project-workflow.mdc` § "Keep Linear up to date during execution" for the full policy.
+
 8. **Write the plan file** using the template below, saved to the `projects/{project}/` layout described above.
 
 9. Proceed to **Refinement**.
@@ -122,7 +125,7 @@ After writing the initial plan, enter a refinement loop:
 1. **Present gaps and assumptions in the chat window.** Format as a numbered list. Example:
 
    ```
-   I've drafted the plan at projects/my-proj/plans/feature-x.plan.md. A few things to resolve:
+   I've drafted the plan at projects/my-proj/plans/feature-x-plan.md. A few things to resolve:
 
    1. The spec mentions "admin approval flow" but doesn't detail the approval states. I assumed: pending -> approved/rejected. Does this need a more complex state machine?
    2. I've listed the Platform team as a collaborator since the spec references their auth service. Should anyone specific from that team be named?
@@ -227,7 +230,7 @@ Linear is an observability mechanism for execution health. If the plan changes a
 
 - Update the Linear project using `save_project` (use `id` to update) to reflect the latest summary and to link to the current spec/plan paths.
 - Update milestones using `save_milestone` (use `id` to update) if milestone names/descriptions/order change.
-- Update issues using `update_issue` as tasks change (title/description/milestone/project), and move issue `state` as work progresses.
+- Update issues using `update_issue` as tasks change (title/description/milestone/project). Move issues into in-progress / in-review states during execution if it helps visibility, but **don't manually transition issues to a completed state** — that happens automatically when the linked PR merges, provided the PR or branch references the issue identifier.
 
 ## Plan Template
 
