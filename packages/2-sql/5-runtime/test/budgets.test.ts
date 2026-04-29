@@ -36,7 +36,6 @@ const baseMeta: PlanMeta = {
   target: 'postgres',
   storageHash: 'sha256:test',
   lane: 'dsl',
-  paramDescriptors: [],
 };
 
 type PlanOverrides = Partial<Omit<SqlExecutionPlan, 'meta'>> & { meta?: Partial<PlanMeta> };
@@ -52,31 +51,11 @@ function createPlan(overrides: PlanOverrides): SqlExecutionPlan {
 }
 
 describe('budgets middleware', () => {
-  describe('heuristic row budget (no AST)', () => {
+  describe('heuristic row budget (no AST, raw plan)', () => {
     it(
-      'throws for unbounded raw SELECT exceeding budget',
+      'throws for unbounded raw SELECT (no LIMIT clause)',
       async () => {
-        const plan = createPlan({
-          sql: 'SELECT id, email FROM "user"',
-          meta: { refs: { tables: ['user'] } },
-        });
-        const mw = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createMiddlewareContext();
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          category: 'BUDGET',
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'throws for unbounded raw SELECT even without table refs',
-      async () => {
-        const plan = createPlan({
-          sql: 'SELECT 1',
-        });
+        const plan = createPlan({ sql: 'SELECT id, email FROM "user"' });
         const mw = budgets({ maxRows: 50 });
         const ctx = createMiddlewareContext();
 
@@ -89,16 +68,10 @@ describe('budgets middleware', () => {
     );
 
     it(
-      'allows bounded raw SELECT with limit annotation within budget',
+      'allows raw SELECT that has a LIMIT clause in the SQL text',
       async () => {
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user" LIMIT 5',
-          meta: {
-            refs: { tables: ['user'] },
-            annotations: { limit: 5 },
-          },
-        });
-        const mw = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
+        const plan = createPlan({ sql: 'SELECT id FROM "user" LIMIT 5' });
+        const mw = budgets({ maxRows: 10_000 });
         const ctx = createMiddlewareContext();
 
         await mw.beforeExecute?.(plan, ctx);
@@ -108,46 +81,7 @@ describe('budgets middleware', () => {
     );
 
     it(
-      'throws when estimated rows exceed budget for bounded query',
-      async () => {
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user" LIMIT 500',
-          meta: {
-            refs: { tables: ['user'] },
-            annotations: { limit: 500 },
-          },
-        });
-        const mw = budgets({ maxRows: 50, defaultTableRows: 10_000 });
-        const ctx = createMiddlewareContext();
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          category: 'BUDGET',
-          details: expect.objectContaining({ source: 'heuristic' }),
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'uses tableRows config for estimation',
-      async () => {
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user"',
-          meta: { refs: { tables: ['user'] } },
-        });
-        const mw = budgets({ maxRows: 100, tableRows: { user: 50 } });
-        const ctx = createMiddlewareContext();
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'does not check row budget for non-SELECT statements',
+      'does not check row budget for non-SELECT raw statements',
       async () => {
         const plan = createPlan({
           sql: 'INSERT INTO "user" (id, email) VALUES ($1, $2)',
@@ -215,7 +149,7 @@ describe('budgets middleware', () => {
       'warns when latency exceeds budget in non-strict mode',
       async () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
-        const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'permissive' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
@@ -231,7 +165,7 @@ describe('budgets middleware', () => {
       'throws when latency exceeds budget in strict mode with error severity',
       async () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'error' } });
-        const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
@@ -247,7 +181,7 @@ describe('budgets middleware', () => {
       'throws when latency exceeds budget in strict mode even with warn severity',
       async () => {
         const mw = budgets({ maxLatencyMs: 100, severities: { latency: 'warn' } });
-        const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext({ mode: 'strict' });
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 200, completed: true };
 
@@ -263,7 +197,7 @@ describe('budgets middleware', () => {
       'does not warn when latency is within budget',
       async () => {
         const mw = budgets({ maxLatencyMs: 1000 });
-        const plan = createPlan({ sql: 'SELECT 1', meta: { annotations: { limit: 1 } } });
+        const plan = createPlan({ sql: 'SELECT 1 LIMIT 1' });
         const ctx = createMiddlewareContext();
         const result: AfterExecuteResult = { rowCount: 1, latencyMs: 50, completed: true };
 
@@ -278,10 +212,8 @@ describe('budgets middleware', () => {
     it(
       'warns instead of throwing when rowCount severity is warn and mode is permissive',
       async () => {
-        const plan = createPlan({
-          sql: 'SELECT id FROM "user"',
-          meta: { refs: { tables: ['user'] } },
-        });
+        const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
+        const plan = createPlan({ ast });
         const mw = budgets({
           maxRows: 50,
           defaultTableRows: 10_000,
@@ -305,10 +237,7 @@ describe('budgets middleware', () => {
         const ast = SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
           .withLimit(5);
-        const plan = createPlan({
-          ast,
-          meta: { refs: { tables: ['user'] } },
-        });
+        const plan = createPlan({ ast });
         const mw = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
         const ctx = createMiddlewareContext();
 
@@ -322,10 +251,7 @@ describe('budgets middleware', () => {
       'throws for unbounded SelectAst without limit',
       async () => {
         const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
-        const plan = createPlan({
-          ast,
-          meta: { refs: { tables: ['user'] } },
-        });
+        const plan = createPlan({ ast });
         const mw = budgets({ maxRows: 50, defaultTableRows: 10_000 });
         const ctx = createMiddlewareContext();
 
@@ -339,35 +265,17 @@ describe('budgets middleware', () => {
     );
 
     it(
-      'throws for unbounded SelectAst without table refs',
-      async () => {
-        const ast = SelectAst.from(userTable).withProjection([ProjectionItem.of('id', idCol)]);
-        const plan = createPlan({ ast });
-        const mw = budgets({ maxRows: 50 });
-        const ctx = createMiddlewareContext();
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          details: expect.objectContaining({ source: 'ast' }),
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'reads limit from AST, not from annotations',
+      'reads the table from the AST (FROM clause), not from sidecar metadata',
       async () => {
         const ast = SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
           .withLimit(5);
-        const plan = createPlan({
-          ast,
-          meta: {
-            refs: { tables: ['user'] },
-            annotations: { limit: 99999 },
-          },
+        const plan = createPlan({ ast });
+        const mw = budgets({
+          maxRows: 10_000,
+          defaultTableRows: 10_000,
+          tableRows: { user: 5 },
         });
-        const mw = budgets({ maxRows: 10_000, defaultTableRows: 10_000 });
         const ctx = createMiddlewareContext();
 
         await mw.beforeExecute?.(plan, ctx);
@@ -395,10 +303,7 @@ describe('budgets middleware', () => {
         const ast = SelectAst.from(userTable).withProjection([
           ProjectionItem.of('count', AggregateExpr.count()),
         ]);
-        const plan = createPlan({
-          ast,
-          meta: { refs: { tables: ['user'] } },
-        });
+        const plan = createPlan({ ast });
         const mw = budgets({ maxRows: 1, defaultTableRows: 10_000 });
         const ctx = createMiddlewareContext();
 
@@ -414,10 +319,7 @@ describe('budgets middleware', () => {
         const ast = SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('count', AggregateExpr.count())])
           .withGroupBy([idCol]);
-        const plan = createPlan({
-          ast,
-          meta: { refs: { tables: ['user'] } },
-        });
+        const plan = createPlan({ ast });
         const mw = budgets({ maxRows: 50, defaultTableRows: 10_000 });
         const ctx = createMiddlewareContext();
 

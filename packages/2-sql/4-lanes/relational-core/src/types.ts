@@ -1,4 +1,4 @@
-import type { Contract, PlanRefs } from '@prisma-next/contract/types';
+import type { Contract } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
 import type {
   ExtractFieldOutputTypes,
@@ -244,9 +244,7 @@ export type ColumnsOf<
   : never;
 
 export interface RawTemplateOptions {
-  readonly refs?: PlanRefs;
   readonly annotations?: Record<string, unknown>;
-  readonly projection?: ReadonlyArray<string>;
 }
 
 export interface RawFunctionOptions extends RawTemplateOptions {

@@ -18,7 +18,6 @@ const stubMeta: PlanMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
   lane: 'mongo',
-  paramDescriptors: [],
 };
 
 export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Promise<T> {

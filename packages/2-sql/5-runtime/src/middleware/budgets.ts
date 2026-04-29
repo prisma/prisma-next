@@ -25,18 +25,28 @@ function hasAggregateWithoutGroupBy(ast: SelectAst): boolean {
   return ast.projection.some((item) => item.expr.kind === 'aggregate');
 }
 
+function primaryTableFromAst(ast: SelectAst): string | undefined {
+  switch (ast.from.kind) {
+    case 'table-source':
+      return ast.from.name;
+    case 'derived-table-source':
+      return ast.from.alias;
+    default:
+      return undefined;
+  }
+}
+
 function estimateRowsFromAst(
   ast: SelectAst,
   tableRows: Record<string, number>,
   defaultTableRows: number,
-  refs: { tables?: readonly string[] } | undefined,
   hasAggregateWithoutGroup: boolean,
 ): number | null {
   if (hasAggregateWithoutGroup) {
     return 1;
   }
 
-  const table = refs?.tables?.[0];
+  const table = primaryTableFromAst(ast);
   if (!table) {
     return null;
   }
@@ -48,30 +58,6 @@ function estimateRowsFromAst(
   }
 
   return tableEstimate;
-}
-
-function estimateRowsFromHeuristics(
-  plan: SqlExecutionPlan,
-  tableRows: Record<string, number>,
-  defaultTableRows: number,
-): number | null {
-  const table = plan.meta.refs?.tables?.[0];
-  if (!table) {
-    return null;
-  }
-
-  const tableEstimate = tableRows[table] ?? defaultTableRows;
-
-  const limit = plan.meta.annotations?.['limit'];
-  if (typeof limit === 'number') {
-    return Math.min(limit, tableEstimate);
-  }
-
-  return tableEstimate;
-}
-
-function hasDetectableLimitFromHeuristics(plan: SqlExecutionPlan): boolean {
-  return typeof plan.meta.annotations?.['limit'] === 'number';
 }
 
 function emitBudgetViolation(
@@ -107,7 +93,7 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
 
       if (isQueryAst(plan.ast)) {
         if (plan.ast.kind === 'select') {
-          return evaluateSelectAst(plan, plan.ast, ctx);
+          return evaluateSelectAst(plan.ast, ctx);
         }
         return;
       }
@@ -148,15 +134,9 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     },
   });
 
-  function evaluateSelectAst(plan: SqlExecutionPlan, ast: SelectAst, ctx: SqlMiddlewareContext) {
+  function evaluateSelectAst(ast: SelectAst, ctx: SqlMiddlewareContext) {
     const hasAggNoGroup = hasAggregateWithoutGroupBy(ast);
-    const estimated = estimateRowsFromAst(
-      ast,
-      tableRows,
-      defaultTableRows,
-      plan.meta.refs,
-      hasAggNoGroup,
-    );
+    const estimated = estimateRowsFromAst(ast, tableRows, defaultTableRows, hasAggNoGroup);
     const isUnbounded = ast.limit === undefined && !hasAggNoGroup;
     const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
 
@@ -198,51 +178,27 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     }
   }
 
+  // REVIEW: remove this, we are getting rid of row query validation
   async function evaluateWithHeuristics(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
-    const estimated = estimateRowsFromHeuristics(plan, tableRows, defaultTableRows);
-    const isUnbounded = !hasDetectableLimitFromHeuristics(plan);
     const sqlUpper = plan.sql.trimStart().toUpperCase();
     const isSelect = sqlUpper.startsWith('SELECT');
+    if (!isSelect) {
+      return;
+    }
+
+    const hasLimitClause = /\blimit\b/i.test(plan.sql);
+    if (hasLimitClause) {
+      return;
+    }
+
     const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-
-    if (isSelect && isUnbounded) {
-      if (estimated !== null && estimated >= maxRows) {
-        emitBudgetViolation(
-          runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-            source: 'heuristic',
-            estimatedRows: estimated,
-            maxRows,
-          }),
-          shouldBlock,
-          ctx,
-        );
-        return;
-      }
-
-      emitBudgetViolation(
-        runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-          source: 'heuristic',
-          maxRows,
-        }),
-        shouldBlock,
-        ctx,
-      );
-      return;
-    }
-
-    if (estimated !== null) {
-      if (estimated > maxRows) {
-        emitBudgetViolation(
-          runtimeError('BUDGET.ROWS_EXCEEDED', 'Estimated row count exceeds budget', {
-            source: 'heuristic',
-            estimatedRows: estimated,
-            maxRows,
-          }),
-          shouldBlock,
-          ctx,
-        );
-      }
-      return;
-    }
+    emitBudgetViolation(
+      runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
+        source: 'heuristic',
+        maxRows,
+      }),
+      shouldBlock,
+      ctx,
+    );
   }
 }

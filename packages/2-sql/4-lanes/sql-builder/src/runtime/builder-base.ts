@@ -129,16 +129,8 @@ export function buildSelectAst(state: BuilderState): SelectAst {
 
 export function buildQueryPlan<Row = unknown>(
   ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
-  rowFields: Record<string, ScopeField>,
   ctx: BuilderContext,
 ): SqlQueryPlan<Row> {
-  const projectionTypes: Record<string, string> = {};
-  const codecs: Record<string, string> = {};
-  for (const [alias, field] of Object.entries(rowFields)) {
-    projectionTypes[alias] = field.codecId;
-    codecs[alias] = field.codecId;
-  }
-
   const paramRefs = ast.collectParamRefs();
   const seen = new Set<import('@prisma-next/sql-relational-core/ast').ParamRef>();
   const uniqueRefs: import('@prisma-next/sql-relational-core/ast').ParamRef[] = [];
@@ -149,26 +141,11 @@ export function buildQueryPlan<Row = unknown>(
     }
   }
   const paramValues = uniqueRefs.map((r) => r.value);
-  const paramDescriptors = uniqueRefs.map((ref, i) => ({
-    index: i + 1,
-    source: 'dsl' as const,
-    ...(ref.codecId ? { codecId: ref.codecId } : {}),
-  }));
-
-  for (const [i, ref] of uniqueRefs.entries()) {
-    if (ref.codecId) codecs[`$${i + 1}`] = ref.codecId;
-  }
-
-  const hasProjectionTypes = Object.keys(projectionTypes).length > 0;
-  const hasCodecs = Object.keys(codecs).length > 0;
 
   const meta: PlanMeta = Object.freeze({
     target: ctx.target,
     storageHash: ctx.storageHash,
     lane: 'dsl',
-    paramDescriptors,
-    ...(hasProjectionTypes ? { projectionTypes } : {}),
-    ...(hasCodecs ? { annotations: Object.freeze({ codecs: Object.freeze(codecs) }) } : {}),
   });
 
   return Object.freeze({ ast, params: paramValues, meta });
@@ -178,7 +155,7 @@ export function buildPlan<Row = unknown>(
   state: BuilderState,
   ctx: BuilderContext,
 ): SqlQueryPlan<Row> {
-  return buildQueryPlan<Row>(buildSelectAst(state), state.rowFields, ctx);
+  return buildQueryPlan<Row>(buildSelectAst(state), ctx);
 }
 
 export function tableToScope(name: string, table: StorageTable): Scope {
@@ -256,7 +233,7 @@ export function resolveSelectArgs(
     for (const colName of args as string[]) {
       const field = scope.topLevel[colName];
       if (!field) throw new Error(`Column "${colName}" not found in scope`);
-      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName)));
+      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName), field.codecId));
       newRowFields[colName] = field;
     }
     return { projections, newRowFields };
@@ -270,8 +247,9 @@ export function resolveSelectArgs(
     ) => Expression<ScopeField>;
     const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const result = exprFn(createFieldProxy(scope), fns);
-    projections.push(ProjectionItem.of(alias, result.buildAst()));
-    newRowFields[alias] = result.returnType;
+    const field = result.returnType;
+    projections.push(ProjectionItem.of(alias, result.buildAst(), field.codecId));
+    newRowFields[alias] = field;
     return { projections, newRowFields };
   }
 
@@ -283,8 +261,9 @@ export function resolveSelectArgs(
     const fns = createAggregateFunctions(ctx.queryOperationTypes);
     const record = callbackFn(createFieldProxy(scope), fns);
     for (const [key, expr] of Object.entries(record)) {
-      projections.push(ProjectionItem.of(key, expr.buildAst()));
-      newRowFields[key] = expr.returnType;
+      const field = expr.returnType;
+      projections.push(ProjectionItem.of(key, expr.buildAst(), field.codecId));
+      newRowFields[key] = field;
     }
     return { projections, newRowFields };
   }

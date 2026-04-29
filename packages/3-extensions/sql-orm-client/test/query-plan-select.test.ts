@@ -27,17 +27,18 @@ import { bindWhereExpr } from '../src/where-binding';
 import { baseContract, createCollection, createCollectionFor } from './collection-fixtures';
 import { buildMixedPolyContract, isSelectAst } from './helpers';
 
-function dslDescriptor(table: string, column: string) {
+function codecForColumn(table: string, column: string): string {
   const columnMeta = (
     baseContract.storage.tables as Record<
       string,
       { columns: Record<string, { codecId: string; nullable: boolean }> }
     >
   )[table]!.columns[column]!;
-  return {
-    source: 'dsl' as const,
-    codecId: columnMeta.codecId,
-  };
+  return columnMeta.codecId;
+}
+
+function paramCodecs(plan: { ast: { collectParamRefs(): ParamRef[] } }): Array<string | undefined> {
+  return [...new Set(plan.ast.collectParamRefs())].map((ref) => ref.codecId);
 }
 
 function expectSelectAst(ast: unknown): asserts ast is SelectAst {
@@ -61,9 +62,9 @@ describe('compileSelectWithIncludeStrategy', () => {
 
     const plan = compileSelectWithIncludeStrategy(baseContract, 'users', state, 'correlated');
     expect(plan.params).toEqual([100, 'Alice']);
-    expect(plan.meta.paramDescriptors).toEqual([
-      dslDescriptor('posts', 'views'),
-      dslDescriptor('users', 'name'),
+    expect(paramCodecs(plan)).toEqual([
+      codecForColumn('posts', 'views'),
+      codecForColumn('users', 'name'),
     ]);
 
     expectSelectAst(plan.ast);
@@ -107,10 +108,10 @@ describe('compileSelectWithIncludeStrategy', () => {
     const plan = compileSelect(baseContract, 'users', state);
     expectSelectAst(plan.ast);
     expect(plan.params).toEqual(['Alice', 'Alice', 7]);
-    expect(plan.meta.paramDescriptors).toEqual([
-      dslDescriptor('users', 'name'),
-      dslDescriptor('users', 'name'),
-      dslDescriptor('users', 'id'),
+    expect(paramCodecs(plan)).toEqual([
+      codecForColumn('users', 'name'),
+      codecForColumn('users', 'name'),
+      codecForColumn('users', 'id'),
     ]);
 
     const gtName = bindWhereExpr(
@@ -139,7 +140,7 @@ describe('compileSelectWithIncludeStrategy', () => {
     const plan = compileSelect(baseContract, 'users', state);
     expectSelectAst(plan.ast);
     expect(plan.params).toEqual([9]);
-    expect(plan.meta.paramDescriptors).toEqual([dslDescriptor('users', 'id')]);
+    expect(paramCodecs(plan)).toEqual([codecForColumn('users', 'id')]);
     expect(plan.ast.where).toEqual(
       bindWhereExpr(baseContract, BinaryExpr.gt(ColumnRef.of('users', 'id'), LiteralExpr.of(9))),
     );
@@ -177,9 +178,9 @@ describe('compileSelectWithIncludeStrategy', () => {
     ]);
 
     expect(plan.params).toEqual([[1, 2, 3]]);
-    expect(plan.meta.paramDescriptors).toEqual([
-      { name: 'searchVec', codecId: 'pg/vector@1', source: 'dsl' },
-    ]);
+    const params = [...new Set(plan.ast.collectParamRefs())];
+    expect(params).toHaveLength(1);
+    expect(params[0]).toMatchObject({ name: 'searchVec', codecId: 'pg/vector@1' });
   });
 
   it('cursor pagination ignores expression-based orders', () => {
@@ -232,8 +233,9 @@ describe('compileSelectWithIncludeStrategy', () => {
     expectSelectAst(plan.ast);
 
     expect(plan.params).toEqual([[1, 2, 3]]);
-    expect(plan.meta.paramDescriptors).toHaveLength(1);
-    expect(plan.meta.paramDescriptors[0]).toMatchObject({
+    const params = [...new Set(plan.ast.collectParamRefs())];
+    expect(params).toHaveLength(1);
+    expect(params[0]).toMatchObject({
       name: 'searchVec',
       codecId: 'pg/vector@1',
     });
@@ -289,10 +291,10 @@ describe('compileSelectWithIncludeStrategy', () => {
     const plan = compileRelationSelect(baseContract, 'posts', 'user_id', [1, 2], state);
     expectSelectAst(plan.ast);
     expect(plan.params).toEqual([1, 2, 'Hello']);
-    expect(plan.meta.paramDescriptors).toEqual([
-      dslDescriptor('posts', 'user_id'),
-      dslDescriptor('posts', 'user_id'),
-      dslDescriptor('posts', 'title'),
+    expect(paramCodecs(plan)).toEqual([
+      codecForColumn('posts', 'user_id'),
+      codecForColumn('posts', 'user_id'),
+      codecForColumn('posts', 'title'),
     ]);
 
     const inWhere = bindWhereExpr(
@@ -347,12 +349,29 @@ describe('compileSelectWithIncludeStrategy', () => {
 });
 
 describe('compileSelect MTI JOINs', () => {
-  const tasksBaseProjection = ['id', 'title', 'type', 'severity'].map((col) =>
-    ProjectionItem.of(col, ColumnRef.of('tasks', col)),
-  );
-  const featuresMtiProjection = [
-    ProjectionItem.of('features__priority', ColumnRef.of('features', 'priority')),
-  ];
+  type AnyContract = {
+    storage: { tables: Record<string, { columns: Record<string, { codecId: string }> }> };
+  };
+  function projectionFor(
+    contract: AnyContract,
+    table: string,
+    columns: readonly string[],
+  ): ProjectionItem[] {
+    return columns.map((column) =>
+      ProjectionItem.of(
+        column,
+        ColumnRef.of(table, column),
+        contract.storage.tables[table]?.columns[column]?.codecId,
+      ),
+    );
+  }
+  function codecForColumn(
+    contract: AnyContract,
+    table: string,
+    column: string,
+  ): string | undefined {
+    return contract.storage.tables[table]?.columns[column]?.codecId;
+  }
   const featuresJoinOn = EqColJoinOn.of(
     ColumnRef.of('tasks', 'id'),
     ColumnRef.of('features', 'id'),
@@ -360,6 +379,19 @@ describe('compileSelect MTI JOINs', () => {
 
   it('base query LEFT JOINs MTI variant tables with table-qualified aliases', () => {
     const contract = buildMixedPolyContract();
+    const tasksBaseProjection = projectionFor(contract, 'tasks', [
+      'id',
+      'title',
+      'type',
+      'severity',
+    ]);
+    const featuresMtiProjection = [
+      ProjectionItem.of(
+        'features__priority',
+        ColumnRef.of('features', 'priority'),
+        codecForColumn(contract, 'features', 'priority'),
+      ),
+    ];
 
     const plan = compileSelect(contract, 'tasks', emptyState(), 'Task');
 
@@ -374,6 +406,19 @@ describe('compileSelect MTI JOINs', () => {
   it('variant query INNER JOINs the specific MTI variant table', () => {
     const contract = buildMixedPolyContract();
     const state = { ...emptyState(), variantName: 'Feature' };
+    const tasksBaseProjection = projectionFor(contract, 'tasks', [
+      'id',
+      'title',
+      'type',
+      'severity',
+    ]);
+    const featuresMtiProjection = [
+      ProjectionItem.of(
+        'features__priority',
+        ColumnRef.of('features', 'priority'),
+        codecForColumn(contract, 'features', 'priority'),
+      ),
+    ];
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
@@ -388,6 +433,12 @@ describe('compileSelect MTI JOINs', () => {
   it('STI-only variant query produces no JOINs', () => {
     const contract = buildMixedPolyContract();
     const state = { ...emptyState(), variantName: 'Bug' };
+    const tasksBaseProjection = projectionFor(contract, 'tasks', [
+      'id',
+      'title',
+      'type',
+      'severity',
+    ]);
 
     const plan = compileSelect(contract, 'tasks', state, 'Task');
 
@@ -404,9 +455,7 @@ describe('compileSelect MTI JOINs', () => {
     expect(plan.ast).toEqual(
       SelectAst.from(TableSource.named('users'))
         .withProjection(
-          ['address', 'email', 'id', 'invited_by_id', 'name'].map((col) =>
-            ProjectionItem.of(col, ColumnRef.of('users', col)),
-          ),
+          projectionFor(baseContract, 'users', ['address', 'email', 'id', 'invited_by_id', 'name']),
         )
         .withSelectAllIntent({ table: 'users' }),
     );

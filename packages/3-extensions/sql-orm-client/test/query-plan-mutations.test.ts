@@ -1,5 +1,4 @@
 import {
-  ColumnRef,
   type DeleteAst,
   type DoUpdateSetConflictAction,
   type InsertAst,
@@ -74,13 +73,14 @@ describe('query plan mutations', () => {
       email: usersColParam(contract, 'email', 'bob@example.com'),
       invited_by_id: usersColParam(contract, 'invited_by_id', 10),
     });
-    expect(plan.ast.returning).toEqual([
-      ColumnRef.of('users', 'address'),
-      ColumnRef.of('users', 'email'),
-      ColumnRef.of('users', 'id'),
-      ColumnRef.of('users', 'invited_by_id'),
-      ColumnRef.of('users', 'name'),
+    expect(plan.ast.returning?.map((item) => item.alias)).toEqual([
+      'address',
+      'email',
+      'id',
+      'invited_by_id',
+      'name',
     ]);
+    expect(plan.ast.returning?.every((item) => item.expr.kind === 'column-ref')).toBe(true);
   });
 
   it('compileInsertCount() keeps explicit empty rows for all-default batch inserts', () => {
@@ -106,10 +106,8 @@ describe('query plan mutations', () => {
     assertInsertAst(plan.ast);
     expect(plan.ast.onConflict?.action?.kind).toBe('do-nothing');
     expect(plan.params).toEqual([10, 'Alice', 'alice@example.com']);
-    expect(plan.ast.returning).toEqual(
-      Object.keys(contract.storage.tables.users.columns).map((column) =>
-        ColumnRef.of('users', column),
-      ),
+    expect(plan.ast.returning?.map((item) => item.alias)).toEqual(
+      Object.keys(contract.storage.tables.users.columns),
     );
   });
 

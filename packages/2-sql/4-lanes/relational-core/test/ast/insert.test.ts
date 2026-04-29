@@ -1,11 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  ColumnRef,
   DefaultValueExpr,
   type DoUpdateSetConflictAction,
   InsertAst,
   InsertOnConflict,
+  ProjectionItem,
 } from '../../src/exports/ast';
-import { col, param, table } from './test-helpers';
+import { col, param, returning, table } from './test-helpers';
 
 describe('ast/insert', () => {
   it('creates insert ASTs with a single values row', () => {
@@ -30,9 +32,9 @@ describe('ast/insert', () => {
         id: param(0, 'id'),
         email: param(1, 'email'),
       })
-      .withReturning([col('user', 'id'), col('user', 'email')]);
+      .withReturning(returning('user', ['id', 'email']));
 
-    expect(insertAst.returning).toEqual([col('user', 'id'), col('user', 'email')]);
+    expect(insertAst.returning).toEqual(returning('user', ['id', 'email']));
   });
 
   it('creates insert ASTs with multiple rows and explicit defaults', () => {
@@ -114,5 +116,31 @@ describe('ast/insert', () => {
     ]);
 
     expect(insertAst.collectParamRefs()).toEqual([r1Id, r1Email, r2Id, r2Email]);
+  });
+
+  it('rewrite descends into returning ProjectionItem.expr', () => {
+    const insertAst = InsertAst.into(table('user'))
+      .withValues({ id: param(1, 'id') })
+      .withReturning([ProjectionItem.of('id', col('user', 'id'), 'pg/int4@1')]);
+
+    const rewritten = insertAst.rewrite({
+      columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_renamed`),
+    });
+
+    expect(rewritten.returning).toEqual([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), 'pg/int4@1'),
+    ]);
+  });
+
+  it('collectParamRefs surfaces ParamRefs from returning items', () => {
+    const idCodec = param(1, 'rid');
+    const insertAst = InsertAst.into(table('user'))
+      .withValues({ id: param(0, 'id') })
+      .withReturning([
+        ProjectionItem.of('id', col('user', 'id')),
+        ProjectionItem.of('computed', idCodec),
+      ]);
+
+    expect(insertAst.collectParamRefs()).toContain(idCodec);
   });
 });

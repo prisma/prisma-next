@@ -184,7 +184,10 @@ describe('Postgres rich AST lowering', () => {
           email: ColumnRef.of('excluded', 'email'),
         }),
       )
-      .withReturning([ColumnRef.of('user', 'id'), ColumnRef.of('user', 'email')]);
+      .withReturning([
+        ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+        ProjectionItem.of('email', ColumnRef.of('user', 'email')),
+      ]);
 
     const insertSql = adapter.lower(insertAst, { contract }).sql;
     expect(insertSql).toContain(
@@ -201,7 +204,7 @@ describe('Postgres rich AST lowering', () => {
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     const updateSql = adapter.lower(updateAst, { contract }).sql;
     expect(updateSql).toBe(
       'UPDATE "user" SET "email" = $1 WHERE "user"."id" = $2 RETURNING "user"."id"',
@@ -214,7 +217,7 @@ describe('Postgres rich AST lowering', () => {
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     const deleteSql = adapter.lower(deleteAst, { contract }).sql;
     expect(deleteSql).toBe('DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"');
   });

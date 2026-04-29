@@ -10,7 +10,6 @@ const baseMeta: PlanMeta = {
   targetFamily: 'mongo',
   storageHash: 'sha256:test',
   lane: 'orm',
-  paramDescriptors: [],
 };
 
 function createPlan(overrides?: Partial<MongoQueryPlan>): MongoQueryPlan {

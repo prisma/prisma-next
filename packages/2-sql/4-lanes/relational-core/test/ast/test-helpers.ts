@@ -5,6 +5,7 @@ import {
   LiteralExpr,
   OperationExpr,
   ParamRef,
+  ProjectionItem,
   SelectAst,
   TableSource,
 } from '../../src/exports/ast';
@@ -54,4 +55,11 @@ export function simpleSelect(tableName: string, columns: ReadonlyArray<string>):
     (ast, column) => ast.addProjection(column, col(tableName, column)),
     SelectAst.from(table(tableName)),
   );
+}
+
+export function returning(
+  tableName: string,
+  columns: ReadonlyArray<string>,
+): ReadonlyArray<ProjectionItem> {
+  return columns.map((column) => ProjectionItem.of(column, col(tableName, column)));
 }

@@ -1,5 +1,7 @@
 # ADR 012 — Raw SQL escape hatch with required annotations
 
+> **Update — retired by [ADR 205](ADR%20205%20-%20Execution%20metadata%20lives%20on%20AST.md):** the optional structured-annotations branch (`refs`, `projection`, `codecs` / `paramDescriptors`) on raw plans has been removed. The minimal annotation schema below (`intent`, `isMutation`, `hasWhere`, `hasLimit`) is unchanged and continues to drive policy routing and lint dispatch. Raw plans now pass parameters to the driver as supplied by the caller and surface wire-level row values back without codec-based transformation; the unindexed-predicate lint and the refs-based row-count budget heuristic only apply to AST-backed plans. See ADR 205 for rationale.
+
 ## Context
 
 We intentionally keep the SQL DSL small and composable. Teams still need to run hand-authored SQL for advanced features, engine extensions, or when SQL is clearer than any builder. Safety and observability cannot be optional just because the query is raw. We need a defined way to create a Plan from raw SQL that keeps guardrails and verification intact without requiring the core to parse SQL.

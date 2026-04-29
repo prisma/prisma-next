@@ -189,12 +189,9 @@ describe('query plan aggregate', () => {
     const ast = plan.ast as SelectAst;
     expect(ast.where).toEqual(filteredViews);
     expect(plan.params).toEqual([100]);
-    expect(plan.meta.paramDescriptors).toEqual([
-      {
-        source: 'dsl',
-        codecId: 'pg/int4@1',
-      },
-    ]);
+    const params = [...new Set(plan.ast.collectParamRefs())];
+    expect(params).toHaveLength(1);
+    expect(params[0]?.codecId).toBe('pg/int4@1');
   });
 
   describe('validateGroupedHavingExpr rejects non-predicate expression types', () => {

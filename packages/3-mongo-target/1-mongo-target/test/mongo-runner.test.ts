@@ -141,7 +141,6 @@ const PLAN_META = {
   target: 'mongo' as const,
   storageHash: 'sha256:test',
   lane: 'mongo-raw',
-  paramDescriptors: [] as const,
 };
 
 function makeCheckPlan(): MongoQueryPlan {

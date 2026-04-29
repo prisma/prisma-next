@@ -11,7 +11,6 @@ const meta: PlanMeta = {
   target: 'postgres',
   storageHash: 'sha256:test',
   lane: 'sql',
-  paramDescriptors: [],
 };
 
 test('SqlExecutionPlan extends framework ExecutionPlan and QueryPlan', () => {

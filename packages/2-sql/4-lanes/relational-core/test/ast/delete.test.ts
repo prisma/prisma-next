@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BinaryExpr, DeleteAst } from '../../src/ast/types';
-import { col, param, table } from './test-helpers';
+import { BinaryExpr, ColumnRef, DeleteAst, ProjectionItem } from '../../src/ast/types';
+import { col, param, returning, table } from './test-helpers';
 
 describe('ast/delete', () => {
   it('creates delete ASTs with table and where clauses', () => {
@@ -15,17 +15,17 @@ describe('ast/delete', () => {
   it('creates delete ASTs with returning clauses', () => {
     const deleteAst = DeleteAst.from(table('user'))
       .withWhere(BinaryExpr.eq(col('user', 'id'), param(0, 'userId')))
-      .withReturning([col('user', 'id'), col('user', 'email')]);
+      .withReturning(returning('user', ['id', 'email']));
 
-    expect(deleteAst.returning).toEqual([col('user', 'id'), col('user', 'email')]);
+    expect(deleteAst.returning).toEqual(returning('user', ['id', 'email']));
   });
 
   it('supports single returning columns and alternate tables', () => {
     expect(
       DeleteAst.from(table('post'))
         .withWhere(BinaryExpr.eq(col('post', 'id'), param(0, 'postId')))
-        .withReturning([col('post', 'id')]).returning,
-    ).toEqual([col('post', 'id')]);
+        .withReturning(returning('post', ['id'])).returning,
+    ).toEqual(returning('post', ['id']));
   });
 
   it('collectParamRefs returns where params', () => {
@@ -40,5 +40,19 @@ describe('ast/delete', () => {
   it('collectParamRefs returns empty array without where', () => {
     const deleteAst = DeleteAst.from(table('user'));
     expect(deleteAst.collectParamRefs()).toEqual([]);
+  });
+
+  it('rewrite descends into returning ProjectionItem.expr', () => {
+    const deleteAst = DeleteAst.from(table('user'))
+      .withWhere(BinaryExpr.eq(col('user', 'id'), param(0, 'userId')))
+      .withReturning([ProjectionItem.of('id', col('user', 'id'), 'pg/int4@1')]);
+
+    const rewritten = deleteAst.rewrite({
+      columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_renamed`),
+    });
+
+    expect(rewritten.returning).toEqual([
+      ProjectionItem.of('id', ColumnRef.of('user', 'id_renamed'), 'pg/int4@1'),
+    ]);
   });
 });

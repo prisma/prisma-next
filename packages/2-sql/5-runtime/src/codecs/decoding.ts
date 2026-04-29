@@ -1,85 +1,82 @@
 import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyQueryAst,
+  Codec,
+  CodecRegistry,
+  ProjectionItem,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
 
 type ColumnRef = { table: string; column: string };
-type ColumnRefIndex = Map<string, ColumnRef>;
+
+interface DecodeContext {
+  readonly aliases: ReadonlyArray<string> | undefined;
+  readonly codecs: ReadonlyMap<string, Codec>;
+  readonly columnRefs: ReadonlyMap<string, ColumnRef>;
+  readonly includeAliases: ReadonlySet<string>;
+}
 
 const WIRE_PREVIEW_LIMIT = 100;
+const EMPTY_INCLUDE_ALIASES: ReadonlySet<string> = new Set<string>();
 
-function resolveRowCodec(
-  alias: string,
+function isAstBackedPlan(
   plan: SqlExecutionPlan,
-  registry: CodecRegistry,
-): Codec | null {
-  const planCodecId = plan.meta.annotations?.codecs?.[alias] as string | undefined;
-  if (planCodecId) {
-    const codec = registry.get(planCodecId);
-    if (codec) {
-      return codec;
-    }
+): plan is SqlExecutionPlan & { readonly ast: AnyQueryAst } {
+  return plan.ast !== undefined;
+}
+
+function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> | undefined {
+  if (ast.kind === 'select') {
+    return ast.projection;
+  }
+  return ast.returning;
+}
+
+function buildDecodeContext(plan: SqlExecutionPlan, registry: CodecRegistry): DecodeContext {
+  if (!isAstBackedPlan(plan)) {
+    return {
+      aliases: undefined,
+      codecs: new Map(),
+      columnRefs: new Map(),
+      includeAliases: EMPTY_INCLUDE_ALIASES,
+    };
   }
 
-  if (plan.meta.projectionTypes) {
-    const typeId = plan.meta.projectionTypes[alias];
-    if (typeId) {
-      const codec = registry.get(typeId);
+  const projection = projectionListFromAst(plan.ast);
+  if (!projection) {
+    return {
+      aliases: undefined,
+      codecs: new Map(),
+      columnRefs: new Map(),
+      includeAliases: EMPTY_INCLUDE_ALIASES,
+    };
+  }
+
+  const aliases: string[] = [];
+  const codecs = new Map<string, Codec>();
+  const columnRefs = new Map<string, ColumnRef>();
+  const includeAliases = new Set<string>();
+
+  for (const item of projection) {
+    aliases.push(item.alias);
+
+    if (item.codecId) {
+      const codec = registry.get(item.codecId);
       if (codec) {
-        return codec;
+        codecs.set(item.alias, codec);
       }
     }
-  }
 
-  return null;
-}
-
-/**
- * Builds a lookup index from column name → { table, column } ref.
- * Called once per decodeRow invocation to avoid O(aliases × refs) linear scans.
- */
-function buildColumnRefIndex(plan: SqlExecutionPlan): ColumnRefIndex | null {
-  const columns = plan.meta.refs?.columns;
-  if (!columns) return null;
-
-  const index: ColumnRefIndex = new Map();
-  for (const ref of columns) {
-    index.set(ref.column, ref);
-  }
-  return index;
-}
-
-function parseProjectionRef(value: string): ColumnRef | null {
-  if (value.startsWith('include:') || value.startsWith('operation:')) {
-    return null;
-  }
-
-  const separatorIndex = value.indexOf('.');
-  if (separatorIndex <= 0 || separatorIndex === value.length - 1) {
-    return null;
-  }
-
-  return {
-    table: value.slice(0, separatorIndex),
-    column: value.slice(separatorIndex + 1),
-  };
-}
-
-function resolveColumnRefForAlias(
-  alias: string,
-  projection: SqlExecutionPlan['meta']['projection'],
-  fallbackColumnRefIndex: ColumnRefIndex | null,
-): ColumnRef | undefined {
-  if (projection && !Array.isArray(projection)) {
-    const mappedRef = (projection as Record<string, string>)[alias];
-    if (typeof mappedRef !== 'string') {
-      return undefined;
+    if (item.expr.kind === 'column-ref') {
+      columnRefs.set(item.alias, { table: item.expr.table, column: item.expr.column });
+    } else if (item.expr.kind === 'subquery' || item.expr.kind === 'json-array-agg') {
+      includeAliases.add(item.alias);
     }
-    return parseProjectionRef(mappedRef) ?? undefined;
   }
 
-  return fallbackColumnRefIndex?.get(alias);
+  return { aliases, codecs, columnRefs, includeAliases };
 }
 
 function previewWireValue(wireValue: unknown): string {
@@ -164,22 +161,19 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
 async function decodeField(
   alias: string,
   wireValue: unknown,
-  plan: SqlExecutionPlan,
-  registry: CodecRegistry,
+  ctx: DecodeContext,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
-  projection: SqlExecutionPlan['meta']['projection'],
-  fallbackColumnRefIndex: ColumnRefIndex | null,
 ): Promise<unknown> {
   if (wireValue === null || wireValue === undefined) {
     return wireValue;
   }
 
-  const codec = resolveRowCodec(alias, plan, registry);
+  const codec = ctx.codecs.get(alias);
   if (!codec) {
     return wireValue;
   }
 
-  const ref = resolveColumnRefForAlias(alias, projection, fallbackColumnRefIndex);
+  const ref = ctx.columnRefs.get(alias);
 
   let decoded: unknown;
   try {
@@ -213,22 +207,9 @@ export async function decodeRow(
   registry: CodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
 ): Promise<Record<string, unknown>> {
-  const projection = plan.meta.projection;
+  const ctx = buildDecodeContext(plan, registry);
 
-  // Build a column-ref index when the projection alias-to-ref mapping is
-  // unavailable so that decode failures and JSON-Schema validation can both
-  // surface { table, column } from `meta.refs.columns` when present.
-  const fallbackColumnRefIndex =
-    !projection || Array.isArray(projection) ? buildColumnRefIndex(plan) : null;
-
-  let aliases: readonly string[];
-  if (projection && !Array.isArray(projection)) {
-    aliases = Object.keys(projection);
-  } else if (projection && Array.isArray(projection)) {
-    aliases = projection;
-  } else {
-    aliases = Object.keys(row);
-  }
+  const aliases = ctx.aliases ?? Object.keys(row);
 
   const tasks: Promise<unknown>[] = [];
   const includeIndices: { index: number; alias: string; value: unknown }[] = [];
@@ -237,28 +218,13 @@ export async function decodeRow(
     const alias = aliases[i] as string;
     const wireValue = row[alias];
 
-    const projectionValue =
-      projection && typeof projection === 'object' && !Array.isArray(projection)
-        ? (projection as Record<string, string>)[alias]
-        : undefined;
-
-    if (typeof projectionValue === 'string' && projectionValue.startsWith('include:')) {
+    if (ctx.includeAliases.has(alias)) {
       includeIndices.push({ index: i, alias, value: wireValue });
       tasks.push(Promise.resolve(undefined));
       continue;
     }
 
-    tasks.push(
-      decodeField(
-        alias,
-        wireValue,
-        plan,
-        registry,
-        jsonValidators,
-        projection,
-        fallbackColumnRefIndex,
-      ),
-    );
+    tasks.push(decodeField(alias, wireValue, ctx, jsonValidators));
   }
 
   const settled = await Promise.all(tasks);

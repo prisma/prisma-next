@@ -26,7 +26,6 @@ function makeCompiled(sqlText = 'select 1'): SqlQueryPlan<Record<string, unknown
       targetFamily: 'sql',
       storageHash: 'sha256:test',
       lane: 'orm-client',
-      paramDescriptors: [],
     },
   };
 }

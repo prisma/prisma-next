@@ -8,7 +8,6 @@ const meta: PlanMeta = {
   target: 'mock',
   storageHash: 'sha256:test',
   lane: 'raw-sql',
-  paramDescriptors: [],
 };
 
 interface MockPlan<Row = Record<string, unknown>> extends QueryPlan<Row> {

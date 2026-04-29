@@ -18,7 +18,6 @@ const rawMeta: PlanMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
   lane: 'mongo-raw',
-  paramDescriptors: [],
 };
 
 function rawPlan(collection: string, command: MongoQueryPlan['command']): MongoQueryPlan {

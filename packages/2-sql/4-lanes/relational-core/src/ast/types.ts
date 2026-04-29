@@ -1,4 +1,3 @@
-import type { PlanRefs } from '@prisma-next/contract/types';
 import type { ParamSpec } from '@prisma-next/operations';
 import type { SqlLoweringSpec } from '@prisma-next/sql-operations';
 
@@ -146,54 +145,89 @@ function collectParamRefsWith<TNode extends Expression>(node: TNode): ParamRef[]
   });
 }
 
-function sortRefs(
-  tables: ReadonlySet<string>,
-  columns: ReadonlyMap<string, { table: string; column: string }>,
-): PlanRefs {
-  const sortedTables = [...tables].sort((a, b) => a.localeCompare(b));
-  const sortedColumns = [...columns.values()].sort((a, b) => {
-    const tableCompare = a.table.localeCompare(b.table);
-    if (tableCompare !== 0) {
-      return tableCompare;
-    }
-    return a.column.localeCompare(b.column);
+function rewriteTableSource(table: TableSource, rewriter: AstRewriter): TableSource {
+  return rewriter.tableSource ? rewriter.tableSource(table) : table;
+}
+
+function rewriteProjectionItem(item: ProjectionItem, rewriter: AstRewriter): ProjectionItem {
+  const rewrittenExpr =
+    item.expr.kind === 'literal'
+      ? rewriter.literal
+        ? rewriter.literal(item.expr)
+        : item.expr
+      : item.expr.rewrite(rewriter);
+  return new ProjectionItem(item.alias, rewrittenExpr, item.codecId);
+}
+
+function rewriteInsertValue(value: InsertValue, rewriter: AstRewriter): InsertValue {
+  switch (value.kind) {
+    case 'param-ref':
+      return rewriter.paramRef ? rewriteParamRefForInsert(value, rewriter) : value;
+    case 'column-ref':
+      return rewriter.columnRef ? rewriteColumnRefForInsert(value, rewriter) : value;
+    case 'default-value':
+      return value;
+  }
+}
+
+function rewriteParamRefForInsert(value: ParamRef, rewriter: AstRewriter): InsertValue {
+  const rewritten = rewriter.paramRef ? rewriter.paramRef(value) : value;
+  return rewritten.kind === 'param-ref' ? rewritten : value;
+}
+
+function rewriteColumnRefForInsert(value: ColumnRef, rewriter: AstRewriter): InsertValue {
+  const rewritten = rewriter.columnRef ? rewriter.columnRef(value) : value;
+  return rewritten.kind === 'column-ref' ? rewritten : value;
+}
+
+function rewriteInsertRow(
+  row: Readonly<Record<string, InsertValue>>,
+  rewriter: AstRewriter,
+): Record<string, InsertValue> {
+  const result: Record<string, InsertValue> = {};
+  for (const [key, value] of Object.entries(row)) {
+    result[key] = rewriteInsertValue(value, rewriter);
+  }
+  return result;
+}
+
+function rewriteUpdateSetValue(
+  value: ColumnRef | ParamRef,
+  rewriter: AstRewriter,
+): ColumnRef | ParamRef {
+  if (value.kind === 'column-ref') {
+    const rewritten = rewriter.columnRef ? rewriter.columnRef(value) : value;
+    return rewritten.kind === 'column-ref' ? rewritten : value;
+  }
+  const rewritten = rewriter.paramRef ? rewriter.paramRef(value) : value;
+  return rewritten.kind === 'param-ref' ? rewritten : value;
+}
+
+function rewriteUpdateSet(
+  set: Readonly<Record<string, ColumnRef | ParamRef>>,
+  rewriter: AstRewriter,
+): Record<string, ColumnRef | ParamRef> {
+  const result: Record<string, ColumnRef | ParamRef> = {};
+  for (const [key, value] of Object.entries(set)) {
+    result[key] = rewriteUpdateSetValue(value, rewriter);
+  }
+  return result;
+}
+
+function rewriteOnConflict(onConflict: InsertOnConflict, rewriter: AstRewriter): InsertOnConflict {
+  const columns = onConflict.columns.map((columnRef) => {
+    const rewritten = rewriter.columnRef ? rewriter.columnRef(columnRef) : columnRef;
+    return rewritten.kind === 'column-ref' ? rewritten : columnRef;
   });
 
-  return {
-    tables: sortedTables,
-    columns: sortedColumns,
-  };
-}
+  if (onConflict.action.kind === 'do-nothing') {
+    return new InsertOnConflict(columns, new DoNothingConflictAction());
+  }
 
-function addColumnRefToRefSets(
-  columnRef: ColumnRef,
-  tables: Set<string>,
-  columns: Map<string, { table: string; column: string }>,
-): void {
-  if (columnRef.table === 'excluded') {
-    return;
-  }
-  tables.add(columnRef.table);
-  const key = `${columnRef.table}.${columnRef.column}`;
-  if (!columns.has(key)) {
-    columns.set(key, {
-      table: columnRef.table,
-      column: columnRef.column,
-    });
-  }
-}
-
-function mergeRefsInto(
-  refs: PlanRefs,
-  tables: Set<string>,
-  columns: Map<string, { table: string; column: string }>,
-): void {
-  for (const table of refs.tables ?? []) {
-    tables.add(table);
-  }
-  for (const column of refs.columns ?? []) {
-    addColumnRefToRefSets(new ColumnRef(column.table, column.column), tables, columns);
-  }
+  return new InsertOnConflict(
+    columns,
+    new DoUpdateSetConflictAction(rewriteUpdateSet(onConflict.action.set, rewriter)),
+  );
 }
 
 abstract class AstNode {
@@ -205,18 +239,11 @@ abstract class AstNode {
 }
 
 abstract class QueryAst extends AstNode {
-  abstract collectRefs(): PlanRefs;
   abstract collectParamRefs(): ParamRef[];
   abstract toQueryAst(): AnyQueryAst;
-
-  collectColumnRefs(): ColumnRef[] {
-    const refs = this.collectRefs().columns ?? [];
-    return refs.map((ref) => new ColumnRef(ref.table, ref.column));
-  }
 }
 
 abstract class FromSource extends AstNode {
-  abstract collectRefs(): PlanRefs;
   abstract rewrite(rewriter: AstRewriter): AnyFromSource;
   abstract toFromSource(): AnyFromSource;
 }
@@ -270,13 +297,6 @@ export class TableSource extends FromSource {
   override toFromSource(): AnyFromSource {
     return this;
   }
-
-  override collectRefs(): PlanRefs {
-    return {
-      tables: [this.name],
-      columns: [],
-    };
-  }
 }
 
 export interface TableRef {
@@ -309,10 +329,6 @@ export class DerivedTableSource extends FromSource {
 
   override toFromSource(): AnyFromSource {
     return this;
-  }
-
-  override collectRefs(): PlanRefs {
-    return this.query.collectRefs();
   }
 }
 
@@ -1052,16 +1068,22 @@ export class ProjectionItem extends AstNode {
   readonly kind = 'projection-item' as const;
   readonly alias: string;
   readonly expr: ProjectionExpr;
+  readonly codecId: string | undefined;
 
-  constructor(alias: string, expr: ProjectionExpr) {
+  constructor(alias: string, expr: ProjectionExpr, codecId?: string) {
     super();
     this.alias = alias;
     this.expr = expr;
+    this.codecId = codecId;
     this.freeze();
   }
 
-  static of(alias: string, expr: ProjectionExpr): ProjectionItem {
-    return new ProjectionItem(alias, expr);
+  static of(alias: string, expr: ProjectionExpr, codecId?: string): ProjectionItem {
+    return new ProjectionItem(alias, expr, codecId);
+  }
+
+  withCodecId(codecId: string | undefined): ProjectionItem {
+    return new ProjectionItem(this.alias, this.expr, codecId);
   }
 }
 
@@ -1218,6 +1240,7 @@ export class SelectAst extends QueryAst {
                 ? rewriter.literal(projection.expr)
                 : projection.expr
               : projection.expr.rewrite(rewriter),
+            projection.codecId,
           ),
       ),
       where: this.where?.rewrite(rewriter),
@@ -1234,7 +1257,7 @@ export class SelectAst extends QueryAst {
     return rewriter.select ? rewriter.select(rewritten) : rewritten;
   }
 
-  override collectColumnRefs(): ColumnRef[] {
+  collectColumnRefs(): ColumnRef[] {
     const refs: ColumnRef[] = [];
     const pushRefs = (columns: ReadonlyArray<ColumnRef>) => {
       refs.push(...columns);
@@ -1322,35 +1345,6 @@ export class SelectAst extends QueryAst {
     return refs;
   }
 
-  override collectRefs(): PlanRefs {
-    const tables = new Set<string>();
-    const columns = new Map<string, { table: string; column: string }>();
-
-    const addSource = (source: AnyFromSource) => {
-      mergeRefsInto(source.collectRefs(), tables, columns);
-    };
-
-    addSource(this.from);
-
-    for (const join of this.joins ?? []) {
-      addSource(join.source);
-      if (join.on.kind === 'eq-col-join-on') {
-        addColumnRefToRefSets(join.on.left, tables, columns);
-        addColumnRefToRefSets(join.on.right, tables, columns);
-      } else {
-        for (const columnRef of join.on.collectColumnRefs()) {
-          addColumnRefToRefSets(columnRef, tables, columns);
-        }
-      }
-    }
-
-    for (const columnRef of this.collectColumnRefs()) {
-      addColumnRefToRefSets(columnRef, tables, columns);
-    }
-
-    return sortRefs(tables, columns);
-  }
-
   override toQueryAst(): AnyQueryAst {
     return this;
   }
@@ -1418,13 +1412,13 @@ export class InsertAst extends QueryAst {
   readonly table: TableSource;
   readonly rows: ReadonlyArray<Readonly<Record<string, InsertValue>>>;
   readonly onConflict: InsertOnConflict | undefined;
-  readonly returning: ReadonlyArray<ColumnRef> | undefined;
+  readonly returning: ReadonlyArray<ProjectionItem> | undefined;
 
   constructor(
     table: TableSource,
     rows: ReadonlyArray<Record<string, InsertValue>> = [{}],
     onConflict?: InsertOnConflict,
-    returning?: ReadonlyArray<ColumnRef>,
+    returning?: ReadonlyArray<ProjectionItem>,
   ) {
     super();
     this.table = table;
@@ -1451,7 +1445,7 @@ export class InsertAst extends QueryAst {
     );
   }
 
-  withReturning(returning: ReadonlyArray<ColumnRef> | undefined): InsertAst {
+  withReturning(returning: ReadonlyArray<ProjectionItem> | undefined): InsertAst {
     return new InsertAst(
       this.table,
       this.rows.map((row) => ({ ...row })),
@@ -1466,6 +1460,15 @@ export class InsertAst extends QueryAst {
       this.rows.map((row) => ({ ...row })),
       onConflict,
       this.returning,
+    );
+  }
+
+  rewrite(rewriter: AstRewriter): InsertAst {
+    return new InsertAst(
+      rewriteTableSource(this.table, rewriter),
+      this.rows.map((row) => rewriteInsertRow(row, rewriter)),
+      this.onConflict ? rewriteOnConflict(this.onConflict, rewriter) : undefined,
+      this.returning?.map((item) => rewriteProjectionItem(item, rewriter)),
     );
   }
 
@@ -1485,44 +1488,12 @@ export class InsertAst extends QueryAst {
         }
       }
     }
+    for (const item of this.returning ?? []) {
+      if (item.expr.kind !== 'literal') {
+        refs.push(...item.expr.collectParamRefs());
+      }
+    }
     return refs;
-  }
-
-  override collectRefs(): PlanRefs {
-    const tables = new Set<string>([this.table.name]);
-    const columns = new Map<string, { table: string; column: string }>();
-
-    const addColumn = (columnRef: ColumnRef) => addColumnRefToRefSets(columnRef, tables, columns);
-    const addValue = (value: InsertValue) => {
-      if (value.kind === 'column-ref') {
-        addColumn(value);
-      }
-    };
-
-    for (const row of this.rows) {
-      for (const value of Object.values(row)) {
-        addValue(value);
-      }
-    }
-
-    for (const columnRef of this.returning ?? []) {
-      addColumn(columnRef);
-    }
-
-    if (this.onConflict) {
-      for (const columnRef of this.onConflict.columns) {
-        addColumn(columnRef);
-      }
-      if (this.onConflict.action.kind === 'do-update-set') {
-        for (const value of Object.values(this.onConflict.action.set)) {
-          if (value.kind === 'column-ref') {
-            addColumn(value);
-          }
-        }
-      }
-    }
-
-    return sortRefs(tables, columns);
   }
 
   override toQueryAst(): AnyQueryAst {
@@ -1535,13 +1506,13 @@ export class UpdateAst extends QueryAst {
   readonly table: TableSource;
   readonly set: Readonly<Record<string, ColumnRef | ParamRef>>;
   readonly where: AnyExpression | undefined;
-  readonly returning: ReadonlyArray<ColumnRef> | undefined;
+  readonly returning: ReadonlyArray<ProjectionItem> | undefined;
 
   constructor(
     table: TableSource,
     set: Readonly<Record<string, ColumnRef | ParamRef>> = {},
     where?: AnyExpression,
-    returning?: ReadonlyArray<ColumnRef>,
+    returning?: ReadonlyArray<ProjectionItem>,
   ) {
     super();
     this.table = table;
@@ -1563,8 +1534,17 @@ export class UpdateAst extends QueryAst {
     return new UpdateAst(this.table, this.set, where, this.returning);
   }
 
-  withReturning(returning: ReadonlyArray<ColumnRef> | undefined): UpdateAst {
+  withReturning(returning: ReadonlyArray<ProjectionItem> | undefined): UpdateAst {
     return new UpdateAst(this.table, this.set, this.where, returning);
+  }
+
+  rewrite(rewriter: AstRewriter): UpdateAst {
+    return new UpdateAst(
+      rewriteTableSource(this.table, rewriter),
+      rewriteUpdateSet(this.set, rewriter),
+      this.where?.rewrite(rewriter),
+      this.returning?.map((item) => rewriteProjectionItem(item, rewriter)),
+    );
   }
 
   override collectParamRefs(): ParamRef[] {
@@ -1577,28 +1557,12 @@ export class UpdateAst extends QueryAst {
     if (this.where) {
       refs.push(...this.where.collectParamRefs());
     }
-    return refs;
-  }
-
-  override collectRefs(): PlanRefs {
-    const tables = new Set<string>([this.table.name]);
-    const columns = new Map<string, { table: string; column: string }>();
-
-    for (const value of Object.values(this.set)) {
-      if (value.kind === 'column-ref') {
-        addColumnRefToRefSets(value, tables, columns);
+    for (const item of this.returning ?? []) {
+      if (item.expr.kind !== 'literal') {
+        refs.push(...item.expr.collectParamRefs());
       }
     }
-
-    for (const columnRef of this.where?.collectColumnRefs() ?? []) {
-      addColumnRefToRefSets(columnRef, tables, columns);
-    }
-
-    for (const columnRef of this.returning ?? []) {
-      addColumnRefToRefSets(columnRef, tables, columns);
-    }
-
-    return sortRefs(tables, columns);
+    return refs;
   }
 
   override toQueryAst(): AnyQueryAst {
@@ -1610,9 +1574,13 @@ export class DeleteAst extends QueryAst {
   readonly kind = 'delete' as const;
   readonly table: TableSource;
   readonly where: AnyExpression | undefined;
-  readonly returning: ReadonlyArray<ColumnRef> | undefined;
+  readonly returning: ReadonlyArray<ProjectionItem> | undefined;
 
-  constructor(table: TableSource, where?: AnyExpression, returning?: ReadonlyArray<ColumnRef>) {
+  constructor(
+    table: TableSource,
+    where?: AnyExpression,
+    returning?: ReadonlyArray<ProjectionItem>,
+  ) {
     super();
     this.table = table;
     this.where = where;
@@ -1628,27 +1596,29 @@ export class DeleteAst extends QueryAst {
     return new DeleteAst(this.table, where, this.returning);
   }
 
-  withReturning(returning: ReadonlyArray<ColumnRef> | undefined): DeleteAst {
+  withReturning(returning: ReadonlyArray<ProjectionItem> | undefined): DeleteAst {
     return new DeleteAst(this.table, this.where, returning);
   }
 
-  override collectParamRefs(): ParamRef[] {
-    return this.where?.collectParamRefs() ?? [];
+  rewrite(rewriter: AstRewriter): DeleteAst {
+    return new DeleteAst(
+      rewriteTableSource(this.table, rewriter),
+      this.where?.rewrite(rewriter),
+      this.returning?.map((item) => rewriteProjectionItem(item, rewriter)),
+    );
   }
 
-  override collectRefs(): PlanRefs {
-    const tables = new Set<string>([this.table.name]);
-    const columns = new Map<string, { table: string; column: string }>();
-
-    for (const columnRef of this.where?.collectColumnRefs() ?? []) {
-      addColumnRefToRefSets(columnRef, tables, columns);
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    if (this.where) {
+      refs.push(...this.where.collectParamRefs());
     }
-
-    for (const columnRef of this.returning ?? []) {
-      addColumnRefToRefSets(columnRef, tables, columns);
+    for (const item of this.returning ?? []) {
+      if (item.expr.kind !== 'literal') {
+        refs.push(...item.expr.collectParamRefs());
+      }
     }
-
-    return sortRefs(tables, columns);
+    return refs;
   }
 
   override toQueryAst(): AnyQueryAst {

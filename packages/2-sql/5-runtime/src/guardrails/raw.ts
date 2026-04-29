@@ -1,4 +1,4 @@
-import type { PlanMeta, PlanRefs } from '@prisma-next/contract/types';
+import type { PlanMeta } from '@prisma-next/contract/types';
 
 export type LintSeverity = 'error' | 'warn';
 export type BudgetSeverity = 'error' | 'warn';
@@ -103,56 +103,7 @@ export function evaluateRawGuardrails(
     );
   }
 
-  const refs = plan.meta.refs;
-  if (refs) {
-    evaluateIndexCoverage(refs, lints);
-  }
-
   return { lints, budgets, statement: statementType };
-}
-
-function evaluateIndexCoverage(refs: PlanRefs, lints: LintFinding[]) {
-  const predicateColumns = refs.columns ?? [];
-  if (predicateColumns.length === 0) {
-    return;
-  }
-
-  const indexes = refs.indexes ?? [];
-
-  if (indexes.length === 0) {
-    lints.push(
-      createLint(
-        'LINT.UNINDEXED_PREDICATE',
-        'warn',
-        'Raw SQL plan predicates lack supporting indexes',
-        {
-          predicates: predicateColumns,
-        },
-      ),
-    );
-    return;
-  }
-
-  const hasSupportingIndex = predicateColumns.every((column) =>
-    indexes.some(
-      (index) =>
-        index.table === column.table &&
-        index.columns.some((col) => col.toLowerCase() === column.column.toLowerCase()),
-    ),
-  );
-
-  if (!hasSupportingIndex) {
-    lints.push(
-      createLint(
-        'LINT.UNINDEXED_PREDICATE',
-        'warn',
-        'Raw SQL plan predicates lack supporting indexes',
-        {
-          predicates: predicateColumns,
-        },
-      ),
-    );
-  }
 }
 
 function classifyStatement(sql: string): 'select' | 'mutation' | 'other' {

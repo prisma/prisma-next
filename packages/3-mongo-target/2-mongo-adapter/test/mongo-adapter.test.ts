@@ -36,7 +36,6 @@ const stubMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
   lane: 'mongo-orm',
-  paramDescriptors: [],
 };
 
 function plan(collection: string, command: AnyMongoCommand) {

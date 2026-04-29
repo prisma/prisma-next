@@ -532,11 +532,21 @@ function renderDelete(ast: DeleteAst): string {
   return `DELETE FROM ${table}${whereClause}${returningClause}`;
 }
 
-function renderReturning(returning: ReadonlyArray<ColumnRef> | undefined): string {
+function renderReturning(returning: ReadonlyArray<ProjectionItem> | undefined): string {
   if (!returning?.length) {
     return '';
   }
-  return ` RETURNING ${returning.map((col) => `${quoteIdentifier(col.table)}.${quoteIdentifier(col.column)}`).join(', ')}`;
+  return ` RETURNING ${returning
+    .map((item) => {
+      if (item.expr.kind === 'column-ref') {
+        const rendered = `${quoteIdentifier(item.expr.table)}.${quoteIdentifier(item.expr.column)}`;
+        return item.expr.column === item.alias
+          ? rendered
+          : `${rendered} AS ${quoteIdentifier(item.alias)}`;
+      }
+      return `${renderExpr(item.expr)} AS ${quoteIdentifier(item.alias)}`;
+    })
+    .join(', ')}`;
 }
 
 export function createSqliteAdapter(options?: SqliteAdapterOptions) {

@@ -59,7 +59,6 @@ describe('SqlFamilyAdapter', () => {
         target: 'postgres',
         storageHash: 'sha256:test-hash',
         lane: 'sql',
-        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],
@@ -76,7 +75,6 @@ describe('SqlFamilyAdapter', () => {
         target: 'mysql', // Wrong target
         storageHash: 'sha256:test-hash',
         lane: 'sql',
-        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],
@@ -94,7 +92,6 @@ describe('SqlFamilyAdapter', () => {
         target: 'postgres',
         storageHash: 'sha256:different-hash', // Wrong hash
         lane: 'sql',
-        paramDescriptors: [],
       },
       sql: 'SELECT 1',
       params: [],

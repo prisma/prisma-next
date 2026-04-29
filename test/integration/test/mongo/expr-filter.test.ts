@@ -17,7 +17,6 @@ const testMeta: PlanMeta = {
   target: 'mongo',
   storageHash: 'test-hash',
   lane: 'expr-filter-test',
-  paramDescriptors: [],
 };
 
 function plan(collection: string, command: MongoQueryPlan['command']): MongoQueryPlan {

@@ -8,7 +8,6 @@ const meta: PlanMeta = {
   target: 'mongodb',
   storageHash: 'sha256:test',
   lane: 'mongo',
-  paramDescriptors: [],
 };
 
 test('MongoQueryPlan extends framework QueryPlan', () => {

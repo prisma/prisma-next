@@ -8,6 +8,7 @@ import {
   InsertAst,
   InsertOnConflict,
   ParamRef,
+  ProjectionItem,
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -19,13 +20,16 @@ function buildReturningColumns(
   contract: Contract<SqlStorage>,
   tableName: string,
   returningColumns: readonly string[] | undefined,
-) {
+): ReadonlyArray<ProjectionItem> {
   const columns =
     returningColumns && returningColumns.length > 0
       ? [...returningColumns]
       : resolveTableColumns(contract, tableName);
 
-  return columns.map((column) => ColumnRef.of(tableName, column));
+  const table = contract.storage.tables[tableName];
+  return columns.map((column) =>
+    ProjectionItem.of(column, ColumnRef.of(tableName, column), table?.columns[column]?.codecId),
+  );
 }
 
 function toParamAssignments(
@@ -114,8 +118,8 @@ export function compileInsertReturning(
   const ast = InsertAst.into(TableSource.named(tableName))
     .withRows(normalizedRows)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileInsertCount(
@@ -125,8 +129,8 @@ export function compileInsertCount(
 ): SqlQueryPlan<Record<string, unknown>> {
   const { rows: normalizedRows } = normalizeInsertRows(contract, tableName, rows);
   const ast = InsertAst.into(TableSource.named(tableName)).withRows(normalizedRows);
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 function stripUndefinedValues(row: Record<string, unknown>): Record<string, unknown> {
@@ -224,8 +228,8 @@ export function compileUpsertReturning(
     .withOnConflict(onConflict)
     .withReturning(buildReturningColumns(contract, tableName, returningColumns));
 
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileUpdateReturning(
@@ -243,8 +247,8 @@ export function compileUpdateReturning(
   if (where) {
     ast = ast.withWhere(where);
   }
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileUpdateCount(
@@ -259,8 +263,8 @@ export function compileUpdateCount(
   if (where) {
     ast = ast.withWhere(where);
   }
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileDeleteReturning(
@@ -276,8 +280,8 @@ export function compileDeleteReturning(
   if (where) {
     ast = ast.withWhere(where);
   }
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileDeleteCount(
@@ -290,6 +294,6 @@ export function compileDeleteCount(
   if (where) {
     ast = ast.withWhere(where);
   }
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }

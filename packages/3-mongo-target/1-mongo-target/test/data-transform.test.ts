@@ -29,7 +29,6 @@ function makePlanMeta() {
     target: 'mongo' as const,
     storageHash: 'sha256:test',
     lane: 'mongo-raw',
-    paramDescriptors: [] as const,
   };
 }
 

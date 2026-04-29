@@ -84,7 +84,6 @@ const meta: PlanMeta = {
   target: 'mock',
   storageHash: 'sha256:test-core',
   lane: 'raw-sql',
-  paramDescriptors: [],
 };
 
 describe('RuntimeCore with mock family', () => {
@@ -110,7 +109,6 @@ describe('RuntimeCore with mock family', () => {
         target: 'other',
         storageHash: 'sha256:other-core',
         lane: 'raw-sql',
-        paramDescriptors: [],
       },
     };
 

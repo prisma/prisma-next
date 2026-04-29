@@ -46,7 +46,6 @@ test('execute(plan) enforces the TPlan constraint and returns AsyncIterableResul
     target: 'mock',
     storageHash: 'sha256:test',
     lane: 'raw-sql',
-    paramDescriptors: [],
   };
   type Row = { id: number };
   const plan: FixturePlan & { readonly _row?: Row } = { draftId: 'd', meta };

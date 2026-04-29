@@ -47,7 +47,6 @@ export function mongoQuery<
         target: 'mongo',
         storageHash: String(storageHash),
         lane: 'mongo-query',
-        paramDescriptors: [],
       };
       return { collection: command.collection, command, meta };
     },

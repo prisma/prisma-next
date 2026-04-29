@@ -49,7 +49,10 @@ function buildProjection(
       ? [...selectedFields]
       : resolveTableColumns(contract, tableName);
 
-  return columns.map((column) => ProjectionItem.of(column, ColumnRef.of(tableRef, column)));
+  const table = contract.storage.tables[tableName];
+  return columns.map((column) =>
+    ProjectionItem.of(column, ColumnRef.of(tableRef, column), table?.columns[column]?.codecId),
+  );
 }
 
 function createBoundaryExpr(tableName: string, entry: CursorOrderEntry): AnyExpression {
@@ -403,10 +406,17 @@ function buildMtiJoins(
     joins.push(join);
 
     const variantColumns = resolveTableColumns(contract, variant.table);
+    const variantTable = contract.storage.tables[variant.table];
     for (const col of variantColumns) {
       if (col === pkColumn) continue;
       const alias = `${variant.table}__${col}`;
-      projection.push(ProjectionItem.of(alias, ColumnRef.of(variant.table, col)));
+      projection.push(
+        ProjectionItem.of(
+          alias,
+          ColumnRef.of(variant.table, col),
+          variantTable?.columns[col]?.codecId,
+        ),
+      );
     }
   }
 
@@ -437,8 +447,8 @@ export function compileSelect(
       : undefined,
   );
 
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileRelationSelect(
@@ -513,6 +523,6 @@ export function compileSelectWithIncludeStrategy(
     },
   );
 
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }

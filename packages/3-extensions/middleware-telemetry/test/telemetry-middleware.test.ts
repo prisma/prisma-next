@@ -8,7 +8,6 @@ describe('telemetry middleware', () => {
       target: 'postgres',
       storageHash: 'sha256:test',
       lane: 'sql',
-      paramDescriptors: [],
     } satisfies PlanMeta,
   };
 

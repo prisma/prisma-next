@@ -24,7 +24,6 @@ export function mongoRaw<TContract extends MongoContract>(options: {
         target: 'mongo',
         storageHash: contract.storage.storageHash,
         lane: 'mongo-raw',
-        paramDescriptors: [],
       };
 
       return createRawMongoCollection(collectionName, meta);

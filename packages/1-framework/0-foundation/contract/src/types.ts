@@ -135,27 +135,6 @@ export interface DocCollection {
   readonly readOnly?: boolean;
 }
 
-// Plan types - target-family agnostic execution types
-export interface ParamDescriptor {
-  readonly index?: number;
-  readonly name?: string;
-  readonly codecId?: string;
-  readonly nativeType?: string;
-  readonly nullable?: boolean;
-  readonly source: 'dsl' | 'raw' | 'lane';
-  readonly refs?: { table: string; column: string };
-}
-
-export interface PlanRefs {
-  readonly tables?: readonly string[];
-  readonly columns?: ReadonlyArray<{ table: string; column: string }>;
-  readonly indexes?: ReadonlyArray<{
-    readonly table: string;
-    readonly columns: ReadonlyArray<string>;
-    readonly name?: string;
-  }>;
-}
-
 export interface PlanMeta {
   readonly target: string;
   readonly targetFamily?: string;
@@ -163,17 +142,8 @@ export interface PlanMeta {
   readonly profileHash?: string;
   readonly lane: string;
   readonly annotations?: {
-    codecs?: Record<string, string>; // alias/param → codec id ('ns/name@v')
-    [key: string]: unknown;
+    readonly [key: string]: unknown;
   };
-  readonly paramDescriptors: ReadonlyArray<ParamDescriptor>;
-  readonly refs?: PlanRefs;
-  readonly projection?: Record<string, string> | ReadonlyArray<string>;
-  /**
-   * Optional mapping of projection alias → column type ID (fully qualified ns/name@version).
-   * Used for codec resolution when AST+refs don't provide enough type info.
-   */
-  readonly projectionTypes?: Record<string, string>;
 }
 
 /**

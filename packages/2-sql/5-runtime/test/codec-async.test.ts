@@ -1,7 +1,18 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import {
+  AndExpr,
+  type AnyExpression,
+  BinaryExpr,
+  ColumnRef,
+  codec,
+  createCodecRegistry,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   JsonSchemaValidateFn,
@@ -10,24 +21,78 @@ import type {
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { decodeRow } from '../src/codecs/decoding';
-import { encodeParam, encodeParams } from '../src/codecs/encoding';
+import { encodeParams } from '../src/codecs/encoding';
 import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
 
 // =============================================================================
-// Shared helpers
+// Shared helpers — AST-backed plans (ADR 205)
 // =============================================================================
 
-function createTestPlan(overrides?: Partial<SqlExecutionPlan>): SqlExecutionPlan {
+interface ParamSpec {
+  readonly value: unknown;
+  readonly codecId?: string;
+  readonly name?: string;
+}
+
+interface ProjectionSpec {
+  readonly alias: string;
+  readonly codecId?: string;
+  readonly column?: { table: string; column: string };
+}
+
+const TEST_HASH = coreHash('sha256:test');
+
+function paramRefFromSpec(spec: ParamSpec): ParamRef {
+  const options: { name?: string; codecId?: string } = {};
+  if (spec.name !== undefined) options.name = spec.name;
+  if (spec.codecId !== undefined) options.codecId = spec.codecId;
+  return ParamRef.of(spec.value, options);
+}
+
+function projectionFromSpec(spec: ProjectionSpec): ProjectionItem {
+  const ref = spec.column ?? { table: 'user', column: spec.alias };
+  return ProjectionItem.of(spec.alias, ColumnRef.of(ref.table, ref.column), spec.codecId);
+}
+
+function buildAstPlan(options: {
+  params?: readonly ParamSpec[];
+  projections?: readonly ProjectionSpec[];
+}): SqlExecutionPlan {
+  const refs = (options.params ?? []).map(paramRefFromSpec);
+  const projections = (options.projections ?? []).map(projectionFromSpec);
+
+  let ast = SelectAst.from(TableSource.named('user'));
+  if (projections.length > 0) {
+    ast = ast.withProjection(projections);
+  }
+  if (refs.length > 0) {
+    const eqs: AnyExpression[] = refs.map((ref) =>
+      BinaryExpr.eq(ColumnRef.of('user', ref.name ?? 'id'), ref),
+    );
+    ast = ast.withWhere(eqs.length === 1 ? eqs[0]! : AndExpr.of(eqs));
+  }
+
   return {
     sql: 'SELECT 1',
-    params: [],
+    params: refs.map((ref) => ref.value),
+    ast,
     meta: {
       target: 'postgres',
-      storageHash: coreHash('sha256:test'),
+      storageHash: TEST_HASH,
       lane: 'dsl',
-      paramDescriptors: [],
     },
-    ...overrides,
+  };
+}
+
+function buildRawPlan(params: readonly unknown[] = []): SqlExecutionPlan {
+  return {
+    sql: 'SELECT 1',
+    params: [...params],
+    meta: {
+      target: 'postgres',
+      storageHash: TEST_HASH,
+      lane: 'raw',
+    },
   };
 }
 
@@ -46,14 +111,13 @@ function deferred<T>(): {
 }
 
 // =============================================================================
-// encodeParams: concurrent dispatch + envelope
+// encodeParams: concurrent dispatch + envelope (AST-backed plans)
 // =============================================================================
 
 describe('encodeParams — async, concurrent dispatch', () => {
   it('dispatches mixed sync/async parameter codecs concurrently via Promise.all', async () => {
     const dA = deferred<string>();
     const dB = deferred<string>();
-
     const callOrder: string[] = [];
 
     const registry = createCodecRegistry();
@@ -91,18 +155,12 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      params: ['alpha', 'bravo', 41],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [
-          { codecId: 'test/async-a@1', source: 'dsl' },
-          { codecId: 'test/async-b@1', source: 'dsl' },
-          { codecId: 'test/sync@1', source: 'dsl' },
-        ],
-      },
+    const plan = buildAstPlan({
+      params: [
+        { value: 'alpha', codecId: 'test/async-a@1', name: 'a' },
+        { value: 'bravo', codecId: 'test/async-b@1', name: 'b' },
+        { value: 41, codecId: 'test/sync@1', name: 'n' },
+      ],
     });
 
     const promise = encodeParams(plan, registry);
@@ -127,14 +185,8 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      params: ['hello'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [{ codecId: 'test/async@1', source: 'dsl' }],
-      },
+    const plan = buildAstPlan({
+      params: [{ value: 'hello', codecId: 'test/async@1' }],
     });
 
     const result = await encodeParams(plan, registry);
@@ -157,14 +209,8 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      params: ['bad'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [{ name: 'pname', codecId: 'test/explody@1', source: 'dsl' }],
-      },
+    const plan = buildAstPlan({
+      params: [{ value: 'bad', codecId: 'test/explody@1', name: 'pname' }],
     });
 
     await expect(encodeParams(plan, registry)).rejects.toMatchObject({
@@ -180,7 +226,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     });
   });
 
-  it('uses param[<i>] label when descriptor has no name', async () => {
+  it('uses param[<i>] label when ParamRef has no name', async () => {
     const registry = createCodecRegistry();
     registry.register(
       codec({
@@ -193,14 +239,8 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      params: ['x'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [{ codecId: 'test/explody@1', source: 'dsl' }],
-      },
+    const plan = buildAstPlan({
+      params: [{ value: 'x', codecId: 'test/explody@1' }],
     });
 
     await expect(encodeParams(plan, registry)).rejects.toMatchObject({
@@ -209,7 +249,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     });
   });
 
-  it('encodeParam returns null for null/undefined and bypasses codec', async () => {
+  it('returns null for null/undefined parameter values without invoking the codec', async () => {
     const registry = createCodecRegistry();
     registry.register(
       codec({
@@ -222,80 +262,45 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const fromNull = await encodeParam(
-      null,
-      { codecId: 'test/sync@1', source: 'dsl' },
-      0,
-      registry,
-    );
-    expect(fromNull).toBeNull();
+    const plan = buildAstPlan({
+      params: [
+        { value: null, codecId: 'test/sync@1', name: 'a' },
+        { value: undefined, codecId: 'test/sync@1', name: 'b' },
+      ],
+    });
 
-    const fromUndefined = await encodeParam(
-      undefined,
-      { codecId: 'test/sync@1', source: 'dsl' },
-      0,
-      registry,
-    );
-    expect(fromUndefined).toBeNull();
+    const result = await encodeParams(plan, registry);
+    expect([...result]).toEqual([null, null]);
   });
 
-  it('passes through values when no codec matches the descriptor', async () => {
+  it('passes through values when no codec is registered for the ParamRef.codecId', async () => {
     const registry = createCodecRegistry();
-    const result = await encodeParam(
-      'raw',
-      { codecId: 'test/missing@1', source: 'dsl' },
-      0,
-      registry,
+    const plan = buildAstPlan({
+      params: [{ value: 'raw', codecId: 'test/missing@1' }],
+    });
+    const result = await encodeParams(plan, registry);
+    expect([...result]).toEqual(['raw']);
+  });
+
+  it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {
+    const registry = createCodecRegistry();
+    registry.register(
+      codec({
+        typeId: 'test/should-not-run@1',
+        targetTypes: ['text'],
+        encode: () => {
+          throw new Error('raw plans must skip codec encoding');
+        },
+        decode: (wire: string) => wire,
+      }),
     );
-    expect(result).toBe('raw');
+
+    const plan = buildRawPlan(['Alice', 42]);
+    const result = await encodeParams(plan, registry);
+    expect([...result]).toEqual(['Alice', 42]);
   });
 
-  it('throws RUNTIME.MISSING_PARAM_DESCRIPTOR when params has more entries than paramDescriptors', async () => {
-    const registry = createCodecRegistry();
-    const plan = createTestPlan({
-      params: ['a', 'b', 'c'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [
-          { codecId: 'test/none@1', source: 'dsl' },
-          { codecId: 'test/none@1', source: 'dsl' },
-        ],
-      },
-    });
-
-    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
-      code: 'RUNTIME.MISSING_PARAM_DESCRIPTOR',
-      category: 'RUNTIME',
-      severity: 'error',
-      details: {
-        paramIndex: 2,
-        paramCount: 3,
-        descriptorCount: 2,
-      },
-    });
-  });
-
-  it('throws RUNTIME.MISSING_PARAM_DESCRIPTOR for the first missing index even if earlier descriptors exist', async () => {
-    const registry = createCodecRegistry();
-    const plan = createTestPlan({
-      params: ['a', 'b'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [{ codecId: 'test/none@1', source: 'dsl' }],
-      },
-    });
-
-    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
-      code: 'RUNTIME.MISSING_PARAM_DESCRIPTOR',
-      details: { paramIndex: 1, paramCount: 2, descriptorCount: 1 },
-    });
-  });
-
-  it('encodes a fully-described plan through encodeParam without throwing', async () => {
+  it('encodes a fully-typed AST-backed plan without throwing', async () => {
     const registry = createCodecRegistry();
     registry.register(
       codec({
@@ -306,21 +311,15 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      params: ['x', 'y'],
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [
-          { codecId: 'test/passthrough@1', source: 'dsl' },
-          { codecId: 'test/passthrough@1', source: 'dsl' },
-        ],
-      },
+    const plan = buildAstPlan({
+      params: [
+        { value: 'x', codecId: 'test/passthrough@1', name: 'x' },
+        { value: 'y', codecId: 'test/passthrough@1', name: 'y' },
+      ],
     });
 
     const encoded = await encodeParams(plan, registry);
-    expect(encoded).toEqual(['wire:x', 'wire:y']);
+    expect([...encoded]).toEqual(['wire:x', 'wire:y']);
   });
 });
 
@@ -395,18 +394,12 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: {
-          a: 'test/slow-a@1',
-          b: 'test/slow-b@1',
-          n: 'test/sync@1',
-        },
-      },
+    const plan = buildAstPlan({
+      projections: [
+        { alias: 'a', codecId: 'test/slow-a@1' },
+        { alias: 'b', codecId: 'test/slow-b@1' },
+        { alias: 'n', codecId: 'test/sync@1' },
+      ],
     });
 
     const row = { a: 'A', b: 'B', n: 21 };
@@ -432,14 +425,8 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { name: 'test/async@1' },
-      },
+    const plan = buildAstPlan({
+      projections: [{ alias: 'name', codecId: 'test/async@1' }],
     });
 
     const result = await decodeRow({ name: 'alice' }, plan, registry);
@@ -460,27 +447,21 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       size: 1,
     };
 
-    const validPlan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+    const plan = buildAstPlan({
+      projections: [
+        {
+          alias: 'metadata',
+          codecId: 'pg/jsonb@1',
+          column: { table: 'user', column: 'metadata' },
+        },
+      ],
     });
 
-    const result = await decodeRow(
-      { metadata: '{"name":"alice"}' },
-      validPlan,
-      registry,
-      validators,
-    );
+    const result = await decodeRow({ metadata: '{"name":"alice"}' }, plan, registry, validators);
     expect(result['metadata']).toEqual({ name: 'alice' });
 
     await expect(
-      decodeRow({ metadata: '{"age":30}' }, validPlan, registry, validators),
+      decodeRow({ metadata: '{"age":30}' }, plan, registry, validators),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       details: {
@@ -506,15 +487,14 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projection: { explody: 'user.payload' },
-        projectionTypes: { explody: 'test/explody@1' },
-      },
+    const plan = buildAstPlan({
+      projections: [
+        {
+          alias: 'explody',
+          codecId: 'test/explody@1',
+          column: { table: 'user', column: 'payload' },
+        },
+      ],
     });
 
     await expect(decodeRow({ explody: 'wire' }, plan, registry)).rejects.toMatchObject({
@@ -530,45 +510,25 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
   });
 
-  it('falls back to refs index when projection mapping is unavailable', async () => {
-    const cause = new Error('boom');
+  it('passes wire values through for raw plans (no AST, no codec decoding)', async () => {
     const registry = createCodecRegistry();
     registry.register(
       codec({
-        typeId: 'test/explody@1',
+        typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
         decode: () => {
-          throw cause;
+          throw new Error('raw plans must skip codec decoding');
         },
       }),
     );
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'test/explody@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
-    });
-
-    await expect(decodeRow({ metadata: 'wire' }, plan, registry)).rejects.toMatchObject({
-      code: 'RUNTIME.DECODE_FAILED',
-      details: {
-        table: 'user',
-        column: 'metadata',
-        codec: 'test/explody@1',
-      },
-    });
+    const plan = buildRawPlan();
+    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry);
+    expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
 
   it('decodeField is single-armed: same path for sync and async codec authors', async () => {
-    // Author functions of different sync/async shapes must produce the same
-    // decoded shape: codec.decode(...) → await → JSON-Schema validate → return value.
-    // Verified by uniform plain-value output regardless of codec author shape.
     const registry = createCodecRegistry();
     const buildCodec = (
       id: string,
@@ -597,14 +557,11 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ),
     );
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { syncCol: 'sync@1', asyncCol: 'async@1' },
-      },
+    const plan = buildAstPlan({
+      projections: [
+        { alias: 'syncCol', codecId: 'sync@1' },
+        { alias: 'asyncCol', codecId: 'async@1' },
+      ],
     });
 
     const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry);
@@ -626,14 +583,8 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       const registry = createCodecRegistry();
       registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
-      const plan = createTestPlan({
-        params: ['Alice'],
-        meta: {
-          target: 'postgres',
-          storageHash: coreHash('sha256:test'),
-          lane: 'dsl',
-          paramDescriptors: [{ name: 'secret', codecId: 'pg/secret@1', source: 'dsl' }],
-        },
+      const plan = buildAstPlan({
+        params: [{ value: 'Alice', codecId: 'pg/secret@1', name: 'secret' }],
       });
 
       const result = await encodeParams(plan, registry);
@@ -652,15 +603,14 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
       const wire = await encryptSecret('top-secret', seed);
-      const plan = createTestPlan({
-        meta: {
-          target: 'postgres',
-          storageHash: coreHash('sha256:test'),
-          lane: 'dsl',
-          paramDescriptors: [],
-          projectionTypes: { secret: 'pg/secret@1' },
-          refs: { columns: [{ table: 'user', column: 'secret' }] },
-        },
+      const plan = buildAstPlan({
+        projections: [
+          {
+            alias: 'secret',
+            codecId: 'pg/secret@1',
+            column: { table: 'user', column: 'secret' },
+          },
+        ],
       });
 
       const result = await decodeRow({ secret: wire }, plan, registry);
@@ -672,15 +622,14 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
     const registry = createCodecRegistry();
     registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
-    const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: coreHash('sha256:test'),
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { secret: 'pg/secret@1' },
-        refs: { columns: [{ table: 'user', column: 'secret' }] },
-      },
+    const plan = buildAstPlan({
+      projections: [
+        {
+          alias: 'secret',
+          codecId: 'pg/secret@1',
+          column: { table: 'user', column: 'secret' },
+        },
+      ],
     });
 
     const rejection = await decodeRow({ secret: 'bad-payload' }, plan, registry).catch(

@@ -30,7 +30,6 @@ function makePlan(storageHash: string = CONTRACT_HASH): SqlQueryPlan {
       target: 'postgres',
       storageHash,
       lane: 'sql',
-      paramDescriptors: [],
     } as unknown as SqlQueryPlan['meta'],
   };
 }

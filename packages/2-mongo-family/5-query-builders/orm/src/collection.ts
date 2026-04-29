@@ -766,7 +766,6 @@ class MongoCollectionImpl<
       target: 'mongo',
       storageHash: this.#contract.storage.storageHash,
       lane: 'mongo-orm',
-      paramDescriptors: [],
     };
   }
 

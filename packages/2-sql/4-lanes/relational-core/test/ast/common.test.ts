@@ -7,6 +7,7 @@ import {
   OperationExpr,
   OrderByItem,
   ParamRef,
+  ProjectionItem,
 } from '../../src/exports/ast';
 import { col, lit, lowerExpr, param, stringReturn, table } from './test-helpers';
 
@@ -91,6 +92,31 @@ describe('ast/common', () => {
         OrderByItem.desc(col('post', 'createdAt')),
       ]),
     );
+  });
+
+  it('creates ProjectionItem with optional codecId', () => {
+    const expr = col('user', 'id');
+
+    const withoutCodec = ProjectionItem.of('id', expr);
+    expect(withoutCodec).toMatchObject({
+      kind: 'projection-item',
+      alias: 'id',
+      expr,
+      codecId: undefined,
+    });
+
+    const withCodec = ProjectionItem.of('id', expr, 'pg/int4@1');
+    expect(withCodec).toMatchObject({
+      kind: 'projection-item',
+      alias: 'id',
+      expr,
+      codecId: 'pg/int4@1',
+    });
+
+    const stamped = withoutCodec.withCodecId('pg/int4@1');
+    expect(stamped.codecId).toBe('pg/int4@1');
+    expect(stamped.alias).toBe('id');
+    expect(stamped.expr).toBe(expr);
   });
 
   it('creates literal expressions by value reference', () => {

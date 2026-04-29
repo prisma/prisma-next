@@ -1,33 +1,30 @@
-import type { ParamDescriptor } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyQueryAst,
+  Codec,
+  CodecRegistry,
+  ParamRef,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
-function resolveParamCodec(
-  paramDescriptor: ParamDescriptor,
-  registry: CodecRegistry,
-): Codec | null {
-  if (paramDescriptor.codecId) {
-    const codec = registry.get(paramDescriptor.codecId);
-    if (codec) {
-      return codec;
-    }
-  }
-
-  return null;
+interface ParamMetadata {
+  readonly codecId: string | undefined;
+  readonly name: string | undefined;
 }
 
-function paramLabel(paramDescriptor: ParamDescriptor, paramIndex: number): string {
-  return paramDescriptor.name ?? `param[${paramIndex}]`;
+const NO_METADATA: ParamMetadata = Object.freeze({ codecId: undefined, name: undefined });
+
+function paramLabel(metadata: ParamMetadata, paramIndex: number): string {
+  return metadata.name ?? `param[${paramIndex}]`;
 }
 
 function wrapEncodeFailure(
   error: unknown,
-  paramDescriptor: ParamDescriptor,
+  metadata: ParamMetadata,
   paramIndex: number,
   codecId: string,
 ): never {
-  const label = paramLabel(paramDescriptor, paramIndex);
+  const label = paramLabel(metadata, paramIndex);
   const message = error instanceof Error ? error.message : String(error);
   const wrapped = runtimeError(
     'RUNTIME.ENCODE_FAILED',
@@ -36,6 +33,18 @@ function wrapEncodeFailure(
   );
   wrapped.cause = error;
   throw wrapped;
+}
+
+function paramRefsByValueOrder(ast: AnyQueryAst): ReadonlyArray<ParamRef> {
+  const seen = new Set<ParamRef>();
+  const ordered: ParamRef[] = [];
+  for (const ref of ast.collectParamRefs()) {
+    if (!seen.has(ref)) {
+      seen.add(ref);
+      ordered.push(ref);
+    }
+  }
+  return ordered;
 }
 
 /**
@@ -47,7 +56,21 @@ function wrapEncodeFailure(
  */
 export async function encodeParam(
   value: unknown,
-  paramDescriptor: ParamDescriptor,
+  paramRef: { readonly codecId?: string; readonly name?: string },
+  paramIndex: number,
+  registry: CodecRegistry,
+): Promise<unknown> {
+  return encodeParamValue(
+    value,
+    { codecId: paramRef.codecId, name: paramRef.name },
+    paramIndex,
+    registry,
+  );
+}
+
+async function encodeParamValue(
+  value: unknown,
+  metadata: ParamMetadata,
   paramIndex: number,
   registry: CodecRegistry,
 ): Promise<unknown> {
@@ -55,7 +78,11 @@ export async function encodeParam(
     return null;
   }
 
-  const codec = resolveParamCodec(paramDescriptor, registry);
+  if (!metadata.codecId) {
+    return value;
+  }
+
+  const codec: Codec | undefined = registry.get(metadata.codecId);
   if (!codec) {
     return value;
   }
@@ -63,7 +90,7 @@ export async function encodeParam(
   try {
     return await codec.encode(value);
   } catch (error) {
-    wrapEncodeFailure(error, paramDescriptor, paramIndex, codec.id);
+    wrapEncodeFailure(error, metadata, paramIndex, codec.id);
   }
 }
 
@@ -80,23 +107,22 @@ export async function encodeParams(
     return plan.params;
   }
 
-  const descriptorCount = plan.meta.paramDescriptors.length;
   const paramCount = plan.params.length;
+  const metadata: ParamMetadata[] = new Array(paramCount).fill(NO_METADATA);
+
+  if (plan.ast) {
+    const refs = paramRefsByValueOrder(plan.ast);
+    for (let i = 0; i < paramCount && i < refs.length; i++) {
+      const ref = refs[i];
+      if (ref) {
+        metadata[i] = { codecId: ref.codecId, name: ref.name };
+      }
+    }
+  }
 
   const tasks: Promise<unknown>[] = new Array(paramCount);
   for (let i = 0; i < paramCount; i++) {
-    const paramValue = plan.params[i];
-    const paramDescriptor = plan.meta.paramDescriptors[i];
-
-    if (!paramDescriptor) {
-      throw runtimeError(
-        'RUNTIME.MISSING_PARAM_DESCRIPTOR',
-        `Missing paramDescriptor for parameter at index ${i} (plan has ${paramCount} params, ${descriptorCount} descriptors). The planner must emit one descriptor per param; this is a contract violation.`,
-        { paramIndex: i, paramCount, descriptorCount },
-      );
-    }
-
-    tasks[i] = encodeParam(paramValue, paramDescriptor, i, registry);
+    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, registry);
   }
 
   const encoded = await Promise.all(tasks);

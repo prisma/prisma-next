@@ -148,7 +148,6 @@ export class PipelineChain<
       target: 'mongo',
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
-      paramDescriptors: [],
     };
   }
 
@@ -509,7 +508,6 @@ export class PipelineChain<
       target: 'mongo',
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
-      paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
   }
@@ -767,7 +765,6 @@ export class PipelineChain<
       target: 'mongo',
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
-      paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
   }
@@ -788,7 +785,6 @@ export class PipelineChain<
       target: 'mongo',
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
-      paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
   }
@@ -804,7 +800,6 @@ export class PipelineChain<
       target: 'mongo',
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
-      paramDescriptors: [],
     };
     return { collection: this.#state.collection, command, meta };
   }

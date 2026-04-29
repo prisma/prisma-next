@@ -80,7 +80,6 @@ const mongoMeta: PlanMeta = {
   targetFamily: 'mongo',
   storageHash: 'sha256:mongo-test',
   lane: 'orm',
-  paramDescriptors: [],
 };
 
 function createMongoPlan(meta: PlanMeta = mongoMeta): MongoQueryPlan {
@@ -111,7 +110,6 @@ describe('cross-family middleware proof', () => {
         target: 'postgres',
         storageHash: 'sha256:sql-test',
         lane: 'sql',
-        paramDescriptors: [],
       },
     };
 
@@ -189,7 +187,6 @@ describe('cross-family middleware proof', () => {
         target: 'postgres',
         storageHash: 'sha256:sql-hash',
         lane: 'sql',
-        paramDescriptors: [],
       },
     };
 
@@ -202,7 +199,6 @@ describe('cross-family middleware proof', () => {
       targetFamily: 'mongo',
       storageHash: 'sha256:mongo-hash',
       lane: 'orm',
-      paramDescriptors: [],
     });
 
     for await (const _row of mongoRuntime.execute(mongoPlan)) {

@@ -71,7 +71,6 @@ function writeMeta(storageHash: string): PlanMeta {
     target: 'mongo',
     storageHash,
     lane: 'mongo-query',
-    paramDescriptors: [],
   };
 }
 

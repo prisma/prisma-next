@@ -5,6 +5,7 @@ import {
   DeleteAst,
   InsertAst,
   ParamRef,
+  ProjectionItem,
   TableSource,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -49,8 +50,14 @@ function buildParamValues(
   return params;
 }
 
-function buildReturningColumnRefs(tableName: string, columns: string[]): ColumnRef[] {
-  return columns.map((col) => ColumnRef.of(tableName, col));
+function buildReturningProjections(
+  tableName: string,
+  columns: string[],
+  rowFields: Record<string, ScopeField>,
+): ProjectionItem[] {
+  return columns.map((col) =>
+    ProjectionItem.of(col, ColumnRef.of(tableName, col), rowFields[col]?.codecId),
+  );
 }
 
 function evaluateWhere(
@@ -131,12 +138,13 @@ export class InsertQueryImpl<
     let ast = InsertAst.into(TableSource.named(this.#tableName)).withValues(paramValues);
 
     if (this.#returningColumns.length > 0) {
-      ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
+      ast = ast.withReturning(
+        buildReturningProjections(this.#tableName, this.#returningColumns, this.#rowFields),
+      );
     }
 
     return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
       ast,
-      this.#rowFields,
       this.ctx,
     );
   }
@@ -234,12 +242,13 @@ export class UpdateQueryImpl<
       .withWhere(whereExpr);
 
     if (this.#returningColumns.length > 0) {
-      ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
+      ast = ast.withReturning(
+        buildReturningProjections(this.#tableName, this.#returningColumns, this.#rowFields),
+      );
     }
 
     return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
       ast,
-      this.#rowFields,
       this.ctx,
     );
   }
@@ -317,12 +326,13 @@ export class DeleteQueryImpl<
     let ast = DeleteAst.from(TableSource.named(this.#tableName)).withWhere(whereExpr);
 
     if (this.#returningColumns.length > 0) {
-      ast = ast.withReturning(buildReturningColumnRefs(this.#tableName, this.#returningColumns));
+      ast = ast.withReturning(
+        buildReturningProjections(this.#tableName, this.#returningColumns, this.#rowFields),
+      );
     }
 
     return buildQueryPlan<ResolveRow<RowType, QC['codecTypes'], QC['resolvedColumnOutputTypes']>>(
       ast,
-      this.#rowFields,
       this.ctx,
     );
   }

@@ -9,7 +9,7 @@ import {
   SelectAst,
   UpdateAst,
 } from '../../src/exports/ast';
-import { col, param, table } from './test-helpers';
+import { col, param, returning, table } from './test-helpers';
 
 describe('ast/builders', () => {
   it('builds select ASTs through fluent rich-node methods', () => {
@@ -46,10 +46,10 @@ describe('ast/builders', () => {
       .withOnConflict(
         InsertOnConflict.on([col('user', 'id')]).doUpdateSet({ email: param(3, 'email') }),
       )
-      .withReturning([col('user', 'id')]);
+      .withReturning(returning('user', ['id']));
 
     expect(ast.onConflict?.columns).toEqual([col('user', 'id')]);
-    expect(ast.returning).toEqual([col('user', 'id')]);
+    expect(ast.returning).toEqual(returning('user', ['id']));
   });
 
   it('builds insert ASTs with do-nothing conflicts and explicit row lists', () => {
@@ -86,12 +86,12 @@ describe('ast/builders', () => {
     const updateAst = UpdateAst.table(table('user'))
       .withSet({ email: param(2, 'email') })
       .withWhere(where)
-      .withReturning([col('user', 'id')]);
+      .withReturning(returning('user', ['id']));
     const deleteAst = DeleteAst.from(table('user'))
       .withWhere(where)
-      .withReturning([col('user', 'id')]);
+      .withReturning(returning('user', ['id']));
 
-    expect(updateAst).toMatchObject({ where, returning: [col('user', 'id')] });
-    expect(deleteAst).toMatchObject({ where, returning: [col('user', 'id')] });
+    expect(updateAst).toMatchObject({ where, returning: returning('user', ['id']) });
+    expect(deleteAst).toMatchObject({ where, returning: returning('user', ['id']) });
   });
 });

@@ -79,7 +79,6 @@ export function compileMongoQuery<Row = unknown>(
     target: 'mongo',
     storageHash,
     lane: 'mongo-orm',
-    paramDescriptors: [],
   };
   const command = new AggregateCommand(collection, stages);
   return { collection, command, meta };

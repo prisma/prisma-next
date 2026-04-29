@@ -5,7 +5,12 @@ import {
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { buildOrmPlanMeta, buildOrmQueryPlan, resolveTableColumns } from '../src/query-plan-meta';
+import {
+  buildOrmPlanMeta,
+  buildOrmQueryPlan,
+  deriveParamsFromAst,
+  resolveTableColumns,
+} from '../src/query-plan-meta';
 import { baseContract } from './collection-fixtures';
 
 describe('query plan meta', () => {
@@ -18,53 +23,46 @@ describe('query plan meta', () => {
     );
   });
 
-  it('includes profileHash in plan meta', () => {
+  it('includes profileHash in plan meta and carries no sidecars', () => {
     expect(buildOrmPlanMeta(baseContract)).toEqual({
       target: baseContract.target,
       targetFamily: baseContract.targetFamily,
       storageHash: baseContract.storage.storageHash,
       profileHash: baseContract.profileHash,
       lane: 'orm-client',
-      paramDescriptors: [],
     });
   });
 
-  it('adds limit annotations for select plans', () => {
+  it('produces a plan whose meta carries no execution-metadata sidecars', () => {
     const ast = SelectAst.from(TableSource.named('users'))
-      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withProjection([
+        ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
+        ProjectionItem.of('email', ColumnRef.of('users', 'email'), 'pg/text@1'),
+      ])
       .withLimit(5);
 
-    const plan = buildOrmQueryPlan(baseContract, ast, ['Alice'], [{ index: 1, source: 'dsl' }]);
-    expect(plan.meta.annotations).toMatchObject({ limit: 5 });
+    const { params } = deriveParamsFromAst(ast);
+    const plan = buildOrmQueryPlan(baseContract, ast, params);
+
+    expect(plan.meta).not.toHaveProperty('paramDescriptors');
+    expect(plan.meta).not.toHaveProperty('projectionTypes');
+    expect(plan.meta).not.toHaveProperty('refs');
+    expect(plan.meta.annotations?.['codecs']).toBeUndefined();
   });
 
-  it('includes projectionTypes and codec annotations for select plans', () => {
+  it('codecIds for projections live on ProjectionItem, not the meta', () => {
     const ast = SelectAst.from(TableSource.named('users')).withProjection([
-      ProjectionItem.of('id', ColumnRef.of('users', 'id')),
-      ProjectionItem.of('email', ColumnRef.of('users', 'email')),
+      ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
+      ProjectionItem.of('email', ColumnRef.of('users', 'email'), 'pg/text@1'),
     ]);
 
-    const plan = buildOrmQueryPlan(baseContract, ast, [], []);
+    const plan = buildOrmQueryPlan(baseContract, ast, []);
 
-    const expectedCodecs: Record<string, string> = {
-      id: 'pg/int4@1',
-      email: 'pg/text@1',
-    };
-    expect(plan.meta.projectionTypes).toEqual(expectedCodecs);
-    expect(plan.meta.annotations).toEqual({ codecs: expectedCodecs });
-  });
-
-  it('includes projectionTypes for select plans with limit', () => {
-    const ast = SelectAst.from(TableSource.named('users'))
-      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
-      .withLimit(10);
-
-    const plan = buildOrmQueryPlan(baseContract, ast, [], []);
-
-    expect(plan.meta.projectionTypes).toEqual({ id: 'pg/int4@1' });
-    expect(plan.meta.annotations).toEqual({
-      codecs: { id: 'pg/int4@1' },
-      limit: 10,
-    });
+    expect(plan.ast.kind).toBe('select');
+    if (plan.ast.kind !== 'select') return;
+    expect(plan.ast.projection.map((item) => [item.alias, item.codecId])).toEqual([
+      ['id', 'pg/int4@1'],
+      ['email', 'pg/text@1'],
+    ]);
   });
 });

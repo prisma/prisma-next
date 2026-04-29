@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BinaryExpr, UpdateAst } from '../../src/ast/types';
-import { col, param, table } from './test-helpers';
+import { BinaryExpr, ColumnRef, ProjectionItem, UpdateAst } from '../../src/ast/types';
+import { col, param, returning, table } from './test-helpers';
 
 describe('ast/update', () => {
   it('creates update ASTs with table, set, and where clauses', () => {
@@ -26,13 +26,13 @@ describe('ast/update', () => {
         name: param(1, 'name'),
       })
       .withWhere(BinaryExpr.eq(col('user', 'id'), param(2, 'userId')))
-      .withReturning([col('user', 'id'), col('user', 'email')]);
+      .withReturning(returning('user', ['id', 'email']));
 
     expect(updateAst.set).toEqual({
       email: param(0, 'email'),
       name: param(1, 'name'),
     });
-    expect(updateAst.returning).toEqual([col('user', 'id'), col('user', 'email')]);
+    expect(updateAst.returning).toEqual(returning('user', ['id', 'email']));
   });
 
   it('supports column refs in set values and empty set objects', () => {
@@ -68,5 +68,20 @@ describe('ast/update', () => {
     });
 
     expect(updateAst.collectParamRefs()).toEqual([emailParam]);
+  });
+
+  it('rewrite descends into returning ProjectionItem.expr', () => {
+    const updateAst = UpdateAst.table(table('user'))
+      .withSet({ email: param(0, 'email') })
+      .withWhere(BinaryExpr.eq(col('user', 'id'), param(1, 'userId')))
+      .withReturning([ProjectionItem.of('email', col('user', 'email'), 'pg/text@1')]);
+
+    const rewritten = updateAst.rewrite({
+      columnRef: (ref) => ColumnRef.of(ref.table, `${ref.column}_v2`),
+    });
+
+    expect(rewritten.returning).toEqual([
+      ProjectionItem.of('email', ColumnRef.of('user', 'email_v2'), 'pg/text@1'),
+    ]);
   });
 });

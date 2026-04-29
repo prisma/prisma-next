@@ -99,7 +99,6 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
         targetFamily: 'sql',
         storageHash: 'test-hash',
         lane: 'sql',
-        paramDescriptors: [],
       },
     };
 
@@ -125,7 +124,6 @@ describe('SqlRuntime AsyncIterableResult integration', () => {
         targetFamily: 'sql',
         storageHash: 'test-hash',
         lane: 'sql',
-        paramDescriptors: [],
       },
     };
 

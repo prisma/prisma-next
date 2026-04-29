@@ -92,7 +92,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
           email: ColumnRef.of('excluded', 'email'),
         }),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     expectParity(ast);
   });
 
@@ -105,7 +105,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'email')]);
+      .withReturning([ProjectionItem.of('email', ColumnRef.of('user', 'email'))]);
     expectParity(ast);
   });
 
@@ -117,7 +117,7 @@ describe('PostgresControlAdapter.lower / PostgresAdapterImpl.lower parity', () =
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     expectParity(ast);
   });
 

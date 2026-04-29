@@ -1,8 +1,17 @@
-import type { Contract, JsonValue, ParamDescriptor } from '@prisma-next/contract/types';
+import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import {
+  BinaryExpr,
+  ColumnRef,
+  codec,
+  createCodecRegistry,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   JsonSchemaValidateFn,
@@ -206,10 +215,13 @@ function createTestPlan(overrides?: Partial<SqlExecutionPlan>): SqlExecutionPlan
       target: 'postgres',
       storageHash: 'sha256:test',
       lane: 'dsl',
-      paramDescriptors: [],
     },
     ...overrides,
   };
+}
+
+function projectionAst(items: ReadonlyArray<ProjectionItem>): SelectAst {
+  return SelectAst.from(TableSource.named('user')).withProjection(items);
 }
 
 // =============================================================================
@@ -310,19 +322,12 @@ describe('JSON Schema encoding validation', () => {
   const codecRegistry = createTestCodecRegistry();
 
   it('encodes JSON values via codec', async () => {
+    const ref = ParamRef.of({ name: 'Alice' }, { codecId: 'pg/jsonb@1' });
     const plan = createTestPlan({
-      params: [{ name: 'Alice' }],
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [
-          {
-            codecId: 'pg/jsonb@1',
-            source: 'dsl' as const,
-          },
-        ],
-      },
+      params: [ref.value],
+      ast: SelectAst.from(TableSource.named('user')).withWhere(
+        BinaryExpr.eq(ColumnRef.of('user', 'metadata'), ref),
+      ),
     });
 
     const result = await encodeParams(plan, codecRegistry);
@@ -330,23 +335,17 @@ describe('JSON Schema encoding validation', () => {
   });
 
   it('returns null for null values', async () => {
-    const descriptor: ParamDescriptor = {
-      codecId: 'pg/jsonb@1',
-      source: 'dsl',
-    };
-
-    const result = await encodeParam(null, descriptor, 0, codecRegistry);
+    const result = await encodeParam(null, { codecId: 'pg/jsonb@1' }, 0, codecRegistry);
     expect(result).toBeNull();
   });
 
   it('encodes when descriptor has name', async () => {
-    const descriptor: ParamDescriptor = {
-      name: 'metadata',
-      codecId: 'pg/jsonb@1',
-      source: 'dsl',
-    };
-
-    const result = await encodeParam({ age: 30 }, descriptor, 0, codecRegistry);
+    const result = await encodeParam(
+      { age: 30 },
+      { name: 'metadata', codecId: 'pg/jsonb@1' },
+      0,
+      codecRegistry,
+    );
     expect(result).toBe('{"age":30}');
   });
 });
@@ -360,14 +359,9 @@ describe('JSON Schema decoding validation', () => {
 
   it('passes valid decoded JSON values', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { metadata: '{"name":"Alice"}' };
@@ -377,14 +371,9 @@ describe('JSON Schema decoding validation', () => {
 
   it('throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED for invalid decoded values', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { metadata: '{"age":30}' };
@@ -405,15 +394,9 @@ describe('JSON Schema decoding validation', () => {
 
   it('validates aliased projection columns using projection mapping', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projection: { userMeta: 'user.metadata' },
-        projectionTypes: { userMeta: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('userMeta', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { userMeta: '{"age":30}' };
@@ -431,26 +414,10 @@ describe('JSON Schema decoding validation', () => {
 
   it('resolves join aliases with duplicate column names using projection mapping', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projection: {
-          userMeta: 'user.metadata',
-          postMeta: 'post.metadata',
-        },
-        projectionTypes: {
-          userMeta: 'pg/jsonb@1',
-          postMeta: 'pg/jsonb@1',
-        },
-        refs: {
-          columns: [
-            { table: 'user', column: 'metadata' },
-            { table: 'post', column: 'metadata' },
-          ],
-        },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('userMeta', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+        ProjectionItem.of('postMeta', ColumnRef.of('post', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = {
@@ -470,14 +437,10 @@ describe('JSON Schema decoding validation', () => {
   });
 
   it('skips validation when column ref cannot be resolved', async () => {
+    // Non-ColumnRef projection expression — no { table, column } available, so
+    // validation is skipped (decoded value still flows through).
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { data: 'pg/jsonb@1' },
-      },
+      ast: projectionAst([ProjectionItem.of('data', ParamRef.of(null), 'pg/jsonb@1')]),
     });
 
     const row = { data: '{"bad":"data"}' };
@@ -487,14 +450,9 @@ describe('JSON Schema decoding validation', () => {
 
   it('skips validation for null wire values', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { metadata: null };
@@ -504,14 +462,9 @@ describe('JSON Schema decoding validation', () => {
 
   it('skips validation when no registry is provided', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { metadata: '{"bad":"data"}' };
@@ -521,19 +474,10 @@ describe('JSON Schema decoding validation', () => {
 
   it('decodes non-JSON columns without validation', async () => {
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { id: 'pg/int4@1', metadata: 'pg/jsonb@1' },
-        refs: {
-          columns: [
-            { table: 'user', column: 'id' },
-            { table: 'user', column: 'metadata' },
-          ],
-        },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('id', ColumnRef.of('user', 'id'), 'pg/int4@1'),
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/jsonb@1'),
+      ]),
     });
 
     const row = { id: 42, metadata: '{"name":"Alice"}' };
@@ -554,14 +498,9 @@ describe('JSON Schema decoding validation', () => {
     );
 
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { metadata: 'pg/async-jsonb@1' },
-        refs: { columns: [{ table: 'user', column: 'metadata' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'pg/async-jsonb@1'),
+      ]),
     });
 
     const row = { metadata: '{"age":30}' };
@@ -608,14 +547,9 @@ describe('JSON Schema decoding validation', () => {
     registry.register(leakyCodec);
 
     const plan = createTestPlan({
-      meta: {
-        target: 'postgres',
-        storageHash: 'sha256:test',
-        lane: 'dsl',
-        paramDescriptors: [],
-        projectionTypes: { secret: 'pg/leaky@1' },
-        refs: { columns: [{ table: 'user', column: 'secret' }] },
-      },
+      ast: projectionAst([
+        ProjectionItem.of('secret', ColumnRef.of('user', 'secret'), 'pg/leaky@1'),
+      ]),
     });
 
     const row = { secret: 'wire-bytes' };

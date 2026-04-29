@@ -170,7 +170,11 @@ function bindSelectAst(contract: Contract<SqlStorage>, ast: SelectAst): SelectAs
     joins: ast.joins?.map((join) => bindJoin(contract, join)),
     projection: ast.projection.map(
       (projection) =>
-        new ProjectionItem(projection.alias, bindProjectionExpr(contract, projection.expr)),
+        new ProjectionItem(
+          projection.alias,
+          bindProjectionExpr(contract, projection.expr),
+          projection.codecId,
+        ),
     ),
     where: ast.where ? bindWhereExprNode(contract, ast.where) : undefined,
     orderBy: ast.orderBy?.map((orderItem) => bindOrderByItem(contract, orderItem)),

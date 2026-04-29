@@ -34,7 +34,6 @@ const baseMeta: PlanMeta = {
   target: 'postgres',
   storageHash: 'sha256:test',
   lane: 'dsl',
-  paramDescriptors: [],
 };
 
 type PlanOverrides = Partial<Omit<SqlExecutionPlan, 'meta'>> & { meta?: Partial<PlanMeta> };

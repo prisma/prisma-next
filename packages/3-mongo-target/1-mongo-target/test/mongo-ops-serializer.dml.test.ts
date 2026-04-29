@@ -369,7 +369,6 @@ describe('deserializeMongoQueryPlan', () => {
         target: 'mongo',
         storageHash: 'sha256:abc',
         lane: 'mongo-raw',
-        paramDescriptors: [],
       },
     };
     const json = JSON.parse(JSON.stringify(plan));
@@ -392,7 +391,6 @@ describe('deserializeMongoQueryPlan', () => {
         target: 'mongo',
         storageHash: 'sha256:def',
         lane: 'mongo-pipeline',
-        paramDescriptors: [],
       },
     };
     const json = JSON.parse(JSON.stringify(plan));
@@ -411,7 +409,6 @@ describe('deserializeMongoQueryPlan', () => {
         target: 'mongo',
         storageHash: 'sha256:abc',
         lane: 'mongo-raw',
-        paramDescriptors: [],
         targetFamily: 'mongo',
         profileHash: 'sha256:profile',
       },
@@ -424,7 +421,7 @@ describe('deserializeMongoQueryPlan', () => {
     );
   });
 
-  it('preserves annotations, refs, projection, and projectionTypes in meta when present', () => {
+  it('preserves annotations in meta when present', () => {
     const plan = {
       collection: 'users',
       command: new RawInsertOneCommand('users', { name: 'test' }),
@@ -432,29 +429,19 @@ describe('deserializeMongoQueryPlan', () => {
         target: 'mongo',
         storageHash: 'sha256:abc',
         lane: 'mongo-raw',
-        paramDescriptors: [],
-        annotations: { codecs: { email: 'mongo/string@1' } },
-        refs: { users: { collection: 'users' } },
-        projection: { name: 'name', email: 'email' },
-        projectionTypes: { name: 'mongo/string@1', email: 'mongo/string@1' },
+        annotations: { intent: 'write' },
       },
     };
     const json = JSON.parse(JSON.stringify(plan));
     const result = deserializeMongoQueryPlan(json);
-    expect(result.meta.annotations).toEqual({ codecs: { email: 'mongo/string@1' } });
-    expect(result.meta.refs).toEqual({ users: { collection: 'users' } });
-    expect(result.meta.projection).toEqual({ name: 'name', email: 'email' });
-    expect(result.meta.projectionTypes).toEqual({
-      name: 'mongo/string@1',
-      email: 'mongo/string@1',
-    });
+    expect(result.meta.annotations).toEqual({ intent: 'write' });
   });
 
   it('throws for missing collection', () => {
     expect(() =>
       deserializeMongoQueryPlan({
         command: { kind: 'rawInsertOne', collection: 'x', document: {} },
-        meta: { target: 'mongo', storageHash: 'x', lane: 'raw', paramDescriptors: [] },
+        meta: { target: 'mongo', storageHash: 'x', lane: 'raw' },
       }),
     ).toThrow(/Invalid.*query plan/i);
   });

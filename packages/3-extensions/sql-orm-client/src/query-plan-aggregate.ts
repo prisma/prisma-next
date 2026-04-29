@@ -124,8 +124,8 @@ export function compileAggregate(
     ast = ast.withWhere(where);
   }
 
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }
 
 export function compileGroupedAggregate(
@@ -145,8 +145,11 @@ export function compileGroupedAggregate(
     throw new Error('groupBy().aggregate() requires at least one aggregation selector');
   }
 
+  const table = contract.storage.tables[tableName];
   const projection: ProjectionItem[] = [
-    ...groupByColumns.map((column) => ProjectionItem.of(column, ColumnRef.of(tableName, column))),
+    ...groupByColumns.map((column) =>
+      ProjectionItem.of(column, ColumnRef.of(tableName, column), table?.columns[column]?.codecId),
+    ),
     ...entries.map(([alias, selector]) =>
       ProjectionItem.of(alias, toAggregateExpr(tableName, selector)),
     ),
@@ -164,6 +167,6 @@ export function compileGroupedAggregate(
     ast = ast.withHaving(validateGroupedHavingExpr(havingExpr));
   }
 
-  const { params, paramDescriptors } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params, paramDescriptors);
+  const { params } = deriveParamsFromAst(ast);
+  return buildOrmQueryPlan(contract, ast, params);
 }

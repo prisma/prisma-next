@@ -22,7 +22,6 @@ describe('execute query plan', () => {
         targetFamily: 'sql',
         storageHash: 'storage-hash',
         lane: 'orm-client',
-        paramDescriptors: [],
       },
     };
 
@@ -43,7 +42,6 @@ describe('execute query plan', () => {
         targetFamily: 'sql',
         storageHash: 'storage-hash',
         lane: 'orm-client',
-        paramDescriptors: [],
       },
     };
 

@@ -19,6 +19,8 @@ import {
   codec,
   createCodecRegistry,
   LiteralExpr,
+  ParamRef,
+  ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
@@ -100,7 +102,8 @@ function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {
       parseMarkerRow: parseContractMarkerRow,
     },
     lower(ast: SelectAst) {
-      return Object.freeze({ sql: JSON.stringify(ast), params: [] });
+      const params = [...new Set(ast.collectParamRefs())].map((ref) => ref.value);
+      return Object.freeze({ sql: JSON.stringify(ast), params });
     },
   };
 }
@@ -239,7 +242,6 @@ function createRawExecutionPlan<Row = Record<string, unknown>>(
       targetFamily: testContract.targetFamily,
       storageHash: testContract.storage.storageHash,
       lane: 'raw',
-      paramDescriptors: [],
       ...metaOverrides,
     },
   };
@@ -452,7 +454,6 @@ describe('createRuntime', () => {
         target: 'postgres',
         storageHash: testContract.storage.storageHash,
         lane: 'dsl',
-        paramDescriptors: [],
       },
     };
 
@@ -530,7 +531,6 @@ describe('createRuntime', () => {
         target: 'postgres',
         storageHash: testContract.storage.storageHash,
         lane: 'dsl',
-        paramDescriptors: [],
       },
     };
 
@@ -584,22 +584,24 @@ describe('createRuntime', () => {
         verify: { mode: 'onFirstUse', requireMarker: false },
       });
 
-      const plan = createRawExecutionPlan({
+      const ast = SelectAst.from(TableSource.named('users'))
+        .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+        .withWhere(
+          BinaryExpr.eq(
+            ColumnRef.of('users', 'name'),
+            ParamRef.of('Alice', { name: 'secret', codecId: 'test/async-secret@1' }),
+          ),
+        );
+      const plan: SqlQueryPlan = {
+        ast,
         params: ['Alice'],
         meta: {
           target: testContract.target,
           targetFamily: testContract.targetFamily,
           storageHash: testContract.storage.storageHash,
-          lane: 'raw',
-          paramDescriptors: [
-            {
-              name: 'secret',
-              codecId: 'test/async-secret@1',
-              source: 'dsl' as const,
-            },
-          ],
+          lane: 'dsl',
         },
-      });
+      };
 
       await runtime.execute(plan).toArray();
 
@@ -633,22 +635,24 @@ describe('createRuntime', () => {
       verify: { mode: 'onFirstUse', requireMarker: false },
     });
 
-    const plan = createRawExecutionPlan({
+    const ast = SelectAst.from(TableSource.named('users'))
+      .withProjection([ProjectionItem.of('id', ColumnRef.of('users', 'id'))])
+      .withWhere(
+        BinaryExpr.eq(
+          ColumnRef.of('users', 'name'),
+          ParamRef.of('Alice', { name: 'secret', codecId: 'test/failing-secret@1' }),
+        ),
+      );
+    const plan: SqlQueryPlan = {
+      ast,
       params: ['Alice'],
       meta: {
         target: testContract.target,
         targetFamily: testContract.targetFamily,
         storageHash: testContract.storage.storageHash,
-        lane: 'raw',
-        paramDescriptors: [
-          {
-            name: 'secret',
-            codecId: 'test/failing-secret@1',
-            source: 'dsl' as const,
-          },
-        ],
+        lane: 'dsl',
       },
-    });
+    };
 
     await expect(runtime.execute(plan).toArray()).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',

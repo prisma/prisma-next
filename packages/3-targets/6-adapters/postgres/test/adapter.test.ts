@@ -118,7 +118,7 @@ describe('Postgres adapter', () => {
           email: ColumnRef.of('excluded', 'email'),
         }),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
     const updateAst = UpdateAst.table(TableSource.named('user'))
       .withSet({ email: ParamRef.of('b@example.com', { name: 'email', codecId: 'pg/text@1' }) })
       .withWhere(
@@ -127,7 +127,7 @@ describe('Postgres adapter', () => {
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'email')]);
+      .withReturning([ProjectionItem.of('email', ColumnRef.of('user', 'email'))]);
     const deleteAst = DeleteAst.from(TableSource.named('user'))
       .withWhere(
         BinaryExpr.eq(
@@ -135,7 +135,7 @@ describe('Postgres adapter', () => {
           ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }),
         ),
       )
-      .withReturning([ColumnRef.of('user', 'id')]);
+      .withReturning([ProjectionItem.of('id', ColumnRef.of('user', 'id'))]);
 
     expect(adapter.lower(insertAst, { contract }).sql).toContain(
       'ON CONFLICT ("email") DO UPDATE SET "email" = excluded."email"',

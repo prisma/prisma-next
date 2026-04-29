@@ -6,7 +6,6 @@ const meta: PlanMeta = {
   target: 'mock',
   storageHash: 'sha256:test',
   lane: 'raw-sql',
-  paramDescriptors: [],
 };
 
 test('QueryPlan carries meta and the phantom _row parameter', () => {

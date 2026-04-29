@@ -4,11 +4,15 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
+  codec,
+  createCodecRegistry,
   LiteralExpr,
   ParamRef,
+  ProjectionItem,
   SelectAst,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
+import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it, vi } from 'vitest';
 import { runBeforeCompileChain } from '../src/middleware/before-compile-chain';
@@ -39,7 +43,6 @@ const meta: PlanMeta = {
   target: 'postgres',
   storageHash: 'sha256:test',
   lane: 'dsl',
-  paramDescriptors: [],
 };
 
 function createDraft(): DraftPlan {
@@ -205,14 +208,12 @@ describe('runBeforeCompileChain', () => {
   );
 
   it(
-    're-derives paramDescriptors from the rewritten ast when params are introduced',
+    'surfaces middleware-introduced ParamRefs through the rewritten AST (no sidecar to re-derive)',
     async () => {
       const draft = createDraft();
       const ctx = createContext();
-      const idEqOne = BinaryExpr.eq(
-        ColumnRef.of('users', 'id'),
-        ParamRef.of(1, { name: 'mw_user_id', codecId: 'pg/int4@1' }),
-      );
+      const introducedParam = ParamRef.of(1, { name: 'mw_user_id', codecId: 'pg/int4@1' });
+      const idEqOne = BinaryExpr.eq(ColumnRef.of('users', 'id'), introducedParam);
       const mw: SqlMiddleware = {
         name: 'onlyAlice',
         familyId: 'sql',
@@ -224,26 +225,20 @@ describe('runBeforeCompileChain', () => {
 
       const result = await runBeforeCompileChain([mw], draft, ctx);
 
-      expect(result.meta.paramDescriptors).toEqual([
-        { index: 1, name: 'mw_user_id', source: 'dsl', codecId: 'pg/int4@1' },
-      ]);
+      expect(result.ast.collectParamRefs()).toEqual([introducedParam]);
     },
     timeouts.default,
   );
 
   it(
-    're-derives paramDescriptors across chained rewrites that each add a param',
+    'surfaces ParamRefs added by chained rewrites in traversal order',
     async () => {
       const draft = createDraft();
       const ctx = createContext();
-      const gte2 = BinaryExpr.gte(
-        ColumnRef.of('users', 'id'),
-        ParamRef.of(2, { name: 'mw_gte', codecId: 'pg/int4@1' }),
-      );
-      const lte3 = BinaryExpr.lte(
-        ColumnRef.of('users', 'id'),
-        ParamRef.of(3, { name: 'mw_lte', codecId: 'pg/int4@1' }),
-      );
+      const gteRef = ParamRef.of(2, { name: 'mw_gte', codecId: 'pg/int4@1' });
+      const lteRef = ParamRef.of(3, { name: 'mw_lte', codecId: 'pg/int4@1' });
+      const gte2 = BinaryExpr.gte(ColumnRef.of('users', 'id'), gteRef);
+      const lte3 = BinaryExpr.lte(ColumnRef.of('users', 'id'), lteRef);
       const lower: SqlMiddleware = {
         name: 'lower',
         familyId: 'sql',
@@ -265,16 +260,13 @@ describe('runBeforeCompileChain', () => {
 
       const result = await runBeforeCompileChain([lower, upper], draft, ctx);
 
-      expect(result.meta.paramDescriptors).toEqual([
-        { index: 1, name: 'mw_gte', source: 'dsl', codecId: 'pg/int4@1' },
-        { index: 2, name: 'mw_lte', source: 'dsl', codecId: 'pg/int4@1' },
-      ]);
+      expect(result.ast.collectParamRefs()).toEqual([gteRef, lteRef]);
     },
     timeouts.default,
   );
 
   it(
-    'preserves paramDescriptors when no middleware rewrites the ast',
+    'leaves the meta object unchanged when no middleware rewrites the ast',
     async () => {
       const draft = createDraft();
       const ctx = createContext();
@@ -294,7 +286,7 @@ describe('runBeforeCompileChain', () => {
   );
 
   it(
-    'preserves other meta fields (lane, target, projectionTypes) when re-deriving descriptors',
+    'preserves meta fields untouched when middleware rewrites the ast',
     async () => {
       const baseDraft = createDraft();
       const draft: DraftPlan = {
@@ -303,8 +295,6 @@ describe('runBeforeCompileChain', () => {
           target: 'postgres',
           storageHash: 'sha256:test',
           lane: 'orm-client',
-          paramDescriptors: [],
-          projectionTypes: { id: 'pg/int4@1' },
         },
       };
       const ctx = createContext();
@@ -323,12 +313,9 @@ describe('runBeforeCompileChain', () => {
 
       const result = await runBeforeCompileChain([mw], draft, ctx);
 
+      expect(result.meta).toBe(draft.meta);
       expect(result.meta.lane).toBe('orm-client');
       expect(result.meta.target).toBe('postgres');
-      expect(result.meta.projectionTypes).toEqual({ id: 'pg/int4@1' });
-      expect(result.meta.paramDescriptors).toEqual([
-        { index: 1, source: 'dsl', codecId: 'pg/int4@1' },
-      ]);
     },
     timeouts.default,
   );
@@ -347,6 +334,63 @@ describe('runBeforeCompileChain', () => {
       };
 
       await expect(runBeforeCompileChain([mw], draft, ctx)).rejects.toThrow('boom');
+    },
+    timeouts.default,
+  );
+
+  // REVIEW: I don't get what this test is testing. Either explain it better or remove it
+  // ADR 205: AST-rewriting middleware is correct-by-construction for codec
+  // resolution. After a beforeCompile rewriter swaps a projection alias the
+  // decoder must read the new alias + codec from the AST, not from a stale
+  // sidecar. Constructed end-to-end: rewrite → decode against the rewritten
+  // AST → assert decoded values land under the new alias.
+  it(
+    'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
+    async () => {
+      const decoderRegistry = createCodecRegistry();
+      decoderRegistry.register(
+        codec({
+          typeId: 'pg/int4@1',
+          targetTypes: ['int4'],
+          encode: (v: number) => v,
+          decode: (w: number) => w + 100,
+        }),
+      );
+
+      const initialAst = SelectAst.from(TableSource.named('users')).withProjection([
+        ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
+      ]);
+      const initial: DraftPlan = { ast: initialAst, meta };
+      const ctx = createContext();
+
+      const renameAlias: SqlMiddleware = {
+        name: 'rename-alias',
+        familyId: 'sql',
+        async beforeCompile(d) {
+          if (d.ast.kind !== 'select') return;
+          const renamed = d.ast.projection.map((item) =>
+            ProjectionItem.of('user_id', item.expr, item.codecId),
+          );
+          return { ...d, ast: d.ast.withProjection(renamed) };
+        },
+      };
+
+      const result = await runBeforeCompileChain([renameAlias], initial, ctx);
+
+      expect(result.ast.kind).toBe('select');
+      const select = result.ast as SelectAst;
+      expect(select.projection.map((p) => p.alias)).toEqual(['user_id']);
+      expect(select.projection[0]?.codecId).toBe('pg/int4@1');
+
+      const { decodeRow } = await import('../src/codecs/decoding');
+      const plan: SqlExecutionPlan = {
+        sql: 'SELECT users.id AS user_id FROM users',
+        params: [],
+        ast: result.ast,
+        meta: result.meta,
+      };
+      const row = await decodeRow({ user_id: 7 }, plan, decoderRegistry);
+      expect(row).toEqual({ user_id: 107 });
     },
     timeouts.default,
   );

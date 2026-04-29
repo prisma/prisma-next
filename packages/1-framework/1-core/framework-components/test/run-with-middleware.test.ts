@@ -12,7 +12,6 @@ const meta: PlanMeta = {
   target: 'mock',
   storageHash: 'sha256:test',
   lane: 'raw-sql',
-  paramDescriptors: [],
 };
 
 interface MockExec extends ExecutionPlan {

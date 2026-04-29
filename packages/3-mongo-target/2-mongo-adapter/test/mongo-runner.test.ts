@@ -567,7 +567,7 @@ describe('MongoMigrationRunner - data transforms', () => {
         collection,
         pipeline: [{ $match: { status: { $exists: false } } }, { $limit: 1 }],
       },
-      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
     };
   }
 
@@ -610,7 +610,6 @@ describe('MongoMigrationRunner - data transforms', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         },
       ],
@@ -657,7 +656,6 @@ describe('MongoMigrationRunner - data transforms', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         },
       ],
@@ -705,7 +703,6 @@ describe('MongoMigrationRunner - data transforms', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         },
       ],
@@ -750,7 +747,6 @@ describe('MongoMigrationRunner - data transforms', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         },
       ],
@@ -829,7 +825,6 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         }),
       },
@@ -840,7 +835,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
           { status: { $exists: false } },
           { $set: { status: 'pending' } },
         ),
-        meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+        meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
       }),
     });
 
@@ -895,7 +890,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
         collection: 'accounts',
         pipeline: [{ $match: { active: { $exists: false } } }, { $limit: 1 }],
       },
-      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw', paramDescriptors: [] },
+      meta: { target: 'mongo', storageHash: 'sha256:x', lane: 'mongo-raw' },
     };
 
     const op = {
@@ -924,7 +919,6 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
             target: 'mongo',
             storageHash: 'sha256:x',
             lane: 'mongo-raw',
-            paramDescriptors: [],
           },
         },
       ],
