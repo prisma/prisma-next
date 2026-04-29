@@ -33,7 +33,7 @@ This skill supports subcommands:
 - `implement`: execute the triaged actions and update status
 - `iterate`: loop `triage` → `implement` until clear (default)
 
-```
+```text
 /github-review-iteration iterate <PR_URL> [output-dir]
 ```
 
@@ -41,7 +41,7 @@ When `output-dir` is omitted, use the standard layout: `wip/reviews/<owner>_<rep
 
 Example:
 
-```
+```text
 /github-review-iteration iterate https://github.com/OWNER/REPO/pull/123
 ```
 
