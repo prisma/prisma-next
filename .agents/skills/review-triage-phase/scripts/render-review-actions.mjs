@@ -97,11 +97,11 @@ function formatCodePaths(paths) {
 
 function computeStatus(actions) {
   const statuses = new Set((actions ?? []).map((a) => a?.status).filter(Boolean));
-  if (statuses.has('in_progress')) return 'In progress';
   if (statuses.size === 0) return 'Triaged';
+  if (statuses.has('in_progress')) return 'In progress';
   if (statuses.size === 1 && statuses.has('done')) return 'Complete';
-  if (statuses.has('pending')) return 'Triaged';
-  return 'Triaged';
+  if (statuses.size === 1 && statuses.has('pending')) return 'Triaged';
+  return 'In progress';
 }
 
 function formatTarget(target) {
