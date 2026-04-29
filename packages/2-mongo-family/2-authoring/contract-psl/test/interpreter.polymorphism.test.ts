@@ -400,18 +400,24 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       const storage = ir.storage as unknown as {
         collections: Record<
           string,
-          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+          {
+            indexes?: Array<{
+              keys: Array<{ field: string; direction: number }>;
+              partialFilterExpression?: Record<string, unknown>;
+            }>;
+          }
         >;
       };
       const tasksColl = storage.collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
-      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
-      expect(indexFields).toEqual(
-        expect.arrayContaining([
-          expect.arrayContaining(['title']),
-          expect.arrayContaining(['severity']),
-        ]),
+      const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
+      const severityIdx = tasksColl?.indexes?.find((idx) =>
+        idx.keys.some((k) => k.field === 'severity'),
       );
+      expect(titleIdx).toBeDefined();
+      expect(severityIdx).toBeDefined();
+      expect(titleIdx?.partialFilterExpression).toBeUndefined();
+      expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
     });
 
     it('merges variant indexes when variant maps to same collection as base', () => {
@@ -439,18 +445,133 @@ describe('interpretPslDocumentToMongoContract — polymorphism', () => {
       const storage = ir.storage as unknown as {
         collections: Record<
           string,
-          { indexes?: Array<{ keys: Array<{ field: string; direction: number }> }> }
+          {
+            indexes?: Array<{
+              keys: Array<{ field: string; direction: number }>;
+              partialFilterExpression?: Record<string, unknown>;
+            }>;
+          }
         >;
       };
       const tasksColl = storage.collections['tasks'];
       expect(tasksColl?.indexes).toBeDefined();
-      const indexFields = (tasksColl?.indexes ?? []).map((idx) => idx.keys.map((k) => k.field));
-      expect(indexFields).toEqual(
-        expect.arrayContaining([
-          expect.arrayContaining(['title']),
-          expect.arrayContaining(['severity']),
-        ]),
+      const titleIdx = tasksColl?.indexes?.find((idx) => idx.keys.some((k) => k.field === 'title'));
+      const severityIdx = tasksColl?.indexes?.find((idx) =>
+        idx.keys.some((k) => k.field === 'severity'),
       );
+      expect(titleIdx?.partialFilterExpression).toBeUndefined();
+      expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
+    });
+  });
+
+  describe('FL-09: polymorphic index scoping', () => {
+    it('AND-merges a user-supplied filter on other keys with the discriminator scope', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([severity], filter: "{\\"active\\": true}")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<
+          string,
+          {
+            indexes?: Array<{
+              keys: Array<{ field: string; direction: number }>;
+              partialFilterExpression?: Record<string, unknown>;
+            }>;
+          }
+        >;
+      };
+      const severityIdx = storage.collections['tasks']?.indexes?.find((idx) =>
+        idx.keys.some((k) => k.field === 'severity'),
+      );
+      expect(severityIdx?.partialFilterExpression).toEqual({ active: true, type: 'bug' });
+    });
+
+    it('is idempotent when user filter already sets the discriminator to the matching value', () => {
+      const ir = interpretOk(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([severity], filter: "{\\"type\\": \\"bug\\"}")
+        }
+      `);
+
+      const storage = ir.storage as unknown as {
+        collections: Record<
+          string,
+          {
+            indexes?: Array<{
+              keys: Array<{ field: string; direction: number }>;
+              partialFilterExpression?: Record<string, unknown>;
+            }>;
+          }
+        >;
+      };
+      const severityIdx = storage.collections['tasks']?.indexes?.find((idx) =>
+        idx.keys.some((k) => k.field === 'severity'),
+      );
+      expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
+    });
+
+    it('emits PSL_INVALID_INDEX with the index attribute span when user filter conflicts with the discriminator value', () => {
+      const result = interpret(`
+        model Task {
+          id    ObjectId @id @map("_id")
+          title String
+          type  String
+
+          @@discriminator(type)
+          @@map("tasks")
+        }
+
+        model Bug {
+          id       ObjectId @id @map("_id")
+          severity String
+
+          @@base(Task, "bug")
+          @@index([severity], filter: "{\\"type\\": \\"feature\\"}")
+        }
+      `);
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+
+      const conflict = result.failure.diagnostics.find(
+        (d) => d.code === 'PSL_INVALID_INDEX' && d.message.includes('discriminator'),
+      );
+      expect(conflict).toBeDefined();
+      expect(conflict?.message).toMatch(/type/);
+      expect(conflict?.message).toMatch(/feature/);
+      expect(conflict?.message).toMatch(/bug/);
+      expect(conflict?.span).toBeDefined();
+      expect(conflict?.span?.start.offset).toBeGreaterThan(0);
+      expect(conflict?.span?.end.offset).toBeGreaterThan(conflict?.span?.start.offset ?? 0);
     });
   });
 
