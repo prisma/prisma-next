@@ -22,14 +22,14 @@ The orchestrator will provide a delegation prompt. The shape depends on whether 
 - Pointer to `projects/{project}/reviews/code-review.md` (the running review log) — this is your source of prior state.
 - Identifiers for the new commits since the last review round (SHAs or a `<base-ref>..HEAD` range).
 - The implementer's structured report — for context, not as primary evidence.
-- Any specific items the orchestrator wants triaged (typically the implementer's flagged decisions).
+- Any specific items the orchestrator wants to be triaged (typically the implementer's flagged decisions).
 
 **Resumed follow-up** (every round after the first by default — see SKILL.md § Subagent continuity): the prompt is a follow-up message; you retain your full prior transcript including the AC scoreboard you maintained, every finding you filed, every verdict you issued, every refresh of `system-design-review.md` and `walkthrough.md`. Expect a much shorter prompt focused on:
 
 - Round identifier (`This is m3 R2`).
 - The new commits since the last round (SHAs or `<prior-head>..HEAD`).
 - The implementer's structured report for this round.
-- Items the orchestrator wants triaged — typically the implementer's flagged decisions and any orchestrator-specific concerns ("apply intent-validation lens to the choice in commit X").
+- Items the orchestrator wants to be triaged — typically the implementer's flagged decisions and any orchestrator-specific concerns ("apply intent-validation lens to the choice in commit X").
 - Anything that has changed in your operating context that you don't already know (e.g. a plan amendment the orchestrator made between rounds).
 
 ### Resume-mode behavior

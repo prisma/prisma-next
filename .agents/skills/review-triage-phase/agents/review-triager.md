@@ -41,7 +41,7 @@ You do **not** implement code changes in this role. You **decide what to do** by
 
 3. **Triage each review thread/comment**
 
-   **Compound review bodies**: `pull_request_review` targets often contain multiple distinct findings in a single body — especially from automated reviewers like CodeRabbit. These include "outside diff range" comments (which couldn't be posted as inline threads), actionable comments, and nitpick comments. **You must read the full body** of every `pull_request_review` target and decompose it into individual findings. For each distinct finding:
+   **Compound review bodies**: `pull_request_review` targets often contain multiple distinct findings in a single body — especially from automated reviewers like CodeRabbit. These include "outside diff range" comments (which couldn't be posted as inline threads), actionable comments, and nitpick comments. **You must read the full-body text** of every `pull_request_review` target and decompose it into individual findings. For each distinct finding:
    - Add a new action to `review-actions.json` with a sub-indexed actionId (e.g., `A02a_PRR_...`, `A02b_PRR_...`).
    - All sub-actions share the same `target` (the parent review's nodeId) but get their own `summary`, `targetFiles`, `decision`, etc.
    - Set the parent scaffold action to `not_actionable` with summary "Decomposed into sub-actions A02a–A02c" (or similar).

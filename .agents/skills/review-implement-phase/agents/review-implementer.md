@@ -44,6 +44,8 @@ Run commands from the `review-implement-phase` skill directory. Script paths bel
        - `commits` (list of commit SHAs for this action)
        - optional `githubAdmin` apply metadata if available
 4. After all actions:
+   - Re-render the action summary:
+     - `node ../review-triage-phase/scripts/render-review-actions.mjs --in <review-actions.json> --out <review-actions.md>`
    - Re-fetch + derive view:
      - `node ../review-fetch-phase/scripts/fetch-review-state.mjs --pr <url> --out-json <review-state.json>`
      - `node ../review-fetch-phase/scripts/render-review-state.mjs --in <review-state.json> --out <review-state.md>`

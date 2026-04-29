@@ -315,8 +315,8 @@ _Decisions deferred to execution, known risks, or dependencies that need monitor
 - Design test cases from acceptance criteria before decomposing tasks. Tasks flow from tests; tests flow from acceptance criteria. This sequence is non-negotiable.
 - Flag scope creep explicitly. If a task doesn't trace back to the spec, call it out.
 - Carry forward unresolved open questions from the spec into the plan's Open Items.
-- Close appropriate linear issues in the previous milestone before starting a new one. If any remain open, confirm with the engineer before closing them.
-- Publish Linear project status updates at milestone boundaries: at the end of a milestone (work complete, ready for merge/review) and at the start of the next (previous milestone closed, new milestone scope). Compose these updates by hand for now (a dedicated `drive-post-update` skill is not yet available locally).
+- Keep Linear issue state aligned with active work, but don't manually transition issues to a completed state. GitHub integration should complete linked issues when the corresponding PR merges.
+- Publish Linear project status updates at milestone boundaries: at the end of a milestone (work complete, ready for merge/review) and at the start of the next (previous milestone closed, new milestone scope).
 
 **Don't:**
 
