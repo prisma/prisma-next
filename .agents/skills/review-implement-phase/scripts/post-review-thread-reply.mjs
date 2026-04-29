@@ -51,8 +51,11 @@ function parseCliArgs(argv) {
   if (!result.repo) {
     throw { code: EXIT_CLI, message: 'error: --repo is required (OWNER/REPO)' };
   }
-  if (!result.prNumber || Number.isNaN(Number.parseInt(result.prNumber, 10))) {
-    throw { code: EXIT_CLI, message: 'error: --pr is required (integer pull request number)' };
+  if (!result.prNumber || !/^[1-9]\d*$/.test(result.prNumber)) {
+    throw {
+      code: EXIT_CLI,
+      message: 'error: --pr is required (positive integer pull request number; e.g. 123)',
+    };
   }
   if (!result.commentNodeId) {
     throw { code: EXIT_CLI, message: 'error: --comment-node-id is required' };
@@ -130,8 +133,14 @@ function resolveTargetNode(commentNodeId) {
     'query($id:ID!){',
     '  node(id:$id){',
     '    __typename',
-    '    ... on PullRequestReviewComment { databaseId }',
-    '    ... on PullRequestReview { databaseId }',
+    '    ... on PullRequestReviewComment {',
+    '      databaseId',
+    '      pullRequest { number repository { nameWithOwner } }',
+    '    }',
+    '    ... on PullRequestReview {',
+    '      databaseId',
+    '      pullRequest { number repository { nameWithOwner } }',
+    '    }',
     '  }',
     '}',
   ].join('\n');
@@ -156,7 +165,31 @@ function resolveTargetNode(commentNodeId) {
   if (databaseId === null || Number.isNaN(databaseId)) {
     throw new Error(`error: failed to resolve databaseId for ${typename} node ${commentNodeId}`);
   }
-  return { kind: typename, databaseId };
+  const repo =
+    typeof node.pullRequest?.repository?.nameWithOwner === 'string'
+      ? node.pullRequest.repository.nameWithOwner
+      : null;
+  const prNumber =
+    typeof node.pullRequest?.number === 'number' ? node.pullRequest.number : null;
+  if (!repo || prNumber === null) {
+    throw new Error(
+      `error: GraphQL node lookup did not return owning repo and PR for ${commentNodeId}`,
+    );
+  }
+  return { kind: typename, databaseId, repo, prNumber };
+}
+
+function assertNodeBelongsTo(target, expectedRepo, expectedPrNumber, commentNodeId) {
+  if (target.repo.toLowerCase() !== expectedRepo.toLowerCase()) {
+    throw new Error(
+      `error: ${commentNodeId} belongs to ${target.repo}#${target.prNumber}, not ${expectedRepo}#${expectedPrNumber}`,
+    );
+  }
+  if (target.prNumber !== expectedPrNumber) {
+    throw new Error(
+      `error: ${commentNodeId} belongs to ${target.repo}#${target.prNumber}, not ${expectedRepo}#${expectedPrNumber}`,
+    );
+  }
 }
 
 function readBody(body, bodyFile) {
@@ -210,6 +243,7 @@ async function main() {
   assertCommandAvailable('gh', 'GitHub CLI (`gh`)');
 
   const target = resolveTargetNode(args.commentNodeId);
+  assertNodeBelongsTo(target, args.repo, Number.parseInt(args.prNumber, 10), args.commentNodeId);
   const body = readBody(args.body, args.bodyFile);
 
   if (target.kind === 'PullRequestReviewComment') {
