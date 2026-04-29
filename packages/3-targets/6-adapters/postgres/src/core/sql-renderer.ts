@@ -71,38 +71,30 @@ const POSTGRES_INFERRABLE_NATIVE_TYPES: ReadonlySet<string> = new Set([
   'bit varying',
 ]);
 
-/**
- * Read the optional `meta.db.sql.postgres.nativeType` field that SQL codecs
- * carry. The framework `CodecLookup.get` returns the framework base codec,
- * which doesn't declare `meta`; the SQL `Codec` extends the base with an
- * optional `meta: CodecMeta`. Every codec actually registered into a SQL
- * codec lookup conforms to `SqlCodec`, so it's safe to narrow on the
- * `meta` shape directly.
- */
-function getCodecPostgresNativeType(codec: SqlCodec | undefined): string | undefined {
-  return codec?.meta?.db?.sql?.postgres?.nativeType;
-}
-
 function renderTypedParam(
   index: number,
   codecId: string | undefined,
   codecLookup: CodecLookup,
-  contractNativeTypes: ReadonlyMap<string, string>,
 ): string {
   if (codecId === undefined) {
     return `$${index}`;
   }
-  // Primary source: the codec's `meta.db.sql.postgres.nativeType`. If the
-  // codec isn't registered in the lookup at all (lookup miss), fall back to
-  // the contract-storage map: contracts carry `codecId → nativeType` for
-  // every column, and the contract is itself a stack-derived artifact, so
-  // it's a sound metadata source when the runtime didn't compose a stack
-  // (e.g. `createPostgresAdapter()` without extension packs).
+  // SQL codecs extend the framework `Codec` base with an optional
+  // `meta: CodecMeta`; the framework `CodecLookup.get` returns the base type,
+  // so we narrow to `SqlCodec` to read `meta`. Every codec actually
+  // registered into a SQL codec lookup conforms to `SqlCodec`.
   const codec = codecLookup.get(codecId) as SqlCodec | undefined;
-  let nativeType = getCodecPostgresNativeType(codec);
-  if (nativeType === undefined && codec === undefined) {
-    nativeType = contractNativeTypes.get(codecId);
+  if (codec === undefined) {
+    throw new Error(
+      `Postgres lowering: ParamRef carries codecId "${codecId}" but the ` +
+        'assembled codec lookup has no entry for it. This usually indicates ' +
+        'a missing extension pack in the runtime stack — register the pack ' +
+        'that contributes this codec (e.g. `extensionPacks: [pgvectorRuntime]`), ' +
+        'or use the codec directly from `@prisma-next/target-postgres/codecs` ' +
+        "if it's a builtin.",
+    );
   }
+  const nativeType = codec.meta?.db?.sql?.postgres?.nativeType;
   if (nativeType !== undefined && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
     return `$${index}::${nativeType}`;
   }
@@ -111,27 +103,13 @@ function renderTypedParam(
 
 /**
  * Per-render carrier threaded through every helper. Bundles the param-index
- * map (for `$N` numbering), the assembled-stack `codecLookup`, and a
- * contract-derived `codecId → nativeType` fallback used when the lookup
- * misses entirely. Carrying these on a single value keeps helper signatures
- * stable.
+ * map (for `$N` numbering) and the assembled-stack `codecLookup` (for
+ * cast policy at the `renderTypedParam` chokepoint). Carrying both on a
+ * single value keeps helper signatures stable.
  */
 interface ParamIndexMap {
   readonly indexMap: Map<ParamRef, number>;
   readonly codecLookup: CodecLookup;
-  readonly contractNativeTypes: ReadonlyMap<string, string>;
-}
-
-function buildContractNativeTypeMap(contract: PostgresContract): ReadonlyMap<string, string> {
-  const byCodecId = new Map<string, string>();
-  for (const table of Object.values(contract.storage.tables)) {
-    for (const column of Object.values(table.columns)) {
-      if (!byCodecId.has(column.codecId)) {
-        byCodecId.set(column.codecId, column.nativeType);
-      }
-    }
-  }
-  return byCodecId;
 }
 
 /**
@@ -156,11 +134,7 @@ export function renderLoweredSql(
     indexMap.set(ref, params.length + 1);
     params.push(ref.value);
   }
-  const pim: ParamIndexMap = {
-    indexMap,
-    codecLookup,
-    contractNativeTypes: buildContractNativeTypeMap(contract),
-  };
+  const pim: ParamIndexMap = { indexMap, codecLookup };
 
   const node = ast;
   let sql: string;
@@ -537,7 +511,7 @@ function renderParamRef(ref: ParamRef, pim: ParamIndexMap): string {
   if (index === undefined) {
     throw new Error('ParamRef not found in index map');
   }
-  return renderTypedParam(index, ref.codecId, pim.codecLookup, pim.contractNativeTypes);
+  return renderTypedParam(index, ref.codecId, pim.codecLookup);
 }
 
 function renderLiteral(expr: LiteralExpr): string {

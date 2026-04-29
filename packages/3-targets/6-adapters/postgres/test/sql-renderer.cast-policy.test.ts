@@ -110,22 +110,21 @@ describe('renderLoweredSql cast policy', () => {
     expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."note" = $1');
   });
 
-  it('falls back to contract storage when the codec lookup misses entirely', () => {
-    // When the codec lookup has no entry for a codecId (e.g. an extension
-    // codec not registered in the bare-factory adapter), the renderer falls
-    // back to the contract's `storage.tables[*].columns` map, which carries
-    // `codecId → nativeType` for every column. The contract is a stack-
-    // derived artifact, so this remains consistent with adapter policy
-    // driven by stack-assembled metadata.
+  it('throws a clear error when the codec lookup has no entry for the codecId', () => {
+    // A `codecId` on a `ParamRef` that resolves to no codec in the assembled
+    // lookup is a stack-configuration failure, not a fallback opportunity:
+    // it almost always means an extension pack is missing from the runtime
+    // stack. Surface it loudly at lower-time so callers fix the configuration
+    // rather than silently emitting an uncast `$N` or guessing from contract
+    // storage. (See ADR 205 § "Adapters built without a stack".)
     const lookup: CodecLookup = { get: () => undefined };
 
     const ast = selectWithParam('tag', 'app/test-foo@1', 'tagged');
-    const lowered = renderLoweredSql(ast, baseContract, lookup);
 
-    expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."tag" = $1::foo');
+    expect(() => renderLoweredSql(ast, baseContract, lookup)).toThrow(/codecId "app\/test-foo@1"/);
   });
 
-  it('emits plain $N when no codec, lookup miss, and no contract column references the codecId', () => {
+  it('throws even when no contract column references the codecId', () => {
     const lookup: CodecLookup = { get: () => undefined };
 
     const ast = SelectAst.from(TableSource.named('user'))
@@ -136,9 +135,10 @@ describe('renderLoweredSql cast policy', () => {
           ParamRef.of(1, { name: 'unknown', codecId: 'app/never-used@1' }),
         ),
       );
-    const lowered = renderLoweredSql(ast, baseContract, lookup);
 
-    expect(lowered.sql).toBe('SELECT "user"."id" AS "id" FROM "user" WHERE "user"."id" = $1');
+    expect(() => renderLoweredSql(ast, baseContract, lookup)).toThrow(
+      /codecId "app\/never-used@1"/,
+    );
   });
 
   it('emits plain $N when the param ref carries no codecId', () => {
