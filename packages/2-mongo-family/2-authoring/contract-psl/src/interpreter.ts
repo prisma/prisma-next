@@ -481,6 +481,17 @@ function collectIndexes(
   const indexes: MongoStorageIndex[] = [];
   let textIndexCount = 0;
 
+  // Storage-indexable PSL field names — i.e. all declared fields except
+  // relation fields (which don't materialize a column on this model). The
+  // index field-existence check (PSL_INDEX_FIELD_NOT_FOUND) consults this
+  // rather than fieldMappings.pslNameToMapped because the latter contains
+  // every PSL field including relation fields.
+  const indexableFieldNames = new Set<string>();
+  for (const f of pslModel.fields) {
+    if (modelNames.has(f.typeName)) continue;
+    indexableFieldNames.add(f.name);
+  }
+
   for (const field of pslModel.fields) {
     if (modelNames.has(field.typeName)) continue;
     const uniqueAttr = getAttribute(field.attributes, 'unique');
@@ -591,7 +602,7 @@ function collectIndexes(
         fieldNameForLookup = pf.name;
       }
       if (fieldNameForLookup === undefined || fieldNameForLookup.length === 0) continue;
-      if (!fieldMappings.pslNameToMapped.has(fieldNameForLookup)) {
+      if (!indexableFieldNames.has(fieldNameForLookup)) {
         missingField = fieldNameForLookup;
         break;
       }

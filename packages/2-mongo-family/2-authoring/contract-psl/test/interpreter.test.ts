@@ -1443,6 +1443,73 @@ describe('interpretPslDocumentToMongoContract', () => {
       `);
       expect(ir).toBeDefined();
     });
+
+    it('rejects @@index that references a relation field', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          posts Post[]
+        }
+
+        model Post {
+          id       ObjectId @id @map("_id")
+          authorId ObjectId
+          author   User @relation(fields: [authorId], references: [id])
+
+          @@index([author])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/author/);
+      expect(diag?.message).toMatch(/Post/);
+    });
+
+    it('rejects @@unique that references a relation field', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          posts Post[]
+        }
+
+        model Post {
+          id       ObjectId @id @map("_id")
+          authorId ObjectId
+          author   User @relation(fields: [authorId], references: [id])
+
+          @@unique([author])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/author/);
+    });
+
+    it('rejects @@textIndex that references a relation field', () => {
+      const result = interpret(`
+        model User {
+          id    ObjectId @id @map("_id")
+          posts Post[]
+        }
+
+        model Post {
+          id       ObjectId @id @map("_id")
+          authorId ObjectId
+          author   User @relation(fields: [authorId], references: [id])
+
+          @@textIndex([author])
+        }
+      `);
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      const diag = result.failure.diagnostics.find((d) => d.code === 'PSL_INDEX_FIELD_NOT_FOUND');
+      expect(diag).toBeDefined();
+      expect(diag?.message).toMatch(/author/);
+    });
   });
 
   describe('validator derivation', () => {
