@@ -32,7 +32,7 @@ export function getDb(): Db {
 
 // Drop the cached client whenever Vite re-executes this module so HMR after a
 // contract re-emit rebuilds the runtime against the fresh contractJson instead
-// of reusing the stale one. APR-VP3-07 will replace this with hash-keyed caching.
+// of reusing the stale one.
 if (import.meta.hot) {
   import.meta.hot.dispose(() => {
     if (cached) {

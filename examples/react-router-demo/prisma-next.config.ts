@@ -23,7 +23,7 @@ export default defineConfig({
   adapter: postgresAdapter,
   contract: useTs
     ? typescriptContract(contract, 'src/prisma/contract.json')
-    : prismaContract('./prisma/schema.prisma', {
+    : prismaContract('./prisma/contract.prisma', {
         output: 'src/prisma/contract.json',
         target: postgres,
       }),

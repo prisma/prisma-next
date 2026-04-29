@@ -7,16 +7,16 @@ import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const exampleDir = dirname(dirname(fileURLToPath(import.meta.url)));
-const schemaPath = join(exampleDir, 'prisma', 'schema.prisma');
+const schemaPath = join(exampleDir, 'prisma', 'contract.prisma');
 const contractJsonPath = join(exampleDir, 'src', 'prisma', 'contract.json');
 
 // Bootstraps Prisma Next's marker table plus our own model tables via raw DDL
 // rather than going through the control client's `dbInit`. This smoke test's job
-// is to validate VP3 (auto-emit + serve through the framework runtime), not to
+// is to validate auto-emit and serving through the framework runtime, not to
 // exercise the migration system — that is covered by the `db init` integration
 // tests in `test/integration/test/cli.db-init.e2e.test.ts`. Inlining the DDL keeps
 // this test readable top-to-bottom without a fixture file or a control-client
-// setup that would expand the scope and the flake surface beyond VP3.
+// setup that would expand the scope and the flake surface.
 const TEST_SCHEMA_SQL = `
 create schema if not exists prisma_contract;
 create table if not exists prisma_contract.marker (
@@ -60,6 +60,16 @@ async function waitForFileMtimeChange(
   return false;
 }
 
+async function createUser(baseUrl: string, email: string): Promise<void> {
+  const response = await fetch(`${baseUrl}/?index`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ email }).toString(),
+    redirect: 'follow',
+  });
+  expect(response.ok).toBe(true);
+}
+
 describe('react-router-demo smoke (e2e)', () => {
   let dev: DevDatabase | null = null;
   let server: ViteDevServer | null = null;
@@ -85,7 +95,11 @@ describe('react-router-demo smoke (e2e)', () => {
       writeFileSync(schemaPath, originalSchema);
       originalSchema = null;
       if (server) {
-        await waitForFileMtimeChange(contractJsonPath, preRevertMtime, 3_000);
+        await waitForFileMtimeChange(
+          contractJsonPath,
+          preRevertMtime,
+          timeouts.typeScriptCompilation,
+        );
       }
     }
     if (server) {
@@ -125,19 +139,24 @@ describe('react-router-demo smoke (e2e)', () => {
 
       const initialMtime = (await stat(contractJsonPath)).mtimeMs;
 
-      // Index-route convention: POST to ?index to disambiguate the index from its parent layout.
-      const createResponse = await fetch(`${baseUrl}/?index`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ email: 'alice@example.com' }).toString(),
-        redirect: 'follow',
+      if (dev === null) {
+        throw new Error('beforeEach must have created a dev database before the test body runs');
+      }
+      await withClient(dev.connectionString, async (client) => {
+        await client.query(
+          'insert into "user" (email, "createdAt") values ($1, now() - interval \'1 hour\')',
+          ['alice@example.com'],
+        );
       });
-      expect(createResponse.ok).toBe(true);
+      await createUser(baseUrl, 'bob@example.com');
 
       const listResponse = await fetch(`${baseUrl}/`);
       expect(listResponse.ok).toBe(true);
       const listBody = await listResponse.text();
       expect(listBody).toContain('alice@example.com');
+      expect(listBody.indexOf('bob@example.com')).toBeLessThan(
+        listBody.indexOf('alice@example.com'),
+      );
 
       if (originalSchema === null) {
         throw new Error('beforeEach must have captured originalSchema before the test body runs');
