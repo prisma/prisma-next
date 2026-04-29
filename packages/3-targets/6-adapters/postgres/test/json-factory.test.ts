@@ -2,7 +2,7 @@ import type { Ctx } from '@prisma-next/framework-components/codec';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { json, pgJsonCodec } from '../src/codecs/json-factory';
+import { json, jsonb, pgJsonbCodec, pgJsonCodec } from '../src/codecs/json-factory';
 
 const synthCtx: Ctx = {
   name: '<anon:test.metadata>',
@@ -48,6 +48,25 @@ describe('json factory', () => {
     it('decode throws when the wire is not valid JSON', () => {
       const codec = json(productSchema)(synthCtx);
       expect(() => codec.decode('not-json')).toThrow();
+    });
+
+    it('decode throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED when the schema validator is async', () => {
+      // Standard Schema permits async validators; the factory rejects them at
+      // decode time because the runtime decode path is synchronous.
+      const asyncSchema: StandardSchemaV1<unknown, { ok: true }> = {
+        '~standard': {
+          version: 1,
+          vendor: 'test-async',
+          validate: () => Promise.resolve({ value: { ok: true } }),
+        },
+      };
+      const codec = json(asyncSchema)(synthCtx);
+      expect(() => codec.decode('{}')).toThrow(
+        expect.objectContaining({
+          code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+          details: expect.objectContaining({ codecId: 'pg/json@1' }),
+        }),
+      );
     });
 
     it('encode returns a JSON string of the value', () => {
@@ -118,6 +137,22 @@ describe('pgJsonCodec descriptor', () => {
     expect(result.issues).toBeDefined();
   });
 
+  it('paramsSchema rejects a null input (must be an object)', () => {
+    const result = pgJsonCodec.paramsSchema['~standard'].validate(null);
+    if (result instanceof Promise) {
+      throw new Error('paramsSchema validator must be synchronous');
+    }
+    expect(result.issues).toBeDefined();
+  });
+
+  it('paramsSchema rejects a primitive input', () => {
+    const result = pgJsonCodec.paramsSchema['~standard'].validate('not-an-object');
+    if (result instanceof Promise) {
+      throw new Error('paramsSchema validator must be synchronous');
+    }
+    expect(result.issues).toBeDefined();
+  });
+
   it('paramsSchema rejects params whose schema field is not a Standard Schema', () => {
     const result = pgJsonCodec.paramsSchema['~standard'].validate({ schema: 42 });
     if (result instanceof Promise) {
@@ -172,5 +207,89 @@ describe('pgJsonCodec descriptor', () => {
       const rendered = pgJsonCodec.renderOutputType!({ schema: schemaWithoutExpression });
       expect(rendered).toBe('unknown');
     });
+
+    it('falls back to "unknown" for the legacy serialized typeParams shape', () => {
+      // Pre-M4 contract IR carries `{ schemaJson, type? }` rather than `{ schema }`.
+      // The descriptor's `renderOutputType` destructures `schema` (undefined here)
+      // and the renderer routes to the `'unknown'` sentinel; the emit path then
+      // falls through to the legacy serialized-typeParams renderer registered
+      // separately. This test pins the sentinel behaviour at the descriptor edge.
+      const rendered = pgJsonCodec.renderOutputType!({
+        schemaJson: { type: 'object' },
+      } as unknown as { schema: StandardSchemaV1 });
+      expect(rendered).toBe('unknown');
+    });
+  });
+});
+
+describe('jsonb factory', () => {
+  const auditSchema = arktype({ action: 'string', actorId: 'number' });
+
+  it('produces a codec keyed under pg/jsonb@1', () => {
+    const codec = jsonb(auditSchema)(synthCtx);
+    expect(codec.id).toBe('pg/jsonb@1');
+    expect(codec.targetTypes).toEqual(['jsonb']);
+    expect(codec.traits).toEqual(['equality']);
+  });
+
+  it('decode validates against the schema and returns the parsed value', () => {
+    const codec = jsonb(auditSchema)(synthCtx);
+    const wire = JSON.stringify({ action: 'create', actorId: 7 });
+    expect(codec.decode(wire)).toEqual({ action: 'create', actorId: 7 });
+  });
+
+  it('decode throws RUNTIME.JSON_SCHEMA_VALIDATION_FAILED on schema mismatch', () => {
+    const codec = jsonb(auditSchema)(synthCtx);
+    const wire = JSON.stringify({ action: 'create' });
+    expect(() => codec.decode(wire)).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+        details: expect.objectContaining({ codecId: 'pg/jsonb@1' }),
+      }),
+    );
+  });
+
+  it('encode returns a JSON string of the value', () => {
+    const codec = jsonb(auditSchema)(synthCtx);
+    expect(codec.encode!({ action: 'create', actorId: 7 })).toBe(
+      JSON.stringify({ action: 'create', actorId: 7 }),
+    );
+  });
+
+  it('json round-trip is identity on the encodeJson / decodeJson surface', () => {
+    const codec = jsonb(auditSchema)(synthCtx);
+    const value = { action: 'update', actorId: 1 };
+    const json = codec.encodeJson(value);
+    expect(json).toEqual(value);
+    expect(codec.decodeJson(json)).toEqual(value);
+  });
+});
+
+describe('pgJsonbCodec descriptor', () => {
+  const schema = arktype({ a: 'string' });
+
+  it('codecId is pg/jsonb@1', () => {
+    expect(pgJsonbCodec.codecId).toBe('pg/jsonb@1');
+  });
+
+  it('paramsSchema accepts a Standard Schema params.schema', () => {
+    const result = pgJsonbCodec.paramsSchema['~standard'].validate({ schema });
+    if (result instanceof Promise) throw new Error('expected sync validator');
+    expect(result.issues).toBeUndefined();
+  });
+
+  it('paramsSchema rejects a missing schema field', () => {
+    const result = pgJsonbCodec.paramsSchema['~standard'].validate({});
+    if (result instanceof Promise) throw new Error('expected sync validator');
+    expect(result.issues).toBeDefined();
+  });
+
+  it('factory unwraps params.schema and delegates to jsonb()', () => {
+    const codec = pgJsonbCodec.factory({ schema })(synthCtx);
+    expect(codec.id).toBe('pg/jsonb@1');
+  });
+
+  it('renderOutputType reads schema.expression for arktype schemas', () => {
+    expect(pgJsonbCodec.renderOutputType!({ schema })).toBe(schema.expression);
   });
 });
