@@ -80,8 +80,8 @@ If missing, instruct user to run:
    - post "On it" when starting each action
    - post "Done" and resolve thread when finished
    - use encoded helper scripts for thread admin operations:
-    - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
-    - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
+     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
+     - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
    - comments must be posted as individual standalone comments/replies, never as part of a pending review
    - after each action completion (Done + resolve), verify no new pending review was created by the acting user
    - never use inline parser snippets (for example: `python -c`, `node -e`, `ruby -e`, ad-hoc awk/sed JSON parsing)
