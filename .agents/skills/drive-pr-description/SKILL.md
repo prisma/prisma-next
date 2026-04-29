@@ -24,7 +24,11 @@ Analyzes the git diff between the current branch and the default branch to gener
    - Resolve the default branch from that remote's HEAD: `git symbolic-ref --short refs/remotes/<remote>/HEAD` (or `git rev-parse --abbrev-ref <remote>/HEAD`), which yields `<remote>/<default-branch>`.
    - Fallback when no remote-tracking HEAD is configured: run `git remote set-head <remote> --auto` (or ask the user) and retry; if that still fails, fall back to `<remote>/main` (or `<remote>/master`) only after confirming the branch exists with `git rev-parse --verify <remote>/<branch>`.
    - Use the resolved `<remote>` and `<default-branch>` consistently in the commands below.
-2. **Get the diff**: `git diff <default-branch>...HEAD`
+2. **Refresh and get the diff**: fetch the resolved default branch from the remote so the diff base is current, then diff against the remote-tracking ref:
+   - `git fetch --prune <remote> <default-branch>`
+   - `git diff <remote>/<default-branch>...HEAD`
+
+   Always diff against `<remote>/<default-branch>` (not the local `<default-branch>`) so a stale local copy can't yield a misleading PR description.
 3. **Analyze changes** to understand intent, scope, and technical decisions
 4. **Generate description** following the structure below
 
