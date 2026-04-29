@@ -9,12 +9,6 @@ import postgres from '@prisma-next/target-postgres/control';
 import { contract } from './prisma/contract';
 
 const useTs = process.env['PRISMA_NEXT_CONTRACT_SOURCE'] === 'ts';
-const databaseUrl = process.env['DATABASE_URL'];
-if (!databaseUrl) {
-  throw new Error(
-    'DATABASE_URL is not set. Copy .env.example to .env and fill in a Postgres connection string.',
-  );
-}
 
 export default defineConfig({
   family: sql,
@@ -28,6 +22,10 @@ export default defineConfig({
         target: postgres,
       }),
   db: {
-    connection: databaseUrl,
+    // Left undefined when DATABASE_URL is not set so emit-only flows
+    // (`prisma-next contract emit`, CI typegen) work in fresh checkouts.
+    // Commands that need a connection surface their own error pointing at
+    // `db.connection` or `--db <url>`.
+    connection: process.env['DATABASE_URL'],
   },
 });
