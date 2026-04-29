@@ -124,7 +124,7 @@ After writing the initial plan, enter a refinement loop:
 
 1. **Present gaps and assumptions in the chat window.** Format as a numbered list. Example:
 
-   ```
+   ```text
    I've drafted the plan at projects/my-proj/plans/feature-x-plan.md. A few things to resolve:
 
    1. The spec mentions "admin approval flow" but doesn't detail the approval states. I assumed: pending -> approved/rejected. Does this need a more complex state machine?
