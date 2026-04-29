@@ -55,7 +55,8 @@ You do **not** implement code changes in this role. You **decide what to do** by
      - **DEFER** (valid, but intentionally postponed; create Linear follow-up and reply with ticket)
      - **OUT OF SCOPE** (belongs in a follow-up PR or different ownership area)
      - **ALREADY FIXED / OUTDATED** (no longer applies)
-     - **NOT ACTIONABLE** (opinion-only with no clear improvement)
+     - **WON'T ADDRESS** (valid finding the team has decided not to act on; record `rationale` explaining the decision and optionally a Linear follow-up. Differs from NOT ACTIONABLE in that the finding itself is real and well-formed — we are choosing not to act, not dismissing it as unactionable.)
+     - **NOT ACTIONABLE** (opinion-only with no clear improvement, or the comment lacks a concrete recommendation we could implement)
 
 4. **Administer GitHub threads**
    - For **WILL ADDRESS**:
