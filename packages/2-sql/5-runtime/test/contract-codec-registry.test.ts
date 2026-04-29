@@ -175,8 +175,13 @@ describe('ContractCodecRegistry', () => {
     expect(resolved).toBeDefined();
     // The per-instance codec carries the column's `length`. Confirms the
     // dispatch path resolves to the descriptor's factory(typeParams)(ctx),
-    // not the codec-id-keyed fallback.
-    expect((resolved as { readonly meta: { readonly length: number } }).meta.length).toBe(768);
+    // not the codec-id-keyed fallback. The `meta.length` field is a test-
+    // local marker; the framework `Codec` type allows arbitrary `meta`, so
+    // the cast through `unknown` is a structural narrow rather than a type
+    // assertion against the framework shape.
+    expect(
+      (resolved as unknown as { readonly meta: { readonly length: number } }).meta.length,
+    ).toBe(768);
   });
 
   it('forColumn returns the same per-instance codec for typeRef columns sharing a named storage type', () => {
@@ -223,7 +228,9 @@ describe('ContractCodecRegistry', () => {
     // (e.g. encryption keys derived from `ctx.usedAt`) is shared across
     // the column set.
     expect(docCodec).toBe(pageCodec);
-    expect((docCodec as { readonly meta: { readonly length: number } }).meta.length).toBe(1536);
+    expect(
+      (docCodec as unknown as { readonly meta: { readonly length: number } }).meta.length,
+    ).toBe(1536);
   });
 
   it('forColumn returns the shared legacy codec for non-parameterized columns', () => {
