@@ -1,4 +1,5 @@
 import sqlFamilyDescriptor from '@prisma-next/family-sql/control';
+import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import type { ControlExtensionDescriptor } from '@prisma-next/framework-components/control';
 import { createControlStack } from '@prisma-next/framework-components/control';
 import type {
@@ -49,12 +50,12 @@ export function createComposedPostgresAdapter(options: {
  */
 export function createComposedPostgresControlAdapter(options: {
   readonly extensionPacks: readonly ControlExtensionDescriptor<'sql', 'postgres'>[];
-}) {
+}): SqlControlAdapter<'postgres'> {
   const stack = createControlStack({
     family: sqlFamilyDescriptor,
     target: postgresTargetControlDescriptor,
     adapter: postgresAdapterControlDescriptor,
     extensionPacks: options.extensionPacks,
   });
-  return postgresAdapterControlDescriptor.create(stack);
+  return postgresAdapterControlDescriptor.create(stack) as SqlControlAdapter<'postgres'>;
 }
