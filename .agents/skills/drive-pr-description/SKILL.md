@@ -19,7 +19,11 @@ Analyzes the git diff between the current branch and the default branch to gener
 
 ## Workflow
 
-1. **Identify the default branch** (usually `main`, but check with `git remote show origin`)
+1. **Identify the remote and default branch**: don't assume the remote is `origin` — resolve the remote-tracking HEAD dynamically, e.g.:
+   - Pick a remote (typically the only one returned by `git remote`; otherwise prefer the upstream of the current branch via `git rev-parse --abbrev-ref --symbolic-full-name @{u}` and take its remote prefix).
+   - Resolve the default branch from that remote's HEAD: `git symbolic-ref --short refs/remotes/<remote>/HEAD` (or `git rev-parse --abbrev-ref <remote>/HEAD`), which yields `<remote>/<default-branch>`.
+   - Fallback when no remote-tracking HEAD is configured: run `git remote set-head <remote> --auto` (or ask the user) and retry; if that still fails, fall back to `<remote>/main` (or `<remote>/master`) only after confirming the branch exists with `git rev-parse --verify <remote>/<branch>`.
+   - Use the resolved `<remote>` and `<default-branch>` consistently in the commands below.
 2. **Get the diff**: `git diff <default-branch>...HEAD`
 3. **Analyze changes** to understand intent, scope, and technical decisions
 4. **Generate description** following the structure below
