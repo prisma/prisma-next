@@ -4,9 +4,9 @@
  * Demonstrates the read-only `cacheAnnotation` from
  * `@prisma-next/middleware-cache`. The annotation is opt-in: the cache
  * middleware only acts on plans whose `meta.annotations` carry a
- * `cacheAnnotation` payload with a `ttl` set. Calling the same lookup
- * with the same `id` within the TTL window is served from the in-memory
- * LRU configured in `src/prisma/db.ts` — the driver is **not** invoked
+ * `cache` payload with a `ttl` set. Calling the same lookup with the
+ * same `id` within the TTL window is served from the in-memory LRU
+ * configured in `src/prisma/db.ts` — the driver is **not** invoked
  * the second time.
  *
  * The cache key is composed by the runtime via
@@ -14,12 +14,30 @@
  * post-lowering SQL plus parameters. Two lookups for different `id`
  * values therefore land in different cache slots; the same `id` hits.
  *
+ * ## Why the array escape hatch?
+ *
+ * The mainline `.annotate(meta => meta.cache({ ttl }))` callback
+ * derives `meta` from the runtime's `AnnotationRegistry` projected
+ * through the `Db<Contract, Registry>` / `OrmClient<Contract, _,
+ * Registry>` generic chain. That works on the SQL DSL (see
+ * `../queries/get-users-cached.ts`) and on the default
+ * `db.User.first(...)` ORM terminal — but `db.User` here is a
+ * custom `UserCollection extends Collection<Contract, 'User'>`
+ * subclass, and TypeScript cannot project the runtime `Registry`
+ * into a user-defined subclass's instance type. The subclass falls
+ * back to `Registry = {}`, so `meta.cache` doesn't exist. The array
+ * escape hatch sidesteps the registry entirely: we import the handle
+ * directly and pass the produced `AnnotationValue` through the
+ * callback's array return. The runtime gate
+ * (`assertAnnotationsApplicable`) still validates that
+ * `cacheAnnotation` is read-applicable for `first()`.
+ *
  * Notes worth pinning:
  *
- * - `cacheAnnotation` declares `applicableTo: ['read']`. Passing it to
- *   a write terminal (`create`, `update`, `delete`) is a type error
- *   *and* a runtime error — it cannot be smuggled through with a cast
- *   on one side without failing on the other.
+ * - `meta.cache` is structurally absent on write terminals' builders
+ *   because `cacheAnnotation` declares `applicableTo: ['read']`. The
+ *   structural registry filter is the type-level applicability gate;
+ *   the runtime gate fails closed for cast-bypass attempts.
  * - On a cache hit, telemetry's `afterExecute` event reports
  *   `source: 'middleware'`. Telemetry is wired in front of the cache
  *   in `db.ts`, so observability still works for cached reads.
@@ -59,10 +77,9 @@ export async function ormClientFindUserByIdCached(
 ) {
   const db = createOrmClient(runtime);
   const ttl = options.ttlMs ?? 60_000;
-  return db.User.first(
-    { id: toUserId(id) },
-    cacheAnnotation.apply({ ttl, skip: options.forceRefresh ?? false }),
-  );
+  return db.User.first({ id: toUserId(id) }, () => [
+    cacheAnnotation({ ttl, skip: options.forceRefresh ?? false }),
+  ]);
 }
 
 function toUserId(value: string): UserId {

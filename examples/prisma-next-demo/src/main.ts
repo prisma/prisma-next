@@ -391,9 +391,7 @@ async function main() {
       void first;
     } else if (cmd === 'cache-demo-sql') {
       const limit = args[0] ? Number.parseInt(args[0], 10) : 10;
-      console.log(
-        'Demonstrating opt-in caching via SQL DSL .annotate(cacheAnnotation.apply(...))...',
-      );
+      console.log('Demonstrating opt-in caching via SQL DSL .annotate(meta => meta.cache(...))...');
       console.log('Running the same select twice — second call should hit cache.\n');
 
       const firstStart = performance.now();

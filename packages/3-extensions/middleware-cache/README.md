@@ -8,9 +8,9 @@ The package depends only on `@prisma-next/framework-components/runtime` — no S
 
 ## Responsibilities
 
-- Provide an opt-in caching `RuntimeMiddleware` that short-circuits repeated reads via the `intercept` hook.
-- Define the `cacheAnnotation` handle (read-only) that lane terminals (SQL DSL `.annotate(...)`, ORM read terminals) use to attach per-query cache parameters (`ttl`, `skip`, `key`).
-- Resolve the cache key per execution: per-query `cacheAnnotation.apply({ key })` override, otherwise `RuntimeMiddlewareContext.contentHash(exec)` from the family runtime.
+- Provide an opt-in caching `RuntimeMiddleware` that short-circuits repeated reads via the `intercept` hook. The middleware contributes its `cache` annotation through the `annotations` field on its return value, so `RuntimeCore` registers it into `runtime.annotationRegistry` automatically.
+- Define the `cacheAnnotation` handle (read-only, callable) that lane terminals' `.annotate(callback)` callbacks expose as `meta.cache(...)` on read builders, and that direct importers use through the array escape hatch (`() => [cacheAnnotation({ ttl })]`).
+- Resolve the cache key per execution: per-query `cacheAnnotation({ key })` override, otherwise `RuntimeMiddlewareContext.contentHash(exec)` from the family runtime.
 - Buffer driver rows on a miss and commit to the `CacheStore` only on successful completion (`completed: true && source: 'driver'`).
 - Bypass the cache when `RuntimeMiddlewareContext.scope` is `'connection'` or `'transaction'`.
 - Ship a default in-memory LRU-with-TTL `CacheStore` and expose the `CacheStore` interface for pluggable backends (Redis, Memcached, etc.).
@@ -26,70 +26,87 @@ The package does **not** depend on `@prisma-next/sql-runtime`, `@prisma-next/mon
 
 ```typescript
 import postgres from '@prisma-next/postgres/runtime';
-import {
-  cacheAnnotation,
-  createCacheMiddleware,
-} from '@prisma-next/middleware-cache';
+import { createCacheMiddleware } from '@prisma-next/middleware-cache';
 import type { Contract } from './contract.d';
 import contractJson from './contract.json' with { type: 'json' };
 
-const db = postgres<Contract>({
+const middleware = [createCacheMiddleware({ maxEntries: 1000 })] as const;
+
+const db = postgres<Contract, typeof middleware>({
   contractJson,
   url: process.env['DATABASE_URL']!,
-  middleware: [createCacheMiddleware({ maxEntries: 1000 })],
+  middleware,
 });
 
-// First call: hits the database, caches the raw rows.
+// First call: hits the database, caches the raw rows. The `meta`
+// builder is structurally typed from the runtime's annotation
+// registry, so `meta.cache` is present on read terminals only.
 const first = await db.orm.User.first(
   { id: 1 },
-  cacheAnnotation.apply({ ttl: 60_000 }),
+  (meta) => meta.cache({ ttl: 60_000 }),
 );
 
 // Second call with the identical plan: served from cache, driver
 // not invoked.
 const second = await db.orm.User.first(
   { id: 1 },
-  cacheAnnotation.apply({ ttl: 60_000 }),
+  (meta) => meta.cache({ ttl: 60_000 }),
 );
 
 // Un-annotated queries are never cached — caching is strictly opt-in.
 const fresh = await db.orm.User.first({ id: 1 }); // always hits the DB
 ```
 
+> **Note on `as const` / `<typeof middleware>`:** TypeScript captures the
+> middleware tuple's literal types only when the user opts in via
+> `as const` or `as const satisfies readonly SqlMiddleware[]`, and only
+> when the second `Mw` generic on `postgres<...>` is allowed to infer
+> the literal tuple. Without it, `Mw` widens to `readonly SqlMiddleware[]`
+> and `AnnotationsOf<Mw>` collapses to `{}` — lane terminals' `meta`
+> builder will then be empty, and only the array escape hatch will
+> work. See `examples/prisma-next-demo/src/prisma/db.ts` for the
+> recommended shape.
+
 ## Opt-in by annotation
 
-The cache middleware acts only on plans that carry a `cacheAnnotation` payload with a `ttl` set:
+The cache middleware acts only on plans that carry a `cache` annotation payload with a `ttl` set:
 
 | Annotation state | Behavior |
 |---|---|
-| No `cacheAnnotation` on the plan | Pass through; never cached. |
-| `cacheAnnotation.apply({ })` (no `ttl`) | Pass through; never cached. |
-| `cacheAnnotation.apply({ skip: true })` | Pass through; never cached. |
-| `cacheAnnotation.apply({ ttl })` | Cache lookup; commit on miss + success. |
-| `cacheAnnotation.apply({ ttl, key })` | As above, but use the supplied key verbatim. |
+| No `cache` annotation on the plan | Pass through; never cached. |
+| `cacheAnnotation({ })` (no `ttl`) | Pass through; never cached. |
+| `cacheAnnotation({ skip: true })` | Pass through; never cached. |
+| `cacheAnnotation({ ttl })` | Cache lookup; commit on miss + success. |
+| `cacheAnnotation({ ttl, key })` | As above, but use the supplied key verbatim. |
 
-The annotation is **read-only**: it declares `applicableTo: ['read']`, so the lane gate (TML-2143 M2) rejects passing it to write terminals at both type and runtime levels. "Cache a mutation" is structurally impossible without an `as any` cast bypass at both the type and runtime levels — the cache middleware itself ships without any mutation classifier.
+The annotation is **read-only**: it declares `applicableTo: ['read']`, so it is structurally absent from `AnnotationBuilder<'write', Registry>` — `meta.cache(...)` on a write terminal is a property-not-found error from the type system. The runtime gate (`assertAnnotationsApplicable`) catches the array-escape-hatch / cast-bypass cases. "Cache a mutation" is structurally impossible without a deliberate cast bypass at both type *and* runtime levels.
 
 ```typescript
-// ✓ ORM read terminal accepts the read-only annotation.
-await db.orm.User.first({ id }, cacheAnnotation.apply({ ttl: 60_000 }));
+// ✓ ORM read terminal accepts the read-only annotation through the registry-driven callback.
+await db.orm.User.first({ id }, (meta) => meta.cache({ ttl: 60_000 }));
 
-// ✗ Type error: write terminal rejects read-only annotation.
-await db.orm.User.create(input, cacheAnnotation.apply({ ttl: 60_000 }));
+// ✗ Type error: meta.cache is structurally absent from AnnotationBuilder<'write', Registry>.
+await db.orm.User.create(input, (meta) => meta.cache({ ttl: 60_000 }));
 
 // ✓ SQL DSL: chainable on select / grouped builders.
 const plan = db.sql
   .from(tables.user)
   .select({ id: tables.user.columns.id })
-  .annotate(cacheAnnotation.apply({ ttl: 60_000 }))
+  .annotate((meta) => meta.cache({ ttl: 60_000 }))
   .build();
+
+// ✓ Array escape hatch (direct handle import) — useful when the
+// terminal is a custom Collection subclass that doesn't propagate
+// the runtime Registry into its instance type.
+import { cacheAnnotation } from '@prisma-next/middleware-cache';
+await db.orm.User.first({ id }, () => [cacheAnnotation({ ttl: 60_000 })]);
 ```
 
 ## Cache key composition
 
 Two-tier resolution:
 
-1. **Per-query override.** `cacheAnnotation.apply({ key })` — the supplied string is used verbatim. The cache middleware does **not** rehash user-supplied keys; the caller is responsible for keeping the string bounded in size and free of sensitive data they do not want flowing into debug logs, Redis `KEYS` output, persistence dumps, or any user-supplied `CacheStore`.
+1. **Per-query override.** `cacheAnnotation({ key })` — the supplied string is used verbatim. The cache middleware does **not** rehash user-supplied keys; the caller is responsible for keeping the string bounded in size and free of sensitive data they do not want flowing into debug logs, Redis `KEYS` output, persistence dumps, or any user-supplied `CacheStore`.
 2. **Default.** `RuntimeMiddlewareContext.contentHash(exec)` — the family runtime owns this. The SQL and Mongo runtimes today compose `meta.storageHash + '|' + …'` and pipe the result through `hashIdentity` (SHA-512 via the Web Crypto API), producing a bounded, opaque digest of the form `sha512:HEXDIGEST`. The cache middleware `await`s the resolved string and uses it directly as the `Map<string, …>` key.
 
 Two consequences worth pinning:
@@ -141,7 +158,7 @@ The default `createInMemoryCacheStore({ maxEntries, clock? })`:
 - **Default store is not coherent across replicas.** Multiple processes / pods do not share state. Use a custom `CacheStore` (Redis, etc.) for cross-process coherence.
 - **Concurrent misses both populate the store.** Two concurrent first-time reads of the same key both run the driver and both commit; last writer wins. Single-flight / coalescing semantics are deferred to a follow-up.
 - **Reads of stale-on-arrival entries.** With a custom replicated store, a follower may serve a stale entry for a brief window after the writer commits. Use the storage-hash discrimination plus a sensible TTL.
-- **No invalidation beyond TTL.** Entries are not invalidated by writes; tag-based or event-based invalidation is out of scope for this milestone. If a write invalidates a cached read, choose a TTL short enough to bound the staleness window, or pass `cacheAnnotation.apply({ skip: true })` on the read that needs to be authoritative.
+- **No invalidation beyond TTL.** Entries are not invalidated by writes; tag-based or event-based invalidation is out of scope for this milestone. If a write invalidates a cached read, choose a TTL short enough to bound the staleness window, or pass `cacheAnnotation({ skip: true })` on the read that needs to be authoritative.
 
 ## See also
 

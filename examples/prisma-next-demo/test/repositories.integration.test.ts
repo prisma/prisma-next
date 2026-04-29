@@ -810,7 +810,12 @@ describe('ORM client integration examples', () => {
   //
   // The cache helpers under `src/orm-client/find-user-by-id-cached.ts` and
   // `src/orm-client/get-users-cached.ts` opt their reads into the
-  // `@prisma-next/middleware-cache` middleware via `cacheAnnotation.apply(...)`.
+  // `@prisma-next/middleware-cache` middleware via the array escape hatch on
+  // `.annotate(callback)` — `() => [cacheAnnotation({ ttl })]`. The custom
+  // `UserCollection` subclass means the registry-driven `meta => meta.cache`
+  // callback can't reach `cache` through the type system; the array form is
+  // documented in the project's spec.md as the supported alternative.
+  //
   // The middleware short-circuits repeated executions of the same plan via
   // its `intercept` hook, so a cache hit means the SQL driver is *not*
   // invoked again. We assert that contract by spying on `driver.execute`.

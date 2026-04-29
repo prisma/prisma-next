@@ -72,7 +72,7 @@ function readCachePayload(plan: ExecutionPlan): CachePayload | undefined {
  *
  * Two-tier resolution:
  *
- * 1. Per-query override: `cacheAnnotation.apply({ key })` — the supplied
+ * 1. Per-query override: `cacheAnnotation({ key })` — the supplied
  *    string is used verbatim. Not rehashed; the user is responsible for
  *    keeping the string bounded and free of sensitive data.
  * 2. Default: `ctx.contentHash(exec)` — the family runtime owns this and
@@ -139,11 +139,14 @@ async function resolveCacheKey(
  *
  * const users = await db.User.first(
  *   { id },
- *   cacheAnnotation.apply({ ttl: 60_000 }),
+ *   (meta) => meta.cache({ ttl: 60_000 }),
  * );
  * ```
  */
-export function createCacheMiddleware(options?: CacheMiddlewareOptions): RuntimeMiddleware & {
+export function createCacheMiddleware(options?: CacheMiddlewareOptions): Omit<
+  RuntimeMiddleware,
+  'annotations'
+> & {
   readonly familyId?: undefined;
   readonly targetId?: undefined;
   readonly annotations: { readonly cache: typeof cacheAnnotation };

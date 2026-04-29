@@ -2,10 +2,11 @@
  * Cached `User.all()` listing.
  *
  * Companion to `find-user-by-id-cached.ts` — same opt-in caching
- * mechanism, this time on a multi-row read terminal. The trailing
- * variadic of `.all(...)` accepts read-typed annotations; we pass
- * `cacheAnnotation.apply({ ttl })` to enable caching of the
- * post-lowering execution.
+ * mechanism, this time on a multi-row read terminal. Uses the array
+ * escape hatch on `.all(...)` for the same reason: `db.User` here is
+ * the custom `UserCollection` subclass and TypeScript can't project
+ * the runtime `Registry` into a user-defined class's instance type.
+ * See `find-user-by-id-cached.ts` for the long form of that note.
  *
  * The example also shows the per-query `key` override. When set, the
  * supplied string is used verbatim as the cache key; the cache
@@ -39,7 +40,7 @@ export async function ormClientGetUsersCached(
 ) {
   const db = createOrmClient(runtime);
   const ttl = options.ttlMs ?? 60_000;
-  return db.User.take(limit).all(
-    cacheAnnotation.apply(options.key !== undefined ? { ttl, key: options.key } : { ttl }),
-  );
+  return db.User.take(limit).all(() => [
+    cacheAnnotation(options.key !== undefined ? { ttl, key: options.key } : { ttl }),
+  ]);
 }

@@ -83,3 +83,48 @@ Mongo does not expose `.annotate()` anywhere today (`grep .annotate packages/2-m
 
 Decision: stage 3 plumbs the registry on the SQL side (where `.annotate()` lives) only. Mongo gets the optional `annotations` field on `MongoMiddleware` via `RuntimeMiddleware` inheritance (already done in stage 2) but no factory-level surface change.
 
+### Stage 6: custom `Collection` subclasses don't get `meta.cache` via the registry-driven callback
+
+The demo's ORM client uses custom `Collection` subclasses (`UserCollection extends Collection<Contract, 'User'>`, `PostCollection`, `TaskCollection`) for convenience methods like `admins()`, `byEmail()`. The `orm()` factory's `ModelCollection<TContract, Collections, ModelName, Registry>` selects the custom class via `CustomCollectionForKey<Collections, ModelName>` when one is registered, falling back to `Collection<TContract, ModelName, InferRootRow<...>, DefaultCollectionTypeState, Registry>` only when no custom class is registered. The custom class is not parameterized by `Registry` — there's no way in TypeScript to project a runtime `Registry` value into a user-defined class's instance type without higher-kinded generics.
+
+Result: `db.User.first(filter, meta => meta.cache(...))` fails with `Property 'cache' does not exist on type 'AnnotationBuilder<"read", {}>'` because the inherited `Collection.first` runs against the subclass's default `Registry = {}`, not the runtime-known `Mw`-derived registry.
+
+Resolution for the demo: use the array escape hatch documented in the spec —
+
+```typescript
+import { cacheAnnotation } from '@prisma-next/middleware-cache';
+
+db.User.first(
+  { id: toUserId(id) },
+  () => [cacheAnnotation({ ttl, skip: options.forceRefresh ?? false })],
+);
+```
+
+The array form is registry-agnostic; the runtime applicability gate still validates each handle's `applicableTo` set. Spec OQ 4 already names "array escape hatch for ad-hoc / closure-captured handles" — I'm using it because custom-Collection users count as "closure-captured".
+
+Follow-up to flag for the next pass: parameterizing custom `Collection` subclasses by `Registry` is plumbing-heavy and somewhat exotic (it'd require either a higher-kinded `Registry` slot on `Collections` config, or having users author their classes as `class UserCollection<R = {}> extends Collection<..., R>` plus a lookup that calls `new UserCollection<DemoRegistry>(...)` at the factory layer). Worth a dedicated mini-project rather than slipping into stage 6.
+
+The SQL DSL example (`getUsersCached` in `examples/prisma-next-demo/src/queries/get-users-cached.ts`) uses the registry-driven callback form — `db.sql.user.select(...).annotate((meta) => meta.cache({ ttl }))` — because the SQL DSL's `Db<Contract, Registry>` carries the registry generic from `postgres<Contract, Mw>(...)` directly, no custom-Collection layer in the way.
+
+## Final summary
+
+All six stages from `plan.md` shipped on the `cache-middleware-new-api` bookmark. Six commits, one per stage, each with its own scoped diff and a green per-package gate (framework-components throughout, plus the stage-specific package). Per-stage commit summaries:
+
+1. **stage 1 — callable annotation handles + `AnnotationRegistry`.** `framework-components` only.
+2. **stage 2 — RuntimeCore aggregates middleware-contributed annotations.** `framework-components` only; SqlMiddleware / MongoMiddleware inherit the field.
+3. **stage 3 — plumb the registry into authoring contexts.** `BuilderContext` / `CollectionContext` / `sql()` / `orm()` / `postgres()`. The deeper `Registry` generic threading on `Db<C, Registry>` and the leaf builder types was deferred to stage 4 (where the type-level surface is actually consumed).
+4. **stage 4 — SQL DSL `.annotate(callback)`.** `sql-builder` types + impls; `Db<C, Registry>` and the chain of `TableProxy`, `SelectQuery`, `GroupedQuery`, mutation queries, `JoinedTables`, `WithSelect`, `WithJoin`, `LateralBuilder` all gain a `Registry = {}` generic.
+5. **stage 5 — Collection terminals + middleware-cache annotation registration.** `Collection` and `GroupedCollection` gain `Registry`; every terminal collapses its variadic-annotations overload into a trailing optional callback. `cacheAnnotation` switches to `name`-based registration; `createCacheMiddleware` declares its `annotations` field. `OrmClient<TContract, Collections, Registry>` carries the new generic; `PostgresClient.orm: OrmClient<TContract, AnnotationsOf<Mw>>` projects it from the postgres facade.
+6. **stage 6 — demo, docs, README sweep.** Demo SQL DSL example uses the registry-driven callback; demo ORM examples use the array escape hatch (custom-Collection limitation). Subsystem doc Annotations section rewritten; middleware-cache README rewritten; final `.apply(` / `ValidAnnotations` sweep through `examples/`, `packages/`, `docs/` is clean.
+
+## Open follow-ups for review
+
+Things I'd like to talk through tomorrow:
+
+1. **Custom `Collection` subclasses don't propagate `Registry`** (see the "Stage 6" decision above). The demo sidesteps this with the array escape hatch, which is documented and works correctly, but the ergonomics are worse than the registry-driven `meta.cache(...)` form. A follow-up project could parameterize the `Collections` config map by `Registry`; possibly the cleanest path is to require user-defined custom classes to accept `Registry` as a generic and have the `orm()` factory project through. Worth a dedicated mini-project rather than slipping into this one.
+2. **`postgres<Contract>(...)` users have to opt into the `as const` middleware tuple** to get `AnnotationsOf<Mw>` to project. The middleware-cache README and demo `db.ts` both document this. The alternative (drop the explicit `<Contract>` type arg, infer from a `contract: validateContract(...)` value) loses the contract-by-`contractJson` ergonomic. If we want “it just works” with `postgres<Contract>(...)`, we'd need a different inference dance — not obvious how to do it without TypeScript higher-kinded types.
+3. **Pre-existing failures untouched.** Across the repo: `model-accessor.ts` has a long-standing `parameter implicitly has an 'any' type` error, `extension-operations.test-d.ts` is broken pre-existing, and `sql-runtime` has unrelated typecheck failures (`marker.ts` / `sql-family-adapter.ts`) and test failures (operation descriptors). I did not touch any of those. `pnpm test:packages` passes 107/110 — the three failing packages (`@prisma-next/adapter-postgres`, `@prisma-next/cli`, `@prisma-next/sql-orm-client`) fail with the same errors on the baseline (verified by stashing onto `cache-middleware-impl` and re-running).
+4. **Mongo runtime side intentionally not exposed.** Mongo doesn't expose `.annotate()` anywhere, so plumbing the registry into `mongoOrm` / `mongoQuery` would be infrastructure with no consumer. The runtime side already has `runtime.annotationRegistry` via stage 2 if/when mongo grows an `.annotate()` API.
+5. **`DefineAnnotationOptions.namespace` override is documented but un-tested at the lane-terminal layer.** All my tests use the default (`namespace = name`). If a real handle ever wants a different namespace, we should add a lane-side test that the override survives end-to-end. Not blocking.
+6. **No `pnpm test:integration` / `pnpm test:e2e` validation.** The plan calls for those after stage 6 against the demo. The integration tests live in `examples/prisma-next-demo/test/repositories.integration.test.ts` and require a live Postgres; I've updated their inline comments but couldn't spin up the database in this environment. The cache integration tests in `middleware-cache/test/` (which use mock executors) all pass.
+
