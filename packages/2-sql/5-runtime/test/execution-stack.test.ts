@@ -39,6 +39,9 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
             capabilities: {},
             codecs: () => registry,
             readMarkerStatement: () => ({ sql: '', params: [] }),
+            parseMarkerRow: () => {
+              throw new Error('stub adapter does not implement parseMarkerRow');
+            },
           },
           lower() {
             return Object.freeze({ sql: '', params: [] });

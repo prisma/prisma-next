@@ -30,7 +30,6 @@ import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
 import { computeSqlFingerprint } from './fingerprint';
 import { lowerSqlPlan } from './lower-sql-plan';
-import { parseContractMarkerRow } from './marker';
 import { runBeforeCompileChain } from './middleware/before-compile-chain';
 import type { SqlMiddleware, SqlMiddlewareContext } from './middleware/sql-middleware';
 import type {
@@ -381,7 +380,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       return;
     }
 
-    const marker = parseContractMarkerRow(result.rows[0]);
+    const marker = this.familyAdapter.markerReader.parseMarkerRow(result.rows[0]);
 
     const contract = this.contract as {
       storage: { storageHash: string };

@@ -1,3 +1,4 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
 import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
 
@@ -6,11 +7,15 @@ import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
  * `prisma_contract.marker` row against the runtime's contract by issuing
  * this statement before executing user queries (when `verify` is enabled).
  *
- * Structurally satisfied by `AdapterProfile`, which already exposes
- * `readMarkerStatement(): MarkerStatement` for adapter-level introspection.
+ * Structurally satisfied by `AdapterProfile`, which exposes both
+ * `readMarkerStatement(): MarkerStatement` and the row parser. Each adapter
+ * is responsible for target-specific row decoding (Postgres returns native
+ * arrays; SQLite returns JSON-encoded TEXT for `invariants`) before
+ * delegating to the shared row schema.
  */
 export interface MarkerReader {
   readMarkerStatement(): MarkerStatement;
+  parseMarkerRow(row: unknown): ContractMarkerRecord;
 }
 
 /**

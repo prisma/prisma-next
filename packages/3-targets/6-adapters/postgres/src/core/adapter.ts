@@ -6,6 +6,7 @@ import {
   createCodecRegistry,
   type LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { renderLoweredSql } from './sql-renderer';
@@ -66,9 +67,12 @@ class PostgresAdapterImpl
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract.marker where id = $1',
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
         params: [1],
       }),
+      // Postgres' driver hydrates `text[]` columns as native JS arrays, so
+      // the row is already in the shape the shared parser expects.
+      parseMarkerRow: (row: unknown) => parseContractMarkerRow(row),
     });
   }
 

@@ -88,7 +88,8 @@ function createSchema<TContract extends Contract<SqlStorage>>(
       canonical_version INTEGER,
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       app_tag TEXT,
-      meta TEXT NOT NULL DEFAULT '{}'
+      meta TEXT NOT NULL DEFAULT '{}',
+      invariants TEXT NOT NULL DEFAULT '[]'
     )
   `);
   db.prepare(

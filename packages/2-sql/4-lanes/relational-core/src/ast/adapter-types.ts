@@ -1,3 +1,4 @@
+import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { CodecRegistry } from './codec-types';
 import type { LoweredStatement } from './types';
 
@@ -24,6 +25,16 @@ export interface AdapterProfile<TTarget extends AdapterTarget = AdapterTarget> {
    * parameter placeholder style).
    */
   readMarkerStatement(): MarkerStatement;
+  /**
+   * Parses a row returned by the adapter's `readMarkerStatement()` into a
+   * `ContractMarkerRecord`. Each adapter is responsible for any
+   * target-specific decoding (e.g. SQLite stores `invariants` as a
+   * JSON-encoded TEXT column and decodes it before delegating to the shared
+   * row schema; Postgres rows already have `invariants` as a native array).
+   * Throws on shape violation — storage corruption surfaces as a hard error
+   * per spec F11.
+   */
+  parseMarkerRow(row: unknown): ContractMarkerRecord;
 }
 
 export interface LowererContext<TContract = unknown> {

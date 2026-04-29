@@ -19,6 +19,9 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
         return createCodecRegistry();
       },
       readMarkerStatement: () => ({ sql: '', params: [] }),
+      parseMarkerRow: () => {
+        throw new Error('stub adapter does not implement parseMarkerRow');
+      },
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);

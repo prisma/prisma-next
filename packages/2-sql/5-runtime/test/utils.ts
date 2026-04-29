@@ -20,6 +20,7 @@ import {
   createSqlExecutionStack,
   ensureSchemaStatement,
   ensureTableStatement,
+  parseContractMarkerRow,
   writeContractMarker,
 } from '../src/exports';
 import type {
@@ -257,10 +258,11 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       },
       readMarkerStatement() {
         return {
-          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta from prisma_contract.marker where id = $1',
+          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
           params: [1],
         };
       },
+      parseMarkerRow: parseContractMarkerRow,
     },
     lower(ast: SelectAst, ctx: { contract: Contract<SqlStorage>; params?: readonly unknown[] }) {
       const sqlText = JSON.stringify(ast);
