@@ -176,14 +176,14 @@ export function findPathWithInvariants(
   if (required.size === 0) {
     return findPath(graph, fromHash, toHash);
   }
+  if (fromHash === toHash) {
+    // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
+    return null;
+  }
   if (required.size > 30) {
     throw new Error(
       `Cannot route with more than 30 required invariants in a single call (got ${required.size}). Please file an issue if you need a higher cap.`,
     );
-  }
-  if (fromHash === toHash) {
-    // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
-    return null;
   }
 
   const requiredArr = [...required].sort();
@@ -207,14 +207,17 @@ export function findPathWithInvariants(
     readonly node: string;
     readonly mask: number;
   }
-  // State key: `${node}${mask}`. Hash format never contains  (it's
-  // `sha256:…` or `h:…` in tests), so collisions are impossible.
-  const stateKey = (s: InvState) => `${s.node}${s.mask}`;
+  // State key: `${node}\0${mask}`. \0 cannot appear in any node identifier
+  // we emit (sha256 hex or `h:`-prefixed test hashes), so distinct
+  // (node, mask) tuples always produce distinct keys regardless of node
+  // length.
+  const stateKey = (s: InvState) => `${s.node}\0${s.mask}`;
 
   // Cache edgeMaskOf per edge — outgoing edges are visited many times during
   // BFS and each visit also calls the comparator, so naive recomputation is
-  // O(k) per edge per visit. WeakMap keyed on edge identity.
-  const edgeMaskCache = new WeakMap<MigrationEdge, number>();
+  // O(k) per edge per visit. Map (not WeakMap) — the cache is per call and
+  // dies on function exit, so WeakMap's GC asymmetry buys nothing.
+  const edgeMaskCache = new Map<MigrationEdge, number>();
   const memoEdgeMask = (edge: MigrationEdge): number => {
     const cached = edgeMaskCache.get(edge);
     if (cached !== undefined) return cached;
