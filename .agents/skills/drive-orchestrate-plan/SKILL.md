@@ -372,9 +372,9 @@ These tighten the orchestrator's defaults when no user is on-hand to course-corr
 - **Defensible choices over novel architecture.** When two equally valid options exist, pick the one closer to existing repo conventions. Log the alternatives.
 - **Pre-existing flakes / unrelated failures.** If a non-milestone failure surfaces, log it. Fix only if it blocks a validation gate; otherwise leave for the user.
 - **Reviewer drift.** Every intent-validation override (per § Loop algorithm step 7) is logged in addition to the visible record in `code-review.md § Orchestrator notes`.
-- **No `--no-verify`.** No skipping of pre-commit hooks under any circumstance, including amends.
-- **No remote push beyond what the loop normally does.** Branch stays local; PR opening is a separate skill and is invoked only if the user explicitly named it as part of the unattended scope.
-- **No third-party automation expansions.** Don't authorize automated agents (e.g. a PR-comment bot's "shall I open a tracking issue?") to create artifacts in the team's trackers without human approval. Decline politely; log the decline.
+- **Avoid `--no-verify`.** Never skip pre-commit hooks under any circumstance, including amends.
+- **Keep the branch local.** Don't push beyond what the loop normally does; PR opening is a separate skill and is invoked only if the user explicitly named it as part of the unattended scope.
+- **Decline third-party automation expansions.** Don't authorize automated agents (e.g. a PR-comment bot's "shall I open a tracking issue?") to create artifacts in the team's trackers without human approval. Decline politely; log the decline.
 
 ### Stop conditions
 
@@ -394,7 +394,7 @@ When stopping, write a stop entry in the decisions log with the trigger and the 
 
 **Lifecycle.**
 - On entering unattended mode, scaffold the file from `./templates/unattended-decisions.template.md` (preamble + operating rules + entry format reference) if it doesn't already exist.
-- Append an entry every time you make a decision that would have been escalated under normal operation. This includes: triage decisions in place of the user; declining out-of-scope findings; verdict overrides; accepted side-quests; declined offers from automated agents; deferring pre-existing failures.
+- Append an entry every time you decide something that would have been escalated under normal operation. This includes: triage decisions in place of the user; declining out-of-scope findings; verdict overrides; accepted side-quests; declined offers from automated agents; deferring pre-existing failures.
 - Append a stop entry if a stop condition fires.
 
 **Append-only and chronological.** Do not reorder entries or backfill. The log is read by a human after the fact who needs an audit trail; out-of-order entries break that.
