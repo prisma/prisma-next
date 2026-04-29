@@ -8,6 +8,7 @@ import { spawnSync } from 'node:child_process';
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
 const EXIT_CLI = 2;
+const SUBPROCESS_TIMEOUT_MS = 30_000;
 
 function parseCliArgs(argv) {
   const args = argv.slice(2);
@@ -60,10 +61,10 @@ function parseCliArgs(argv) {
   if (!result.commentNodeId) {
     throw { code: EXIT_CLI, message: 'error: --comment-node-id is required' };
   }
-  if (!result.body && !result.bodyFile) {
+  if (result.body === null && result.bodyFile === null) {
     throw { code: EXIT_CLI, message: 'error: provide exactly one of --body or --body-file' };
   }
-  if (result.body && result.bodyFile) {
+  if (result.body !== null && result.bodyFile !== null) {
     throw { code: EXIT_CLI, message: 'error: provide only one of --body or --body-file' };
   }
 
@@ -93,9 +94,16 @@ function run(command, args, input = null) {
   const result = spawnSync(command, args, {
     encoding: 'utf8',
     input: input ?? undefined,
+    timeout: SUBPROCESS_TIMEOUT_MS,
   });
   if (result.error) {
+    if (result.error.code === 'ETIMEDOUT') {
+      throw new Error(`error: ${command} timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds`);
+    }
     throw new Error(`error: failed to execute ${command}: ${result.error.message}`);
+  }
+  if (result.signal) {
+    throw new Error(`error: ${command} was terminated by signal ${result.signal}`);
   }
   if (result.status !== 0) {
     throw new Error(`error: ${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`.trim());
@@ -104,7 +112,15 @@ function run(command, args, input = null) {
 }
 
 function assertCommandAvailable(command, installHint) {
-  const probe = spawnSync(command, ['--version'], { encoding: 'utf8' });
+  const probe = spawnSync(command, ['--version'], { encoding: 'utf8', timeout: SUBPROCESS_TIMEOUT_MS });
+  if (probe.error?.code === 'ETIMEDOUT') {
+    throw new Error(
+      `error: required dependency "${command}" timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds.`,
+    );
+  }
+  if (probe.signal) {
+    throw new Error(`error: required dependency "${command}" was terminated by signal ${probe.signal}.`);
+  }
   if (probe.error || probe.status !== 0) {
     throw new Error(
       `error: required dependency "${command}" is not available. Install ${installHint} and retry.`,
