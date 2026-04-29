@@ -363,6 +363,37 @@ function validateBodyEntryShape(entry, pointer) {
   }
 }
 
+function validateReviewBodyShape(entry, pointer) {
+  if (typeof entry !== 'object' || entry === null) {
+    throw new TypeError(`${pointer} must be an object`);
+  }
+  if (!isNonEmptyString(entry.nodeId)) {
+    throw new TypeError(`${pointer}.nodeId must be a non-empty string`);
+  }
+  if (typeof entry.author !== 'object' || entry.author === null) {
+    throw new TypeError(`${pointer}.author must be an object`);
+  }
+  if (entry.author.login !== null && entry.author.login !== undefined && typeof entry.author.login !== 'string') {
+    throw new TypeError(`${pointer}.author.login must be string or null`);
+  }
+  if (!isNonEmptyString(entry.body)) {
+    throw new TypeError(`${pointer}.body must be a non-empty string`);
+  }
+  if (!Array.isArray(entry.reactionGroups)) {
+    throw new TypeError(`${pointer}.reactionGroups must be an array`);
+  }
+  for (let index = 0; index < entry.reactionGroups.length; index += 1) {
+    validateReactionGroupShape(entry.reactionGroups[index], `${pointer}.reactionGroups[${index}]`);
+  }
+}
+
+function validateIssueCommentShape(entry, pointer) {
+  validateReviewBodyShape(entry, pointer);
+  if (!Array.isArray(entry.replies)) {
+    throw new TypeError(`${pointer}.replies must be an array`);
+  }
+}
+
 function assertReviewStateV1(reviewState) {
   if (typeof reviewState !== 'object' || reviewState === null) {
     throw new TypeError('review-state must be an object');
@@ -418,8 +449,14 @@ function assertReviewStateV1(reviewState) {
   if (!Array.isArray(reviewState.reviews)) {
     throw new TypeError('review-state reviews must be an array');
   }
+  for (let index = 0; index < reviewState.reviews.length; index += 1) {
+    validateReviewBodyShape(reviewState.reviews[index], `review-state reviews[${index}]`);
+  }
   if (!Array.isArray(reviewState.issueComments)) {
     throw new TypeError('review-state issueComments must be an array');
+  }
+  for (let index = 0; index < reviewState.issueComments.length; index += 1) {
+    validateIssueCommentShape(reviewState.issueComments[index], `review-state issueComments[${index}]`);
   }
   if (!Array.isArray(reviewState.targets)) {
     throw new TypeError('review-state targets must be an array');
