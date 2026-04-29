@@ -1,5 +1,9 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
+import type {
+  AnnotationRegistry,
+  AnnotationValue,
+  OperationKind,
+} from '@prisma-next/framework-components/runtime';
 import type { StorageTable } from '@prisma-next/sql-contract/types';
 import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
@@ -86,6 +90,16 @@ export interface BuilderContext {
   readonly applyMutationDefaults: (
     options: MutationDefaultsOptions,
   ) => ReadonlyArray<AppliedMutationDefault>;
+  /**
+   * Registry assembled from middleware-contributed annotation handles.
+   * Lane terminals (`SelectQueryImpl`, `GroupedQueryImpl`,
+   * `InsertQueryImpl`, `UpdateQueryImpl`, `DeleteQueryImpl`) consume it
+   * via `createMetaBuilder(registry, kind)` to derive the kind-filtered
+   * `AnnotationBuilder` they hand to the `.annotate(callback)` callback.
+   * Populated by the family runtime (currently `postgres()`); empty
+   * registry when no middleware contributes annotations.
+   */
+  readonly annotationRegistry: AnnotationRegistry;
 }
 
 export function emptyState(from: TableSource, scope: Scope): BuilderState {

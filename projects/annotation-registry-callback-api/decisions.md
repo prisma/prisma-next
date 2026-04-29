@@ -61,3 +61,25 @@ This isn't fixable in stage 1 without violating its disjoint write scope (stage 
 
 Decision: continue exactly as the plan sequences — framework-components is green at every commit, downstream packages may be red between stage 1 and the stage that owns them. Stage 4 fixes `sql-builder` tests, stage 5 fixes `middleware-cache` and `sql-orm-client` tests, stage 6 fixes the demo and any straggling docs/examples. The final commit is fully green workspace-wide.
 
+### Stage 3: defer the deep `Registry` generic threading to stage 4
+
+The plan asks stage 3 to thread `Registry` through `Db<TContract, …>`, `OrmClient<TContract, …>`, and the leaf builder types so the postgres facade can project `PostgresClient<TContract, AnnotationsOf<Mw>>`. Threading the generic through every type in the chain (`Db`, `TableProxy`, `WithSelect`, `WithJoin`, `SelectQuery`, `GroupedQuery`, mutation queries, `Collection`, `GroupedCollection`, etc.) is a sweeping refactor whose only consumer is the stage-4 `.annotate(callback)` signature.
+
+For stage 3 I'll do the narrower runtime-only plumbing the acceptance tests actually exercise:
+
+- New `createMetaBuilder(registry, kind)` factory in `framework-components`.
+- `BuilderContext.annotationRegistry` (sql-builder) populated from the runtime via `sql({ context, annotationRegistry })`.
+- `CollectionContext.annotationRegistry` (sql-orm-client) populated similarly via `orm({ runtime, context, annotationRegistry })`.
+- `postgres()` builds the registry from `options.middleware`, capturing `const Mw extends readonly SqlMiddleware[]` so the type tracks the contributions.
+- `PostgresClient<TContract, Registry = {}>` carries `Registry` as a phantom field; it is not yet propagated into `Db<TContract>` nor `OrmClient<TContract>`.
+
+Stage 4 will do the deeper threading at the same time as it adds the `.annotate(callback)` signature, which is the first place `Registry` is actually consumed at the type level. That keeps the diff for stage 3 focused on runtime plumbing (matching the runtime acceptance tests in the plan) and stage 4 focused on the type-system widening + DSL surface change.
+
+The “demo's `db.ts` still compiles without any source change” expectation in the plan can't be met regardless because of the stage-1 `.apply` cascade noted above; deferring the `Registry` generic doesn't worsen the situation.
+
+### Stage 3: skip mongo authoring-context plumbing
+
+Mongo does not expose `.annotate()` anywhere today (`grep .annotate packages/2-mongo-family` finds nothing). The runtime side (stage 2) already exposes `runtime.annotationRegistry` for any future consumer; threading the registry into `mongoOrm` / `mongoQuery` would create infrastructure with no consumer. When/if mongo grows a `.annotate()` API, the same SQL-side pattern applies: add an option to `mongoOrm`/`mongoQuery`, default to an empty registry, surface the runtime's registry at the user's call site.
+
+Decision: stage 3 plumbs the registry on the SQL side (where `.annotate()` lives) only. Mongo gets the optional `annotations` field on `MongoMiddleware` via `RuntimeMiddleware` inheritance (already done in stage 2) but no factory-level surface change.
+

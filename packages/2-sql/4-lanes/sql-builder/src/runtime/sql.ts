@@ -1,4 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
+import {
+  type AnnotationRegistry,
+  createAnnotationRegistry,
+} from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import type { Db } from '../types/db';
@@ -7,6 +11,15 @@ import { TableProxyImpl } from './table-proxy-impl';
 
 export interface SqlOptions<C extends Contract<SqlStorage>> {
   readonly context: ExecutionContext<C>;
+  /**
+   * Registry of middleware-contributed annotation handles that lane
+   * terminals consume via the `.annotate(callback)` API. Defaults to an
+   * empty registry when omitted (no middleware-contributed annotations
+   * available); pass the registry assembled by the family runtime
+   * (`postgres()` builds it from `options.middleware`) to surface
+   * runtime-known annotations to authoring sites.
+   */
+  readonly annotationRegistry?: AnnotationRegistry;
 }
 
 export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<C> {
@@ -17,6 +30,7 @@ export function sql<C extends Contract<SqlStorage>>(options: SqlOptions<C>): Db<
     target: context.contract.target ?? 'unknown',
     storageHash: context.contract.storage.storageHash ?? 'unknown',
     applyMutationDefaults: (options) => context.applyMutationDefaults(options),
+    annotationRegistry: options.annotationRegistry ?? createAnnotationRegistry(),
   };
 
   return new Proxy({} as Db<C>, {

@@ -12,6 +12,7 @@ export type {
 } from '../annotations';
 export { assertAnnotationsApplicable, defineAnnotation } from '../annotations';
 export { AsyncIterableResult } from '../async-iterable-result';
+export { createMetaBuilder } from '../meta-builder';
 export type { ExecutionPlan, QueryPlan, ResultType } from '../query-plan';
 export { runWithMiddleware } from '../run-with-middleware';
 export type { RuntimeCoreOptions } from '../runtime-core';

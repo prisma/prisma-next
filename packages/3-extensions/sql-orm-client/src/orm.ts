@@ -1,4 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
+import {
+  type AnnotationRegistry,
+  createAnnotationRegistry,
+} from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from './collection';
@@ -17,6 +21,15 @@ export interface OrmOptions<
   readonly runtime: RuntimeQueryable;
   readonly collections?: Collections;
   readonly context: ExecutionContext<TContract>;
+  /**
+   * Registry of middleware-contributed annotation handles that
+   * `Collection` terminals consume via the `.annotate(callback)` API.
+   * Defaults to an empty registry when omitted; pass the registry
+   * assembled by the family runtime (`postgres()` builds it from
+   * `options.middleware`) to surface runtime-known annotations to
+   * authoring sites.
+   */
+  readonly annotationRegistry?: AnnotationRegistry;
 }
 
 type ModelNames<TContract extends Contract<SqlStorage>> = CollectionModelName<TContract>;
@@ -58,7 +71,11 @@ export function orm<
 >(options: OrmOptions<TContract, Collections>): OrmClient<TContract, Collections> {
   const { runtime, collections, context } = options;
   const contract = context.contract;
-  const ctx: CollectionContext<TContract> = { runtime, context };
+  const ctx: CollectionContext<TContract> = {
+    runtime,
+    context,
+    annotationRegistry: options.annotationRegistry ?? createAnnotationRegistry(),
+  };
   const modelNames = new Set(Object.keys(contract.models));
   const collectionRegistry = createCollectionRegistry(contract, collections);
   const cache = new Map<

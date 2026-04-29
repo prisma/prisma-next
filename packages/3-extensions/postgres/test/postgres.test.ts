@@ -63,6 +63,7 @@ vi.mock('pg', () => {
   return { Pool, Client };
 });
 
+import { defineAnnotation } from '@prisma-next/framework-components/runtime';
 import { Client, Pool } from 'pg';
 import postgres, { type PostgresClient } from '../src/runtime/postgres';
 
@@ -510,5 +511,97 @@ describe('postgres', () => {
 
     expect(mocks.instantiateExecutionStack).toHaveBeenCalledTimes(1);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(1);
+  });
+
+  describe('annotation registry plumbing', () => {
+    const cacheAnnotation = defineAnnotation<{ ttl: number }, 'read'>({
+      name: 'cache',
+      applicableTo: ['read'],
+    });
+    const auditAnnotation = defineAnnotation<{ actor: string }, 'write'>({
+      name: 'audit',
+      applicableTo: ['write'],
+    });
+
+    it('exposes an empty registry when no middleware contributes annotations', () => {
+      const db = postgres({
+        contract,
+        url: 'postgres://localhost:5432/db',
+      });
+      expect(db.annotationRegistry.entries()).toEqual({});
+    });
+
+    it('exposes the merged registry assembled from middleware annotations', () => {
+      const cacheMw = { name: 'cache', annotations: { cache: cacheAnnotation } };
+      const auditMw = { name: 'audit', annotations: { audit: auditAnnotation } };
+      const db = postgres({
+        contract,
+        url: 'postgres://localhost:5432/db',
+        middleware: [cacheMw, auditMw],
+      });
+
+      const entries = db.annotationRegistry.entries();
+      expect(Object.keys(entries).sort()).toEqual(['audit', 'cache']);
+      expect(entries['cache']).toBe(cacheAnnotation);
+      expect(entries['audit']).toBe(auditAnnotation);
+    });
+
+    it('threads the assembled registry into the sql builder factory', () => {
+      const cacheMw = { name: 'cache', annotations: { cache: cacheAnnotation } };
+      postgres({
+        contract,
+        url: 'postgres://localhost:5432/db',
+        middleware: [cacheMw],
+      });
+
+      // The first sqlBuilder call (eager construction) receives the
+      // registry assembled from `options.middleware` so lane terminals
+      // can derive their kind-filtered AnnotationBuilder at .annotate()
+      // time.
+      expect(mocks.sqlBuilder).toHaveBeenCalledTimes(1);
+      const [sqlOptions] = mocks.sqlBuilder.mock.calls[0] ?? [];
+      const registry = (
+        sqlOptions as { annotationRegistry?: { entries(): Record<string, unknown> } }
+      )?.annotationRegistry;
+      expect(registry).toBeDefined();
+      expect(registry?.entries()['cache']).toBe(cacheAnnotation);
+    });
+
+    it('threads the assembled registry into the orm factory', async () => {
+      const { orm: ormMock } = await import('@prisma-next/sql-orm-client');
+      vi.mocked(ormMock).mockClear();
+      const cacheMw = { name: 'cache', annotations: { cache: cacheAnnotation } };
+      postgres({
+        contract,
+        url: 'postgres://localhost:5432/db',
+        middleware: [cacheMw],
+      });
+
+      // The eager orm call (the orm constructed at postgres() time).
+      expect(vi.mocked(ormMock)).toHaveBeenCalled();
+      const [ormOptions] = vi.mocked(ormMock).mock.calls[0] ?? [];
+      const registry = (
+        ormOptions as { annotationRegistry?: { entries(): Record<string, unknown> } }
+      )?.annotationRegistry;
+      expect(registry).toBeDefined();
+      expect(registry?.entries()['cache']).toBe(cacheAnnotation);
+    });
+
+    it('throws at construction when two middleware contribute different handles under the same name', () => {
+      const cacheA = { name: 'cache-a', annotations: { cache: cacheAnnotation } };
+      const cacheBHandle = defineAnnotation<{ ttl: number }, 'read'>({
+        name: 'cache',
+        applicableTo: ['read'],
+      });
+      const cacheB = { name: 'cache-b', annotations: { cache: cacheBHandle } };
+
+      expect(() =>
+        postgres({
+          contract,
+          url: 'postgres://localhost:5432/db',
+          middleware: [cacheA, cacheB],
+        }),
+      ).toThrow('Annotation "cache" is already registered with a different handle');
+    });
   });
 });

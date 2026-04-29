@@ -3,6 +3,11 @@ import type { Contract } from '@prisma-next/contract/types';
 import postgresDriver from '@prisma-next/driver-postgres/runtime';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
 import { instantiateExecutionStack } from '@prisma-next/framework-components/execution';
+import {
+  type AnnotationRegistry,
+  type AnnotationsOf,
+  createAnnotationRegistry,
+} from '@prisma-next/framework-components/runtime';
 import { sql as sqlBuilder } from '@prisma-next/sql-builder/runtime';
 import type { Db } from '@prisma-next/sql-builder/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -42,19 +47,49 @@ export interface PostgresTransactionContext<TContract extends Contract<SqlStorag
   readonly orm: OrmClient<TContract>;
 }
 
-export interface PostgresClient<TContract extends Contract<SqlStorage>> {
+/**
+ * Lazy Postgres client.
+ *
+ * The `Registry` generic carries the merged shape of every annotation
+ * handle contributed by `options.middleware`. It is computed via
+ * `AnnotationsOf<Mw>` from the const-captured middleware tuple at the
+ * factory call site and projected here as a phantom field. Stage 4 will
+ * thread `Registry` into `Db<TContract, Registry>` and the ORM surface
+ * so the `.annotate(callback)` callback can derive its kind-filtered
+ * `AnnotationBuilder` from `Registry` at the call site.
+ */
+export interface PostgresClient<TContract extends Contract<SqlStorage>, Registry = {}> {
   readonly sql: Db<TContract>;
   readonly orm: OrmClient<TContract>;
   readonly context: ExecutionContext<TContract>;
   readonly stack: SqlExecutionStackWithDriver<PostgresTargetId>;
+  /**
+   * Registry assembled from `options.middleware` at construction time.
+   * Exposed for tests and tooling that want to introspect the contributed
+   * annotation handles. Mainline call sites should not need to touch this
+   * — the registry is wired into the lane builders automatically.
+   */
+  readonly annotationRegistry: AnnotationRegistry;
+  /**
+   * Phantom slot carrying the type-level merged annotation-registry shape
+   * derived from `options.middleware` via `AnnotationsOf<Mw>`. Stage 4
+   * threads this `Registry` through `Db<TContract, Registry>` and the ORM
+   * surface so the `.annotate(callback)` callback can structurally derive
+   * its kind-filtered `AnnotationBuilder` at the call site. The value is
+   * always `undefined` at runtime; it exists solely to keep the `Registry`
+   * generic referenced.
+   */
+  readonly _registry?: Registry;
   connect(bindingInput?: PostgresBindingInput): Promise<Runtime>;
   runtime(): Runtime;
   transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R>;
 }
 
-export interface PostgresOptionsBase {
+export interface PostgresOptionsBase<
+  Mw extends readonly SqlMiddleware[] = readonly SqlMiddleware[],
+> {
   readonly extensions?: readonly SqlRuntimeExtensionDescriptor<PostgresTargetId>[];
-  readonly middleware?: readonly SqlMiddleware[];
+  readonly middleware?: Mw;
   readonly verify?: RuntimeVerifyOptions;
   readonly poolOptions?: {
     readonly connectionTimeoutMillis?: number;
@@ -68,24 +103,29 @@ export interface PostgresBindingOptions {
   readonly pg?: Pool | Client;
 }
 
-export type PostgresOptionsWithContract<TContract extends Contract<SqlStorage>> =
-  PostgresBindingOptions &
-    PostgresOptionsBase & {
-      readonly contract: TContract;
-      readonly contractJson?: never;
-    };
+export type PostgresOptionsWithContract<
+  TContract extends Contract<SqlStorage>,
+  Mw extends readonly SqlMiddleware[] = readonly SqlMiddleware[],
+> = PostgresBindingOptions &
+  PostgresOptionsBase<Mw> & {
+    readonly contract: TContract;
+    readonly contractJson?: never;
+  };
 
-export type PostgresOptionsWithContractJson<TContract extends Contract<SqlStorage>> =
-  PostgresBindingOptions &
-    PostgresOptionsBase & {
-      readonly contractJson: unknown;
-      readonly contract?: never;
-      readonly _contract?: TContract;
-    };
+export type PostgresOptionsWithContractJson<
+  TContract extends Contract<SqlStorage>,
+  Mw extends readonly SqlMiddleware[] = readonly SqlMiddleware[],
+> = PostgresBindingOptions &
+  PostgresOptionsBase<Mw> & {
+    readonly contractJson: unknown;
+    readonly contract?: never;
+    readonly _contract?: TContract;
+  };
 
-export type PostgresOptions<TContract extends Contract<SqlStorage>> =
-  | PostgresOptionsWithContract<TContract>
-  | PostgresOptionsWithContractJson<TContract>;
+export type PostgresOptions<
+  TContract extends Contract<SqlStorage>,
+  Mw extends readonly SqlMiddleware[] = readonly SqlMiddleware[],
+> = PostgresOptionsWithContract<TContract, Mw> | PostgresOptionsWithContractJson<TContract, Mw>;
 
 function hasContractJson<TContract extends Contract<SqlStorage>>(
   options: PostgresOptions<TContract>,
@@ -98,6 +138,24 @@ function resolveContract<TContract extends Contract<SqlStorage>>(
 ): TContract {
   const contractInput = hasContractJson(options) ? options.contractJson : options.contract;
   return validateContract<TContract>(contractInput, emptyCodecLookup);
+}
+
+function assembleAnnotationRegistry(
+  middleware: readonly SqlMiddleware[] | undefined,
+): AnnotationRegistry {
+  const registry = createAnnotationRegistry();
+  if (!middleware) {
+    return registry;
+  }
+  for (const mw of middleware) {
+    if (!mw.annotations) {
+      continue;
+    }
+    for (const handle of Object.values(mw.annotations)) {
+      registry.register(handle);
+    }
+  }
+  return registry;
 }
 
 function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
@@ -124,16 +182,31 @@ function toRuntimeBinding<TContract extends Contract<SqlStorage>>(
  *
  * - No-emit: pass a TypeScript-authored contract. Example: postgres({ contract })
  * - Emitted: pass Contract type explicitly. Example: postgres<Contract>({ contractJson, url })
+ *
+ * The `const Mw extends readonly SqlMiddleware[]` generic captures the
+ * middleware tuple literally so the projected `AnnotationsOf<Mw>` carries
+ * the merged annotation-handle types contributed by every middleware.
+ * Users who pass a non-literal `middleware: someVariable` will see `Mw`
+ * widen to `readonly SqlMiddleware[]` and therefore `Registry` resolve to
+ * `{}`; recommend inline literals or `as const satisfies readonly
+ * SqlMiddleware[]` to preserve the registry projection.
  */
-export default function postgres<TContract extends Contract<SqlStorage>>(
-  options: PostgresOptionsWithContract<TContract>,
-): PostgresClient<TContract>;
-export default function postgres<TContract extends Contract<SqlStorage>>(
-  options: PostgresOptionsWithContractJson<TContract>,
-): PostgresClient<TContract>;
-export default function postgres<TContract extends Contract<SqlStorage>>(
-  options: PostgresOptions<TContract>,
-): PostgresClient<TContract> {
+export default function postgres<
+  TContract extends Contract<SqlStorage>,
+  const Mw extends readonly SqlMiddleware[] = readonly [],
+>(
+  options: PostgresOptionsWithContract<TContract, Mw>,
+): PostgresClient<TContract, AnnotationsOf<Mw>>;
+export default function postgres<
+  TContract extends Contract<SqlStorage>,
+  const Mw extends readonly SqlMiddleware[] = readonly [],
+>(
+  options: PostgresOptionsWithContractJson<TContract, Mw>,
+): PostgresClient<TContract, AnnotationsOf<Mw>>;
+export default function postgres<
+  TContract extends Contract<SqlStorage>,
+  const Mw extends readonly SqlMiddleware[] = readonly [],
+>(options: PostgresOptions<TContract, Mw>): PostgresClient<TContract, AnnotationsOf<Mw>> {
   const contract = resolveContract(options);
   let binding = resolveOptionalPostgresBinding(options);
   const stack = createSqlExecutionStack({
@@ -206,6 +279,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     return runtimeInstance;
   };
+  const annotationRegistry = assembleAnnotationRegistry(options.middleware);
   const orm: OrmClient<TContract> = ormBuilder({
     runtime: {
       execute(plan) {
@@ -216,15 +290,17 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
       },
     },
     context,
+    annotationRegistry,
   });
 
-  const sql: Db<TContract> = sqlBuilder<TContract>({ context });
+  const sql: Db<TContract> = sqlBuilder<TContract>({ context, annotationRegistry });
 
   return {
     sql,
     orm,
     context,
     stack,
+    annotationRegistry,
 
     async connect(bindingInput) {
       if (driverConnected || connectPromise) {
@@ -256,7 +332,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
 
     transaction<R>(fn: (tx: PostgresTransactionContext<TContract>) => PromiseLike<R>): Promise<R> {
       return withTransaction(getRuntime(), (txCtx) => {
-        const txSql: Db<TContract> = sqlBuilder<TContract>({ context });
+        const txSql: Db<TContract> = sqlBuilder<TContract>({ context, annotationRegistry });
 
         const txOrm: OrmClient<TContract> = ormBuilder({
           runtime: {
@@ -265,6 +341,7 @@ export default function postgres<TContract extends Contract<SqlStorage>>(
             },
           },
           context,
+          annotationRegistry,
         });
 
         // Use `txCtx` as the prototype instead of spreading it so that live

@@ -1,5 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
-import type { AnnotationValue, OperationKind } from '@prisma-next/framework-components/runtime';
+import type {
+  AnnotationRegistry,
+  AnnotationValue,
+  OperationKind,
+} from '@prisma-next/framework-components/runtime';
 import type {
   ExtractCodecTypes,
   ExtractQueryOperationTypes,
@@ -144,6 +148,17 @@ export interface RuntimeQueryable extends RuntimeScope {
 export interface CollectionContext<TContract extends Contract<SqlStorage>> {
   readonly runtime: RuntimeQueryable;
   readonly context: ExecutionContext<TContract>;
+  /**
+   * Registry assembled from middleware-contributed annotation handles.
+   * `Collection` terminals consume it via `createMetaBuilder(registry,
+   * kind)` to derive the kind-filtered `AnnotationBuilder` they hand to
+   * the `.annotate(callback)` callback. Populated by the family runtime
+   * (currently `postgres()`); when omitted, terminals fall back to an
+   * empty registry (no middleware-contributed annotations available
+   * — callers can still use the array escape hatch with externally-
+   * imported handles).
+   */
+  readonly annotationRegistry?: AnnotationRegistry;
 }
 
 // ---------------------------------------------------------------------------
