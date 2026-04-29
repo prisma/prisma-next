@@ -110,15 +110,11 @@ What this case pins:
 
 ### AC-5. `ParamRef` carries column refs
 
-- `ParamRef` (the relational-core AST node) gains `refs?: { table, column }`.
-- The SQL builder and sql-orm-client populate `refs` when constructing `ParamRef` from a column-bound site (a value bound to `column = ?` in WHERE, INSERT VALUES, etc.).
-- Encode-side `forColumn` dispatch is the primary path for parameterized columns; the `forCodecId` fallback is used only for refs-less call sites.
+- **Deferred to TML-2357**: `ParamRef` gains `refs?: { table, column }`; populated from column-bound construction sites; encode-side `forColumn` dispatch becomes the primary path. Today encode-side dispatch falls back to `forCodecId` for parameterized codec ids whose DSL-param values lack refs; the fallback is fragile (works for pgvector by coincidence, since vector wire format is length-independent).
 
 ### AC-6. JSON-validator registry deletes
 
-- `JsonSchemaValidatorRegistry` and `buildJsonSchemaValidatorRegistry` delete.
-- The decode path calls `forColumn(t, c).decode(wire)` and the resolved codec's `decode` body runs validation internally.
-- The `'json-validator'` `CodecTrait` either deletes (no consumer remains) or persists only as a structural marker for codecs whose `decode` validates.
+- **Deferred to TML-2357**: `JsonSchemaValidatorRegistry` and `buildJsonSchemaValidatorRegistry` delete; validation moves into the resolved codec's `decode` body; the `'json-validator'` `CodecTrait` retires or persists only as a structural marker.
 
 ### AC-7. JSON column factory ships from a per-library extension package
 
