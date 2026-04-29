@@ -89,7 +89,7 @@ flowchart TD
 
 ### Plan Helpers (`plan.ts`)
 - Defines `SqlQueryPlan<Row>` interface for SQL query plans produced by lanes before lowering
-- Provides `augmentDescriptorWithColumnMeta(descriptors, columnMeta)` helper to update ParamDescriptor with `codecId` and `nativeType` from column metadata
+- Per [ADR 205](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Execution%20metadata%20lives%20on%20AST.md), codec IDs travel on `ProjectionItem.codecId` (output) and `ParamRef.codecId` (parameters) on the AST itself, not on plan-level descriptor lists
 
 ### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
 

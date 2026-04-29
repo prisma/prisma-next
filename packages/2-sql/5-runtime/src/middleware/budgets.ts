@@ -91,14 +91,9 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
     async beforeExecute(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
       observedRowsByPlan.set(plan, { count: 0 });
 
-      if (isQueryAst(plan.ast)) {
-        if (plan.ast.kind === 'select') {
-          return evaluateSelectAst(plan.ast, ctx);
-        }
-        return;
+      if (isQueryAst(plan.ast) && plan.ast.kind === 'select') {
+        return evaluateSelectAst(plan.ast, ctx);
       }
-
-      return evaluateWithHeuristics(plan, ctx);
     },
 
     async onRow(_row: Record<string, unknown>, plan: SqlExecutionPlan, _ctx: SqlMiddlewareContext) {
@@ -176,29 +171,5 @@ export function budgets(options?: BudgetsOptions): SqlMiddleware {
         ctx,
       );
     }
-  }
-
-  // REVIEW: remove this, we are getting rid of row query validation
-  async function evaluateWithHeuristics(plan: SqlExecutionPlan, ctx: SqlMiddlewareContext) {
-    const sqlUpper = plan.sql.trimStart().toUpperCase();
-    const isSelect = sqlUpper.startsWith('SELECT');
-    if (!isSelect) {
-      return;
-    }
-
-    const hasLimitClause = /\blimit\b/i.test(plan.sql);
-    if (hasLimitClause) {
-      return;
-    }
-
-    const shouldBlock = rowSeverity === 'error' || ctx.mode === 'strict';
-    emitBudgetViolation(
-      runtimeError('BUDGET.ROWS_EXCEEDED', 'Unbounded SELECT query exceeds budget', {
-        source: 'heuristic',
-        maxRows,
-      }),
-      shouldBlock,
-      ctx,
-    );
   }
 }

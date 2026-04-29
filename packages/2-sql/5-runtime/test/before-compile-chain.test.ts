@@ -338,12 +338,14 @@ describe('runBeforeCompileChain', () => {
     timeouts.default,
   );
 
-  // REVIEW: I don't get what this test is testing. Either explain it better or remove it
-  // ADR 205: AST-rewriting middleware is correct-by-construction for codec
-  // resolution. After a beforeCompile rewriter swaps a projection alias the
-  // decoder must read the new alias + codec from the AST, not from a stale
-  // sidecar. Constructed end-to-end: rewrite → decode against the rewritten
-  // AST → assert decoded values land under the new alias.
+  // End-to-end check that the AST is the only channel carrying codec info
+  // (ADR 205). The middleware here renames the projection alias from `id` to
+  // `user_id` while keeping the same `codecId` on the rewritten
+  // ProjectionItem. The test then runs the real `decodeRow` against a wire
+  // row keyed by the *new* alias and asserts the registered codec fired
+  // (decode adds 100, so wire 7 → decoded 107). If the decoder still looked
+  // up codecs by the original alias on a sidecar, the assertion would fail
+  // because no codec would resolve under `user_id`.
   it(
     'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
     async () => {

@@ -11,7 +11,7 @@ Core contract data types and JSON schemas for Prisma Next.
 This package provides the foundational type definitions for Prisma Next data contracts:
 
 - **Contract data types**: The canonical description of an application's data model and storage layout (`ContractBase`, `DocumentContract`, `Source`, `FieldType`)
-- **Plan metadata**: Target-family-agnostic plan metadata types (`PlanMeta`, `ParamDescriptor`, `PlanRefs`). The plan markers themselves (`QueryPlan`, `ExecutionPlan`) live in `@prisma-next/framework-components/runtime`; family-specific plans (`SqlExecutionPlan`, `MongoExecutionPlan`) live in their respective domains.
+- **Plan metadata**: Target-family-agnostic plan metadata (`PlanMeta`). The plan markers themselves (`QueryPlan`, `ExecutionPlan`) live in `@prisma-next/framework-components/runtime`; family-specific plans (`SqlExecutionPlan`, `MongoExecutionPlan`) live in their respective domains. Per [ADR 205](../../../../docs/architecture%20docs/adrs/ADR%20205%20-%20Execution%20metadata%20lives%20on%20AST.md), execution metadata (codec IDs, projection refs, parameter descriptors) lives on the family AST when one is present, not on `PlanMeta`.
 - **Hash types**: Branded hash types for storage, execution, and profile hashing (`StorageHashBase`, `ExecutionHashBase`, `ProfileHashBase`)
 - **JSON Schemas**: Validation schemas for contract files
 - **Type guards**: Runtime type guards for narrowing contract types (`isDocumentContract`)
@@ -59,16 +59,6 @@ For SQL contracts, use `@prisma-next/sql-contract-ts/schema-sql` instead.
 - `./validate-domain`: Domain model validation
 
 ## Type System
-
-### Plan Types
-
-`ParamDescriptor` describes a single parameter in an execution plan:
-
-- **`source`**: Origin of the parameter (`'dsl'`, `'raw'`, or `'lane'`)
-- **`index`** (optional): 1-based position into `plan.params`
-- **`name`** (optional): Parameter name for codec resolution
-- **`codecId`**, **`nativeType`**, **`nullable`** (optional): Type metadata from contract
-- **`refs`** (optional): `{ table, column }` when the param is used against a known column
 
 ### Column Defaults
 

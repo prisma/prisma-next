@@ -51,50 +51,6 @@ function createPlan(overrides: PlanOverrides): SqlExecutionPlan {
 }
 
 describe('budgets middleware', () => {
-  describe('heuristic row budget (no AST, raw plan)', () => {
-    it(
-      'throws for unbounded raw SELECT (no LIMIT clause)',
-      async () => {
-        const plan = createPlan({ sql: 'SELECT id, email FROM "user"' });
-        const mw = budgets({ maxRows: 50 });
-        const ctx = createMiddlewareContext();
-
-        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
-          code: 'BUDGET.ROWS_EXCEEDED',
-          category: 'BUDGET',
-        });
-      },
-      timeouts.default,
-    );
-
-    it(
-      'allows raw SELECT that has a LIMIT clause in the SQL text',
-      async () => {
-        const plan = createPlan({ sql: 'SELECT id FROM "user" LIMIT 5' });
-        const mw = budgets({ maxRows: 10_000 });
-        const ctx = createMiddlewareContext();
-
-        await mw.beforeExecute?.(plan, ctx);
-        expect(ctx.log.warn).not.toHaveBeenCalled();
-      },
-      timeouts.default,
-    );
-
-    it(
-      'does not check row budget for non-SELECT raw statements',
-      async () => {
-        const plan = createPlan({
-          sql: 'INSERT INTO "user" (id, email) VALUES ($1, $2)',
-        });
-        const mw = budgets({ maxRows: 1 });
-        const ctx = createMiddlewareContext();
-
-        await mw.beforeExecute?.(plan, ctx);
-      },
-      timeouts.default,
-    );
-  });
-
   describe('observed row count (onRow)', () => {
     it(
       'throws when observed rows exceed budget',
