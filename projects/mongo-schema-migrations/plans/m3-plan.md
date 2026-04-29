@@ -83,12 +83,39 @@ export function applyPolymorphicScopeToMongoIndex(
 - New test: variant `@@index([severity], filter: "{ \"active\": true }")` produces a merged filter `{ active: true, type: 'bug' }`.
 - New test: variant `@@index([severity], filter: "{ \"type\": \"bug\" }")` (matching) is idempotent — output filter equals input filter.
 - New test: variant `@@index([severity], filter: "{ \"type\": \"feature\" }")` on a `Bug` variant emits a `PSL_INVALID_INDEX` diagnostic with the index attribute span.
-- New test: variant `@@index([title])` on `Bug` (where `title` is on `Task`, not on `Bug`) emits a field-not-found diagnostic on the variant model — confirms the spec's "indexing inherited base fields with variant scope is not supported" rule is organically enforced. (Add this to assert the regression even if the failure is already produced by existing field-resolution code.)
+- New test: variant `@@index([title])` on `Bug` (where `title` is on `Task`, not on `Bug`) emits a field-not-found diagnostic on the variant model — landed via T3.2.1's new model-level diagnostic, not via existing field-resolution (see T3.2.1 below).
 
 **Implementation notes:**
 
 - The variant patcher already knows `baseDecl.value` and the base's `discriminator.field` (from the previous validation pass). Compute the scope once per variant before the merge loop.
 - Map the helper's `conflict` result to a `ContractSourceDiagnostic` with `code: 'PSL_INVALID_INDEX'`, `sourceId`, and the original `@@index`/`@@unique` attribute's `span`. To get the span, capture it on the `MongoStorageIndex` shape during `collectIndexes` (e.g. via a parallel `Map<MongoStorageIndex, span>` rather than mutating the storage type) — or restructure `collectIndexes` to return `{ index, span }` pairs internally and strip the spans before emitting. Keep `MongoStorageIndex` storage-shape clean.
+
+---
+
+#### 3.2.1 Tests + impl: PSL `collectIndexes` rejects unknown field references
+
+**Background:** Phase 2 R1 surfaced a pre-existing escapee — `collectIndexes` in `interpreter.ts` builds index keys via `fieldMappings.pslNameToMapped.get(pf.name) ?? pf.name`, silently emitting an index referencing the raw PSL name when the field isn't declared on the model. The spec's § Cross-variant indexes claim that "PSL field resolution rejects this organically" was incorrect — there is no such enforcement. Closing the escapee inline lets AC-M3-07 land cleanly and removes a footgun affecting every Mongo `@@index`/`@@unique`/`@@textIndex`.
+
+**Goal:** Emit a `ContractSourceDiagnostic` with code `PSL_INDEX_FIELD_NOT_FOUND` for any `@@index` / `@@unique` / `@@textIndex` field-list reference that names a field not declared on the model.
+
+**Package:** `packages/2-mongo-family/2-authoring/contract-psl/`
+
+**Edit:** `src/interpreter.ts` — `collectIndexes` (the same function T3.2 already touches for span propagation). Field existence is checked against the same `fieldMappings.pslNameToMapped` map that's used for name resolution. Wildcard segments (e.g. `attrs.$**`) check the prefix only.
+
+**Tests** (extend `test/interpreter.indexes.test.ts` if it exists, otherwise add to the most relevant `test/interpreter.*.test.ts` file):
+
+- Non-polymorphic `@@index([nonexistent])` on a model emits `PSL_INDEX_FIELD_NOT_FOUND` with the index attribute's span.
+- `@@unique([nonexistent])` emits the same.
+- `@@textIndex([nonexistent])` emits the same.
+- Wildcard `@@index([nonexistent.$**])` emits the same (prefix-checked).
+- A model with both a valid and an invalid field in the field list emits one diagnostic, identifying the missing field by name.
+- Polymorphic regression: `@@index([title])` on `Bug` (variant of `Task`, where `title` is declared on `Task`) emits `PSL_INDEX_FIELD_NOT_FOUND` — closes AC-M3-07 via this path.
+
+**Implementation notes:**
+
+- The diagnostic shape mirrors the existing `PSL_INVALID_INDEX` ones in `collectIndexes` (same `sourceId`, same `span: attr.span`).
+- The check should run **before** the helper invocation in T3.2's variant-merge — the field-existence diagnostic preempts the discriminator-scope helper, which means a missing-field variant index never reaches the helper at all.
+- The new code is small (~10–15 lines including the wildcard-prefix carve-out). Keep the variable naming consistent with the surrounding `collectIndexes` style.
 
 ---
 
@@ -111,6 +138,29 @@ export function applyPolymorphicScopeToMongoIndex(
 
 - Maintain symmetry with the PSL path: the helper is called from one place, errors are mapped to the TS path's existing diagnostic shape (the current code uses thrown `Error`s — keep that).
 - If the existing model-builder shape doesn't carry enough info to compute the scope at `buildCollections()` time (it should — `__base` is set during `.base()` and the discriminator is on the base builder), add the missing wiring rather than hacking around it.
+
+---
+
+#### 3.3.1 Tests + impl: TS contract-builder rejects unknown field references in `index({ keys })`
+
+**Background:** Mirror of T3.2.1 on the TS authoring surface. The TS DSL's `index({ keys: { fieldName: 1 } })` accepts a `fieldName` string at runtime without checking that `fieldName` is declared on the model's `fields`. Same pre-existing escapee shape, same fix shape.
+
+**Goal:** When `buildCollections()` flushes a model builder's `__indexes` into its collection, validate that every `keys` field reference exists in `modelBuilder.__fields` (mapped name, matching whatever name the index generates from the runtime `fieldName`). On miss, throw an `Error` naming the model, the index signature, and the missing field — matching the existing `buildCollections()` error idiom (e.g. the duplicate-index error at L1264).
+
+**Package:** `packages/2-mongo-family/2-authoring/contract-ts/`
+
+**Edit:** `src/contract-builder.ts`, `buildCollections()` (~L1226). The check should run **before** the polymorphic-scope helper invocation in T3.3 — same preempt rule as T3.2.1.
+
+**Tests** (in `test/contract-builder.polymorphism.test.ts` or wherever T3.3's tests landed):
+
+- Non-polymorphic model with `index({ keys: { nonexistent: 1 } })` throws.
+- Polymorphic regression: variant declares `index({ keys: { titleFromBase: 1 } })` where `titleFromBase` is on the base model only — throws (closes the TS half of AC-M3-07).
+- Mixed valid/invalid keys: throws once, identifies the missing field.
+
+**Implementation notes:**
+
+- The check uses `modelBuilder.__fields` (the variant's own fields) — by spec, variant fields are thin (variant-specific only). A base-inherited field is not available on the variant, which is exactly the intended rule.
+- If the TS DSL's `keys` shape uses anything beyond plain `Record<string, MongoIndexFieldValue>` (e.g. nested wildcard syntax), the check accommodates it the same way T3.2.1's PSL implementation does — prefix only for wildcards, exact match otherwise. Confirm the shape during reconnaissance.
 
 ---
 
@@ -189,9 +239,12 @@ Re-emit the demo contract via the demo's existing emit command. Sanity-check `pr
 | PSL: base index unchanged | Unit | 3.2 |
 | PSL: user-compatible filter merges | Unit | 3.2 |
 | PSL: user-conflicting filter → diagnostic with span | Unit | 3.2 |
-| PSL: variant-on-base-field still field-not-found | Unit | 3.2 |
+| PSL: `@@index`/`@@unique`/`@@textIndex` rejects unknown field references | Unit | 3.2.1 |
+| PSL: variant-on-base-field emits `PSL_INDEX_FIELD_NOT_FOUND` | Unit | 3.2.1 |
 | TS DSL: parity with PSL output | Unit | 3.3 |
 | TS DSL: conflicting filter throws | Unit | 3.3 |
+| TS DSL: `index({ keys })` rejects unknown field references | Unit | 3.3.1 |
+| TS DSL: variant-on-base-field throws | Unit | 3.3.1 |
 | Demo emits expected `partialFilterExpression` | Smoke | 3.4 |
 | End-to-end plan + apply produces correct partial index | Integration (`mongodb-memory-server`) | 3.5 |
 | Partial unique constraint enforced per variant | Integration (`mongodb-memory-server`) | 3.5 |
@@ -199,8 +252,8 @@ Re-emit the demo contract via the demo's existing emit command. Sanity-check `pr
 
 ## Open items
 
-- **Span propagation for PSL conflict diagnostics.** Currently `collectIndexes` returns `MongoStorageIndex[]` and discards source spans. The diagnostic in 3.2 needs the span. Options: (a) parallel array of spans returned from `collectIndexes`, (b) `Map<MongoStorageIndex, Span>` keyed by reference, (c) restructure `collectIndexes` to return tuples and project to indexes at the end. (c) is cleanest. Confirm at implementation time.
-- **TS DSL variant scope discoverability.** Confirm the model builder graph in `buildCollections()` carries `__base` (or equivalent) and the base builder's `__discriminator` is reachable. If not, the wiring needs a small extension; not expected to be invasive.
+- **Span propagation for PSL conflict diagnostics.** Currently `collectIndexes` returns `MongoStorageIndex[]` and discards source spans. The diagnostic in 3.2 needs the span. Options: (a) parallel array of spans returned from `collectIndexes`, (b) `Map<MongoStorageIndex, Span>` keyed by reference, (c) restructure `collectIndexes` to return tuples and project to indexes at the end. **Resolved (Phase 2 R1):** option (b), `Map<MongoStorageIndex, PslSpan>` keyed by reference, scoped to the interpreter call. (c) would have rippled through 5+ pass-through sites; (b) was a smaller diff with no GC concerns since the map is local to one call.
+- **TS DSL variant scope discoverability.** Confirm the model builder graph in `buildCollections()` carries `__base` (or equivalent) and the base builder's `__discriminator` is reachable. **Resolved (Phase 2 R1):** confirmed — `modelBuilder.__base`, base builder's `__discriminator.field`, and `baseBuilder.__variants[variantName].value` all reachable; no wiring extension needed.
 - **Demo index choice.** `@@unique([summary])` on `Article` or `@@index([duration])` on `Tutorial` — pick whichever reads better in the demo narrative.
 
 ## Risk

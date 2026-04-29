@@ -141,7 +141,14 @@ Both authoring paths translate `conflict` results into their existing diagnostic
 
 ### Cross-variant indexes
 
-Already enforced organically by PSL field resolution: variant `fields` are thin (variant-specific only per ADR 173). A `@@index([title])` on `Bug` would fail to resolve because `Bug` doesn't declare `title` (it inherits it). Indexing an inherited base field with variant scope is not supported in M3; if a user wants to index a base field collection-wide, they declare it on the base. We confirm this with a regression test.
+Variant `fields` are thin per ADR 173 — variant-specific only. The intended rule is that `@@index([title])` on `Bug` should fail because `Bug` doesn't declare `title` (it inherits it from `Task`); indexing a base-inherited field with variant scope is not supported in M3. The base-collection-wide case is expressed by declaring `@@index([title])` on `Task`.
+
+**Pre-M3 gap surfaced during implementation (Phase 2 R1):** the Mongo PSL interpreter's `collectIndexes` and the TS contract-builder both silently emitted indexes referencing fields that aren't declared on the model. The pre-existing escapee affects every `@@index`/`@@unique` field reference, not just polymorphism — but it's exactly what allows the cross-variant rule above to bite. M3 closes the escapee on both authoring surfaces:
+
+- **PSL path (T3.2.1):** `collectIndexes` emits `PSL_INDEX_FIELD_NOT_FOUND` (a `ContractSourceDiagnostic` with the index attribute's span) when an `@@index`/`@@unique`/`@@textIndex` field-list references a field not declared on the model.
+- **TS path (T3.3.1):** the contract-builder throws an `Error` naming the model, the index's signature, and the missing field when an `index({ keys: { ... } })` declaration on a model builder names a field not present on the model's `fields`.
+
+The variant-on-base-field regression test (`@@index([title])` on `Bug`) routes through the new diagnostic. Same-shape regression on the TS DSL.
 
 ## Acceptance criteria
 
@@ -151,7 +158,10 @@ Already enforced organically by PSL field resolution: variant `fields` are thin 
 - [ ] An index declared on the base model (not on a variant) is unchanged — no `partialFilterExpression` is added by M3.
 - [ ] When a user-supplied `filter:` argument on a variant index is compatible with the variant's discriminator (no overlap, or overlap with matching value), the helper merges them and the AND-combined filter appears in the contract.
 - [ ] When a user-supplied `filter:` sets the discriminator field to a value that disagrees with the variant's discriminator, the authoring layer emits a diagnostic (PSL: `ContractSourceDiagnostic`; TS: `Error`).
-- [ ] An attempt to index a base-inherited field on a variant model produces a field-resolution diagnostic (regression).
+- [ ] An attempt to index a base-inherited field on a variant model produces a field-resolution diagnostic (regression). Both surfaces:
+  - PSL: `@@index([title])` on `Bug` emits `PSL_INDEX_FIELD_NOT_FOUND` with the attribute's span.
+  - TS DSL: the contract-builder throws an `Error` naming the model, index signature, and missing field.
+- [ ] **Model-level field-existence diagnostic (closes the pre-M3 escapee):** any non-polymorphic `@@index([nonexistent])` / `@@unique([nonexistent])` / `index({ keys: { nonexistent: 1 } })` declaration on a Mongo model also surfaces the same diagnostic — the rule applies model-wide, not just to polymorphic variants.
 - [ ] The existing "merges variant indexes into base collection" tests in `interpreter.polymorphism.test.ts` are extended to assert `partialFilterExpression` content (not just key membership).
 - [ ] `examples/mongo-demo/prisma/contract.prisma` declares an index on a variant-specific field on at least one of the existing polymorphic variants (`Article` or `Tutorial`) and the emitted `contract.json` carries the expected `partialFilterExpression`.
 - [ ] **End-to-end**: a polymorphic PSL contract with at least one variant-specific index runs through `migration plan` → `migration apply` against `mongodb-memory-server`, and the resulting MongoDB index reported by `db.collection.listIndexes()` has the expected `partialFilterExpression` set to `{ [discriminatorField]: discriminatorValue }`.
