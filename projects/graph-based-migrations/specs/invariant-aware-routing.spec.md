@@ -283,7 +283,7 @@ Rename affects: the type declaration, every call site, every test, and any docum
 
 ## Functional Requirements
 
-**F1. `invariantId?: string` on `DataTransformOperation` is opt-in routing identity.** `DataTransformOperation` gains an optional `invariantId?: string`. Presence opts the transform into routing visibility; absence means the transform is a path-dependent one-off that the routing layer doesn't reason about. `name` keeps its existing role (retry/ledger identity, display-friendly). `invariantId` is a separate, stable, routing-only key — authored content that participates in `edgeId` / attestation alongside `check` and `run`. Format rule: lowercase ASCII, digits, hyphens, slashes for namespacing — same pattern `refs.ts` uses for ref names (`REF_NAME_PATTERN`). Verify fails with `MIGRATION.INVALID_INVARIANT_ID` on a malformed id.
+**F1. `invariantId?: string` on `DataTransformOperation` is opt-in routing identity.** `DataTransformOperation` gains an optional `invariantId?: string`. Presence opts the transform into routing visibility; absence means the transform is a path-dependent one-off that the routing layer doesn't reason about. `name` is a human-readable label (op id/label, error messages, CLI output); `invariantId` is a separate, stable, routing-only key — authored content that participates in `edgeId` / attestation alongside `check` and `run`. Hygiene rule: non-empty, no whitespace (ASCII or Unicode), no control characters; case, punctuation, and Unicode letters are at the author's discretion. Refs need filesystem-safe names; invariants are opaque strings compared by equality, so the constraint is narrower than `REF_NAME_PATTERN`. Verify fails with `MIGRATION.INVALID_INVARIANT_ID` on a malformed id.
 
 **F2. `providedInvariants` on `migration.json` is the attestation-covered aggregate.** Each migration's `migration.json` manifest gains `providedInvariants: readonly string[]` — the sorted, deduplicated list of `invariantId`s from the migration's data transforms. Producer/checker split:
 
@@ -335,7 +335,7 @@ Vocabulary: "applied" (not "active") — it's the right reading under the applie
 
 The following structured errors (all subtypes of `MigrationToolsError`) are introduced or enumerated by this spec. Each carries the shape the rest of the error catalogue uses (`code`, `message`, `why`, `fix`, `details`, `category: 'MIGRATION'`). Every error surfaces in both human output and `--json` envelopes.
 
-- **`MIGRATION.INVALID_INVARIANT_ID`** (verify-time). A data-transform op declares an `invariantId` that doesn't match the format rule (lowercase ASCII, digits, hyphens, slashes). `fix` names the offending value and the pattern.
+- **`MIGRATION.INVALID_INVARIANT_ID`** (verify-time). A data-transform op declares an `invariantId` that violates the hygiene rule (empty, contains whitespace, or contains an ASCII control character). `fix` names the offending value and points at the rule.
 - **`MIGRATION.DUPLICATE_INVARIANT_IN_EDGE`** (verify-time). Two ops in a single `migration.ts` declare the same `invariantId`. The marker's set-semantic collapses them, and the `providedInvariants` aggregate would lose the duplication detail; neither outcome is what the author wants. `fix` names the conflicting ops and suggests renaming one.
 - **`MIGRATION.PROVIDED_INVARIANTS_MISMATCH`** (verify-time). `migration.json`'s `providedInvariants` disagrees with the list derived from `ops.json`. Typically means `migration.json` was hand-edited without regenerating from ops (the `edgeId` hash would also catch this, but the dedicated error gives a targeted diagnostic). `details` names the stored set, the derived set, and their difference; `fix` says to re-emit the migration.
 - **`MIGRATION.UNKNOWN_INVARIANT`** (pre-check; fatal in both apply and status). A ref's `invariants` list references an id that no migration in the graph declares. Both `migration apply --ref` and `migration status --ref` run the same check and exit 1 before the pathfinder runs. `details.unknown` lists the unknown ids; `details.declared` lists what's available. `fix` says either the ref has a typo or the declaring migration hasn't been authored/attested yet.
@@ -418,7 +418,7 @@ Grouped by concern. Ordering/chunking decided separately from this spec.
 
 - [ ] `DataTransformOperation.invariantId?: string` exists on the type
 - [ ] Verify accepts a data-transform with `invariantId` unset (treats as non-routing-visible) and with `invariantId` set to a valid value
-- [ ] Verify fails with `MIGRATION.INVALID_INVARIANT_ID` on a malformed id (e.g. uppercase, whitespace, starts with hyphen)
+- [ ] Verify fails with `MIGRATION.INVALID_INVARIANT_ID` on a malformed id (e.g. ASCII space, tab, NUL, NBSP, em space)
 - [ ] Verify fails with `MIGRATION.DUPLICATE_INVARIANT_IN_EDGE` when two ops in one `migration.ts` declare the same `invariantId`
 - [ ] `migration.json` gains `providedInvariants: readonly string[]` — sorted ascending, deduplicated, never undefined
 - [ ] **Emit** writes `providedInvariants` into `migration.json` derived from ops (filter `operationClass === 'data'` + `invariantId !== undefined`, collect `invariantId`, sort, dedupe) — no code path tolerates the field being missing at reconstruct-time

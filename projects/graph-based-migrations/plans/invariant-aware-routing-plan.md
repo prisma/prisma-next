@@ -114,7 +114,7 @@ The marker table is the single-row source of truth for current database state. A
 
 *Format validation + verify-time checks:*
 
-- [ ] Validator function for `invariantId` (lowercase ASCII / digits / hyphens / slashes — mirror `REF_NAME_PATTERN` from `refs.ts`). Export from migration-tools.
+- [ ] Validator function for `invariantId` (non-empty; reject whitespace and ASCII/Unicode control characters; case, punctuation, and Unicode letters at the author's discretion). Export from migration-tools.
 - [ ] Wire validation into `migration verify` / attestation path: fail with `MIGRATION.INVALID_INVARIANT_ID` on a malformed id
 - [ ] Wire duplicate detection into verify: fail with `MIGRATION.DUPLICATE_INVARIANT_IN_EDGE` when two ops in one migration declare the same `invariantId`
 - [ ] Add `INVALID_INVARIANT_ID`, `DUPLICATE_INVARIANT_IN_EDGE`, and `PROVIDED_INVARIANTS_MISMATCH` to `migration-tools/src/errors.ts` with `code`, `why`, `fix`, `details`
