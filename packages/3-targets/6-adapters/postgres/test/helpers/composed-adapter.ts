@@ -5,7 +5,7 @@ import type {
   RuntimeExtensionDescriptor,
   RuntimeTargetDescriptor,
 } from '@prisma-next/framework-components/execution';
-import postgresControlAdapterDescriptor from '@prisma-next/target-postgres/control';
+import postgresTargetControlDescriptor from '@prisma-next/target-postgres/control';
 import { PostgresControlAdapter } from '../../src/core/control-adapter';
 import postgresAdapterControlDescriptor from '../../src/exports/control';
 import postgresRuntimeAdapterDescriptor from '../../src/exports/runtime';
@@ -52,7 +52,7 @@ export function createComposedPostgresControlAdapter(options: {
 }) {
   const stack = createControlStack({
     family: sqlFamilyDescriptor,
-    target: postgresControlAdapterDescriptor,
+    target: postgresTargetControlDescriptor,
     adapter: postgresAdapterControlDescriptor,
     extensionPacks: options.extensionPacks,
   });
