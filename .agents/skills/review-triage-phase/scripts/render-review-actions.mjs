@@ -67,6 +67,9 @@ function parseCliArgs(argv) {
   if (!result.inPath) {
     throw { code: EXIT_CLI, message: 'error: --in is required' };
   }
+  if (result.inPath === '-') {
+    throw { code: EXIT_CLI, message: 'error: --in - is not supported' };
+  }
   if (result.inPath !== '-' && !result.inPath.endsWith('.json')) {
     throw { code: EXIT_CLI, message: 'error: --in file path must end with .json' };
   }

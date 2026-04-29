@@ -61,6 +61,9 @@ function parseCliArgs(argv) {
   if (!result.inPath) {
     throw { code: EXIT_CLI, message: 'error: --in is required' };
   }
+  if (result.inPath === '-') {
+    throw { code: EXIT_CLI, message: 'error: --in - is not supported' };
+  }
   if (result.inPath !== '-' && !result.inPath.endsWith('.json')) {
     throw { code: EXIT_CLI, message: 'error: --in file path must end with .json' };
   }
@@ -101,6 +104,10 @@ function summarizeBody(body, maxLength = 180) {
     return normalized;
   }
   return `${normalized.slice(0, maxLength - 1)}…`;
+}
+
+function formatAuthorLogin(author) {
+  return typeof author?.login === 'string' && author.login.length > 0 ? author.login : '<deleted>';
 }
 
 export function renderReviewStateMarkdown(payload, { sourcePath }) {
@@ -148,7 +155,7 @@ export function renderReviewStateMarkdown(payload, { sourcePath }) {
     lines.push(
       [
         escapeTableCell(review.nodeId),
-        escapeTableCell(review.author.login),
+        escapeTableCell(formatAuthorLogin(review.author)),
         escapeTableCell(review.state),
         escapeTableCell(review.submittedAt),
         escapeTableCell(review.url),
@@ -166,7 +173,7 @@ export function renderReviewStateMarkdown(payload, { sourcePath }) {
     lines.push(
       [
         escapeTableCell(comment.nodeId),
-        escapeTableCell(comment.author.login),
+        escapeTableCell(formatAuthorLogin(comment.author)),
         escapeTableCell(comment.createdAt),
         escapeTableCell(comment.url),
         escapeTableCell(summarizeBody(comment.body)),
