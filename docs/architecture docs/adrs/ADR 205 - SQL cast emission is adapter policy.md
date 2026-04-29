@@ -14,7 +14,7 @@ SELECT * FROM "embeddings" WHERE "vec" <-> $1 < 0.5
 
 Run this with `[0.1, 0.2, 0.3]` as `$1` and Postgres errors:
 
-```
+```text
 ERROR: operator does not exist: vector <-> text
 ```
 
