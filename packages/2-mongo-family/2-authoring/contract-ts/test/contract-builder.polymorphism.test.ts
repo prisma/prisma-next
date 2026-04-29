@@ -166,6 +166,52 @@ describe('mongo contract builder — polymorphic index scoping', () => {
     expect(severityIdx?.partialFilterExpression).toEqual({ type: 'bug' });
   });
 
+  it('throws when a variant indexes a base-inherited field (AC-M3-07)', () => {
+    const Task = model('Task', {
+      collection: 'tasks',
+      fields: {
+        _id: field.objectId(),
+        type: field.string(),
+        title: field.string(),
+      },
+      discriminator: {
+        field: 'type',
+        variants: { Bug: { value: 'bug' } },
+      },
+    });
+
+    const Bug = model('Bug', {
+      collection: 'tasks',
+      base: Task,
+      fields: {
+        severity: field.string(),
+      },
+      indexes: [index({ title: 1 })],
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Task, Bug },
+      }),
+    ).toThrow(/Bug/);
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Task, Bug },
+      }),
+    ).toThrow(/title/);
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { Task, Bug },
+      }),
+    ).toThrow(/unknown field|not a field|not declared/i);
+  });
+
   it('throws an Error naming the model, discriminator field, user value, and variant value when the user filter conflicts', () => {
     const Task = model('Task', {
       collection: 'tasks',

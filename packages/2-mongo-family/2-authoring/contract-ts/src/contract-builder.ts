@@ -1224,6 +1224,22 @@ function toStorageCollectionOptions(opts: MongoCollectionOptions): MongoStorageC
   return result as unknown as MongoStorageCollectionOptions;
 }
 
+function findMissingIndexField(
+  index: MongoIndex,
+  modelFields: Record<string, unknown>,
+): string | undefined {
+  for (const fieldName of Object.keys(index.fields)) {
+    const wildcardMatch = fieldName.match(/^(.+)\.\$\*\*$/);
+    const lookupName = wildcardMatch ? wildcardMatch[1] : fieldName;
+    if (lookupName === undefined || lookupName.length === 0) continue;
+    if (lookupName === '$**') continue;
+    if (!Object.hasOwn(modelFields, lookupName)) {
+      return lookupName;
+    }
+  }
+  return undefined;
+}
+
 function resolveVariantScope(
   modelBuilder: AnyModelBuilder,
   modelMap: Record<string, AnyModelBuilder>,
@@ -1287,6 +1303,14 @@ function buildCollections(
     }
 
     for (const collectionIndex of modelBuilder.__indexes ?? []) {
+      const missingField = findMissingIndexField(collectionIndex, modelBuilder.__fields);
+      if (missingField !== undefined) {
+        const indexSignature = stableStringify(collectionIndex);
+        throw new Error(
+          `Model "${modelBuilder.__name}" index ${indexSignature} references unknown field "${missingField}".`,
+        );
+      }
+
       const indexSignature = stableStringify(collectionIndex);
       const collectionIndexKey = `${modelBuilder.__collection}:${indexSignature}`;
       const firstOwner = declaredIndexOwners.get(collectionIndexKey);

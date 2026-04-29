@@ -274,20 +274,13 @@ describe('mongo contract builder', () => {
         title: field.string(),
       },
       indexes: [index({ title: 1 }, { unique: true })],
-      discriminator: {
-        field: 'type',
-        variants: {
-          TaskDerived: { value: 'derived' },
-        },
-      },
     });
 
-    const TaskDerived = model('TaskDerived', {
+    const TaskAlt = model('TaskAlt', {
       collection: 'tasks',
-      base: TaskBase,
       fields: {
         _id: field.objectId(),
-        expiresAt: field.date(),
+        title: field.string(),
       },
       indexes: [index({ title: 1 }, { unique: true })],
     });
@@ -296,10 +289,10 @@ describe('mongo contract builder', () => {
       defineContract({
         family: mongoFamilyPack,
         target: mongoTargetPack,
-        models: { TaskBase, TaskDerived },
+        models: { TaskBase, TaskAlt },
       }),
     ).toThrow(
-      'Collection "tasks" defines duplicate index {"fields":{"title":1},"options":{"unique":true}}. First declared on model "TaskBase" and duplicated on model "TaskDerived".',
+      'Collection "tasks" defines duplicate index {"fields":{"title":1},"options":{"unique":true}}. First declared on model "TaskBase" and duplicated on model "TaskAlt".',
     );
   });
 
@@ -319,6 +312,59 @@ describe('mongo contract builder', () => {
         models: { Comment },
       }),
     ).toThrow('Model "Comment" defines indexes but has no collection to attach them to.');
+  });
+
+  it('rejects index field references that are not declared on the model', () => {
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+        email: field.string(),
+      },
+      indexes: [index({ nonexistent: 1 })],
+    });
+
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { User },
+      }),
+    ).toThrow(/User/);
+    expect(() =>
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { User },
+      }),
+    ).toThrow(/nonexistent/);
+  });
+
+  it('throws once and names the missing field when a multi-key index mixes valid and invalid fields', () => {
+    const User = model('User', {
+      collection: 'users',
+      fields: {
+        _id: field.objectId(),
+        email: field.string(),
+      },
+      indexes: [index({ email: 1, nonexistent: 1 })],
+    });
+
+    let thrown: unknown;
+    try {
+      defineContract({
+        family: mongoFamilyPack,
+        target: mongoTargetPack,
+        models: { User },
+      });
+    } catch (err) {
+      thrown = err;
+    }
+
+    expect(thrown).toBeInstanceOf(Error);
+    const message = (thrown as Error).message;
+    expect(message).toMatch(/nonexistent/);
+    expect(message).toMatch(/User/);
   });
 
   it('lowers collection options into storage.collections', () => {
