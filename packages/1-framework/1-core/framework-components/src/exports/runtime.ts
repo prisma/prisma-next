@@ -7,6 +7,7 @@ export type { RuntimeAbortedPhase, RuntimeErrorEnvelope } from '../execution/run
 export { isRuntimeError, RUNTIME_ABORTED, runtimeAborted, runtimeError } from '../execution/runtime-error';
 export type {
   AfterExecuteResult,
+  RuntimeExecuteOptions,
   RuntimeExecutor,
   RuntimeLog,
   RuntimeMiddleware,

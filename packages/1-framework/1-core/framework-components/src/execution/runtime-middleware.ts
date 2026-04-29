@@ -44,6 +44,19 @@ export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
 }
 
 /**
+ * Optional per-`execute` options accepted by every family runtime.
+ *
+ * `signal` is the per-query cancellation signal. The runtime threads the
+ * signal through to every codec call for the query and uses it to short-
+ * circuit the row stream with `RUNTIME.ABORTED` when the caller aborts.
+ * Omitting the option (or passing `undefined`) preserves today's behavior
+ * bit-for-bit.
+ */
+export interface RuntimeExecuteOptions {
+  readonly signal?: AbortSignal;
+}
+
+/**
  * Cross-family SPI for any runtime that can execute plans and be shut down.
  * Each family runtime (SQL, Mongo) satisfies this interface — SQL nominally,
  * Mongo structurally (due to its phantom Row parameter using a unique symbol).
@@ -52,7 +65,10 @@ export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
  * plan, mirroring how `QueryPlan<Row>` carries a phantom `_row?: Row`.
  */
 export interface RuntimeExecutor<TPlan extends QueryPlan> {
-  execute<Row>(plan: TPlan & { readonly _row?: Row }): AsyncIterableResult<Row>;
+  execute<Row>(
+    plan: TPlan & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
