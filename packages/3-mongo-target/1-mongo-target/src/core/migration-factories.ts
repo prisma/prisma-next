@@ -24,6 +24,7 @@ import {
   type MongoMigrationPlanOperation,
 } from '@prisma-next/mongo-query-ast/control';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { CollModMeta } from './op-factory-call';
 
 interface Buildable {
@@ -87,7 +88,7 @@ export function dataTransform(
     label: `Data transform: ${name}`,
     operationClass: 'data',
     name,
-    ...(options.invariantId !== undefined ? { invariantId: options.invariantId } : {}),
+    ...ifDefined('invariantId', options.invariantId),
     precheck,
     run,
     postcheck,

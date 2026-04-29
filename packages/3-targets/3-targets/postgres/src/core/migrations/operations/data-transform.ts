@@ -37,6 +37,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 interface Buildable<R = unknown> {
   build(): SqlQueryPlan<R>;
@@ -82,7 +83,7 @@ export function dataTransform<TContract extends Contract<SqlStorage>>(
     label: `Data transform: ${name}`,
     operationClass: 'data',
     name,
-    ...(options.invariantId !== undefined ? { invariantId: options.invariantId } : {}),
+    ...ifDefined('invariantId', options.invariantId),
     source: 'migration.ts',
     check: options.check ? invokeAndLower(options.check, contract, adapter, name) : null,
     run: runClosures.map((closure) => invokeAndLower(closure, contract, adapter, name)),

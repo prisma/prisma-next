@@ -2,6 +2,7 @@ import type {
   DataTransformOperation,
   MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import { deriveProvidedInvariants, validateInvariantId } from '../src/invariants';
@@ -12,7 +13,7 @@ function dataOp(name: string, invariantId?: string): DataTransformOperation {
     label: `Data: ${name}`,
     operationClass: 'data',
     name,
-    ...(invariantId !== undefined ? { invariantId } : {}),
+    ...ifDefined('invariantId', invariantId),
     source: 'migration.ts',
     check: null,
     run: null,
