@@ -26,7 +26,7 @@ describe(
     it('mid-stream abort between rows exits with RUNTIME.ABORTED { phase: stream } and yields the rows received before the abort', async () => {
       const controller = new AbortController();
       const reason = new Error('cancelled mid-stream');
-      const plan = db().users.select('id', 'name').orderBy('id', 'asc').build();
+      const plan = db().users.select('id', 'name').orderBy('id').build();
 
       const collected: { id: number; name: string }[] = [];
       const consume = async (): Promise<void> => {
@@ -51,7 +51,7 @@ describe(
     });
 
     it('regression — omitting options is identical to today (stream completes)', async () => {
-      const plan = db().users.select('id').orderBy('id', 'asc').build();
+      const plan = db().users.select('id').orderBy('id').build();
       const rows = await runtime().execute(plan).toArray();
       expect(rows.map((r) => r.id)).toEqual([1, 2, 3, 4]);
     });
