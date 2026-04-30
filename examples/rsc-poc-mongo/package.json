@@ -1,0 +1,52 @@
+{
+  "name": "rsc-poc-mongo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "emit": "prisma-next contract emit",
+    "emit:check": "pnpm emit && git diff --exit-code src/prisma/contract.json src/prisma/contract.d.ts",
+    "seed": "tsx scripts/seed.ts",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "stress:baseline": "k6 run scripts/stress.k6.js -e SCENARIO=baseline",
+    "stress:pool-pressure": "k6 run scripts/stress.k6.js -e SCENARIO=pool_pressure",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "lint": "biome check . --error-on-warnings"
+  },
+  "dependencies": {
+    "@prisma-next/adapter-mongo": "workspace:*",
+    "@prisma-next/contract": "workspace:*",
+    "@prisma-next/driver-mongo": "workspace:*",
+    "@prisma-next/middleware-telemetry": "workspace:*",
+    "@prisma-next/mongo-contract": "workspace:*",
+    "@prisma-next/mongo-orm": "workspace:*",
+    "@prisma-next/mongo-query-ast": "workspace:*",
+    "@prisma-next/mongo-query-builder": "workspace:*",
+    "@prisma-next/mongo-runtime": "workspace:*",
+    "@prisma-next/mongo-value": "workspace:*",
+    "mongodb": "catalog:",
+    "next": "^16.1.7",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4"
+  },
+  "devDependencies": {
+    "@prisma-next/cli": "workspace:*",
+    "@prisma-next/family-mongo": "workspace:*",
+    "@prisma-next/mongo-contract-psl": "workspace:*",
+    "@prisma-next/target-mongo": "workspace:*",
+    "@prisma-next/test-utils": "workspace:*",
+    "@prisma-next/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "mongodb-memory-server": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -150,6 +150,8 @@ The right next step is a **proof-of-concept**: build a Next.js App Router page w
 
 3. **Pool sizing guidance**: How should pool size account for RSC's concurrent rendering? The PoC should measure connection acquisition patterns to inform guidance (e.g., expected parallel components per page × concurrent requests).
 
+**Status — PoC complete.** See [RSC Concurrency Safety — Findings](./rsc-concurrency-findings.md) for the write-up. Summary: no correctness bugs on either family; one performance bug (redundant cold-start marker reads under `onFirstUse` / `startup`) with a shared-promise-dedupe fix recommended; pool sizing guidance remains deferred.
+
 ---
 
 ## Hard problem 3: Streaming composition
@@ -310,7 +312,7 @@ NestJS (~5M/week) is the only framework that structurally requires a DI wrapper 
 | # | Gap | Hard problem | Impact |
 |---|---|---|---|
 | 1 | **Adapter driver architecture is undefined** — single adapter with pluggable drivers vs. separate packages per driver | Connection mgmt | Blocks every framework integration; the user-facing API depends on this |
-| 2 | **RSC concurrency safety is untested** — runtime mutable state and ORM lazy cache under parallel Server Component rendering | RSC statefulness | Blocks confident Next.js integration (11.2M/week) |
+| 2 | ~~**RSC concurrency safety is untested**~~ — **resolved**: PoC complete, see [findings](./rsc-concurrency-findings.md). No correctness bugs on either family; one performance bug (redundant cold-start marker reads under `onFirstUse` / `startup`) pending a follow-up fix | RSC statefulness | Was blocking confident Next.js integration; no longer blocking |
 
 ### High-priority gaps
 
