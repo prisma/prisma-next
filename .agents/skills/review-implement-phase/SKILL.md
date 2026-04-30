@@ -78,14 +78,14 @@ If missing, instruct user to run:
    - run relevant checks
    - create focused commits
    - post "On it" when starting each action
-   - post "Done" and resolve thread when finished
+   - post "Done" when finished (universal); resolve the thread **only when `target.kind === "review_thread"`** and a `threadNodeId` is available. `pull_request_review` targets have no inline thread, so the implementer skips the resolve step for them and records the issue-comment id in the action's `done` record (per behavior step 3).
    - use encoded helper scripts for thread admin operations:
-     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"`
-     - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>`
+     - `node ./scripts/post-review-thread-reply.mjs --repo <owner>/<repo> --pr <number> --comment-node-id <primaryCommentNodeId> --body "<text>"` (works for both `review_thread` and `pull_request_review` — auto-detects node kind)
+     - `node ./scripts/resolve-review-thread.mjs --thread-node-id <threadNodeId>` (only for `review_thread` targets)
    - comments must be posted as individual standalone comments/replies, never as part of a pending review
-   - after each action completion (Done + resolve), verify no new pending review was created by the acting user
+   - after each action completion (Done + resolve when applicable), verify no new pending review was created by the acting user
    - never use inline parser snippets (for example: `python -c`, `node -e`, `ruby -e`, ad-hoc awk/sed JSON parsing)
-   - only set `status: done` after Done + resolve succeeds
+   - only set `status: done` after Done (and, for `review_thread` targets, resolve) succeeds
    - update `review-actions.json` (`status`, `done.doneAt`, `done.summary`, `done.commits`) in the same completion step
 6. Render latest action markdown:
 
