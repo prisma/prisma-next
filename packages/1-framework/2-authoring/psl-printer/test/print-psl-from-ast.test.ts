@@ -655,6 +655,33 @@ describe('printPslFromAst', () => {
     expect(() => printPslFromAst(ast)).not.toThrow();
   });
 
+  it('preserves @map values containing PSL escape sequences across parse → print round-trip', () => {
+    // Regression for double-escape in `getPositionalStringArg`. The parser stores
+    // a quoted-literal argument with PSL escape sequences (`\\`, `\"`, `\n`,
+    // `\r`) intact; we must decode them once on extraction so that the printer's
+    // `escapePslString` does not re-escape them on output.
+    const source = `model Doc {
+  id   Int    @id
+  body String @map("with \\"quote\\" and \\\\backslash and \\nnewline")
+}
+`;
+    const parsed1 = parsePslDocument({ schema: source, sourceId: 'r' });
+    expect(parsed1.ok).toBe(true);
+    const printed = printPslFromAst(parsed1.ast);
+    const parsed2 = parsePslDocument({ schema: printed, sourceId: 'r2' });
+    expect(parsed2.ok).toBe(true);
+
+    const findMap = (ast: typeof parsed1.ast): string | undefined => {
+      const model = ast.models.find((m) => m.name === 'Doc');
+      const field = model?.fields.find((f) => f.name === 'body');
+      const mapAttr = field?.attributes.find((a) => a.name === 'map' && a.target === 'field');
+      const positional = mapAttr?.args.find((a) => a.kind === 'positional');
+      return positional?.value;
+    };
+
+    expect(findMap(parsed2.ast)).toBe(findMap(parsed1.ast));
+  });
+
   it('parser → printer → parser round-trip for a small schema', () => {
     const source = `// This file was introspected from the database. Do not edit manually.
 

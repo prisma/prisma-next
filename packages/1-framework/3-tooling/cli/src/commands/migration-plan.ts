@@ -512,8 +512,9 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   );
 
   if (result.preview && result.preview.statements.length > 0) {
+    const allSql = result.preview.statements.every((s) => s.language === 'sql');
     lines.push('');
-    lines.push(dim_('DDL preview'));
+    lines.push(dim_(allSql ? 'DDL preview' : 'Operation preview'));
     lines.push('');
     for (const statement of result.preview.statements) {
       const trimmed = statement.text.trim();

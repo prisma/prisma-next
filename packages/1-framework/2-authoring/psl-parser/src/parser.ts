@@ -1,4 +1,3 @@
-import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -20,7 +19,8 @@ import type {
   PslSpan,
   PslTypeConstructorCall,
   PslTypesBlock,
-} from './types';
+} from '@prisma-next/framework-components/psl-ast';
+import { ifDefined } from '@prisma-next/utils/defined';
 
 const SCALAR_TYPES = new Set([
   'String',

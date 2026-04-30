@@ -26,4 +26,4 @@ export type {
   PslSpan,
   PslTypesBlock,
   PslUniqueConstraint,
-} from '../types';
+} from '@prisma-next/framework-components/psl-ast';

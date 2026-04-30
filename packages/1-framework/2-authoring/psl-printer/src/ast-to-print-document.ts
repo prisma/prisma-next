@@ -98,7 +98,39 @@ function getPositionalStringArg(attr: PslAttribute, index: number): string | und
   const raw = positional[index]?.value.trim();
   if (!raw) return undefined;
   const m = raw.match(/^(['"])(.*)\1$/);
-  return m?.[2];
+  if (!m) return undefined;
+  return unescapePslString(m[2] as string);
+}
+
+/**
+ * Inverse of `escapePslString`. The parser stores quoted-literal arguments with
+ * their PSL escape sequences (`\\`, `\"`, `\n`, `\r`) intact; when we round-trip
+ * a value through `getPositionalStringArg` and re-render via `escapePslString`,
+ * we must decode it once on extraction to avoid double-escaping the same
+ * sequences on output.
+ */
+function unescapePslString(value: string): string {
+  let result = '';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value.charCodeAt(i);
+    if (ch !== 0x5c /* '\\' */ || i + 1 >= value.length) {
+      result += value[i];
+      continue;
+    }
+    const next = value[i + 1];
+    if (next === '\\' || next === '"' || next === "'") {
+      result += next;
+    } else if (next === 'n') {
+      result += '\n';
+    } else if (next === 'r') {
+      result += '\r';
+    } else {
+      result += '\\';
+      result += next;
+    }
+    i++;
+  }
+  return result;
 }
 
 function modelToPrinterModel(model: PslModel): PrinterModel {

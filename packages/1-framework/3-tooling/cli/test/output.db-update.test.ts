@@ -301,11 +301,12 @@ describe('formatMigrationJson', () => {
   });
 });
 
-describe('formatMigrationPlanOutput — DDL preview rendering', () => {
+describe('formatMigrationPlanOutput — preview block rendering', () => {
   // Byte-identity bar from spec § A9 / OQ-4: SQL output must be unchanged from
   // the pre-M3 `sql: string[]` rendering. The legacy renderer trimmed each
   // statement and appended `;` if missing, one statement per line under the
-  // `DDL preview` header.
+  // `DDL preview` header. SQL-only previews continue to use that header label;
+  // any non-SQL preview switches to a family-agnostic `Operation preview`.
   it('renders SQL statements identically to the legacy `sql[]` rendering', () => {
     const result = createPlanResult({
       plan: {
@@ -323,13 +324,21 @@ describe('formatMigrationPlanOutput — DDL preview rendering', () => {
     const flags = parseGlobalFlags({ 'no-color': true });
     const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
     expect(stripped).toContain('DDL preview');
-    expect(stripped).toContain('CREATE TABLE "user" (id int4 NOT NULL);');
-    expect(stripped).toContain('ALTER TABLE "post" ADD COLUMN name text;');
-    // Pre-existing trailing `;` must not be doubled.
-    expect(stripped).not.toContain('ADD COLUMN name text;;');
+    // Byte-identity bar: assert exact ordered DDL line shape, not just
+    // substring presence. `toContain` would silently accept format drifts (e.g.
+    // missing trailing `;`, doubled `;`, reordered statements, additional
+    // injected lines).
+    const ddlLines = stripped
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('CREATE ') || line.startsWith('ALTER '));
+    expect(ddlLines).toEqual([
+      'CREATE TABLE "user" (id int4 NOT NULL);',
+      'ALTER TABLE "post" ADD COLUMN name text;',
+    ]);
   });
 
-  it('renders `mongodb-shell` statements verbatim without trailing `;`', () => {
+  it('uses an `Operation preview` header and renders `mongodb-shell` statements verbatim without trailing `;`', () => {
     const result = createPlanResult({
       plan: {
         targetId: 'mongo',
@@ -348,7 +357,8 @@ describe('formatMigrationPlanOutput — DDL preview rendering', () => {
     });
     const flags = parseGlobalFlags({ 'no-color': true });
     const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
-    expect(stripped).toContain('DDL preview');
+    expect(stripped).toContain('Operation preview');
+    expect(stripped).not.toContain('DDL preview');
     expect(stripped).toContain('db.users.createIndex({ "email": 1 }, { unique: true })');
     expect(stripped).toContain('db.users.dropIndex("email_1")');
     // Mongo shell lines must not be suffixed with `;`.
