@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
  * Hashes a canonical-string representation of an execution into a bounded,
  * opaque cache-key digest.
  *
- * Designed for use as the final step of `RuntimeMiddlewareContext.identityKey`
+ * Designed for use as the final step of `RuntimeMiddlewareContext.contentHash`
  * implementations: family runtimes compose a canonical string from
  * `meta.storageHash`, the rendered statement (or wire command), and
  * canonicalized parameters via `canonicalStringify`, then pipe the result
@@ -44,10 +44,10 @@ import { createHash } from 'node:crypto';
  * @example
  * ```typescript
  * const canonical = `${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`;
- * return hashIdentity(canonical);
+ * return hashContent(canonical);
  * // → 'blake2b512:8f3...e1c' (always 137 chars: 'blake2b512:' + 128 hex chars)
  * ```
  */
-export function hashIdentity(value: string): string {
+export function hashContent(value: string): string {
   return `blake2b512:${createHash('blake2b512').update(value).digest('hex')}`;
 }

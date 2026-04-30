@@ -24,7 +24,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      identityKey: () => 'mock-key',
+      contentHash: () => 'mock-hash',
     };
 
     await middleware.beforeExecute!(plan, ctx);
@@ -45,7 +45,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      identityKey: () => 'mock-key',
+      contentHash: () => 'mock-hash',
     };
     const result = {
       rowCount: 5,
@@ -76,7 +76,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-      identityKey: () => 'mock-key',
+      contentHash: () => 'mock-hash',
     };
     const result = {
       rowCount: 3,
@@ -107,7 +107,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info, warn: vi.fn(), error: vi.fn() },
-      identityKey: () => 'mock-key',
+      contentHash: () => 'mock-hash',
     };
 
     await middleware.beforeExecute!(plan, ctx);
@@ -131,7 +131,7 @@ describe('telemetry middleware', () => {
       mode: 'strict' as const,
       now: Date.now,
       log: { info: vi.fn(), warn, error: vi.fn() },
-      identityKey: () => 'mock-key',
+      contentHash: () => 'mock-hash',
     };
 
     await expect(middleware.beforeExecute!(plan, ctx)).resolves.toBeUndefined();

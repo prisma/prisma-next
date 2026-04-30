@@ -1,9 +1,9 @@
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
-import { hashIdentity } from '@prisma-next/utils/hash-identity';
+import { hashContent } from '@prisma-next/utils/hash-content';
 
 /**
- * Computes a stable identity key for a lowered SQL execution plan.
+ * Computes a stable content hash for a lowered SQL execution plan.
  *
  * Internally composes three components separated by `|`:
  *
@@ -13,15 +13,15 @@ import { hashIdentity } from '@prisma-next/utils/hash-identity';
  *    structure produce different keys. Note that we deliberately do **not**
  *    use `computeSqlFingerprint` here: that helper strips literals to group
  *    executions by statement shape (used by telemetry), which is the
- *    opposite of what an identity key needs — we want per-execution
+ *    opposite of what a content hash needs — we want per-execution
  *    discrimination, not per-statement-shape grouping.
  * 3. `canonicalStringify(exec.params)` — a deterministic serialization of
  *    the bound parameters that is stable across object key insertion order
  *    and that distinguishes types JSON would otherwise conflate (e.g.
  *    `BigInt(1)` vs `1`).
  *
- * The composed canonical string is then piped through `hashIdentity` to
- * produce a bounded, opaque digest (see `@prisma-next/utils/hash-identity`
+ * The composed canonical string is then piped through `hashContent` to
+ * produce a bounded, opaque digest (see `@prisma-next/utils/hash-content`
  * for the rationale). The two key reasons for hashing rather than using
  * the canonical string directly:
  *
@@ -36,6 +36,6 @@ import { hashIdentity } from '@prisma-next/utils/hash-identity';
  *
  * @internal
  */
-export function computeSqlIdentityKey(exec: SqlExecutionPlan): string {
-  return hashIdentity(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
+export function computeSqlContentHash(exec: SqlExecutionPlan): string {
+  return hashContent(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
 }

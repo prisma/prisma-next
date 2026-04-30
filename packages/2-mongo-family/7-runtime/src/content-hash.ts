@@ -1,9 +1,9 @@
 import { canonicalStringify } from '@prisma-next/utils/canonical-stringify';
-import { hashIdentity } from '@prisma-next/utils/hash-identity';
+import { hashContent } from '@prisma-next/utils/hash-content';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 
 /**
- * Computes a stable identity key for a lowered Mongo execution plan.
+ * Computes a stable content hash for a lowered Mongo execution plan.
  *
  * Internally composes two components separated by `|`:
  *
@@ -26,8 +26,8 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * a Mongo `MongoExecutionPlan.command` is the wire command itself —
  * canonicalizing it captures both structure and parameters in one pass.
  *
- * The composed canonical string is then piped through `hashIdentity` to
- * produce a bounded, opaque digest (see `@prisma-next/utils/hash-identity`
+ * The composed canonical string is then piped through `hashContent` to
+ * produce a bounded, opaque digest (see `@prisma-next/utils/hash-content`
  * for the rationale). The two key reasons for hashing rather than using
  * the canonical string directly:
  *
@@ -43,6 +43,6 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  *
  * @internal
  */
-export function computeMongoIdentityKey(exec: MongoExecutionPlan): string {
-  return hashIdentity(`${exec.meta.storageHash}|${canonicalStringify({ ...exec.command })}`);
+export function computeMongoContentHash(exec: MongoExecutionPlan): string {
+  return hashContent(`${exec.meta.storageHash}|${canonicalStringify({ ...exec.command })}`);
 }

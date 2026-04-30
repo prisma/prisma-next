@@ -11,7 +11,7 @@ import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeMongoRow } from './codecs/decoding';
-import { computeMongoIdentityKey } from './identity-key';
+import { computeMongoContentHash } from './content-hash';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoCodecLookup, MongoExecutionContext } from './mongo-execution-stack';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
@@ -85,7 +85,7 @@ class MongoRuntimeImpl
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
-      identityKey: (exec) => computeMongoIdentityKey(exec as MongoExecutionPlan),
+      contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
     };
 
     super({ middleware, ctx });

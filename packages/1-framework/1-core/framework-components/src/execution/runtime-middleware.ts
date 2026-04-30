@@ -27,7 +27,7 @@ export interface RuntimeMiddlewareContext {
    * The returned string is intended to be consumed directly as a `Map` key
    * — it is not (and should not be) further hashed by callers.
    */
-  identityKey(exec: ExecutionPlan): string;
+  contentHash(exec: ExecutionPlan): string;
 }
 
 export interface AfterExecuteResult {
