@@ -424,4 +424,126 @@ withTempDir(({ createTempDir }) => {
       timeouts.spinUpPpgDev,
     );
   });
+
+  describe('Journey R: A→B→A→B — marker.invariants stays monotonic across rollback + re-apply', () => {
+    const db = useDevDatabase();
+
+    // The pinned behavior: `marker.invariants` is set-semantic. Once an
+    // invariant id has been written by a successful apply, it stays in the
+    // set forever — no rollback path removes it. A second forward apply via
+    // `--ref` after an out-of-band marker reset routes through the same
+    // edge, the data transform is re-evaluated, and the set is unchanged
+    // (already-present id is a no-op union).
+    //
+    // Important: whether the data transform's *body* re-runs depends on
+    // its `check`, which is authored per-migration. The NOT-NULL backfill
+    // here checks `name IS NULL`; after the first apply the column is
+    // NOT NULL so no row can satisfy that check anymore. The check fires
+    // (no violations), `run` is skipped, marker advances. That is the
+    // honest outcome — the test does not pretend the data transform's
+    // body re-fires when it doesn't.
+    it(
+      'rollback marker.storageHash to A → re-apply via --ref selects M1 → marker advances back to B with invariants unchanged',
+      async () => {
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
+
+        expect((await runContractEmit(ctx)).exitCode, 'R.01: emit C1').toBe(0);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
+        expect(plan0.exitCode, 'R.01: plan init').toBe(0);
+        const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
+        expect((await runMigrationApply(ctx)).exitCode, 'R.01: apply init').toBe(0);
+
+        await sql(
+          db.connectionString,
+          `INSERT INTO "public"."user" (id, email) VALUES (1, 'alice@example.com')`,
+        );
+
+        swapContract(ctx, 'contract-additive-required-name');
+        expect((await runContractEmit(ctx)).exitCode, 'R.02: emit C2').toBe(0);
+        expect(
+          (await runMigrationPlan(ctx, ['--name', 'add-required-name'])).exitCode,
+          'R.02: plan',
+        ).toBe(0);
+
+        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationDir = join(
+          migrationsDir,
+          readdirSync(migrationsDir)
+            .filter((d) => d.includes('add_required_name'))
+            .sort()
+            .at(-1)!,
+        );
+        patchBackfillMigrationTs(migrationDir, { addInvariantId: true });
+        expect((await runMigrationEmit(ctx, ['--dir', migrationDir])).exitCode, 'R.02: emit').toBe(
+          0,
+        );
+
+        const manifest = JSON.parse(readFileSync(join(migrationDir, 'migration.json'), 'utf-8'));
+        const c2Hash = manifest.to as string;
+
+        writeRefFile(ctx, 'prod', c2Hash, [INVARIANT_ID]);
+
+        const apply1 = await runMigrationApply(ctx, ['--ref', 'prod', '--json']);
+        expect(apply1.exitCode, 'R.02: apply --ref prod').toBe(0);
+        expect(
+          parseJsonOutput<{ markerHash: string }>(apply1).markerHash,
+          'R.02: marker at C2',
+        ).toBe(c2Hash);
+
+        // Out-of-band rollback: reset only the storage hash. marker.invariants
+        // is intentionally left untouched to model the "applied-at-least-once"
+        // semantic — the set never shrinks, even when a structural rollback
+        // moves the storage hash backward.
+        await sql(
+          db.connectionString,
+          `UPDATE "prisma_contract"."marker" SET core_hash = $1 WHERE id = 1`,
+          [c1Hash],
+        );
+        const markerAfterReset = await sql(
+          db.connectionString,
+          `SELECT core_hash, invariants FROM "prisma_contract"."marker" WHERE id = 1`,
+        );
+        expect(markerAfterReset.rows[0]?.['core_hash'], 'R.03: storage hash rolled back').toBe(
+          c1Hash,
+        );
+        expect(
+          markerAfterReset.rows[0]?.['invariants'],
+          'R.03: invariants survive the rollback',
+        ).toEqual([INVARIANT_ID]);
+
+        const apply2 = await runMigrationApply(ctx, ['--ref', 'prod', '--json']);
+        expect(apply2.exitCode, 'R.04: re-apply --ref prod').toBe(0);
+        const apply2Result = parseJsonOutput<{
+          markerHash: string;
+          pathDecision?: {
+            requiredInvariants: readonly string[];
+            satisfiedInvariants: readonly string[];
+          };
+        }>(apply2);
+        expect(apply2Result.markerHash, 'R.04: marker advanced back to C2').toBe(c2Hash);
+        // effectiveRequired empties out: the marker still has the id, so the
+        // CLI's marker-subtraction strips it from the required set before
+        // routing. requiredInvariants in pathDecision reflects the EFFECTIVE
+        // required set (post-subtraction), not the ref's raw declaration.
+        expect(
+          apply2Result.pathDecision?.requiredInvariants,
+          'R.04: effectiveRequired empty after marker subtraction',
+        ).toEqual([]);
+
+        const markerAfterReapply = await sql(
+          db.connectionString,
+          `SELECT core_hash, invariants FROM "prisma_contract"."marker" WHERE id = 1`,
+        );
+        expect(markerAfterReapply.rows[0]?.['core_hash'], 'R.05: marker at C2').toBe(c2Hash);
+        expect(
+          markerAfterReapply.rows[0]?.['invariants'],
+          'R.05: invariants unchanged after re-apply (set union with already-present id is a no-op)',
+        ).toEqual([INVARIANT_ID]);
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });
