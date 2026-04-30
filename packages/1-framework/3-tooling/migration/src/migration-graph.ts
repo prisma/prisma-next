@@ -150,10 +150,11 @@ export function findPath(
  * empty, delegates to `findPath` so the result is byte-identical for that case.
  *
  * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup.
- * The covered subset is encoded as a 30-bit unsigned mask over a sorted
- * enumeration of `required` — fast for the typical small-k case and capped
- * at entry to fail loudly past 30 rather than silently misbehave from JS's
- * signed 32-bit bitwise ops.
+ * The covered subset is a `Set<string>` of invariant ids; the state's dedup
+ * key is `${node}\0${[...covered].sort().join('\0')}`. State keys distinguish
+ * distinct `(node, covered)` tuples regardless of node-name length because
+ * `\0` cannot appear in any invariant id (validation rejects whitespace and
+ * control chars at authoring time).
  *
  * Neighbour ordering when `required ≠ ∅`: edges covering ≥1 still-needed
  * invariant come first, with `labelPriority → createdAt → to → migrationHash`
@@ -173,79 +174,47 @@ export function findPathWithInvariants(
     // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
     return null;
   }
-  if (required.size > 30) {
-    throw new Error(
-      `Cannot route with more than 30 required invariants in a single call (got ${required.size}). Please file an issue if you need a higher cap.`,
-    );
-  }
-
-  const requiredArr = [...required].sort();
-  const requiredBit = new Map<string, number>();
-  for (const [i, val] of requiredArr.entries()) {
-    requiredBit.set(val, 1 << i);
-  }
-  const fullMask = (1 << requiredArr.length) - 1;
-
-  const edgeMaskOf = (edge: MigrationEdge): number => {
-    let m = 0;
-    for (const inv of edge.invariants) {
-      const bit = requiredBit.get(inv);
-      if (bit !== undefined) m |= bit;
-    }
-    return m;
-  };
 
   interface InvState {
     readonly node: string;
-    readonly mask: number;
+    readonly covered: ReadonlySet<string>;
   }
-  // State key: `${node}\0${mask}`. \0 cannot appear in any node identifier
-  // we emit (sha256 hex or `h:`-prefixed test hashes), so distinct
-  // (node, mask) tuples always produce distinct keys regardless of node
-  // length.
-  const stateKey = (s: InvState) => `${s.node}\0${s.mask}`;
-
-  // Cache edgeMaskOf per edge — outgoing edges are visited many times during
-  // BFS and the comparator calls edgeMaskOf each time, so naive recomputation
-  // is O(k) per edge per visit.
-  const edgeMaskCache = new Map<MigrationEdge, number>();
-  const memoEdgeMask = (edge: MigrationEdge): number => {
-    const cached = edgeMaskCache.get(edge);
-    if (cached !== undefined) return cached;
-    const m = edgeMaskOf(edge);
-    edgeMaskCache.set(edge, m);
-    return m;
+  const stateKey = (s: InvState): string => {
+    if (s.covered.size === 0) return `${s.node}\0`;
+    return `${s.node}\0${[...s.covered].sort().join('\0')}`;
   };
 
   const neighbours = (s: InvState): Iterable<{ next: InvState; edge: MigrationEdge }> => {
     const outgoing = graph.forwardChain.get(s.node) ?? [];
     if (outgoing.length === 0) return [];
-    const remainingMask = fullMask & ~s.mask;
-    // Annotate once, sort by precomputed keys. D11: invariant-covering edges
-    // first, then the existing tie-break.
-    const annotated = outgoing.map((edge) => {
-      const provided = memoEdgeMask(edge);
-      return {
+    return [...outgoing]
+      .map((edge) => {
+        let useful = false;
+        let next: Set<string> | null = null;
+        for (const inv of edge.invariants) {
+          if (required.has(inv) && !s.covered.has(inv)) {
+            if (next === null) next = new Set(s.covered);
+            next.add(inv);
+            useful = true;
+          }
+        }
+        return { edge, useful, nextCovered: next ?? s.covered };
+      })
+      .sort((a, b) => {
+        if (a.useful !== b.useful) return a.useful ? -1 : 1;
+        return compareTieBreak(a.edge, b.edge);
+      })
+      .map(({ edge, nextCovered }) => ({
+        next: { node: edge.to, covered: nextCovered },
         edge,
-        provided,
-        useful: (provided & remainingMask) !== 0 ? 1 : 0,
-      };
-    });
-    annotated.sort((a, b) => {
-      if (a.useful !== b.useful) return b.useful - a.useful;
-      return compareTieBreak(a.edge, b.edge);
-    });
-    return annotated.map(({ edge, provided }) => ({
-      next: { node: edge.to, mask: s.mask | provided },
-      edge,
-    }));
+      }));
   };
 
   // Path reconstruction is consumer-side, keyed on stateKey, same shape as
   // findPath's parents map.
   const parents = new Map<string, { parentKey: string; edge: MigrationEdge }>();
   for (const step of bfs<InvState, MigrationEdge>(
-    [{ node: fromHash, mask: 0 }],
+    [{ node: fromHash, covered: new Set() }],
     neighbours,
     stateKey,
   )) {
@@ -253,7 +222,7 @@ export function findPathWithInvariants(
     if (step.parent !== null && step.incomingEdge !== null) {
       parents.set(curKey, { parentKey: stateKey(step.parent), edge: step.incomingEdge });
     }
-    if (step.state.node === toHash && step.state.mask === fullMask) {
+    if (step.state.node === toHash && step.state.covered.size === required.size) {
       const path: MigrationEdge[] = [];
       let cur: string | undefined = curKey;
       while (cur !== undefined) {

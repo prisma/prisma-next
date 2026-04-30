@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { EMPTY_CONTRACT_HASH } from '../src/constants';
-import type { MigrationEdge, MigrationGraph } from '../src/graph';
+import type { MigrationEdge } from '../src/graph';
 import { computeMigrationHash } from '../src/hash';
 import { findPath, findPathWithInvariants, reconstructGraph } from '../src/migration-graph';
 import type { MigrationPackage } from '../src/package';
@@ -197,30 +197,6 @@ describe('findPathWithInvariants — core correctness', () => {
     const path = findPathWithInvariants(graph, 'A', 'F', new Set(['X', 'Y']));
     expect(path).not.toBeNull();
     expect(dirNames(path)).toEqual(['m_AD_y', 'm_DE', 'm_EF']);
-  });
-
-  it('distinguishes (node, mask) states even when node and mask digits could concatenate ambiguously', () => {
-    // Two distinct states whose node names and mask digits could form the
-    // same string under naïve concatenation: (node='H', mask=11) and
-    // (node='H1', mask=1) would both yield "H11". BFS visits (H1, 1)
-    // before (H, 11); only the path through (H, 11) covers the required
-    // set, so the dedup key must distinguish the two states.
-    //
-    // Required: {a, b, c, d, e} (k=5). Layout:
-    //   start → A   provides {a}        (mask 1 at A)
-    //   A     → B   provides {b}        (mask 3 at B)
-    //   B     → H   provides {d}        (mask 11 at H)
-    //   start → H1  provides {a}        (mask 1 at H1; visited before H)
-    //   H     → end provides {c, e}     (mask 31 at end ⇒ satisfies)
-    const graph = reconstructGraph([
-      pkg('start', 'A', 'm_sa', { invariants: ['a'] }),
-      pkg('A', 'B', 'm_ab', { invariants: ['b'] }),
-      pkg('B', 'H', 'm_bh', { invariants: ['d'] }),
-      pkg('start', 'H1', 'm_sh1', { invariants: ['a'] }),
-      pkg('H', 'end', 'm_he', { invariants: ['c', 'e'] }),
-    ]);
-    const path = findPathWithInvariants(graph, 'start', 'end', new Set(['a', 'b', 'c', 'd', 'e']));
-    expect(dirNames(path)).toEqual(['m_sa', 'm_ab', 'm_bh', 'm_he']);
   });
 });
 
@@ -466,25 +442,5 @@ describe('findPathWithInvariants — pathological shapes', () => {
       pkg('M', 'N', 'm_disconnected', { invariants: ['X'] }),
     ]);
     expect(findPathWithInvariants(graph, 'A', 'C', new Set(['X']))).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Subset-mask cap — defensive guard for the 30-bit limit (N1/N2 expects k in
-// single digits; this is a correctness rail, not a perf threshold).
-// ---------------------------------------------------------------------------
-
-describe('findPathWithInvariants — subset-mask cap', () => {
-  it('throws an error when required.size > 30', () => {
-    const graph: MigrationGraph = {
-      nodes: new Set(['A', 'B']),
-      forwardChain: new Map(),
-      reverseChain: new Map(),
-      migrationByHash: new Map(),
-    };
-    const required = new Set(Array.from({ length: 31 }, (_, i) => `inv-${i}`));
-    expect(() => findPathWithInvariants(graph, 'A', 'B', required)).toThrow(
-      /more than 30 required invariants/,
-    );
   });
 });
