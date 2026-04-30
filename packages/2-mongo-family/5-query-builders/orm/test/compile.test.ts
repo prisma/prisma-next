@@ -1,3 +1,4 @@
+import type { MongoModelDefinition } from '@prisma-next/mongo-contract';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   type MongoAndExpr,
@@ -16,6 +17,61 @@ import type { MongoCollectionState } from '../src/collection-state';
 import { emptyCollectionState } from '../src/collection-state';
 import { compileMongoQuery } from '../src/compile';
 
+const testUserModel: MongoModelDefinition = {
+  storage: { collection: 'users' },
+  relations: {},
+  fields: {
+    _id: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+    },
+    name: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    },
+    email: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    },
+    age: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/int32@1' },
+    },
+    active: {
+      nullable: true,
+      type: { kind: 'scalar', codecId: 'mongo/boolean@1' },
+    },
+    tags: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+      many: true,
+    },
+    address: {
+      nullable: false,
+      type: { kind: 'valueObject', name: 'Address' },
+    },
+  },
+};
+
+const testPostModel: MongoModelDefinition = {
+  storage: { collection: 'posts' },
+  relations: {},
+  fields: {
+    _id: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+    },
+    title: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/string@1' },
+    },
+    authorId: {
+      nullable: false,
+      type: { kind: 'scalar', codecId: 'mongo/objectId@1' },
+    },
+  },
+};
+
 const testHash = 'test-hash';
 
 function stages(plan: MongoQueryPlan): ReadonlyArray<MongoPipelineStage> {
@@ -26,7 +82,7 @@ function stages(plan: MongoQueryPlan): ReadonlyArray<MongoPipelineStage> {
 
 describe('compileMongoQuery', () => {
   it('produces empty pipeline from empty state', () => {
-    const plan = compileMongoQuery('users', emptyCollectionState(), testHash);
+    const plan = compileMongoQuery('users', emptyCollectionState(), testHash, testUserModel);
     expect(plan.collection).toBe('users');
     expect(plan.command.kind).toBe('aggregate');
     expect(stages(plan)).toEqual([]);
@@ -39,7 +95,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       filters: [MongoFieldFilter.eq('name', 'Alice')],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const match = stages(plan)[0] as MongoMatchStage;
     expect(match).toBeInstanceOf(MongoMatchStage);
@@ -51,7 +107,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       filters: [MongoFieldFilter.eq('name', 'Alice'), MongoFieldFilter.gte('age', 18)],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const match = stages(plan)[0] as MongoMatchStage;
     expect(match.filter.kind).toBe('and');
@@ -63,7 +119,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       selectedFields: ['name', 'email'],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const project = stages(plan)[0] as MongoProjectStage;
     expect(project).toBeInstanceOf(MongoProjectStage);
@@ -75,7 +131,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       selectedFields: ['_id', 'name'],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     const project = stages(plan)[0] as MongoProjectStage;
     expect(project.projection).toEqual({ _id: 1, name: 1 });
   });
@@ -85,7 +141,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       selectedFields: [],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toEqual([]);
   });
 
@@ -94,7 +150,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       orderBy: { age: -1, name: 1 },
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const sort = stages(plan)[0] as MongoSortStage;
     expect(sort).toBeInstanceOf(MongoSortStage);
@@ -106,7 +162,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       limit: 10,
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const limit = stages(plan)[0] as MongoLimitStage;
     expect(limit).toBeInstanceOf(MongoLimitStage);
@@ -118,7 +174,7 @@ describe('compileMongoQuery', () => {
       ...emptyCollectionState(),
       offset: 5,
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     const skip = stages(plan)[0] as MongoSkipStage;
     expect(skip).toBeInstanceOf(MongoSkipStage);
@@ -138,7 +194,7 @@ describe('compileMongoQuery', () => {
         },
       ],
     };
-    const plan = compileMongoQuery('posts', state, testHash);
+    const plan = compileMongoQuery('posts', state, testHash, testPostModel);
     expect(stages(plan)).toHaveLength(2);
     const lookup = stages(plan)[0] as MongoLookupStage;
     expect(lookup).toBeInstanceOf(MongoLookupStage);
@@ -165,7 +221,7 @@ describe('compileMongoQuery', () => {
         },
       ],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
     expect(stages(plan)).toHaveLength(1);
     expect(stages(plan)[0]).toBeInstanceOf(MongoLookupStage);
   });
@@ -187,9 +243,61 @@ describe('compileMongoQuery', () => {
       limit: 5,
       selectedFields: ['_id', 'name', 'email'],
     };
-    const plan = compileMongoQuery('users', state, testHash);
+    const plan = compileMongoQuery('users', state, testHash, testUserModel);
 
     const stageKinds = stages(plan).map((s) => s.kind);
     expect(stageKinds).toEqual(['match', 'lookup', 'sort', 'skip', 'limit', 'project']);
+  });
+
+  describe('resultShape from contract', () => {
+    it('full model maps scalar fields to leaf codec shapes', () => {
+      const plan = compileMongoQuery('users', emptyCollectionState(), testHash, testUserModel);
+      expect(plan.resultShape?.kind).toBe('document');
+      if (plan.resultShape?.kind !== 'document') return;
+      expect(plan.resultShape.fields['name']).toEqual({
+        kind: 'leaf',
+        codecId: 'mongo/string@1',
+        nullable: false,
+      });
+      expect(plan.resultShape.fields['address']?.kind).toBe('unknown');
+    });
+
+    it('scalar many field is array with leaf element', () => {
+      const plan = compileMongoQuery('users', emptyCollectionState(), testHash, testUserModel);
+      if (plan.resultShape?.kind !== 'document') throw new Error('expected document');
+      expect(plan.resultShape.fields['tags']).toEqual({
+        kind: 'array',
+        nullable: false,
+        element: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
+      });
+    });
+
+    it('selection narrows result shape fields', () => {
+      const state: MongoCollectionState = {
+        ...emptyCollectionState(),
+        selectedFields: ['name', 'email'],
+      };
+      const plan = compileMongoQuery('users', state, testHash, testUserModel);
+      if (plan.resultShape?.kind !== 'document') throw new Error('expected document');
+      expect(Object.keys(plan.resultShape.fields).sort()).toEqual(['email', 'name']);
+    });
+
+    it('include adds unknown relation field', () => {
+      const state: MongoCollectionState = {
+        ...emptyCollectionState(),
+        includes: [
+          {
+            relationName: 'author',
+            from: 'users',
+            localField: 'authorId',
+            foreignField: '_id',
+            cardinality: 'N:1',
+          },
+        ],
+      };
+      const plan = compileMongoQuery('posts', state, testHash, testPostModel);
+      if (plan.resultShape?.kind !== 'document') throw new Error('expected document');
+      expect(plan.resultShape.fields['author']?.kind).toBe('unknown');
+    });
   });
 });

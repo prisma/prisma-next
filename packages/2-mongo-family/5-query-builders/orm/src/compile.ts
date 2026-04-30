@@ -1,4 +1,5 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import type { MongoModelDefinition } from '@prisma-next/mongo-contract';
 import type { MongoPipelineStage, MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
   AggregateCommand,
@@ -11,6 +12,7 @@ import {
   MongoSortStage,
   MongoUnwindStage,
 } from '@prisma-next/mongo-query-ast/execution';
+import { contractModelToMongoResultShape } from '@prisma-next/mongo-query-builder';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
 
 function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoPipelineStage[] {
@@ -38,6 +40,7 @@ export function compileMongoQuery<Row = unknown>(
   collection: string,
   state: MongoCollectionState,
   storageHash: string,
+  model: MongoModelDefinition,
 ): MongoQueryPlan<Row> {
   const stages: MongoPipelineStage[] = [];
 
@@ -81,5 +84,17 @@ export function compileMongoQuery<Row = unknown>(
     lane: 'mongo-orm',
   };
   const command = new AggregateCommand(collection, stages);
-  return { collection, command, meta };
+
+  const selection =
+    state.selectedFields !== undefined && state.selectedFields.length > 0
+      ? state.selectedFields
+      : undefined;
+  const includeRelationNames =
+    state.includes.length > 0 ? state.includes.map((inc) => inc.relationName) : undefined;
+  const resultShape = contractModelToMongoResultShape(model, {
+    ...(selection !== undefined ? { selection } : {}),
+    ...(includeRelationNames !== undefined ? { includeRelationNames } : {}),
+  });
+
+  return { collection, command, meta, resultShape };
 }

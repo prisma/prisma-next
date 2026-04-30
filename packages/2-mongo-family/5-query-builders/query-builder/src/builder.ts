@@ -3,6 +3,7 @@ import type {
   ExtractMongoCodecTypes,
   MongoContract,
   MongoContractWithTypeMaps,
+  MongoModelDefinition,
   MongoTypeMaps,
 } from '@prisma-next/mongo-contract';
 import type {
@@ -14,6 +15,7 @@ import type {
   MongoPipelineStage,
   MongoProjectionValue,
   MongoQueryPlan,
+  MongoResultShape,
   MongoUpdatePipelineStage,
   MongoWindowField,
   UpdateResult,
@@ -56,7 +58,9 @@ import {
 } from '@prisma-next/mongo-query-ast/execution';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
+import { pipelineSupportsFlatResultShape } from './pipeline-result-shape';
 import type { NestedDocShape } from './resolve-path';
+import { contractModelToMongoResultShape } from './result-shape';
 import type {
   DocField,
   DocShape,
@@ -75,6 +79,7 @@ interface PipelineChainState {
   readonly collection: string;
   readonly stages: ReadonlyArray<MongoPipelineStage>;
   readonly storageHash: string;
+  readonly modelName?: string;
 }
 
 /**
@@ -801,7 +806,23 @@ export class PipelineChain<
       storageHash: this.#state.storageHash,
       lane: 'mongo-query',
     };
-    return { collection: this.#state.collection, command, meta };
+    const modelName = this.#state.modelName;
+    const contractNarrow = this.#contract as MongoContract;
+    let resultShape: MongoResultShape | undefined;
+    if (modelName !== undefined) {
+      if (pipelineSupportsFlatResultShape(this.#state.stages)) {
+        const model = contractNarrow.models[modelName] as MongoModelDefinition | undefined;
+        resultShape = model ? contractModelToMongoResultShape(model) : { kind: 'unknown' as const };
+      } else {
+        resultShape = { kind: 'unknown' as const };
+      }
+    }
+    return {
+      collection: this.#state.collection,
+      command,
+      meta,
+      ...(resultShape !== undefined ? { resultShape } : {}),
+    };
   }
 
   /**

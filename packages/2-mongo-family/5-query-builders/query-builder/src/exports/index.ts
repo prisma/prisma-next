@@ -25,6 +25,10 @@ export type {
   ResolvePath,
   ValidPaths,
 } from '../resolve-path';
+export {
+  contractFieldToMongoFieldShape,
+  contractModelToMongoResultShape,
+} from '../result-shape';
 export { CollectionHandle, FilteredCollection } from '../state-classes';
 export type {
   ArrayField,

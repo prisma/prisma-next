@@ -513,7 +513,8 @@ class MongoCollectionImpl<
       offset: undefined,
     });
     const ids: unknown[] = [];
-    for await (const row of idQuery.#execute()) {
+    const { resultShape: _rs, ...planWithoutShape } = idQuery.#compile();
+    for await (const row of this.#executor.execute(planWithoutShape)) {
       ids.push((row as Record<string, unknown>)['_id']);
     }
     return ids;
@@ -525,10 +526,15 @@ class MongoCollectionImpl<
   }
 
   #compile(): MongoQueryPlan<IncludedRow<TContract, ModelName, TIncludes>> {
+    const model = this.#contract.models[this.#modelName] as MongoModelDefinition | undefined;
+    if (!model) {
+      throw new Error(`Unknown model: "${this.#modelName}".`);
+    }
     return compileMongoQuery<IncludedRow<TContract, ModelName, TIncludes>>(
       this.#collectionName,
       this.#state,
       this.#contract.storage.storageHash,
+      model,
     );
   }
 
