@@ -14,6 +14,7 @@ import {
 import { verifyMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import type { MigrationMetadata } from './metadata';
+import { MigrationOpsSchema } from './op-schema';
 import type { MigrationOps, MigrationPackage } from './package';
 
 const MANIFEST_FILE = 'migration.json';
@@ -50,16 +51,6 @@ const MigrationMetadataSchema = type({
   }).or('null'),
   createdAt: 'string',
 });
-
-const MigrationOpSchema = type({
-  id: 'string',
-  label: 'string',
-  operationClass: "'additive' | 'widening' | 'destructive' | 'data'",
-  'invariantId?': 'string',
-});
-
-// Intentionally shallow: operation-specific payload validation is owned by planner/runner layers.
-const MigrationOpsSchema = MigrationOpSchema.array();
 
 export async function writeMigrationPackage(
   dir: string,
