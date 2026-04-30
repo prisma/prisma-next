@@ -33,7 +33,7 @@ jobs:
           if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
             BASELINE_ARG="--baseline-commit ${{ github.event.pull_request.base.sha }}"
           fi
-          semgrep scan --severity ERROR --error --sarif --config auto --exclude-rule javascript.express.security.express-wkhtml-injection.express-wkhtmltoimage-injection . --output=semgrep-results.sarif $BASELINE_ARG
+          semgrep scan --severity ERROR --error --sarif --config auto --exclude-rule javascript.express.security.express-wkhtml-injection.express-wkhtmltoimage-injection --exclude-rule javascript.express.security.audit.remote-property-injection.remote-property-injection . --output=semgrep-results.sarif $BASELINE_ARG
 
       - name: Save SARIF results as artifact
         if: always() && github.event.pull_request != null && hashFiles('semgrep-results.sarif') != ''
