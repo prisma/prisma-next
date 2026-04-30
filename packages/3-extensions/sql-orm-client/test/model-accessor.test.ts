@@ -454,9 +454,44 @@ describe('createModelAccessor', () => {
       return registry;
     }
 
+    function makeDescriptors(
+      entries: Record<string, readonly CodecTrait[]>,
+    ): typeof context.codecDescriptors {
+      const map = new Map(
+        Object.entries(entries).map(([codecId, traits]) => [
+          codecId,
+          {
+            codecId,
+            traits,
+            targetTypes: [] as readonly string[],
+            paramsSchema: {
+              '~standard': {
+                version: 1 as const,
+                vendor: 'test',
+                validate: (value: unknown) => ({ value: value as void }),
+              },
+            },
+            // The trait-gating tests don't materialize codecs; the
+            // factory is shape-only and never invoked.
+            factory: () => () => {
+              throw new Error('test descriptor factory not exercised');
+            },
+          },
+        ]),
+      );
+      return {
+        descriptorFor: (id) => map.get(id),
+        values: function* () {
+          yield* map.values();
+        },
+        byTargetType: () => Object.freeze([]),
+      };
+    }
+
     it('only creates equality methods when codec has equality trait', () => {
       const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
-      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+      const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['equality'] });
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
       const field = accessor['id'] as unknown as Record<string, unknown>;
 
       expect(typeof field['eq']).toBe('function');
@@ -479,7 +514,10 @@ describe('createModelAccessor', () => {
       const codecs = makeRegistry({
         'pg/text@1': ['equality', 'order', 'textual'],
       });
-      const accessor = createModelAccessor({ ...context, codecs }, 'User');
+      const codecDescriptors = makeDescriptors({
+        'pg/text@1': ['equality', 'order', 'textual'],
+      });
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'User');
       const field = accessor['name'] as unknown as Record<string, unknown>;
 
       for (const method of [
@@ -503,7 +541,8 @@ describe('createModelAccessor', () => {
 
     it('throws when relation shorthand filter targets a field without equality trait', () => {
       const codecs = makeRegistry({ 'pg/int4@1': ['order'] });
-      const accessor = createModelAccessor({ ...context, codecs }, 'Post');
+      const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['order'] });
+      const accessor = createModelAccessor({ ...context, codecs, codecDescriptors }, 'Post');
 
       expect(() => accessor['comments']!.some({ postId: 42 })).toThrow(
         /does not support equality comparisons/,
