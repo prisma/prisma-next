@@ -24,9 +24,15 @@ function renderPreviewStatement(text: string, language: string): string | undefi
  * legacy `DDL preview` label (preserves CLI byte-identity for SQL targets per
  * spec OQ-4); previews from any other family — or a mix that includes any
  * non-SQL language — use the family-agnostic `Operation preview` label.
+ *
+ * An empty `statements` array deliberately renders as `Operation preview`
+ * rather than `DDL preview`: `Array.prototype.every` is vacuously true for
+ * empty arrays, but we have no evidence the preview is SQL-only when no
+ * statements are present, so the family-agnostic label is the safer default.
  */
 export function previewBlockHeader(preview: OperationPreview): string {
-  const allSql = preview.statements.every((s) => s.language === 'sql');
+  const allSql =
+    preview.statements.length > 0 && preview.statements.every((s) => s.language === 'sql');
   return allSql ? 'DDL preview' : 'Operation preview';
 }
 

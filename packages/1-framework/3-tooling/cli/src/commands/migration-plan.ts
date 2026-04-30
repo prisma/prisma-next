@@ -512,6 +512,8 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
   );
 
   if (result.preview && result.preview.statements.length > 0) {
+    // The non-empty length is already guaranteed by the surrounding check, so
+    // a plain `every` here is equivalent to the helper in formatters/migrations.ts.
     const allSql = result.preview.statements.every((s) => s.language === 'sql');
     lines.push('');
     lines.push(dim_(allSql ? 'DDL preview' : 'Operation preview'));

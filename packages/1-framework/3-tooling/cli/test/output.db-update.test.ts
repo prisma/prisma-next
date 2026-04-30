@@ -364,4 +364,23 @@ describe('formatMigrationPlanOutput — preview block rendering', () => {
     // Mongo shell lines must not be suffixed with `;`.
     expect(stripped).not.toContain('createIndex({ "email": 1 }, { unique: true });');
   });
+
+  it('uses an `Operation preview` header for an empty preview, not `DDL preview`', () => {
+    // `Array.prototype.every` is vacuously true on empty arrays. Without
+    // explicitly guarding on length, an empty preview would be misclassified
+    // as SQL-only and rendered with the SQL-specific `DDL preview` header.
+    // Default the empty case to the family-agnostic label.
+    const result = createPlanResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [],
+        preview: { statements: [] },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('Operation preview');
+    expect(stripped).not.toContain('DDL preview');
+  });
 });
