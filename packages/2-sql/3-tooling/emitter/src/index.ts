@@ -294,6 +294,33 @@ export const sqlEmission = {
     return `{ ${storageParts.join('; ')} }`;
   },
 
+  resolveFieldTypeParams(
+    _modelName: string,
+    fieldName: string,
+    model: ContractModel,
+    contract: Contract,
+  ): Record<string, unknown> | undefined {
+    const sqlModel = model as ContractModel<SqlModelStorage>;
+    const storageField = sqlModel.storage?.fields?.[fieldName];
+    if (!storageField) return undefined;
+
+    const storage = contract.storage as unknown as SqlStorage | undefined;
+    if (!storage) return undefined;
+
+    const tableName = sqlModel.storage.table;
+    const table: StorageTable | undefined = storage.tables[tableName];
+    if (!table) return undefined;
+
+    const column = table.columns[storageField.column];
+    if (!column) return undefined;
+
+    if (column.typeRef) {
+      const typeInstance = storage.types?.[column.typeRef];
+      return typeInstance?.typeParams;
+    }
+    return column.typeParams;
+  },
+
   getFamilyImports(): string[] {
     return [
       'import type {',
