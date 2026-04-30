@@ -194,6 +194,45 @@ describe('query plan aggregate', () => {
     expect(params[0]?.codecId).toBe('pg/int4@1');
   });
 
+  it('stamps min/max ProjectionItem.codecId from the underlying column', () => {
+    const plan = compileAggregate(baseContract, 'posts', [], {
+      minViews: { kind: 'aggregate', fn: 'min', column: 'views' },
+      maxViews: { kind: 'aggregate', fn: 'max', column: 'views' },
+    });
+
+    expect(plan.ast.kind).toBe('select');
+    const ast = plan.ast as SelectAst;
+    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codecId]));
+    expect(byAlias).toEqual({ minViews: 'pg/int4@1', maxViews: 'pg/int4@1' });
+  });
+
+  it('leaves count/sum/avg ProjectionItem.codecId undefined (deferred until target+widening-aware mapping)', () => {
+    const plan = compileAggregate(baseContract, 'posts', [], {
+      total: { kind: 'aggregate', fn: 'count' },
+      sumViews: { kind: 'aggregate', fn: 'sum', column: 'views' },
+      avgViews: { kind: 'aggregate', fn: 'avg', column: 'views' },
+    });
+
+    const ast = plan.ast as SelectAst;
+    const byAlias = Object.fromEntries(ast.projection.map((p) => [p.alias, p.codecId]));
+    expect(byAlias).toEqual({ total: undefined, sumViews: undefined, avgViews: undefined });
+  });
+
+  it('stamps min/max codec on grouped aggregates too', () => {
+    const plan = compileGroupedAggregate(
+      baseContract,
+      'posts',
+      [],
+      ['user_id'],
+      { peakViews: { kind: 'aggregate', fn: 'max', column: 'views' } },
+      undefined,
+    );
+
+    const ast = plan.ast as SelectAst;
+    const peak = ast.projection.find((p) => p.alias === 'peakViews');
+    expect(peak?.codecId).toBe('pg/int4@1');
+  });
+
   describe('validateGroupedHavingExpr rejects non-predicate expression types', () => {
     it('rejects ColumnRef', () => {
       expect(() => compileWithHaving(ColumnRef.of('posts', 'views'))).toThrow(
