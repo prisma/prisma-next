@@ -160,9 +160,15 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       ProjectionItem.of('agg', AggregateExpr.count(), 'test/observe-undef@1'),
     ]);
 
-    await decodeRow({ agg: '1' }, p, registry, undefined, {
+    // Seed the row ctx with a stale `column` to confirm unresolved cells
+    // explicitly clear inherited `column` rather than passing `rowCtx`
+    // through unchanged.
+    const rowCtx: SqlCodecCallContext = {
       signal: new AbortController().signal,
-    });
+      column: { table: 'stale', name: 'stale' },
+    };
+
+    await decodeRow({ agg: '1' }, p, registry, undefined, rowCtx);
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
@@ -187,9 +193,12 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
       ProjectionItem.of('computed', LiteralExpr.of(1), 'test/observe-no-ref@1'),
     ]);
 
-    await decodeRow({ computed: 'wire' }, p, registry, undefined, {
+    const rowCtx: SqlCodecCallContext = {
       signal: new AbortController().signal,
-    });
+      column: { table: 'stale', name: 'stale' },
+    };
+
+    await decodeRow({ computed: 'wire' }, p, registry, undefined, rowCtx);
 
     expect(observed).toBeDefined();
     expect(observed?.column).toBeUndefined();
