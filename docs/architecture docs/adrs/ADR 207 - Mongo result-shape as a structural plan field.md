@@ -1,6 +1,4 @@
-# ADR — Mongo result-shape as a structural plan field
-
-> **Status:** Draft (lives under `projects/mongo-runtime-decode/`). Migrate to `docs/architecture docs/adrs/` with a final ADR number at project close-out.
+# ADR 207 — Mongo result-shape as a structural plan field
 
 ## Context
 
@@ -203,8 +201,8 @@ RuntimeError {
 
 ## References
 
-- [ADR 204 — Single-Path Async Codec Runtime](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Defers Mongo decode and constrains the runtime invocation pattern (always-await, one `Promise.all` per row).
-- [ADR 030 — Result decoding & codecs registry](../../docs/architecture%20docs/adrs/ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md). Registry model and error-mapping codes (still in force).
-- [ADR 027 — Error Envelope Stable Codes](../../docs/architecture%20docs/adrs/ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). `RUNTIME.DECODE_FAILED` shape.
+- [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Defers Mongo decode and constrains the runtime invocation pattern (always-await, one `Promise.all` per row).
+- [ADR 030 — Result decoding & codecs registry](./ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md). Registry model and error-mapping codes (still in force).
+- [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). `RUNTIME.DECODE_FAILED` shape.
 - SQL reference: `packages/2-sql/5-runtime/src/codecs/decoding.ts` and `packages/2-sql/4-lanes/sql-builder/src/runtime/builder-base.ts`. Used as parity reference for the runtime invocation pattern; structural model deliberately diverges.
 - Existing type-level vocabulary: `packages/2-mongo-family/5-query-builders/query-builder/src/{types,resolve-path}.ts` (`DocField`, `DocShape`, `NestedDocShape`, `ObjectField`).
