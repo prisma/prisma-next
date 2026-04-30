@@ -220,7 +220,7 @@ export function createMigrationShowCommand(): Command {
   setCommandDescriptions(
     command,
     'Display migration package contents',
-    'Shows the operations, DDL preview, and metadata for a migration package.\n' +
+    'Shows the operations, statement preview, and metadata for a migration package.\n' +
       'Accepts a directory path, a hash prefix (git-style), or defaults to the\n' +
       'latest migration.',
   );

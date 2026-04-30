@@ -6,8 +6,8 @@ import { createColorFormatter, formatDim, isVerbose } from './helpers';
 
 /**
  * Render a single statement of an `OperationPreview` for the human-readable
- * "DDL preview" block. SQL statements get a trailing `;` if missing — matches
- * the legacy `string[]`-based renderer byte-for-byte (per spec OQ-4). Other
+ * preview block. SQL statements get a trailing `;` if missing — matches the
+ * legacy `string[]`-based renderer byte-for-byte (per spec OQ-4). Other
  * languages (`'mongodb-shell'`) render verbatim.
  */
 function renderPreviewStatement(text: string, language: string): string | undefined {
@@ -17,6 +17,17 @@ function renderPreviewStatement(text: string, language: string): string | undefi
     return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
   }
   return trimmed;
+}
+
+/**
+ * Choose the header label for a preview block. SQL-only previews keep the
+ * legacy `DDL preview` label (preserves CLI byte-identity for SQL targets per
+ * spec OQ-4); previews from any other family — or a mix that includes any
+ * non-SQL language — use the family-agnostic `Operation preview` label.
+ */
+export function previewBlockHeader(preview: OperationPreview): string {
+  const allSql = preview.statements.every((s) => s.language === 'sql');
+  return allSql ? 'DDL preview' : 'Operation preview';
 }
 
 // ============================================================================
@@ -113,13 +124,13 @@ export function formatMigrationPlanOutput(
     lines.push(`${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`);
   }
 
-  // DDL preview (any family that implements OperationPreviewCapable)
+  // Statement preview (any family that implements OperationPreviewCapable)
   const preview = result.plan?.preview;
   if (preview) {
     lines.push('');
-    lines.push(`${formatDimText('DDL preview')}`);
+    lines.push(`${formatDimText(previewBlockHeader(preview))}`);
     if (preview.statements.length === 0) {
-      lines.push(`${formatDimText('No DDL operations.')}`);
+      lines.push(`${formatDimText('No operations.')}`);
     } else {
       lines.push('');
       for (const statement of preview.statements) {
@@ -260,7 +271,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
 
   if (result.preview.statements.length > 0) {
     lines.push('');
-    lines.push(`${formatDimText('DDL preview')}`);
+    lines.push(`${formatDimText(previewBlockHeader(result.preview))}`);
     lines.push('');
     for (const statement of result.preview.statements) {
       const rendered = renderPreviewStatement(statement.text, statement.language);
