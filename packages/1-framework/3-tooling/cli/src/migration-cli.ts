@@ -15,7 +15,8 @@
  * entrypoint (`node migration.ts`), the CLI:
  *
  * 1. Detects whether the file is the direct entrypoint (no-op when imported).
- * 2. Parses CLI args (`--help`, `--dry-run`, `--config <path>`).
+ * 2. Parses CLI args (`--help`, `--dry-run`, `--config <path>`) via
+ *    [clipanion](https://github.com/arcanis/clipanion).
  * 3. Loads the project's `prisma-next.config.ts` via the same `loadConfig`
  *    the CLI commands use, walking up from the migration file's directory.
  * 4. Probe-instantiates the migration class without a stack so it can read
@@ -34,14 +35,30 @@
  * on-disk persistence. `@prisma-next/migration-tools` owns the pure
  * conversion from a `Migration` instance to artifact strings; `Migration`
  * stays a pure abstract class.
+ *
+ * Parser library: clipanion (chosen over Commander/citty/`node:util.parseArgs`
+ * for its in-process testability and runtime-agnostic execution surface).
+ * See `projects/migration-cli-arg-parser/spec.md` and
+ * `projects/migration-cli-arg-parser/research/commander-friction-points.md`
+ * (TML-2318) for rationale.
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
-import { errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
-import { errorInvalidJson } from '@prisma-next/migration-tools/errors';
+import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
+import type { Writable } from 'node:stream';
+import { fileURLToPath } from 'node:url';
+import {
+  CliStructuredError,
+  errorMigrationCliInvalidConfigArg,
+  errorMigrationCliUnknownFlag,
+} from '@prisma-next/errors/control';
+import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
+import { createControlStack } from '@prisma-next/framework-components/control';
+import { errorInvalidJson, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import { buildMigrationArtifacts, type Migration } from '@prisma-next/migration-tools/migration';
-import { join } from 'pathe';
+import { Cli, Command, Option, UsageError } from 'clipanion';
+import { dirname, join } from 'pathe';
+import { loadConfig } from './config-loader';
 
 /**
  * Constructor shape accepted by `MigrationCLI.run`. `Migration` subclasses
@@ -61,67 +78,75 @@ import { join } from 'pathe';
 // biome-ignore lint/suspicious/noExplicitAny: see JSDoc - rest args with any are the idiomatic TS pattern for accepting arbitrary subclass constructor signatures
 export type MigrationConstructor = new (...args: any[]) => Migration;
 
-interface ParsedArgs {
-  readonly help: boolean;
-  readonly dryRun: boolean;
-  readonly configPath: string | undefined;
-}
+/**
+ * Stream surface accepted by `MigrationCLI.run`'s `options.stdout` /
+ * `options.stderr`. Aliases node's `Writable` because clipanion's
+ * `BaseContext.stdout`/`stderr` are typed as `Writable`, and the CLI
+ * forwards the injected streams into clipanion's context.
+ *
+ * `process.stdout` and `process.stderr` are `Writable`-shaped, so the
+ * default-fallback path remains a no-op for existing two-argument
+ * callers like `MigrationCLI.run(import.meta.url, MyMigration)`.
+ *
+ * Tests inject a `Writable` subclass that captures chunks for
+ * assertions.
+ */
+export type MigrationCliWritable = Writable;
 
 /**
- * Minimal structural shape the migration-file CLI writes to. Matches
- * what clipanion's `Cli.run({ stdout, stderr })` consumes — just
- * `write` and `end` — so callers can inject any buffer-like collector
- * (including `process.stdout`/`process.stderr`, which trivially
- * satisfy this surface) without dragging in the full
- * `NodeJS.WritableStream` event-emitter surface.
+ * Flags exposed by the migration-file CLI.
+ *
+ * Must stay in sync with the `Option` declarations on
+ * `MigrationFileCommand` below. This list is rendered in the
+ * `errorMigrationCliUnknownFlag` envelope's `fix` text and `meta`,
+ * so order matters for user-visible output (declaration order is the
+ * order users see when they run `--help`).
  */
-export interface MigrationCliWritable {
-  write(chunk: string | Uint8Array): boolean;
-  end(chunk?: string | Uint8Array): void;
-}
+const KNOWN_FLAGS: readonly string[] = ['--help', '--dry-run', '--config'];
 
 /**
- * Parse the subset of `process.argv` that `MigrationCLI.run` cares about.
- * Recognised flags: `--help`, `--dry-run`, `--config <path>` /
- * `--config=<path>`. Unknown flags are ignored to keep the surface
- * forgiving for ad-hoc tooling that wraps a migration file.
- *
- * Throws `errorMigrationCliInvalidConfigArg` (`PN-CLI-4012`) when
- * `--config` is missing its path argument or is followed by another flag
- * (e.g. `--config --dry-run`); silently consuming the next flag would
- * either drop dry-run handling or serialize against the wrong project.
- *
- * NOTE: this hand-rolled parser is a known wart, tracked separately by
- * TML-2318 ("Migration CLI: replace handrolled arg parser with shared
- * CLI library"). Until that lands the surface is intentionally tiny.
+ * The clipanion command that owns the migration-file CLI's option
+ * declarations. The class is internal — `MigrationCLI.run` is the
+ * stable public surface. Adding a flag here automatically updates
+ * `--help` rendering and the `KNOWN_FLAGS` list (the latter must be
+ * updated in tandem).
  */
-function parseArgs(argv: readonly string[]): ParsedArgs {
-  let help = false;
-  let dryRun = false;
-  let configPath: string | undefined;
+class MigrationFileCommand extends Command {
+  static override paths = [Command.Default];
 
-  for (let i = 0; i < argv.length; i++) {
-    const arg = argv[i]!;
-    if (arg === '--help' || arg === '-h') {
-      help = true;
-    } else if (arg === '--dry-run') {
-      dryRun = true;
-    } else if (arg === '--config') {
-      const next = argv[i + 1];
-      if (next === undefined) {
-        throw errorMigrationCliInvalidConfigArg();
-      }
-      if (next.startsWith('-')) {
-        throw errorMigrationCliInvalidConfigArg({ nextToken: next });
-      }
-      configPath = next;
-      i++;
-    } else if (arg.startsWith('--config=')) {
-      configPath = arg.slice('--config='.length);
-    }
+  static override usage = Command.Usage({
+    description: 'Self-emit ops.json and migration.json from a class-flow migration',
+    details: `
+      Loads the project's prisma-next.config.ts, assembles a ControlStack
+      from the configured target/adapter/extensions, and serializes the
+      migration's operations + metadata next to this file.
+    `,
+    examples: [
+      ['Self-emit ops.json + migration.json next to migration.ts', '$0'],
+      ['Preview without writing files', '$0 --dry-run'],
+      ['Use a non-default config path', '$0 --config ./custom.config.ts'],
+    ],
+  });
+
+  dryRun = Option.Boolean('--dry-run', false, {
+    description: 'Print operations to stdout without writing files',
+  });
+
+  config = Option.String('--config', {
+    description: 'Path to prisma-next.config.ts',
+  });
+
+  /**
+   * Unused: orchestration runs inside `MigrationCLI.run` so error
+   * routing stays under our control (clipanion's `cli.run` writes
+   * error output to `context.stdout`, but our contract requires
+   * structured errors on stderr). `cli.process` is used to parse
+   * argv into a populated `MigrationFileCommand` instance whose
+   * fields drive the orchestration directly.
+   */
+  override async execute(): Promise<number> {
+    return 0;
   }
-
-  return { help, dryRun, configPath };
 }
 
 /**
@@ -147,19 +172,20 @@ export class MigrationCLI {
    * Each option defaults to its `process` global when omitted, so
    * existing two-argument call sites
    * (`MigrationCLI.run(import.meta.url, MyMigration)`) continue to
-   * compile and behave identically once the clipanion-based body lands
-   * in m4.
+   * compile and behave identically.
    *
-   * Returns the exit code so the caller can branch on it (or set
-   * `process.exitCode` themselves). Awaiting is optional: the typical
-   * top-level call pattern doesn't await because node's module
-   * evaluation keeps the promise alive until completion.
+   * Returns the exit code so the caller can branch on it. Also writes
+   * the same code to `process.exitCode` so script-style callers that
+   * don't await the return value still surface a non-zero exit when
+   * something fails.
    *
-   * Stub: the clipanion-based implementation lands in plan m4. The
-   * tests in `test/migration-cli.test.ts` already assert against the
-   * post-m4 contract; they will fail on this stub-throw and turn green
-   * once m4 wires up the parser. This is the canonical tests-first
-   * pattern. See `projects/migration-cli-arg-parser/plan.md` § Commit 4.
+   * Exit codes:
+   * - 0 — success, or `--help`, or imported-not-entrypoint no-op.
+   * - 1 — runtime/orchestration error (config not found, target
+   *   mismatch, etc.).
+   * - 2 — usage error (unknown flag, malformed `--config`).
+   *
+   * See `projects/migration-cli-arg-parser/spec.md` § Behaviour changes.
    */
   static async run(
     importMetaUrl: string,
@@ -170,16 +196,244 @@ export class MigrationCLI {
       readonly stderr?: MigrationCliWritable;
     } = {},
   ): Promise<number> {
-    void importMetaUrl;
-    void MigrationClass;
-    void options;
-    // Helpers retained for m4 (parser swap will reuse the existing
-    // orchestration); referenced here so `noUnusedLocals` doesn't fire
-    // against the stub. Removed in m4.
-    void parseArgs;
-    void serializeMigrationToDisk;
-    throw new Error('MigrationCLI.run: clipanion-based implementation lands in m4');
+    if (!importMetaUrl) {
+      return 0;
+    }
+
+    const argv = options.argv ?? process.argv;
+    const stdout = options.stdout ?? process.stdout;
+    const stderr = options.stderr ?? process.stderr;
+
+    if (!isDirectEntrypoint(importMetaUrl, argv)) {
+      return 0;
+    }
+
+    const exitCode = await orchestrate(importMetaUrl, MigrationClass, {
+      argv,
+      stdout,
+      stderr,
+    });
+    process.exitCode = exitCode;
+    return exitCode;
   }
+}
+
+/**
+ * Argv-aware variant of the entrypoint guard. The shared
+ * `@prisma-next/migration-tools` helper of the same name reads
+ * `process.argv[1]` directly, which doesn't compose with the new
+ * in-process testability surface (tests inject `argv` without mutating
+ * the process global). Inlined here so the migration-file CLI's check
+ * follows the injected `argv[1]` consistently.
+ */
+function isDirectEntrypoint(importMetaUrl: string, argv: readonly string[]): boolean {
+  const argv1 = argv[1];
+  if (!argv1) {
+    return false;
+  }
+  try {
+    return realpathSync(fileURLToPath(importMetaUrl)) === realpathSync(argv1);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Argv-and-stream-driven orchestration body. Pulled out of the static
+ * method so the entrypoint guard / process-default plumbing stays
+ * separate from the parse + load + serialize steps.
+ */
+async function orchestrate(
+  importMetaUrl: string,
+  MigrationClass: MigrationConstructor,
+  ctx: {
+    readonly argv: readonly string[];
+    readonly stdout: MigrationCliWritable;
+    readonly stderr: MigrationCliWritable;
+  },
+): Promise<number> {
+  const cli = Cli.from([MigrationFileCommand], {
+    binaryName: 'migration.ts',
+    binaryLabel: 'Migration file CLI',
+  });
+
+  const input = ctx.argv.slice(2);
+
+  // Pre-scan for malformed `--config` (no value, or value-shaped-as-flag)
+  // before delegating to clipanion. The legacy parser surfaced both as
+  // `errorMigrationCliInvalidConfigArg` (`PN-CLI-4012`); pre-scanning
+  // here keeps that contract independent of how clipanion classifies
+  // the error internally (it variably throws `UnknownSyntaxError` or
+  // accepts the flag-shaped token as the value depending on what other
+  // options are registered).
+  const configError = detectInvalidConfig(input);
+  if (configError) {
+    writeStructuredError(ctx.stderr, configError);
+    return 2;
+  }
+
+  let parsed: MigrationFileCommand;
+  try {
+    const command = cli.process({
+      input: [...input],
+      context: { stdout: ctx.stdout, stderr: ctx.stderr },
+    });
+    if (!(command instanceof MigrationFileCommand)) {
+      // The only registered command class is `MigrationFileCommand`;
+      // any other concrete type indicates clipanion emitted its
+      // built-in `HelpCommand`. Render usage directly so we don't
+      // depend on calling `cli.run` (which routes errors to stdout —
+      // wrong stream for our contract).
+      ctx.stdout.write(cli.usage(MigrationFileCommand, { detailed: true }));
+      return 0;
+    }
+    parsed = command;
+  } catch (err) {
+    return renderParseError(err, input, ctx.stderr);
+  }
+
+  if (parsed.help) {
+    ctx.stdout.write(cli.usage(MigrationFileCommand, { detailed: true }));
+    return 0;
+  }
+
+  try {
+    await runMigration(importMetaUrl, MigrationClass, parsed, ctx);
+    return 0;
+  } catch (err) {
+    if (CliStructuredError.is(err)) {
+      writeStructuredError(ctx.stderr, err);
+    } else if (MigrationToolsError.is(err)) {
+      // Migration-tools errors (e.g. `errorInvalidJson` thrown by
+      // `readExistingMetadata` when migration.json is malformed) carry
+      // their own `code`/`why`/`fix` shape. Render them with the same
+      // visual structure as `CliStructuredError` so consumers grepping
+      // for `MIGRATION.<CODE>` see consistent output across surfaces.
+      const fix = err.fix ? `\n${err.fix}` : '';
+      ctx.stderr.write(`${err.code}: ${err.message}\n${err.why}${fix}\n`);
+    } else {
+      ctx.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
+    }
+    return 1;
+  }
+}
+
+/**
+ * Returns an `errorMigrationCliInvalidConfigArg` envelope when `input`
+ * contains a malformed `--config`:
+ *
+ * - `--config` as the last token (no value follows).
+ * - `--config <flag>` where `<flag>` starts with `-` (silently
+ *   consuming the next flag would either drop the flag or serialize
+ *   against the wrong project).
+ *
+ * `--config=<value>` and `--config <value>` are both valid; this
+ * pre-scan ignores them (and the equals form's value is allowed to
+ * start with `-` — the `=` makes the binding explicit).
+ */
+function detectInvalidConfig(input: readonly string[]): CliStructuredError | null {
+  for (let i = 0; i < input.length; i++) {
+    if (input[i] !== '--config') {
+      continue;
+    }
+    const next = input[i + 1];
+    if (next === undefined) {
+      return errorMigrationCliInvalidConfigArg();
+    }
+    if (next.startsWith('-')) {
+      return errorMigrationCliInvalidConfigArg({ nextToken: next });
+    }
+  }
+  return null;
+}
+
+/**
+ * Translate clipanion's parse-time errors into the project's structured
+ * error envelopes.
+ *
+ * - `UnknownSyntaxError` covers both unknown flags (`--frobnicate`) and
+ *   the bare-trailing `--config` case (where arity-1 needs a value but
+ *   none was supplied). Distinguished by inspecting the input array.
+ * - `UsageError` covers schema/validator failures from typanion. None
+ *   of the migration-file CLI's options have validators today, but we
+ *   still translate it as a usage error (exit 2) for forward-compat.
+ * - Anything else re-throws — caller's outer catch will surface it as
+ *   exit 1 (runtime error).
+ */
+function renderParseError(
+  err: unknown,
+  input: readonly string[],
+  stderr: MigrationCliWritable,
+): number {
+  if (isUnknownSyntaxError(err)) {
+    const flag = findOffendingFlag(input);
+    writeStructuredError(stderr, errorMigrationCliUnknownFlag({ flag, knownFlags: KNOWN_FLAGS }));
+    return 2;
+  }
+  if (err instanceof UsageError) {
+    // typanion validator failures and similar usage errors. None of
+    // the migration-file CLI's options have validators today, so this
+    // branch is forward-compat scaffolding — kept so that a future
+    // option declaration with a validator routes through the same PN
+    // envelope path rather than escaping as exit 1.
+    writeStructuredError(stderr, errorMigrationCliInvalidConfigArg({ nextToken: err.message }));
+    return 2;
+  }
+  throw err;
+}
+
+/**
+ * Duck-type check for clipanion's `UnknownSyntaxError`: the class is
+ * thrown by the parser but is not re-exported from the package's main
+ * entry (only `UsageError` is — see clipanion's `advanced/index.d.ts`).
+ * Identified by `name === 'UnknownSyntaxError'` and the
+ * `clipanion.type === 'none'` discriminator that clipanion's
+ * `ErrorWithMeta` interface guarantees.
+ */
+function isUnknownSyntaxError(err: unknown): err is Error {
+  if (!(err instanceof Error) || err.name !== 'UnknownSyntaxError') {
+    return false;
+  }
+  // clipanion's `ErrorWithMeta` interface guarantees a `clipanion` field with
+  // a `type` discriminator on every error it throws. Read it via a structural
+  // shape rather than importing the class (it's not re-exported from the
+  // package main).
+  const meta = (err as { clipanion?: { type?: string } }).clipanion;
+  return typeof meta === 'object' && meta !== null && meta.type === 'none';
+}
+
+/**
+ * Best-effort: pull the first input token that doesn't match a known
+ * flag. Falls back to the first token when we can't pinpoint it. The
+ * returned name is rendered into the user-visible PN-CLI-4013 envelope
+ * (`Unknown flag \`<name>\``) and round-tripped via `meta.flag` so
+ * agent consumers can render their own "did you mean" suggestions.
+ */
+function findOffendingFlag(input: readonly string[]): string {
+  for (const token of input) {
+    if (!token.startsWith('-')) {
+      continue;
+    }
+    const head = token.split('=', 1)[0] ?? token;
+    if (!KNOWN_FLAGS.includes(head) && head !== '-h') {
+      return head;
+    }
+  }
+  return input[0] ?? '';
+}
+
+/**
+ * Write a `CliStructuredError` envelope to the given stream. Format
+ * matches the legacy hand-rolled writer (`message: why`) so the rest of
+ * the project's error rendering stays consistent across surfaces. The
+ * full PN code (`PN-<domain>-<code>`) is included so consumers can
+ * grep for stable identifiers.
+ */
+function writeStructuredError(stream: MigrationCliWritable, err: CliStructuredError): void {
+  const envelope = err.toEnvelope();
+  const why = envelope.why ?? envelope.summary;
+  const fix = envelope.fix ? `\n${envelope.fix}` : '';
+  stream.write(`${envelope.code}: ${envelope.summary}\n${why}${fix}\n`);
 }
 
 /**
@@ -235,20 +489,69 @@ function serializeMigrationToDisk(
   instance: Migration,
   migrationDir: string,
   dryRun: boolean,
+  stdout: MigrationCliWritable,
 ): void {
   const metadataPath = join(migrationDir, 'migration.json');
   const existing = readExistingMetadata(metadataPath);
   const { opsJson, metadataJson } = buildMigrationArtifacts(instance, existing);
 
   if (dryRun) {
-    process.stdout.write(`--- migration.json ---\n${metadataJson}\n`);
-    process.stdout.write('--- ops.json ---\n');
-    process.stdout.write(`${opsJson}\n`);
+    stdout.write(`--- migration.json ---\n${metadataJson}\n`);
+    stdout.write('--- ops.json ---\n');
+    stdout.write(`${opsJson}\n`);
     return;
   }
 
   writeFileSync(join(migrationDir, 'ops.json'), opsJson);
   writeFileSync(metadataPath, metadataJson);
 
-  process.stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
+  stdout.write(`Wrote ops.json + migration.json to ${migrationDir}\n`);
+}
+
+/**
+ * Inner orchestration: load config, probe-construct the migration,
+ * verify target, assemble the stack, construct with the stack, persist.
+ *
+ * Throws `CliStructuredError` for known failure modes (config not
+ * found, target mismatch); the outer `orchestrate` translates those to
+ * exit 1.
+ */
+async function runMigration(
+  importMetaUrl: string,
+  MigrationClass: MigrationConstructor,
+  parsed: MigrationFileCommand,
+  ctx: {
+    readonly stdout: MigrationCliWritable;
+    readonly stderr: MigrationCliWritable;
+  },
+): Promise<void> {
+  const migrationFile = fileURLToPath(importMetaUrl);
+  const migrationDir = dirname(migrationFile);
+
+  const config = await loadConfig(parsed.config);
+
+  // Probe-instantiate without a stack so we can read `targetId` before
+  // any target-specific constructor side effects (e.g.
+  // `PostgresMigration`'s `stack.adapter.create(stack)`) run. Concrete
+  // subclasses are required to accept the no-arg form; the abstract
+  // `Migration` constructor declares `stack?` and target subclasses
+  // (Postgres, Mongo) propagate that optionality. This makes the
+  // target-mismatch guard fail fast with `PN-MIG-2006` before any
+  // stack-driven adapter construction begins, even if the wrong-target
+  // adapter's `create` would otherwise succeed and silently misshapen
+  // the stored adapter cast.
+  const probe = new MigrationClass();
+
+  if (probe.targetId !== config.target.targetId) {
+    throw errorMigrationTargetMismatch({
+      migrationTargetId: probe.targetId,
+      configTargetId: config.target.targetId,
+    });
+  }
+
+  const stack = createControlStack(config);
+  const instance = new MigrationClass(stack);
+
+  serializeMigrationToDisk(instance, migrationDir, parsed.dryRun, ctx.stdout);
+  void ctx.stderr;
 }

@@ -1,6 +1,7 @@
 /**
  * Re-export all domain error factories from @prisma-next/errors for convenience.
- * CLI-specific errors (e.g., Commander.js argument validation) can be added here if needed.
+ * CLI-specific errors (e.g., Commander argument validation in the main CLI, or
+ * clipanion parse errors in the migration-file CLI) can be added here if needed.
  */
 export type { CliErrorConflict, CliErrorEnvelope } from '@prisma-next/errors/control';
 

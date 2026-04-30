@@ -17,6 +17,7 @@
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { Writable } from 'node:stream';
 import { pathToFileURL } from 'node:url';
 import { errorConfigFileNotFound } from '@prisma-next/errors/control';
 import { Migration } from '@prisma-next/migration-tools/migration';
@@ -40,26 +41,23 @@ vi.mock('@prisma-next/framework-components/control', async () => {
 const { MigrationCLI } = await import('../src/migration-cli');
 
 /**
- * Minimal `Writable`-shaped buffer for capturing CLI output in-process.
- * Implements the surface clipanion's `Cli.run({ stdout, stderr })`
- * needs: `write(chunk, ...)` returns `true` and `end(chunk?, ...)`
- * accepts an optional final chunk. The `.text` getter joins everything
- * written so assertions can use `.toContain(...)` / `.toMatch(...)`.
+ * `node:stream.Writable` subclass that captures every chunk written to
+ * it so assertions can use `.toContain(...)` / `.toMatch(...)` on the
+ * accumulated text. Subclasses `Writable` (rather than implementing the
+ * stream interface ad-hoc) because clipanion's `BaseContext.stdout` and
+ * `BaseContext.stderr` are typed as `Writable`, and the migration-file
+ * CLI forwards the injected streams into clipanion's context.
  */
-class BufferStream {
+class BufferStream extends Writable {
   private readonly chunks: string[] = [];
 
-  write(chunk: unknown): boolean {
-    if (chunk !== undefined && chunk !== null) {
-      this.chunks.push(typeof chunk === 'string' ? chunk : String(chunk));
-    }
-    return true;
-  }
-
-  end(chunk?: unknown): void {
-    if (chunk !== undefined && chunk !== null) {
-      this.write(chunk);
-    }
+  override _write(
+    chunk: unknown,
+    _encoding: BufferEncoding,
+    callback: (error?: Error | null) => void,
+  ): void {
+    this.chunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+    callback();
   }
 
   get text(): string {
