@@ -195,6 +195,13 @@ export function arktypeJson<S extends Type<unknown>>(
   readonly typeParams: ArktypeJsonTypeParams;
   readonly type: (ctx: CodecInstanceContext) => ArktypeJsonCodec<S['infer']>;
 } {
+  // Reject non-callable lookalikes before any property reads. An object
+  // shaped like `{ expression, json }` would otherwise pass the field
+  // checks and only explode on the first `decode`/`decodeJson` call,
+  // defeating the early authoring-time guard this factory provides.
+  if (typeof schema !== 'function') {
+    throw new Error('arktypeJson(schema) expects a callable arktype Type.');
+  }
   const expression: unknown = (schema as { readonly expression?: unknown }).expression;
   const jsonIr: unknown = (schema as { readonly json?: unknown }).json;
   if (typeof expression !== 'string') {
