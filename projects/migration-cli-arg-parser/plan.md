@@ -262,6 +262,12 @@ export class MigrationCLI {
  Return `Promise<number>`.
 - Update the catch-all error handler at the bottom of `run()` to use
  the injected `stderr` instead of `process.stderr.write` directly.
+- Update the stale comment at the top of
+ `packages/1-framework/3-tooling/cli/src/utils/cli-errors.ts` —
+ currently mentions "Commander.js argument validation"; replace with
+ wording that covers both Commander (still used by the main CLI) and
+ clipanion (used by the migration-file CLI). Surfaced by the m2
+ implementer; tracked here to avoid being missed.
 - Run the rewritten tests from commit 3 — they should now pass.
 
 **Validation**:
