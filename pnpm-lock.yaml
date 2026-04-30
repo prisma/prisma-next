@@ -564,24 +564,6 @@ importers:
         specifier: 'catalog:'
         version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
 
-  packages/1-framework/0-foundation/psl-types:
-    devDependencies:
-      '@prisma-next/tsconfig':
-        specifier: workspace:*
-        version: link:../../../0-config/tsconfig
-      '@prisma-next/tsdown':
-        specifier: workspace:*
-        version: link:../../../0-config/tsdown
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.18.4(typescript@5.9.3)
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-      vitest:
-        specifier: 'catalog:'
-        version: 4.0.17(@types/node@24.10.4)(@vitest/ui@4.0.17)(jiti@2.6.1)(jsdom@28.1.0(@noble/hashes@2.0.1))(lightningcss@1.32.0)(tsx@4.20.6)(yaml@2.8.1)
-
   packages/1-framework/0-foundation/utils:
     devDependencies:
       '@prisma-next/tsconfig':
@@ -664,9 +646,6 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../operations
-      '@prisma-next/psl-types':
-        specifier: workspace:*
-        version: link:../../0-foundation/psl-types
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -777,9 +756,9 @@ importers:
 
   packages/1-framework/2-authoring/psl-parser:
     dependencies:
-      '@prisma-next/psl-types':
+      '@prisma-next/framework-components':
         specifier: workspace:*
-        version: link:../../0-foundation/psl-types
+        version: link:../../1-core/framework-components
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -802,9 +781,9 @@ importers:
 
   packages/1-framework/2-authoring/psl-printer:
     dependencies:
-      '@prisma-next/psl-types':
+      '@prisma-next/framework-components':
         specifier: workspace:*
-        version: link:../../0-foundation/psl-types
+        version: link:../../1-core/framework-components
     devDependencies:
       '@prisma-next/psl-parser':
         specifier: workspace:*
@@ -854,9 +833,6 @@ importers:
       '@prisma-next/psl-printer':
         specifier: workspace:*
         version: link:../../2-authoring/psl-printer
-      '@prisma-next/psl-types':
-        specifier: workspace:*
-        version: link:../../0-foundation/psl-types
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -2102,9 +2078,6 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/psl-types':
-        specifier: workspace:*
-        version: link:../../1-framework/0-foundation/psl-types
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../1-core/contract

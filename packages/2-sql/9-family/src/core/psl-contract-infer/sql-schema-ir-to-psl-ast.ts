@@ -10,7 +10,7 @@ import type {
   PslNamedTypeDeclaration,
   PslSpan,
   PslTypesBlock,
-} from '@prisma-next/psl-types';
+} from '@prisma-next/framework-components/psl-ast';
 import type { SqlColumnIR, SqlSchemaIR, SqlTableIR } from '@prisma-next/sql-schema-ir/types';
 import type { DefaultMappingOptions } from './default-mapping';
 import { mapDefault } from './default-mapping';

@@ -1,1 +1,1 @@
-export * from '@prisma-next/psl-types';
+export * from '@prisma-next/framework-components/psl-ast';

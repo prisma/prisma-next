@@ -1,4 +1,3 @@
-import type { PslDocumentAst } from '@prisma-next/psl-types';
 import { describe, expect, it } from 'vitest';
 import {
   hasOperationPreview,
@@ -7,6 +6,7 @@ import {
 } from '../src/control-capabilities';
 import type { ControlFamilyInstance } from '../src/control-instances';
 import type { OperationPreview } from '../src/control-operation-preview';
+import type { PslDocumentAst } from '../src/psl-ast';
 
 const SYNTHETIC_AST: PslDocumentAst = {
   kind: 'document',

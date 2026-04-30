@@ -1,5 +1,5 @@
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
-import type { PslDocumentAst } from '@prisma-next/psl-types';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';

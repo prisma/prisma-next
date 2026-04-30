@@ -19,7 +19,7 @@ import {
   hasPslContractInfer,
   hasSchemaView,
 } from '@prisma-next/framework-components/control';
-import type { PslDocumentAst } from '@prisma-next/psl-types';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';

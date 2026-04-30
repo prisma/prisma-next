@@ -17,7 +17,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
-import type { PslDocumentAst } from '@prisma-next/psl-types';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { Result } from '@prisma-next/utils/result';
 
 // ============================================================================
