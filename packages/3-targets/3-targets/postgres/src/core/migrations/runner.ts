@@ -186,18 +186,18 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
         existingInvariants.has(id),
       );
-      if (isSelfEdge && applyValue.operationsExecuted === 0 && incomingIsSubsetOfExisting) {
-        await this.commitTransaction(driver);
-        committed = true;
-        return runnerSuccess({
-          operationsPlanned: options.plan.operations.length,
-          operationsExecuted: 0,
-        });
-      }
+      const isSelfEdgeNoOp =
+        isSelfEdge && applyValue.operationsExecuted === 0 && incomingIsSubsetOfExisting;
 
-      // Record marker and ledger entries
-      await this.upsertMarker(driver, options, existingMarker);
-      await this.recordLedgerEntry(driver, options, existingMarker, applyValue.executedOperations);
+      if (!isSelfEdgeNoOp) {
+        await this.upsertMarker(driver, options, existingMarker);
+        await this.recordLedgerEntry(
+          driver,
+          options,
+          existingMarker,
+          applyValue.executedOperations,
+        );
+      }
 
       await this.commitTransaction(driver);
       committed = true;

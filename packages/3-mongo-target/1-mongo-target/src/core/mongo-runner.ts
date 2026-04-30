@@ -196,57 +196,58 @@ export class MongoMigrationRunner {
     // Skip marker/ledger writes (and schema verification) only when the apply
     // is a true no-op: no operations executed, marker already at destination,
     // and every incoming invariant is already in the stored set.
-    if (operationsExecuted === 0 && markerAlreadyAtDestination && incomingIsSubsetOfExisting) {
-      return ok({ operationsPlanned: operations.length, operationsExecuted });
-    }
+    const isNoOp =
+      operationsExecuted === 0 && markerAlreadyAtDestination && incomingIsSubsetOfExisting;
 
-    const liveSchema = await this.deps.introspectSchema();
-    const verifyResult = verifyMongoSchema({
-      contract: options.destinationContract,
-      schema: liveSchema,
-      strict: options.strictVerification ?? true,
-      frameworkComponents: options.frameworkComponents,
-      ...(options.context ? { context: options.context } : {}),
-    });
-    if (!verifyResult.ok) {
-      return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
-        why: 'The resulting database schema does not satisfy the destination contract.',
-        meta: { issues: verifyResult.schema.issues },
+    if (!isNoOp) {
+      const liveSchema = await this.deps.introspectSchema();
+      const verifyResult = verifyMongoSchema({
+        contract: options.destinationContract,
+        schema: liveSchema,
+        strict: options.strictVerification ?? true,
+        frameworkComponents: options.frameworkComponents,
+        ...(options.context ? { context: options.context } : {}),
       });
-    }
-
-    if (existingMarker) {
-      const updated = await markerOps.updateMarker(existingMarker.storageHash, {
-        storageHash: destination.storageHash,
-        profileHash,
-        invariants: incomingInvariants,
-      });
-      if (!updated) {
-        return runnerFailure(
-          'MARKER_CAS_FAILURE',
-          'Marker was modified by another process during migration execution.',
-          {
-            meta: {
-              expectedStorageHash: existingMarker.storageHash,
-              destinationStorageHash: destination.storageHash,
-            },
-          },
-        );
+      if (!verifyResult.ok) {
+        return runnerFailure('SCHEMA_VERIFY_FAILED', verifyResult.summary, {
+          why: 'The resulting database schema does not satisfy the destination contract.',
+          meta: { issues: verifyResult.schema.issues },
+        });
       }
-    } else {
-      await markerOps.initMarker({
-        storageHash: destination.storageHash,
-        profileHash,
-        invariants: incomingInvariants,
+
+      if (existingMarker) {
+        const updated = await markerOps.updateMarker(existingMarker.storageHash, {
+          storageHash: destination.storageHash,
+          profileHash,
+          invariants: incomingInvariants,
+        });
+        if (!updated) {
+          return runnerFailure(
+            'MARKER_CAS_FAILURE',
+            'Marker was modified by another process during migration execution.',
+            {
+              meta: {
+                expectedStorageHash: existingMarker.storageHash,
+                destinationStorageHash: destination.storageHash,
+              },
+            },
+          );
+        }
+      } else {
+        await markerOps.initMarker({
+          storageHash: destination.storageHash,
+          profileHash,
+          invariants: incomingInvariants,
+        });
+      }
+
+      const originHash = existingMarker?.storageHash ?? '';
+      await markerOps.writeLedgerEntry({
+        edgeId: `${originHash}->${destination.storageHash}`,
+        from: originHash,
+        to: destination.storageHash,
       });
     }
-
-    const originHash = existingMarker?.storageHash ?? '';
-    await markerOps.writeLedgerEntry({
-      edgeId: `${originHash}->${destination.storageHash}`,
-      from: originHash,
-      to: destination.storageHash,
-    });
 
     return ok({ operationsPlanned: operations.length, operationsExecuted });
   }
