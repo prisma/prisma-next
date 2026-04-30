@@ -1,7 +1,12 @@
 import type { PslDocumentAst } from '@prisma-next/psl-types';
 import { describe, expect, it } from 'vitest';
-import { hasPslContractInfer, hasSchemaView } from '../src/control-capabilities';
+import {
+  hasOperationPreview,
+  hasPslContractInfer,
+  hasSchemaView,
+} from '../src/control-capabilities';
 import type { ControlFamilyInstance } from '../src/control-instances';
+import type { OperationPreview } from '../src/control-operation-preview';
 
 const SYNTHETIC_AST: PslDocumentAst = {
   kind: 'document',
@@ -57,5 +62,33 @@ describe('hasSchemaView', () => {
 
   it('returns false when instance does not declare toSchemaView', () => {
     expect(hasSchemaView(baseInstance)).toBe(false);
+  });
+});
+
+describe('hasOperationPreview', () => {
+  const SYNTHETIC_PREVIEW: OperationPreview = {
+    statements: [{ text: 'CREATE TABLE x (id int)', language: 'sql' }],
+  };
+
+  it('returns true when instance exposes toOperationPreview function', () => {
+    const instance = {
+      ...baseInstance,
+      toOperationPreview: () => SYNTHETIC_PREVIEW,
+    } as ControlFamilyInstance<'sql', unknown>;
+
+    expect(hasOperationPreview(instance)).toBe(true);
+  });
+
+  it('returns false when instance does not declare toOperationPreview', () => {
+    expect(hasOperationPreview(baseInstance)).toBe(false);
+  });
+
+  it('returns false when toOperationPreview is present but not a function', () => {
+    const instance = {
+      ...baseInstance,
+      toOperationPreview: 'not a function',
+    } as unknown as ControlFamilyInstance<'sql', unknown>;
+
+    expect(hasOperationPreview(instance)).toBe(false);
   });
 });
