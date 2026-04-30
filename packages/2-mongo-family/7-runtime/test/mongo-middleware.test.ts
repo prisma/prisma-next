@@ -1,12 +1,51 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
-import { createMongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
+import type {
+  MongoExecutionContext,
+  MongoExecutionStack,
+  MongoRuntimeAdapterDescriptor,
+  MongoRuntimeAdapterInstance,
+  MongoRuntimeTargetDescriptor,
+} from '../src/mongo-execution-stack';
 import type { MongoMiddleware } from '../src/mongo-middleware';
 import { createMongoRuntime } from '../src/mongo-runtime';
 
-const testCodecs = createMongoCodecRegistry();
+function makeContext(adapter: MongoAdapter): MongoExecutionContext {
+  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
+  const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
+    familyId: 'mongo',
+    targetId: 'mongo',
+    lower: adapter.lower.bind(adapter),
+  };
+  const target: MongoRuntimeTargetDescriptor<'mongo'> = {
+    kind: 'target',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+  };
+  const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+    kind: 'adapter',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => adapterInstance,
+  };
+  const stack: MongoExecutionStack<'mongo'> = {
+    target,
+    adapter: adapterDescriptor,
+    driver: undefined,
+    extensionPacks: [],
+  };
+  return Object.freeze({ contract: {}, codecs, stack });
+}
 
 const baseMeta: PlanMeta = {
   target: 'mongo',
@@ -60,12 +99,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([{ _id: '1', name: 'Alice' }]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -78,12 +115,10 @@ describe('MongoRuntime middleware lifecycle', () => {
   });
 
   it('works with no middleware', async () => {
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([{ _id: '1' }]),
-      codecs: testCodecs,
-      contract: {},
-      targetId: 'mongo',
     });
 
     const results: unknown[] = [];
@@ -103,12 +138,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -139,12 +172,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: failingDriver,
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -174,12 +205,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: failingDriver,
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -208,12 +237,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: failingDriver,
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -233,12 +260,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -258,12 +283,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
       mode: 'permissive',
     });
@@ -288,12 +311,10 @@ describe('MongoRuntime middleware lifecycle', () => {
       },
     };
 
+    const adapter = createMockAdapter();
     const runtime = createMongoRuntime({
-      adapter: createMockAdapter(),
+      context: makeContext(adapter),
       driver: createMockDriver([]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -310,11 +331,8 @@ describe('MongoRuntime middleware compatibility validation', () => {
     const middleware: MongoMiddleware = { name: 'generic' };
     expect(() =>
       createMongoRuntime({
-        adapter: createMockAdapter(),
+        context: makeContext(createMockAdapter()),
         driver: createMockDriver(),
-        contract: {},
-        targetId: 'mongo',
-        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -324,11 +342,8 @@ describe('MongoRuntime middleware compatibility validation', () => {
     const middleware: MongoMiddleware = { name: 'mongo-specific', familyId: 'mongo' };
     expect(() =>
       createMongoRuntime({
-        adapter: createMockAdapter(),
+        context: makeContext(createMockAdapter()),
         driver: createMockDriver(),
-        contract: {},
-        targetId: 'mongo',
-        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -344,11 +359,8 @@ describe('MongoRuntime middleware compatibility validation', () => {
     } as unknown as MongoMiddleware;
     expect(() =>
       createMongoRuntime({
-        adapter: createMockAdapter(),
+        context: makeContext(createMockAdapter()),
         driver: createMockDriver(),
-        contract: {},
-        targetId: 'mongo',
-        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).toThrow(

@@ -1,4 +1,19 @@
+export type { RuntimeTargetInstance } from '@prisma-next/framework-components/execution';
 export type { MongoExecutionPlan } from '../mongo-execution-plan';
+export type {
+  MongoExecutionContext,
+  MongoExecutionStack,
+  MongoRuntimeAdapterDescriptor,
+  MongoRuntimeAdapterInstance,
+  MongoRuntimeExtensionDescriptor,
+  MongoRuntimeExtensionInstance,
+  MongoRuntimeTargetDescriptor,
+  MongoStaticContributions,
+} from '../mongo-execution-stack';
+export {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
+} from '../mongo-execution-stack';
 export type { MongoMiddleware, MongoMiddlewareContext } from '../mongo-middleware';
 export type { MongoRuntime, MongoRuntimeOptions } from '../mongo-runtime';
 export { createMongoRuntime } from '../mongo-runtime';

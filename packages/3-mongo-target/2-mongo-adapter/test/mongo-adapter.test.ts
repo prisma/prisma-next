@@ -30,7 +30,7 @@ import {
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 import { describe, expect, expectTypeOf, it } from 'vitest';
-import { createMongoAdapter } from '../src/mongo-adapter';
+import { _unstable_createMongoAdapterWithCodecs, createMongoAdapter } from '../src/mongo-adapter';
 
 const stubMeta = {
   target: 'mongo',
@@ -390,7 +390,7 @@ describe('MongoAdapter with codec registry', () => {
     return registry;
   }
 
-  const adapterWithCodecs = createMongoAdapter(registryWithUppercase());
+  const adapterWithCodecs = _unstable_createMongoAdapterWithCodecs(registryWithUppercase());
 
   it('encodes MongoParamRef with codecId in insertOne document', async () => {
     const command = new InsertOneCommand('users', {

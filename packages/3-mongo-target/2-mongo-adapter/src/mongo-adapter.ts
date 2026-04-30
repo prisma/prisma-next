@@ -19,6 +19,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
+import { mongoStandardCodecs } from './core/codecs';
 import { lowerFilter, lowerPipeline, lowerStage } from './lowering';
 import { resolveValue } from './resolve-value';
 
@@ -156,36 +157,42 @@ class MongoAdapterImpl implements MongoAdapter {
   }
 }
 
-import {
-  mongoBooleanCodec,
-  mongoDateCodec,
-  mongoDoubleCodec,
-  mongoInt32Codec,
-  mongoObjectIdCodec,
-  mongoStringCodec,
-  mongoVectorCodec,
-} from './core/codecs';
-
-function defaultCodecRegistry(): MongoCodecRegistry {
+/**
+ * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo
+ * wire-type codecs. Internal helper used by the runtime adapter
+ * descriptor's `create(stack)` factory and by the public
+ * `createMongoAdapter()` helper. Not re-exported from the package's public
+ * surface — userland callers obtain a registry via the framework's
+ * execution-stack composition (see `createMongoExecutionContext`).
+ */
+function buildStandardCodecRegistry(): MongoCodecRegistry {
   const registry = createMongoCodecRegistry();
-  for (const codec of [
-    mongoObjectIdCodec,
-    mongoStringCodec,
-    mongoDoubleCodec,
-    mongoInt32Codec,
-    mongoBooleanCodec,
-    mongoDateCodec,
-    mongoVectorCodec,
-  ]) {
+  for (const codec of mongoStandardCodecs) {
     registry.register(codec);
   }
   return registry;
 }
 
-export function createDefaultMongoCodecRegistry(): MongoCodecRegistry {
-  return defaultCodecRegistry();
+/**
+ * Construct a Mongo adapter with the standard wire-type codecs registered
+ * for encode-side dispatch (`MongoParamRef.codecId` lookups).
+ *
+ * The runtime-side codec registry the runtime decodes against is composed
+ * separately by `createMongoExecutionContext`. This factory exists for
+ * direct adapter use (the runtime descriptor's `create(stack)` calls
+ * through it). User code should compose a stack/context instead.
+ */
+export function createMongoAdapter(): MongoAdapter {
+  return new MongoAdapterImpl(buildStandardCodecRegistry());
 }
 
-export function createMongoAdapter(codecs?: MongoCodecRegistry): MongoAdapter {
-  return new MongoAdapterImpl(codecs ?? defaultCodecRegistry());
+/**
+ * Internal escape hatch — direct adapter construction with a caller-supplied
+ * codec registry, used only by adapter unit tests that exercise the
+ * encode-side codec-dispatch path with synthetic codecs. Not re-exported
+ * from the package's public surface and not for production use; production
+ * callers compose a `MongoExecutionStack` and `MongoExecutionContext`.
+ */
+export function _unstable_createMongoAdapterWithCodecs(codecs: MongoCodecRegistry): MongoAdapter {
+  return new MongoAdapterImpl(codecs);
 }

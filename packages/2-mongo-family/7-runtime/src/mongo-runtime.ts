@@ -12,16 +12,25 @@ import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { decodeMongoRow } from './codecs/decoding';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
+import type { MongoExecutionContext } from './mongo-execution-stack';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
 
 function noop() {}
 
+/**
+ * Mongo runtime options.
+ *
+ * The runtime takes a {@link MongoExecutionContext} (built via
+ * `createMongoExecutionContext`) and a driver. Codec resolution flows from
+ * the context — there is no `codecs` field on this options bag. The adapter
+ * is reached via `context.stack.adapter` (instantiated lazily through the
+ * stack's `create(stack)` factory). See ADR — Mongo result-shape as a
+ * structural plan field, § Codec registry: stack aggregation, not user
+ * threading.
+ */
 export interface MongoRuntimeOptions {
-  readonly adapter: MongoAdapter;
+  readonly context: MongoExecutionContext;
   readonly driver: MongoDriver;
-  readonly contract: unknown;
-  readonly targetId: string;
-  readonly codecs: MongoCodecRegistry;
   readonly middleware?: readonly MongoMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
@@ -65,12 +74,13 @@ class MongoRuntimeImpl
 
   constructor(options: MongoRuntimeOptions) {
     const middleware = options.middleware ? [...options.middleware] : [];
+    const targetId = options.context.stack.target.targetId;
     for (const mw of middleware) {
-      checkMiddlewareCompatibility(mw, 'mongo', options.targetId);
+      checkMiddlewareCompatibility(mw, 'mongo', targetId);
     }
 
     const ctx: MongoMiddlewareContext = {
-      contract: options.contract,
+      contract: options.context.contract,
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
@@ -78,9 +88,11 @@ class MongoRuntimeImpl
 
     super({ middleware, ctx });
 
-    this.#adapter = options.adapter;
+    const adapterDescriptor = options.context.stack.adapter;
+    const adapterInstance = adapterDescriptor.create(options.context.stack);
+    this.#adapter = adapterInstance;
     this.#driver = options.driver;
-    this.#codecs = options.codecs;
+    this.#codecs = options.context.codecs;
   }
 
   protected override async lower(
