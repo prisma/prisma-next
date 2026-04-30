@@ -74,3 +74,37 @@ Each command should print no matches (or, for `pnpm lint:deps` / `pnpm test:pack
 - **OQ-2**: `inferPslContract(schemaIR: unknown)` — symmetric with `toSchemaView`.
 - **OQ-3**: `language` is a free-form string.
 - **OQ-4**: Formatter output is byte-identical to today.
+
+## Validation gates per milestone
+
+Each milestone's validation gate is the set of harness commands that must all pass before declaring the milestone done. Inferred from the project's `package.json` scripts; written back here so subsequent rounds inherit them. Gates run from the workspace root unless noted.
+
+**M1 — Printer accepts `PslDocumentAst`:**
+- `pnpm typecheck` — workspace-wide typecheck (the printer's signature change is consumed by `contract-infer.ts`).
+- `pnpm --filter @prisma-next/psl-printer test` — package-scoped tests, including the new AST-based test file.
+- `pnpm test:packages` — workspace-wide test, since the printer is a public export consumed by the CLI.
+- `pnpm lint:deps` — verifies `psl-printer` no longer imports `sql-schema-ir` (A7).
+- Structural check: `rg "@prisma-next/sql-schema-ir" packages/1-framework/2-authoring/psl-printer/` returns no matches at end of M1 (excluding any temporary `legacy-shim.ts`, removed in M2).
+
+**M2 — `PslContractInferCapable` and CLI cleanup:**
+- `pnpm typecheck` — workspace-wide.
+- `pnpm test:packages` — covers `framework-components`, sql family, and CLI.
+- `pnpm --filter @prisma-next/cli test` — package-scoped CLI tests (focus on `inspect-live-schema.test.ts`, `contract-infer.test.ts`, `client.test.ts`).
+- `pnpm lint:deps` — confirms layering is clean.
+- Structural checks:
+  - `rg "@prisma-next/(sql-|psl-printer/postgres)" packages/1-framework/3-tooling/cli/src/commands/inspect-live-schema.ts packages/1-framework/3-tooling/cli/src/commands/contract-infer.ts` returns no matches.
+  - `rg "familyId\\s*===" packages/1-framework/3-tooling/cli/src/commands/inspect-live-schema.ts packages/1-framework/3-tooling/cli/src/commands/contract-infer.ts` returns no matches.
+
+**M3 — `OperationPreviewCapable` and `sql` field rename:**
+- `pnpm typecheck` — workspace-wide.
+- `pnpm test:packages` — workspace-wide; the rename touches CLI types consumed by tests in multiple packages.
+- `pnpm --filter @prisma-next/cli test` — CLI formatter and migration command tests.
+- `pnpm --filter @prisma-next/sql-family test` and `pnpm --filter @prisma-next/mongo-family test` — family-scoped tests for the new capability.
+- `pnpm lint:deps` — confirms layering is clean.
+- `pnpm fixtures:check` — guards against any drift in JSON output of `db init` / `db update` plan output via fixtures (if any fixtures exercise this surface).
+- Structural checks:
+  - `rg "extractSqlDdl|extract-sql-ddl|extractOperationStatements" packages/1-framework/3-tooling/cli/src/` returns no matches.
+  - `rg "familyId\\s*===" packages/1-framework/3-tooling/cli/src/` returns no matches anywhere in the CLI.
+  - `rg "\\bsql:\\s*readonly" packages/1-framework/3-tooling/cli/src/` returns no matches.
+
+A gate failure is a hard pause: the implementer surfaces it; the orchestrator decides whether the failure is in-scope (regression to fix) or pre-existing fragility (escalate / log). Gates are never declared green by skipping commands.
