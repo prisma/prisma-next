@@ -152,12 +152,12 @@ export function errorSameSourceAndTarget(dir: string, hash: string): MigrationTo
   const dirName = basename(dir);
   return new MigrationToolsError(
     'MIGRATION.SAME_SOURCE_AND_TARGET',
-    'Migration has same source and target',
+    'Migration with no operations has same source and target',
     {
-      why: `Migration "${dirName}" has from === to === "${hash}". A migration must transition between two different contract states.`,
+      why: `Migration "${dirName}" has from === to === "${hash}" and declares no data-transform operations. Self-edges are only allowed when the migration runs at least one dataTransform — otherwise the migration is a no-op.`,
       fix: reemitHint(
         dir,
-        'or delete the directory if the migration is unwanted and the source TypeScript is gone.',
+        'and either change the contract so from ≠ to, add a dataTransform op, or delete the directory if the migration is unwanted.',
       ),
       details: { dirName, hash },
     },

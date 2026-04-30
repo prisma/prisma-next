@@ -51,7 +51,10 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
     const { to } = pkg.metadata;
 
     if (from === to) {
-      throw errorSameSourceAndTarget(pkg.dirPath, from);
+      const hasDataOp = pkg.ops.some((op) => op.operationClass === 'data');
+      if (!hasDataOp) {
+        throw errorSameSourceAndTarget(pkg.dirPath, from);
+      }
     }
 
     nodes.add(from);
@@ -174,10 +177,6 @@ export function findPathWithInvariants(
 ): readonly MigrationEdge[] | null {
   if (required.size === 0) {
     return findPath(graph, fromHash, toHash);
-  }
-  if (fromHash === toHash) {
-    // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
-    return null;
   }
 
   interface InvState {
@@ -318,11 +317,7 @@ export function findPathWithDecision(
 ): FindPathOutcome {
   const requiredInvariants = [...required].sort();
 
-  if (fromHash === toHash) {
-    if (required.size > 0) {
-      // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
-      return { kind: 'unsatisfiable', structuralPath: [], missing: requiredInvariants };
-    }
+  if (fromHash === toHash && required.size === 0) {
     return {
       kind: 'ok',
       decision: {

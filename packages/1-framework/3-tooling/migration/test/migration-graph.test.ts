@@ -74,6 +74,34 @@ function pkgWithInvariants(
   };
 }
 
+function pkgSelfEdge(
+  hash: string,
+  dirName: string,
+  opts: { readonly invariants?: readonly string[] } = {},
+): MigrationPackage {
+  const uniqueCreatedAt = `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
+  const ops = [
+    {
+      id: 'data_migration.self-edge',
+      label: 'Self-edge data migration',
+      operationClass: 'data' as const,
+    },
+  ];
+  const metadata = createTestMetadata({
+    from: hash,
+    to: hash,
+    createdAt: uniqueCreatedAt,
+    providedInvariants: opts.invariants ?? [],
+  });
+  const migrationHash = computeMigrationHash(metadata, ops);
+  return {
+    dirName,
+    dirPath: `/migrations/${dirName}`,
+    metadata: { ...metadata, migrationHash },
+    ops,
+  };
+}
+
 const E = EMPTY_CONTRACT_HASH;
 
 describe('reconstructGraph', () => {
@@ -135,7 +163,7 @@ describe('reconstructGraph', () => {
     expect(edge?.invariants).toEqual([]);
   });
 
-  it('rejects same source and target with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
+  it('rejects self-edge with no data ops with code MIGRATION.SAME_SOURCE_AND_TARGET', () => {
     try {
       reconstructGraph([pkg('H1', 'H1', 'm1')]);
       expect.fail('expected error');
@@ -148,6 +176,18 @@ describe('reconstructGraph', () => {
       expect(mte.details).toHaveProperty('hash', 'H1');
       expect(mte.fix).toBeTruthy();
     }
+  });
+
+  it('accepts a self-edge that declares at least one data op', () => {
+    const graph = reconstructGraph([pkgSelfEdge('H1', 'm1', { invariants: ['X'] })]);
+    expect(graph.nodes.size).toBe(1);
+    expect(graph.nodes.has('H1')).toBe(true);
+    expect(graph.forwardChain.get('H1')).toHaveLength(1);
+    expect(graph.reverseChain.get('H1')).toHaveLength(1);
+    const [edge] = [...graph.migrationByHash.values()];
+    expect(edge?.from).toBe('H1');
+    expect(edge?.to).toBe('H1');
+    expect(edge?.invariants).toEqual(['X']);
   });
 
   it('rejects duplicate migrationHash values', () => {
@@ -282,6 +322,13 @@ describe('findPath', () => {
 
   it('returns empty array when from === to', () => {
     const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const path = findPath(graph, 'H1', 'H1');
+    expect(path).toEqual([]);
+  });
+
+  it('returns empty array even when a self-edge exists (the empty path is structurally shortest)', () => {
+    const packages = [pkg(E, 'H1', 'm0'), pkgSelfEdge('H1', 'm_self')];
     const graph = reconstructGraph(packages);
     const path = findPath(graph, 'H1', 'H1');
     expect(path).toEqual([]);
@@ -620,7 +667,7 @@ describe('findPathWithDecision', () => {
     });
   });
 
-  it('returns unsatisfiable on a no-op transition (from === to) when required is non-empty', () => {
+  it('returns unsatisfiable on a no-op transition (from === to) when no self-edge covers required', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
     const result = findPathWithDecision(graph, 'H1', 'H1', undefined, new Set(['X']));
@@ -629,7 +676,7 @@ describe('findPathWithDecision', () => {
     expect(result.structuralPath).toEqual([]);
   });
 
-  it('preserves existing routing outcome when required is empty (F8)', () => {
+  it('preserves existing routing outcome when required is empty', () => {
     const packages = [pkgWithInvariants(E, 'H1', 'm1'), pkgWithInvariants('H1', 'H2', 'm2')];
     const graph = reconstructGraph(packages);
     const withEmpty = findPathWithDecision(graph, E, 'H2', undefined, new Set());
@@ -640,5 +687,24 @@ describe('findPathWithDecision', () => {
     expect(withEmpty.decision.selectedPath.map((e) => e.dirName)).toEqual(
       withoutRequired.decision.selectedPath.map((e) => e.dirName),
     );
+  });
+
+  it('selects a self-edge that covers the required invariant when from === to', () => {
+    const packages = [pkg(E, 'H1', 'm0'), pkgSelfEdge('H1', 'm_self', { invariants: ['X'] })];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'H1', 'H1', undefined, new Set(['X']));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual(['m_self']);
+    expect(result.decision.satisfiedInvariants).toEqual(['X']);
+  });
+
+  it('returns ok with empty path when from === to and required is empty even if a self-edge exists', () => {
+    const packages = [pkg(E, 'H1', 'm0'), pkgSelfEdge('H1', 'm_self', { invariants: ['X'] })];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'H1', 'H1');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath).toEqual([]);
   });
 });

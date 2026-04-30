@@ -159,11 +159,11 @@ async function executeMigrationNewCommand(
     throw error;
   }
 
-  if (fromHash === toStorageHash) {
+  if (fromHash === toStorageHash && !options.from) {
     return notOk(
       errorRuntime('No changes detected', {
         why: 'The from and to contract hashes are identical — there is nothing to migrate.',
-        fix: 'Change the contract and run `prisma-next contract emit` before creating a new migration.',
+        fix: 'Change the contract and run `prisma-next contract emit` before creating a new migration. To author a data-only migration on the current contract hash, pass `--from <hash>` explicitly.',
       }),
     );
   }
