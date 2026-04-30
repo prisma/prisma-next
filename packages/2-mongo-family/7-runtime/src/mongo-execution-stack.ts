@@ -100,11 +100,25 @@ export function createMongoExecutionStack<TTargetId extends string = 'mongo'>(op
 }
 
 /**
+ * Read-only view of the codec registry exposed on `MongoExecutionContext`.
+ *
+ * Hides `register()` and the iterator from public surface — users do not
+ * mutate the per-execution codec registry. Internal aggregation in
+ * `createMongoExecutionContext` keeps using the full `MongoCodecRegistry`
+ * (it needs `register()`).
+ */
+export interface MongoCodecLookup {
+  get(id: string): MongoCodec<string> | undefined;
+  has(id: string): boolean;
+}
+
+/**
  * Per-execution context aggregated from a `MongoExecutionStack`.
  *
- * Carries the user's contract, the codec registry composed from every
- * stack contributor, and a back-reference to the stack itself so the
- * runtime can reach the adapter without users threading it explicitly.
+ * Carries the user's contract, a read-only lookup over the codec registry
+ * composed from every stack contributor, and a back-reference to the stack
+ * itself so the runtime can reach the adapter without users threading it
+ * explicitly.
  *
  * Mirrors SQL's `ExecutionContext` in role; Mongo's flavour is leaner
  * because there are no parameterised codecs, JSON-schema validators, or
@@ -112,7 +126,7 @@ export function createMongoExecutionStack<TTargetId extends string = 'mongo'>(op
  */
 export interface MongoExecutionContext<TTargetId extends string = 'mongo'> {
   readonly contract: unknown;
-  readonly codecs: MongoCodecRegistry;
+  readonly codecs: MongoCodecLookup;
   readonly stack: MongoExecutionStack<TTargetId>;
 }
 

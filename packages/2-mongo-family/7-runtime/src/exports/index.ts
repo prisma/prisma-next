@@ -1,6 +1,7 @@
 export type { RuntimeTargetInstance } from '@prisma-next/framework-components/execution';
 export type { MongoExecutionPlan } from '../mongo-execution-plan';
 export type {
+  MongoCodecLookup,
   MongoExecutionContext,
   MongoExecutionStack,
   MongoRuntimeAdapterDescriptor,

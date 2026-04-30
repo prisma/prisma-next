@@ -18,6 +18,14 @@ export interface MongodContext {
   readonly dbName: string;
   readonly client: MongoClient;
   readonly runtime: MongoRuntime;
+  // Tests need to install synthetic codecs (e.g. throwing decoders) after
+  // the runtime is built. The public `MongoExecutionContext.codecs` exposes
+  // only the read-only `MongoCodecLookup` view; here we surface the
+  // underlying mutable `MongoCodecRegistry` that
+  // `createMongoExecutionContext` constructed, so test fixtures can install
+  // codecs against the same registry the runtime decodes against.
+  // Production callers must not reach for this — see
+  // `createMongoExecutionContext` and `MongoCodecLookup`.
   readonly codecs: MongoCodecRegistry;
   readonly stubMeta: PlanMeta;
 }
@@ -48,12 +56,20 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
   const driver = await createMongoDriver(connectionUri, dbName);
   const runtime = createMongoRuntime({ context, driver });
 
+  // Cast back to `MongoCodecRegistry` — the test setup is the one place that
+  // legitimately mutates the per-execution registry mid-flight (to install
+  // synthetic codecs for failure-mode tests). The aggregation in
+  // `createMongoExecutionContext` returns a real `MongoCodecRegistry`
+  // structurally; we just narrowed the public type to hide `register()` from
+  // user-facing code.
+  const codecs = context.codecs as MongoCodecRegistry;
+
   const ctx: MongodContext = {
     connectionUri,
     dbName,
     client,
     runtime,
-    codecs: context.codecs,
+    codecs,
     stubMeta,
   };
 
