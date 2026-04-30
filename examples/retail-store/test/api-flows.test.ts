@@ -58,7 +58,11 @@ describe(
       const orderId = order._id;
       const fetched = await getOrderWithUser(ctx.db, orderId);
       expect(fetched).not.toBeNull();
-      expect(fetched!.userId).toEqual(alice._id);
+      // `alice._id` comes back from `orm.users.create()` as the raw driver
+      // value (an ObjectId); `fetched!.userId` is decoded to a hex string by
+      // the typed-read path. Compare via String(...) until create() decodes
+      // its return value (separate change).
+      expect(fetched!.userId).toEqual(String(alice._id));
 
       const bobOrders = await getUserOrders(ctx.db, bob._id);
       expect(bobOrders).toHaveLength(0);
@@ -128,7 +132,9 @@ describe(
 
       const remaining = await getUserOrders(ctx.db, alice._id);
       expect(remaining).toHaveLength(1);
-      expect(remaining[0]!._id).toEqual(order2._id);
+      // Same shape mismatch as above: `order2._id` comes from create() (raw
+      // ObjectId), the `remaining[0]!._id` from a typed read (decoded hex).
+      expect(remaining[0]!._id).toEqual(String(order2._id));
     });
   },
 );
