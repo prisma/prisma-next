@@ -44,8 +44,18 @@ export interface SqlCodecCallContext extends CodecCallContext {
 }
 
 /**
- * Descriptor for parameterized codecs that require type parameter validation.
- * Shared between adapter (compile-time) and runtime layers to avoid duplication.
+ * Legacy adapter-level descriptor for parameterized codecs that require
+ * type-parameter validation at compile time. The runtime descriptor
+ * (`RuntimeParameterizedCodecDescriptor` in `@prisma-next/sql-runtime`)
+ * has migrated to the unified `CodecDescriptor<P>` shape with
+ * `factory: (P) => (Ctx) => Codec`; this descriptor stays only because
+ * the SQL `Adapter.parameterizedCodecs()` surface still returns
+ * `CodecParamsDescriptor[]` (compile-time typeParams validation only,
+ * not runtime materialization).
+ *
+ * Retirement is tracked under TML-2357 T3.5.4 (single registration slot)
+ * — the adapter-level `parameterizedCodecs()` collapses into the unified
+ * runtime descriptor map once contributors migrate fully.
  *
  * @template TParams - The shape of the type parameters (e.g., `{ length: number }`)
  * @template THelper - The type returned by the optional `init` hook
@@ -64,6 +74,14 @@ export interface CodecParamsDescriptor<TParams = Record<string, unknown>, THelpe
    * Optional init hook called during runtime context creation.
    * Receives validated params and returns a helper object to be stored in context.types.
    * If not provided, the validated params are stored directly.
+   *
+   * Predecessor pattern. The runtime descriptor's curried
+   * `factory: (P) => (Ctx) => Codec` subsumes this hook — per-instance
+   * state lives on the resolved codec rather than in a parallel
+   * `TypeHelperRegistry` entry. Retirement tracked under TML-2357 T3.5.2
+   * (narrow runtime `Codec` interface) and T3.5.4 (single registration
+   * slot). Adapter-level callers reading codec-self-carried `init` should
+   * migrate to the runtime descriptor map's factory instead.
    */
   readonly init?: (params: TParams) => THelper;
 }
@@ -94,6 +112,14 @@ export interface CodecMeta {
  * bivariantly, so the SQL narrowing is structurally compatible with the
  * framework {@link BaseCodec} super-interface.
  *
+ * Note: `paramsSchema` and `init` here are the legacy adapter-level slots
+ * mirrored from {@link CodecParamsDescriptor}. The runtime materialization
+ * path uses `RuntimeParameterizedCodecDescriptor` (in
+ * `@prisma-next/sql-runtime`) via the unified `CodecDescriptor<P>` shape;
+ * codec-self-carried `paramsSchema`/`init` retire under TML-2357 (T3.5.2
+ * narrows the runtime `Codec` interface; T3.5.4 collapses the parallel
+ * registration slots).
+ *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
  */
@@ -109,6 +135,11 @@ export interface Codec<
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
+  /**
+   * Predecessor init hook. Retirement tracked under TML-2357 (T3.5.2 /
+   * T3.5.4); the unified runtime descriptor's
+   * `factory: (P) => (Ctx) => Codec` is the replacement.
+   */
   readonly init?: (params: TParams) => THelper;
 }
 
