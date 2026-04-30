@@ -148,21 +148,48 @@ function arktypeJsonCodecForSchema<TInferred>(
     return result as TInferred;
   }
 
+  // Derive both `encode` (wire string) and `encodeJson` (JsonValue)
+  // outputs from the same `JSON.stringify` → `JSON.parse` round-trip,
+  // then validate the normalized payload through the schema. Without
+  // this normalization, a non-JSON-safe runtime value (e.g. a class
+  // instance, a function field on a narrowed type) could slip through
+  // `encodeJson` unchanged while `encode` silently dropped or
+  // transformed it — producing wire payloads the codec's own decode
+  // path would later reject. The serialize/parse round-trip also
+  // produces the JSON-safe shape required by the contract IR's
+  // `JsonValue` surface, so `encodeJson` no longer needs a blind cast.
+  function serializeToJsonSafe(value: TInferred): { wire: string; json: JsonValue } {
+    // `JSON.stringify` returns `string | undefined` — `undefined`
+    // happens when the input is `undefined` itself or contains only
+    // unserializable values (functions, symbols). Reject explicitly so
+    // the caller sees the schema-failure code rather than a downstream
+    // `JSON.parse(undefined)` SyntaxError.
+    const wire: string | undefined = JSON.stringify(value);
+    if (typeof wire !== 'string') {
+      throw runtimeError(
+        'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+        `arktype-json value is not representable as JSON (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
+        { codecId: ARKTYPE_JSON_CODEC_ID },
+      );
+    }
+    const json = JSON.parse(wire) as JsonValue;
+    // Validate the normalized payload — the round-trip strips
+    // class-prototype shape and arktype-narrowed fields, and the
+    // schema must still accept the result. Run validation and discard
+    // its return value (we keep `json` as the JsonValue, not the
+    // schema's `inferOut` which already matches `TInferred`).
+    validateSchema(json);
+    return { wire, json };
+  }
+
   return (_ctx) =>
     codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
       typeId: ARKTYPE_JSON_CODEC_ID,
       targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
       traits: ['equality'] as const,
-      encode: (value: TInferred): string => JSON.stringify(value),
+      encode: (value: TInferred): string => serializeToJsonSafe(value).wire,
       decode: (wire: string): TInferred => validateSchema(JSON.parse(wire)),
-      // The contract IR's JSON-side surface is typed against `JsonValue`;
-      // arktype outputs may include narrowed types (literal unions,
-      // branded types, …) that aren't structurally `JsonValue`. The
-      // encodeJson cast is a wire-level identity by contract: the caller
-      // agrees the value is JSON-safe. `decodeJson` runs the schema so a
-      // contract-load → ORM-read path that bypasses `decode` still
-      // validates the payload.
-      encodeJson: (value: TInferred) => value as unknown as JsonValue,
+      encodeJson: (value: TInferred): JsonValue => serializeToJsonSafe(value).json,
       decodeJson: (json: JsonValue) => validateSchema(json),
     }) as ArktypeJsonCodec<TInferred>;
 }

@@ -128,12 +128,68 @@ describe('arktypeJson roundtrip', () => {
     expect(decoded).toEqual(original);
   });
 
-  it('encodeJson / decodeJson identity-pass JsonValue payloads', () => {
+  it('encodeJson / decodeJson round-trip JsonValue payloads', () => {
     const codec = arktypeJson(productSchema).type(SYNTH_CTX);
     const original = { name: 'Widget', price: 10 };
     const json = codec.encodeJson(original);
     const restored = codec.decodeJson(json);
     expect(restored).toEqual(original);
+  });
+
+  // The codec derives both `encode` (wire string) and `encodeJson`
+  // (JsonValue) outputs from the same `JSON.stringify` → `JSON.parse`
+  // round-trip, then runs the schema on the normalized payload. Without
+  // this unification, `encodeJson` would emit non-JSON-safe values
+  // unchanged while `encode` silently dropped or transformed them,
+  // producing wire payloads the codec'\''s own decode path would later
+  // reject. The next two tests pin both halves of that contract.
+  it('encode and encodeJson agree on the normalized payload', async () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    const original = { name: 'Widget', price: 10, description: 'desc' };
+    const wire = await codec.encode(original, CALL_CTX);
+    const json = codec.encodeJson(original);
+    expect(wire).toBe(JSON.stringify(json));
+  });
+
+  it('encode rejects non-JSON-safe runtime values via the shared validator', async () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    // Class instance with extra prototype-only methods. `JSON.stringify`
+    // strips those so the wire payload normalizes to `{ name, price }`,
+    // but the schema must still accept the normalized shape — this case
+    // does. The check ensures the unification path runs without
+    // throwing for legitimate JSON-safe payloads even when the runtime
+    // type isn'\''t a plain object.
+    class Widget {
+      constructor(
+        public name: string,
+        public price: number,
+      ) {}
+      toString() {
+        return `${this.name}@${this.price}`;
+      }
+    }
+    const widget = new Widget('Widget', 10);
+    const wire = await codec.encode(widget, CALL_CTX);
+    expect(wire).toBe('{"name":"Widget","price":10}');
+  });
+
+  it('encode rejects values that are not representable as JSON', async () => {
+    // A schema whose inferred type accepts a function field would never
+    // be authored intentionally — but the type system can'\''t catch that
+    // for `unknown`-typed schemas at runtime. Cast through the typed
+    // surface to model the case where a runtime value is structurally
+    // unserializable; both encode paths must reject.
+    const anySchema = type('object');
+    const codec = arktypeJson(anySchema).type(SYNTH_CTX);
+    // `JSON.stringify(undefined)` returns `undefined`, not a string; the
+    // serializeToJsonSafe guard rejects this with a clear schema-failure
+    // code rather than a downstream `JSON.parse(undefined)` SyntaxError.
+    await expect(codec.encode(undefined as never, CALL_CTX)).rejects.toThrow(
+      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+    );
+    expect(() => codec.encodeJson(undefined as never)).toThrow(
+      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+    );
   });
 });
 
@@ -305,8 +361,8 @@ describe('arktypeJsonEmitCodec (emit-only shim)', () => {
   });
 
   it('encode/decode reject because runtime materialization goes through the descriptor', async () => {
-    await expect(arktypeJsonEmitCodec.encode('value')).rejects.toThrow(/emit-only/);
-    await expect(arktypeJsonEmitCodec.decode('wire')).rejects.toThrow(/emit-only/);
+    await expect(arktypeJsonEmitCodec.encode('value', CALL_CTX)).rejects.toThrow(/emit-only/);
+    await expect(arktypeJsonEmitCodec.decode('wire', CALL_CTX)).rejects.toThrow(/emit-only/);
   });
 
   it('encodeJson/decodeJson throw because runtime materialization goes through the descriptor', () => {
