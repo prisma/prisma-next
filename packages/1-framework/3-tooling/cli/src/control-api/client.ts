@@ -6,6 +6,8 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  MigrationPlanOperation,
+  OperationPreview,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -13,6 +15,7 @@ import type {
 import {
   createControlStack,
   hasMigrations,
+  hasOperationPreview,
   hasPslContractInfer,
   hasSchemaView,
 } from '@prisma-next/framework-components/control';
@@ -475,6 +478,14 @@ class ControlClientImpl implements ControlClient {
     this.init();
     if (this.familyInstance && hasPslContractInfer(this.familyInstance)) {
       return this.familyInstance.inferPslContract(schemaIR);
+    }
+    return undefined;
+  }
+
+  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview | undefined {
+    this.init();
+    if (this.familyInstance && hasOperationPreview(this.familyInstance)) {
+      return this.familyInstance.toOperationPreview(operations);
     }
     return undefined;
   }

@@ -12,6 +12,7 @@ import type {
   CoreSchemaView,
   MigrationPlannerConflict,
   MigrationPlanOperation,
+  OperationPreview,
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
@@ -284,7 +285,14 @@ export interface DbInitSuccess {
       readonly label: string;
       readonly operationClass: string;
     }>;
-    readonly sql?: ReadonlyArray<string>;
+    /**
+     * Family-agnostic textual preview of the planned operations, e.g.
+     * `language: 'sql'` for SQL families and `language: 'mongodb-shell'`
+     * for the Mongo family. Replaces the previous `sql?: readonly string[]`
+     * field; consumers that previously read `plan.sql` should read
+     * `plan.preview?.statements.map((s) => s.text)`.
+     */
+    readonly preview?: OperationPreview;
   };
   readonly destination: {
     readonly storageHash: string;
@@ -342,7 +350,14 @@ export interface DbUpdateSuccess {
       readonly label: string;
       readonly operationClass: string;
     }>;
-    readonly sql?: ReadonlyArray<string>;
+    /**
+     * Family-agnostic textual preview of the planned operations, e.g.
+     * `language: 'sql'` for SQL families and `language: 'mongodb-shell'`
+     * for the Mongo family. Replaces the previous `sql?: readonly string[]`
+     * field; consumers that previously read `plan.sql` should read
+     * `plan.preview?.statements.map((s) => s.text)`.
+     */
+    readonly preview?: OperationPreview;
   };
   readonly destination: {
     readonly storageHash: string;
@@ -700,6 +715,16 @@ export interface ControlClient {
    * @returns PslDocumentAst if the family supports the capability, undefined otherwise
    */
   inferPslContract(schemaIR: unknown): PslDocumentAst | undefined;
+
+  /**
+   * Renders a textual preview of a migration plan's operations for the CLI's
+   * "DDL preview" output. Delegates to the family instance's
+   * `toOperationPreview` method.
+   *
+   * @param operations - The migration plan operations to render
+   * @returns OperationPreview if the family supports the capability, undefined otherwise
+   */
+  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview | undefined;
 
   /**
    * Emits the contract to JSON and TypeScript declarations.
