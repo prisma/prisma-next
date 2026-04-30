@@ -11,12 +11,21 @@ import type { MigrationEdge, MigrationGraph } from './graph';
 import { bfs } from './graph-ops';
 import type { MigrationPackage } from './package';
 
-/** Forward-edge neighbours for BFS: edge `e` from `n` visits `e.to` next. */
+/** Forward-edge neighbours: edge `e` from `n` visits `e.to` next. */
 function forwardNeighbours(graph: MigrationGraph, node: string) {
   return (graph.forwardChain.get(node) ?? []).map((edge) => ({ next: edge.to, edge }));
 }
 
-/** Reverse-edge neighbours for BFS: edge `e` from `n` visits `e.from` next. */
+/**
+ * Forward-edge neighbours, sorted by the deterministic tie-break.
+ * Used by path-finding so the resulting shortest path is stable across runs.
+ */
+function sortedForwardNeighbours(graph: MigrationGraph, node: string) {
+  const edges = graph.forwardChain.get(node) ?? [];
+  return [...edges].sort(compareTieBreak).map((edge) => ({ next: edge.to, edge }));
+}
+
+/** Reverse-edge neighbours: edge `e` from `n` visits `e.from` next. */
 function reverseNeighbours(graph: MigrationGraph, node: string) {
   return (graph.reverseChain.get(node) ?? []).map((edge) => ({ next: edge.from, edge }));
 }
@@ -67,8 +76,8 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
 
 // ---------------------------------------------------------------------------
 // Deterministic tie-breaking for BFS neighbour order.
-// Used by `findPath` and `findPathWithDecision` only; not a general-purpose
-// utility. Ordering: label priority → createdAt → to → migrationHash.
+// Used by path-finders only; not a general-purpose utility.
+// Ordering: label priority → createdAt → to → migrationHash.
 // ---------------------------------------------------------------------------
 
 const LABEL_PRIORITY: Record<string, number> = { main: 0, default: 1, feature: 2 };
@@ -96,13 +105,6 @@ function sortedNeighbors(edges: readonly MigrationEdge[]): readonly MigrationEdg
   return [...edges].sort(compareTieBreak);
 }
 
-/** Ordering adapter for `bfs` — sorts `{next, edge}` pairs by tie-break. */
-function bfsOrdering(
-  items: readonly { next: string; edge: MigrationEdge }[],
-): readonly { next: string; edge: MigrationEdge }[] {
-  return items.slice().sort((a, b) => compareTieBreak(a.edge, b.edge));
-}
-
 /**
  * Find the shortest path from `fromHash` to `toHash` using BFS over the
  * contract-hash graph. Returns the ordered list of edges, or null if no path
@@ -119,11 +121,11 @@ export function findPath(
   if (fromHash === toHash) return [];
 
   const parents = new Map<string, { parent: string; edge: MigrationEdge }>();
-  for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n), bfsOrdering)) {
+  for (const step of bfs([fromHash], (n) => sortedForwardNeighbours(graph, n))) {
     if (step.parent !== null && step.incomingEdge !== null) {
-      parents.set(step.node, { parent: step.parent, edge: step.incomingEdge });
+      parents.set(step.state, { parent: step.parent, edge: step.incomingEdge });
     }
-    if (step.node === toHash) {
+    if (step.state === toHash) {
       const path: MigrationEdge[] = [];
       let cur = toHash;
       let p = parents.get(cur);
@@ -141,13 +143,110 @@ export function findPath(
 }
 
 /**
+ * Find the shortest path from `fromHash` to `toHash` whose edges collectively
+ * cover every invariant in `required`. Returns `null` when no such path exists
+ * (either `fromHash`→`toHash` is structurally unreachable, or every reachable
+ * path leaves at least one required invariant uncovered). When `required` is
+ * empty, delegates to `findPath` so the result is byte-identical for that case.
+ *
+ * Algorithm: BFS over `(node, coveredSubset)` states with state-level dedup.
+ * The covered subset is a `Set<string>` of invariant ids; the state's dedup
+ * key is `${node}\0${[...covered].sort().join('\0')}`. State keys distinguish
+ * distinct `(node, covered)` tuples regardless of node-name length because
+ * `\0` cannot appear in any invariant id (validation rejects whitespace and
+ * control chars at authoring time).
+ *
+ * Neighbour ordering when `required ≠ ∅`: edges covering ≥1 still-needed
+ * invariant come first, with `labelPriority → createdAt → to → migrationHash`
+ * as the secondary key. The heuristic steers BFS toward the satisfying path;
+ * correctness (shortest, deterministic) does not depend on it.
+ */
+export function findPathWithInvariants(
+  graph: MigrationGraph,
+  fromHash: string,
+  toHash: string,
+  required: ReadonlySet<string>,
+): readonly MigrationEdge[] | null {
+  if (required.size === 0) {
+    return findPath(graph, fromHash, toHash);
+  }
+  if (fromHash === toHash) {
+    // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
+    return null;
+  }
+
+  interface InvState {
+    readonly node: string;
+    readonly covered: ReadonlySet<string>;
+  }
+  const stateKey = (s: InvState): string => {
+    if (s.covered.size === 0) return `${s.node}\0`;
+    return `${s.node}\0${[...s.covered].sort().join('\0')}`;
+  };
+
+  const neighbours = (s: InvState): Iterable<{ next: InvState; edge: MigrationEdge }> => {
+    const outgoing = graph.forwardChain.get(s.node) ?? [];
+    if (outgoing.length === 0) return [];
+    return [...outgoing]
+      .map((edge) => {
+        let useful = false;
+        let next: Set<string> | null = null;
+        for (const inv of edge.invariants) {
+          if (required.has(inv) && !s.covered.has(inv)) {
+            if (next === null) next = new Set(s.covered);
+            next.add(inv);
+            useful = true;
+          }
+        }
+        return { edge, useful, nextCovered: next ?? s.covered };
+      })
+      .sort((a, b) => {
+        if (a.useful !== b.useful) return a.useful ? -1 : 1;
+        return compareTieBreak(a.edge, b.edge);
+      })
+      .map(({ edge, nextCovered }) => ({
+        next: { node: edge.to, covered: nextCovered },
+        edge,
+      }));
+  };
+
+  // Path reconstruction is consumer-side, keyed on stateKey, same shape as
+  // findPath's parents map.
+  const parents = new Map<string, { parentKey: string; edge: MigrationEdge }>();
+  for (const step of bfs<InvState, MigrationEdge>(
+    [{ node: fromHash, covered: new Set() }],
+    neighbours,
+    stateKey,
+  )) {
+    const curKey = stateKey(step.state);
+    if (step.parent !== null && step.incomingEdge !== null) {
+      parents.set(curKey, { parentKey: stateKey(step.parent), edge: step.incomingEdge });
+    }
+    if (step.state.node === toHash && step.state.covered.size === required.size) {
+      const path: MigrationEdge[] = [];
+      let cur: string | undefined = curKey;
+      while (cur !== undefined) {
+        const p = parents.get(cur);
+        if (!p) break;
+        path.push(p.edge);
+        cur = p.parentKey;
+      }
+      path.reverse();
+      return path;
+    }
+  }
+
+  return null;
+}
+
+/**
  * Reverse-BFS from `toHash` over `reverseChain` to collect every node from
  * which `toHash` is reachable (inclusive of `toHash` itself).
  */
 function collectNodesReachingTarget(graph: MigrationGraph, toHash: string): Set<string> {
   const reached = new Set<string>();
   for (const step of bfs([toHash], (n) => reverseNeighbours(graph, n))) {
-    reached.add(step.node);
+    reached.add(step.state);
   }
   return reached;
 }
@@ -233,7 +332,7 @@ function findDivergencePoint(
   const ancestorSets = leaves.map((leaf) => {
     const ancestors = new Set<string>();
     for (const step of bfs([leaf], (n) => reverseNeighbours(graph, n))) {
-      ancestors.add(step.node);
+      ancestors.add(step.state);
     }
     return ancestors;
   });
@@ -262,8 +361,8 @@ function findDivergencePoint(
 export function findReachableLeaves(graph: MigrationGraph, fromHash: string): readonly string[] {
   const leaves: string[] = [];
   for (const step of bfs([fromHash], (n) => forwardNeighbours(graph, n))) {
-    if (!graph.forwardChain.get(step.node)?.length) {
-      leaves.push(step.node);
+    if (!graph.forwardChain.get(step.state)?.length) {
+      leaves.push(step.state);
     }
   }
   return leaves;
@@ -410,7 +509,7 @@ export function detectOrphans(graph: MigrationGraph): readonly MigrationEdge[] {
   }
 
   for (const step of bfs(startNodes, (n) => forwardNeighbours(graph, n))) {
-    reachable.add(step.node);
+    reachable.add(step.state);
   }
 
   const orphans: MigrationEdge[] = [];
