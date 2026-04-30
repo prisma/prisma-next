@@ -1,7 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/print-psl';
-import { makeOptions } from './print-psl-test-helpers';
+import { printPslLegacy as printPsl } from '../src/legacy-shim';
 
 describe('printPsl', () => {
   it('schema with defaults (autoincrement, now, boolean, string, number)', () => {
@@ -49,7 +48,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -94,7 +93,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -152,7 +151,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -217,7 +216,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -294,7 +293,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -352,7 +351,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -388,7 +387,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -446,7 +445,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -505,7 +504,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -542,7 +541,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 

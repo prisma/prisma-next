@@ -8,7 +8,7 @@ import type {
   SqlReferentialAction,
   SqlSchemaIR,
   SqlUniqueIR,
-} from '@prisma-next/sql-schema-ir/types';
+} from './legacy-sql-schema-ir-gateway';
 
 const REFERENTIAL_ACTIONS = new Set<SqlReferentialAction>([
   'noAction',

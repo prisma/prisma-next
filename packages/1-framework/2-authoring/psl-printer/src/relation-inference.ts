@@ -1,4 +1,4 @@
-import type { SqlForeignKeyIR } from '@prisma-next/sql-schema-ir/types';
+import type { SqlForeignKeyIR } from './legacy-sql-schema-ir-gateway';
 import { deriveBackRelationFieldName, deriveRelationFieldName, pluralize } from './name-transforms';
 import type { PslPrintableSqlTable } from './schema-validation';
 import type { RelationField } from './types';
