@@ -182,6 +182,10 @@ function defaultCodecRegistry(): MongoCodecRegistry {
   return registry;
 }
 
+export function createDefaultMongoCodecRegistry(): MongoCodecRegistry {
+  return defaultCodecRegistry();
+}
+
 export function createMongoAdapter(codecs?: MongoCodecRegistry): MongoAdapter {
   return new MongoAdapterImpl(codecs ?? defaultCodecRegistry());
 }

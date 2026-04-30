@@ -1,4 +1,4 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
@@ -26,9 +26,10 @@ describe('CRUD lifecycle', { timeout: timeouts.spinUpMongoMemoryServer }, () => 
     client = new MongoClient(replSet.getUri());
     await client.connect();
 
-    const adapter = createMongoAdapter();
+    const codecs = createDefaultMongoCodecRegistry();
+    const adapter = createMongoAdapter(codecs);
     const driver = await createMongoDriver(replSet.getUri(), dbName);
-    runtime = createMongoRuntime({ adapter, driver, contract, targetId: 'mongo' });
+    runtime = createMongoRuntime({ adapter, driver, codecs, contract, targetId: 'mongo' });
   }, timeouts.spinUpMongoMemoryServer);
 
   beforeEach(async () => {

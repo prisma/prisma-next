@@ -1,4 +1,4 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
@@ -29,9 +29,10 @@ export function setupTestDb(dbName: string) {
     client = new MongoClient(replSet.getUri());
     await client.connect();
 
-    const adapter = createMongoAdapter();
+    const codecs = createDefaultMongoCodecRegistry();
+    const adapter = createMongoAdapter(codecs);
     const driver = await createMongoDriver(replSet.getUri(), dbName);
-    runtime = createMongoRuntime({ adapter, driver, contract, targetId: 'mongo' });
+    runtime = createMongoRuntime({ adapter, driver, codecs, contract, targetId: 'mongo' });
     const orm = mongoOrm({ contract, executor: runtime });
 
     db = { orm, runtime, query, raw, contract };

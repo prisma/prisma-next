@@ -1,4 +1,4 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
@@ -14,11 +14,13 @@ const query = mongoQuery<Contract>({ contractJson });
 const raw = mongoRaw({ contract });
 
 export async function createClient(connectionUri: string, dbName: string) {
-  const adapter = createMongoAdapter();
+  const codecs = createDefaultMongoCodecRegistry();
+  const adapter = createMongoAdapter(codecs);
   const driver = await createMongoDriver(connectionUri, dbName);
   const runtime = createMongoRuntime({
     adapter,
     driver,
+    codecs,
     contract,
     targetId: 'mongo',
     middleware: [createTelemetryMiddleware()],

@@ -1,4 +1,4 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
@@ -118,7 +118,8 @@ export default function mongo<
   let closed = false;
 
   const buildRuntime = async (resolvedBinding: MongoBinding): Promise<MongoRuntime> => {
-    const adapter = createMongoAdapter();
+    const codecs = createDefaultMongoCodecRegistry();
+    const adapter = createMongoAdapter(codecs);
     const driver =
       resolvedBinding.kind === 'url'
         ? await MongoDriverImpl.fromConnection(resolvedBinding.url, resolvedBinding.dbName)
@@ -126,6 +127,7 @@ export default function mongo<
     return createMongoRuntime({
       adapter,
       driver,
+      codecs,
       contract,
       targetId: 'mongo',
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
