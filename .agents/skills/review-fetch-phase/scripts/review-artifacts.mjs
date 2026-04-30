@@ -209,6 +209,7 @@ function normalizeReviewStateV1(input) {
 
     const sortedComments = sortThreadComments(normalizedComments);
     const primaryComment = sortedComments[0] ?? null;
+    if (primaryComment === null) continue;
     const startLine =
       Number.isInteger(thread.startLine) && thread.startLine >= 0
         ? thread.startLine
@@ -236,19 +237,17 @@ function normalizeReviewStateV1(input) {
         earliestCommentCreatedAt: earliestCommentCreatedAt(sortedComments),
         nodeId: thread.id,
       },
-      primaryComment: primaryComment
-        ? {
-            nodeId: primaryComment.nodeId,
-            url: primaryComment.url,
-            authorLogin: primaryComment.author.login,
-            createdAt: primaryComment.createdAt,
-            bodySnippet: summarizeBody(primaryComment.body),
-          }
-        : null,
+      primaryComment: {
+        nodeId: primaryComment.nodeId,
+        url: primaryComment.url,
+        authorLogin: primaryComment.author.login,
+        createdAt: primaryComment.createdAt,
+        bodySnippet: summarizeBody(primaryComment.body),
+      },
       targetHint: {
         kind: 'review_thread',
         nodeId: thread.id,
-        url: primaryComment?.url ?? null,
+        url: primaryComment.url,
       },
       isActionableCandidate: !Boolean(thread.isOutdated),
       comments: sortedComments,
