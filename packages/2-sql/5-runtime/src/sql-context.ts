@@ -1,4 +1,6 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { CodecDescriptor, Ctx } from '@prisma-next/framework-components/codec';
+import { synthesizeNonParameterizedDescriptor } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -14,7 +16,7 @@ import {
   type RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
   type SqlOperationDescriptor,
@@ -22,39 +24,40 @@ import {
 import type {
   Adapter,
   AnyQueryAst,
-  CodecParamsDescriptor,
+  Codec,
   CodecRegistry,
+  ContractCodecRegistry,
   LoweredStatement,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   AppliedMutationDefault,
+  CodecDescriptorRegistry,
   ExecutionContext,
   JsonSchemaValidateFn,
   JsonSchemaValidatorRegistry,
   MutationDefaultsOptions,
   TypeHelperRegistry,
 } from '@prisma-next/sql-relational-core/query-lane-context';
-import { type as arktype } from 'arktype';
 
 /**
  * Runtime parameterized codec descriptor.
- * Provides validation schema and optional init hook for codecs that support type parameters.
- * Used at runtime to validate typeParams and create type helpers.
  *
- * This is a type alias for `CodecParamsDescriptor` from the AST layer,
- * which is the shared definition used by both adapter and runtime.
+ * The unified `CodecDescriptor<P>` shape applied to parameterized codecs
+ * — `paramsSchema: StandardSchemaV1<P>` for JSON-boundary validation,
+ * `factory: (P) => (Ctx) => Codec` for the curried higher-order codec.
+ * The factory is called once per `storage.types` instance (or once per
+ * inline-`typeParams` column); per-instance state lives in the closure.
+ *
+ * Codec-registry-unification spec § Decision.
  */
-export type RuntimeParameterizedCodecDescriptor<
-  TParams = Record<string, unknown>,
-  THelper = unknown,
-> = CodecParamsDescriptor<TParams, THelper>;
+export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> = CodecDescriptor<P>;
 
 export interface SqlStaticContributions {
   readonly codecs: () => CodecRegistry;
   // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
-  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any, any>>;
+  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any>>;
   readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
@@ -206,9 +209,16 @@ function validateTypeParams(
   codecDescriptor: RuntimeParameterizedCodecDescriptor,
   context: { typeName?: string; tableName?: string; columnName?: string },
 ): Record<string, unknown> {
-  const result = codecDescriptor.paramsSchema(typeParams);
-  if (result instanceof arktype.errors) {
-    const messages = result.map((p: { message: string }) => p.message).join('; ');
+  const result = codecDescriptor.paramsSchema['~standard'].validate(typeParams);
+  if (result instanceof Promise) {
+    throw runtimeError(
+      'RUNTIME.TYPE_PARAMS_INVALID',
+      `paramsSchema for codec '${codecDescriptor.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
+      { ...context, codecId: codecDescriptor.codecId, typeParams },
+    );
+  }
+  if (result.issues) {
+    const messages = result.issues.map((issue) => issue.message).join('; ');
     const locationInfo = context.typeName
       ? `type '${context.typeName}'`
       : `column '${context.tableName}.${context.columnName}'`;
@@ -218,7 +228,7 @@ function validateTypeParams(
       { ...context, codecId: codecDescriptor.codecId, typeParams },
     );
   }
-  return result as Record<string, unknown>;
+  return result.value as Record<string, unknown>;
 }
 
 function collectParameterizedCodecDescriptors(
@@ -242,32 +252,111 @@ function collectParameterizedCodecDescriptors(
   return descriptors;
 }
 
+/**
+ * Build the unified descriptor map. Combines parameterized descriptors
+ * (which already ship as `CodecDescriptor`s) with synthesized descriptors
+ * for non-parameterized codecs registered through the legacy `codecs:`
+ * slot. Codec ids that ship a parameterized descriptor take precedence —
+ * even when the legacy registry registers a representative codec under
+ * the same id, the parameterized descriptor is the authoritative source.
+ *
+ * Codec-registry-unification spec § Decision: every codec resolves
+ * through one descriptor map; reads are non-branching.
+ */
+function buildCodecDescriptorRegistry(
+  codecRegistry: CodecRegistry,
+  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): CodecDescriptorRegistry {
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumers narrow per codec.
+  type AnyDescriptor = CodecDescriptor<any>;
+  const byId = new Map<string, AnyDescriptor>();
+  const byTargetType = new Map<string, Array<AnyDescriptor>>();
+
+  function registerInIndices(descriptor: AnyDescriptor): void {
+    byId.set(descriptor.codecId, descriptor);
+    for (const targetType of descriptor.targetTypes) {
+      const list = byTargetType.get(targetType);
+      if (list) {
+        list.push(descriptor);
+      } else {
+        byTargetType.set(targetType, [descriptor]);
+      }
+    }
+  }
+
+  for (const descriptor of parameterizedDescriptors.values()) {
+    registerInIndices(descriptor);
+  }
+
+  for (const codec of codecRegistry.values()) {
+    if (byId.has(codec.id)) continue;
+    registerInIndices(synthesizeNonParameterizedDescriptor(codec));
+  }
+
+  return {
+    descriptorFor(codecId: string): AnyDescriptor | undefined {
+      return byId.get(codecId);
+    },
+    *values(): IterableIterator<AnyDescriptor> {
+      yield* byId.values();
+    },
+    byTargetType(targetType: string): readonly AnyDescriptor[] {
+      return byTargetType.get(targetType) ?? Object.freeze([]);
+    },
+  };
+}
+
+function collectTypeRefSites(
+  storage: SqlStorage,
+): Map<string, Array<{ readonly table: string; readonly column: string }>> {
+  const sites = new Map<string, Array<{ readonly table: string; readonly column: string }>>();
+  for (const [tableName, table] of Object.entries(storage.tables)) {
+    for (const [columnName, column] of Object.entries(table.columns)) {
+      if (typeof column.typeRef !== 'string') continue;
+      const list = sites.get(column.typeRef);
+      const entry = { table: tableName, column: columnName };
+      if (list) {
+        list.push(entry);
+      } else {
+        sites.set(column.typeRef, [entry]);
+      }
+    }
+  }
+  return sites;
+}
+
 function initializeTypeHelpers(
-  storageTypes: Record<string, StorageTypeInstance> | undefined,
+  storage: SqlStorage,
   codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): TypeHelperRegistry {
   const helpers: TypeHelperRegistry = {};
+  const storageTypes = storage.types;
 
   if (!storageTypes) {
     return helpers;
   }
 
+  const typeRefSites = collectTypeRefSites(storage);
+
   for (const [typeName, typeInstance] of Object.entries(storageTypes)) {
     const descriptor = codecDescriptors.get(typeInstance.codecId);
 
-    if (descriptor) {
-      const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
-        typeName,
-      });
-
-      if (descriptor.init) {
-        helpers[typeName] = descriptor.init(validatedParams);
-      } else {
-        helpers[typeName] = typeInstance;
-      }
-    } else {
+    if (!descriptor) {
+      // No parameterized descriptor for this codec id — store the raw
+      // type instance for callers that need typeParams metadata.
       helpers[typeName] = typeInstance;
+      continue;
     }
+
+    const validatedParams = validateTypeParams(typeInstance.typeParams, descriptor, {
+      typeName,
+    });
+
+    const usedAt = typeRefSites.get(typeName) ?? [];
+    helpers[typeName] = descriptor.factory(validatedParams)({
+      name: typeName,
+      usedAt,
+    });
   }
 
   return helpers;
@@ -290,67 +379,175 @@ function validateColumnTypeParams(
 }
 
 /**
- * Builds a registry of compiled JSON Schema validators by scanning the contract
- * for columns whose codec descriptor provides an `init` hook returning `{ validate }`.
- *
- * Handles both:
- * - Inline `typeParams.schema` on columns
- * - `typeRef` → `storage.types[ref]` with init hook results already in `types` registry
+ * View of a codec that exposes a per-instance JSON-schema `validate`
+ * function. Codecs declare this contract by including the
+ * `'json-validator'` `CodecTrait` in their `traits` array; the trait is
+ * the gate that lets `extractValidator` resolve from structurally-typed
+ * `unknown` to this typed view.
  */
-function buildJsonSchemaValidatorRegistry(
+type JsonValidatorCodec = {
+  readonly traits?: ReadonlyArray<unknown>;
+  readonly validate: JsonSchemaValidateFn;
+};
+
+function hasJsonValidatorTrait(candidate: unknown): candidate is JsonValidatorCodec {
+  if (candidate === null || typeof candidate !== 'object') return false;
+  const traits = (candidate as { readonly traits?: unknown }).traits;
+  if (!Array.isArray(traits)) return false;
+  if (!traits.includes('json-validator')) return false;
+  const validate = (candidate as { readonly validate?: unknown }).validate;
+  return typeof validate === 'function';
+}
+
+function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined {
+  return hasJsonValidatorTrait(candidate) ? candidate.validate : undefined;
+}
+
+function isResolvedCodec(candidate: unknown): candidate is Codec {
+  return (
+    candidate !== null &&
+    typeof candidate === 'object' &&
+    'id' in candidate &&
+    'decode' in candidate
+  );
+}
+
+/**
+ * Walk the contract's `storage.tables[].columns[]` and resolve each
+ * column to a `Codec` through the unified descriptor map. Per-instance
+ * behavior:
+ *
+ * - **typeRef columns**: reuse the resolved codec materialized once by
+ *   `initializeTypeHelpers` for the `storage.types` entry. Multiple
+ *   columns sharing one typeRef share one codec instance.
+ * - **inline-typeParams columns**: call `descriptor.factory(typeParams)
+ *   (ctx)` once per column (per-column anonymous instance).
+ * - **non-parameterized columns**: call `descriptor.factory()(ctx)`
+ *   once. The synthesized descriptor's factory is constant — every call
+ *   returns the same shared codec instance — so columns sharing a non-
+ *   parameterized codec id share one resolved codec without explicit
+ *   caching.
+ *
+ * Combines what `initializeTypeHelpers` (named-instance walk) and the
+ * old `buildJsonSchemaValidatorRegistry` (per-column walk) used to do
+ * separately: one walk over all columns, one resolved codec per column,
+ * one trait-gated validator extraction per column. The result drives
+ * both the dispatch registry (`ContractCodecRegistry.forColumn`) and the
+ * validator registry.
+ *
+ * Codec-registry-unification spec § AC-4: every column resolves through
+ * one descriptor map without branching on parameterization.
+ */
+function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
+  codecDescriptors: CodecDescriptorRegistry,
+  legacyCodecRegistry: CodecRegistry,
   types: TypeHelperRegistry,
-  codecDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
-): JsonSchemaValidatorRegistry | undefined {
+  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+): {
+  readonly registry: ContractCodecRegistry;
+  readonly jsonValidators: JsonSchemaValidatorRegistry | undefined;
+} {
+  const byColumn = new Map<string, Codec>();
+  const byCodecId = new Map<string, Codec>();
   const validators = new Map<string, JsonSchemaValidateFn>();
-
-  // Collect codec IDs that have init hooks (these produce { validate } helpers)
-  const codecIdsWithInit = new Set<string>();
-  for (const [codecId, descriptor] of codecDescriptors) {
-    if (descriptor.init) {
-      codecIdsWithInit.add(codecId);
-    }
-  }
-
-  if (codecIdsWithInit.size === 0) {
-    return undefined;
-  }
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const [columnName, column] of Object.entries(table.columns)) {
-      if (!codecIdsWithInit.has(column.codecId)) continue;
+      const columnKey = `${tableName}.${columnName}`;
+      const descriptor = codecDescriptors.descriptorFor(column.codecId);
 
-      const key = `${tableName}.${columnName}`;
+      let resolvedCodec: Codec | undefined;
 
-      // Case 1: column references a named type → validator already compiled via init hook
-      if (column.typeRef) {
-        const helper = types[column.typeRef] as { validate?: JsonSchemaValidateFn } | undefined;
-        if (helper?.validate) {
-          validators.set(key, helper.validate);
+      if (descriptor) {
+        const isParameterized = parameterizedDescriptors.has(column.codecId);
+
+        if (column.typeRef) {
+          // The named instance was already materialized once by
+          // `initializeTypeHelpers`; reuse it so multiple columns sharing
+          // the same typeRef share one codec instance (and any per-
+          // instance helper state on it).
+          const helper = types[column.typeRef];
+          if (isResolvedCodec(helper)) {
+            resolvedCodec = helper;
+          }
+        } else if (column.typeParams && isParameterized) {
+          const parameterizedDescriptor = parameterizedDescriptors.get(column.codecId);
+          if (parameterizedDescriptor) {
+            const validatedParams = validateTypeParams(column.typeParams, parameterizedDescriptor, {
+              tableName,
+              columnName,
+            });
+            const ctx: Ctx = {
+              name: `<anon:${tableName}.${columnName}>`,
+              usedAt: [{ table: tableName, column: columnName }],
+            };
+            resolvedCodec = parameterizedDescriptor.factory(validatedParams)(ctx);
+          }
+        } else if (!isParameterized) {
+          // Non-parameterized column. Cache the resolved codec by codec
+          // id — the synthesized descriptor's factory is constant for
+          // non-parameterized codecs, so columns sharing this codec id
+          // share one resolved instance.
+          let cached = byCodecId.get(column.codecId);
+          if (!cached) {
+            const ctx: Ctx = {
+              name: `<shared:${column.codecId}>`,
+              usedAt: [{ table: tableName, column: columnName }],
+            };
+            // `synthesizeNonParameterizedDescriptor` produces a
+            // `CodecDescriptor<void>` whose factory ignores its params
+            // and ctx; passing `undefined` is safe and matches the
+            // descriptor's typed `void` parameter.
+            cached = (descriptor.factory as (params: void) => (ctx: Ctx) => Codec)(undefined)(ctx);
+            byCodecId.set(column.codecId, cached);
+          }
+          resolvedCodec = cached;
         }
-        continue;
+        // else: parameterized codec id with no typeRef and no typeParams
+        // — the column is missing the params the descriptor needs. Leave
+        // `resolvedCodec` undefined; encode/decode for this column will
+        // fall through to `forCodecId` (the AC-5-deferred carve-out).
       }
 
-      // Case 2: inline typeParams with schema → compile via init hook
-      if (column.typeParams) {
-        const descriptor = codecDescriptors.get(column.codecId);
-        if (descriptor?.init) {
-          const helper = descriptor.init(column.typeParams) as
-            | { validate?: JsonSchemaValidateFn }
-            | undefined;
-          if (helper?.validate) {
-            validators.set(key, helper.validate);
-          }
+      if (resolvedCodec) {
+        byColumn.set(columnKey, resolvedCodec);
+        const validate = extractValidator(resolvedCodec);
+        if (validate) {
+          validators.set(columnKey, validate);
+        }
+        if (!byCodecId.has(column.codecId)) {
+          byCodecId.set(column.codecId, resolvedCodec);
         }
       }
     }
   }
 
-  if (validators.size === 0) return undefined;
-  return {
-    get: (key: string) => validators.get(key),
-    size: validators.size,
+  const registry: ContractCodecRegistry = {
+    forColumn(table, column) {
+      return byColumn.get(`${table}.${column}`);
+    },
+    forCodecId(codecId) {
+      // Codec-id-only fallback for sites without a column ref (encode-
+      // side DSL params whose `ParamRef.refs` isn't populated). Prefer
+      // the contract-walk-derived shared codec; fall back to the legacy
+      // `codecRegistry.get` for parameterized codec ids whose contracts
+      // don't have a typeRef/typeParams column the walk could resolve
+      // through. The legacy fallback retires once `ParamRef.refs` is
+      // threaded everywhere (TML-2357).
+      return byCodecId.get(codecId) ?? legacyCodecRegistry.get(codecId);
+    },
   };
+
+  const jsonValidators: JsonSchemaValidatorRegistry | undefined =
+    validators.size > 0
+      ? {
+          get: (key: string) => validators.get(key),
+          size: validators.size,
+        }
+      : undefined;
+
+  return { registry, jsonValidators };
 }
 
 function collectMutationDefaultGenerators(
@@ -476,23 +673,32 @@ export function createExecutionContext<
   }
 
   const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
+  const codecDescriptors = buildCodecDescriptorRegistry(
+    codecRegistry,
+    parameterizedCodecDescriptors,
+  );
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
   }
 
-  const types = initializeTypeHelpers(contract.storage.types, parameterizedCodecDescriptors);
+  const types = initializeTypeHelpers(contract.storage, parameterizedCodecDescriptors);
 
-  const jsonSchemaValidators = buildJsonSchemaValidatorRegistry(
-    contract,
-    types,
-    parameterizedCodecDescriptors,
-  );
+  const { registry: contractCodecs, jsonValidators: jsonSchemaValidators } =
+    buildContractCodecRegistry(
+      contract,
+      codecDescriptors,
+      codecRegistry,
+      types,
+      parameterizedCodecDescriptors,
+    );
 
   return {
     contract,
     codecs: codecRegistry,
+    contractCodecs,
+    codecDescriptors,
     queryOperations: queryOperationRegistry,
     types,
     ...(jsonSchemaValidators ? { jsonSchemaValidators } : {}),

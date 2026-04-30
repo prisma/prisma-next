@@ -1,7 +1,7 @@
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
@@ -172,26 +172,44 @@ const jsonTypeParamsSchema = arktype({
 });
 
 function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor[] = [
-    {
-      codecId: 'pg/json@1',
-      paramsSchema: jsonTypeParamsSchema,
-      init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params['schema'] as Record<string, unknown>),
-      }),
+  // Phase B note: JSON-validator codec descriptors compile their schema
+  // in the factory and attach `validate` as per-instance state on the
+  // resolved codec. The framework's `JsonSchemaValidatorRegistry` builder
+  // extracts `validate` via the `'json-validator'` `CodecTrait` gate.
+  const baseJson = jsonbCodec('pg/json@1', 'json');
+  const baseJsonb = jsonbCodec('pg/jsonb@1', 'jsonb');
+
+  const buildJsonDescriptor = (
+    codecId: 'pg/json@1' | 'pg/jsonb@1',
+    base: typeof baseJson | typeof baseJsonb,
+    targetType: 'json' | 'jsonb',
+  ): RuntimeParameterizedCodecDescriptor<Record<string, unknown>> => ({
+    codecId,
+    traits: ['json-validator'],
+    targetTypes: [targetType],
+    paramsSchema: jsonTypeParamsSchema,
+    factory: (params: Record<string, unknown>) => {
+      const validate = createStubValidator(params['schema'] as Record<string, unknown>);
+      const baseTraits: ReadonlyArray<string> = base.traits ?? [];
+      const traitsArr = Array.from(new Set([...baseTraits, 'json-validator']));
+      const traits = Object.freeze(traitsArr) as NonNullable<Codec['traits']>;
+      const resolved: Codec & { readonly validate: typeof validate } = {
+        ...base,
+        traits,
+        validate,
+      };
+      return () => resolved;
     },
-    {
-      codecId: 'pg/jsonb@1',
-      paramsSchema: jsonTypeParamsSchema,
-      init: (params: Record<string, unknown>) => ({
-        validate: createStubValidator(params['schema'] as Record<string, unknown>),
-      }),
-    },
+  });
+
+  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<Record<string, unknown>>[] = [
+    buildJsonDescriptor('pg/json@1', baseJson, 'json'),
+    buildJsonDescriptor('pg/jsonb@1', baseJsonb, 'jsonb'),
   ];
 
   const registry = createCodecRegistry();
-  registry.register(jsonbCodec('pg/json@1', 'json'));
-  registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
+  registry.register(baseJson);
+  registry.register(baseJsonb);
 
   return {
     kind: 'extension' as const,
@@ -287,18 +305,31 @@ describe('JSON Schema validator registry', () => {
       expect(context.jsonSchemaValidators!.get('user.profile')).toBeDefined();
     });
 
-    it('omits validator registry when no init hooks are defined', () => {
+    it('omits validator registry when no descriptor declares the json-validator trait', () => {
+      const baseJsonb = jsonbCodec('pg/jsonb@1', 'jsonb');
       const registry = createCodecRegistry();
-      registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
+      registry.register(baseJsonb);
 
-      const noInitExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      // The factory returns the legacy codec without attaching `validate`
+      // and without declaring the `'json-validator'` trait — so the
+      // framework's validator registry builder finds no per-column
+      // validators to extract.
+      const noValidatorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
-        id: 'json-no-init',
+        id: 'json-no-validator',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
         codecs: () => registry,
-        parameterizedCodecs: () => [{ codecId: 'pg/jsonb@1', paramsSchema: jsonTypeParamsSchema }],
+        parameterizedCodecs: () => [
+          {
+            codecId: 'pg/jsonb@1',
+            traits: [],
+            targetTypes: ['jsonb'],
+            paramsSchema: jsonTypeParamsSchema,
+            factory: (_params) => () => baseJsonb,
+          },
+        ],
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -306,7 +337,7 @@ describe('JSON Schema validator registry', () => {
 
       const contract = createJsonSchemaContract();
       const context = createTestContext(contract, createStubAdapter(), {
-        extensionPacks: [noInitExtension],
+        extensionPacks: [noValidatorExtension],
       });
 
       expect(context.jsonSchemaValidators).toBeUndefined();
