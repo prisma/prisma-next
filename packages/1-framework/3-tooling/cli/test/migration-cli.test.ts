@@ -243,6 +243,56 @@ describe('MigrationCLI.run', () => {
     expect(stderr.text).toBe('');
   });
 
+  // A `migration.ts` file may execute other code alongside `MigrationCLI.run`
+  // — most realistically, an unhandled rejection or an explicit
+  // `process.exitCode = N` somewhere upstream that signals a prior failure.
+  // The CLI must not clobber that signal: a successful migration write
+  // should not turn a previously-failing process into a successful one.
+  it('preserves a pre-existing non-zero process.exitCode on success', async () => {
+    loadConfigMock.mockResolvedValue(okConfig);
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+
+    const originalExitCode = process.exitCode;
+    process.exitCode = 7;
+    try {
+      const stdout = new BufferStream();
+      const stderr = new BufferStream();
+      const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+        argv: entrypointArgv(),
+        stdout,
+        stderr,
+      });
+      expect(exitCode).toBe(0);
+      expect(process.exitCode).toBe(7);
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+  });
+
+  // A failure inside `MigrationCLI.run` must still set `process.exitCode`
+  // for script-style callers that don't await the return value, even when
+  // there's no prior non-zero status.
+  it('sets process.exitCode on failure when no prior status was set', async () => {
+    loadConfigMock.mockResolvedValue(okConfig);
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+
+    const originalExitCode = process.exitCode;
+    process.exitCode = undefined;
+    try {
+      const stdout = new BufferStream();
+      const stderr = new BufferStream();
+      const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+        argv: entrypointArgv('--frobnicate'),
+        stdout,
+        stderr,
+      });
+      expect(exitCode).toBe(2);
+      expect(process.exitCode).toBe(2);
+    } finally {
+      process.exitCode = originalExitCode;
+    }
+  });
+
   it('renders --help to stdout and exits 0', async () => {
     const stdout = new BufferStream();
     const stderr = new BufferStream();
@@ -399,6 +449,44 @@ describe('MigrationCLI.run', () => {
     expect(loadConfigMock).not.toHaveBeenCalled();
     expect(stderr.text).toContain('PN-CLI-4012');
     expect(stderr.text).toContain('--config');
+  });
+
+  // `--config=` (equals form, empty value) is a usage error: the user
+  // expressed intent to override the config path but the override is
+  // empty. Loader behaviour for an empty path is implementation-defined
+  // and worse for the user than a structured PN-CLI-4012.
+  it('rejects --config= (equals form, empty value) with PN-CLI-4012 and exit 2', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config='),
+      stdout,
+      stderr,
+    });
+
+    expect(exitCode).toBe(2);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    expect(stderr.text).toContain('PN-CLI-4012');
+  });
+
+  // `--config ""` (separated form, empty string token) is the same kind
+  // of usage error as `--config=`. Shells expand `""` into a real
+  // (empty) argv token, so this is what an author hits in practice
+  // when scripting `--config "$MAYBE_UNSET_VAR"`.
+  it('rejects --config "" (separated form, empty string) with PN-CLI-4012 and exit 2', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config', ''),
+      stdout,
+      stderr,
+    });
+
+    expect(exitCode).toBe(2);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    expect(stderr.text).toContain('PN-CLI-4012');
   });
 
   it('rejects target-mismatched migrations before any stack-driven construction', async () => {

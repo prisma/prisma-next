@@ -213,7 +213,17 @@ export class MigrationCLI {
       stdout,
       stderr,
     });
-    process.exitCode = exitCode;
+    // Preserve any pre-existing non-zero `process.exitCode` set by code
+    // running alongside `MigrationCLI.run` (an unhandled rejection
+    // upstream, an explicit `process.exitCode = N` from another
+    // module). Overwriting it with our success would mask the upstream
+    // failure for script-style callers that don't await the return
+    // value. Failures we return here are still surfaced — non-zero
+    // codes always win over the prior status — but successes never
+    // clear it.
+    if (exitCode !== 0 || !process.exitCode) {
+      process.exitCode = exitCode;
+    }
     return exitCode;
   }
 }
@@ -326,22 +336,34 @@ async function orchestrate(
  * - `--config <flag>` where `<flag>` starts with `-` (silently
  *   consuming the next flag would either drop the flag or serialize
  *   against the wrong project).
+ * - `--config <empty>` where the value is the empty string. Shells
+ *   expand `--config ""` (or `--config "$UNSET_VAR"`) into a real
+ *   empty argv token; treating that as a usage error here surfaces
+ *   `PN-CLI-4012` instead of a less actionable loader error on an
+ *   empty path.
+ * - `--config=` (the equals form with an empty value). Same shape as
+ *   the empty-string case above; the user expressed intent to override
+ *   the config path but the override is empty.
  *
- * `--config=<value>` and `--config <value>` are both valid; this
- * pre-scan ignores them (and the equals form's value is allowed to
- * start with `-` — the `=` makes the binding explicit).
+ * `--config=<value>` and `--config <value>` with a non-empty value are
+ * both valid (and the equals form's value is allowed to start with
+ * `-` — the `=` makes the binding explicit).
  */
 function detectInvalidConfig(input: readonly string[]): CliStructuredError | null {
   for (let i = 0; i < input.length; i++) {
-    if (input[i] !== '--config') {
+    const token = input[i];
+    if (token === '--config') {
+      const next = input[i + 1];
+      if (next === undefined || next === '') {
+        return errorMigrationCliInvalidConfigArg();
+      }
+      if (next.startsWith('-')) {
+        return errorMigrationCliInvalidConfigArg({ nextToken: next });
+      }
       continue;
     }
-    const next = input[i + 1];
-    if (next === undefined) {
+    if (token === '--config=') {
       return errorMigrationCliInvalidConfigArg();
-    }
-    if (next.startsWith('-')) {
-      return errorMigrationCliInvalidConfigArg({ nextToken: next });
     }
   }
   return null;
