@@ -308,21 +308,35 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             }),
         );
 
-        for await (const rawRow of stream) {
-          // Between-row abort check: exit promptly with
-          // RUNTIME.ABORTED { phase: stream } before pulling the next
-          // raw row through the driver iterator.
-          if (signal?.aborted) {
-            throw runtimeAborted('stream', signal.reason);
+        // Manually drive the driver's async iterator so the between-row
+        // abort check fires *before* requesting the next row. With a
+        // `for await...of` loop the runtime would await `iterator.next()`
+        // first, leaving a window where one extra row is pulled through
+        // the driver after the signal aborted.
+        const iterator = stream[Symbol.asyncIterator]();
+        try {
+          while (true) {
+            if (signal?.aborted) {
+              throw runtimeAborted('stream', signal.reason);
+            }
+            const next = await iterator.next();
+            if (next.done) {
+              break;
+            }
+            const decodedRow = await decodeRow(
+              next.value,
+              exec,
+              self.codecRegistry,
+              self.jsonSchemaValidators,
+              codecCtx,
+            );
+            yield decodedRow as Row;
           }
-          const decodedRow = await decodeRow(
-            rawRow,
-            exec,
-            self.codecRegistry,
-            self.jsonSchemaValidators,
-            codecCtx,
-          );
-          yield decodedRow as Row;
+        } finally {
+          // Best-effort iterator cleanup so the driver can release its
+          // resources whether the stream finished normally, threw, or was
+          // abandoned by the consumer.
+          await iterator.return?.();
         }
 
         outcome = 'success';
