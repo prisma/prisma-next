@@ -16,10 +16,12 @@ const mocks = vi.hoisted(() => {
   const loadConfigMock = vi.fn();
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
+  const inferPslContractMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
+    inferPslContract: inferPslContractMock,
     close: closeMock,
   }));
 
@@ -27,6 +29,7 @@ const mocks = vi.hoisted(() => {
     loadConfigMock,
     introspectMock,
     toSchemaViewMock,
+    inferPslContractMock,
     closeMock,
     createControlClientMock,
   };
@@ -77,6 +80,7 @@ describe('inspectLiveSchema', () => {
     mocks.loadConfigMock.mockResolvedValue(baseConfig);
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(undefined);
+    mocks.inferPslContractMock.mockReturnValue(undefined);
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);
@@ -260,7 +264,7 @@ describe('inspectLiveSchema', () => {
     expect(mocks.closeMock).toHaveBeenCalledTimes(1);
   });
 
-  it('passes non-SQL schema IR through without validatePrintableSqlSchemaIR', async () => {
+  it('passes non-SQL schema IR through unchanged when no contract inference is supported', async () => {
     const mongoSchemaIR = { collections: { users: { name: 'users', indexes: [] } } };
     mocks.loadConfigMock.mockResolvedValue({
       ...baseConfig,
@@ -269,6 +273,7 @@ describe('inspectLiveSchema', () => {
       db: { connection: 'mongodb://localhost:27017/test' },
     });
     mocks.introspectMock.mockResolvedValue(mongoSchemaIR);
+    mocks.inferPslContractMock.mockReturnValue(undefined);
 
     const { flags, ui } = createUi();
     const result = await inspectLiveSchema({}, flags, ui, 0, context);
@@ -277,5 +282,19 @@ describe('inspectLiveSchema', () => {
     if (!result.ok) return;
     expect(result.value.schema).toBe(mongoSchemaIR);
     expect(result.value.target.familyId).toBe('mongo');
+    expect(result.value.pslContractAst).toBeUndefined();
+  });
+
+  it('exposes the AST returned by client.inferPslContract', async () => {
+    const fakeAst = { kind: 'document', models: [] } as unknown;
+    mocks.inferPslContractMock.mockReturnValue(fakeAst);
+
+    const { flags, ui } = createUi();
+    const result = await inspectLiveSchema({}, flags, ui, 0, context);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.pslContractAst).toBe(fakeAst);
+    expect(mocks.inferPslContractMock).toHaveBeenCalledWith(schemaIR);
   });
 });

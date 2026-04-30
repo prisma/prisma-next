@@ -1093,6 +1093,41 @@ describe('ControlClient progress emission', () => {
     });
   });
 
+  describe('inferPslContract()', () => {
+    it('delegates to family instance when capability is implemented', () => {
+      const fakeAst = { kind: 'document', models: [] } as unknown;
+      const { mockFamily, mockTarget, mockAdapter, mockFamilyInstance } = createMockComponents();
+      (mockFamilyInstance as unknown as { inferPslContract: (ir: unknown) => unknown })[
+        'inferPslContract'
+      ] = (ir: unknown) => {
+        void ir;
+        return fakeAst;
+      };
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = client.inferPslContract({ tables: {} });
+      expect(result).toBe(fakeAst);
+    });
+
+    it('returns undefined when family does not implement the capability', () => {
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = client.inferPslContract({ tables: {} });
+      expect(result).toBeUndefined();
+    });
+  });
+
   describe('no onProgress callback', () => {
     it('does not throw when onProgress is omitted from verify', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
