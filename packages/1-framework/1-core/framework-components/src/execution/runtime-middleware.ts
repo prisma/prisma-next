@@ -22,7 +22,7 @@ export interface RuntimeMiddlewareContext {
    *
    * The family runtime owns the implementation:
    * - SQL: `meta.storageHash` + `exec.sql` + `canonicalStringify(exec.params)`
-   * - Mongo: `meta.storageHash` + `canonicalStringify(exec.command)`
+   * - Mongo: `meta.storageHash` + `canonicalStringify({ ...exec.command })`
    *
    * The method is `async` because the underlying digest helper
    * (`hashContent`) uses the WebCrypto API, whose `crypto.subtle.digest`

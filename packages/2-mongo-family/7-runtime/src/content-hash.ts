@@ -44,5 +44,10 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * @internal
  */
 export function computeMongoContentHash(exec: MongoExecutionPlan): Promise<string> {
+  // Spread to a plain object: `canonicalStringify` rejects class
+  // instances by design (so `Map`/`Set`/class instances cannot collapse
+  // to `{}` and silently collide). All wire-command data lives on own
+  // enumerable properties, so this preserves the same canonical form
+  // and therefore the same hash.
   return hashContent(`${exec.meta.storageHash}|${canonicalStringify({ ...exec.command })}`);
 }
