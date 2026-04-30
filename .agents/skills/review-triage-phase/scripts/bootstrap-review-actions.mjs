@@ -92,8 +92,13 @@ function toActionFromTarget(target, order) {
   };
 }
 
+const IMPLEMENT_PHASE_SUPPORTED_TARGET_KINDS = new Set(['review_thread', 'pull_request_review']);
+
 function buildReviewActions(reviewState, reviewStatePath) {
-  const actions = reviewState.targets.map((target, index) => toActionFromTarget(target, index + 1));
+  const supportedTargets = reviewState.targets.filter((target) =>
+    IMPLEMENT_PHASE_SUPPORTED_TARGET_KINDS.has(target.kind),
+  );
+  const actions = supportedTargets.map((target, index) => toActionFromTarget(target, index + 1));
 
   return {
     version: 2,
