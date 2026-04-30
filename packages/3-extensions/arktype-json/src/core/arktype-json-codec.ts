@@ -98,6 +98,18 @@ type ArktypeSchemaLike = ((value: unknown) => unknown) & {
 };
 
 /**
+ * Type predicate for `ArktypeSchemaLike`. Lets the column-author
+ * factory narrow `unknown` schemas to the structural shape the codec
+ * depends on after the explicit field guards run, so the descriptor
+ * builder doesn't fall back to a `as unknown as` cast.
+ */
+function isArktypeSchemaLike(value: unknown): value is ArktypeSchemaLike {
+  if (typeof value !== 'function') return false;
+  const expression = (value as { readonly expression?: unknown }).expression;
+  return typeof expression === 'string';
+}
+
+/**
  * Build the curried factory for a rehydrated arktype schema. The factory's
  * returned codec carries the schema in its closure; `decode` validates
  * wire payloads via `schema(parsed)`, throwing
@@ -195,26 +207,29 @@ export function arktypeJson<S extends Type<unknown>>(
   readonly typeParams: ArktypeJsonTypeParams;
   readonly type: (ctx: CodecInstanceContext) => ArktypeJsonCodec<S['infer']>;
 } {
-  // Reject non-callable lookalikes before any property reads. An object
-  // shaped like `{ expression, json }` would otherwise pass the field
-  // checks and only explode on the first `decode`/`decodeJson` call,
-  // defeating the early authoring-time guard this factory provides.
-  if (typeof schema !== 'function') {
-    throw new Error('arktypeJson(schema) expects a callable arktype Type.');
+  // Reject non-callable / non-arktype-shaped lookalikes before any
+  // property reads. An object shaped like `{ expression, json }` would
+  // otherwise pass the field checks and only explode on the first
+  // `decode`/`decodeJson` call, defeating the early authoring-time
+  // guard this factory provides. The `isArktypeSchemaLike` predicate
+  // narrows `schema` so the descriptor builder hands the typed shape
+  // straight to the curried factory — no `as unknown as` cast.
+  if (!isArktypeSchemaLike(schema)) {
+    throw new Error(
+      typeof schema !== 'function'
+        ? 'arktypeJson(schema) expects a callable arktype Type.'
+        : 'arktypeJson(schema) expects an arktype Type (missing `expression: string`).',
+    );
   }
-  const expression: unknown = (schema as { readonly expression?: unknown }).expression;
   const jsonIr: unknown = (schema as { readonly json?: unknown }).json;
-  if (typeof expression !== 'string') {
-    throw new Error('arktypeJson(schema) expects an arktype Type (missing `expression: string`).');
-  }
   if (jsonIr === null || typeof jsonIr !== 'object') {
     throw new Error('arktypeJson(schema) expects an arktype Type (missing `json` IR).');
   }
   return {
     codecId: ARKTYPE_JSON_CODEC_ID,
     nativeType: ARKTYPE_JSON_NATIVE_TYPE,
-    typeParams: { expression, jsonIr },
-    type: arktypeJsonCodecForSchema<S['infer']>(schema as unknown as ArktypeSchemaLike),
+    typeParams: { expression: schema.expression, jsonIr },
+    type: arktypeJsonCodecForSchema<S['infer']>(schema),
   } as const;
 }
 
@@ -284,9 +299,12 @@ function renderArktypeJsonOutputTypeFromUnknownParams(
  * descriptor's `renderOutputType` is the long-term home for the renderer
  * but the emit-path glue still routes through `CodecLookup`).
  *
- * Encode/decode here are sentinels that throw if invoked — runtime
+ * All conversion methods are sentinels that throw if invoked — runtime
  * materialization always goes through `arktypeJsonCodec.factory`'s
- * curried `(params) => (ctx) => Codec`, never through this instance. A
+ * curried `(params) => (ctx) => Codec`, never through this instance.
+ * `encodeJson`/`decodeJson` throw alongside `encode`/`decode` so a
+ * mistaken contract-load that resolved to this stub fails fast at the
+ * JSON boundary instead of silently returning unvalidated payloads. A
  * future cleanup could route the emit path through the descriptor map
  * directly and retire this shim.
  */
@@ -304,8 +322,12 @@ export const arktypeJsonEmitCodec: Codec<
   traits: ['equality'] as const,
   encode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
   decode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
-  encodeJson: (value) => value as never,
-  decodeJson: (json) => json as unknown,
+  encodeJson: () => {
+    throw new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR);
+  },
+  decodeJson: () => {
+    throw new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR);
+  },
   renderOutputType: renderArktypeJsonOutputTypeFromUnknownParams,
 };
 

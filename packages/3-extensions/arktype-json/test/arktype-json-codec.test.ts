@@ -309,9 +309,12 @@ describe('arktypeJsonEmitCodec (emit-only shim)', () => {
     await expect(arktypeJsonEmitCodec.decode('wire')).rejects.toThrow(/emit-only/);
   });
 
-  it('encodeJson/decodeJson identity-pass JsonValue payloads', () => {
-    expect(arktypeJsonEmitCodec.encodeJson('payload')).toBe('payload');
-    expect(arktypeJsonEmitCodec.decodeJson({ a: 1 })).toEqual({ a: 1 });
+  it('encodeJson/decodeJson throw because runtime materialization goes through the descriptor', () => {
+    // Mirrors `encode`/`decode`: a contract-load path that resolved to
+    // this emit-only stub must fail fast at the JSON boundary instead
+    // of silently returning unvalidated payloads.
+    expect(() => arktypeJsonEmitCodec.encodeJson('payload')).toThrow(/emit-only/);
+    expect(() => arktypeJsonEmitCodec.decodeJson({ a: 1 })).toThrow(/emit-only/);
   });
 });
 
