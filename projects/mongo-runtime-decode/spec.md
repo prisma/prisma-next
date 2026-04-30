@@ -81,11 +81,20 @@ A new module `packages/2-mongo-family/7-runtime/src/codecs/decoding.ts` exports 
 
 `MongoRuntimeImpl.execute` calls `decodeMongoRow` per row, between `driver.execute(...)` and `yield row`, when `plan.resultShape` is present. When `resultShape` is `undefined`, behaviour is unchanged (rows pass through verbatim — the raw escape hatch is preserved).
 
-### FR4 — Codec registry plumbing
+### FR4 — Codec registry plumbing via the framework execution-stack model
 
-- `MongoRuntimeOptions` gains a required `codecs: MongoCodecRegistry` field. Construction of a runtime without a registry is a type-level error.
-- The `mongo()` extension (`packages/3-extensions/mongo/src/runtime/mongo.ts`) constructs a single `MongoCodecRegistry` instance and passes it to both `createMongoAdapter(codecs)` and `createMongoRuntime({ codecs, ... })` so encode and decode resolve identically.
-- Test setup (`packages/2-mongo-family/7-runtime/test/setup.ts`) is updated to construct and pass a registry.
+The codec registry is **not** a parameter the user threads through the runtime. It is aggregated by the framework's execution-stack composition machinery, the same way SQL does it.
+
+Concretely:
+
+- **Component descriptors declare their codecs.** Each `RuntimeMongoTargetDescriptor`, `RuntimeMongoAdapterDescriptor`, and `RuntimeMongoExtensionDescriptor` declares its codec contributions via the existing `ComponentMetadata.types.codecTypes.codecInstances` field (already in use control-plane-side; this work mirrors it on the runtime side). The Mongo target descriptor declares the seven scalar wire codecs (`mongo/objectId@1`, `mongo/string@1`, etc.); future extension packs declare their own.
+- **`MongoExecutionStack`** is `{ target, adapter, driver?, extensionPacks }`, mirroring `SqlExecutionStack`. Constructed by `createMongoExecutionStack({ target, adapter, driver?, extensionPacks? })`. The stack is the unit the user composes (or that a higher-level extension composes for them).
+- **`createMongoExecutionContext({ contract, stack })`** walks the stack contributors (`stack.target`, `stack.adapter`, `...stack.extensionPacks`), folds their `codecInstances` into a single `MongoCodecRegistry`, validates contract↔stack requirements, and returns `{ contract, codecs }`. This mirrors SQL's `createExecutionContext` exactly.
+- **`MongoRuntimeOptions`** is `{ context, driver, middleware?, mode? }`. There is no `codecs` field, no `adapter` field, no `targetId` field — the context carries the contract, the codec registry, and (transitively, via the stack) the adapter. `MongoRuntimeImpl` reads `context.codecs` for decode and gets the adapter via the stack the context was built from.
+- **`mongo()` extension** constructs the stack + the context internally; the user never sees `MongoCodecRegistry`. Direct callers of `createMongoRuntime` (tests, examples) compose a stack and a context once; the resulting one-liner is comparable to the pre-decode shape.
+- **No `createDefaultMongoCodecRegistry` export.** That helper was the imperative duplicate of what stack aggregation gives us. It un-exports; users register custom codecs by declaring them on a component descriptor (e.g. their own extension pack), not by mutating a registry imperatively.
+
+This change is **structural** — the Mongo runtime joins the framework's existing target-composition model. The visible payoff at the user surface is removing the codec-registry leak (`createDefaultMongoCodecRegistry` and the threading of one instance through two constructors). The systemic payoff is that future Mongo extension packs get their codecs aggregated automatically, matching SQL's extensibility story.
 
 ### FR5 — Lane population
 
@@ -137,6 +146,8 @@ The original error is attached via `cause`.
 
 # Acceptance Criteria
 
+> ACs originally landed in m1 (decode behaviour, error handling, dispatch, plan structure, integration). The codec-registry-plumbing ACs (AC10, AC11) are amended in m2 and supplemented with new ACs (AC16–AC20) for the execution-stack composition model.
+
 ## Decode behaviour
 
 - [ ] **AC1**: A typed find of a collection whose model declares `_id: 'mongo/objectId@1'` returns rows where `row._id` is a hex `string`, not an `ObjectId` instance.
@@ -154,8 +165,8 @@ The original error is attached via `cause`.
 ## Runtime / dispatch
 
 - [ ] **AC9**: Per-row decode dispatches all leaf decodes via a single `Promise.all` (asserted by structure / unit test).
-- [ ] **AC10**: `MongoRuntimeOptions.codecs` is required at the type level — omitting it is a TypeScript error.
-- [ ] **AC11**: The `mongo()` extension passes the same `MongoCodecRegistry` instance to `createMongoAdapter` and `createMongoRuntime`.
+- [ ] **AC10** (m2): `MongoRuntimeOptions` does **not** carry a `codecs` field. The runtime reads codecs from the execution context. Construction of a runtime with an explicit `codecs` field is a type-level error.
+- [ ] **AC11** (m2): The `mongo()` extension constructs a `MongoExecutionStack` and a `MongoExecutionContext` internally; user-facing options do not mention `MongoCodecRegistry`. `createDefaultMongoCodecRegistry` is no longer exported.
 
 ## Plan structure
 
@@ -166,6 +177,14 @@ The original error is attached via `cause`.
 ## Integration
 
 - [ ] **AC15**: An end-to-end integration test using `mongodb-memory-server` writes a document, reads it via the runtime with a real contract + registry, and asserts decoded JS values (notably hex `_id`).
+
+## Execution-stack composition (m2)
+
+- [ ] **AC16**: A `MongoExecutionStack` is `{ target, adapter, driver?, extensionPacks }` and is constructed via `createMongoExecutionStack({ ... })`. Each component contributes its codecs via `ComponentMetadata.types.codecTypes.codecInstances` on the descriptor.
+- [ ] **AC17**: `createMongoExecutionContext({ contract, stack })` aggregates `codecInstances` across `[stack.target, stack.adapter, ...stack.extensionPacks]` into a single `MongoCodecRegistry` and returns `{ contract, codecs }`. Duplicate codec ids across contributors throw at composition time.
+- [ ] **AC18**: `createMongoRuntime({ context, driver, ... })` accepts only the context, the driver, and orthogonal options (middleware, mode). The runtime reads `context.codecs` for decode dispatch and the adapter from `context.stack.adapter` (or equivalent).
+- [ ] **AC19**: The Mongo target descriptor (declared via the framework's `RuntimeAdapterDescriptor` machinery) declares the seven Mongo wire-type codecs (`mongo/objectId@1`, `mongo/string@1`, `mongo/double@1`, `mongo/int32@1`, `mongo/bool@1`, `mongo/date@1`, `mongo/vector@1`) on its `codecInstances` field. The runtime registry is constructed from these declarations, not from a hand-rolled `defaultCodecRegistry()` factory.
+- [ ] **AC20**: `mongo()` extension users do not see `MongoCodecRegistry` in any public type or parameter. Examples in `examples/mongo-demo` and `examples/retail-store` show no codec-registry construction at the user call site.
 
 # Other Considerations
 

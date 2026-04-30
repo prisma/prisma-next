@@ -71,9 +71,21 @@ export type MongoFieldShape =
 |---|---|
 | **Lanes** (ORM, query-builder typed-read terminals) | Produce `resultShape` from the contract. Identity-stage pipelines preserve the source shape. Shape-rewriting aggregation stages reify `TypedAggExpr<F>._field` into matching `MongoFieldShape` (deferred; emit `kind: 'unknown'` until then). Raw commands omit `resultShape`. |
 | **Adapter** (`MongoAdapter.lower`) | Untouched. Lowering is about the wire command, not the result shape. |
-| **Codec registry** (`MongoCodecRegistry`) | Resolves `codecId` → `MongoCodec` at decode time. Same registry instance flows to both adapter (encode) and runtime (decode); the `mongo()` extension constructs one and passes it to both. |
+| **Codec registry** (`MongoCodecRegistry`) | Resolves `codecId` → `MongoCodec` at decode and encode time. Aggregated by the framework's execution-stack composition machinery: each component descriptor (target, adapter, extension packs) declares its codecs via `ComponentMetadata.types.codecTypes.codecInstances`; `createMongoExecutionContext({ contract, stack })` walks the stack, folds the declarations into a single `MongoCodecRegistry`, and exposes it on `context.codecs`. The runtime reads `context.codecs`; the adapter, since it is part of the stack the context is built from, has access to the same registry through the same path. **Users do not construct or thread a `MongoCodecRegistry` themselves.** |
 | **Runtime** (`MongoRuntimeImpl.execute`) | Walks `(row, resultShape)` in lockstep, gathers leaf decode tasks with dot-paths, dispatches via one `Promise.all` per row, wraps failures in `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. |
 | **Driver** | Untouched. Continues to surface BSON-shaped wire values. |
+
+## Codec registry: stack aggregation, not user threading
+
+The codec registry is **not** a user-facing parameter. Mongo joins the framework's existing execution-stack composition model — the same model SQL has used since ADR 152 (Execution Plane Descriptors and Instances). Component descriptors declare their codec instances via `ComponentMetadata.types.codecTypes.codecInstances` (already in use control-plane-side); `createMongoExecutionContext({ contract, stack })` aggregates them into a single registry by walking `[stack.target, stack.adapter, ...stack.extensionPacks]`, mirroring SQL's `createExecutionContext` exactly.
+
+This places three constraints on the runtime API:
+
+- `MongoRuntimeOptions` does not expose a `codecs` field. The runtime takes `{ context, driver, ... }`; codec resolution happens via `context.codecs`.
+- The Mongo target descriptor is the source of truth for the standard wire-type codecs (`mongo/objectId@1`, `mongo/string@1`, etc.). There is no parallel hand-rolled `defaultCodecRegistry()` factory, no exported `createDefaultMongoCodecRegistry`. The standard codec set is what the descriptor declares — single source of truth.
+- Custom or third-party codecs (encryption, vendor-specific scalars) are contributed via an extension-pack descriptor whose `codecInstances` list includes them. The aggregation surfaces them automatically. Users never imperatively register codecs against a runtime registry.
+
+The user-visible payoff is the absence of the `MongoCodecRegistry` symbol from public APIs and call sites. The systemic payoff is that future Mongo extension packs match the existing SQL/pgvector pattern: declare codecs on the descriptor, get them everywhere they're needed.
 
 ## Why a structural field, not `meta.annotations`
 
