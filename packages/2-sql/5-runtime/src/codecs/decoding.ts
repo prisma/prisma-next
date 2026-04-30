@@ -196,12 +196,21 @@ async function decodeField(
   // `column` is a `SqlColumnRef = { table, name }` projection of the resolved
   // `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses
   // below — no double work). Cells the runtime cannot resolve (aggregate
-  // aliases, computed projections without a simple ref) get `column: undefined`.
-  const cellCtx: SqlCodecCallContext | undefined = rowCtx
-    ? ref
-      ? { ...rowCtx, column: { table: ref.table, name: ref.column } }
-      : rowCtx
-    : undefined;
+  // aliases, computed projections without a simple ref) drop the `column`
+  // field entirely — explicitly cleared so a previously-populated
+  // `rowCtx.column` cannot leak through to unrelated cells when callers
+  // reuse a context object across cells. Destructuring (rather than
+  // `column: undefined`) is required because `SqlCodecCallContext.column`
+  // is declared `column?: SqlColumnRef` under `exactOptionalPropertyTypes`.
+  let cellCtx: SqlCodecCallContext | undefined;
+  if (rowCtx) {
+    if (ref) {
+      cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
+    } else {
+      const { column: _drop, ...rowCtxWithoutColumn } = rowCtx;
+      cellCtx = rowCtxWithoutColumn;
+    }
+  }
 
   let decoded: unknown;
   try {
