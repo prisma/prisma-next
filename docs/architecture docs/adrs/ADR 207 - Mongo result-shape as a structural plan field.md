@@ -1,49 +1,82 @@
 # ADR 207 — Mongo result-shape as a structural plan field
 
-## Context
+> **Decision (in one sentence):** Mongo plans carry a recursive structural `resultShape` field that tells the runtime how to decode each row; if no `resultShape` is attached, the runtime yields the row from the driver verbatim.
 
-The Mongo runtime currently yields driver rows verbatim — there is no decode boundary, so codec `decode` is never called. ADR 204 (Single-Path Async Codec Runtime) shipped the encode-side wiring for Mongo and explicitly deferred decode as out of scope, identifying a future Mongo `decodeRow`/`decodeField` mirroring the SQL pattern as the natural plug-in point. This ADR is that follow-up.
+## A grounding example
 
-The SQL runtime resolves codecs from two `PlanMeta` fields populated by the SQL builder:
+Suppose we read a `User` model from MongoDB:
 
-- `meta.annotations.codecs[alias]` — per-alias override.
-- `meta.projectionTypes[alias]` — alias → fully-qualified codec id.
+```ts
+// Contract field types for User:
+//   _id:       ObjectId
+//   name:      string
+//   tags:      string[]
+//   address:   { city: string }      // a value-object subdocument
+//   posts:     Post[]                // a relation populated by $lookup
+```
 
-Both are populated by `buildQueryPlan` in `packages/2-sql/4-lanes/sql-builder/src/runtime/builder-base.ts` and consumed by `decodeRow` in `packages/2-sql/5-runtime/src/codecs/decoding.ts`. The runtime treats every projected alias as a flat top-level cell and uses these maps to dispatch codecs.
+The driver hands the runtime a row that looks like this on the wire:
 
-Two structural facts shape the Mongo problem differently:
+```js
+{
+  _id:     ObjectId('64aa…'),
+  name:    'Ada',
+  tags:    ['admin', 'staff'],
+  address: { city: 'London' },
+  posts:   [/* subdocuments */],
+}
+```
 
-1. **Mongo rows are recursive.** A document can carry sub-documents (value objects), arrays of scalars, arrays of subdocuments (`$lookup` results, embedded relations), and arbitrary nesting. A flat alias→codec map can't describe an array of subdocuments where each subdoc has its own codecs.
-2. **`PlanMeta` was originally for cross-cutting plan metadata and lane↔middleware annotations** — i.e. observability tags, lane intent, and other data that doesn't structurally describe what the plan *is*. The codec mapping for a row is structural: it describes the shape of the result the lane is asking for. Putting it on `meta` was a pragmatic seam in SQL; carrying it forward to Mongo would compound that seam at exactly the moment the structure has become genuinely tree-shaped.
+Application code expects something like this — `_id` decoded to a hex string, `tags` decoded element-by-element, the rest passed through:
 
-## Problem
+```js
+{
+  _id:     '64aa…',
+  name:    'Ada',
+  tags:    ['admin', 'staff'],
+  address: { city: 'London' },     // value-object: not decoded yet
+  posts:   [/* subdocuments */],   // relation: not decoded yet
+}
+```
 
-We need to wire codec decode into the Mongo runtime in a way that:
+The plan that produced the read tells the runtime how to do that translation by carrying a description of its own result shape:
 
-- Handles recursive row shapes (subdocuments, arrays of subdocs, arrays of scalars) by construction — not as a future bolt-on.
-- Honours the existing escape hatches: raw commands and aggregation pipelines whose result shape the lane cannot vouch for must remain pass-through.
-- Keeps the runtime ignorant of the contract — the runtime should consume a self-contained description of the row shape, not reach into the contract to look up field types.
-- Doesn't compound the `PlanMeta` overload in a domain (Mongo) where the structural problem is now obvious.
+```ts
+plan.resultShape = {
+  kind: 'document',
+  fields: {
+    _id:     { kind: 'leaf',    codecId: 'mongo/objectId@1', nullable: false },
+    name:    { kind: 'leaf',    codecId: 'mongo/string@1',   nullable: false },
+    tags:    { kind: 'array',   nullable: false,
+               element: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false } },
+    address: { kind: 'unknown' },
+    posts:   { kind: 'unknown' },
+  },
+};
+```
 
-## Constraints
+The runtime walks `(row, resultShape)` in lockstep, runs the codec at each leaf, and yields the decoded row. `kind: 'unknown'` says "the lane vouches for the surrounding shape but cannot vouch for this position" — the value passes through.
 
-- **No SQL changes in this work.** Migrating SQL to a structural seam is a separate decision. Mongo can diverge cleanly because the Mongo runtime currently does no decode at all — we're not breaking parity, we're choosing where the new path lives.
-- **ADR 204 invariants must hold**: single-path always-await codec runtime, one `Promise.all` per row (single microtask hop), no public `runtime: 'sync' | 'async'` marker, no conditional return types.
-- **Raw commands are an escape hatch.** A raw command must continue to yield rows untouched — the lane has not vouched for any shape and the runtime must not invent one.
-- **Cross-family `MongoCodec` shape (ADR 204) is unchanged.** This ADR introduces a per-plan structural carrier; it does not change the codec interface.
+That's the whole shape of this ADR. The rest fills in the type, the rules, and why it's a *plan field* rather than a metadata annotation.
 
 ## Decision
 
-The Mongo runtime resolves codecs from a new structural field on the plan: `resultShape?: MongoResultShape`, **not** from `meta.annotations` or `meta.projectionTypes`. The field is:
+Plans gain an optional structural carrier:
 
-- Optional. When absent, the runtime yields rows verbatim (raw escape hatch).
-- Recursive. Documents have field maps, arrays carry an element shape, leaves carry a `codecId`, and an explicit `kind: 'unknown'` represents "the lane vouches for the surrounding shape but cannot vouch for this position".
-- Structurally identical to the type-level `DocShape` / `NestedDocShape` / `TypedAggExpr<F>._field` vocabulary the query-builder already threads through pipeline stages.
-- Deep-frozen at construction time, mirroring `MongoProjectStage.projection`.
+```ts
+interface MongoQueryPlan<Row, Command> {
+  // …existing fields…
+  readonly resultShape?: MongoResultShape;
+}
+```
 
-The carrier lives on `MongoQueryPlan` in `packages/2-mongo-family/4-query/query-ast/src/result-shape.ts` and is propagated through lowering on `MongoExecutionPlan` (the runtime's `lower` hook copies it through unchanged — it is structural about the result, not about lowering).
+The carrier is **recursive** (documents nest; arrays carry an element shape), **immutable** (deep-frozen at construction), and **structural** (it lives on the plan, not on `meta`). When the field is absent, the runtime yields rows from the driver unchanged — that is the raw escape hatch, used by `rawCommand(...)` and any future plan source the runtime should not transform.
 
-The vocabulary:
+The carrier propagates through lowering: `MongoExecutionPlan` carries the same `resultShape` after the adapter has produced the wire command. Lowering does not reshape it; lowering is about the wire command, not about the result.
+
+## The result-shape vocabulary
+
+The full type is small and intentionally orthogonal to the codec interface:
 
 ```ts
 export type MongoResultShape =
@@ -51,158 +84,130 @@ export type MongoResultShape =
   | { readonly kind: 'unknown' };
 
 export type MongoFieldShape =
-  | { readonly kind: 'leaf'; readonly codecId: string; readonly nullable: boolean }
+  | { readonly kind: 'leaf';     readonly codecId: string; readonly nullable: boolean }
   | { readonly kind: 'document'; readonly nullable: boolean;
-      readonly fields: Readonly<Record<string, MongoFieldShape>> }
-  | { readonly kind: 'array'; readonly nullable: boolean; readonly element: MongoFieldShape }
+                                 readonly fields: Readonly<Record<string, MongoFieldShape>> }
+  | { readonly kind: 'array';    readonly nullable: boolean; readonly element: MongoFieldShape }
   | { readonly kind: 'unknown' };
 ```
 
-`undefined` (no `resultShape` at all) and `kind: 'unknown'` are deliberately distinct:
+Walking through the example one variant at a time:
 
-- **`undefined`**: the lane has not produced a shape. Raw commands.
-- **`kind: 'unknown'`**: the lane has produced a shape but vouches for nothing at this specific position. Used by the lane for value-object subtrees, `$lookup` arrays, and shape-rewriting aggregation stages until per-stage value-level shape rebuild lands.
+- **`kind: 'leaf'`** — a position holding a single codec-managed value. `_id` and `name` in the example. The runtime resolves `codecId` against the registry and runs `decode` on the wire value.
+- **`kind: 'array'`** — a position holding an array; the element shape applies to each entry. `tags` in the example. The runtime walks the array, applying the element shape recursively at every index. Paths in error messages join with dots: `tags.0`, `tags.1`, …
+- **`kind: 'document'`** — a position holding a sub-object with its own field map. The example doesn't use this on `address` (it shows `unknown` instead — see below); a future lane upgrade that knows the value-object's shape would write `kind: 'document'` here, and the runtime would recurse.
+- **`kind: 'unknown'`** — a position the lane decides not to describe. The runtime returns the value unchanged. `address` and `posts` in the example.
 
-## Responsibilities
+A row field that the shape *doesn't mention at all* also passes through unchanged. The decode walk is structurally additive: it transforms positions the shape describes and leaves the rest alone. Drop semantics belongs to projection (`select(...)`, `$project`), not to decode.
 
-| Layer | Responsibility |
-|---|---|
-| **Lanes** (ORM, query-builder typed-read terminals) | Produce `resultShape` from the contract. Identity-stage pipelines preserve the source shape. Shape-rewriting aggregation stages reify `TypedAggExpr<F>._field` into matching `MongoFieldShape` (deferred; emit `kind: 'unknown'` until then). Raw commands omit `resultShape`. |
-| **Adapter** (`MongoAdapter.lower`) | Untouched. Lowering is about the wire command, not the result shape. |
-| **Codec registry** (`MongoCodecRegistry`) | Resolves `codecId` → `MongoCodec` at decode and encode time. Aggregated by the framework's execution-stack composition machinery: each component descriptor (target, adapter, extension packs) declares its codecs via `ComponentMetadata.types.codecTypes.codecInstances`; `createMongoExecutionContext({ contract, stack })` walks the stack, folds the declarations into a single `MongoCodecRegistry`, and exposes it on `context.codecs`. The runtime reads `context.codecs`; the adapter, since it is part of the stack the context is built from, has access to the same registry through the same path. **Users do not construct or thread a `MongoCodecRegistry` themselves.** |
-| **Runtime** (`MongoRuntimeImpl.execute`) | Walks `(row, resultShape)` in lockstep, gathers leaf decode tasks with dot-paths, dispatches via one `Promise.all` per row, wraps failures in `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. |
-| **Driver** | Untouched. Continues to surface BSON-shaped wire values. |
+### `undefined` vs. `kind: 'unknown'` — distinct on purpose
 
-## Codec registry: stack aggregation, not user threading
+These look similar but signal different things, and the difference is load-bearing:
 
-The codec registry is **not** a user-facing parameter. Mongo joins the framework's existing execution-stack composition model — the same model SQL has used since ADR 152 (Execution Plane Descriptors and Instances). Component descriptors declare their codec instances via `ComponentMetadata.types.codecTypes.codecInstances` (already in use control-plane-side); `createMongoExecutionContext({ contract, stack })` aggregates them into a single registry by walking `[stack.target, stack.adapter, ...stack.extensionPacks]`, mirroring SQL's `createExecutionContext` exactly.
+- **`resultShape: undefined`** — the lane has not produced any shape. Used by raw commands. The runtime treats the entire row as opaque and yields it untouched.
+- **`resultShape.kind: 'unknown'`** (or a `kind: 'unknown'` slot inside a larger shape) — the lane *has* produced a shape and vouches for the surrounding structure, but cannot vouch for this specific position. The runtime decodes everything else around it; this position is pass-through.
 
-This places three constraints on the runtime API:
+Collapsing the two would lose information. A typed read with one unknown slot is a different artifact from a raw command, and middleware that wants to inspect the result shape (for telemetry, validation, or future strict-mode checks) needs to tell them apart.
 
-- `MongoRuntimeOptions` does not expose a `codecs` field. The runtime takes `{ context, driver, ... }`; codec resolution happens via `context.codecs`.
-- The Mongo target descriptor is the source of truth for the standard wire-type codecs (`mongo/objectId@1`, `mongo/string@1`, etc.). There is no parallel hand-rolled `defaultCodecRegistry()` factory, no exported `createDefaultMongoCodecRegistry`. The standard codec set is what the descriptor declares — single source of truth.
-- Custom or third-party codecs (encryption, vendor-specific scalars) are contributed via an extension-pack descriptor whose `codecInstances` list includes them. The aggregation surfaces them automatically. Users never imperatively register codecs against a runtime registry.
+### How decode runs
 
-The user-visible payoff is the absence of the `MongoCodecRegistry` symbol from public APIs and call sites. The systemic payoff is that future Mongo extension packs match the existing SQL/pgvector pattern: declare codecs on the descriptor, get them everywhere they're needed.
-
-## Why a structural field, not `meta.annotations`
-
-- **Honesty about what's structural.** A field's codec is part of the row's shape, not metadata about the plan. Treating it structurally lets the type system mirror the runtime story (the existing type-level `DocShape` already does this).
-- **Recursion is native.** A flat alias→codec map cannot describe an array of subdocuments. Carrying that into `meta` would force a parallel encoding (`'tags.0.title': 'mongo/string@1'`) or a sidecar tree on `meta`. Either is structure-on-meta — better to put structure on its own field.
-- **`meta` keeps its job.** `PlanMeta` reverts to cross-cutting metadata and lane↔middleware annotations. Middleware that inspects `meta.annotations` is unaffected; middleware that wants to inspect the result shape inspects `plan.resultShape`.
-- **`unknown` is a first-class signal.** `kind: 'unknown'` makes "I don't know" load-bearing. With `meta.projectionTypes`, the absence of an entry means the same thing as the absence of a key, the absence of the whole field, or "haven't gotten to it yet" — three different states collapsed into one. Structural `unknown` is explicit.
-- **Lane work is mechanical.** The query-builder already tracks `Shape extends DocShape` at the type level through every pipeline stage. The structural `MongoResultShape` is the value-level mirror of those types; per-stage population is a translation, not a design.
-
-## Why not migrate SQL to the same seam now
-
-SQL has working production decode through `meta.annotations`/`meta.projectionTypes`. That seam survives because SQL rows are structurally flat from the runtime's perspective (one alias per cell; nested JSON aggregates are decoded by a single JSON codec at the leaf). The recursion problem that motivates a structural shape on Mongo doesn't bite SQL today. Migrating SQL would be a behaviour-preserving refactor with no immediate correctness payoff — defer until SQL grows a recursion problem of its own (or until cross-family parity becomes load-bearing for some other reason).
-
-## Consequences
-
-### Positive
-
-- Recursive decode lands by construction; later lane work threading shape through aggregation stages or value-objects is purely additive (replace `unknown` slots with concrete subtrees).
-- The runtime never reads the contract — all contract knowledge stays in lanes.
-- `meta` is no longer the dumping ground for structural information; future "is this *really* meta?" debates have a cleaner answer.
-- Cross-family seam clarification: the runtime's job is the same on both sides (resolve codecs, await, wrap failures). What differs is *where the shape comes from*, and that's now an explicit per-family decision rather than an implicit reuse.
-
-### Negative
-
-- SQL and Mongo now diverge on where codec resolution comes from. A reader looking at one runtime cannot infer the other's pattern by symmetry. Mitigated by this ADR documenting the intentional split and by the runtime invocation pattern (await + `Promise.all`) staying identical.
-- Lanes carry a small amount of additional work (build a `MongoResultShape` value alongside the existing type-level `DocShape`). Mostly mechanical translation.
-- `kind: 'unknown'` opens a class of "lane forgot to populate" bugs that the SQL pattern hides under "no entry, no decode". Mitigated by always-on integration tests around the headline cases (ObjectId, vector, etc.) and by a future strict-mode check (deferred follow-up).
-
-### Walk-back path
-
-If the structural seam proves heavier than the annotational seam in lane code, the additive path is to:
-
-1. Keep `resultShape` as the canonical structural carrier.
-2. Add a small lane helper that constructs `resultShape` from a SQL-style `Record<string, codecId>` map for callers that don't need recursion.
-
-This is non-breaking — the helper produces a `kind: 'document'` shape with leaf entries.
-
-## Examples
-
-### Find with default shape
+`MongoRuntimeImpl.execute` overrides the framework's runtime base to layer per-row decode between the middleware loop's `yield` and the consumer-visible `yield`:
 
 ```ts
-// Lane (ORM / query-builder typed read)
-const plan: MongoQueryPlan<UserRow> = {
-  collection: 'users',
-  command: aggregateUsersCommand,
-  meta: { target: 'mongo', storageHash, lane: 'mongo-orm', paramDescriptors: [] },
-  resultShape: Object.freeze({
-    kind: 'document',
-    fields: Object.freeze({
-      _id:       { kind: 'leaf', codecId: 'mongo/objectId@1', nullable: false },
-      name:      { kind: 'leaf', codecId: 'mongo/string@1',   nullable: false },
-      email:     { kind: 'leaf', codecId: 'mongo/string@1',   nullable: false },
-      bio:       { kind: 'leaf', codecId: 'mongo/string@1',   nullable: true  },
-      createdAt: { kind: 'leaf', codecId: 'mongo/date@1',     nullable: false },
-      // posts (relation) populated as 'unknown' until include/lookup work lands
-      posts:     { kind: 'unknown' },
-    }),
-  }),
-};
+for await (const rawRow of stream) {
+  if (exec.resultShape === undefined) {
+    yield rawRow;
+  } else {
+    yield await decodeMongoRow(rawRow, exec.resultShape, codecs, exec.command.collection);
+  }
+}
 ```
 
-The runtime walks the row in lockstep with `resultShape`, decodes `_id` to a hex string via `mongoObjectIdCodec`, leaves `posts` untouched.
+`decodeMongoRow` walks the shape and the row in lockstep, gathering one flat list of leaf-decode tasks as it descends, then awaits a single `Promise.all` per row. That keeps the per-row dispatch to one microtask hop regardless of nesting depth (the invariant from ADR 204). Three short-circuits at the leaf level honour the natural escape hatches: `null` and `undefined` cells skip the codec call; an unknown `codecId` (no entry in the registry) returns the wire value unchanged; a `kind: 'unknown'` slot anywhere in the tree is pass-through.
 
-### Scalar array
-
-A field declared `tags: { codecId: 'mongo/string@1', many: true, nullable: false }` produces:
+When a leaf decode throws, the runtime wraps the original error in a `RUNTIME.DECODE_FAILED` envelope keyed by the cell's dot-path:
 
 ```ts
-tags: {
-  kind: 'array',
-  nullable: false,
-  element: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
-},
-```
-
-The runtime walks each element through the leaf, with paths `tags.0`, `tags.1`, etc. (Mongo dot-notation.)
-
-### Aggregation that rewrites shape (current branch behaviour)
-
-```ts
-collection
-  .match({ status: 'published' })
-  .group({ _id: '$status', total: { $sum: '$views' } })  // shape rewritten
-  .build();
-
-// resultShape: { kind: 'unknown' }
-```
-
-The lane does have the typed information (`TypedAccumulatorExpr<F>._field`) to thread, but per-stage value-level shape rebuild ships in a follow-up. Until then, `$group` results are pass-through.
-
-### Raw command (escape hatch)
-
-```ts
-mongoQuery(contract).rawCommand(new RawAggregateCommand('users', [...]))
-// resultShape omitted; rows pass through verbatim.
-```
-
-### Decode failure envelope
-
-```ts
-// Synthetic codec whose decode throws.
 RuntimeError {
   code: 'RUNTIME.DECODE_FAILED',
   message: "Failed to decode field address.city in collection 'users' with codec 'mongo/string@1': boom",
   details: {
     collection: 'users',
-    path: 'address.city',
+    path: 'address.city',          // dot-joined; arrays use numeric indices, e.g. tags.0
     codec: 'mongo/string@1',
-    wirePreview: 'San Francisco',
+    wirePreview: 'San Francisco',  // bounded preview of the offending wire value
   },
   cause: <original Error>,
 }
 ```
 
+The envelope code, fields, and `cause` chain are unchanged from ADR 027.
+
+## Layer responsibilities
+
+| Layer | What it does for `resultShape` |
+|---|---|
+| **Lanes** (ORM, query-builder typed-read terminals) | Produce the `resultShape` from the contract. Identity-stage pipelines (`$match`, `$sort`, `$limit`, `$skip`, `$sample`) preserve the source shape; shape-rewriting stages (`$project`, `$group`, `$addFields`, `$unwind`, `$replaceRoot`) currently emit `kind: 'unknown'` (per-stage value-level reification is mechanical follow-up work — see *Consequences*). Raw commands omit `resultShape` entirely. |
+| **Runtime** (`MongoRuntimeImpl.execute`) | Reads `exec.resultShape` and decodes per-row when present. Walks the shape and the row in lockstep, dispatches all leaf decodes through one `Promise.all`, wraps failures in the envelope above. Sources the `collection` name from `exec.command` (post-lowering authoritative) so middleware that rewrites collection names is reflected in error envelopes. |
+| **Adapter** (`MongoAdapter.lower`) | Untouched. Lowering is about producing the wire command; the result shape passes through unchanged. |
+| **Codec registry** (`MongoCodecLookup`) | Resolves `codecId` → `MongoCodec`. Aggregated by the framework's execution-stack composition machinery: each component descriptor (target, adapter, extension packs) declares its codecs via `ComponentMetadata.types.codecTypes.codecInstances`; `createMongoExecutionContext({ contract, stack })` walks `[stack.target, stack.adapter, ...stack.extensionPacks]` and folds the declarations into a single registry. The runtime sees a read-only `MongoCodecLookup` (`get` / `has`); `register` stays internal to the aggregator. **Users never construct a `MongoCodecRegistry` themselves** — they compose a stack and a context, and codec aggregation falls out. |
+| **Driver** | Untouched. Continues to surface BSON-shaped wire values. |
+
+## Consequences
+
+### Positive
+
+- **Recursive decode lands by construction.** Subsequent lane work (value-object subtrees, `$lookup` arrays, per-stage shape rebuild for aggregation pipelines) replaces `kind: 'unknown'` slots with concrete subtrees and the runtime handles them automatically — no runtime changes needed.
+- **`meta` keeps its job.** `PlanMeta` is for cross-cutting plan metadata and lane↔middleware annotations (telemetry tags, lane intent, observability hooks). The result shape is structural — describing what the plan returns — and now lives next to the rest of the plan's structural fields.
+- **The runtime never reads the contract.** All contract knowledge stays in lanes; the runtime consumes a self-contained description of the row. That keeps the runtime agnostic to authoring decisions (TS-first vs. PSL-first, custom value objects, polymorphic models).
+- **Codec aggregation falls out for free.** Future Mongo extension packs (encryption, vendor-specific scalars) declare their codecs on a descriptor; stack composition surfaces them everywhere they're needed — the same pattern `pgvector` already uses for SQL.
+
+### Negative
+
+- **SQL and Mongo diverge on where codec resolution comes from.** SQL still uses `meta.annotations.codecs` and `meta.projectionTypes`; Mongo uses the structural `resultShape`. A reader looking at one runtime cannot infer the other's pattern by symmetry. Mitigated by this ADR documenting the intentional split, and by the runtime *invocation* pattern (always-await, one `Promise.all` per row, ADR 027 envelopes) staying identical across both.
+- **Lanes carry a small amount of additional value-level work** (reify the existing type-level `DocShape` into a `MongoResultShape` value alongside it). Mostly mechanical translation; the type-level shape is already there.
+- **`kind: 'unknown'` opens a class of "lane forgot to populate" bugs.** A lane that quietly emits `kind: 'unknown'` when it could have produced a concrete shape produces silent pass-through (rows undecoded), not a loud failure. Mitigated by always-on integration tests around the headline cases (ObjectId, vector, Date, scalar arrays, end-to-end roundtrips). A strict-mode codec-registry-completeness check is a planned follow-up.
+
+### Walk-back path
+
+If the structural seam later proves heavier than the annotational seam in lane code, the additive walk-back is to keep `resultShape` as the canonical structural carrier and add a small lane helper that constructs one from a SQL-style `Record<string, codecId>` map for callers that don't need recursion. That helper produces a `kind: 'document'` shape with leaf entries — non-breaking; existing consumers continue to work.
+
+## Alternatives considered
+
+### Reuse SQL's `meta.annotations.codecs` / `meta.projectionTypes`
+
+The SQL runtime resolves codecs from two flat alias→codec maps populated by the SQL builder, in `meta`:
+
+```ts
+plan.meta.annotations.codecs = { _id: 'mongo/objectId@1', /* … */ };
+plan.meta.projectionTypes    = { _id: 'mongo/objectId@1', /* … */ };
+```
+
+This is a flat map: each projected alias points to a codec id. It works for SQL because SQL rows are flat from the runtime's perspective — one alias per cell, with nested JSON aggregates handled by a single JSON codec at the leaf.
+
+Mongo rows are not flat. A row carrying `tags: string[]` plus `address: { city: string }` plus `posts: Post[]` (where each post has its own scalar fields) cannot be described by a flat `Record<string, codecId>`. We would have to encode structure into the keys (`'address.city': 'mongo/string@1'`, `'posts.0.title': 'mongo/string@1'`, …) — which both encodes structure as a string at every consumer's edge, and depends on knowing the array length up-front for elements that are positional. Or we'd have to add a sidecar tree on `meta`. Either is structure-on-`meta` — same problem the structural carrier solves, except hidden in a metadata bag whose original purpose was something else.
+
+The honest framing is that SQL's `meta.annotations.codecs` was a pragmatic seam, not a design intent — it works because SQL's rows happened to be flat. Mongo's are not. Recurring the SQL seam in a domain where it doesn't fit would compound an existing architectural debt instead of paying it down.
+
+### Migrate SQL to the structural seam in the same change
+
+The structural carrier could just as well live on `SqlQueryPlan`. Migrating SQL to it would unify both runtimes on the same model.
+
+We didn't, deliberately. SQL's `meta.annotations.codecs` is in production and works correctly for every shape SQL plans produce today. The recursion problem that motivates the structural carrier on Mongo doesn't exist on SQL: SQL runs decode against flat aliases. A SQL migration would be a behaviour-preserving refactor with no immediate correctness payoff, while doubling the change's blast radius. Defer until SQL grows a recursion problem of its own (e.g. typed nested JSON aggregates, or cross-family parity becomes load-bearing for some other reason).
+
+### Have the user thread a `MongoCodecRegistry` through the runtime
+
+An earlier draft of this work added a required `codecs: MongoCodecRegistry` field to `MongoRuntimeOptions` and asked the user — or the `mongo()` extension — to construct one and pass the same instance to both adapter and runtime. It worked, but it leaked an internal coordination problem onto every call site: the same-instance invariant was enforced by the user remembering to do it correctly.
+
+The framework already had the right model for this. SQL's runtime composes from a stack of component descriptors (`SqlExecutionStack`), each of which declares its codec contributions on `ComponentMetadata.types.codecTypes.codecInstances`; `createExecutionContext({ contract, stack })` walks the stack and aggregates the contributions into a single registry. The Mongo runtime simply hadn't joined that model. This ADR's design plugs Mongo in: descriptors declare `codecInstances`, `createMongoExecutionContext` aggregates them, the runtime takes a context whole. `MongoCodecRegistry` doesn't appear in any user-facing surface; the read-only `MongoCodecLookup` is what the runtime uses internally.
+
+This is the same shape SQL already uses, applied to Mongo — not a new pattern.
+
 ## References
 
-- [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Defers Mongo decode and constrains the runtime invocation pattern (always-await, one `Promise.all` per row).
-- [ADR 030 — Result decoding & codecs registry](./ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md). Registry model and error-mapping codes (still in force).
-- [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). `RUNTIME.DECODE_FAILED` shape.
-- SQL reference: `packages/2-sql/5-runtime/src/codecs/decoding.ts` and `packages/2-sql/4-lanes/sql-builder/src/runtime/builder-base.ts`. Used as parity reference for the runtime invocation pattern; structural model deliberately diverges.
-- Existing type-level vocabulary: `packages/2-mongo-family/5-query-builders/query-builder/src/{types,resolve-path}.ts` (`DocField`, `DocShape`, `NestedDocShape`, `ObjectField`).
+- [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). Defines the `RUNTIME.DECODE_FAILED` envelope shape used here.
+- [ADR 030 — Result decoding & codecs registry](./ADR%20030%20-%20Result%20decoding%20%26%20codecs%20registry.md). Registry model and error-mapping codes (still in force; this ADR refines decoding for Mongo specifically).
+- [ADR 152 — Execution Plane Descriptors and Instances](./ADR%20152%20-%20Execution%20Plane%20Descriptors%20and%20Instances.md). The execution-stack composition model Mongo joins for codec aggregation.
+- [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Always-await, one-`Promise.all`-per-row invocation pattern preserved here. Originally deferred Mongo decode; this ADR closes that.
+- SQL reference for runtime invocation parity: `packages/2-sql/5-runtime/src/codecs/decoding.ts` and `packages/2-sql/4-lanes/sql-builder/src/runtime/builder-base.ts`.
+- Existing type-level shape vocabulary: `packages/2-mongo-family/5-query-builders/query-builder/src/{types,resolve-path}.ts` (`DocField`, `DocShape`, `NestedDocShape`, `ObjectField`).
