@@ -9,8 +9,10 @@ type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>;
 
 // Hoisted mocks so they are observable from inside vi.mock() factories.
 const mocks = vi.hoisted(() => ({
-  createMongoAdapter: vi.fn(),
-  createDefaultMongoCodecRegistry: vi.fn(),
+  mongoRuntimeAdapter: { id: 'mongo-runtime-adapter' },
+  mongoRuntimeTarget: { id: 'mongo-runtime-target' },
+  createMongoExecutionStack: vi.fn(),
+  createMongoExecutionContext: vi.fn(),
   createMongoRuntime: vi.fn(),
   driverFromConnection: vi.fn(),
   driverFromDb: vi.fn(),
@@ -19,12 +21,17 @@ const mocks = vi.hoisted(() => ({
   mongoQuery: vi.fn(),
 }));
 
-vi.mock('@prisma-next/adapter-mongo', () => ({
-  createMongoAdapter: mocks.createMongoAdapter,
-  createDefaultMongoCodecRegistry: mocks.createDefaultMongoCodecRegistry,
+vi.mock('@prisma-next/adapter-mongo/runtime', () => ({
+  default: mocks.mongoRuntimeAdapter,
+}));
+
+vi.mock('@prisma-next/target-mongo/runtime', () => ({
+  default: mocks.mongoRuntimeTarget,
 }));
 
 vi.mock('@prisma-next/mongo-runtime', () => ({
+  createMongoExecutionStack: mocks.createMongoExecutionStack,
+  createMongoExecutionContext: mocks.createMongoExecutionContext,
   createMongoRuntime: mocks.createMongoRuntime,
 }));
 
@@ -56,11 +63,13 @@ const fakeQuery = { id: 'query-instance' };
 
 describe('mongo() facade', () => {
   beforeEach(() => {
-    for (const fn of Object.values(mocks)) fn.mockReset();
+    for (const fn of Object.values(mocks)) {
+      if (typeof fn === 'function' && 'mockReset' in fn) fn.mockReset();
+    }
 
     mocks.validateMongoContract.mockReturnValue({ contract: fakeContract });
-    mocks.createDefaultMongoCodecRegistry.mockReturnValue({ id: 'shared-codecs' });
-    mocks.createMongoAdapter.mockReturnValue({ id: 'adapter' });
+    mocks.createMongoExecutionStack.mockReturnValue({ id: 'stack-instance' });
+    mocks.createMongoExecutionContext.mockReturnValue({ id: 'context-instance' });
     mocks.driverFromConnection.mockResolvedValue({ id: 'driver-from-url' });
     mocks.driverFromDb.mockReturnValue({ id: 'driver-from-db' });
     mocks.createMongoRuntime.mockReturnValue(fakeRuntime);
@@ -95,14 +104,29 @@ describe('mongo() facade', () => {
       'mongodb://localhost:27017/mydb',
       'mydb',
     );
+
+    // Per buildRuntime invocation: one stack, one context, threaded into runtime.
+    expect(mocks.createMongoExecutionStack).toHaveBeenCalledTimes(1);
+    expect(mocks.createMongoExecutionStack).toHaveBeenCalledWith({
+      target: mocks.mongoRuntimeTarget,
+      adapter: mocks.mongoRuntimeAdapter,
+    });
+    expect(mocks.createMongoExecutionContext).toHaveBeenCalledTimes(1);
+    expect(mocks.createMongoExecutionContext).toHaveBeenCalledWith({
+      contract: fakeContract,
+      stack: { id: 'stack-instance' },
+    });
     expect(mocks.createMongoRuntime).toHaveBeenCalledTimes(1);
-    expect(mocks.createDefaultMongoCodecRegistry).toHaveBeenCalledTimes(1);
-    expect(mocks.createMongoAdapter).toHaveBeenCalledWith({ id: 'shared-codecs' });
     expect(mocks.createMongoRuntime).toHaveBeenCalledWith(
       expect.objectContaining({
-        codecs: { id: 'shared-codecs' },
+        context: { id: 'context-instance' },
       }),
     );
+    // The user-facing options bag never sees `codecs`.
+    const runtimeArgs = mocks.createMongoRuntime.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(runtimeArgs).not.toHaveProperty('codecs');
+    expect(runtimeArgs).not.toHaveProperty('adapter');
+    expect(runtimeArgs).not.toHaveProperty('targetId');
   });
 
   it('builds the runtime exactly once across concurrent first calls (lazy memoisation)', async () => {

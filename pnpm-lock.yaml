@@ -1495,6 +1495,9 @@ importers:
       '@prisma-next/mongo-runtime':
         specifier: workspace:*
         version: link:../../7-runtime
+      '@prisma-next/target-mongo':
+        specifier: workspace:*
+        version: link:../../../3-mongo-target/1-mongo-target
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../../test/utils
@@ -2697,6 +2700,9 @@ importers:
       '@prisma-next/migration-tools':
         specifier: workspace:*
         version: link:../../1-framework/3-tooling/migration
+      '@prisma-next/mongo-codec':
+        specifier: workspace:*
+        version: link:../../2-mongo-family/1-foundation/mongo-codec
       '@prisma-next/mongo-contract':
         specifier: workspace:*
         version: link:../../2-mongo-family/1-foundation/mongo-contract

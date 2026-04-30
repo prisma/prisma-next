@@ -1,6 +1,12 @@
-import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
+import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
-import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
+import {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
+  createMongoRuntime,
+  type MongoRuntime,
+} from '@prisma-next/mongo-runtime';
+import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -43,16 +49,13 @@ export function describeWithMongoDB(name: string, fn: (ctx: MongodContext) => vo
       client = new MongoClient(replSet.getUri());
       await client.connect();
 
-      const codecs = createDefaultMongoCodecRegistry();
-      const adapter = createMongoAdapter(codecs);
-      const driver = await createMongoDriver(replSet.getUri(), dbName);
-      runtime = createMongoRuntime({
-        adapter,
-        driver,
-        contract: {},
-        targetId: 'mongo',
-        codecs,
+      const stack = createMongoExecutionStack({
+        target: mongoRuntimeTarget,
+        adapter: mongoRuntimeAdapter,
       });
+      const context = createMongoExecutionContext({ contract: {}, stack });
+      const driver = await createMongoDriver(replSet.getUri(), dbName);
+      runtime = createMongoRuntime({ context, driver });
     }, timeouts.spinUpMongoMemoryServer);
 
     beforeEach(async () => {

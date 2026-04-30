@@ -7,10 +7,17 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
-import { createMongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
-import { createMongoRuntime } from '@prisma-next/mongo-runtime';
+import {
+  createMongoRuntime,
+  type MongoExecutionContext,
+  type MongoExecutionStack,
+  type MongoRuntimeAdapterDescriptor,
+  type MongoRuntimeAdapterInstance,
+  type MongoRuntimeTargetDescriptor,
+} from '@prisma-next/mongo-runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 function collectingTelemetry() {
@@ -63,6 +70,40 @@ function createMockMongoAdapter(): MongoAdapter {
       command: plan.command,
     })),
   } as unknown as MongoAdapter;
+}
+
+function makeMongoContext(adapter: MongoAdapter): MongoExecutionContext {
+  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
+  const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
+    familyId: 'mongo',
+    targetId: 'mongo',
+    lower: adapter.lower.bind(adapter),
+  };
+  const target: MongoRuntimeTargetDescriptor<'mongo'> = {
+    kind: 'target',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+  };
+  const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+    kind: 'adapter',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => adapterInstance,
+  };
+  const stack: MongoExecutionStack<'mongo'> = {
+    target,
+    adapter: adapterDescriptor,
+    driver: undefined,
+    extensionPacks: [],
+  };
+  return Object.freeze({ contract: {}, codecs, stack });
 }
 
 function createMockMongoDriver(rows: Record<string, unknown>[] = []): MongoDriver {
@@ -137,15 +178,13 @@ describe('cross-family middleware proof', () => {
   it('same middleware observes queries from a Mongo runtime', async () => {
     const { middleware, events } = collectingTelemetry();
 
+    const mongoAdapter = createMockMongoAdapter();
     const mongoRuntime = createMongoRuntime({
-      adapter: createMockMongoAdapter(),
+      context: makeMongoContext(mongoAdapter),
       driver: createMockMongoDriver([
         { _id: '1', name: 'Bob' },
         { _id: '2', name: 'Carol' },
       ]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: createMongoCodecRegistry(),
       middleware: [middleware],
     });
 
@@ -174,12 +213,10 @@ describe('cross-family middleware proof', () => {
 
     const sqlRuntime = new MockSqlRuntime([middleware], sqlCtx, [{ id: 1 }]);
 
+    const mongoAdapter = createMockMongoAdapter();
     const mongoRuntime = createMongoRuntime({
-      adapter: createMockMongoAdapter(),
+      context: makeMongoContext(mongoAdapter),
       driver: createMockMongoDriver([{ _id: '1' }]),
-      contract: {},
-      targetId: 'mongo',
-      codecs: createMongoCodecRegistry(),
       middleware: [middleware],
     });
 

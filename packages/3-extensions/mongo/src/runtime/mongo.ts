@@ -1,4 +1,4 @@
-import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
+import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { MongoDriverImpl } from '@prisma-next/driver-mongo';
 import { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
 import type {
@@ -11,7 +11,12 @@ import type { MongoOrmClient, MongoQueryPlan } from '@prisma-next/mongo-orm';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import type { MongoRuntime } from '@prisma-next/mongo-runtime';
-import { createMongoRuntime } from '@prisma-next/mongo-runtime';
+import {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
+  createMongoRuntime,
+} from '@prisma-next/mongo-runtime';
+import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import {
   type MongoBinding,
   type MongoBindingInput,
@@ -118,18 +123,18 @@ export default function mongo<
   let closed = false;
 
   const buildRuntime = async (resolvedBinding: MongoBinding): Promise<MongoRuntime> => {
-    const codecs = createDefaultMongoCodecRegistry();
-    const adapter = createMongoAdapter(codecs);
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    const context = createMongoExecutionContext({ contract, stack });
     const driver =
       resolvedBinding.kind === 'url'
         ? await MongoDriverImpl.fromConnection(resolvedBinding.url, resolvedBinding.dbName)
         : MongoDriverImpl.fromDb(resolvedBinding.client.db(resolvedBinding.dbName));
     return createMongoRuntime({
-      adapter,
+      context,
       driver,
-      codecs,
-      contract,
-      targetId: 'mongo',
       ...(options.mode !== undefined ? { mode: options.mode } : {}),
     });
   };
