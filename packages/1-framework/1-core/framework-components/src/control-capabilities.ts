@@ -1,3 +1,4 @@
+import type { PslDocumentAst } from '@prisma-next/psl-types';
 import type { ControlTargetDescriptor } from './control-descriptors';
 import type { ControlFamilyInstance } from './control-instances';
 import type { TargetMigrationsCapability } from './control-migration-types';
@@ -30,5 +31,22 @@ export function hasSchemaView<TFamilyId extends string, TSchemaIR>(
   return (
     'toSchemaView' in instance &&
     typeof (instance as Record<string, unknown>)['toSchemaView'] === 'function'
+  );
+}
+
+/**
+ * Capability declaring that a family can infer a PSL contract AST from its
+ * opaque introspected schema IR. Consumed by `prisma-next contract infer`.
+ */
+export interface PslContractInferCapable<TSchemaIR = unknown> {
+  inferPslContract(schemaIR: TSchemaIR): PslDocumentAst;
+}
+
+export function hasPslContractInfer<TFamilyId extends string, TSchemaIR>(
+  instance: ControlFamilyInstance<TFamilyId, TSchemaIR>,
+): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & PslContractInferCapable<TSchemaIR> {
+  return (
+    'inferPslContract' in instance &&
+    typeof (instance as Record<string, unknown>)['inferPslContract'] === 'function'
   );
 }

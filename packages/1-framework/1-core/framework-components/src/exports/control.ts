@@ -1,5 +1,9 @@
-export type { MigratableTargetDescriptor, SchemaViewCapable } from '../control-capabilities';
-export { hasMigrations, hasSchemaView } from '../control-capabilities';
+export type {
+  MigratableTargetDescriptor,
+  PslContractInferCapable,
+  SchemaViewCapable,
+} from '../control-capabilities';
+export { hasMigrations, hasPslContractInfer, hasSchemaView } from '../control-capabilities';
 export type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
