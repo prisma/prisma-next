@@ -403,15 +403,15 @@ describe('emitter', () => {
     expect(userEmbeddingCall?.hasContract).toBe(true);
   });
 
-  it('returns undefined from the resolveFieldTypeParams wrapper when the model is missing', async () => {
-    // The wrapper short-circuits on `contract.models[modelName] === undefined`
-    // before calling the SPI. We can't trigger that branch through the
-    // contract IR (every field's modelName is, by construction, a model
-    // key), but the runtime shape of the wrapper exposes the precondition
-    // through the wrapper's identity: the SPI is consulted only when the
-    // model is found. Assert the negative branch by replacing the contract
-    // walk with one that has no models — the wrapper is built but never
-    // invoked, so the SPI delegate is never called.
+  it('does not invoke resolveFieldTypeParams when the contract has no models', async () => {
+    // With no models in the contract, field-map generation has no
+    // fields to walk and never reaches the wrapper. The wrapper itself
+    // also carries an internal `if (!model) return undefined` guard,
+    // but field-map generation already filters non-model entries
+    // before invoking the resolver, so that internal branch is
+    // unreachable from the emit path. This test pins the upstream
+    // short-circuit: the SPI delegate must stay unobserved when the
+    // contract has nothing to walk.
     const ir = createTestContract({ storage: { tables: {} } });
 
     let resolverInvocations = 0;
