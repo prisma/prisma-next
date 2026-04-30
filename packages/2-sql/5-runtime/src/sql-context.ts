@@ -268,8 +268,7 @@ function buildCodecDescriptorRegistry(
   codecRegistry: CodecRegistry,
   parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
 ): CodecDescriptorRegistry {
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumers narrow per codec.
-  type AnyDescriptor = CodecDescriptor<any>;
+  type AnyDescriptor = CodecDescriptor<unknown>;
   const byId = new Map<string, AnyDescriptor>();
   const byTargetType = new Map<string, Array<AnyDescriptor>>();
 
@@ -285,13 +284,21 @@ function buildCodecDescriptorRegistry(
     }
   }
 
+  // The descriptor map is heterogeneous in `P` — each codec id has its own
+  // params shape. The public `CodecDescriptorRegistry` interface widens to
+  // `CodecDescriptor<unknown>` and consumers narrow per codec id at the
+  // call site (the descriptor's `paramsSchema` validates JSON-sourced
+  // params before the factory ever sees them, so the runtime narrow is
+  // safe). The cast at registration goes through `unknown` because
+  // `CodecDescriptor<P>` is invariant in `P` (the `factory` and
+  // `renderOutputType` slots use `P` contravariantly).
   for (const descriptor of parameterizedDescriptors.values()) {
-    registerInIndices(descriptor);
+    registerInIndices(descriptor as unknown as AnyDescriptor);
   }
 
   for (const codec of codecRegistry.values()) {
     if (byId.has(codec.id)) continue;
-    registerInIndices(synthesizeNonParameterizedDescriptor(codec));
+    registerInIndices(synthesizeNonParameterizedDescriptor(codec) as unknown as AnyDescriptor);
   }
 
   return {
@@ -449,6 +456,14 @@ function buildContractCodecRegistry(
 } {
   const byColumn = new Map<string, Codec>();
   const byCodecId = new Map<string, Codec>();
+  // Codec ids whose `byCodecId` entry is ambiguous — multiple distinct
+  // resolved instances landed under the same parameterized codec id (e.g.
+  // `Vector<1024>` and `Vector<1536>` both registering under
+  // `pg/vector@1`). The encode-side `forCodecId` fallback rejects these
+  // ids so a DSL-param without a column ref cannot silently bind to the
+  // wrong instance. Retires when AC-5's `ParamRef.refs` plumbing lands
+  // (TML-2357).
+  const ambiguousCodecIds = new Set<string>();
   const validators = new Map<string, JsonSchemaValidateFn>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -515,9 +530,15 @@ function buildContractCodecRegistry(
           resolvedCodec = cached;
         }
         // else: parameterized codec id with no typeRef and no typeParams
-        // — the column is missing the params the descriptor needs. Leave
-        // `resolvedCodec` undefined; encode/decode for this column will
-        // fall through to `forCodecId` (the AC-5-deferred carve-out).
+        // — this is the legitimate "undimensioned" form for codecs that
+        // ship a no-params column variant alongside a parameterized one
+        // (e.g. pgvector's `vectorColumn` vs. `vector(N)`). Leave
+        // `resolvedCodec` undefined; encode/decode for this column flows
+        // through `forCodecId` (the AC-5-deferred carve-out documented
+        // in `relational-core/src/ast/codec-types.ts`). The fallback
+        // works for these cases because their wire format is
+        // params-independent (vector formats `[v1,v2,...]` regardless
+        // of declared length).
       }
 
       if (resolvedCodec) {
@@ -526,8 +547,11 @@ function buildContractCodecRegistry(
         if (validate) {
           validators.set(columnKey, validate);
         }
-        if (!byCodecId.has(column.codecId)) {
+        const existing = byCodecId.get(column.codecId);
+        if (existing === undefined) {
           byCodecId.set(column.codecId, resolvedCodec);
+        } else if (existing !== resolvedCodec && parameterizedDescriptors.has(column.codecId)) {
+          ambiguousCodecIds.add(column.codecId);
         }
       }
     }
@@ -545,6 +569,20 @@ function buildContractCodecRegistry(
       // don't have a typeRef/typeParams column the walk could resolve
       // through. The legacy fallback retires once `ParamRef.refs` is
       // threaded everywhere (TML-2357).
+      //
+      // Reject ambiguous parameterized fallbacks: if the contract walk
+      // resolved more than one distinct codec instance under this id
+      // (e.g. multiple vector dimensions, multiple arktype-json
+      // schemas), the codec-id-keyed lookup cannot honor the call site
+      // — fail fast rather than bind to whichever instance happened to
+      // land first.
+      if (ambiguousCodecIds.has(codecId)) {
+        throw runtimeError(
+          'RUNTIME.TYPE_PARAMS_INVALID',
+          `Codec '${codecId}' resolves to multiple parameterized instances; column-aware dispatch is required.`,
+          { codecId },
+        );
+      }
       return byCodecId.get(codecId) ?? legacyCodecRegistry.get(codecId);
     },
   };

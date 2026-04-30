@@ -17,21 +17,18 @@ export interface CodecDescriptorRegistry {
    * Descriptors carry distinct param shapes per codec id; the registry is
    * heterogeneous and the consumer narrows per codec.
    */
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
-  descriptorFor(codecId: string): CodecDescriptor<any> | undefined;
+  descriptorFor(codecId: string): CodecDescriptor<unknown> | undefined;
   /**
    * All registered descriptors. Used by `validateCodecRegistryCompleteness`
    * and other startup-time consumers that enumerate descriptors.
    */
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
-  values(): IterableIterator<CodecDescriptor<any>>;
+  values(): IterableIterator<CodecDescriptor<unknown>>;
   /**
    * Descriptors indexed by `targetTypes[i]` (each scalar type the codec
    * advertises). Multiple descriptors may map to the same scalar type;
    * ordering reflects registration order.
    */
-  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
-  byTargetType(targetType: string): readonly CodecDescriptor<any>[];
+  byTargetType(targetType: string): readonly CodecDescriptor<unknown>[];
 }
 
 /**

@@ -13,6 +13,12 @@ export type CodecTrait =
    * the framework's `JsonSchemaValidatorRegistry` consults at runtime. The
    * trait gates the `extractValidator` cast from structurally-typed
    * `unknown` to a typed validator view.
+   *
+   * Retirement target. The unified `CodecDescriptor` model moves
+   * validation into the resolved codec's `decode` body; the parallel
+   * `JsonSchemaValidatorRegistry` (and this trait alongside it) retires
+   * under TML-2357 (T3.5.12). Per-library JSON extensions like
+   * `@prisma-next/extension-arktype-json` already follow the new pattern.
    */
   | 'json-validator';
 
@@ -196,15 +202,26 @@ export interface CodecDescriptor<P = void> {
 }
 
 /**
- * Standard Schema validator for `void` params. Accepts any input and
- * returns `undefined`. Used by the framework-supplied non-parameterized
- * descriptor synthesizer.
+ * Standard Schema validator for `void` params. Accepts only `undefined`
+ * (or absent input); rejects any other value so a contract that tries to
+ * thread `typeParams` through a non-parameterized codec id fails fast at
+ * the JSON boundary instead of silently coercing the value away. Used by
+ * the framework-supplied non-parameterized descriptor synthesizer.
  */
 export const voidParamsSchema: StandardSchemaV1<void> = {
   '~standard': {
     version: 1,
     vendor: 'prisma-next',
-    validate: () => ({ value: undefined }),
+    validate: (input) =>
+      input === undefined
+        ? { value: undefined }
+        : {
+            issues: [
+              {
+                message: 'unexpected typeParams for non-parameterized codec (void params expected)',
+              },
+            ],
+          },
   },
 };
 
