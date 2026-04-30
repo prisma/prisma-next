@@ -1,5 +1,6 @@
 import type { QueryPlan } from '@prisma-next/framework-components/runtime';
 import type { AnyMongoCommand } from './commands';
+import type { MongoResultShape } from './result-shape';
 
 declare const __mongoQueryPlanRow: unique symbol;
 
@@ -15,5 +16,6 @@ export interface MongoQueryPlan<Row = unknown, Command extends AnyMongoCommand =
   extends QueryPlan<Row> {
   readonly collection: string;
   readonly command: Command;
+  readonly resultShape?: MongoResultShape;
   readonly [__mongoQueryPlanRow]?: Row;
 }

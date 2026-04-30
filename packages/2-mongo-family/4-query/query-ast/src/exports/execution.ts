@@ -49,6 +49,8 @@ export {
   RawUpdateManyCommand,
   RawUpdateOneCommand,
 } from '../raw-commands';
+export type { MongoFieldShape, MongoResultShape } from '../result-shape';
+export { freezeMongoFieldShape, freezeMongoResultShape } from '../result-shape';
 export type {
   DeleteManyResult,
   DeleteOneResult,
