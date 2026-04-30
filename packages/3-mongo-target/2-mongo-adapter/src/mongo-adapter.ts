@@ -1,5 +1,5 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import type {
   MongoQueryPlan,
@@ -19,7 +19,7 @@ import {
   UpdateManyWireCommand,
   UpdateOneWireCommand,
 } from '@prisma-next/mongo-wire';
-import { mongoStandardCodecs } from './core/codecs';
+import { buildStandardCodecRegistry } from './core/codecs';
 import { lowerFilter, lowerPipeline, lowerStage } from './lowering';
 import { resolveValue } from './resolve-value';
 
@@ -155,22 +155,6 @@ class MongoAdapterImpl implements MongoAdapter {
       }
     }
   }
-}
-
-/**
- * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo
- * wire-type codecs. Internal helper used by the runtime adapter
- * descriptor's `create(stack)` factory and by the public
- * `createMongoAdapter()` helper. Not re-exported from the package's public
- * surface — userland callers obtain a registry via the framework's
- * execution-stack composition (see `createMongoExecutionContext`).
- */
-function buildStandardCodecRegistry(): MongoCodecRegistry {
-  const registry = createMongoCodecRegistry();
-  for (const codec of mongoStandardCodecs) {
-    registry.register(codec);
-  }
-  return registry;
 }
 
 /**

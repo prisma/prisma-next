@@ -13,6 +13,7 @@ import {
   MongoUnwindStage,
 } from '@prisma-next/mongo-query-ast/execution';
 import { contractModelToMongoResultShape } from '@prisma-next/mongo-query-builder';
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { MongoCollectionState, MongoIncludeExpr } from './collection-state';
 
 function compileIncludes(includes: readonly MongoIncludeExpr[]): MongoPipelineStage[] {
@@ -92,8 +93,8 @@ export function compileMongoQuery<Row = unknown>(
   const includeRelationNames =
     state.includes.length > 0 ? state.includes.map((inc) => inc.relationName) : undefined;
   const resultShape = contractModelToMongoResultShape(model, {
-    ...(selection !== undefined ? { selection } : {}),
-    ...(includeRelationNames !== undefined ? { includeRelationNames } : {}),
+    ...ifDefined('selection', selection),
+    ...ifDefined('includeRelationNames', includeRelationNames),
   });
 
   return { collection, command, meta, resultShape };

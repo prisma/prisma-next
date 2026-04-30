@@ -1,4 +1,8 @@
-import { mongoCodec } from '@prisma-next/mongo-codec';
+import {
+  createMongoCodecRegistry,
+  type MongoCodecRegistry,
+  mongoCodec,
+} from '@prisma-next/mongo-codec';
 import { ObjectId } from 'mongodb';
 import {
   MONGO_BOOLEAN_CODEC_ID,
@@ -94,3 +98,21 @@ export const mongoStandardCodecs = [
   mongoDateCodec,
   mongoVectorCodec,
 ] as const;
+
+/**
+ * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo
+ * wire-type codecs.
+ *
+ * Single point of truth for adapter-side codec construction: used by the
+ * legacy synchronous `createMongoAdapter()` factory and by the runtime
+ * adapter descriptor's `codecs()` getter. Userland code obtains a registry
+ * via the framework's execution-stack composition (see
+ * `createMongoExecutionContext`) instead of calling this directly.
+ */
+export function buildStandardCodecRegistry(): MongoCodecRegistry {
+  const registry = createMongoCodecRegistry();
+  for (const codec of mongoStandardCodecs) {
+    registry.register(codec);
+  }
+  return registry;
+}

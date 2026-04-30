@@ -18,7 +18,8 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
-    "@prisma-next/mongo-value": "workspace:*"
+    "@prisma-next/mongo-value": "workspace:*",
+    "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
     "@prisma-next/tsconfig": "workspace:*",

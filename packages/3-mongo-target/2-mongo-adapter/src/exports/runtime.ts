@@ -3,9 +3,9 @@ import type {
   RuntimeAdapterDescriptor,
   RuntimeAdapterInstance,
 } from '@prisma-next/framework-components/execution';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
-import { mongoStandardCodecs } from '../core/codecs';
+import { buildStandardCodecRegistry, mongoStandardCodecs } from '../core/codecs';
 import { createMongoAdapter } from '../mongo-adapter';
 
 /**
@@ -25,14 +25,6 @@ import { createMongoAdapter } from '../mongo-adapter';
 interface MongoRuntimeAdapterInstance
   extends RuntimeAdapterInstance<'mongo', 'mongo'>,
     MongoAdapter {}
-
-function buildStandardCodecRegistry(): MongoCodecRegistry {
-  const registry = createMongoCodecRegistry();
-  for (const codec of mongoStandardCodecs) {
-    registry.register(codec);
-  }
-  return registry;
-}
 
 const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   'mongo',

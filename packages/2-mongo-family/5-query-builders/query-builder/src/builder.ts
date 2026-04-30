@@ -56,6 +56,7 @@ import {
   UpdateManyCommand,
   UpdateOneCommand,
 } from '@prisma-next/mongo-query-ast/execution';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { createFieldAccessor, type Expression, type FieldAccessor } from './field-accessor';
 import type { FindAndModifyEnabled, LeadingMatch, UpdateEnabled } from './markers';
 import { pipelineSupportsFlatResultShape } from './pipeline-result-shape';
@@ -821,7 +822,7 @@ export class PipelineChain<
       collection: this.#state.collection,
       command,
       meta,
-      ...(resultShape !== undefined ? { resultShape } : {}),
+      ...ifDefined('resultShape', resultShape),
     };
   }
 

@@ -7,17 +7,16 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
   createMongoRuntime,
   type MongoExecutionContext,
-  type MongoExecutionStack,
   type MongoRuntimeAdapterDescriptor,
-  type MongoRuntimeAdapterInstance,
-  type MongoRuntimeTargetDescriptor,
 } from '@prisma-next/mongo-runtime';
+import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import { describe, expect, it, vi } from 'vitest';
 
 function collectingTelemetry() {
@@ -72,38 +71,33 @@ function createMockMongoAdapter(): MongoAdapter {
   } as unknown as MongoAdapter;
 }
 
-function makeMongoContext(adapter: MongoAdapter): MongoExecutionContext {
-  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
-  const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
-    familyId: 'mongo',
-    targetId: 'mongo',
-    lower: adapter.lower.bind(adapter),
-  };
-  const target: MongoRuntimeTargetDescriptor<'mongo'> = {
-    kind: 'target',
-    id: 'mongo',
-    familyId: 'mongo',
-    targetId: 'mongo',
-    version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
-    create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
-  };
-  const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+// A minimal Mongo runtime adapter descriptor that wraps a caller-supplied
+// `MongoAdapter` mock. We compose it through the production
+// `createMongoExecutionStack` + `createMongoExecutionContext` path so the
+// runtime's expectations on stack/context structure are exercised end-to-end
+// even with a stub adapter.
+function mockAdapterDescriptor(adapter: MongoAdapter): MongoRuntimeAdapterDescriptor<'mongo'> {
+  return {
     kind: 'adapter',
     id: 'mongo',
     familyId: 'mongo',
     targetId: 'mongo',
     version: '0.0.1',
-    codecs: () => createMongoCodecRegistry(),
-    create: () => adapterInstance,
+    codecs: () => mongoRuntimeTarget.codecs(),
+    create: () => ({
+      familyId: 'mongo',
+      targetId: 'mongo',
+      lower: adapter.lower.bind(adapter),
+    }),
   };
-  const stack: MongoExecutionStack<'mongo'> = {
-    target,
-    adapter: adapterDescriptor,
-    driver: undefined,
-    extensionPacks: [],
-  };
-  return Object.freeze({ contract: {}, codecs, stack });
+}
+
+function makeMongoContext(adapter: MongoAdapter): MongoExecutionContext {
+  const stack = createMongoExecutionStack({
+    target: mongoRuntimeTarget,
+    adapter: mockAdapterDescriptor(adapter),
+  });
+  return createMongoExecutionContext({ contract: {}, stack });
 }
 
 function createMockMongoDriver(rows: Record<string, unknown>[] = []): MongoDriver {
