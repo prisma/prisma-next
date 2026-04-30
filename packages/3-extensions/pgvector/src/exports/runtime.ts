@@ -1,3 +1,4 @@
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
@@ -21,10 +22,23 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
+// pgvector's encode is parameter-independent (the wire format `[v1,v2,...]`
+// doesn't care about declared length), so the resolved codec for every
+// `(length)` instance is the same shared codec object today. The factory
+// returns it directly; `Ctx` is unused. When a future refactor wants per-
+// instance state (e.g. capping wire length to declared dimension), the
+// closure over `params` is the place to add it.
+const sharedVectorCodec: Codec = codecDefinitions.vector.codec;
+const vectorFactory = (_params: { readonly length: number }) => (_ctx: Ctx) => sharedVectorCodec;
+
 const parameterizedCodecDescriptors = [
   {
     codecId: VECTOR_CODEC_ID,
+    traits: ['equality'] as const,
+    targetTypes: ['vector'] as const,
     paramsSchema: vectorParamsSchema,
+    renderOutputType: (params: { readonly length: number }) => `Vector<${params.length}>`,
+    factory: vectorFactory,
   },
 ] as const satisfies ReadonlyArray<
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
