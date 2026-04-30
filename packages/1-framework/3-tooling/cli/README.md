@@ -1062,6 +1062,8 @@ node migrations/<dir>/migration.ts
 
 The scaffolded `migration.ts` calls `MigrationCLI.run(import.meta.url, ...)` from `@prisma-next/cli/migration-cli` when invoked as the entrypoint. (Postgres scaffolds re-export `MigrationCLI` through `@prisma-next/target-postgres/migration` so a Postgres `migration.ts` only needs the single facade import; Mongo scaffolds still pull from `@prisma-next/cli/migration-cli` directly.) The CLI entrypoint loads `prisma-next.config.ts`, assembles a `ControlStack`, instantiates the migration with that stack (so `dataTransform` and other adapter-aware helpers can materialize a real adapter), and serializes operations to `ops.json` while writing the content-addressed `migrationHash` into `migration.json`. If `migration.ts` contains unfilled `placeholder()` slots, the script exits with `PN-MIG-2001` and reports the slot to fill in.
 
+`MigrationCLI.run` accepts an optional third argument `{ argv?, stdout?, stderr? }` for in-process testability (default: `process.argv` / `process.stdout` / `process.stderr`) and returns the exit code as a `Promise<number>`. The flag surface is `--help` / `--dry-run` / `--config <path>`, parsed by [`clipanion`](https://github.com/arcanis/clipanion). The main multi-command surface (`prisma-next contract emit`, `db verify`, etc.) uses Commander; the per-migration `MigrationCLI.run` entrypoint uses clipanion to keep authored migration files lightweight and in-process testable.
+
 ### `prisma-next migration ref`
 
 Manage named refs in `migrations/refs.json`. Refs map logical environment names (e.g., `staging`, `production`) to contract hashes, enabling multi-environment migration workflows where different environments track different points in the migration graph.
