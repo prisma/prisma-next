@@ -52,22 +52,31 @@ describe('arktypeJson(schema)', () => {
     expect(codec.traits).toEqual(['equality']);
   });
 
-  it('rejects non-arktype schemas at the call site', () => {
+  it('rejects non-callable schema lookalikes at the call site', () => {
     // The runtime check enforces the column-author surface accepts
-    // arktype `Type`s only — a misconfigured schema (e.g. a plain
-    // function or a different library's schema) surfaces here, not
-    // at contract-load time. The double-cast through `unknown` models
-    // a deliberate misuse of the typed surface without falling back
-    // to `any` (which the project bans).
+    // callable arktype `Type`s only — a plain object lookalike (with
+    // `expression` and `json` fields shaped right but not callable)
+    // would have passed the field checks and only blown up at the
+    // first `decode`/`decodeJson`. Reject early instead.
     const notASchema = { foo: 'bar' } as unknown as Type<unknown>;
-    expect(() => arktypeJson(notASchema)).toThrow(/expects an arktype Type/);
+    expect(() => arktypeJson(notASchema)).toThrow(/callable arktype Type/);
   });
 
-  it('rejects schemas with non-object json IR', () => {
-    const malformedSchema = {
+  it('rejects callable schemas missing the `expression` field', () => {
+    // A callable that doesn't carry arktype's `expression` getter is
+    // not an arktype `Type` — the column descriptor relies on
+    // `expression` for emit-path rendering.
+    const callableWithoutExpression = (() => undefined) as unknown as Type<unknown>;
+    expect(() => arktypeJson(callableWithoutExpression)).toThrow(/missing `expression: string`/);
+  });
+
+  it('rejects callable schemas with non-object json IR', () => {
+    // A callable that carries `expression` but lacks the `json` IR
+    // can't be rehydrated at runtime; reject at authoring time.
+    const malformedSchema = Object.assign(() => undefined, {
       expression: 'string',
       json: 'not-an-object',
-    } as unknown as Type<unknown>;
+    }) as unknown as Type<unknown>;
     expect(() => arktypeJson(malformedSchema)).toThrow(/missing `json` IR/);
   });
 });
