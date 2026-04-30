@@ -1,10 +1,10 @@
 # Framework Gaps — what Prisma Next is missing for an extension like CipherStash
 
-> Companion to `[./system-design-review.md](./system-design-review.md)`, `[./code-review.md](./code-review.md)`, and `[./walkthrough.md](./walkthrough.md)`.
+> Companion to [system-design-review.md](./system-design-review.md), [code-review.md](./code-review.md), and [walkthrough.md](./walkthrough.md).
 >
 > Audience: the **Prisma Next framework team**. The CipherStash integration is the first non-trivial real-world consumer of the post-#379 / [ADR 204](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) extension surface. This document collects every place where the integration paid a measurable tax — code it had to write, types it had to vendor, behavior it had to document around — because of a missing or under-specified framework seam. Each gap names the workaround the integration ships today and what the framework should provide so the workaround can be deleted.
 >
-> Scope: branch `prisma-next` of `cipherstash/stack` vs `origin/main`, head commit `8e8e5a2`. Integration code under `[reference/cipherstash/stack/packages/stack/src/prisma/](../../../reference/cipherstash/stack/packages/stack/src/prisma/)`.
+> Scope: branch `prisma-next` of `cipherstash/stack` vs `origin/main`, head commit `8e8e5a2`. Integration code under [reference/cipherstash/stack/packages/stack/src/prisma/](../../../reference/cipherstash/stack/packages/stack/src/prisma/).
 
 ---
 
@@ -422,7 +422,7 @@ Tracked upstream under [TML-2329](https://linear.app/prisma-company/issue/TML-23
 
 > **Status: ✅ Resolved (2026-04-30).** [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) lands the framework `CodecCallContext = { signal? }` and threads it from `runtime.execute(plan, { signal })` through every codec dispatch site (SQL `encodeParams` / `decodeRow` / between-rows stream loop; Mongo `resolveValue` recursive walk). Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to their underlying SDK (e.g. `bulkEncrypt({ signal: ctx.signal })`). Aborts surface as `RUNTIME.ABORTED { phase: 'encode' | 'decode' | 'stream' }` with `cause = signal.reason` (or a synthesised `DOMException('AbortError')`). Cooperative cancellation: the runtime returns promptly via the abort race; in-flight codec bodies that ignore the signal complete in the background. The integration's "codecs simply ignore cancellation" workaround below can be replaced today. The original problem statement stands as historical context.
 
-**Symptom.** A query that's been cancelled (HTTP request aborted, transaction timeout) still completes its in-flight `bulkEncrypt` against ZeroKMS. The work is wasted, the budget is spent, the latency is incurred.
+**Original symptom (preserved as historical context, resolved by ADR 207).** A query that's been cancelled (HTTP request aborted, transaction timeout) still completes its in-flight `bulkEncrypt` against ZeroKMS. The work is wasted, the budget is spent, the latency is incurred.
 
 **Why the extension needs this.** Cancellation is correctness-relevant for any codec performing IO:
 
@@ -430,17 +430,15 @@ Tracked upstream under [TML-2329](https://linear.app/prisma-company/issue/TML-23
 - **Timeout propagation**: a transaction with a deadline needs to abort in-flight codec calls before the deadline expires; otherwise the deadline-enforcement is theoretical (the request "succeeds" arbitrarily late).
 - **Backpressure**: an upstream cancellation should propagate down to the SDK so the SDK can stop sending requests, freeing connection-pool slots.
 
-The codec's `encode` / `decode` need an `AbortSignal` (or equivalent token) to forward to the SDK's `bulkEncrypt({ signal })`. Today the codec interface doesn't carry one.
+The codec's `encode` / `decode` previously had no way to receive an `AbortSignal` (or equivalent token) to forward to the SDK's `bulkEncrypt({ signal })`. ADR 207 adds the `CodecCallContext.signal` parameter and threads it from `runtime.execute(plan, { signal })` through every codec dispatch site, resolving this gap.
 
 Applicability: **broadly applicable to IO-bound codecs**. Any codec that talks to a network service, reads from a file, or does meaningful CPU work benefits from cancellation propagation. Pure in-process codecs (fast CPU work) generally don't need it. The split mirrors G4: in-process codecs vs service-backed codecs.
 
-**Today's workaround.** None — the integration's codecs simply ignore cancellation.
+**Original workaround (now obsolete).** None — the integration's codecs simply ignored cancellation. With ADR 207 in place, codec authors take a `(value, ctx)` author signature and forward `ctx.signal` to their underlying SDK.
 
-**What the framework should provide.** An `AbortSignal` (or equivalent cancellation token) on `EncodeContext` / `DecodeContext`. Codec authors that wrap network calls forward it to `fetch` / SDK; codec authors that don't, ignore it.
+**What the framework now provides.** `CodecCallContext.signal` on the framework `Codec.encode` / `Codec.decode` two-arg author signature, and `runtime.execute(plan, { signal })` to plumb a per-query signal in from the caller. Codec authors that wrap network calls forward `ctx.signal` to `fetch` / SDK; codec authors that don't, ignore it. See [ADR 207](../architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) for the full design.
 
-ADR 204 §Risks acknowledges this as an open design concern.
-
-**Payoff.** The integration can pipe `signal` through to the SDK; aborted requests stop talking to ZeroKMS. (Requires SDK plumbing too — but the framework is the prerequisite.)
+**Payoff (now realised).** The integration can pipe `signal` through to the SDK; aborted requests stop talking to ZeroKMS. (Requires SDK plumbing too — but the framework prerequisite is now in place.)
 
 ---
 
@@ -616,7 +614,7 @@ The integration already defines its own `JsonValue` in `internal-types/prisma-ne
 
 The CipherStash integration's structural shape — control + runtime + pack + column-types + codec-types + operation-types subpath exports, per-extension factory closure, conditional-method `OperationTypes`, microtask batcher, vendored migration assets behind `databaseDependencies.init`, per-column DDL via `planTypeOperations` — is **almost a template** for any non-trivial extension pack. The framework would benefit from publishing this shape as a **starter**:
 
-```
+```text
 @prisma-next/extension-template
 ├── src/
 │   ├── core/        (codecs, batcher, migrations)
