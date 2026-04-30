@@ -16,6 +16,7 @@ import type {
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
 } from '@prisma-next/framework-components/control';
+import type { PslDocumentAst } from '@prisma-next/psl-types';
 import type { Result } from '@prisma-next/utils/result';
 
 // ============================================================================
@@ -690,6 +691,15 @@ export interface ControlClient {
    * @returns CoreSchemaView if the family supports it, undefined otherwise
    */
   toSchemaView(schemaIR: unknown): CoreSchemaView | undefined;
+
+  /**
+   * Infers a PSL contract AST from an introspected schema IR.
+   * Delegates to the family instance's inferPslContract method.
+   *
+   * @param schemaIR - The schema IR from introspect()
+   * @returns PslDocumentAst if the family supports the capability, undefined otherwise
+   */
+  inferPslContract(schemaIR: unknown): PslDocumentAst | undefined;
 
   /**
    * Emits the contract to JSON and TypeScript declarations.

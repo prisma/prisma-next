@@ -1,9 +1,61 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import type { PslDocumentAst, PslSpan } from '@prisma-next/psl-types';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { executeCommand, setupCommandMocks } from '../utils/test-helpers';
+
+const SYNTHETIC_SPAN: PslSpan = {
+  start: { offset: 0, line: 1, column: 1 },
+  end: { offset: 0, line: 1, column: 1 },
+};
+
+function buildSyntheticUserAst(): PslDocumentAst {
+  return {
+    kind: 'document',
+    sourceId: 'test',
+    models: [
+      {
+        kind: 'model',
+        name: 'User',
+        fields: [
+          {
+            kind: 'field',
+            name: 'id',
+            typeName: 'Int',
+            optional: false,
+            list: false,
+            attributes: [
+              {
+                kind: 'attribute',
+                target: 'field',
+                name: 'id',
+                args: [],
+                span: SYNTHETIC_SPAN,
+              },
+            ],
+            span: SYNTHETIC_SPAN,
+          },
+          {
+            kind: 'field',
+            name: 'email',
+            typeName: 'String',
+            optional: false,
+            list: false,
+            attributes: [],
+            span: SYNTHETIC_SPAN,
+          },
+        ],
+        attributes: [],
+        span: SYNTHETIC_SPAN,
+      },
+    ],
+    enums: [],
+    compositeTypes: [],
+    span: SYNTHETIC_SPAN,
+  };
+}
 
 type CreateContractInferCommand =
   typeof import('../../src/commands/contract-infer')['createContractInferCommand'];
@@ -12,10 +64,12 @@ const mocks = vi.hoisted(() => {
   const loadConfigMock = vi.fn();
   const introspectMock = vi.fn();
   const toSchemaViewMock = vi.fn();
+  const inferPslContractMock = vi.fn();
   const closeMock = vi.fn();
   const createControlClientMock = vi.fn(() => ({
     introspect: introspectMock,
     toSchemaView: toSchemaViewMock,
+    inferPslContract: inferPslContractMock,
     close: closeMock,
   }));
 
@@ -23,6 +77,7 @@ const mocks = vi.hoisted(() => {
     loadConfigMock,
     introspectMock,
     toSchemaViewMock,
+    inferPslContractMock,
     closeMock,
     createControlClientMock,
   };
@@ -98,6 +153,7 @@ describe('createContractInferCommand', () => {
     mocks.loadConfigMock.mockResolvedValue(baseConfig);
     mocks.introspectMock.mockResolvedValue(schemaIR);
     mocks.toSchemaViewMock.mockReturnValue(undefined);
+    mocks.inferPslContractMock.mockReturnValue(buildSyntheticUserAst());
     mocks.closeMock.mockResolvedValue(undefined);
     mocks.createControlClientMock.mockClear();
   }, timeouts.typeScriptCompilation);
@@ -216,5 +272,30 @@ describe('createContractInferCommand', () => {
 
     expect(existsSync(join(testDir, 'output/contract.prisma'))).toBe(false);
     expect(consoleErrors.join('\n')).toContain('Driver is required for DB-connected commands');
+  });
+
+  it('returns a capability-based error when the family does not implement contract inference', async () => {
+    process.chdir(testDir);
+    mocks.loadConfigMock.mockResolvedValue({
+      ...baseConfig,
+      family: { familyId: 'mongo' },
+      target: { targetId: 'mongo' },
+      db: { connection: 'mongodb://localhost:27017/test' },
+    });
+    mocks.inferPslContractMock.mockReturnValue(undefined);
+
+    await expect(
+      executeCommand(createContractInferCommand(), [
+        '--config',
+        'prisma-next.config.ts',
+        '--no-color',
+      ]),
+    ).rejects.toThrow('process.exit called');
+
+    expect(existsSync(join(testDir, 'output/contract.prisma'))).toBe(false);
+    const stderr = consoleErrors.join('\n');
+    expect(stderr).toContain('contract infer is not supported for this family');
+    // Capability-based wording — must not name the familyId string directly.
+    expect(stderr).not.toContain('family "mongo"');
   });
 });

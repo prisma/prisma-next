@@ -1,4 +1,5 @@
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
+import type { PslDocumentAst } from '@prisma-next/psl-types';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
@@ -32,6 +33,12 @@ export interface InspectLiveSchemaResult {
   readonly config: LoadedCliConfig;
   readonly schema: unknown;
   readonly schemaView: CoreSchemaView | undefined;
+  /**
+   * PSL AST inferred from the introspected schema, when the configured family
+   * implements `PslContractInferCapable`. `undefined` for families that do not
+   * support inference (e.g. Mongo today).
+   */
+  readonly pslContractAst: PslDocumentAst | undefined;
   readonly target: {
     readonly familyId: string;
     readonly id: string;
@@ -126,6 +133,7 @@ export async function inspectLiveSchema(
       onProgress,
     });
     const schemaView = client.toSchemaView(schema);
+    const pslContractAst = client.inferPslContract(schema);
 
     const dbUrl = typeof dbConnection === 'string' ? maskConnectionUrl(dbConnection) : undefined;
 
@@ -133,6 +141,7 @@ export async function inspectLiveSchema(
       config,
       schema,
       schemaView,
+      pslContractAst,
       target: {
         familyId: config.family.familyId,
         id: config.target.targetId,
