@@ -78,3 +78,19 @@ export const mongoVectorCodec = mongoCodec({
     return `Vector<${length}>`;
   },
 });
+
+/**
+ * The canonical set of Mongo wire-type codecs.
+ *
+ * Single source of truth for both control- and runtime-plane adapter
+ * descriptors. Don't duplicate this list — import it.
+ */
+export const mongoStandardCodecs = [
+  mongoObjectIdCodec,
+  mongoStringCodec,
+  mongoDoubleCodec,
+  mongoInt32Codec,
+  mongoBooleanCodec,
+  mongoDateCodec,
+  mongoVectorCodec,
+] as const;

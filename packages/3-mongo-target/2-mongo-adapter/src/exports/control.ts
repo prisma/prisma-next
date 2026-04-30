@@ -8,15 +8,7 @@ export {
 } from '../core/mongo-control-driver';
 export { createMongoRunnerDeps, extractDb } from '../core/runner-deps';
 
-import {
-  mongoBooleanCodec,
-  mongoDateCodec,
-  mongoDoubleCodec,
-  mongoInt32Codec,
-  mongoObjectIdCodec,
-  mongoStringCodec,
-  mongoVectorCodec,
-} from '../core/codecs';
+import { mongoStandardCodecs } from '../core/codecs';
 
 const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
   kind: 'adapter',
@@ -34,15 +26,7 @@ const mongoAdapterDescriptor: ControlAdapterDescriptor<'mongo', 'mongo'> = {
   ]),
   types: {
     codecTypes: {
-      codecInstances: [
-        mongoObjectIdCodec,
-        mongoStringCodec,
-        mongoDoubleCodec,
-        mongoInt32Codec,
-        mongoBooleanCodec,
-        mongoDateCodec,
-        mongoVectorCodec,
-      ],
+      codecInstances: [...mongoStandardCodecs],
       import: {
         package: '@prisma-next/adapter-mongo/codec-types',
         named: 'CodecTypes',
