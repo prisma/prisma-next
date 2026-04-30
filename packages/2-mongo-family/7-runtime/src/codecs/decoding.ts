@@ -1,6 +1,6 @@
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoFieldShape, MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
+import type { MongoCodecLookup } from '../mongo-execution-stack';
 
 const WIRE_PREVIEW_LIMIT = 100;
 
@@ -38,7 +38,7 @@ function wrapDecodeFailure(
 export async function decodeMongoRow(
   row: unknown,
   shape: MongoResultShape,
-  registry: MongoCodecRegistry,
+  registry: MongoCodecLookup,
   collection: string,
 ): Promise<unknown> {
   if (shape.kind === 'unknown') {
@@ -79,6 +79,9 @@ export async function decodeMongoRow(
     path: string,
     assign: (v: unknown) => void,
   ): void {
+    // Exhaustive over `MongoFieldShape['kind']` by construction:
+    // adding a new variant must add a corresponding arm or the
+    // `satisfies never` below would error at type-check time.
     switch (fieldShape.kind) {
       case 'unknown':
         assign(value);
@@ -128,17 +131,31 @@ export async function decodeMongoRow(
         }
         return;
       }
-      default: {
-        fieldShape satisfies never;
-        break;
-      }
     }
+    // The switch above is exhaustive over `MongoFieldShape['kind']`. The
+    // `satisfies never` below is a compile-time guard that fails if a new
+    // variant is added without a corresponding arm.
+    /* v8 ignore start */
+    fieldShape satisfies never;
+    /* v8 ignore stop */
   }
 
   for (const [k, fShape] of Object.entries(shape.fields)) {
     walkField(rowObj[k], fShape, k, (v) => {
       out[k] = v;
     });
+  }
+
+  // Pass through any row fields the shape does not describe. The shape is a
+  // partial, lane-vouched description of what the runtime knows how to decode;
+  // fields outside that description (e.g. polymorphic variant fields the base
+  // model's shape doesn't enumerate, sidecar fields a future schema migration
+  // adds) round-trip verbatim. Drop semantics belongs to explicit projection
+  // (`select` / `$project`), not to the structural decode path.
+  for (const k of Object.keys(rowObj)) {
+    if (!Object.hasOwn(shape.fields, k)) {
+      out[k] = rowObj[k];
+    }
   }
 
   await Promise.all(tasks);
