@@ -1415,10 +1415,10 @@ describe('MongoMigrationPlanner', () => {
       expect(empty.origin).toEqual({ storageHash: 'sha256:00' });
     });
 
-    it('treats an empty fromHash as a null origin', () => {
+    it('treats a null fromHash as a null origin', () => {
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: '',
+        fromHash: null,
         toHash: 'sha256:01',
       });
 

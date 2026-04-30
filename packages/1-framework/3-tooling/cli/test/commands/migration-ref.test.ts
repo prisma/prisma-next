@@ -53,7 +53,7 @@ async function createTempDir(prefix: string): Promise<string> {
 async function writeAttestedMigration(
   migrationsDir: string,
   opts: {
-    from: string;
+    from: string | null;
     to: string;
     fromContract: Contract | null;
     toContract: Contract;
@@ -67,7 +67,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
     hints: {
@@ -166,7 +165,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: EMPTY_CONTRACT_HASH,
+      from: null,
       to: HASH_A,
       fromContract: null,
       toContract: contractA,
@@ -277,7 +276,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: EMPTY_CONTRACT_HASH,
+      from: null,
       to: HASH_A,
       fromContract: null,
       toContract: contractA,
@@ -388,7 +387,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: EMPTY_CONTRACT_HASH,
+      from: null,
       to: HASH_A,
       fromContract: null,
       toContract: contractA,
@@ -479,7 +478,7 @@ describe('ref-aware pathfinding integration', { timeout: timeouts.databaseOperat
     });
 
     await writeAttestedMigration(migrationsDir, {
-      from: EMPTY_CONTRACT_HASH,
+      from: null,
       to: HASH_A,
       fromContract: null,
       toContract: contractA,

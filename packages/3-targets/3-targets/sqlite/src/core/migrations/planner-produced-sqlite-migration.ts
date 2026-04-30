@@ -50,7 +50,6 @@ export class TypeScriptRenderableSqliteMigration
     return renderCallsToTypeScript(this.#calls, {
       from: this.#meta.from,
       to: this.#meta.to,
-      ...ifDefined('kind', this.#meta.kind),
       ...ifDefined('labels', this.#meta.labels),
     });
   }

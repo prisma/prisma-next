@@ -23,9 +23,8 @@ export interface MigrationHints {
  */
 export interface MigrationMetadata {
   readonly migrationHash: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
-  readonly kind: 'regular' | 'baseline';
   readonly fromContract: Contract | null;
   readonly toContract: Contract;
   readonly hints: MigrationHints;

@@ -12,7 +12,6 @@ import { readFileSync } from 'node:fs';
 import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import { createControlStack } from '@prisma-next/framework-components/control';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
@@ -62,7 +61,7 @@ interface MigrationNewOptions extends CommonCommandOptions {
 interface MigrationNewResult {
   readonly ok: true;
   readonly dir: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly summary: string;
 }
@@ -117,7 +116,7 @@ async function executeMigrationNewCommand(
   }
 
   let fromContract: Contract | null = null;
-  let fromHash: string = EMPTY_CONTRACT_HASH;
+  let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
   try {
@@ -181,7 +180,6 @@ async function executeMigrationNewCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: fromHash,
     to: toStorageHash,
-    kind: 'regular',
     fromContract,
     toContract: toContractJson,
     hints: {

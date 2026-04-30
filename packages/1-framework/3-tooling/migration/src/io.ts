@@ -32,10 +32,10 @@ const MigrationHintsSchema = type({
 });
 
 const MigrationMetadataSchema = type({
-  from: 'string',
+  '+': 'reject',
+  from: 'string > 0 | null',
   to: 'string',
   migrationHash: 'string',
-  kind: "'regular' | 'baseline'",
   fromContract: 'object | null',
   toContract: 'object',
   hints: MigrationHintsSchema,

@@ -16,7 +16,7 @@ describe('PlannerProducedMongoMigration', () => {
   });
 
   it('exposes describe() metadata as supplied', () => {
-    const meta = { ...META, kind: 'baseline' as const, labels: ['initial'] };
+    const meta = { ...META, labels: ['initial'] };
     const migration = new PlannerProducedMongoMigration([], meta);
 
     expect(migration.describe()).toEqual(meta);
@@ -29,8 +29,8 @@ describe('PlannerProducedMongoMigration', () => {
     expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
   });
 
-  it("treats an empty 'from' as a null origin so runners do not match against an empty hash", () => {
-    const migration = new PlannerProducedMongoMigration([], { from: '', to: 'sha256:01' });
+  it("treats a null 'from' as a null origin so runners do not match against an empty hash", () => {
+    const migration = new PlannerProducedMongoMigration([], { from: null, to: 'sha256:01' });
 
     expect(migration.origin).toBeNull();
     expect(migration.destination).toEqual({ storageHash: 'sha256:01' });
@@ -82,11 +82,10 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain(META.to);
   });
 
-  it('passes optional describe() metadata (kind, labels) through to renderTypeScript', () => {
+  it('passes optional describe() metadata (labels) through to renderTypeScript', () => {
     const calls = [new CreateIndexCall('users', [{ field: 'email', direction: 1 }])];
     const migration = new PlannerProducedMongoMigration(calls, {
       ...META,
-      kind: 'baseline',
       labels: ['initial', 'seed'],
     });
 
@@ -95,7 +94,6 @@ describe('PlannerProducedMongoMigration', () => {
     expect(source).toContain('class M extends Migration');
     expect(source).toContain(META.from);
     expect(source).toContain(META.to);
-    expect(source).toContain('kind: "baseline"');
     expect(source).toContain('labels: ["initial", "seed"]');
   });
 
@@ -105,7 +103,6 @@ describe('PlannerProducedMongoMigration', () => {
 
     const source = migration.renderTypeScript();
 
-    expect(source).not.toContain('kind:');
     expect(source).not.toContain('labels:');
   });
 });

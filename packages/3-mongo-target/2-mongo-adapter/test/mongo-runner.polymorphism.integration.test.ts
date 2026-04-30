@@ -106,7 +106,7 @@ function makeContractFromPsl(): MongoContract {
 function planForContract(
   contract: MongoContract,
   origin: MongoSchemaIR = new MongoSchemaIR([]),
-  fromHash = '',
+  fromHash: string | null = null,
 ): MigrationPlan {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({

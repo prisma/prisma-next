@@ -292,11 +292,11 @@ export interface MigrationPlanner<
     readonly policy: MigrationOperationPolicy;
     /**
      * Storage hash of the "from" contract (the state the planner assumes the
-     * database starts at). Planners use this to populate `describe()` on the
-     * produced plan so the rendered `migration.ts` has correct `from`/`to`
-     * metadata.
+     * database starts at), or `null` for a baseline plan with no prior state.
+     * Planners use this to populate `describe()` on the produced plan so the
+     * rendered `migration.ts` has correct `from`/`to` metadata.
      */
-    readonly fromHash: string;
+    readonly fromHash: string | null;
     /**
      * The "from" contract (the state the planner assumes the database starts
      * at). Planners pass this to data-safety strategies so they can compare
@@ -425,11 +425,12 @@ export interface MigrationScaffoldContext {
   /** Absolute path to the contract.json file, if one exists. Used by targets that emit typed-contract imports. */
   readonly contractJsonPath?: string;
   /**
-   * Storage hash of the "from" contract. Targets use this to populate
-   * `describe()` on the rendered empty migration so that identity metadata
-   * is correctly populated.
+   * Storage hash of the "from" contract, or `null` for a baseline scaffold
+   * with no prior state. Targets use this to populate `describe()` on the
+   * rendered empty migration so that identity metadata is correctly
+   * populated.
    */
-  readonly fromHash: string;
+  readonly fromHash: string | null;
   /**
    * Storage hash of the "to" contract. Same purpose as `fromHash` — threaded
    * through so the rendered class's `describe()` declares the correct

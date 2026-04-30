@@ -432,7 +432,7 @@ export type EmitResult = Result<EmitSuccess, EmitFailure>;
  */
 export interface MigrationApplyStep {
   readonly dirName: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly toContract: Contract;
   readonly operations: readonly MigrationPlanOperation[];
@@ -471,7 +471,7 @@ export interface MigrationApplyOptions {
  */
 export interface MigrationApplyAppliedEntry {
   readonly dirName: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly operationsExecuted: number;
 }

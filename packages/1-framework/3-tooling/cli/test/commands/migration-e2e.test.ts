@@ -97,9 +97,8 @@ describe('migration plan → emit end-to-end', () => {
       const metadata = await writeTestPackage(
         packageDir,
         {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:initial-hash',
-          kind: 'regular',
           fromContract: null,
           toContract,
           hints: {
@@ -115,7 +114,7 @@ describe('migration plan → emit end-to-end', () => {
       );
 
       const pkg = await readMigrationPackage(packageDir);
-      expect(pkg.metadata.from).toBe(EMPTY_CONTRACT_HASH);
+      expect(pkg.metadata.from).toBeNull();
       expect(pkg.metadata.to).toBe('sha256:initial-hash');
       expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
       expect(pkg.metadata.fromContract).toBeNull();
@@ -160,9 +159,8 @@ describe('migration plan → emit end-to-end', () => {
         await writeTestPackage(
           path1,
           {
-            from: EMPTY_CONTRACT_HASH,
+            from: null,
             to: 'sha256:hash-a',
-            kind: 'regular',
             fromContract: null,
             toContract: contractA,
             hints: {
@@ -186,7 +184,6 @@ describe('migration plan → emit end-to-end', () => {
           {
             from: 'sha256:hash-a',
             to: 'sha256:hash-b',
-            kind: 'regular',
             fromContract: contractA,
             toContract: contractB,
             hints: {
@@ -238,9 +235,8 @@ describe('migration plan → emit end-to-end', () => {
       await writeTestPackage(
         path1,
         {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:target-hash',
-          kind: 'regular',
           fromContract: null,
           toContract: contract,
           hints: {
@@ -278,10 +274,9 @@ describe('migration plan → emit end-to-end', () => {
       const packageDir = join(root, dirName);
       await mkdir(packageDir, { recursive: true });
       const invalidMetadata = {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: EMPTY_CONTRACT_HASH,
         migrationHash: null,
-        kind: 'regular' as const,
         fromContract: null,
         toContract: createSqlContract({ storage: { tables: {} } }),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },

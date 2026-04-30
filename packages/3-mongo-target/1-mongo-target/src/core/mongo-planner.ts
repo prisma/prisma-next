@@ -225,7 +225,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash: string;
+    readonly fromHash: string | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): MigrationPlannerResult {
     const contract = options.contract as MongoContract;

@@ -83,7 +83,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash?: string;
+    readonly fromHash?: string | null;
     /**
      * The "from" contract (state the planner assumes the database starts
      * at). Only `migration plan` supplies this; `db update` / `db init`
@@ -96,7 +96,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
+    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? null);
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
@@ -106,7 +106,10 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): PostgresPlanResult {
+  private planSql(
+    options: SqlMigrationPlannerPlanOptions,
+    fromHash: string | null,
+  ): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {

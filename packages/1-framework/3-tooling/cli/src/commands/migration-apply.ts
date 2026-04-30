@@ -50,7 +50,7 @@ export interface MigrationApplyResult {
   readonly markerHash: string;
   readonly applied: readonly {
     readonly dirName: string;
-    readonly from: string;
+    readonly from: string | null;
     readonly to: string;
     readonly operationsExecuted: number;
   }[];

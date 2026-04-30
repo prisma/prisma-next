@@ -16,16 +16,14 @@ import { MigrationOpSchema } from './op-schema';
 import type { MigrationOps } from './package';
 
 export interface MigrationMeta {
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
-  readonly kind?: 'regular' | 'baseline';
   readonly labels?: readonly string[];
 }
 
 const MigrationMetaSchema = type({
-  from: 'string',
+  from: 'string | null',
   to: 'string',
-  'kind?': "'regular' | 'baseline'",
   'labels?': type('string').array(),
 });
 
@@ -78,11 +76,7 @@ export abstract class Migration<
 
   get origin(): { readonly storageHash: string } | null {
     const from = this.describe().from;
-    // An empty `from` represents a migration with no prior origin (e.g.
-    // initial baseline, or an in-process plan that was never persisted).
-    // Surface that as a null origin so runners treat the plan as
-    // origin-less rather than matching against an empty storage hash.
-    return from === '' ? null : { storageHash: from };
+    return from === null ? null : { storageHash: from };
   }
 
   get destination(): { readonly storageHash: string } {
@@ -133,7 +127,7 @@ export interface MigrationArtifacts {
  * case: it was scaffolded by `migration plan`), preserve the contract
  * bookends, hints, labels, and `createdAt` set there — those fields are
  * owned by the CLI scaffolder, not the authored class. Only the
- * `describe()`-derived fields (`from`, `to`, `kind`) and the operations
+ * `describe()`-derived fields (`from`, `to`) and the operations
  * change as the author iterates. When no metadata exists yet (a bare
  * `migration.ts` run from scratch), synthesize a minimal but
  * schema-conformant record so the resulting package can still be read,
@@ -152,7 +146,6 @@ function buildAttestedMetadata(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: meta.from,
     to: meta.to,
-    kind: meta.kind ?? 'regular',
     labels: meta.labels ?? existing?.labels ?? [],
     providedInvariants: deriveProvidedInvariants(ops),
     createdAt: existing?.createdAt ?? new Date().toISOString(),

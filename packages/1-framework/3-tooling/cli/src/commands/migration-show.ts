@@ -37,10 +37,9 @@ export interface MigrationShowResult {
   readonly ok: true;
   readonly dirName: string;
   readonly dirPath: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly migrationHash: string;
-  readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
     readonly id: string;
@@ -184,7 +183,6 @@ async function executeMigrationShowCommand(
     from: pkg.metadata.from,
     to: pkg.metadata.to,
     migrationHash: pkg.metadata.migrationHash,
-    kind: pkg.metadata.kind,
     createdAt: pkg.metadata.createdAt,
     operations: ops.map((op) => ({
       id: op.id,

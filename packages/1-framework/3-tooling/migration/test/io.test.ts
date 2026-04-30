@@ -127,7 +127,7 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when "from" is not a string', async () => {
+  it('errors when "from" is not a string or null', async () => {
     const dir = join(tmpDir, '20260225T1430_bad_from');
     const metadata = { ...createTestMetadata(), from: 42 };
     await mkdir(dir, { recursive: true });
@@ -140,9 +140,30 @@ describe('writeMigrationPackage + readMigrationPackage', () => {
     });
   });
 
-  it('errors when "kind" has invalid value', async () => {
-    const dir = join(tmpDir, '20260225T1430_bad_kind');
-    const metadata = { ...createTestMetadata(), kind: 'rollback' };
+  it('rejects manifest carrying a `kind` field', async () => {
+    const dir = join(tmpDir, '20260225T1430_carries_kind');
+    const metadata = { ...createTestMetadata(), kind: 'regular' };
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
+    await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));
+
+    await expect(readMigrationPackage(dir)).rejects.toSatisfy((e) => {
+      expectMigrationError(e, 'MIGRATION.INVALID_MANIFEST');
+      return true;
+    });
+  });
+
+  it('accepts `from: null` (baseline manifest)', async () => {
+    const dir = join(tmpDir, '20260225T1430_baseline');
+    await writeTestPackage(dir, { from: null });
+
+    const pkg = await readMigrationPackage(dir);
+    expect(pkg.metadata.from).toBeNull();
+  });
+
+  it('rejects `from: ""` (legacy empty-string sentinel)', async () => {
+    const dir = join(tmpDir, '20260225T1430_empty_from');
+    const metadata = { ...createTestMetadata(), from: '' };
     await mkdir(dir, { recursive: true });
     await writeFile(join(dir, 'migration.json'), JSON.stringify(metadata));
     await writeFile(join(dir, 'ops.json'), JSON.stringify(createTestOps()));

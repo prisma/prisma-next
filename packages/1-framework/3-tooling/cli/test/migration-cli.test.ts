@@ -357,7 +357,6 @@ describe('MigrationCLI.run', () => {
       from: 'sha256:from',
       to: 'sha256:to',
       migrationHash: null,
-      kind: 'regular',
       fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' },
       toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' },
       hints: { used: [], applied: [], plannerVersion: '2.0.0' },
