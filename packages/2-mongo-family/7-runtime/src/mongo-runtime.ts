@@ -7,12 +7,12 @@ import {
   type RuntimeExecuteOptions,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
-import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeMongoRow } from './codecs/decoding';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
-import type { MongoExecutionContext } from './mongo-execution-stack';
+import type { MongoCodecLookup, MongoExecutionContext } from './mongo-execution-stack';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
 
 function noop() {}
@@ -70,7 +70,7 @@ class MongoRuntimeImpl
 {
   readonly #adapter: MongoAdapter;
   readonly #driver: MongoDriver;
-  readonly #codecs: MongoCodecRegistry;
+  readonly #codecs: MongoCodecLookup;
 
   constructor(options: MongoRuntimeOptions) {
     const middleware = options.middleware ? [...options.middleware] : [];
@@ -102,7 +102,7 @@ class MongoRuntimeImpl
     return {
       command: await this.#adapter.lower(plan, ctx),
       meta: plan.meta,
-      ...(plan.resultShape !== undefined ? { resultShape: plan.resultShape } : {}),
+      ...ifDefined('resultShape', plan.resultShape),
     };
   }
 
@@ -131,11 +131,16 @@ class MongoRuntimeImpl
         if (exec.resultShape === undefined) {
           yield rawRow as Row;
         } else {
+          // Source the collection from the lowered exec rather than the
+          // pre-lowering plan: a `runBeforeCompile` middleware is allowed to
+          // rewrite collection names during compilation, and the wire
+          // command carried by `exec` is always authoritative for what just
+          // ran.
           const decoded = await decodeMongoRow(
             rawRow,
             exec.resultShape,
             self.#codecs,
-            plan.collection,
+            exec.command.collection,
           );
           yield decoded as Row;
         }
