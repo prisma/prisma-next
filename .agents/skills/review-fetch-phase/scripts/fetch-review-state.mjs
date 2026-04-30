@@ -19,6 +19,7 @@ const EXIT_OPERATIONAL = 1;
 const EXIT_CLI = 2;
 
 const SPAWN_MAX_BUFFER_BYTES = 16 * 1024 * 1024;
+const SUBPROCESS_TIMEOUT_MS = 30_000;
 
 const THREADS_QUERY = `
   query($owner: String!, $repo: String!, $number: Int!, $threadsCursor: String) {
@@ -218,12 +219,25 @@ function runSync(command, args, input) {
     encoding: 'utf-8',
     input: input ?? undefined,
     maxBuffer: SPAWN_MAX_BUFFER_BYTES,
+    timeout: SUBPROCESS_TIMEOUT_MS,
   });
   if (result.error) {
-    const detail = result.error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER'
-      ? `${command} output exceeded ${SPAWN_MAX_BUFFER_BYTES} bytes; raise SPAWN_MAX_BUFFER_BYTES`
-      : `failed to execute ${command}: ${result.error.message}`;
+    let detail;
+    if (result.error.code === 'ETIMEDOUT') {
+      detail = `${command} timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds`;
+    } else if (result.error.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+      detail = `${command} output exceeded ${SPAWN_MAX_BUFFER_BYTES} bytes; raise SPAWN_MAX_BUFFER_BYTES`;
+    } else {
+      detail = `failed to execute ${command}: ${result.error.message}`;
+    }
     return { stdout: '', stderr: detail, status: result.status ?? 1 };
+  }
+  if (result.signal) {
+    return {
+      stdout: result.stdout ?? '',
+      stderr: `${command} was terminated by signal ${result.signal}`,
+      status: result.status ?? 1,
+    };
   }
   return { stdout: result.stdout, stderr: result.stderr, status: result.status };
 }
