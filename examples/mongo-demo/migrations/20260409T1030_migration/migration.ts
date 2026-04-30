@@ -5,7 +5,7 @@ import { createIndex } from '@prisma-next/target-mongo/migration';
 class InitialMigration extends Migration {
   override describe() {
     return {
-      from: 'sha256:empty',
+      from: null,
       to: 'sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe',
     };
   }

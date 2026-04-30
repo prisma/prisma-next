@@ -1,10 +1,6 @@
 {
   "from": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
   "to": "sha256:e5cfc21670435e53a4af14a665d61d8ba716d5e2e67b63c1443affdcad86985d",
-  "kind": "regular",
-  "labels": ["backfill-product-status"],
-  "providedInvariants": [],
-  "createdAt": "2026-04-16T07:26:17.265Z",
   "fromContract": null,
   "toContract": {
     "storage": {
@@ -16,5 +12,8 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:6f8ce46352b08ad823369c3abc2a92a67e0dc030bb3b9fce009e68b513b34d37"
+  "labels": ["backfill-product-status"],
+  "providedInvariants": [],
+  "createdAt": "2026-04-16T07:26:17.265Z",
+  "migrationHash": "sha256:3b5da6e635d99d8fd06cc41c2f3f8fb9e4a6d73c88e1429767eb3ff11ae4f263"
 }

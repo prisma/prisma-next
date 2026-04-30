@@ -1,10 +1,6 @@
 {
-  "from": "sha256:empty",
+  "from": null,
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
-  "kind": "regular",
-  "labels": [],
-  "providedInvariants": [],
-  "createdAt": "2026-04-09T10:30:13.948Z",
   "fromContract": null,
   "toContract": {
     "schemaVersion": "1",
@@ -247,5 +243,8 @@
     "applied": [],
     "plannerVersion": "1.0.0"
   },
-  "migrationHash": "sha256:cb98119e5a429d60033078144c2845f7d59cab32d35b1404951d9e3ba51749fd"
+  "labels": [],
+  "providedInvariants": [],
+  "createdAt": "2026-04-09T10:30:13.948Z",
+  "migrationHash": "sha256:0ff6d19daf157c11be29f22923bd9b977893a1a9902e7062ebbbb9005c3b2329"
 }

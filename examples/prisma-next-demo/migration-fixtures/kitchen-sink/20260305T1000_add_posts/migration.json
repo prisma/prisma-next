@@ -1,8 +1,6 @@
 {
   "from": "sha256:c81f321969619c77a34fb8ff6f2acb5c990d47dd24ddddd99a1aac0a95525711",
   "to": "sha256:a94b7b4182e84e872afd95caf7921f565c22be691e2fc907c4bdbe2aa429282a",
-  "migrationHash": "sha256:068418ab27103898b0b4f919c58483e631321206aa23a7b2f5f997c2176b6393",
-  "kind": "regular",
   "fromContract": {
     "schemaVersion": "1",
     "target": "postgres",
@@ -134,9 +132,10 @@
   "hints": {
     "used": [],
     "applied": [],
-    "plannerVersion": "1.0.0",
-    "planningStrategy": "diff"
+    "plannerVersion": "1.0.0"
   },
   "labels": [],
-  "createdAt": "2026-03-24T15:13:45.654Z"
+  "providedInvariants": [],
+  "createdAt": "2026-03-24T15:13:45.654Z",
+  "migrationHash": "sha256:e481290ac0826731a9f1509cad3cf12aab158e215501fc48027ce5c5e6478766"
 }

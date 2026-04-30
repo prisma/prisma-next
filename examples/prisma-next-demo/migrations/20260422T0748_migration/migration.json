@@ -1,10 +1,6 @@
 {
   "from": "sha256:5618dcac53bc3aebf85f5da0f74670d6d2b2d340d449adc73219d7cbba360d69",
   "to": "sha256:6cee6146eaf257ce236bf1144efb238a1087e45a62e04a8104a55d490d9029f4",
-  "kind": "regular",
-  "labels": [],
-  "providedInvariants": [],
-  "createdAt": "2026-04-22T07:48:11.647Z",
   "fromContract": {
     "schemaVersion": "1",
     "targetFamily": "sql",
@@ -1422,5 +1418,8 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:c8e6239ff44e31a0ab29f6a8ddd7c7070ffb8be2be13fbf54ce62bfc02ec8c86"
+  "labels": [],
+  "providedInvariants": [],
+  "createdAt": "2026-04-22T07:48:11.647Z",
+  "migrationHash": "sha256:363d95cf60f902b301515e5d30e0a463c27c2ecd8406cbb1ef242db8ee0a5c40"
 }

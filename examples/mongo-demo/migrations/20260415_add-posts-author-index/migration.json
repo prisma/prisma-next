@@ -1,10 +1,6 @@
 {
   "from": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
   "to": "sha256:358522152ebe3ca9db3d573471c656778c1845f4cdd424caf06632352b9772fe",
-  "kind": "regular",
-  "labels": ["add-posts-author-index"],
-  "providedInvariants": [],
-  "createdAt": "2026-04-15T17:17:30.570Z",
   "fromContract": null,
   "toContract": {
     "storage": {
@@ -16,5 +12,8 @@
     "applied": [],
     "plannerVersion": "2.0.0"
   },
-  "migrationHash": "sha256:f4a6b5f219e6d5f10af7f17ff23253281295d41f1f3573faf232e2ccce6023a7"
+  "labels": ["add-posts-author-index"],
+  "providedInvariants": [],
+  "createdAt": "2026-04-15T17:17:30.570Z",
+  "migrationHash": "sha256:4061fcfce26ea9939c4f891adb07742fedb6b8b1948d349bca0e7dcfcc3d5808"
 }
