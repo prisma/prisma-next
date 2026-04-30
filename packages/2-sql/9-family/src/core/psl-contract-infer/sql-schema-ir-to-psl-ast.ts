@@ -1,3 +1,4 @@
+import type { ColumnDefault } from '@prisma-next/contract/types';
 import type {
   PslAttribute,
   PslAttributeArgument,
@@ -521,12 +522,12 @@ function parseColumnDefault(
   value: unknown,
   nativeType: string | undefined,
   rawDefaultParser: PslPrinterOptions['parseRawDefault'],
-): import('@prisma-next/contract/types').ColumnDefault | undefined {
+): ColumnDefault | undefined {
   if (typeof value === 'string') {
     return rawDefaultParser ? rawDefaultParser(value, nativeType) : undefined;
   }
   if (value !== null && typeof value === 'object' && 'kind' in (value as Record<string, unknown>)) {
-    return value as import('@prisma-next/contract/types').ColumnDefault;
+    return value as ColumnDefault;
   }
   return undefined;
 }
