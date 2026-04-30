@@ -98,6 +98,18 @@ export function errorInvalidManifest(filePath: string, reason: string): Migratio
   });
 }
 
+export function errorInvalidOperationEntry(index: number, reason: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.INVALID_OPERATION_ENTRY',
+    'Migration operation entry is malformed',
+    {
+      why: `Operation at index ${index} returned by the migration class failed schema validation: ${reason}.`,
+      fix: "Update the migration class so each entry of `operations` carries `id` (string), `label` (string), and `operationClass` (one of 'additive' | 'widening' | 'destructive' | 'data').",
+      details: { index, reason },
+    },
+  );
+}
+
 export function errorInvalidSlug(slug: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_NAME', 'Invalid migration name', {
     why: `The slug "${slug}" contains no valid characters after sanitization (only a-z, 0-9 are kept).`,

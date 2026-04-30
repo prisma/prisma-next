@@ -138,11 +138,13 @@ describe('buildMigrationArtifacts', () => {
 
   it('produces ops.json + migration.json strings with synthesized metadata fields', () => {
     const { opsJson, metadata, metadataJson } = buildMigrationArtifacts(
-      makeMigration([{ id: 'op1', label: 'Test op' }]),
+      makeMigration([{ id: 'op1', label: 'Test op', operationClass: 'additive' }]),
       null,
     );
 
-    expect(JSON.parse(opsJson)).toEqual([{ id: 'op1', label: 'Test op' }]);
+    expect(JSON.parse(opsJson)).toEqual([
+      { id: 'op1', label: 'Test op', operationClass: 'additive' },
+    ]);
 
     expect(metadata.from).toBe('abc');
     expect(metadata.to).toBe('def');
@@ -228,9 +230,68 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing id', () => {
+    const ops = [{ label: 'No id', operationClass: 'additive' }];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+        details: expect.objectContaining({ index: 0 }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing label', () => {
+    const ops = [{ id: 'op1', operationClass: 'additive' }];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+        details: expect.objectContaining({ index: 0 }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when an entry is missing operationClass', () => {
+    const ops = [{ id: 'op1', label: 'No class' }];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+        details: expect.objectContaining({ index: 0 }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('throws MIGRATION.INVALID_OPERATION_ENTRY when operationClass is outside the allowed union', () => {
+    const ops = [{ id: 'op1', label: 'Bad class', operationClass: 'unknown' }];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+        details: expect.objectContaining({ index: 0 }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('reports the offending entry index when later entries in the array are malformed', () => {
+    const ops = [
+      { id: 'op1', label: 'Good', operationClass: 'additive' },
+      { id: 'op2', label: 'Good', operationClass: 'widening' },
+      { id: 'op3', label: 'Bad', operationClass: 'totally-wrong' },
+    ];
+    expect(() => buildMigrationArtifacts(makeMigration(ops), null)).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.INVALID_OPERATION_ENTRY',
+        details: expect.objectContaining({ index: 2 }),
+      }) as unknown as Error,
+    );
+  });
+
   it('throws a clear error when describe() returns invalid metadata', () => {
     expect(() =>
-      buildMigrationArtifacts(makeMigration([{ id: 'op1' }], { bad: true } as never), null),
+      buildMigrationArtifacts(
+        makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
+          bad: true,
+        } as never),
+        null,
+      ),
     ).toThrow(/describe\(\).*invalid/);
   });
 
