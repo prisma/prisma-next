@@ -1,5 +1,4 @@
 import type { CoreSchemaView } from '@prisma-next/framework-components/control';
-import { validatePrintableSqlSchemaIR } from '@prisma-next/psl-printer';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
@@ -122,13 +121,10 @@ export async function inspectLiveSchema(
   const onProgress = createProgressAdapter({ ui, flags });
 
   try {
-    const schemaIR = await client.introspect({
+    const schema = await client.introspect({
       connection: dbConnection,
       onProgress,
     });
-    // TODO(TML-2251): Remove SQL-specific branching — SQL should use the same family-agnostic path as Mongo.
-    const schema =
-      config.family.familyId === 'sql' ? validatePrintableSqlSchemaIR(schemaIR) : schemaIR;
     const schemaView = client.toSchemaView(schema);
 
     const dbUrl = typeof dbConnection === 'string' ? maskConnectionUrl(dbConnection) : undefined;
