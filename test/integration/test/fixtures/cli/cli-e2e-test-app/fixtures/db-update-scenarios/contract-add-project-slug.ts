@@ -1,6 +1,6 @@
 import {
   enumType,
-  jsonb,
+  jsonbColumn,
   textColumn,
   timestamptzColumn,
   varcharColumn,
@@ -24,7 +24,7 @@ const Account = model('Account', {
       .id(),
     email: field.column(varcharColumn(320)).unique(),
     status: field.namedType(types.AccountStatus),
-    profile: field.column(jsonb()).optional(),
+    profile: field.column(jsonbColumn).optional(),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
   },
 }).sql({ table: 'account' });
@@ -41,7 +41,7 @@ const Project = model('Project', {
     name: field.column(textColumn),
     slug: field.column(varcharColumn(128)).optional(),
     visibility: field.namedType(types.ProjectVisibility),
-    metadata: field.column(jsonb()).optional(),
+    metadata: field.column(jsonbColumn).optional(),
     createdAt: field.column(timestamptzColumn).defaultSql('now()'),
   },
 }).sql(({ cols, constraints }) => ({
