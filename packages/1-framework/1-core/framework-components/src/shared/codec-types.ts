@@ -105,24 +105,26 @@ export const emptyCodecLookup: CodecLookup = {
 };
 
 /**
- * Column context supplied by the framework when applying a higher-order
- * codec factory. Allows stateful codecs (e.g. column-scoped encryption) to
- * derive per-instance state from the column it is bound to.
+ * Family-agnostic per-instance context supplied by the framework when
+ * applying a higher-order codec factory. Allows stateful codecs (e.g.
+ * column-scoped encryption) to derive per-instance state from the
+ * materialization site.
  *
- * - `name` — the `storage.types` instance name (e.g. `Embedding1536`) for
- *   typeRef-shaped columns, the synthesized anonymous instance name
- *   (`<anon:Document.embedding>`) for inline-`typeParams` columns, or the
- *   shared sentinel (`<shared:pg/text@1>`) for non-parameterized codec ids.
- * - `usedAt` — every column the resolved codec serves. For `typeRef`
- *   columns sharing one named instance the array lists every referencing
- *   column; for inline-`typeParams` columns the array has exactly one
- *   entry; for shared non-parameterized codecs the array carries the
- *   column that triggered materialization (representative — the codec is
- *   shared across all columns with that codec id).
+ * - `name` — the family-agnostic instance identity. For SQL, the runtime
+ *   populates this as the `storage.types` instance name (e.g.
+ *   `Embedding1536`) for typeRef-shaped columns, the synthesized
+ *   anonymous instance name (`<anon:Document.embedding>`) for inline-
+ *   `typeParams` columns, or a shared sentinel (`<shared:pg/text@1>`)
+ *   for non-parameterized codec ids. Other families pick the analogous
+ *   identity for their materialization sites.
+ *
+ * Family-specific extensions (e.g. {@link import('@prisma-next/sql-relational-core/ast').SqlCodecInstanceContext}
+ * in the SQL layer) augment this base with domain-shaped column-set
+ * metadata. Codec authors target the base when they don't read family-
+ * specific metadata; they target the family extension when they do.
  */
-export interface Ctx {
+export interface CodecInstanceContext {
   readonly name: string;
-  readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
 }
 
 /**
@@ -190,7 +192,7 @@ export interface CodecDescriptor<P = void> {
    * `storage.types` instance (or once per inline-`typeParams` column),
    * with `ctx` carrying the column set the resulting codec serves.
    */
-  readonly factory: (params: P) => (ctx: Ctx) => Codec;
+  readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
 
 /**
@@ -219,12 +221,12 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
  * steps aside.
  */
 export function synthesizeNonParameterizedDescriptor(codec: Codec): CodecDescriptor<void> {
-  // The descriptor's `factory: (params: void) => (ctx: Ctx) => Codec` is a
-  // constant for non-parameterized codecs — `params` is never read and the
-  // returned ctx-applier always yields the same shared codec. We rely on
-  // the descriptor's typed `factory` slot to infer the signatures rather
-  // than naming `void` locally (biome's `noConfusingVoidType` flags `void`
-  // outside return positions).
+  // The descriptor's `factory: (params: void) => (ctx: CodecInstanceContext)
+  // => Codec` is a constant for non-parameterized codecs — `params` is
+  // never read and the returned ctx-applier always yields the same shared
+  // codec. We rely on the descriptor's typed `factory` slot to infer the
+  // signatures rather than naming `void` locally (biome's
+  // `noConfusingVoidType` flags `void` outside return positions).
   const sharedFactory = () => () => codec;
   // Family-extended codecs (SQL `Codec`) carry an optional `meta` field
   // that the base interface doesn't declare. Read it through a structural

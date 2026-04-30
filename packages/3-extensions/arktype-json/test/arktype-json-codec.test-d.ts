@@ -1,4 +1,8 @@
-import type { Codec, CodecDescriptor, Ctx } from '@prisma-next/framework-components/codec';
+import type {
+  Codec,
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import { type } from 'arktype';
 import { type ArktypeJsonTypeParams, arktypeJson } from '../src/core/arktype-json-codec';
 import type { arktypeJsonCodec } from '../src/exports/codecs';
@@ -16,7 +20,7 @@ const productSchema = type({
 const product = arktypeJson(productSchema);
 type ProductType = typeof product.type;
 
-export type _Arktype_TakesCtx = Assert<IsEqual<Parameters<ProductType>[0], Ctx>>;
+export type _Arktype_TakesCtx = Assert<IsEqual<Parameters<ProductType>[0], CodecInstanceContext>>;
 
 type ProductResolved = ReturnType<ProductType>;
 type ProductJs =

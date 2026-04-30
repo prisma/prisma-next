@@ -1,8 +1,8 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { Ctx } from '@prisma-next/framework-components/codec';
+import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
-import type { Codec } from '@prisma-next/sql-relational-core/ast';
+import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
@@ -231,7 +231,7 @@ describe('parameterized types', () => {
   });
 
   // Phase B note: `init` was the predecessor hook returning a helper. The
-  // unified descriptor uses `factory: (P) => (Ctx) => Codec`; per-instance
+  // unified descriptor uses `factory: (P) => (CodecInstanceContext) => Codec`; per-instance
   // state lives in the resolved codec returned by the factory. The
   // `TypeHelperRegistry` (`context.types`) carries the resolved codec for
   // every typed instance — or, for codec ids without a parameterized
@@ -239,7 +239,7 @@ describe('parameterized types', () => {
   describe('factory for type helpers', () => {
     function createPgVectorExt(opts?: {
       paramsSchema?: Type<{ length: number }>;
-      factory?: (params: { length: number }) => (ctx: Ctx) => Codec;
+      factory?: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec;
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
       const paramsSchema =
@@ -275,7 +275,7 @@ describe('parameterized types', () => {
 
     it('calls factory(params)(ctx) and stores resolved codec in context.types', () => {
       const taggedCodec = vectorCodecInstance({ dimensions: 1536, isVector: true });
-      const factory = (_params: { length: number }) => (_ctx: Ctx) => taggedCodec;
+      const factory = (_params: { length: number }) => (_ctx: CodecInstanceContext) => taggedCodec;
       const extensionDescriptor = createPgVectorExt({ factory });
 
       const contract = createParamTypesTestContract({
@@ -299,12 +299,19 @@ describe('parameterized types', () => {
     });
 
     it('threads ctx (name + usedAt) through to the factory', () => {
-      const observedCtxs: Ctx[] = [];
+      const observedCtxs: SqlCodecInstanceContext[] = [];
       const sharedCodec = vectorCodecInstance();
-      const factory = (_params: { length: number }) => (ctx: Ctx) => {
+      // SQL extensions that read `usedAt` author against the SQL-extended
+      // ctx; the descriptor's factory slot is family-agnostic, so we cast
+      // through the base. This mirrors what production SQL extensions do
+      // (see `pgvector/src/exports/runtime.ts`'s family-agnostic cast).
+      const sqlFactory = (_params: { length: number }) => (ctx: SqlCodecInstanceContext) => {
         observedCtxs.push(ctx);
         return sharedCodec;
       };
+      const factory = sqlFactory as unknown as (params: {
+        length: number;
+      }) => (ctx: CodecInstanceContext) => Codec;
       const extensionDescriptor = createPgVectorExt({ factory });
 
       const contract = createParamTypesTestContract({

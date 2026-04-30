@@ -29,7 +29,11 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
-import type { Codec, CodecDescriptor, Ctx } from '@prisma-next/framework-components/codec';
+import type {
+  Codec,
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { codec } from '@prisma-next/sql-relational-core/ast';
 import { ArkErrors, ark, type Type, type } from 'arktype';
@@ -111,7 +115,7 @@ type ArktypeSchemaLike = ((value: unknown) => unknown) & {
  */
 function arktypeJsonCodecForSchema<TInferred>(
   schema: ArktypeSchemaLike,
-): (ctx: Ctx) => ArktypeJsonCodec<TInferred> {
+): (ctx: CodecInstanceContext) => ArktypeJsonCodec<TInferred> {
   return (_ctx) =>
     codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
       typeId: ARKTYPE_JSON_CODEC_ID,
@@ -181,7 +185,7 @@ export function arktypeJson<S extends Type<unknown>>(
   readonly codecId: typeof ARKTYPE_JSON_CODEC_ID;
   readonly nativeType: typeof ARKTYPE_JSON_NATIVE_TYPE;
   readonly typeParams: ArktypeJsonTypeParams;
-  readonly type: (ctx: Ctx) => ArktypeJsonCodec<S['infer']>;
+  readonly type: (ctx: CodecInstanceContext) => ArktypeJsonCodec<S['infer']>;
 } {
   const expression: unknown = (schema as { readonly expression?: unknown }).expression;
   const jsonIr: unknown = (schema as { readonly json?: unknown }).json;

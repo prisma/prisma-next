@@ -1,4 +1,4 @@
-import type { Ctx } from '@prisma-next/framework-components/codec';
+import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
@@ -9,9 +9,8 @@ import {
   arktypeJsonCodec,
 } from '../src/core/arktype-json-codec';
 
-const SYNTH_CTX: Ctx = {
+const SYNTH_CTX: CodecInstanceContext = {
   name: '<arktype-json-test>',
-  usedAt: [{ table: 'Test', column: 'doc' }],
 };
 
 // Per-call context the runtime threads to every `codec.encode` /

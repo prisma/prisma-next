@@ -1,5 +1,5 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { CodecDescriptor, Ctx } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { synthesizeNonParameterizedDescriptor } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
@@ -28,6 +28,7 @@ import type {
   CodecRegistry,
   ContractCodecRegistry,
   LoweredStatement,
+  SqlCodecInstanceContext,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -46,7 +47,7 @@ import type {
  *
  * The unified `CodecDescriptor<P>` shape applied to parameterized codecs
  * — `paramsSchema: StandardSchemaV1<P>` for JSON-boundary validation,
- * `factory: (P) => (Ctx) => Codec` for the curried higher-order codec.
+ * `factory: (P) => (CodecInstanceContext) => Codec` for the curried higher-order codec.
  * The factory is called once per `storage.types` instance (or once per
  * inline-`typeParams` column); per-instance state lives in the closure.
  *
@@ -353,10 +354,8 @@ function initializeTypeHelpers(
     });
 
     const usedAt = typeRefSites.get(typeName) ?? [];
-    helpers[typeName] = descriptor.factory(validatedParams)({
-      name: typeName,
-      usedAt,
-    });
+    const ctx: SqlCodecInstanceContext = { name: typeName, usedAt };
+    helpers[typeName] = descriptor.factory(validatedParams)(ctx);
   }
 
   return helpers;
@@ -478,7 +477,7 @@ function buildContractCodecRegistry(
               tableName,
               columnName,
             });
-            const ctx: Ctx = {
+            const ctx: SqlCodecInstanceContext = {
               name: `<anon:${tableName}.${columnName}>`,
               usedAt: [{ table: tableName, column: columnName }],
             };
@@ -491,7 +490,7 @@ function buildContractCodecRegistry(
           // share one resolved instance.
           let cached = byCodecId.get(column.codecId);
           if (!cached) {
-            const ctx: Ctx = {
+            const ctx: SqlCodecInstanceContext = {
               name: `<shared:${column.codecId}>`,
               usedAt: [{ table: tableName, column: columnName }],
             };
@@ -501,10 +500,15 @@ function buildContractCodecRegistry(
             // structural cast goes through `unknown` to satisfy the
             // heterogeneous-`P` registry boundary (the factory's
             // declared `P` is `any` here; the consumer narrows per
-            // codec id). Per spec § Non-functional constraints.
+            // codec id). The cast narrows the descriptor's
+            // family-agnostic `CodecInstanceContext` slot to the SQL
+            // `SqlCodecInstanceContext` we pass at this call site —
+            // function-argument contravariance makes the narrow safe
+            // (a callee that accepts the base will also accept the
+            // SQL extension). Per spec § Non-functional constraints.
             const voidFactory = descriptor.factory as unknown as (
               params: undefined,
-            ) => (ctx: Ctx) => Codec;
+            ) => (ctx: SqlCodecInstanceContext) => Codec;
             cached = voidFactory(undefined)(ctx);
             byCodecId.set(column.codecId, cached);
           }

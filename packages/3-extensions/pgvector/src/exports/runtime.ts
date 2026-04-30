@@ -1,4 +1,4 @@
-import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
+import type { Codec, CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
@@ -25,11 +25,18 @@ const vectorParamsSchema = arktype({
 // pgvector's encode is parameter-independent (the wire format `[v1,v2,...]`
 // doesn't care about declared length), so the resolved codec for every
 // `(length)` instance is the same shared codec object today. The factory
-// returns it directly; `Ctx` is unused. When a future refactor wants per-
+// returns it directly; `ctx` is unused. When a future refactor wants per-
 // instance state (e.g. capping wire length to declared dimension), the
 // closure over `params` is the place to add it.
+//
+// The factory parameter types as the family-agnostic
+// `CodecInstanceContext` because pgvector doesn't read the SQL-specific
+// `usedAt` field. The SQL runtime materializer passes a
+// `SqlCodecInstanceContext`; family-agnostic factories are structurally
+// compatible with the SQL extended type.
 const sharedVectorCodec: Codec = codecDefinitions.vector.codec;
-const vectorFactory = (_params: { readonly length: number }) => (_ctx: Ctx) => sharedVectorCodec;
+const vectorFactory = (_params: { readonly length: number }) => (_ctx: CodecInstanceContext) =>
+  sharedVectorCodec;
 
 const parameterizedCodecDescriptors = [
   {

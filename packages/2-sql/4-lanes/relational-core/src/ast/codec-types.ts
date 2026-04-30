@@ -2,6 +2,7 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type {
   Codec as BaseCodec,
   CodecCallContext,
+  CodecInstanceContext,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -44,11 +45,37 @@ export interface SqlCodecCallContext extends CodecCallContext {
 }
 
 /**
+ * SQL-family per-instance context. Extends the framework
+ * {@link CodecInstanceContext} (`name` only) with `usedAt`, the set of
+ * `(table, column)` pairs the resolved codec serves.
+ *
+ * - For `typeRef` columns sharing one named `storage.types` instance, the
+ *   array lists every referencing column — a column-scoped stateful codec
+ *   (e.g. encryption) can derive aggregated per-instance state across all
+ *   the columns sharing the named instance.
+ * - For inline-`typeParams` columns, the array has exactly one entry —
+ *   the column that owns the inline params.
+ * - For shared non-parameterized codecs, the array carries one
+ *   representative entry (the column that triggered materialization);
+ *   the codec is shared across every column with that codec id, so the
+ *   `usedAt` is informational only.
+ *
+ * SQL extensions consuming `usedAt` (e.g. column-scoped state derivation)
+ * type their factory parameter as `SqlCodecInstanceContext`. Extensions
+ * that don't read `usedAt` type their factory parameter as the
+ * family-agnostic {@link CodecInstanceContext} — a `SqlCodecInstanceContext`
+ * is structurally assignable to the base.
+ */
+export interface SqlCodecInstanceContext extends CodecInstanceContext {
+  readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
+}
+
+/**
  * Legacy adapter-level descriptor for parameterized codecs that require
  * type-parameter validation at compile time. The runtime descriptor
  * (`RuntimeParameterizedCodecDescriptor` in `@prisma-next/sql-runtime`)
  * has migrated to the unified `CodecDescriptor<P>` shape with
- * `factory: (P) => (Ctx) => Codec`; this descriptor stays only because
+ * `factory: (P) => (CodecInstanceContext) => Codec`; this descriptor stays only because
  * the SQL `Adapter.parameterizedCodecs()` surface still returns
  * `CodecParamsDescriptor[]` (compile-time typeParams validation only,
  * not runtime materialization).
@@ -76,7 +103,7 @@ export interface CodecParamsDescriptor<TParams = Record<string, unknown>, THelpe
    * If not provided, the validated params are stored directly.
    *
    * Predecessor pattern. The runtime descriptor's curried
-   * `factory: (P) => (Ctx) => Codec` subsumes this hook — per-instance
+   * `factory: (P) => (CodecInstanceContext) => Codec` subsumes this hook — per-instance
    * state lives on the resolved codec rather than in a parallel
    * `TypeHelperRegistry` entry. Retirement tracked under TML-2357 T3.5.2
    * (narrow runtime `Codec` interface) and T3.5.4 (single registration
@@ -138,7 +165,7 @@ export interface Codec<
   /**
    * Predecessor init hook. Retirement tracked under TML-2357 (T3.5.2 /
    * T3.5.4); the unified runtime descriptor's
-   * `factory: (P) => (Ctx) => Codec` is the replacement.
+   * `factory: (P) => (CodecInstanceContext) => Codec` is the replacement.
    */
   readonly init?: (params: TParams) => THelper;
 }
