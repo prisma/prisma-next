@@ -14,7 +14,6 @@
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/operations": "workspace:*",
-    "@prisma-next/psl-types": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
   "devDependencies": {
@@ -35,6 +34,7 @@
     "./control": "./dist/control.mjs",
     "./emission": "./dist/emission.mjs",
     "./execution": "./dist/execution.mjs",
+    "./psl-ast": "./dist/psl-ast.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },

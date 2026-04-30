@@ -1,9 +1,9 @@
-import type { PslDocumentAst } from '@prisma-next/psl-types';
 import type { ControlTargetDescriptor } from './control-descriptors';
 import type { ControlFamilyInstance } from './control-instances';
 import type { MigrationPlanOperation, TargetMigrationsCapability } from './control-migration-types';
 import type { OperationPreview } from './control-operation-preview';
 import type { CoreSchemaView } from './control-schema-view';
+import type { PslDocumentAst } from './psl-ast';
 
 export interface MigratableTargetDescriptor<
   TFamilyId extends string,

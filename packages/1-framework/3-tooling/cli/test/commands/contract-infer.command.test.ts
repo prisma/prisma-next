@@ -1,6 +1,6 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import type { PslDocumentAst, PslSpan } from '@prisma-next/psl-types';
+import type { PslDocumentAst, PslSpan } from '@prisma-next/framework-components/psl-ast';
 import { timeouts } from '@prisma-next/test-utils';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

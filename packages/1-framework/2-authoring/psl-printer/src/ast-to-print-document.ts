@@ -7,7 +7,7 @@ import type {
   PslModel,
   PslNamedTypeDeclaration,
   PslTypeConstructorCall,
-} from '@prisma-next/psl-types';
+} from '@prisma-next/framework-components/psl-ast';
 import type { PrintDocument } from './print-document';
 import { escapePslString } from './serialize-print-document';
 import type { PrinterEnum, PrinterField, PrinterModel, PrinterNamedType } from './types';
@@ -196,7 +196,8 @@ function hasFullRelation(field: PslField): boolean {
   const named = Object.fromEntries(
     rel.args
       .filter(
-        (a): a is import('@prisma-next/psl-types').PslAttributeNamedArgument => a.kind === 'named',
+        (a): a is import('@prisma-next/framework-components/psl-ast').PslAttributeNamedArgument =>
+          a.kind === 'named',
       )
       .map((a) => [a.name, a.value.trim()]),
   );

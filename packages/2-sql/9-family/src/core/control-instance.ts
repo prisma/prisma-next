@@ -26,7 +26,7 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
-import type { PslDocumentAst } from '@prisma-next/psl-types';
+import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {

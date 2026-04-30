@@ -1,4 +1,3 @@
-import { parsePslDocument } from '@prisma-next/psl-parser';
 import type {
   PslAttribute,
   PslDocumentAst,
@@ -6,7 +5,8 @@ import type {
   PslNamedTypeDeclaration,
   PslSpan,
   PslTypesBlock,
-} from '@prisma-next/psl-types';
+} from '@prisma-next/framework-components/psl-ast';
+import { parsePslDocument } from '@prisma-next/psl-parser';
 import { describe, expect, it } from 'vitest';
 import { printPslFromAst } from '../src/print-psl';
 
