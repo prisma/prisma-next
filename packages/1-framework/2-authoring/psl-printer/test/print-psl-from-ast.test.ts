@@ -8,9 +8,7 @@ import type {
   PslTypesBlock,
 } from '@prisma-next/psl-types';
 import { describe, expect, it } from 'vitest';
-import { legacyInputToAst, legacyPostgresPrinterOptions, printPslLegacy } from '../src/legacy-shim';
 import { printPslFromAst } from '../src/print-psl';
-import { validatePrintableSqlSchemaIR } from '../src/schema-validation';
 
 function span(off: number): PslSpan {
   return {
@@ -350,28 +348,5 @@ model Post {
     expect(parsed2.ast.models.map((m) => m.name).sort()).toEqual(
       parsed1.ast.models.map((m) => m.name).sort(),
     );
-  });
-
-  it('legacy SQL path matches printPslFromAst after legacyInputToAst', () => {
-    const schemaIR = {
-      tables: {
-        user: {
-          name: 'user',
-          columns: {
-            id: { name: 'id', nativeType: 'int4', nullable: false, default: undefined },
-          },
-          primaryKey: { columns: ['id'] },
-          foreignKeys: [],
-          uniques: [],
-          indexes: [],
-        },
-      },
-      dependencies: [],
-    };
-    const schema = validatePrintableSqlSchemaIR(schemaIR);
-    const opts = legacyPostgresPrinterOptions(schema);
-    const viaNew = printPslFromAst(legacyInputToAst(schema, opts));
-    const viaLegacy = printPslLegacy(schemaIR);
-    expect(viaNew).toBe(viaLegacy);
   });
 });

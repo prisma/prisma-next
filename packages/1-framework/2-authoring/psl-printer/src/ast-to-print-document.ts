@@ -29,7 +29,7 @@ export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
   const printerModels = sortedModels.map((m) => modelToPrinterModel(m));
 
   return {
-    headerComment: ast.headerComment ?? DEFAULT_AST_PRINT_HEADER,
+    headerComment: DEFAULT_AST_PRINT_HEADER,
     namedTypes,
     enums: enums.map((e) => ({
       name: e.name,
@@ -124,7 +124,7 @@ function modelToPrinterModel(model: PslModel): PrinterModel {
     mapName,
     fields: printerFields,
     modelAttributes: modelAttrStrings,
-    comment: model.comment,
+    comment: undefined,
   };
 }
 
