@@ -70,9 +70,9 @@ export interface Codec<
   readonly targetTypes: readonly string[];
   /** Semantic traits for operator gating (e.g. equality, order, numeric). */
   readonly traits?: TTraits;
-  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation and (on decode call sites only) column identity. */
+  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation; family layers may narrow the ctx to extend it (e.g. SQL adds `column`). */
   encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>;
-  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation and column identity when the cell resolves to a single (table, name). */
+  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation; family layers may narrow the ctx to extend it (e.g. SQL adds `column`). */
   decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>;
   /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
