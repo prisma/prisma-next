@@ -37,20 +37,11 @@
  */
 
 import { readFileSync, writeFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
-import { CliStructuredError, errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
-import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
-import { createControlStack } from '@prisma-next/framework-components/control';
-import { errorInvalidJson, MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import { errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
+import { errorInvalidJson } from '@prisma-next/migration-tools/errors';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import {
-  buildMigrationArtifacts,
-  isDirectEntrypoint,
-  type Migration,
-  printMigrationHelp,
-} from '@prisma-next/migration-tools/migration';
-import { dirname, join } from 'pathe';
-import { loadConfig } from './config-loader';
+import { buildMigrationArtifacts, type Migration } from '@prisma-next/migration-tools/migration';
+import { join } from 'pathe';
 
 /**
  * Constructor shape accepted by `MigrationCLI.run`. `Migration` subclasses
@@ -74,6 +65,19 @@ interface ParsedArgs {
   readonly help: boolean;
   readonly dryRun: boolean;
   readonly configPath: string | undefined;
+}
+
+/**
+ * Minimal structural shape the migration-file CLI writes to. Matches
+ * what clipanion's `Cli.run({ stdout, stderr })` consumes — just
+ * `write` and `end` — so callers can inject any buffer-like collector
+ * (including `process.stdout`/`process.stderr`, which trivially
+ * satisfy this surface) without dragging in the full
+ * `NodeJS.WritableStream` event-emitter surface.
+ */
+export interface MigrationCliWritable {
+  write(chunk: string | Uint8Array): boolean;
+  end(chunk?: string | Uint8Array): void;
 }
 
 /**
@@ -135,65 +139,46 @@ function parseArgs(argv: readonly string[]): ParsedArgs {
 // biome-ignore lint/complexity/noStaticOnlyClass: see JSDoc - intentional class facade for the migration-file CLI surface; future methods will share state derived from argv/config.
 export class MigrationCLI {
   /**
-   * Orchestrates a class-flow `migration.ts` script run. Awaitable:
-   * callers may `await MigrationCLI.run(...)` to surface async failures
-   * from config loading, but the typical usage pattern (top-level call
-   * after the class definition) does not require awaiting because
-   * node's module evaluation keeps the promise alive until completion.
+   * Orchestrates a class-flow `migration.ts` script run.
    *
-   * Any throwable inside this function must surface through the internal
-   * try/catch — script callers do not await, so an unhandled rejection
-   * would silently exit 0. Treat the try/catch as load-bearing for the
-   * no-await usage pattern.
+   * The third argument is the in-process testability surface: callers
+   * (and tests) may inject `argv`, `stdout`, and `stderr` instead of
+   * relying on `process.argv` / `process.stdout` / `process.stderr`.
+   * Each option defaults to its `process` global when omitted, so
+   * existing two-argument call sites
+   * (`MigrationCLI.run(import.meta.url, MyMigration)`) continue to
+   * compile and behave identically once the clipanion-based body lands
+   * in m4.
+   *
+   * Returns the exit code so the caller can branch on it (or set
+   * `process.exitCode` themselves). Awaiting is optional: the typical
+   * top-level call pattern doesn't await because node's module
+   * evaluation keeps the promise alive until completion.
+   *
+   * Stub: the clipanion-based implementation lands in plan m4. The
+   * tests in `test/migration-cli.test.ts` already assert against the
+   * post-m4 contract; they will fail on this stub-throw and turn green
+   * once m4 wires up the parser. This is the canonical tests-first
+   * pattern. See `projects/migration-cli-arg-parser/plan.md` § Commit 4.
    */
-  static async run(importMetaUrl: string, MigrationClass: MigrationConstructor): Promise<void> {
-    if (!importMetaUrl) return;
-    if (!isDirectEntrypoint(importMetaUrl)) return;
-
-    try {
-      const args = parseArgs(process.argv.slice(2));
-
-      if (args.help) {
-        printMigrationHelp();
-        return;
-      }
-
-      const migrationFile = fileURLToPath(importMetaUrl);
-      const migrationDir = dirname(migrationFile);
-
-      const config = await loadConfig(args.configPath);
-
-      // Probe-instantiate without a stack so we can read `targetId` before
-      // any target-specific constructor side effects (e.g.
-      // `PostgresMigration`'s `stack.adapter.create(stack)`) run. Concrete
-      // subclasses are required to accept the no-arg form; the abstract
-      // `Migration` constructor declares `stack?` and target subclasses
-      // (Postgres, Mongo) propagate that optionality. This makes the
-      // target-mismatch guard fail fast with `PN-MIG-2006` before any
-      // stack-driven adapter construction begins, even if the wrong-target
-      // adapter's `create` would otherwise succeed and silently misshapen
-      // the stored adapter cast.
-      const probe = new MigrationClass();
-
-      if (probe.targetId !== config.target.targetId) {
-        throw errorMigrationTargetMismatch({
-          migrationTargetId: probe.targetId,
-          configTargetId: config.target.targetId,
-        });
-      }
-
-      const stack = createControlStack(config);
-      const instance = new MigrationClass(stack);
-
-      serializeMigrationToDisk(instance, migrationDir, args.dryRun);
-    } catch (err) {
-      if (CliStructuredError.is(err) || MigrationToolsError.is(err)) {
-        process.stderr.write(`${err.message}: ${err.why}\n`);
-      } else {
-        process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
-      }
-      process.exitCode = 1;
-    }
+  static async run(
+    importMetaUrl: string,
+    MigrationClass: MigrationConstructor,
+    options: {
+      readonly argv?: readonly string[];
+      readonly stdout?: MigrationCliWritable;
+      readonly stderr?: MigrationCliWritable;
+    } = {},
+  ): Promise<number> {
+    void importMetaUrl;
+    void MigrationClass;
+    void options;
+    // Helpers retained for m4 (parser swap will reuse the existing
+    // orchestration); referenced here so `noUnusedLocals` doesn't fire
+    // against the stub. Removed in m4.
+    void parseArgs;
+    void serializeMigrationToDisk;
+    throw new Error('MigrationCLI.run: clipanion-based implementation lands in m4');
   }
 }
 
