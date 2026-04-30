@@ -1,13 +1,15 @@
 import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
-import { type } from 'arktype';
+import { type Type, type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   ARKTYPE_JSON_CODEC_ID,
   ARKTYPE_JSON_NATIVE_TYPE,
   arktypeJson,
   arktypeJsonCodec,
+  arktypeJsonEmitCodec,
 } from '../src/core/arktype-json-codec';
+import { arktypeJsonPackMeta } from '../src/core/pack-meta';
 
 const SYNTH_CTX: CodecInstanceContext = {
   name: '<arktype-json-test>',
@@ -51,24 +53,22 @@ describe('arktypeJson(schema)', () => {
   });
 
   it('rejects non-arktype schemas at the call site', () => {
-    expect(() =>
-      // The runtime check enforces the column-author surface accepts
-      // arktype `Type`s only — a misconfigured schema (e.g. a plain
-      // function or a different library's schema) surfaces here, not
-      // at contract-load time.
-      // biome-ignore lint/suspicious/noExplicitAny: deliberate misuse for the negative case
-      arktypeJson({ foo: 'bar' } as any),
-    ).toThrow(/expects an arktype Type/);
+    // The runtime check enforces the column-author surface accepts
+    // arktype `Type`s only — a misconfigured schema (e.g. a plain
+    // function or a different library's schema) surfaces here, not
+    // at contract-load time. The double-cast through `unknown` models
+    // a deliberate misuse of the typed surface without falling back
+    // to `any` (which the project bans).
+    const notASchema = { foo: 'bar' } as unknown as Type<unknown>;
+    expect(() => arktypeJson(notASchema)).toThrow(/expects an arktype Type/);
   });
 
   it('rejects schemas with non-object json IR', () => {
-    expect(() =>
-      arktypeJson({
-        expression: 'string',
-        json: 'not-an-object',
-        // biome-ignore lint/suspicious/noExplicitAny: deliberate misuse for the negative case
-      } as any),
-    ).toThrow(/missing `json` IR/);
+    const malformedSchema = {
+      expression: 'string',
+      json: 'not-an-object',
+    } as unknown as Type<unknown>;
+    expect(() => arktypeJson(malformedSchema)).toThrow(/missing `json` IR/);
   });
 });
 
@@ -236,5 +236,108 @@ describe('serialize/rehydrate roundtrip', () => {
     await expect(
       reCodec.decode(JSON.stringify({ actor: 'stranger', at: 1 }), CALL_CTX),
     ).rejects.toThrow(/actor/);
+  });
+});
+
+describe('decodeJson schema enforcement', () => {
+  // `decode` (wire string → JS) and `decodeJson` (JsonValue → JS) must
+  // both run the schema. Without enforcement on `decodeJson`, any
+  // adapter/runtime path that hands parsed JSON straight to the codec
+  // would bypass schema validation and return unchecked data.
+  it('decodeJson runs the schema against typed JsonValue payloads', () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    expect(codec.decodeJson({ name: 'Widget', price: 10 })).toEqual({
+      name: 'Widget',
+      price: 10,
+    });
+  });
+
+  it('decodeJson throws when payload misses required fields', () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    expect(() => codec.decodeJson({ name: 'Widget' })).toThrow(
+      /JSON_SCHEMA_VALIDATION_FAILED|price/,
+    );
+  });
+
+  it('decodeJson throws when payload has type-mismatched fields', () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    expect(() => codec.decodeJson({ name: 'Widget', price: 'not-a-number' })).toThrow(/price/);
+  });
+});
+
+describe('arktypeJsonEmitCodec (emit-only shim)', () => {
+  // The emit-only codec carries `renderOutputType` so the framework
+  // emitter's `CodecLookup` can resolve the column's TS type at emit
+  // time. encode/decode are sentinels that throw if invoked — runtime
+  // materialization always goes through the descriptor's factory.
+  it('exposes the codec id and native type', () => {
+    expect(arktypeJsonEmitCodec.id).toBe(ARKTYPE_JSON_CODEC_ID);
+    expect(arktypeJsonEmitCodec.targetTypes).toEqual([ARKTYPE_JSON_NATIVE_TYPE]);
+    expect(arktypeJsonEmitCodec.traits).toEqual(['equality']);
+  });
+
+  it('renderOutputType returns expression for well-formed typeParams', () => {
+    expect(
+      arktypeJsonEmitCodec.renderOutputType?.({
+        expression: '{ name: string }',
+        jsonIr: { domain: 'object' },
+      }),
+    ).toBe('{ name: string }');
+  });
+
+  it('renderOutputType returns undefined for malformed typeParams', () => {
+    expect(arktypeJsonEmitCodec.renderOutputType?.({ expression: 42, jsonIr: {} })).toBeUndefined();
+    expect(
+      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: null }),
+    ).toBeUndefined();
+    expect(
+      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: 'str' }),
+    ).toBeUndefined();
+  });
+
+  it('encode/decode reject because runtime materialization goes through the descriptor', async () => {
+    await expect(arktypeJsonEmitCodec.encode('value')).rejects.toThrow(/emit-only/);
+    await expect(arktypeJsonEmitCodec.decode('wire')).rejects.toThrow(/emit-only/);
+  });
+
+  it('encodeJson/decodeJson identity-pass JsonValue payloads', () => {
+    expect(arktypeJsonEmitCodec.encodeJson('payload')).toBe('payload');
+    expect(arktypeJsonEmitCodec.decodeJson({ a: 1 })).toEqual({ a: 1 });
+  });
+});
+
+describe('arktypeJsonPackMeta', () => {
+  // Pack metadata threads the emit-only `Codec` instance into the
+  // codec-id-keyed `CodecLookup` and declares the storage backing
+  // (`jsonb` on Postgres). Asserting the structure protects the
+  // framework-composition entry point.
+  it('declares kind, id, family, and target', () => {
+    expect(arktypeJsonPackMeta.kind).toBe('extension');
+    expect(arktypeJsonPackMeta.id).toBe('arktype-json');
+    expect(arktypeJsonPackMeta.familyId).toBe('sql');
+    expect(arktypeJsonPackMeta.targetId).toBe('postgres');
+  });
+
+  it('threads arktypeJsonEmitCodec into codecInstances for emit-path lookup', () => {
+    expect(arktypeJsonPackMeta.types.codecTypes.codecInstances).toContain(arktypeJsonEmitCodec);
+  });
+
+  it('declares jsonb storage backing for the codec id', () => {
+    expect(arktypeJsonPackMeta.types.storage).toEqual([
+      {
+        typeId: ARKTYPE_JSON_CODEC_ID,
+        familyId: 'sql',
+        targetId: 'postgres',
+        nativeType: 'jsonb',
+      },
+    ]);
+  });
+
+  it('declares the type-side import spec', () => {
+    expect(arktypeJsonPackMeta.types.codecTypes.import).toEqual({
+      package: '@prisma-next/extension-arktype-json/codec-types',
+      named: 'CodecTypes',
+      alias: 'ArktypeJsonTypes',
+    });
   });
 });

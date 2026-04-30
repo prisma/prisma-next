@@ -116,34 +116,42 @@ type ArktypeSchemaLike = ((value: unknown) => unknown) & {
 function arktypeJsonCodecForSchema<TInferred>(
   schema: ArktypeSchemaLike,
 ): (ctx: CodecInstanceContext) => ArktypeJsonCodec<TInferred> {
+  // Shared schema check used by both `decode` (wire → JS) and
+  // `decodeJson` (JsonValue → JS). Either entry point must reject
+  // payloads that don't match the schema; without the shared validator,
+  // any caller that hands parsed JSON straight to the codec would bypass
+  // schema enforcement and return unchecked data.
+  function validateSchema(value: unknown): TInferred {
+    const result = schema(value);
+    if (result instanceof ArkErrors) {
+      throw runtimeError(
+        'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+        `arktype-json schema validation failed (decode): ${result.summary}`,
+        { codecId: ARKTYPE_JSON_CODEC_ID, issues: result.summary },
+      );
+    }
+    // arktype's call-result is `inferOut | ArkErrors`; the ArkErrors
+    // branch is excluded above. The cast threads the caller-supplied
+    // generic onto the structurally-typed validation output.
+    return result as TInferred;
+  }
+
   return (_ctx) =>
     codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
       typeId: ARKTYPE_JSON_CODEC_ID,
       targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
       traits: ['equality'] as const,
       encode: (value: TInferred): string => JSON.stringify(value),
-      decode: (wire: string): TInferred => {
-        const parsed: unknown = JSON.parse(wire);
-        const result = schema(parsed);
-        if (result instanceof ArkErrors) {
-          throw runtimeError(
-            'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
-            `arktype-json schema validation failed (decode): ${result.summary}`,
-            { codecId: ARKTYPE_JSON_CODEC_ID, issues: result.summary },
-          );
-        }
-        // arktype's call-result is `inferOut | ArkErrors`; the ArkErrors
-        // branch is excluded above. The cast threads the caller-supplied
-        // generic onto the structurally-typed validation output.
-        return result as TInferred;
-      },
+      decode: (wire: string): TInferred => validateSchema(JSON.parse(wire)),
       // The contract IR's JSON-side surface is typed against `JsonValue`;
       // arktype outputs may include narrowed types (literal unions,
-      // branded types, …) that aren't structurally `JsonValue`. Casts at
-      // the encodeJson/decodeJson boundary are wire-level identities by
-      // contract: the caller agrees the value is JSON-safe.
+      // branded types, …) that aren't structurally `JsonValue`. The
+      // encodeJson cast is a wire-level identity by contract: the caller
+      // agrees the value is JSON-safe. `decodeJson` runs the schema so a
+      // contract-load → ORM-read path that bypasses `decode` still
+      // validates the payload.
       encodeJson: (value: TInferred) => value as unknown as JsonValue,
-      decodeJson: (json: JsonValue) => json as unknown as TInferred,
+      decodeJson: (json: JsonValue) => validateSchema(json),
     }) as ArktypeJsonCodec<TInferred>;
 }
 
