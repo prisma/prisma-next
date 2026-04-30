@@ -7,6 +7,7 @@ import {
   type Codec,
   type CodecRegistry,
   collectOrderedParamRefs,
+  type ContractCodecRegistry,
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
@@ -17,6 +18,39 @@ interface ParamMetadata {
 }
 
 const NO_METADATA: ParamMetadata = Object.freeze({ codecId: undefined, name: undefined });
+
+/**
+ * Resolve the codec for an outgoing param.
+ *
+ * Phase B (and AC-5-deferred carve-out): `ParamRef` does not carry a
+ * `(table, column)` ref today — every `ParamRef` carries `codecId` but
+ * not the column it relates to. Encode-side dispatch therefore consults
+ * `contractCodecs.forCodecId(codecId)` (which itself prefers the
+ * contract-walk-derived shared codec, falling back to the legacy
+ * `CodecRegistry.get` for parameterized codec ids whose contracts don't
+ * have a column the walk could resolve through).
+ *
+ * For the parameterized codecs shipped at Phase B (pgvector, postgres
+ * json/jsonb), encode is per-instance-stateless w.r.t. params:
+ * - pgvector formats `[v1,v2,...]` regardless of declared length;
+ * - postgres json/jsonb encode is `JSON.stringify` regardless of schema.
+ *
+ * So the codec-id-keyed lookup yields a structurally equivalent encoder
+ * even when the resolved per-instance codec carries extra state (e.g. a
+ * compiled JSON-Schema validator used only by `decode`). TML-2357 retires
+ * the fallback by threading `ParamRef.refs` through column-bound
+ * construction sites.
+ */
+function resolveParamCodec(
+  metadata: ParamMetadata,
+  registry: CodecRegistry,
+  contractCodecs: ContractCodecRegistry | undefined,
+): Codec | undefined {
+  if (!metadata.codecId) return undefined;
+  const fromContract = contractCodecs?.forCodecId(metadata.codecId);
+  if (fromContract) return fromContract;
+  return registry.get(metadata.codecId);
+}
 
 function paramLabel(metadata: ParamMetadata, paramIndex: number): string {
   return metadata.name ?? `param[${paramIndex}]`;
@@ -59,6 +93,7 @@ export async function encodeParam(
   paramIndex: number,
   registry: CodecRegistry,
   ctx: SqlCodecCallContext,
+  contractCodecs?: ContractCodecRegistry,
 ): Promise<unknown> {
   return encodeParamValue(
     value,
@@ -66,6 +101,7 @@ export async function encodeParam(
     paramIndex,
     registry,
     ctx,
+    contractCodecs,
   );
 }
 
@@ -75,16 +111,13 @@ async function encodeParamValue(
   paramIndex: number,
   registry: CodecRegistry,
   ctx: SqlCodecCallContext,
+  contractCodecs: ContractCodecRegistry | undefined,
 ): Promise<unknown> {
   if (value === null || value === undefined) {
     return null;
   }
 
-  if (!metadata.codecId) {
-    return value;
-  }
-
-  const codec: Codec | undefined = registry.get(metadata.codecId);
+  const codec = resolveParamCodec(metadata, registry, contractCodecs);
   if (!codec) {
     return value;
   }
@@ -119,6 +152,7 @@ export async function encodeParams(
   plan: SqlExecutionPlan,
   registry: CodecRegistry,
   ctx: SqlCodecCallContext,
+  contractCodecs?: ContractCodecRegistry,
 ): Promise<readonly unknown[]> {
   checkAborted(ctx, 'encode');
   const signal = ctx.signal;
@@ -142,7 +176,14 @@ export async function encodeParams(
 
   const tasks: Promise<unknown>[] = new Array(paramCount);
   for (let i = 0; i < paramCount; i++) {
-    tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, registry, ctx);
+    tasks[i] = encodeParamValue(
+      plan.params[i],
+      metadata[i] ?? NO_METADATA,
+      i,
+      registry,
+      ctx,
+      contractCodecs,
+    );
   }
 
   const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');

@@ -18,6 +18,7 @@ import type {
   Adapter,
   AnyQueryAst,
   CodecRegistry,
+  ContractCodecRegistry,
   LoweredStatement,
   SqlCodecCallContext,
   SqlDriver,
@@ -140,6 +141,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly driver: SqlDriver<unknown>;
   private readonly familyAdapter: RuntimeFamilyAdapter<Contract<SqlStorage>>;
   private readonly codecRegistry: CodecRegistry;
+  private readonly contractCodecs: ContractCodecRegistry;
   private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private readonly sqlCtx: SqlMiddlewareContext;
@@ -176,6 +178,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.driver = driver;
     this.familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
     this.codecRegistry = context.codecs;
+    this.contractCodecs = context.contractCodecs;
     this.codecDescriptors = context.codecDescriptors;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.sqlCtx = sqlCtx;
@@ -209,7 +212,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
-      params: await encodeParams(lowered, this.codecRegistry, ctx),
+      params: await encodeParams(lowered, this.codecRegistry, ctx, this.contractCodecs),
     });
   }
 
@@ -276,7 +279,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       const exec: SqlExecutionPlan = isExecutionPlan(plan)
         ? Object.freeze({
             ...plan,
-            params: await encodeParams(plan, self.codecRegistry, codecCtx),
+            params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
           })
         : await self.lower(await self.runBeforeCompile(plan), codecCtx);
 
@@ -329,6 +332,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
               self.codecRegistry,
               self.jsonSchemaValidators,
               codecCtx,
+              self.contractCodecs,
             );
             yield decodedRow as Row;
           }
