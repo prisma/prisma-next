@@ -1,6 +1,11 @@
-import { type as arktype } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { json, jsonb, jsonbColumn, jsonColumn } from '../src/exports/column-types';
+import { jsonbColumn, jsonColumn } from '../src/exports/column-types';
+
+// Phase C of the codec-registry-unification project retired the schema-
+// typed `json(schema)` / `jsonb(schema)` overloads from the postgres
+// adapter — schema-typed JSON now ships from per-library extension
+// packages (`@prisma-next/extension-arktype-json` for arktype). The
+// adapter retains only the static raw-JSON / raw-JSONB descriptors.
 
 describe('adapter-postgres column-types', () => {
   describe('jsonColumn', () => {
@@ -18,93 +23,6 @@ describe('adapter-postgres column-types', () => {
         codecId: 'pg/jsonb@1',
         nativeType: 'jsonb',
       });
-    });
-  });
-
-  describe('json()', () => {
-    it('returns static descriptor when no schema is provided', () => {
-      expect(json()).toEqual(jsonColumn);
-    });
-
-    it('attaches standard-schema output in typeParams.schemaJson', () => {
-      const descriptor = json(
-        arktype({
-          action: 'string',
-          actorId: 'number',
-        }),
-      );
-      expect(descriptor).toMatchObject({
-        codecId: 'pg/json@1',
-        nativeType: 'json',
-        typeParams: {
-          schemaJson: expect.objectContaining({
-            type: 'object',
-          }),
-        },
-      });
-    });
-
-    it('does not have a runtime schema key in typeParams', () => {
-      const descriptor = json(
-        arktype({
-          action: 'string',
-          actorId: 'number',
-        }),
-      );
-      expect(descriptor.typeParams).not.toHaveProperty('schema');
-    });
-  });
-
-  describe('jsonb()', () => {
-    it('returns static descriptor when no schema is provided', () => {
-      expect(jsonb()).toEqual(jsonbColumn);
-    });
-
-    it('attaches standard-schema output in typeParams.schemaJson', () => {
-      const descriptor = jsonb(
-        arktype({
-          source: 'string',
-          rank: 'number',
-        }),
-      );
-      expect(descriptor).toMatchObject({
-        codecId: 'pg/jsonb@1',
-        nativeType: 'jsonb',
-        typeParams: {
-          schemaJson: expect.objectContaining({
-            type: 'object',
-          }),
-        },
-      });
-    });
-
-    it('does not have a runtime schema key in typeParams', () => {
-      const descriptor = jsonb(
-        arktype({
-          source: 'string',
-          rank: 'number',
-        }),
-      );
-      expect(descriptor.typeParams).not.toHaveProperty('schema');
-    });
-  });
-
-  describe('error paths', () => {
-    it('throws when schema lacks ~standard.jsonSchema.output', () => {
-      const badSchema = { '~standard': {} } as never;
-      expect(() => jsonb(badSchema)).toThrow(
-        'JSON schema must expose ~standard.jsonSchema.output()',
-      );
-    });
-
-    it('throws when schema is not a Standard Schema value', () => {
-      const notASchema = { foo: 'bar' } as never;
-      expect(() => jsonb(notASchema)).toThrow('jsonb(schema) expects a Standard Schema value');
-    });
-
-    it('throws for json() with invalid schema', () => {
-      const notASchema = { foo: 'bar' } as never;
-      expect(() => json(notASchema)).toThrow('json(schema) expects a Standard Schema value');
     });
   });
 });

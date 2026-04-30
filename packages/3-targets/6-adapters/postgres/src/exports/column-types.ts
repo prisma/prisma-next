@@ -29,12 +29,6 @@ import {
   SQL_CHAR_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
-import {
-  extractStandardSchemaOutputJsonSchema,
-  extractStandardSchemaTypeExpression,
-  isStandardSchemaLike,
-  type StandardSchemaLike,
-} from '../core/standard-schema';
 
 export const textColumn = {
   codecId: PG_TEXT_CODEC_ID,
@@ -164,67 +158,28 @@ export function intervalColumn(precision?: number): ColumnTypeDescriptor & {
   } as const;
 }
 
+/**
+ * Postgres `json` column descriptor — untyped raw JSON.
+ *
+ * For schema-typed JSON columns, use the per-library extension package
+ * (`@prisma-next/extension-arktype-json` ships `arktypeJson(schema)` for
+ * arktype). The schema-accepting `json(schema)` / `jsonb(schema)`
+ * overloads previously shipped from this module retired in Phase C of
+ * the codec-registry-unification project — see spec § AC-7.
+ */
 export const jsonColumn = {
   codecId: PG_JSON_CODEC_ID,
   nativeType: 'json',
 } as const satisfies ColumnTypeDescriptor;
 
+/**
+ * Postgres `jsonb` column descriptor — untyped raw JSONB. Same retirement
+ * note as {@link jsonColumn}.
+ */
 export const jsonbColumn = {
   codecId: PG_JSONB_CODEC_ID,
   nativeType: 'jsonb',
 } as const satisfies ColumnTypeDescriptor;
-
-type JsonSchemaTypeParams = {
-  readonly schemaJson: Record<string, unknown>;
-  readonly type?: string;
-};
-
-function createJsonTypeParams(schema: StandardSchemaLike): JsonSchemaTypeParams {
-  const outputSchema = extractStandardSchemaOutputJsonSchema(schema);
-  if (!outputSchema) {
-    throw new Error('JSON schema must expose ~standard.jsonSchema.output()');
-  }
-
-  const expression = extractStandardSchemaTypeExpression(schema);
-  if (expression) {
-    return { schemaJson: outputSchema, type: expression };
-  }
-
-  return { schemaJson: outputSchema };
-}
-
-function createJsonColumnFactory(
-  codecId: string,
-  nativeType: string,
-  staticDescriptor: ColumnTypeDescriptor,
-) {
-  return (schema?: StandardSchemaLike): ColumnTypeDescriptor => {
-    if (!schema) {
-      return staticDescriptor;
-    }
-
-    if (!isStandardSchemaLike(schema)) {
-      throw new Error(`${nativeType}(schema) expects a Standard Schema value`);
-    }
-
-    return {
-      codecId,
-      nativeType,
-      typeParams: createJsonTypeParams(schema),
-    };
-  };
-}
-
-const _json = createJsonColumnFactory(PG_JSON_CODEC_ID, 'json', jsonColumn);
-const _jsonb = createJsonColumnFactory(PG_JSONB_CODEC_ID, 'jsonb', jsonbColumn);
-
-export function json(schema?: StandardSchemaLike): ColumnTypeDescriptor {
-  return _json(schema);
-}
-
-export function jsonb(schema?: StandardSchemaLike): ColumnTypeDescriptor {
-  return _jsonb(schema);
-}
 
 export function enumType<const Values extends readonly string[]>(
   name: string,

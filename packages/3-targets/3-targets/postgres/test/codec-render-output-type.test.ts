@@ -1,4 +1,3 @@
-import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
@@ -153,46 +152,24 @@ describe('codec renderOutputType', () => {
     });
   });
 
+  // Phase C: pg/json@1 and pg/jsonb@1 no longer carry renderOutputType.
+  // The schema-typed JSON column surface that drove typeParams.schemaJson
+  // / typeParams.type retired in favor of the per-library extension
+  // (`@prisma-next/extension-arktype-json`). Untyped raw json/jsonb
+  // columns have no typeParams; the framework emit path falls through to
+  // the generic CodecTypes accessor.
   describe('pg/jsonb@1', () => {
-    const codec = codecDefinitions['jsonb'].codec;
-
-    it('renders type expression from schemaJson', () => {
-      const result = codec.renderOutputType!({
-        schemaJson: {
-          type: 'object',
-          properties: { name: { type: 'string' } },
-          required: ['name'],
-        },
-      });
-      expect(result).toBe('{ name: string }');
-    });
-
-    it('renders type name from type param', () => {
-      expect(codec.renderOutputType!({ type: 'AuditPayload' })).toBe('AuditPayload');
-    });
-
-    it('throws when no type or schemaJson', () => {
-      expect(() => codec.renderOutputType!({})).toThrow(/JSON codec typeParams/);
+    it('has no renderOutputType (raw JSONB)', () => {
+      const codec = codecDefinitions['jsonb'].codec;
+      expect(codec.renderOutputType).toBeUndefined();
     });
   });
 
   describe('pg/json@1', () => {
-    const codec = codecDefinitions['json'].codec;
-
-    it(
-      'renders type expression from schemaJson',
-      () => {
-        const result = codec.renderOutputType!({
-          schemaJson: {
-            type: 'object',
-            properties: { action: { type: 'string' }, actorId: { type: 'number' } },
-            required: ['action', 'actorId'],
-          },
-        });
-        expect(result).toBe('{ action: string; actorId: number }');
-      },
-      timeouts.databaseOperation,
-    );
+    it('has no renderOutputType (raw JSON)', () => {
+      const codec = codecDefinitions['json'].codec;
+      expect(codec.renderOutputType).toBeUndefined();
+    });
   });
 
   describe('non-parameterized codecs', () => {
