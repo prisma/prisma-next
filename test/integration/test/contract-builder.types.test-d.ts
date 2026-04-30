@@ -1,9 +1,10 @@
 import {
   int4Column,
-  jsonb,
+  jsonbColumn,
   textColumn,
   timestamptzColumn,
 } from '@prisma-next/adapter-postgres/column-types';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamilyPack from '@prisma-next/family-sql/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -391,7 +392,10 @@ test('contract structure type matches Contract', () => {
   expectTypeOf(contract).toHaveProperty('storage');
 });
 
-test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
+test('arktypeJson and jsonbColumn preserve JsonValue fallback in no-emit type path', () => {
+  // Phase C: schema-typed JSON ships from per-library extension packages
+  // now (`@prisma-next/extension-arktype-json` for arktype). The
+  // adapter's `jsonbColumn` is the untyped fallback.
   const payloadSchema = arktype({
     action: 'string',
     actorId: 'number',
@@ -404,8 +408,8 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
       Event: model('Event', {
         fields: {
           id: field.column(int4Column).id(),
-          payload: field.column(jsonb(payloadSchema)),
-          meta: field.column(jsonb()),
+          payload: field.column(arktypeJson(payloadSchema)),
+          meta: field.column(jsonbColumn),
         },
       }).sql({ table: 'event' }),
     },
@@ -419,12 +423,13 @@ test('jsonb schema preserves JsonValue fallback in no-emit type path', () => {
 
   type Row = ResultType<typeof _plan>;
 
-  // The DSL derives codec types from the pack's phantom __codecTypes field.
-  // Because the pack declares __codecTypes as optional, the type resolver
-  // cannot narrow the codec output for jsonb columns in the no-emit path,
-  // so ResultType falls back to never. The chain builder's explicit
-  // <CodecTypes> parameter resolved this to unknown. Tracked as a known
-  // DSL type-inference gap to fix when __codecTypes becomes required on packs.
+  // The DSL derives codec types from the pack's phantom __codecTypes
+  // field. Because the pack declares __codecTypes as optional, the type
+  // resolver cannot narrow the codec output for jsonb columns in the
+  // no-emit path, so ResultType falls back to never. The chain builder's
+  // explicit <CodecTypes> parameter resolved this to unknown. Tracked as
+  // a known DSL type-inference gap to fix when __codecTypes becomes
+  // required on packs.
   expectTypeOf<Row['payload']>().toEqualTypeOf(undefined as never);
   expectTypeOf<Row['meta']>().toEqualTypeOf(undefined as never);
 });
