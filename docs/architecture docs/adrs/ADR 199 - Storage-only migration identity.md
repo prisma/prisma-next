@@ -1,5 +1,7 @@
 # ADR 199 — Storage-only migration identity
 
+**Revised:** 2026-04-30 — `kind` removed; `from` is now nullable (TML-2270).
+
 **Amends:** [ADR 169 §3 — Content-addressed migration identity](ADR%20169%20-%20On-disk%20migration%20persistence.md)
 
 ## At a glance
@@ -35,7 +37,7 @@ export function computeMigrationId(manifest: MigrationManifest, ops: MigrationOp
 }
 ```
 
-`strippedMeta` contains `from`, `to`, `kind`, `labels`, `authorship?`, `createdAt`. The `from` and `to` fields are storage hashes — the same storage-projection commitment that ADR 004 defines. They pin the migration to its bookends: which physical schema it expects, and which physical schema it produces. Together with `ops`, they fully describe what the migration does to the database. Everything else is metadata *about* the migration, not part of its physical identity.
+`strippedMeta` contains `from`, `to`, `labels`, `authorship?`, `createdAt`. The `from` field is `string | null`: when it is a string, it is the prior-state storage hash — the same storage-projection commitment that ADR 004 defines; `null` denotes a baseline with no prior state. The `to` field is the destination storage hash. They pin the migration to its bookends: which physical schema it expects (if any), and which physical schema it produces. Together with `ops`, they fully describe what the migration does to the database. Everything else is metadata *about* the migration, not part of its physical identity.
 
 ### What stays on disk
 
