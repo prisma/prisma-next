@@ -119,13 +119,13 @@ export async function encodeParams(
   registry: CodecRegistry,
   ctx?: SqlCodecCallContext,
 ): Promise<readonly unknown[]> {
-  if (plan.params.length === 0) {
-    return plan.params;
-  }
-
   const signal = ctx?.signal;
   if (signal?.aborted) {
     throw runtimeAborted('encode', signal.reason);
+  }
+
+  if (plan.params.length === 0) {
+    return plan.params;
   }
 
   const paramCount = plan.params.length;

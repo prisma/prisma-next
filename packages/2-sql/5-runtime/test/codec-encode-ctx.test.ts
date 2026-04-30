@@ -170,6 +170,21 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     expect(callCount).toBe(0);
   });
 
+  it('already-aborted signal short-circuits even for empty param lists', async () => {
+    const registry = createCodecRegistry();
+    const controller = new AbortController();
+    const reason = new Error('encode short-circuit');
+    controller.abort(reason);
+
+    await expect(
+      encodeParams(buildPlan([]), registry, { signal: controller.signal }),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ABORTED',
+      details: { phase: 'encode' },
+      cause: reason,
+    });
+  });
+
   it('mid-encode abort surfaces RUNTIME.ABORTED { phase: encode } via abortable race', async () => {
     const release = deferred<string>();
     const registry = createCodecRegistry();
