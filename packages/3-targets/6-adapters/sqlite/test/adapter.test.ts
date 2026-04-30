@@ -269,6 +269,15 @@ describe('SQLite adapter', () => {
       expect(sql).toContain('RETURNING "user"."id"');
     });
 
+    it('renders RETURNING with `AS <alias>` when the projection alias differs from the column name', () => {
+      const ast = InsertAst.into(TableSource.named('user'))
+        .withRows([{ id: ParamRef.of(1), email: ParamRef.of('a@example.com') }])
+        .withReturning([ProjectionItem.of('user_id', ColumnRef.of('user', 'id'))]);
+
+      const { sql } = adapter.lower(ast, { contract });
+      expect(sql).toContain('RETURNING "user"."id" AS "user_id"');
+    });
+
     it('throws on DEFAULT value in VALUES (unsupported by SQLite)', () => {
       const ast = InsertAst.into(TableSource.named('user')).withRows([
         { id: ParamRef.of(1), email: new DefaultValueExpr() },

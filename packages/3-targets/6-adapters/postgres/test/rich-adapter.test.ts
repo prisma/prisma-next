@@ -221,4 +221,14 @@ describe('Postgres rich AST lowering', () => {
     const deleteSql = adapter.lower(deleteAst, { contract }).sql;
     expect(deleteSql).toBe('DELETE FROM "user" WHERE "user"."id" = $1 RETURNING "user"."id"');
   });
+
+  it('renders RETURNING with `AS <alias>` when the projection alias differs from the column name', () => {
+    const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });
+    const insertAst = InsertAst.into(TableSource.named('user'))
+      .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])
+      .withReturning([ProjectionItem.of('user_id', ColumnRef.of('user', 'id'))]);
+
+    const sql = adapter.lower(insertAst, { contract }).sql;
+    expect(sql).toContain('RETURNING "user"."id" AS "user_id"');
+  });
 });

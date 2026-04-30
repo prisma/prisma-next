@@ -388,4 +388,36 @@ describe('runBeforeCompileChain', () => {
     },
     timeouts.default,
   );
+
+  it(
+    'decodes RETURNING values via ProjectionItem.codecId on a mutation AST',
+    async () => {
+      const { InsertAst } = await import('@prisma-next/sql-relational-core/ast');
+
+      const decoderRegistry = createCodecRegistry();
+      decoderRegistry.register(
+        codec({
+          typeId: 'pg/int4@1',
+          targetTypes: ['int4'],
+          encode: (v: number) => v,
+          decode: (w: number) => w + 100,
+        }),
+      );
+
+      const insert = InsertAst.into(TableSource.named('users'))
+        .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])
+        .withReturning([ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1')]);
+
+      const { decodeRow } = await import('../src/codecs/decoding');
+      const plan: SqlExecutionPlan = {
+        sql: 'INSERT INTO users (id) VALUES ($1) RETURNING users.id',
+        params: [1],
+        ast: insert,
+        meta,
+      };
+      const row = await decodeRow({ id: 7 }, plan, decoderRegistry);
+      expect(row).toEqual({ id: 107 });
+    },
+    timeouts.default,
+  );
 });
