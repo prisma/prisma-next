@@ -122,8 +122,23 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
           });
         }
 
-        await this.upsertMarker(driver, options, existingMarker);
-        await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+        // Self-edge no-op detection: a self-edge migration whose ops all
+        // self-skipped (or had no ops to begin with) and brings no new
+        // invariants produced no observable change. Skip the marker + ledger
+        // writes so an idempotent re-apply of a self-edge data transform
+        // doesn't churn updatedAt or pile up empty ledger entries. db update
+        // no-ops still write a ledger entry as audit trail.
+        const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
+        const existingInvariants = new Set(existingMarker?.invariants ?? []);
+        const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
+          existingInvariants.has(id),
+        );
+        const isSelfEdgeNoOp = isSelfEdge && operationsExecuted === 0 && incomingIsSubsetOfExisting;
+
+        if (!isSelfEdgeNoOp) {
+          await this.upsertMarker(driver, options, existingMarker);
+          await this.recordLedgerEntry(driver, options, existingMarker, executedOperations);
+        }
 
         if (fkWasEnabled) {
           const fkIntegrityCheck = await this.verifyForeignKeyIntegrity(driver);

@@ -233,6 +233,77 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
   describe('when origin === destination (self-edge plan)', () => {
     it(
+      'on a true no-op self-edge (no ops executed, no new invariants), skips both marker and ledger writes',
+      { timeout: testTimeout },
+      async () => {
+        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+        const initialPlan = planner.plan({
+          contract,
+          schema: emptySchema,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        if (initialPlan.kind !== 'success') {
+          throw new Error('expected initial planner success');
+        }
+        await runner.execute({
+          plan: initialPlan.plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        // Snapshot ledger count after the init apply.
+        const initialLedgerCount = await driver!.query<{ count: string }>(
+          'select count(*)::text as count from prisma_contract.ledger',
+        );
+        const initialUpdatedAt = await driver!.query<{ updated_at: Date }>(
+          'select updated_at from prisma_contract.marker where id = 1',
+        );
+
+        // Self-edge plan with no operations and no new invariants. This is a
+        // true no-op: nothing should be written.
+        const noOpSelfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: toPlanContractInfo(contract),
+          destination: toPlanContractInfo(contract),
+          operations: [],
+        });
+
+        const result = await runner.execute({
+          plan: noOpSelfEdgePlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toMatchObject({
+            operationsPlanned: 0,
+            operationsExecuted: 0,
+          });
+        }
+
+        // Ledger count unchanged: no spurious entry for the no-op self-edge.
+        const ledgerCountAfter = await driver!.query<{ count: string }>(
+          'select count(*)::text as count from prisma_contract.ledger',
+        );
+        expect(ledgerCountAfter.rows[0]?.count).toBe(initialLedgerCount.rows[0]?.count);
+
+        // Marker updated_at unchanged: no churn from the no-op.
+        const updatedAtAfter = await driver!.query<{ updated_at: Date }>(
+          'select updated_at from prisma_contract.marker where id = 1',
+        );
+        expect(updatedAtAfter.rows[0]?.updated_at?.toISOString()).toBe(
+          initialUpdatedAt.rows[0]?.updated_at?.toISOString(),
+        );
+      },
+    );
+
+    it(
       'runs operations instead of skipping them — the marker matching destination is not a skip signal for self-edges',
       { timeout: testTimeout },
       async () => {

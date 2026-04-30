@@ -96,6 +96,73 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     expect(storedOps[0]).toMatchObject({ id: 'table.user', execute: [] });
   });
 
+  it('on a true no-op self-edge (no ops executed, no new invariants), skips both marker and ledger writes', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+
+    // Bring marker to contract hash via a synthetic empty initial apply.
+    driver.db.exec(
+      'CREATE TABLE "user" (id INTEGER PRIMARY KEY, email TEXT NOT NULL, UNIQUE (email))',
+    );
+    driver.db.exec('CREATE INDEX "user_email_idx" ON "user"(email)');
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+    const initPlan = createMigrationPlan<SqlitePlanTargetDetails>({
+      targetId: 'sqlite',
+      origin: null,
+      destination: toPlanContractInfo(contract),
+      operations: [],
+    });
+    const initResult = await runner.execute({
+      plan: initPlan,
+      driver,
+      destinationContract: contract,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
+      strictVerification: false,
+    });
+    if (!initResult.ok) throw new Error(formatRunnerFailure(initResult.failure));
+
+    const initialLedger = await driver.query<{ cnt: number }>(
+      'SELECT COUNT(*) as cnt FROM _prisma_ledger',
+    );
+    const initialUpdatedAt = await driver.query<{ updated_at: string }>(
+      'SELECT updated_at FROM _prisma_marker WHERE id = ?',
+      [1],
+    );
+
+    // True no-op self-edge: origin === destination, no ops, no invariants.
+    const noOpPlan = createMigrationPlan<SqlitePlanTargetDetails>({
+      targetId: 'sqlite',
+      origin: toPlanContractInfo(contract),
+      destination: toPlanContractInfo(contract),
+      operations: [],
+    });
+    const result = await runner.execute({
+      plan: noOpPlan,
+      driver,
+      destinationContract: contract,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
+      strictVerification: false,
+    });
+    if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
+    expect(result.value).toMatchObject({
+      operationsPlanned: 0,
+      operationsExecuted: 0,
+    });
+
+    const ledgerAfter = await driver.query<{ cnt: number }>(
+      'SELECT COUNT(*) as cnt FROM _prisma_ledger',
+    );
+    expect(ledgerAfter.rows[0]!.cnt).toBe(initialLedger.rows[0]!.cnt);
+
+    const updatedAtAfter = await driver.query<{ updated_at: string }>(
+      'SELECT updated_at FROM _prisma_marker WHERE id = ?',
+      [1],
+    );
+    expect(updatedAtAfter.rows[0]!.updated_at).toBe(initialUpdatedAt.rows[0]!.updated_at);
+  });
+
   it('runs operations on a self-edge plan (origin === destination) — marker matching destination is not a skip signal', async () => {
     testDb = createTestDatabase();
     const { driver } = testDb;
