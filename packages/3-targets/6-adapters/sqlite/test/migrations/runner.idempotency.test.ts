@@ -95,4 +95,78 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     expect(storedOps).toHaveLength(1);
     expect(storedOps[0]).toMatchObject({ id: 'table.user', execute: [] });
   });
+
+  it('runs operations on a self-edge plan (origin === destination) — marker matching destination is not a skip signal', async () => {
+    testDb = createTestDatabase();
+    const { driver } = testDb;
+
+    // Apply the schema first so the marker is at the contract hash.
+    driver.db.exec(
+      'CREATE TABLE "user" (id INTEGER PRIMARY KEY, email TEXT NOT NULL, UNIQUE (email))',
+    );
+    driver.db.exec('CREATE INDEX "user_email_idx" ON "user"(email)');
+    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
+
+    const initPlan = createMigrationPlan<SqlitePlanTargetDetails>({
+      targetId: 'sqlite',
+      origin: null,
+      destination: toPlanContractInfo(contract),
+      operations: [],
+    });
+    const initResult = await runner.execute({
+      plan: initPlan,
+      driver,
+      destinationContract: contract,
+      policy: INIT_ADDITIVE_POLICY,
+      frameworkComponents,
+      strictVerification: false,
+    });
+    if (!initResult.ok) throw new Error(formatRunnerFailure(initResult.failure));
+
+    // Side-effect proof outside the contract.
+    driver.db.exec('CREATE TABLE "self_edge_proof" (val INTEGER PRIMARY KEY)');
+
+    const selfEdgePlan = createMigrationPlan<SqlitePlanTargetDetails>({
+      targetId: 'sqlite',
+      origin: toPlanContractInfo(contract),
+      destination: toPlanContractInfo(contract),
+      operations: [
+        {
+          id: 'self_edge.insert_proof',
+          label: 'Insert proof row',
+          summary: 'Must execute on a self-edge plan',
+          operationClass: 'data',
+          target: {
+            id: 'sqlite',
+            details: { schema: 'main', objectType: 'table', name: 'self_edge_proof' },
+          },
+          precheck: [],
+          execute: [
+            {
+              description: 'insert proof',
+              sql: 'INSERT INTO "self_edge_proof" (val) VALUES (42)',
+            },
+          ],
+          postcheck: [],
+        },
+      ],
+    });
+
+    const result = await runner.execute({
+      plan: selfEdgePlan,
+      driver,
+      destinationContract: contract,
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+      frameworkComponents,
+      strictVerification: false,
+    });
+    if (!result.ok) throw new Error(formatRunnerFailure(result.failure));
+    expect(result.value).toMatchObject({
+      operationsPlanned: 1,
+      operationsExecuted: 1,
+    });
+
+    const proof = await driver.query<{ val: number }>('SELECT val FROM "self_edge_proof"');
+    expect(proof.rows).toEqual([{ val: 42 }]);
+  });
 });

@@ -6,6 +6,7 @@ import {
   createDriver,
   createMigrationPlan,
   createTestDatabase,
+  emptySchema,
   familyInstance,
   frameworkComponents,
   type PostgresControlDriver,
@@ -226,6 +227,91 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
             },
           },
         });
+      },
+    );
+  });
+
+  describe('when origin === destination (self-edge plan)', () => {
+    it(
+      'runs operations instead of skipping them — the marker matching destination is not a skip signal for self-edges',
+      { timeout: testTimeout },
+      async () => {
+        // Apply the schema first so the marker sits at the contract hash.
+        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+        const initialPlan = planner.plan({
+          contract,
+          schema: emptySchema,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+        if (initialPlan.kind !== 'success') {
+          throw new Error('expected initial planner success');
+        }
+        await runner.execute({
+          plan: initialPlan.plan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY,
+          frameworkComponents,
+        });
+
+        // Self-edge plan: origin === destination, single op with a side-effect
+        // (insert a row). If the runner skipped this op the way it used to
+        // when marker matched destination, the row would be absent.
+        await driver!.query('create table "self_edge_proof" (val int not null primary key)');
+
+        const selfEdgePlan = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: toPlanContractInfo(contract),
+          destination: toPlanContractInfo(contract),
+          operations: [
+            {
+              id: 'self_edge.insert_proof',
+              label: 'Insert proof row',
+              summary: 'Must execute on a self-edge plan',
+              operationClass: 'data',
+              target: {
+                id: 'postgres',
+                details: {
+                  schema: 'public',
+                  objectType: 'table',
+                  name: 'self_edge_proof',
+                },
+              },
+              precheck: [],
+              execute: [
+                {
+                  description: 'insert proof',
+                  sql: 'insert into "self_edge_proof" (val) values (42)',
+                },
+              ],
+              postcheck: [],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: selfEdgePlan,
+          driver: driver!,
+          destinationContract: contract,
+          policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
+          frameworkComponents,
+          // Side-effect uses a synthetic table outside the contract; relax
+          // schema verification so the post-execute drift check doesn't fail.
+          strictVerification: false,
+        });
+        expect(result.ok).toBe(true);
+        if (result.ok) {
+          expect(result.value).toMatchObject({
+            operationsPlanned: 1,
+            operationsExecuted: 1,
+          });
+        }
+
+        // Side-effect proof: the op actually executed against the DB.
+        const proof = await driver!.query<{ val: number }>('select val from "self_edge_proof"');
+        expect(proof.rows).toEqual([{ val: 42 }]);
       },
     );
   });
