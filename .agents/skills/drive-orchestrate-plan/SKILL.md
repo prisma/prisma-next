@@ -472,7 +472,7 @@ These are the cross-cutting invariants the orchestrator is responsible for enfor
 
 | From this skill                | To                                | Trigger                                                                 |
 |--------------------------------|-----------------------------------|-------------------------------------------------------------------------|
-| `drive-create-spec`            | this skill                        | Spec exists; plan is being generated.                                   |
+| `drive-create-spec`            | `drive-create-plan`               | Spec exists; plan is being generated.                                   |
 | `drive-create-plan`            | this skill                        | Plan exists with milestones + validation gates; ready to execute.       |
 | this skill                     | `commit-as-you-go`                | Implementer needs commit-shaping guidance.                              |
 | this skill                     | `drive-pr-local-review`           | `code-review.md` doesn't yet exist; scaffold via that skill's templates.|
