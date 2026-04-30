@@ -82,10 +82,38 @@ describe('raceAgainstAbort', () => {
 
   it('removes the abort listener after the race settles (no leak when the work wins)', async () => {
     const controller = new AbortController();
-    const before = countAbortListeners(controller.signal);
+    const tracker = trackAbortListeners(controller.signal);
     await raceAgainstAbort(Promise.resolve(1), controller.signal, 'encode');
-    const after = countAbortListeners(controller.signal);
-    expect(after).toBe(before);
+    expect(tracker.added).toHaveLength(1);
+    expect(tracker.removed).toContainEqual(tracker.added[0]);
+  });
+
+  it('removes the abort listener after the race rejects with a non-abort error (no leak when work rejects first)', async () => {
+    const controller = new AbortController();
+    const tracker = trackAbortListeners(controller.signal);
+    await expect(
+      raceAgainstAbort(Promise.reject(new TypeError('boom')), controller.signal, 'encode'),
+    ).rejects.toBeInstanceOf(TypeError);
+    expect(tracker.added).toHaveLength(1);
+    expect(tracker.removed).toContainEqual(tracker.added[0]);
+  });
+
+  it('does not install an abort listener when the signal is already aborted on entry', async () => {
+    const controller = new AbortController();
+    const reason = new Error('pre-aborted');
+    controller.abort(reason);
+    const tracker = trackAbortListeners(controller.signal);
+    // Use a pending work promise so the abort path is the only way the
+    // race settles; this proves the already-aborted branch rejects without
+    // depending on `Promise.race` ordering against an already-settled work.
+    const work = deferred<number>();
+    await expect(raceAgainstAbort(work.promise, controller.signal, 'encode')).rejects.toMatchObject(
+      { code: 'RUNTIME.ABORTED', cause: reason },
+    );
+    // Already-aborted path short-circuits without installing the listener.
+    expect(tracker.added).toHaveLength(0);
+    expect(tracker.removed).toHaveLength(0);
+    work.resolve(1);
   });
 
   it('handles undefined signal.reason (default abort) by carrying undefined through to RUNTIME.ABORTED.cause', async () => {
@@ -108,20 +136,33 @@ describe('raceAgainstAbort', () => {
 });
 
 /**
- * Count installed `abort` listeners by toggling the signal's listener internal
- * counter via a probe listener. AbortSignal does not expose listener counts
- * directly; this is a coarse smoke check for "no leaked listeners after the
- * helper returns" rather than a precise count assertion.
+ * Spy on `addEventListener('abort', …)` / `removeEventListener('abort', …)`
+ * for a single signal. Returns the captured listener references so a test
+ * can assert add/remove pairing precisely. AbortSignal does not expose
+ * listener counts via any public API, so spying is the only way to prove
+ * the helper installs and tears down its listener correctly.
  */
-function countAbortListeners(signal: AbortSignal): number {
-  // No public API to count listeners; treat absence of throw as success.
-  // The real assertion is that adding/removing a probe listener does not
-  // throw — i.e. the signal is in a sane state.
-  let probeFired = 0;
-  const probe = () => {
-    probeFired += 1;
-  };
-  signal.addEventListener('abort', probe);
-  signal.removeEventListener('abort', probe);
-  return probeFired;
+type AbortListenerArg = Parameters<AbortSignal['addEventListener']>[1];
+
+function trackAbortListeners(signal: AbortSignal): {
+  added: AbortListenerArg[];
+  removed: AbortListenerArg[];
+} {
+  const added: AbortListenerArg[] = [];
+  const removed: AbortListenerArg[] = [];
+  const originalAdd = signal.addEventListener.bind(signal);
+  const originalRemove = signal.removeEventListener.bind(signal);
+  signal.addEventListener = ((type, listener, options) => {
+    if (type === 'abort' && listener) {
+      added.push(listener);
+    }
+    return originalAdd(type, listener, options);
+  }) as typeof signal.addEventListener;
+  signal.removeEventListener = ((type, listener, options) => {
+    if (type === 'abort' && listener) {
+      removed.push(listener);
+    }
+    return originalRemove(type, listener, options);
+  }) as typeof signal.removeEventListener;
+  return { added, removed };
 }

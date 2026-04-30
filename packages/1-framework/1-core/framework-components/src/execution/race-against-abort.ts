@@ -8,12 +8,15 @@ import { runtimeAborted } from './runtime-error';
  * signal are abandoned and run to completion in the background — the
  * cooperative-cancellation contract documented in ADR 204.
  *
- * The call site MUST pre-check `signal.aborted` and short-circuit before
- * invoking this helper; this function assumes the signal is not already
- * aborted on entry. (It still installs an `abort` listener and would fire
- * synchronously if the signal aborted between pre-check and listener
- * registration, which is a harmless edge: the rejection is still attributed
- * to the abort path.)
+ * Call sites still SHOULD pre-check `signal.aborted` and short-circuit with
+ * a phase-tagged `RUNTIME.ABORTED` envelope before invoking this helper —
+ * that path is the canonical "aborted at entry" surface and avoids
+ * scheduling the work promise. As a defensive belt-and-braces, this helper
+ * also handles the already-aborted case internally: `AbortSignal` does not
+ * replay past abort events to listeners registered after the abort, so we
+ * inspect `signal.aborted` synchronously and reject with the sentinel
+ * before installing the listener. The rejection is still attributed to the
+ * abort path via the sentinel-identity check.
  *
  * Distinguishing the rejection source is load-bearing for AC-ERR4
  * (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` pass through unchanged).
@@ -39,6 +42,11 @@ export async function raceAgainstAbort<T>(
   let onAbort: (() => void) | undefined;
 
   const abortPromise = new Promise<never>((_, reject) => {
+    if (signal.aborted) {
+      sentinel.reason = signal.reason;
+      reject(sentinel);
+      return;
+    }
     onAbort = () => {
       sentinel.reason = signal.reason;
       reject(sentinel);
