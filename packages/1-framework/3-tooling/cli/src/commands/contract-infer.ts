@@ -1,12 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { errorRuntime } from '@prisma-next/errors/execution';
-import { printPsl, validatePrintableSqlSchemaIR } from '@prisma-next/psl-printer';
-import {
-  createPostgresDefaultMapping,
-  createPostgresTypeMap,
-  extractEnumInfo,
-  parseRawDefault,
-} from '@prisma-next/psl-printer/postgres';
+import { printPslLegacy as printPsl } from '@prisma-next/psl-printer/legacy';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative } from 'pathe';
@@ -70,15 +64,8 @@ async function executeContractInferCommand(
     );
   }
 
-  const schema = validatePrintableSqlSchemaIR(inspectResult.value.schema);
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
-  const enumInfo = extractEnumInfo(schema.annotations);
-  const pslContent = printPsl(schema, {
-    defaultMapping: createPostgresDefaultMapping(),
-    typeMap: createPostgresTypeMap(enumInfo.typeNames),
-    enumInfo,
-    parseRawDefault,
-  });
+  const pslContent = printPsl(inspectResult.value.schema);
 
   if (existsSync(outputPath) && !flags.json && !flags.quiet) {
     ui.stderr(`\u26A0 Overwriting existing file: ${relative(process.cwd(), outputPath)}`);
