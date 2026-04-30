@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { realpathSync } from 'node:fs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -60,19 +60,28 @@ function run(command, args, input = null) {
     throw new Error(`error: ${command} was terminated by signal ${result.signal}`);
   }
   if (result.status !== 0) {
-    throw new Error(`error: ${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`.trim());
+    throw new Error(
+      `error: ${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`.trim(),
+    );
   }
   return result.stdout;
 }
 
 function assertCommandAvailable(command, installHint) {
-  const probe = spawnSync(command, ['--version'], { encoding: 'utf8', timeout: SUBPROCESS_TIMEOUT_MS });
+  const probe = spawnSync(command, ['--version'], {
+    encoding: 'utf8',
+    timeout: SUBPROCESS_TIMEOUT_MS,
+  });
   if (probe.error || probe.status !== 0) {
     if (probe.error?.code === 'ETIMEDOUT') {
-      throw new Error(`error: required dependency "${command}" timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds.`);
+      throw new Error(
+        `error: required dependency "${command}" timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds.`,
+      );
     }
     if (probe.signal) {
-      throw new Error(`error: required dependency "${command}" was terminated by signal ${probe.signal}.`);
+      throw new Error(
+        `error: required dependency "${command}" was terminated by signal ${probe.signal}.`,
+      );
     }
     throw new Error(
       `error: required dependency "${command}" is not available. Install ${installHint} and retry.`,
@@ -92,7 +101,14 @@ function resolveThread(threadNodeId) {
     '}',
   ].join('\n');
 
-  const response = run('gh', ['api', 'graphql', '-f', `query=${mutation}`, '-F', `threadId=${threadNodeId}`]);
+  const response = run('gh', [
+    'api',
+    'graphql',
+    '-f',
+    `query=${mutation}`,
+    '-F',
+    `threadId=${threadNodeId}`,
+  ]);
 
   let parsed;
   try {
@@ -103,7 +119,11 @@ function resolveThread(threadNodeId) {
 
   if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
     const messages = parsed.errors
-      .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+      .map((err) =>
+        typeof err?.message === 'string' && err.message.length > 0
+          ? err.message
+          : JSON.stringify(err),
+      )
       .join('; ');
     throw new Error(`error: ${messages}`);
   }
@@ -129,25 +149,24 @@ async function main() {
 
   const result = resolveThread(args.threadNodeId);
   process.stdout.write(
-    JSON.stringify({
+    `${JSON.stringify({
       ok: true,
       threadNodeId: args.threadNodeId,
       resolvedThreadId: result.resolvedThreadId,
       isResolved: true,
-    }) + '\n',
+    })}\n`,
   );
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {

@@ -38,9 +38,7 @@ function normalizeReactionGroups(groups) {
   }
   const normalized = groups.map((group) => {
     const rawTotalCount = group?.users?.totalCount;
-    const totalCount = Number.isFinite(rawTotalCount)
-      ? Math.max(0, Math.trunc(rawTotalCount))
-      : 0;
+    const totalCount = Number.isFinite(rawTotalCount) ? Math.max(0, Math.trunc(rawTotalCount)) : 0;
     return {
       content: String(group?.content ?? ''),
       users: { totalCount },
@@ -249,7 +247,7 @@ function normalizeReviewStateV1(input) {
         nodeId: thread.id,
         url: primaryComment.url,
       },
-      isActionableCandidate: !Boolean(thread.isOutdated),
+      isActionableCandidate: !thread.isOutdated,
       comments: sortedComments,
     });
   }
@@ -359,10 +357,18 @@ function validateBodyEntryShape(entry, pointer) {
   if (typeof entry?.author !== 'object' || entry.author === null) {
     throw new TypeError(`${pointer}.author must be an object`);
   }
-  if (entry.author.login !== null && entry.author.login !== undefined && typeof entry.author.login !== 'string') {
+  if (
+    entry.author.login !== null &&
+    entry.author.login !== undefined &&
+    typeof entry.author.login !== 'string'
+  ) {
     throw new TypeError(`${pointer}.author.login must be string or null`);
   }
-  if (entry.createdAt !== null && entry.createdAt !== undefined && typeof entry.createdAt !== 'string') {
+  if (
+    entry.createdAt !== null &&
+    entry.createdAt !== undefined &&
+    typeof entry.createdAt !== 'string'
+  ) {
     throw new TypeError(`${pointer}.createdAt must be string or null`);
   }
   if (typeof entry.body !== 'string') {
@@ -386,7 +392,11 @@ function validateReviewBodyShape(entry, pointer) {
   if (typeof entry.author !== 'object' || entry.author === null) {
     throw new TypeError(`${pointer}.author must be an object`);
   }
-  if (entry.author.login !== null && entry.author.login !== undefined && typeof entry.author.login !== 'string') {
+  if (
+    entry.author.login !== null &&
+    entry.author.login !== undefined &&
+    typeof entry.author.login !== 'string'
+  ) {
     throw new TypeError(`${pointer}.author.login must be string or null`);
   }
   if (!isNonEmptyString(entry.body)) {
@@ -469,7 +479,10 @@ function assertReviewStateV1(reviewState) {
     throw new TypeError('review-state issueComments must be an array');
   }
   for (let index = 0; index < reviewState.issueComments.length; index += 1) {
-    validateIssueCommentShape(reviewState.issueComments[index], `review-state issueComments[${index}]`);
+    validateIssueCommentShape(
+      reviewState.issueComments[index],
+      `review-state issueComments[${index}]`,
+    );
   }
   if (!Array.isArray(reviewState.targets)) {
     throw new TypeError('review-state targets must be an array');

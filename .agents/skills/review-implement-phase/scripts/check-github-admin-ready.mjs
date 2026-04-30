@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { realpathSync } from 'node:fs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -51,15 +51,17 @@ function parsePrUrl(url) {
   if (!match) {
     return null;
   }
-  return { owner: match[1], repo: match[2].replace(/\.git$/, ''), number: Number.parseInt(match[3], 10) };
+  return {
+    owner: match[1],
+    repo: match[2].replace(/\.git$/, ''),
+    number: Number.parseInt(match[3], 10),
+  };
 }
 
 function run(command, args) {
   const result = spawnSync(command, args, { encoding: 'utf8', timeout: SUBPROCESS_TIMEOUT_MS });
   if (result.error?.code === 'ETIMEDOUT') {
-    throw new Error(
-      `error: ${command} timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds`,
-    );
+    throw new Error(`error: ${command} timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds`);
   }
   if (result.signal) {
     throw new Error(`error: ${command} was terminated by signal ${result.signal}`);
@@ -68,9 +70,7 @@ function run(command, args) {
 }
 
 function hasRepoScope(output) {
-  const scopeLine = output
-    .split(/\r?\n/)
-    .find((line) => line.includes('Token scopes:'));
+  const scopeLine = output.split(/\r?\n/).find((line) => line.includes('Token scopes:'));
   if (!scopeLine) {
     return false;
   }
@@ -120,7 +120,9 @@ function assertPrApiAccess(owner, repo, number) {
     `number=${number}`,
   ]);
   if (result.status !== 0) {
-    throw new Error(`error: cannot access PR via gh api graphql: ${result.stderr || result.stdout}`.trim());
+    throw new Error(
+      `error: cannot access PR via gh api graphql: ${result.stderr || result.stdout}`.trim(),
+    );
   }
 }
 
@@ -133,7 +135,10 @@ async function main() {
 
   const parsed = parsePrUrl(args.prUrl);
   if (!parsed) {
-    throw { code: EXIT_CLI, message: 'error: invalid PR URL (expected https://github.com/OWNER/REPO/pull/123)' };
+    throw {
+      code: EXIT_CLI,
+      message: 'error: invalid PR URL (expected https://github.com/OWNER/REPO/pull/123)',
+    };
   }
 
   assertCommandAvailable('gh', 'GitHub CLI (`gh`)');
@@ -143,16 +148,15 @@ async function main() {
   process.stdout.write('ok: github admin preflight passed\n');
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {

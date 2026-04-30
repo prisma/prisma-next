@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
+import { spawnSync } from 'node:child_process';
 import { readFileSync, realpathSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { spawnSync } from 'node:child_process';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -106,20 +106,27 @@ function run(command, args, input = null) {
     throw new Error(`error: ${command} was terminated by signal ${result.signal}`);
   }
   if (result.status !== 0) {
-    throw new Error(`error: ${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`.trim());
+    throw new Error(
+      `error: ${command} ${args.join(' ')} failed: ${result.stderr || result.stdout}`.trim(),
+    );
   }
   return result.stdout;
 }
 
 function assertCommandAvailable(command, installHint) {
-  const probe = spawnSync(command, ['--version'], { encoding: 'utf8', timeout: SUBPROCESS_TIMEOUT_MS });
+  const probe = spawnSync(command, ['--version'], {
+    encoding: 'utf8',
+    timeout: SUBPROCESS_TIMEOUT_MS,
+  });
   if (probe.error?.code === 'ETIMEDOUT') {
     throw new Error(
       `error: required dependency "${command}" timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds.`,
     );
   }
   if (probe.signal) {
-    throw new Error(`error: required dependency "${command}" was terminated by signal ${probe.signal}.`);
+    throw new Error(
+      `error: required dependency "${command}" was terminated by signal ${probe.signal}.`,
+    );
   }
   if (probe.error || probe.status !== 0) {
     throw new Error(
@@ -137,7 +144,11 @@ function parseApiResponse(jsonText, contextDescription) {
   }
   if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
     const messages = parsed.errors
-      .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+      .map((err) =>
+        typeof err?.message === 'string' && err.message.length > 0
+          ? err.message
+          : JSON.stringify(err),
+      )
       .join('; ');
     throw new Error(`error: ${messages}`);
   }
@@ -160,7 +171,14 @@ function resolveTargetNode(commentNodeId) {
     '  }',
     '}',
   ].join('\n');
-  const response = run('gh', ['api', 'graphql', '-f', `query=${query}`, '-F', `id=${commentNodeId}`]);
+  const response = run('gh', [
+    'api',
+    'graphql',
+    '-f',
+    `query=${query}`,
+    '-F',
+    `id=${commentNodeId}`,
+  ]);
   const parsed = parseApiResponse(response, 'GraphQL node lookup response');
   const node = parsed?.data?.node;
   if (!node || typeof node !== 'object') {
@@ -185,8 +203,7 @@ function resolveTargetNode(commentNodeId) {
     typeof node.pullRequest?.repository?.nameWithOwner === 'string'
       ? node.pullRequest.repository.nameWithOwner
       : null;
-  const prNumber =
-    typeof node.pullRequest?.number === 'number' ? node.pullRequest.number : null;
+  const prNumber = typeof node.pullRequest?.number === 'number' ? node.pullRequest.number : null;
   if (!repo || prNumber === null) {
     throw new Error(
       `error: GraphQL node lookup did not return owning repo and PR for ${commentNodeId}`,
@@ -244,7 +261,9 @@ function postIssueComment(repo, prNumber, body) {
   ]);
   const parsed = parseApiResponse(response, 'issue-comment REST response');
   if (typeof parsed?.id !== 'number') {
-    throw new Error('error: top-level PR comment was posted but response did not include a numeric comment id');
+    throw new Error(
+      'error: top-level PR comment was posted but response did not include a numeric comment id',
+    );
   }
   return parsed.id;
 }
@@ -265,40 +284,39 @@ async function main() {
   if (target.kind === 'PullRequestReviewComment') {
     const replyId = postInlineReply(args.repo, args.prNumber, body, target.databaseId);
     process.stdout.write(
-      JSON.stringify({
+      `${JSON.stringify({
         ok: true,
         kind: 'review_thread_reply',
         replyCommentId: replyId,
         inReplyTo: target.databaseId,
         commentNodeId: args.commentNodeId,
-      }) + '\n',
+      })}\n`,
     );
     return;
   }
 
   const issueCommentId = postIssueComment(args.repo, args.prNumber, body);
   process.stdout.write(
-    JSON.stringify({
+    `${JSON.stringify({
       ok: true,
       kind: 'issue_comment',
       issueCommentId,
       reviewDatabaseId: target.databaseId,
       commentNodeId: args.commentNodeId,
       note: 'PullRequestReview targets do not accept inline replies; posted a top-level PR issue comment instead.',
-    }) + '\n',
+    })}\n`,
   );
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {

@@ -1,6 +1,7 @@
 import { db } from './prisma/db';
 
 async function main() {
+  // biome-ignore lint/style/noNonNullAssertion: loaded from .env
   const client = await db.connect(process.env['DATABASE_URL']!, 'mydb');
   const user = await client.orm.User.where((u) => u.email.eq('alice@example.com')).first();
   console.log(user);

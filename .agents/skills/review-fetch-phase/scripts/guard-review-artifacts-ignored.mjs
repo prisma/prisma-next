@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
+import { realpathSync } from 'node:fs';
 import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { realpathSync } from 'node:fs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -127,16 +127,15 @@ async function main() {
   process.stdout.write('ok: review artifact paths are ignored by git\n');
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {

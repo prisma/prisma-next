@@ -73,12 +73,18 @@ function assertReviewActionsV1(reviewActions) {
       throw new TypeError(`${pointer}.decision must be a supported value`);
     }
     if (action.decision === 'wont_address' && !isNonEmptyString(action?.rationale)) {
-      throw new TypeError(`${pointer}.rationale must be a non-empty string when decision is wont_address`);
+      throw new TypeError(
+        `${pointer}.rationale must be a non-empty string when decision is wont_address`,
+      );
     }
     if (action.decision !== 'triage_pending' && !isNonEmptyString(action?.summary)) {
       throw new TypeError(`${pointer}.summary must be a non-empty string once triaged`);
     }
-    if (action.summary !== null && action.summary !== undefined && typeof action.summary !== 'string') {
+    if (
+      action.summary !== null &&
+      action.summary !== undefined &&
+      typeof action.summary !== 'string'
+    ) {
       throw new TypeError(`${pointer}.summary must be a string or null`);
     }
     if (
@@ -115,7 +121,9 @@ function assertReviewActionsV1(reviewActions) {
     }
     if (
       action.status === 'done' &&
-      (typeof action.done !== 'object' || action.done === null || !isNonEmptyString(action.done.doneAt))
+      (typeof action.done !== 'object' ||
+        action.done === null ||
+        !isNonEmptyString(action.done.doneAt))
     ) {
       throw new TypeError(`${pointer}.done.doneAt must be present when status is done`);
     }

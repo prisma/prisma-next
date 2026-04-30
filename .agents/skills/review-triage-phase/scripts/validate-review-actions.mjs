@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { assertReviewActionsV1, REVIEW_ACTIONS_VERSION } from './review-artifacts.mjs';
 
@@ -81,16 +81,15 @@ async function main() {
   process.stdout.write(`ok: ${args.inPath}\n`);
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {

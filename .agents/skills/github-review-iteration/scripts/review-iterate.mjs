@@ -37,7 +37,11 @@ function parsePrUrl(url) {
     .trim()
     .match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)(?:\/)?(?:#.*)?$/i);
   if (!match) return null;
-  return { owner: match[1], repo: match[2].replace(/\.git$/i, ''), number: Number.parseInt(match[3], 10) };
+  return {
+    owner: match[1],
+    repo: match[2].replace(/\.git$/i, ''),
+    number: Number.parseInt(match[3], 10),
+  };
 }
 
 function deriveReviewDirectoryName(prUrl) {
@@ -118,7 +122,8 @@ async function main() {
   process.stdout.write(`${reviewDir}\n`);
 }
 
-const isMain = Boolean(process.argv[1]) && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
+const isMain =
+  Boolean(process.argv[1]) && pathToFileURL(resolve(process.argv[1])).href === import.meta.url;
 if (isMain) {
   main().catch((error) => {
     const code = typeof error?.code === 'number' ? error.code : EXIT_OPERATIONAL;

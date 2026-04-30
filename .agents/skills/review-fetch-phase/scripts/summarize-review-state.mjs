@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { realpathSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertReviewStateV1, formatCanonicalJson } from './review-artifacts.mjs';
@@ -75,10 +73,16 @@ function parseCliArgs(argv) {
   }
   if (result.outPath !== null && result.outPath !== '-') {
     if (result.format === 'json' && !result.outPath.endsWith('.json')) {
-      throw { code: EXIT_CLI, message: 'error: --out file path must end with .json for --format json' };
+      throw {
+        code: EXIT_CLI,
+        message: 'error: --out file path must end with .json for --format json',
+      };
     }
     if (result.format === 'text' && !result.outPath.endsWith('.txt')) {
-      throw { code: EXIT_CLI, message: 'error: --out file path must end with .txt for --format text' };
+      throw {
+        code: EXIT_CLI,
+        message: 'error: --out file path must end with .txt for --format text',
+      };
     }
   }
 
@@ -183,7 +187,10 @@ function safeRealpath(path) {
 
 const invokedScriptPath = process.argv[1] ? safeRealpath(resolve(process.argv[1])) : null;
 const currentModulePath = safeRealpath(fileURLToPath(import.meta.url));
-const isMain = invokedScriptPath !== null && currentModulePath !== null && invokedScriptPath === currentModulePath;
+const isMain =
+  invokedScriptPath !== null &&
+  currentModulePath !== null &&
+  invokedScriptPath === currentModulePath;
 
 if (isMain) {
   main().catch((error) => {

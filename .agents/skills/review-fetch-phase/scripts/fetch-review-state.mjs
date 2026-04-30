@@ -3,16 +3,14 @@
 import { spawnSync } from 'node:child_process';
 import { realpathSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-
+import { renderReviewStateMarkdown as renderReviewStateMarkdownImpl } from './render-review-state.mjs';
 import {
   assertReviewStateV1,
   formatCanonicalJson,
   normalizeReviewStateV1,
 } from './review-artifacts.mjs';
-import { renderReviewStateMarkdown as renderReviewStateMarkdownImpl } from './render-review-state.mjs';
 
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
@@ -325,9 +323,16 @@ function fetchGraphQL(query, variables) {
     const parsed = JSON.parse(result.stdout);
     if (Array.isArray(parsed?.errors) && parsed.errors.length > 0) {
       const messages = parsed.errors
-        .map((err) => (typeof err?.message === 'string' && err.message.length > 0 ? err.message : JSON.stringify(err)))
+        .map((err) =>
+          typeof err?.message === 'string' && err.message.length > 0
+            ? err.message
+            : JSON.stringify(err),
+        )
         .join('; ');
-      return { code: EXIT_OPERATIONAL, error: `error: GitHub GraphQL returned errors: ${messages}` };
+      return {
+        code: EXIT_OPERATIONAL,
+        error: `error: GitHub GraphQL returned errors: ${messages}`,
+      };
     }
     return { data: parsed };
   } catch {
@@ -362,7 +367,10 @@ function paginateThreadComments(threadId, cursor) {
   }
   const connection = response.data?.data?.node?.comments;
   if (!connection) {
-    return { code: EXIT_OPERATIONAL, error: 'error: thread comments connection missing in GraphQL response' };
+    return {
+      code: EXIT_OPERATIONAL,
+      error: 'error: thread comments connection missing in GraphQL response',
+    };
   }
   return { connection };
 }
@@ -373,7 +381,14 @@ function paginateAll(owner, repo, number) {
   let threadCursor = null;
 
   for (;;) {
-    const page = paginateConnection(owner, repo, number, THREADS_QUERY, 'threadsCursor', threadCursor);
+    const page = paginateConnection(
+      owner,
+      repo,
+      number,
+      THREADS_QUERY,
+      'threadsCursor',
+      threadCursor,
+    );
     if (page.error) {
       return page;
     }
@@ -394,7 +409,10 @@ function paginateAll(owner, repo, number) {
         return next;
       }
       thread.comments.nodes = (thread.comments.nodes ?? []).concat(next.connection.nodes ?? []);
-      thread.comments.pageInfo = next.connection.pageInfo ?? { hasNextPage: false, endCursor: null };
+      thread.comments.pageInfo = next.connection.pageInfo ?? {
+        hasNextPage: false,
+        endCursor: null,
+      };
       commentCursor = thread.comments.pageInfo.endCursor;
     }
   }
@@ -402,7 +420,14 @@ function paginateAll(owner, repo, number) {
   let reviews = [];
   let reviewCursor = null;
   for (;;) {
-    const page = paginateConnection(owner, repo, number, REVIEWS_QUERY, 'reviewsCursor', reviewCursor);
+    const page = paginateConnection(
+      owner,
+      repo,
+      number,
+      REVIEWS_QUERY,
+      'reviewsCursor',
+      reviewCursor,
+    );
     if (page.error) {
       return page;
     }
@@ -417,7 +442,14 @@ function paginateAll(owner, repo, number) {
   let issueComments = [];
   let commentsCursor = null;
   for (;;) {
-    const page = paginateConnection(owner, repo, number, COMMENTS_QUERY, 'commentsCursor', commentsCursor);
+    const page = paginateConnection(
+      owner,
+      repo,
+      number,
+      COMMENTS_QUERY,
+      'commentsCursor',
+      commentsCursor,
+    );
     if (page.error) {
       return page;
     }
@@ -481,7 +513,9 @@ async function main() {
   if (!prUrl) {
     sourceBranch = getCurrentBranch();
     if (!sourceBranch || sourceBranch === 'HEAD') {
-      process.stderr.write('error: cannot discover PR when in detached HEAD state; pass --pr <url>\n');
+      process.stderr.write(
+        'error: cannot discover PR when in detached HEAD state; pass --pr <url>\n',
+      );
       process.exit(EXIT_OPERATIONAL);
     }
     const discovered = discoverPrUrl(sourceBranch);
@@ -540,16 +574,15 @@ async function main() {
   process.exit(EXIT_SUCCESS);
 }
 
-const isMain =
-  (function computeIsMain() {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (function computeIsMain() {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {
@@ -559,9 +592,4 @@ if (isMain) {
   });
 }
 
-export {
-  deriveOutJsonPath,
-  parseCliArgs,
-  parsePrUrl,
-  renderReviewStateMarkdown,
-};
+export { deriveOutJsonPath, parseCliArgs, parsePrUrl, renderReviewStateMarkdown };

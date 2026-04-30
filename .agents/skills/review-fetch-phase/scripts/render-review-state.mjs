@@ -1,10 +1,8 @@
 #!/usr/bin/env node
 
 import { realpathSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { assertReviewStateV1 } from './review-artifacts.mjs';
@@ -142,7 +140,10 @@ export function renderReviewStateMarkdown(payload, { sourcePath }) {
         thread.isOutdated ? 'yes' : 'no',
         escapeTableCell(thread.comments.length),
         escapeTableCell(summarizeBody(primaryComment?.body ?? '')),
-      ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'),
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |'),
     );
   }
   lines.push('');
@@ -160,7 +161,10 @@ export function renderReviewStateMarkdown(payload, { sourcePath }) {
         escapeTableCell(review.submittedAt),
         escapeTableCell(review.url),
         escapeTableCell(summarizeBody(review.body)),
-      ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'),
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |'),
     );
   }
   lines.push('');
@@ -177,7 +181,10 @@ export function renderReviewStateMarkdown(payload, { sourcePath }) {
         escapeTableCell(comment.createdAt),
         escapeTableCell(comment.url),
         escapeTableCell(summarizeBody(comment.body)),
-      ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'),
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |'),
     );
   }
   return `${lines.join('\n')}\n`;
@@ -219,7 +226,10 @@ function safeRealpath(path) {
 
 const invokedScriptPath = process.argv[1] ? safeRealpath(resolve(process.argv[1])) : null;
 const currentModulePath = safeRealpath(fileURLToPath(import.meta.url));
-const isMain = invokedScriptPath !== null && currentModulePath !== null && invokedScriptPath === currentModulePath;
+const isMain =
+  invokedScriptPath !== null &&
+  currentModulePath !== null &&
+  invokedScriptPath === currentModulePath;
 
 if (isMain) {
   main().catch((error) => {

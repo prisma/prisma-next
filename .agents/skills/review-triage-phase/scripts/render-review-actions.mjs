@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
-import { readFile } from 'node:fs/promises';
-import { mkdir, writeFile } from 'node:fs/promises';
 import { realpathSync } from 'node:fs';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -134,7 +133,9 @@ export function renderReviewActionsMarkdown(payload, { sourcePath }) {
       : 'Only items triaged as **WILL ADDRESS** are listed below.',
   );
   lines.push('');
-  lines.push('| Action ID | Decision | Target | Link | Action | Target files | Acceptance check | Status |');
+  lines.push(
+    '| Action ID | Decision | Target | Link | Action | Target files | Acceptance check | Status |',
+  );
   lines.push('| --- | --- | --- | --- | --- | --- | --- | --- |');
 
   for (const action of includedActions) {
@@ -157,7 +158,10 @@ export function renderReviewActionsMarkdown(payload, { sourcePath }) {
         targetFiles,
         escapeTableCell(acceptance || ''),
         escapeTableCell(status),
-      ].join(' | ').replace(/^/, '| ').replace(/$/, ' |'),
+      ]
+        .join(' | ')
+        .replace(/^/, '| ')
+        .replace(/$/, ' |'),
     );
   }
 
@@ -194,16 +198,15 @@ async function main() {
   await writeOutput(args.outPath, markdown);
 }
 
-const isMain =
-  (() => {
-    try {
-      const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
-      const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
-      return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
-    } catch {
-      return false;
-    }
-  })();
+const isMain = (() => {
+  try {
+    const invokedScriptPath = process.argv[1] ? realpathSync(resolve(process.argv[1])) : null;
+    const currentModulePath = realpathSync(fileURLToPath(import.meta.url));
+    return invokedScriptPath !== null && invokedScriptPath === currentModulePath;
+  } catch {
+    return false;
+  }
+})();
 
 if (isMain) {
   main().catch((error) => {
