@@ -1,17 +1,10 @@
 /**
  * Unit tests for `MigrationCLI.run` (the migration-file CLI entrypoint).
  *
- * **Tests-first**: this file asserts the post-clipanion contract for
- * `MigrationCLI.run`. The implementation lands in plan m4
- * (`projects/migration-cli-arg-parser/plan.md` § Commit 4); until then
- * `MigrationCLI.run` is a stub that throws, so most cases below will
- * fail at runtime. That's the audit trail of contract → implementation
- * the project's tests-first sequencing requires.
- *
  * Test-doubles approach: `BufferStream` collects output written via
  * `write`/`end`; `argv` is injected explicitly. No `process.argv` /
  * `process.stdout` / `process.stderr` mutation, no `vi.spyOn` on
- * process globals — the new public surface accepts an injectable
+ * process globals — the public surface accepts an injectable
  * `{ argv, stdout, stderr }` so tests can capture in-process.
  */
 

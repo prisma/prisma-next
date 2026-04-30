@@ -37,10 +37,9 @@
  * stays a pure abstract class.
  *
  * Parser library: clipanion (chosen over Commander/citty/`node:util.parseArgs`
- * for its in-process testability and runtime-agnostic execution surface).
- * See `projects/migration-cli-arg-parser/spec.md` and
- * `projects/migration-cli-arg-parser/research/commander-friction-points.md`
- * (TML-2318) for rationale.
+ * for its in-process testability and runtime-agnostic execution surface; see
+ * `docs/architecture docs/research/commander-friction-points.md` for the
+ * evaluation rubric and the durable rationale that drove the choice).
  */
 
 import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
@@ -183,9 +182,8 @@ export class MigrationCLI {
    * - 0 — success, or `--help`, or imported-not-entrypoint no-op.
    * - 1 — runtime/orchestration error (config not found, target
    *   mismatch, etc.).
-   * - 2 — usage error (unknown flag, malformed `--config`).
-   *
-   * See `projects/migration-cli-arg-parser/spec.md` § Behaviour changes.
+   * - 2 — usage error (unknown flag, malformed `--config`). Aligns
+   *   with `docs/CLI Style Guide.md` § Exit Codes.
    */
   static async run(
     importMetaUrl: string,
