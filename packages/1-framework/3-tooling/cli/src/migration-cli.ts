@@ -199,17 +199,24 @@ export class MigrationCLI {
 
 /**
  * Read a previously-scaffolded `migration.json` from disk, returning
- * `null` when the file is missing or unparseable. The CLI feeds this into
- * `buildMigrationArtifacts` so the pure builder can preserve fields owned
- * by `migration plan` (contract bookends, hints, labels, `createdAt`)
- * across re-emits.
+ * `null` when the file is missing and throwing `MIGRATION.INVALID_JSON`
+ * when the file is present but cannot be parsed as JSON. The CLI feeds
+ * this into `buildMigrationArtifacts` so the pure builder can preserve
+ * fields owned by `migration plan` (contract bookends, hints, labels,
+ * `createdAt`) across re-emits.
  *
- * Author-time path: this loader is non-verifying by design. Hash mismatch
- * is the *expected* outcome of a re-author (the developer's source
- * changes invalidate the prior hash by construction), and verification
- * here would block legitimate regenerations. Apply-time consumers always
- * route through the verifying `readMigrationPackage` in
- * `@prisma-next/migration-tools/io` instead.
+ * Author-time path: this loader still does not verify the manifest hash
+ * or schema — that is the apply-time loader's job. Hash mismatch is the
+ * *expected* outcome of a re-author (the developer's source changes
+ * invalidate the prior hash by construction), and verification here
+ * would block legitimate regenerations. Syntactic JSON-parse failure,
+ * however, is now surfaced rather than swallowed: a malformed
+ * `migration.json` indicates either a hand-edit gone wrong or partial
+ * write, and silently rebuilding from `describe()` would discard the
+ * user's on-disk content (preserved bookends, hints, labels,
+ * `createdAt`) without any indication something was wrong on disk.
+ * Apply-time consumers always route through the verifying
+ * `readMigrationPackage` in `@prisma-next/migration-tools/io` instead.
  */
 function readExistingMetadata(metadataPath: string): Partial<MigrationMetadata> | null {
   let raw: string;
