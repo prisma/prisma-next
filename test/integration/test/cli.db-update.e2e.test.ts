@@ -160,12 +160,20 @@ withTempDir(({ createTempDir }) => {
               targetId: expect.any(String),
               destination: { storageHash: expect.any(String) },
               operations: expect.any(Array),
-              sql: expect.any(Array),
+              preview: { statements: expect.any(Array) },
             },
           });
 
-          const sqlPreview = (payload as { plan?: { sql?: unknown[] } }).plan?.sql ?? [];
-          expect(sqlPreview.length).toBeGreaterThan(0);
+          const previewStatements =
+            (
+              payload as {
+                plan?: {
+                  preview?: { statements?: ReadonlyArray<{ language: string; text: string }> };
+                };
+              }
+            ).plan?.preview?.statements ?? [];
+          const sqlStatements = previewStatements.filter((s) => s.language === 'sql');
+          expect(sqlStatements.length).toBeGreaterThan(0);
         });
       },
       timeouts.spinUpPpgDev,

@@ -325,6 +325,336 @@ describe('printPslFromAst', () => {
     expect(text).toContain('enum StatusB');
   });
 
+  it('renders @@map on enum', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [
+        {
+          kind: 'enum',
+          name: 'Status',
+          values: [{ kind: 'enumValue', name: 'Ok', span: span(0) }],
+          attributes: [
+            attr('enum', 'map', [{ kind: 'positional', value: '"db_status"', span: span(1) }], 2),
+          ],
+          span: span(0),
+        },
+      ],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toContain('enum Status');
+    expect(out).toContain('@@map("db_status")');
+  });
+
+  it('normalises enum members with non-identifier characters and reserved words', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [
+        {
+          kind: 'enum',
+          name: 'Mixed',
+          values: [
+            { kind: 'enumValue', name: 'in-progress', span: span(0) },
+            { kind: 'enumValue', name: '123leading', span: span(1) },
+            { kind: 'enumValue', name: 'enum', span: span(2) },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toContain('inProgress');
+    expect(out).toContain('_123leading');
+    expect(out).toContain('_enum');
+  });
+
+  it('appends a numeric suffix to duplicate normalised enum member names', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [
+        {
+          kind: 'enum',
+          name: 'Dupes',
+          values: [
+            { kind: 'enumValue', name: 'foo bar', span: span(0) },
+            { kind: 'enumValue', name: 'foo-bar', span: span(1) },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toMatch(/fooBar\b/);
+    expect(out).toMatch(/fooBar2\b/);
+  });
+
+  it('renders optional and list type modifiers, plus @map on field', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [
+        {
+          kind: 'model',
+          name: 'Doc',
+          fields: [
+            {
+              kind: 'field',
+              name: 'id',
+              typeName: 'Int',
+              optional: false,
+              list: false,
+              attributes: [attr('field', 'id', [], 0)],
+              span: span(0),
+            },
+            {
+              kind: 'field',
+              name: 'nickname',
+              typeName: 'String',
+              optional: true,
+              list: false,
+              attributes: [
+                attr(
+                  'field',
+                  'map',
+                  [{ kind: 'positional', value: '"nick_name"', span: span(1) }],
+                  2,
+                ),
+              ],
+              span: span(0),
+            },
+            {
+              kind: 'field',
+              name: 'tags',
+              typeName: 'String',
+              optional: false,
+              list: true,
+              attributes: [],
+              span: span(0),
+            },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      enums: [],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toMatch(/nickname String\?\s+@map\("nick_name"\)/);
+    expect(out).toMatch(/tags\s+String\[\]/);
+  });
+
+  it('renders model with both fields and model-level attributes (separator blank line)', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [
+        {
+          kind: 'model',
+          name: 'WithAttrs',
+          fields: [
+            {
+              kind: 'field',
+              name: 'id',
+              typeName: 'Int',
+              optional: false,
+              list: false,
+              attributes: [attr('field', 'id', [], 0)],
+              span: span(0),
+            },
+          ],
+          attributes: [
+            attr('model', 'index', [{ kind: 'positional', value: '[id]', span: span(1) }], 2),
+          ],
+          span: span(0),
+        },
+      ],
+      enums: [],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toContain('  id Int @id');
+    expect(out).toContain('  @@index([id])');
+    expect(out).toMatch(/ {2}id Int @id\n\n {2}@@index/);
+  });
+
+  it('renders model with leading comment and per-field comment', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [
+        {
+          kind: 'model',
+          name: 'Audit',
+          fields: [
+            {
+              kind: 'field',
+              name: 'id',
+              typeName: 'Int',
+              optional: false,
+              list: false,
+              attributes: [attr('field', 'id', [], 0)],
+              span: span(0),
+            },
+          ],
+          attributes: [],
+          span: span(0),
+          comment: '// WARNING: legacy table',
+        },
+      ],
+      enums: [],
+      compositeTypes: [],
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toContain('// WARNING: legacy table');
+    expect(out).toMatch(/\/\/ WARNING: legacy table\nmodel Audit \{/);
+  });
+
+  it('renders types block with attributes on a named type', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [],
+      compositeTypes: [],
+      types: {
+        kind: 'types',
+        declarations: [
+          {
+            kind: 'namedType',
+            name: 'Email',
+            baseType: 'String',
+            attributes: [
+              attr(
+                'namedType',
+                'check',
+                [{ kind: 'positional', value: '"len > 0"', span: span(0) }],
+                1,
+              ),
+            ],
+            span: span(0),
+          },
+        ],
+        span: span(0),
+      },
+      span: span(0),
+    };
+    const out = printPslFromAst(ast);
+    expect(out).toContain('Email = String @check("len > 0")');
+  });
+
+  it('renders field type with a typeConstructor (e.g. Money(2))', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [
+        {
+          kind: 'model',
+          name: 'Account',
+          fields: [
+            {
+              kind: 'field',
+              name: 'balance',
+              typeName: 'Decimal',
+              typeConstructor: {
+                kind: 'typeConstructor',
+                path: ['Money'],
+                args: [{ kind: 'positional', value: '2', span: span(0) }],
+                span: span(0),
+              },
+              optional: false,
+              list: false,
+              attributes: [],
+              span: span(0),
+            },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      enums: [],
+      compositeTypes: [],
+      span: span(0),
+    };
+    expect(printPslFromAst(ast)).toContain('balance Money(2)');
+  });
+
+  it('renders typeConstructor with no arguments (just a path)', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [],
+      compositeTypes: [],
+      types: {
+        kind: 'types',
+        declarations: [
+          {
+            kind: 'namedType',
+            name: 'Plain',
+            typeConstructor: {
+              kind: 'typeConstructor',
+              path: ['Json'],
+              args: [],
+              span: span(0),
+            },
+            attributes: [],
+            span: span(0),
+          },
+        ],
+        span: span(0),
+      },
+      span: span(0),
+    };
+    expect(printPslFromAst(ast)).toContain('Plain = Json');
+  });
+
+  it('does not treat empty type-name strings as relations during topological sort', () => {
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [
+        {
+          kind: 'model',
+          name: 'Edge',
+          fields: [
+            {
+              kind: 'field',
+              name: 'phantom',
+              typeName: '',
+              optional: false,
+              list: false,
+              attributes: [],
+              span: span(0),
+            },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      enums: [],
+      compositeTypes: [],
+      span: span(0),
+    };
+    expect(() => printPslFromAst(ast)).not.toThrow();
+  });
+
   it('parser → printer → parser round-trip for a small schema', () => {
     const source = `// This file was introspected from the database. Do not edit manually.
 
