@@ -1128,6 +1128,44 @@ describe('ControlClient progress emission', () => {
     });
   });
 
+  describe('toOperationPreview()', () => {
+    it('delegates to family instance when capability is implemented', () => {
+      const fakePreview = {
+        statements: [{ text: 'CREATE TABLE x (id int)', language: 'sql' }],
+      };
+      const { mockFamily, mockTarget, mockAdapter, mockFamilyInstance } = createMockComponents();
+      (
+        mockFamilyInstance as unknown as {
+          toOperationPreview: (ops: readonly unknown[]) => unknown;
+        }
+      )['toOperationPreview'] = (ops: readonly unknown[]) => {
+        void ops;
+        return fakePreview;
+      };
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      const result = client.toOperationPreview([]);
+      expect(result).toBe(fakePreview);
+    });
+
+    it('returns undefined when family does not implement the capability', () => {
+      const { mockFamily, mockTarget, mockAdapter } = createMockComponents();
+
+      const client = createControlClient({
+        family: mockFamily,
+        target: mockTarget,
+        adapter: mockAdapter,
+      });
+
+      expect(client.toOperationPreview([])).toBeUndefined();
+    });
+  });
+
   describe('no onProgress callback', () => {
     it('does not throw when onProgress is omitted from verify', async () => {
       const { mockFamily, mockTarget, mockAdapter, mockDriverDescriptor } = createMockComponents();
