@@ -108,23 +108,6 @@ export function isDirectEntrypoint(importMetaUrl: string): boolean {
   }
 }
 
-export function printMigrationHelp(): void {
-  printHelp();
-}
-
-function printHelp(): void {
-  process.stdout.write(
-    [
-      'Usage: node <migration-file> [options]',
-      '',
-      'Options:',
-      '  --dry-run  Print operations to stdout without writing files',
-      '  --help     Show this help message',
-      '',
-    ].join('\n'),
-  );
-}
-
 /**
  * In-memory artifacts produced from a `Migration` instance: the
  * serialized `ops.json` body, the `migration.json` metadata object, and
