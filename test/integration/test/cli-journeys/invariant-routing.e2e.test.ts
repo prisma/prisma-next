@@ -697,4 +697,156 @@ MigrationCLI.run(import.meta.url, M);
       timeouts.spinUpPpgDev,
     );
   });
+
+  describe('Journey T: status --ref reports INVARIANTS_PENDING when marker is at target hash but missing required invariants', () => {
+    const db = useDevDatabase();
+
+    const NORMALIZED_EMAIL = 'normalized@example.com';
+    const SELF_EDGE_INVARIANT = 'normalize-user-email';
+
+    // The pinned behavior: when the marker matches the structural target
+    // (`pendingCount === 0`) but is missing required invariants the active
+    // ref declares, status must NOT say "up to date". A self-edge migration
+    // exists in the graph that provides the invariant, so the routing path
+    // is satisfiable — but `apply --ref` hasn't been run since marker.invariants
+    // got out of sync (modeled here by an out-of-band UPDATE).
+    //
+    // Mirrors Journey R's manual-marker-UPDATE pattern.
+    it(
+      'manually clear marker.invariants → status --ref surfaces MIGRATION.INVARIANTS_PENDING and summary names the missing id',
+      async () => {
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
+
+        expect((await runContractEmit(ctx)).exitCode, 'T.01: emit C1').toBe(0);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
+        expect(plan0.exitCode, 'T.01: plan init').toBe(0);
+        const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
+        expect((await runMigrationApply(ctx)).exitCode, 'T.01: apply init').toBe(0);
+
+        await sql(
+          db.connectionString,
+          `INSERT INTO "public"."user" (id, email) VALUES (1, 'Alice@Example.COM')`,
+        );
+
+        // T.02: author a self-edge migration providing the invariant.
+        const newResult = await runMigrationNew(ctx, [
+          '--name',
+          'lowercase-emails',
+          '--from',
+          c1Hash,
+        ]);
+        expect(newResult.exitCode, 'T.02: migration new --from <c1>').toBe(0);
+        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationDir = join(
+          migrationsDir,
+          readdirSync(migrationsDir)
+            .filter((d) => d.includes('lowercase_emails'))
+            .sort()
+            .at(-1)!,
+        );
+
+        const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import endContract from './end-contract.json' with { type: 'json' };
+
+const db = sql({
+  context: createExecutionContext({
+    contract: endContract,
+    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+  }),
+});
+
+export default class M extends Migration {
+  override describe() {
+    return { from: ${JSON.stringify(c1Hash)}, to: ${JSON.stringify(c1Hash)} };
+  }
+
+  override get operations() {
+    return [
+      this.dataTransform(endContract, '${SELF_EDGE_INVARIANT}', {
+        invariantId: '${SELF_EDGE_INVARIANT}',
+        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+      }),
+    ];
+  }
+}
+
+MigrationCLI.run(import.meta.url, M);
+`;
+        writeFileSync(join(migrationDir, 'migration.ts'), handAuthored);
+        expect(
+          (await runMigrationEmit(ctx, ['--dir', migrationDir])).exitCode,
+          'T.02: emit self-edge',
+        ).toBe(0);
+
+        // T.03: ref points at c1 and requires the self-edge's invariant. Apply
+        // populates marker.invariants with the id.
+        writeRefFile(ctx, 'prod', c1Hash, [SELF_EDGE_INVARIANT]);
+        expect(
+          (await runMigrationApply(ctx, ['--ref', 'prod'])).exitCode,
+          'T.03: apply --ref prod',
+        ).toBe(0);
+        const markerAfterApply = await sql(
+          db.connectionString,
+          `SELECT invariants FROM "prisma_contract"."marker" WHERE id = 1`,
+        );
+        expect(
+          markerAfterApply.rows[0]?.['invariants'],
+          'T.03: marker.invariants populated by apply',
+        ).toEqual([SELF_EDGE_INVARIANT]);
+
+        // T.04: out-of-band marker.invariants reset. core_hash stays at c1Hash
+        // (the structural target), so pendingCount === 0. effectiveRequired now
+        // is non-empty — this is the case the bug fix surfaces.
+        await sql(
+          db.connectionString,
+          `UPDATE "prisma_contract"."marker" SET invariants = '{}' WHERE id = 1`,
+        );
+        const markerAfterReset = await sql(
+          db.connectionString,
+          `SELECT core_hash, invariants FROM "prisma_contract"."marker" WHERE id = 1`,
+        );
+        expect(markerAfterReset.rows[0]?.['core_hash'], 'T.04: marker still at c1').toBe(c1Hash);
+        expect(markerAfterReset.rows[0]?.['invariants'], 'T.04: marker.invariants cleared').toEqual(
+          [],
+        );
+
+        // T.05: status --ref must report INVARIANTS_PENDING, NOT UP_TO_DATE.
+        const statusResult = await runMigrationStatus(ctx, ['--ref', 'prod', '--json']);
+        expect(statusResult.exitCode, 'T.05: status exits 0').toBe(0);
+        const envelope = parseJsonOutput<{
+          mode: string;
+          summary: string;
+          diagnostics: readonly { code: string; severity: string; message: string }[];
+          requiredInvariants: readonly string[];
+          appliedInvariants?: readonly string[];
+          missingInvariants?: readonly string[];
+        }>(statusResult);
+        expect(envelope.mode, 'T.05: online mode').toBe('online');
+        expect(envelope.requiredInvariants, 'T.05: requiredInvariants').toEqual([
+          SELF_EDGE_INVARIANT,
+        ]);
+        expect(envelope.appliedInvariants, 'T.05: appliedInvariants empty after reset').toEqual([]);
+        expect(envelope.missingInvariants, 'T.05: missingInvariants').toEqual([
+          SELF_EDGE_INVARIANT,
+        ]);
+        expect(envelope.summary, 'T.05: summary names the missing invariant').toMatch(
+          /missing invariant\(s\): normalize-user-email/i,
+        );
+        const codes = envelope.diagnostics.map((d) => d.code);
+        expect(codes, 'T.05: no spurious UP_TO_DATE').not.toContain('MIGRATION.UP_TO_DATE');
+        expect(codes, 'T.05: INVARIANTS_PENDING surfaced').toContain(
+          'MIGRATION.INVARIANTS_PENDING',
+        );
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
 });
