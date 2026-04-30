@@ -14,7 +14,7 @@
  */
 
 import type { CodecTypes } from '../types/codec-types';
-import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonEmitCodec } from './arktype-json-codec';
 
 const arktypeJsonPackMetaBase = {
   kind: 'extension',
@@ -25,10 +25,13 @@ const arktypeJsonPackMetaBase = {
   capabilities: {},
   types: {
     codecTypes: {
-      // Phase B: parameterized descriptor is the single source of truth
-      // for codec-id-keyed metadata; the legacy `codecInstances` array
-      // stays empty.
-      codecInstances: [] as const,
+      // The emitter's `CodecLookup` is the codec-id-keyed source of
+      // truth for `renderOutputType` at the framework emit-path
+      // boundary. We thread an emit-only `Codec` instance carrying the
+      // `renderOutputType` here so the lookup resolves; runtime
+      // materialization goes through the unified descriptor's
+      // `factory: (P) => (Ctx) => Codec`, never through this shim.
+      codecInstances: [arktypeJsonEmitCodec],
       import: {
         package: '@prisma-next/extension-arktype-json/codec-types',
         named: 'CodecTypes',

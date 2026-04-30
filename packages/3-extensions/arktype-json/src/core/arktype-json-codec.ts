@@ -242,6 +242,55 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
 }
 
 /**
+ * Build a permissive `renderOutputType` that accepts the framework's
+ * generic typeParams shape and dispatches to the type-narrow renderer
+ * once the input is structurally an `ArktypeJsonTypeParams`.
+ */
+function renderArktypeJsonOutputTypeFromUnknownParams(
+  typeParams: Record<string, unknown>,
+): string | undefined {
+  const expression = typeParams['expression'];
+  const jsonIr = typeParams['jsonIr'];
+  if (typeof expression !== 'string' || jsonIr === null || typeof jsonIr !== 'object') {
+    return undefined;
+  }
+  return renderArktypeJsonOutputType({ expression, jsonIr });
+}
+
+/**
+ * Emit-only `Codec` instance for `arktype/json@1`. Threaded through the
+ * pack-meta's `codecInstances` array so the emitter's `CodecLookup` can
+ * find a `renderOutputType` for the codec id (the emitter consults the
+ * codec-id-keyed `CodecLookup` at the framework boundary; the unified
+ * descriptor's `renderOutputType` is the long-term home for the renderer
+ * but the emit-path glue still routes through `CodecLookup`).
+ *
+ * Encode/decode here are sentinels that throw if invoked — runtime
+ * materialization always goes through `arktypeJsonCodec.factory`'s
+ * curried `(params) => (ctx) => Codec`, never through this instance. A
+ * future cleanup could route the emit path through the descriptor map
+ * directly and retire this shim.
+ */
+const ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR =
+  'arktype-json codec instances must be materialized via the descriptor factory; this is an emit-only stub';
+
+export const arktypeJsonEmitCodec: Codec<
+  typeof ARKTYPE_JSON_CODEC_ID,
+  readonly ['equality'],
+  string,
+  unknown
+> = {
+  id: ARKTYPE_JSON_CODEC_ID,
+  targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
+  traits: ['equality'] as const,
+  encode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
+  decode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
+  encodeJson: (value) => value as never,
+  decodeJson: (json) => json as unknown,
+  renderOutputType: renderArktypeJsonOutputTypeFromUnknownParams,
+};
+
+/**
  * Framework-registration descriptor for the arktype-json codec. Registered
  * through the SQL runtime's `parameterizedCodecs:` slot. `sql-runtime`'s
  * `initializeTypeHelpers` (and per-column walk in
