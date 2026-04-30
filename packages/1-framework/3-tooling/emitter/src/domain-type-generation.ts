@@ -225,19 +225,40 @@ function applyModifiers(base: string, field: ContractField): string {
   return result;
 }
 
+/**
+ * Per-family resolver for typeParams that don't live inline on the
+ * framework-domain `ContractField`. SQL columns authored via a named
+ * `storage.types` entry carry their `typeRef` on the storage column
+ * (family-specific) rather than on the framework's domain field; the
+ * per-family emitter walks `storage.types[ref].typeParams` here so the
+ * framework emit path can render the parameterized output type.
+ *
+ * Returns `undefined` when the field has no resolvable typeParams (i.e.
+ * the column isn't parameterized, isn't a `typeRef`, or the family
+ * doesn't support named storage types).
+ */
+export type FieldTypeParamsResolver = (
+  modelName: string,
+  fieldName: string,
+) => Record<string, unknown> | undefined;
+
 export function resolveFieldType(
   field: ContractField,
   codecLookup?: CodecLookup,
+  resolvedTypeParams?: Record<string, unknown>,
 ): ResolvedFieldType {
   const { type } = field;
 
   switch (type.kind) {
     case 'scalar': {
       let outputResolved: string | undefined;
-      if (codecLookup && type.typeParams && Object.keys(type.typeParams).length > 0) {
+      const inlineTypeParams =
+        type.typeParams && Object.keys(type.typeParams).length > 0 ? type.typeParams : undefined;
+      const effectiveTypeParams = inlineTypeParams ?? resolvedTypeParams;
+      if (codecLookup && effectiveTypeParams && Object.keys(effectiveTypeParams).length > 0) {
         const codec = codecLookup.get(type.codecId);
         if (codec?.renderOutputType) {
-          const rendered = codec.renderOutputType(type.typeParams);
+          const rendered = codec.renderOutputType(effectiveTypeParams);
           if (rendered && isSafeTypeExpression(rendered)) {
             outputResolved = rendered;
           }
@@ -289,6 +310,7 @@ export function generateFieldResolvedType(
 export function generateBothFieldTypesMaps(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): ResolvedFieldType {
   if (!models || Object.keys(models).length === 0) {
     return { output: 'Record<string, never>', input: 'Record<string, never>' };
@@ -301,7 +323,14 @@ export function generateBothFieldTypesMaps(
     const outputFieldEntries: string[] = [];
     const inputFieldEntries: string[] = [];
     for (const [fieldName, field] of Object.entries(model.fields)) {
-      const resolved = resolveFieldType(field, codecLookup);
+      const inlineTypeParams =
+        field.type.kind === 'scalar' &&
+        field.type.typeParams &&
+        Object.keys(field.type.typeParams).length > 0
+          ? field.type.typeParams
+          : undefined;
+      const resolvedTypeParams = inlineTypeParams ?? resolveFieldTypeParams?.(modelName, fieldName);
+      const resolved = resolveFieldType(field, codecLookup, resolvedTypeParams);
       const key = `readonly ${serializeObjectKey(fieldName)}`;
       outputFieldEntries.push(`${key}: ${resolved.output}`);
       inputFieldEntries.push(`${key}: ${resolved.input}`);
@@ -328,15 +357,17 @@ export function generateBothFieldTypesMaps(
 export function generateFieldOutputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup).output;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).output;
 }
 
 export function generateFieldInputTypesMap(
   models: Record<string, ContractModel> | undefined,
   codecLookup?: CodecLookup,
+  resolveFieldTypeParams?: FieldTypeParamsResolver,
 ): string {
-  return generateBothFieldTypesMaps(models, codecLookup).input;
+  return generateBothFieldTypesMaps(models, codecLookup, resolveFieldTypeParams).input;
 }
 
 export function generateValueObjectType(

@@ -68,9 +68,18 @@ export function generateContractDts(
       ? `\n  readonly execution: ${serializeExecutionType(contract.execution)};`
       : '';
 
+  const resolveFieldTypeParams = emitter.resolveFieldTypeParams
+    ? (modelName: string, fieldName: string) => {
+        const model = (contract.models as Record<string, ContractModel> | undefined)?.[modelName];
+        if (!model) return undefined;
+        return emitter.resolveFieldTypeParams?.(modelName, fieldName, model, contract);
+      }
+    : undefined;
+
   const fieldTypesMaps = generateBothFieldTypesMaps(
     contract.models as Record<string, ContractModel> | undefined,
     codecLookup,
+    resolveFieldTypeParams,
   );
 
   const contractWrapper = emitter.getContractWrapper('ContractBase', 'TypeMaps');
