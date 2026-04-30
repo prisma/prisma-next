@@ -162,6 +162,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
         idempotencyChecks: true,
       },
       frameworkComponents,
+      invariants: migration.invariants ?? [],
     });
 
     if (!runnerResult.ok) {

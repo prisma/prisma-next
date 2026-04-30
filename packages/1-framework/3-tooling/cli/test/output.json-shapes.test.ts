@@ -39,8 +39,16 @@ describe('MigrationApplyResult JSON shape', () => {
         toHash: 'sha256:b',
         alternativeCount: 0,
         tieBreakReasons: [],
+        requiredInvariants: [],
+        satisfiedInvariants: [],
         selectedPath: [
-          { dirName: 'm1', migrationHash: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+          {
+            dirName: 'm1',
+            migrationHash: 'sha256:mid',
+            from: 'sha256:a',
+            to: 'sha256:b',
+            invariants: [],
+          },
         ],
       },
       timings: { total: 42 },
@@ -61,6 +69,8 @@ describe('MigrationApplyResult JSON shape', () => {
       [
         "alternativeCount",
         "fromHash",
+        "requiredInvariants",
+        "satisfiedInvariants",
         "selectedPath",
         "tieBreakReasons",
         "toHash",
@@ -73,6 +83,7 @@ describe('MigrationApplyResult JSON shape', () => {
       migrationHash: 'sha256:mid',
       from: 'sha256:a',
       to: 'sha256:b',
+      invariants: [],
     });
   });
 
@@ -90,8 +101,16 @@ describe('MigrationApplyResult JSON shape', () => {
         alternativeCount: 1,
         tieBreakReasons: ['at sha256:a: 2 candidates, selected by tie-break'],
         refName: 'production',
+        requiredInvariants: ['backfill-user-phone'],
+        satisfiedInvariants: ['backfill-user-phone'],
         selectedPath: [
-          { dirName: 'm1', migrationHash: 'sha256:mid', from: 'sha256:a', to: 'sha256:b' },
+          {
+            dirName: 'm1',
+            migrationHash: 'sha256:mid',
+            from: 'sha256:a',
+            to: 'sha256:b',
+            invariants: ['backfill-user-phone'],
+          },
         ],
       },
       timings: { total: 10 },
@@ -101,12 +120,15 @@ describe('MigrationApplyResult JSON shape', () => {
       migrationHash: 'sha256:mid',
       from: 'sha256:a',
       to: 'sha256:b',
+      invariants: ['backfill-user-phone'],
     });
     expect(Object.keys(result.pathDecision!).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
         "fromHash",
         "refName",
+        "requiredInvariants",
+        "satisfiedInvariants",
         "selectedPath",
         "tieBreakReasons",
         "toHash",
@@ -154,6 +176,8 @@ describe('MigrationStatusResult JSON shape', () => {
         alternativeCount: 0,
         tieBreakReasons: [],
         refName: 'production',
+        requiredInvariants: [],
+        satisfiedInvariants: [],
         selectedPath: [],
       },
       summary: 'At ref "production" target',

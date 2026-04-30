@@ -45,6 +45,35 @@ function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
   return specs.map(([from, to, dirName]) => pkg(from!, to!, dirName!));
 }
 
+interface PkgWithInvariantsOpts {
+  readonly invariants?: readonly string[];
+  readonly labels?: readonly string[];
+}
+
+function pkgWithInvariants(
+  from: string,
+  to: string,
+  dirName: string,
+  opts: PkgWithInvariantsOpts = {},
+): MigrationPackage {
+  const uniqueCreatedAt = `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
+  const metadata = createTestMetadata({
+    from,
+    to,
+    createdAt: uniqueCreatedAt,
+    labels: opts.labels ?? [],
+    providedInvariants: opts.invariants ?? [],
+  });
+  const ops = createTestOps();
+  const migrationHash = computeMigrationHash(metadata, ops);
+  return {
+    dirName,
+    dirPath: `/migrations/${dirName}`,
+    metadata: { ...metadata, migrationHash },
+    ops,
+  };
+}
+
 const E = EMPTY_CONTRACT_HASH;
 
 describe('reconstructGraph', () => {
@@ -384,35 +413,38 @@ describe('findPathWithDecision', () => {
   it('returns no-op decision when from === to', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H1');
-    expect(decision).not.toBeNull();
-    expect(decision!.selectedPath).toEqual([]);
-    expect(decision!.fromHash).toBe('H1');
-    expect(decision!.toHash).toBe('H1');
-    expect(decision!.alternativeCount).toBe(0);
-    expect(decision!.tieBreakReasons).toEqual([]);
+    const result = findPathWithDecision(graph, 'H1', 'H1');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath).toEqual([]);
+    expect(result.decision.fromHash).toBe('H1');
+    expect(result.decision.toHash).toBe('H1');
+    expect(result.decision.alternativeCount).toBe(0);
+    expect(result.decision.tieBreakReasons).toEqual([]);
   });
 
-  it('returns null when no path exists', () => {
+  it('returns unreachable when no structural path exists', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
-    expect(findPathWithDecision(graph, 'H1', 'H99')).toBeNull();
+    expect(findPathWithDecision(graph, 'H1', 'H99')).toEqual({ kind: 'unreachable' });
   });
 
   it('includes ref metadata when provided', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H2', 'production');
-    expect(decision).not.toBeNull();
-    expect(decision!.refName).toBe('production');
+    const result = findPathWithDecision(graph, 'H1', 'H2', 'production');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.refName).toBe('production');
   });
 
   it('omits ref metadata when not provided', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H2');
-    expect(decision).not.toBeNull();
-    expect(decision!.refName).toBeUndefined();
+    const result = findPathWithDecision(graph, 'H1', 'H2');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.refName).toBeUndefined();
   });
 
   it('reports alternative count for converging paths', () => {
@@ -423,10 +455,11 @@ describe('findPathWithDecision', () => {
       pkg('H1', 'H3', 'm_shortcut'),
     ];
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H3');
-    expect(decision).not.toBeNull();
-    expect(decision!.selectedPath).toHaveLength(1);
-    expect(decision!.alternativeCount).toBeGreaterThan(0);
+    const result = findPathWithDecision(graph, 'H1', 'H3');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath).toHaveLength(1);
+    expect(result.decision.alternativeCount).toBeGreaterThan(0);
   });
 
   it('does not count dead-end outgoing edges as alternatives', () => {
@@ -439,21 +472,25 @@ describe('findPathWithDecision', () => {
       pkg('H1', 'H_dead', 'm_deadend'),
     ];
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, 'H1', 'H3');
-    expect(decision).not.toBeNull();
-    expect(decision!.alternativeCount).toBe(0);
+    const result = findPathWithDecision(graph, 'H1', 'H3');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.alternativeCount).toBe(0);
   });
 
   it('output shape matches expected keys', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, E, 'H2', 'staging');
-    expect(decision).not.toBeNull();
-    expect(Object.keys(decision!).sort()).toMatchInlineSnapshot(`
+    const result = findPathWithDecision(graph, E, 'H2', 'staging');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(Object.keys(result.decision).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
         "fromHash",
         "refName",
+        "requiredInvariants",
+        "satisfiedInvariants",
         "selectedPath",
         "tieBreakReasons",
         "toHash",
@@ -464,16 +501,144 @@ describe('findPathWithDecision', () => {
   it('output shape without ref matches expected keys', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
-    const decision = findPathWithDecision(graph, E, 'H1');
-    expect(decision).not.toBeNull();
-    expect(Object.keys(decision!).sort()).toMatchInlineSnapshot(`
+    const result = findPathWithDecision(graph, E, 'H1');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(Object.keys(result.decision).sort()).toMatchInlineSnapshot(`
       [
         "alternativeCount",
         "fromHash",
+        "requiredInvariants",
+        "satisfiedInvariants",
         "selectedPath",
         "tieBreakReasons",
         "toHash",
       ]
     `);
+  });
+
+  it('requiredInvariants and satisfiedInvariants default to empty arrays when no required set is passed', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, E, 'H1');
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.requiredInvariants).toEqual([]);
+    expect(result.decision.satisfiedInvariants).toEqual([]);
+  });
+
+  it('requiredInvariants reflects the caller-supplied set, sorted', () => {
+    const packages = [pkgWithInvariants(E, 'H1', 'm1', { invariants: ['Y', 'X'] })];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, E, 'H1', undefined, new Set(['Y', 'X']));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.requiredInvariants).toEqual(['X', 'Y']);
+  });
+
+  it('satisfiedInvariants equals requiredInvariants on an ok outcome (every required id is covered by selectedPath)', () => {
+    const packages = [
+      pkgWithInvariants(E, 'A', 'm1', { invariants: ['X'] }),
+      pkgWithInvariants('A', 'B', 'm2', { invariants: ['Y'] }),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, E, 'B', undefined, new Set(['X', 'Y']));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.satisfiedInvariants).toEqual(['X', 'Y']);
+    expect(result.decision.requiredInvariants).toEqual(['X', 'Y']);
+  });
+
+  it('satisfiedInvariants ignores edge invariants not in the required set (intersection semantics)', () => {
+    const packages = [
+      pkgWithInvariants(E, 'A', 'm1', { invariants: ['X', 'noise'] }),
+      pkgWithInvariants('A', 'B', 'm2'),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, E, 'B', undefined, new Set(['X']));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.satisfiedInvariants).toEqual(['X']);
+  });
+
+  it('routes through edges that cover the required invariant when an alternative does not', () => {
+    // Diamond: A → B → D (no invariants) and A → C → D (C→D provides X).
+    // With X required, the C→D path must be chosen.
+    const packages = [
+      pkgWithInvariants(E, 'A', 'm0'),
+      pkgWithInvariants('A', 'B', 'm_left'),
+      pkgWithInvariants('A', 'C', 'm_right'),
+      pkgWithInvariants('B', 'D', 'm_left_close'),
+      pkgWithInvariants('C', 'D', 'm_right_close', { invariants: ['X'] }),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'A', 'D', undefined, new Set(['X']));
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual([
+      'm_right',
+      'm_right_close',
+    ]);
+    expect(result.decision.satisfiedInvariants).toEqual(['X']);
+  });
+
+  it('returns unsatisfiable with structuralPath when required cannot be covered on any reachable path', () => {
+    // X is declared on an edge that is not on any path from H1 to H3.
+    const packages = [
+      pkgWithInvariants(E, 'H1', 'm1'),
+      pkgWithInvariants('H1', 'H3', 'm_shortcut'),
+      pkgWithInvariants('H1', 'H_off', 'm_offpath', { invariants: ['X'] }),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'H1', 'H3', undefined, new Set(['X']));
+    expect(result.kind).toBe('unsatisfiable');
+    if (result.kind !== 'unsatisfiable') return;
+    expect(result.structuralPath.map((e) => e.dirName)).toEqual(['m_shortcut']);
+    expect(result.missing).toEqual(['X']);
+  });
+
+  it('unsatisfiable.missing accounts for partial coverage on the structural path', () => {
+    // Required {X, Y}. Structural path provides X via m1 but no edge on the
+    // path to H3 covers Y. missing should be ['Y'], not ['X', 'Y'].
+    const packages = [
+      pkgWithInvariants(E, 'H1', 'm1', { invariants: ['X'] }),
+      pkgWithInvariants('H1', 'H3', 'm_shortcut'),
+      pkgWithInvariants('H1', 'H_off', 'm_offpath', { invariants: ['Y'] }),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, E, 'H3', undefined, new Set(['X', 'Y']));
+    expect(result.kind).toBe('unsatisfiable');
+    if (result.kind !== 'unsatisfiable') return;
+    expect(result.missing).toEqual(['Y']);
+  });
+
+  it('returns unreachable when from → to is structurally unreachable, regardless of required', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    expect(findPathWithDecision(graph, 'H1', 'H99', undefined, new Set(['X']))).toEqual({
+      kind: 'unreachable',
+    });
+  });
+
+  it('returns unsatisfiable on a no-op transition (from === to) when required is non-empty', () => {
+    const packages = chain([E, 'H1', 'm1']);
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'H1', 'H1', undefined, new Set(['X']));
+    expect(result.kind).toBe('unsatisfiable');
+    if (result.kind !== 'unsatisfiable') return;
+    expect(result.structuralPath).toEqual([]);
+  });
+
+  it('preserves existing routing outcome when required is empty (F8)', () => {
+    const packages = [pkgWithInvariants(E, 'H1', 'm1'), pkgWithInvariants('H1', 'H2', 'm2')];
+    const graph = reconstructGraph(packages);
+    const withEmpty = findPathWithDecision(graph, E, 'H2', undefined, new Set());
+    const withoutRequired = findPathWithDecision(graph, E, 'H2');
+    expect(withEmpty.kind).toBe('ok');
+    expect(withoutRequired.kind).toBe('ok');
+    if (withEmpty.kind !== 'ok' || withoutRequired.kind !== 'ok') return;
+    expect(withEmpty.decision.selectedPath.map((e) => e.dirName)).toEqual(
+      withoutRequired.decision.selectedPath.map((e) => e.dirName),
+    );
   });
 });

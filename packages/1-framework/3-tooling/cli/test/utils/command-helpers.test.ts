@@ -1,9 +1,11 @@
 import { resolve } from 'node:path';
+import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { describe, expect, it } from 'vitest';
 import {
   maskConnectionUrl,
   resolveContractPath,
   sanitizeErrorMessage,
+  toPathDecisionResult,
 } from '../../src/utils/command-helpers';
 
 describe('maskConnectionUrl', () => {
@@ -103,5 +105,91 @@ describe('sanitizeErrorMessage', () => {
 
     expect(sanitized).not.toContain('password=secret');
     expect(sanitized).not.toContain('user=admin');
+  });
+});
+
+describe('toPathDecisionResult', () => {
+  function decision(overrides: Partial<PathDecision> = {}): PathDecision {
+    return {
+      fromHash: 'sha256:from',
+      toHash: 'sha256:to',
+      alternativeCount: 0,
+      tieBreakReasons: [],
+      requiredInvariants: [],
+      satisfiedInvariants: [],
+      selectedPath: [],
+      ...overrides,
+    };
+  }
+
+  it('passes through requiredInvariants and satisfiedInvariants', () => {
+    const result = toPathDecisionResult(
+      decision({
+        requiredInvariants: ['X', 'Y'],
+        satisfiedInvariants: ['X'],
+      }),
+    );
+    expect(result.requiredInvariants).toEqual(['X', 'Y']);
+    expect(result.satisfiedInvariants).toEqual(['X']);
+  });
+
+  it('defaults requiredInvariants and satisfiedInvariants to empty arrays', () => {
+    const result = toPathDecisionResult(decision());
+    expect(result.requiredInvariants).toEqual([]);
+    expect(result.satisfiedInvariants).toEqual([]);
+  });
+
+  it('emits per-edge invariants on each selectedPath entry', () => {
+    const result = toPathDecisionResult(
+      decision({
+        selectedPath: [
+          {
+            from: 'A',
+            to: 'B',
+            migrationHash: 'mh:1',
+            dirName: 'm1',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            labels: [],
+            invariants: ['X', 'Y'],
+          },
+          {
+            from: 'B',
+            to: 'C',
+            migrationHash: 'mh:2',
+            dirName: 'm2',
+            createdAt: '2026-01-02T00:00:00.000Z',
+            labels: [],
+            invariants: [],
+          },
+        ],
+      }),
+    );
+    expect(result.selectedPath.map((e) => e.invariants)).toEqual([['X', 'Y'], []]);
+  });
+
+  it('omits createdAt and labels from per-edge entries (slim view)', () => {
+    const result = toPathDecisionResult(
+      decision({
+        selectedPath: [
+          {
+            from: 'A',
+            to: 'B',
+            migrationHash: 'mh:1',
+            dirName: 'm1',
+            createdAt: '2026-01-01T00:00:00.000Z',
+            labels: ['main'],
+            invariants: [],
+          },
+        ],
+      }),
+    );
+    const entry = result.selectedPath[0]!;
+    expect(Object.keys(entry).sort()).toEqual([
+      'dirName',
+      'from',
+      'invariants',
+      'migrationHash',
+      'to',
+    ]);
   });
 });

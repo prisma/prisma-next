@@ -1,7 +1,12 @@
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import {
+  errorNoInvariantPath,
+  errorUnknownInvariant,
+  MigrationToolsError,
+} from '@prisma-next/migration-tools/errors';
 import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
@@ -21,6 +26,7 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  collectDeclaredInvariants,
   loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
@@ -61,11 +67,14 @@ export interface MigrationApplyResult {
     readonly alternativeCount: number;
     readonly tieBreakReasons: readonly string[];
     readonly refName?: string;
+    readonly requiredInvariants: readonly string[];
+    readonly satisfiedInvariants: readonly string[];
     readonly selectedPath: readonly {
       readonly dirName: string;
       readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
+      readonly invariants: readonly string[];
     }[];
   };
   readonly timings: {
@@ -88,6 +97,7 @@ function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
     to: pkg.metadata.to,
     toContract: pkg.metadata.toContract,
     operations: pkg.ops,
+    invariants: pkg.metadata.providedInvariants,
   };
 }
 
@@ -131,12 +141,14 @@ async function executeMigrationApplyCommand(
 
   let destinationHash: string;
   let refName: string | undefined;
+  let refEntry: RefEntry | undefined;
 
   if (options.ref) {
     refName = options.ref;
     try {
       const refs = await readRefs(refsDir);
-      destinationHash = resolveRef(refs, refName).hash;
+      refEntry = resolveRef(refs, refName);
+      destinationHash = refEntry.hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -190,6 +202,24 @@ async function executeMigrationApplyCommand(
       return notOk(mapMigrationToolsError(error));
     }
     throw error;
+  }
+
+  // F15 — UNKNOWN_INVARIANT pre-check before any DB activity. Refs that name
+  // an id no migration declares fail loudly and consistently across commands.
+  if (refEntry && refEntry.invariants.length > 0) {
+    const declared = collectDeclaredInvariants(migrations.graph);
+    const unknown = refEntry.invariants.filter((id) => !declared.has(id));
+    if (unknown.length > 0) {
+      return notOk(
+        mapMigrationToolsError(
+          errorUnknownInvariant({
+            ...(refName !== undefined ? { refName } : {}),
+            unknown,
+            declared: [...declared].sort(),
+          }),
+        ),
+      );
+    }
   }
 
   const client = createControlClient({
@@ -278,8 +308,39 @@ async function executeMigrationApplyCommand(
     // "No marker" means the database is fresh — start from the empty contract hash.
     const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
 
-    const decision = findPathWithDecision(migrations.graph, originHash, destinationHash, refName);
-    if (!decision) {
+    // F13 — subtract invariants the marker has already accumulated so re-applies
+    // don't re-require already-covered invariants.
+    const appliedInvariants = new Set(marker?.invariants ?? []);
+    const effectiveRequired = new Set(
+      (refEntry?.invariants ?? []).filter((id) => !appliedInvariants.has(id)),
+    );
+
+    const outcome = findPathWithDecision(
+      migrations.graph,
+      originHash,
+      destinationHash,
+      refName,
+      effectiveRequired,
+    );
+    if (outcome.kind === 'unsatisfiable') {
+      return notOk(
+        mapMigrationToolsError(
+          errorNoInvariantPath({
+            ...(refName !== undefined ? { refName } : {}),
+            required: [...effectiveRequired].sort(),
+            missing: outcome.missing,
+            structuralPath: outcome.structuralPath.map((edge) => ({
+              dirName: edge.dirName,
+              migrationHash: edge.migrationHash,
+              from: edge.from,
+              to: edge.to,
+              invariants: edge.invariants,
+            })),
+          }),
+        ),
+      );
+    }
+    if (outcome.kind === 'unreachable') {
       return notOk(
         errorRuntime('No migration path from current state to target', {
           why: `Cannot find a path from "${originHash}" to target "${destinationHash}"`,
@@ -288,6 +349,7 @@ async function executeMigrationApplyCommand(
         }),
       );
     }
+    const decision = outcome.decision;
 
     const pendingPath = decision.selectedPath;
     const pathDecision = toPathDecisionResult(decision);

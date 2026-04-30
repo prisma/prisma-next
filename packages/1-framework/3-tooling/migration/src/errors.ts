@@ -295,6 +295,63 @@ export function errorProvidedInvariantsMismatch(
   );
 }
 
+export interface NoInvariantPathStructuralEdge {
+  readonly dirName: string;
+  readonly migrationHash: string;
+  readonly from: string;
+  readonly to: string;
+  readonly invariants: readonly string[];
+}
+
+export function errorNoInvariantPath(args: {
+  readonly refName?: string;
+  readonly required: readonly string[];
+  readonly missing: readonly string[];
+  readonly structuralPath: readonly NoInvariantPathStructuralEdge[];
+}): MigrationToolsError {
+  const { refName, required, missing, structuralPath } = args;
+  const refClause = refName ? `Ref "${refName}"` : 'Target';
+  const missingList = missing.map((id) => JSON.stringify(id)).join(', ');
+  const requiredList = required.map((id) => JSON.stringify(id)).join(', ');
+  return new MigrationToolsError(
+    'MIGRATION.NO_INVARIANT_PATH',
+    'No path covers the required invariants',
+    {
+      why: `${refClause} requires invariants the reachable path doesn't cover. required=[${requiredList}], missing=[${missingList}].`,
+      fix: 'Add a migration on the path that runs `dataTransform({ invariantId: "<id>", … })` for each missing invariant, or retarget the ref to a hash whose path already provides them.',
+      details: {
+        required,
+        missing,
+        structuralPath,
+        ...(refName !== undefined ? { refName } : {}),
+      },
+    },
+  );
+}
+
+export function errorUnknownInvariant(args: {
+  readonly refName?: string;
+  readonly unknown: readonly string[];
+  readonly declared: readonly string[];
+}): MigrationToolsError {
+  const { refName, unknown, declared } = args;
+  const refClause = refName ? `Ref "${refName}" declares` : 'Declares';
+  const unknownList = unknown.map((id) => JSON.stringify(id)).join(', ');
+  return new MigrationToolsError(
+    'MIGRATION.UNKNOWN_INVARIANT',
+    'Ref declares invariants no migration in the graph provides',
+    {
+      why: `${refClause} invariants no migration in the graph provides. unknown=[${unknownList}].`,
+      fix: 'Either the ref has a typo, or the declaring migration has not been authored/attested yet. Re-check the ref file and the migrations directory.',
+      details: {
+        unknown,
+        declared,
+        ...(refName !== undefined ? { refName } : {}),
+      },
+    },
+  );
+}
+
 export function errorMigrationHashMismatch(
   dir: string,
   storedHash: string,

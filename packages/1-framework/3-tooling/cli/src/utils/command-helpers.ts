@@ -110,12 +110,31 @@ export interface PathDecisionResult {
   readonly alternativeCount: number;
   readonly tieBreakReasons: readonly string[];
   readonly refName?: string;
+  readonly requiredInvariants: readonly string[];
+  readonly satisfiedInvariants: readonly string[];
   readonly selectedPath: readonly {
     readonly dirName: string;
     readonly migrationHash: string;
     readonly from: string;
     readonly to: string;
+    readonly invariants: readonly string[];
   }[];
+}
+
+/**
+ * Collect every `invariantId` declared by an edge in the graph. Used by
+ * apply/status to run the F15 UNKNOWN_INVARIANT pre-check before routing.
+ */
+export function collectDeclaredInvariants(graph: MigrationGraph): ReadonlySet<string> {
+  const declared = new Set<string>();
+  for (const edges of graph.forwardChain.values()) {
+    for (const edge of edges) {
+      for (const inv of edge.invariants) {
+        declared.add(inv);
+      }
+    }
+  }
+  return declared;
 }
 
 /**
@@ -127,12 +146,15 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
     toHash: decision.toHash,
     alternativeCount: decision.alternativeCount,
     tieBreakReasons: decision.tieBreakReasons,
+    requiredInvariants: decision.requiredInvariants,
+    satisfiedInvariants: decision.satisfiedInvariants,
     ...ifDefined('refName', decision.refName),
     selectedPath: decision.selectedPath.map((entry) => ({
       dirName: entry.dirName,
       migrationHash: entry.migrationHash,
       from: entry.from,
       to: entry.to,
+      invariants: entry.invariants,
     })),
   };
 }

@@ -1,6 +1,10 @@
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
-import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
+import {
+  errorNoInvariantPath,
+  errorUnknownInvariant,
+  MigrationToolsError,
+} from '@prisma-next/migration-tools/errors';
 import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import {
   findPath,
@@ -8,7 +12,7 @@ import {
   findReachableLeaves,
 } from '@prisma-next/migration-tools/migration-graph';
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
-import type { Refs } from '@prisma-next/migration-tools/refs';
+import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
@@ -25,6 +29,7 @@ import {
 } from '../utils/cli-errors';
 import {
   addGlobalOptions,
+  collectDeclaredInvariants,
   loadMigrationPackages,
   maskConnectionUrl,
   readContractEnvelope,
@@ -80,17 +85,26 @@ export interface MigrationStatusResult {
   readonly targetHash: string;
   readonly contractHash: string;
   readonly refs?: readonly StatusRef[];
+  /** Required invariants, sorted ascending. Present only when --ref is used and the ref declares any. */
+  readonly requiredInvariants?: readonly string[];
+  /** Invariants the marker has applied at least once, intersected with required for display relevance. */
+  readonly appliedInvariants?: readonly string[];
+  /** required − applied. Empty when the marker has covered every required invariant. */
+  readonly missingInvariants?: readonly string[];
   readonly pathDecision?: {
     readonly fromHash: string;
     readonly toHash: string;
     readonly alternativeCount: number;
     readonly tieBreakReasons: readonly string[];
     readonly refName?: string;
+    readonly requiredInvariants: readonly string[];
+    readonly satisfiedInvariants: readonly string[];
     readonly selectedPath: readonly {
       readonly dirName: string;
       readonly migrationHash: string;
       readonly from: string;
       readonly to: string;
+      readonly invariants: readonly string[];
     }[];
   };
   readonly summary: string;
@@ -357,6 +371,7 @@ async function executeMigrationStatusCommand(
 
   let activeRefName: string | undefined;
   let activeRefHash: string | undefined;
+  let activeRefEntry: RefEntry | undefined;
   let allRefs: Refs = {};
   try {
     allRefs = await readRefs(refsDir);
@@ -370,7 +385,8 @@ async function executeMigrationStatusCommand(
   if (options.ref) {
     activeRefName = options.ref;
     try {
-      activeRefHash = resolveRef(allRefs, activeRefName).hash;
+      activeRefEntry = resolveRef(allRefs, activeRefName);
+      activeRefHash = activeRefEntry.hash;
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -395,6 +411,12 @@ async function executeMigrationStatusCommand(
     }
     if (activeRefName) {
       details.push({ label: 'ref', value: activeRefName });
+    }
+    if (activeRefEntry && activeRefEntry.invariants.length > 0) {
+      details.push({
+        label: 'required',
+        value: formatInvariantList(activeRefEntry.invariants),
+      });
     }
     const header = formatStyledHeader({
       command: 'migration status',
@@ -432,6 +454,24 @@ async function executeMigrationStatusCommand(
         why: `Failed to read migrations directory: ${error instanceof Error ? error.message : String(error)}`,
       }),
     );
+  }
+
+  // F15 — UNKNOWN_INVARIANT pre-check. Same severity as `migration apply`:
+  // a misconfigured ref fails fast across both commands.
+  if (activeRefEntry && activeRefEntry.invariants.length > 0) {
+    const declared = collectDeclaredInvariants(graph);
+    const unknown = activeRefEntry.invariants.filter((id) => !declared.has(id));
+    if (unknown.length > 0) {
+      return notOk(
+        mapMigrationToolsError(
+          errorUnknownInvariant({
+            ...(activeRefName !== undefined ? { refName: activeRefName } : {}),
+            unknown,
+            declared: [...declared].sort(),
+          }),
+        ),
+      );
+    }
   }
 
   if (bundles.length === 0) {
@@ -480,6 +520,7 @@ async function executeMigrationStatusCommand(
   }
 
   let markerHash: string | undefined;
+  let markerInvariants: readonly string[] = [];
   let mode: 'online' | 'offline' = 'offline';
 
   if (dbConnection && hasDriver) {
@@ -492,7 +533,9 @@ async function executeMigrationStatusCommand(
     });
     try {
       await client.connect(dbConnection);
-      markerHash = (await client.readMarker())?.storageHash;
+      const marker = await client.readMarker();
+      markerHash = marker?.storageHash;
+      markerInvariants = marker?.invariants ?? [];
       mode = 'online';
     } catch {
       if (!flags.json && !flags.quiet) {
@@ -655,12 +698,54 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  // Compute the three invariant sets when --ref is in play and the ref
+  // declares any. Display vocabulary is "applied" (F14): the marker tracks
+  // applied-at-least-once, not currently-true-of-data.
+  const refInvariants = activeRefEntry?.invariants ?? [];
+  const requiredInvariants = refInvariants.length > 0 ? [...refInvariants].sort() : undefined;
+  let appliedInvariants: readonly string[] | undefined;
+  let missingInvariants: readonly string[] | undefined;
+  let effectiveRequired = new Set<string>();
+  if (requiredInvariants !== undefined) {
+    const requiredSet = new Set(requiredInvariants);
+    appliedInvariants = markerInvariants.filter((id) => requiredSet.has(id)).sort();
+    const appliedSet = new Set(appliedInvariants);
+    missingInvariants = requiredInvariants.filter((id) => !appliedSet.has(id));
+    effectiveRequired = new Set(missingInvariants);
+  }
+
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online' && markerHash !== undefined) {
-    const decision = findPathWithDecision(graph, markerHash, targetHash, activeRefName);
-    if (decision) {
-      pathDecision = toPathDecisionResult(decision);
+    const outcome = findPathWithDecision(
+      graph,
+      markerHash,
+      targetHash,
+      activeRefName,
+      effectiveRequired,
+    );
+    if (outcome.kind === 'ok') {
+      pathDecision = toPathDecisionResult(outcome.decision);
+    } else if (outcome.kind === 'unsatisfiable') {
+      return notOk(
+        mapMigrationToolsError(
+          errorNoInvariantPath({
+            ...(activeRefName !== undefined ? { refName: activeRefName } : {}),
+            required: [...effectiveRequired].sort(),
+            missing: outcome.missing,
+            structuralPath: outcome.structuralPath.map((edge) => ({
+              dirName: edge.dirName,
+              migrationHash: edge.migrationHash,
+              from: edge.from,
+              to: edge.to,
+              invariants: edge.invariants,
+            })),
+          }),
+        ),
+      );
     }
+    // outcome.kind === 'unreachable' — leave pathDecision undefined; the
+    // existing display chain logic (resolveDisplayChain + diagnostics)
+    // already surfaces unreachable-marker / divergence cases.
   }
 
   const result: MigrationStatusResult = {
@@ -672,6 +757,9 @@ async function executeMigrationStatusCommand(
     summary,
     diagnostics,
     ...ifDefined('markerHash', markerHash),
+    ...ifDefined('requiredInvariants', requiredInvariants),
+    ...ifDefined('appliedInvariants', appliedInvariants),
+    ...ifDefined('missingInvariants', missingInvariants),
     ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
     ...ifDefined('pathDecision', pathDecision),
     graph,
@@ -798,6 +886,14 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
     lines.push(result.summary);
   }
 
+  // D12 mode annotation: applied / missing are derivable from the marker; surface
+  // them alongside the existing summary when --ref is in play. `required` is on
+  // the header (visible pre-DB).
+  if (result.requiredInvariants && result.requiredInvariants.length > 0) {
+    lines.push(`${c(dim, 'applied  ')}${formatInvariantList(result.appliedInvariants ?? [])}`);
+    lines.push(`${c(dim, 'missing  ')}${formatInvariantList(result.missingInvariants ?? [])}`);
+  }
+
   const warnings = result.diagnostics?.filter((d) => d.severity === 'warn') ?? [];
   for (const diag of warnings) {
     lines.push(`${c(yellow, '⚠')} ${diag.message}`);
@@ -807,6 +903,10 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   }
 
   return lines.join('\n');
+}
+
+function formatInvariantList(ids: readonly string[]): string {
+  return ids.length === 0 ? '(none)' : ids.join(', ');
 }
 
 function summarizeRefDistance(

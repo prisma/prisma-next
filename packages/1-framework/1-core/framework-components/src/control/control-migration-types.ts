@@ -370,6 +370,12 @@ export interface MigrationRunner<
     readonly frameworkComponents: ReadonlyArray<
       TargetBoundComponentDescriptor<TFamilyId, TTargetId>
     >;
+    /**
+     * Invariant ids contributed by this apply (the migration's `providedInvariants`).
+     * The runner unions these into the marker's `invariants` set atomically
+     * with the marker write. Defaults to `[]` for marker-only flows.
+     */
+    readonly invariants?: readonly string[];
   }): Promise<MigrationRunnerResult>;
 }
 

@@ -263,31 +263,101 @@ export interface PathDecision {
   readonly alternativeCount: number;
   readonly tieBreakReasons: readonly string[];
   readonly refName?: string;
+  /** The caller-supplied required invariant set, sorted ascending. */
+  readonly requiredInvariants: readonly string[];
+  /**
+   * The subset of `requiredInvariants` actually covered by edges on
+   * `selectedPath`. Always a subset of `requiredInvariants` (when the path
+   * is satisfying, equal to it); always derived from `selectedPath`.
+   */
+  readonly satisfiedInvariants: readonly string[];
 }
 
 /**
+ * Outcome of {@link findPathWithDecision}. The pathfinder distinguishes
+ * three cases up front so callers don't re-derive structural reachability:
+ *
+ * - `ok` — a path covering `required` exists; `decision` carries the
+ *   selection metadata and per-edge invariants.
+ * - `unreachable` — `from`→`to` has no structural path. Mapped by callers
+ *   to the existing no-path / `NO_TARGET` diagnostic.
+ * - `unsatisfiable` — `from`→`to` is structurally reachable but no path
+ *   covers every required invariant. `structuralPath` is the
+ *   `findPath(graph, from, to)` result, included so callers don't have to
+ *   recompute it when raising `MIGRATION.NO_INVARIANT_PATH`. `missing` is
+ *   the subset of `required` that the structural path does *not* cover —
+ *   correctly accounts for partial coverage when some required invariants
+ *   are met by the fallback path. Only emitted when `required` is
+ *   non-empty.
+ */
+export type FindPathOutcome =
+  | { readonly kind: 'ok'; readonly decision: PathDecision }
+  | { readonly kind: 'unreachable' }
+  | {
+      readonly kind: 'unsatisfiable';
+      readonly structuralPath: readonly MigrationEdge[];
+      readonly missing: readonly string[];
+    };
+
+/**
  * Find the shortest path from `fromHash` to `toHash` and return structured
- * path-decision metadata for machine-readable output.
+ * path-decision metadata for machine-readable output. When `required` is
+ * non-empty, the returned path is the shortest one whose edges collectively
+ * cover every required invariant.
+ *
+ * The discriminated return type tells the caller *why* a path could not be
+ * found, so the CLI can pick the right structured error without re-running
+ * a structural BFS.
  */
 export function findPathWithDecision(
   graph: MigrationGraph,
   fromHash: string,
   toHash: string,
   refName?: string,
-): PathDecision | null {
+  required: ReadonlySet<string> = new Set(),
+): FindPathOutcome {
+  const requiredInvariants = [...required].sort();
+
   if (fromHash === toHash) {
+    if (required.size > 0) {
+      // Empty path covers no invariants; required is non-empty ⇒ unsatisfiable.
+      return { kind: 'unsatisfiable', structuralPath: [], missing: requiredInvariants };
+    }
     return {
-      selectedPath: [],
-      fromHash,
-      toHash,
-      alternativeCount: 0,
-      tieBreakReasons: [],
-      ...ifDefined('refName', refName),
+      kind: 'ok',
+      decision: {
+        selectedPath: [],
+        fromHash,
+        toHash,
+        alternativeCount: 0,
+        tieBreakReasons: [],
+        requiredInvariants,
+        satisfiedInvariants: [],
+        ...ifDefined('refName', refName),
+      },
     };
   }
 
-  const path = findPath(graph, fromHash, toHash);
-  if (!path) return null;
+  const path = findPathWithInvariants(graph, fromHash, toHash, required);
+  if (!path) {
+    if (required.size === 0) {
+      return { kind: 'unreachable' };
+    }
+    const structural = findPath(graph, fromHash, toHash);
+    if (structural === null) {
+      return { kind: 'unreachable' };
+    }
+    const coveredByStructural = new Set<string>();
+    for (const edge of structural) {
+      for (const inv of edge.invariants) {
+        if (required.has(inv)) coveredByStructural.add(inv);
+      }
+    }
+    const missing = requiredInvariants.filter((id) => !coveredByStructural.has(id));
+    return { kind: 'unsatisfiable', structuralPath: structural, missing };
+  }
+
+  const satisfiedInvariants = computeSatisfiedInvariants(required, path);
 
   // Single reverse BFS marks every node from which `toHash` is reachable.
   // Replaces a per-edge `findPath(e.to, toHash)` call inside the loop below,
@@ -316,13 +386,32 @@ export function findPathWithDecision(
   }
 
   return {
-    selectedPath: path,
-    fromHash,
-    toHash,
-    alternativeCount,
-    tieBreakReasons,
-    ...ifDefined('refName', refName),
+    kind: 'ok',
+    decision: {
+      selectedPath: path,
+      fromHash,
+      toHash,
+      alternativeCount,
+      tieBreakReasons,
+      requiredInvariants,
+      satisfiedInvariants,
+      ...ifDefined('refName', refName),
+    },
   };
+}
+
+function computeSatisfiedInvariants(
+  required: ReadonlySet<string>,
+  path: readonly MigrationEdge[],
+): readonly string[] {
+  if (required.size === 0) return [];
+  const covered = new Set<string>();
+  for (const edge of path) {
+    for (const inv of edge.invariants) {
+      if (required.has(inv)) covered.add(inv);
+    }
+  }
+  return [...covered].sort();
 }
 
 /**

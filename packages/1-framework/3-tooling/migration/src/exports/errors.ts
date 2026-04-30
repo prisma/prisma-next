@@ -1,1 +1,7 @@
-export { errorInvalidJson, MigrationToolsError } from '../errors';
+export {
+  errorInvalidJson,
+  errorNoInvariantPath,
+  errorUnknownInvariant,
+  MigrationToolsError,
+  type NoInvariantPathStructuralEdge,
+} from '../errors';
