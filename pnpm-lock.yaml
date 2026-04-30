@@ -664,6 +664,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../operations
+      '@prisma-next/psl-types':
+        specifier: workspace:*
+        version: link:../../0-foundation/psl-types
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -799,22 +802,13 @@ importers:
 
   packages/1-framework/2-authoring/psl-printer:
     dependencies:
-      '@prisma-next/contract':
-        specifier: workspace:*
-        version: link:../../0-foundation/contract
-      '@prisma-next/psl-parser':
-        specifier: workspace:*
-        version: link:../psl-parser
       '@prisma-next/psl-types':
         specifier: workspace:*
         version: link:../../0-foundation/psl-types
-      '@prisma-next/sql-schema-ir':
-        specifier: workspace:*
-        version: link:../../../2-sql/1-core/schema-ir
-      '@prisma-next/utils':
-        specifier: workspace:*
-        version: link:../../0-foundation/utils
     devDependencies:
+      '@prisma-next/psl-parser':
+        specifier: workspace:*
+        version: link:../psl-parser
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../../0-config/tsconfig
@@ -860,6 +854,9 @@ importers:
       '@prisma-next/psl-printer':
         specifier: workspace:*
         version: link:../../2-authoring/psl-printer
+      '@prisma-next/psl-types':
+        specifier: workspace:*
+        version: link:../../0-foundation/psl-types
       '@prisma-next/utils':
         specifier: workspace:*
         version: link:../../0-foundation/utils
@@ -2105,6 +2102,9 @@ importers:
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
+      '@prisma-next/psl-types':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/psl-types
       '@prisma-next/sql-contract':
         specifier: workspace:*
         version: link:../1-core/contract
@@ -2139,6 +2139,9 @@ importers:
       '@prisma-next/psl-parser':
         specifier: workspace:*
         version: link:../../1-framework/2-authoring/psl-parser
+      '@prisma-next/psl-printer':
+        specifier: workspace:*
+        version: link:../../1-framework/2-authoring/psl-printer
       '@prisma-next/sql-contract-psl':
         specifier: workspace:*
         version: link:../2-authoring/contract-psl
