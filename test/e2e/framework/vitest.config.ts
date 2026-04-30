@@ -8,8 +8,8 @@ export default defineConfig({
     include: ['test/**/*.test.ts', 'test/**/*.test-d.ts'],
     fileParallelism: false,
     maxConcurrency: 1,
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    testTimeout: timeouts.databaseOperation,
+    hookTimeout: timeouts.databaseOperation,
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
