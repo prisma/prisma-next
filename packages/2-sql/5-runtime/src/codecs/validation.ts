@@ -2,6 +2,7 @@ import type { Contract } from '@prisma-next/contract/types';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { CodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 
 export function extractCodecIds(contract: Contract<SqlStorage>): Set<string> {
   const codecIds = new Set<string>();
@@ -30,15 +31,33 @@ function extractCodecIdsFromColumns(contract: Contract<SqlStorage>): Map<string,
   return codecIds;
 }
 
+interface CodecLookupForValidation {
+  has(id: string): boolean;
+}
+
+function adaptDescriptorRegistry(registry: CodecDescriptorRegistry): CodecLookupForValidation {
+  return { has: (id: string) => registry.descriptorFor(id) !== undefined };
+}
+
+function isDescriptorRegistry(
+  registry: CodecRegistry | CodecDescriptorRegistry,
+): registry is CodecDescriptorRegistry {
+  return 'descriptorFor' in registry;
+}
+
 export function validateContractCodecMappings(
-  registry: CodecRegistry,
+  registry: CodecRegistry | CodecDescriptorRegistry,
   contract: Contract<SqlStorage>,
 ): void {
+  const lookup: CodecLookupForValidation = isDescriptorRegistry(registry)
+    ? adaptDescriptorRegistry(registry)
+    : registry;
+
   const codecIds = extractCodecIdsFromColumns(contract);
   const invalidCodecs: Array<{ table: string; column: string; codecId: string }> = [];
 
   for (const [key, codecId] of codecIds.entries()) {
-    if (!registry.has(codecId)) {
+    if (!lookup.has(codecId)) {
       const parts = key.split('.');
       const table = parts[0] ?? '';
       const column = parts[1] ?? '';
@@ -61,7 +80,7 @@ export function validateContractCodecMappings(
 }
 
 export function validateCodecRegistryCompleteness(
-  registry: CodecRegistry,
+  registry: CodecRegistry | CodecDescriptorRegistry,
   contract: Contract<SqlStorage>,
 ): void {
   validateContractCodecMappings(registry, contract);
