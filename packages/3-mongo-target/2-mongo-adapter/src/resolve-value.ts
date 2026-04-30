@@ -1,4 +1,9 @@
-import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import {
+  raceAgainstAbort,
+  runtimeAborted,
+  runtimeError,
+} from '@prisma-next/framework-components/runtime';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -16,17 +21,41 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
  * (mirroring SQL's `wrapEncodeFailure` shape) with `{ label, codec }` details
  * and the original error attached on `cause`. An already-wrapped envelope is
  * re-thrown verbatim so nested resolvers don't double-wrap.
+ *
+ * The optional `ctx?: CodecCallContext` is forwarded verbatim to every
+ * `codec.encode(value, ctx)` call. The same `ctx` reference is also passed
+ * to nested `resolveValue` invocations so codec authors observe **signal
+ * identity** across the entire recursive walk for one `runtime.execute()`.
+ *
+ * Abort observation (only when `ctx.signal` is provided):
+ *
+ * - **Already-aborted at entry** — every recursive call pre-checks
+ *   `ctx.signal.aborted` and short-circuits with
+ *   `RUNTIME.ABORTED { phase: 'encode' }` before any codec is invoked.
+ * - **Mid-flight abort** — each per-level `Promise.all` races against the
+ *   signal via `raceAgainstAbort`. The runtime returns
+ *   `RUNTIME.ABORTED { phase: 'encode' }` promptly even if codec bodies
+ *   ignore the signal; in-flight bodies run to completion in the background
+ *   (cooperative cancellation, see ADR 204).
+ * - `RUNTIME.ENCODE_FAILED` envelopes thrown by a codec body before the
+ *   runtime sees the abort pass through unchanged (AC-ERR4).
  */
 export async function resolveValue(
   value: MongoValue,
   codecs?: MongoCodecRegistry,
+  ctx?: CodecCallContext,
 ): Promise<unknown> {
+  const signal = ctx?.signal;
+  if (signal?.aborted) {
+    throw runtimeAborted('encode', signal.reason);
+  }
+
   if (value instanceof MongoParamRef) {
     if (value.codecId && codecs) {
       const codec = codecs.get(value.codecId);
       if (codec?.encode) {
         try {
-          return await codec.encode(value.value);
+          return await codec.encode(value.value, ctx);
         } catch (error) {
           wrapEncodeFailure(error, value, codec.id);
         }
@@ -41,10 +70,12 @@ export async function resolveValue(
     return value;
   }
   if (Array.isArray(value)) {
-    return Promise.all(value.map((v) => resolveValue(v, codecs)));
+    const tasks = Promise.all(value.map((v) => resolveValue(v, codecs, ctx)));
+    return signal ? raceAgainstAbort(tasks, signal, 'encode') : tasks;
   }
   const entries = Object.entries(value);
-  const resolved = await Promise.all(entries.map(([, val]) => resolveValue(val, codecs)));
+  const all = Promise.all(entries.map(([, val]) => resolveValue(val, codecs, ctx)));
+  const resolved = signal ? await raceAgainstAbort(all, signal, 'encode') : await all;
   const result: Record<string, unknown> = {};
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];
