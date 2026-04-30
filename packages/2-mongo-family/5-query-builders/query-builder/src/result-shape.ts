@@ -43,10 +43,10 @@ export function contractModelToMongoResultShape(
     fields[rel] = Object.freeze({ kind: 'unknown' as const });
   }
   const modelFields = model.fields;
-  const keys =
-    options?.selection !== undefined && options.selection.length > 0
-      ? options.selection
-      : Object.keys(modelFields);
+  // An explicit empty selection is honored as-is (returns a document shape
+  // with no fields). Only the absence of a selection falls back to the model's
+  // full field set.
+  const keys = options?.selection !== undefined ? options.selection : Object.keys(modelFields);
 
   for (const key of keys) {
     if (Object.hasOwn(fields, key)) {
