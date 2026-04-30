@@ -143,9 +143,9 @@ Mirror M2 for the Mongo encode dispatch. Demonstrable via Mongo runtime tests co
 - [ ] **T3.4** Update [`packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts) and [`packages/3-mongo-target/2-mongo-adapter/src/lowering.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/lowering.ts):
   - `MongoAdapter.lower(plan, ctx?: CodecCallContext)` accepts and forwards `ctx` to its internal `resolveValue` calls.
 - [ ] **T3.5** Update [`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts):
-  - `MongoRuntime.execute(plan, options?)` accepts the options bag.
-  - `lower(plan, ctx?)` accepts and forwards `ctx` to `adapter.lower`.
-  - Pre-check `signal.aborted` at entry; throw `RUNTIME.ABORTED` if already aborted.
+  - `MongoRuntime.execute(plan, options?)` is inherited from `RuntimeCore.execute` (m1 landed the per-execute ctx construction + entry-pre-check + ctx-forward-to-`lower(plan, ctx?)`); no Mongo-specific `execute` override is needed. Mongo also has no decode dispatch (per ADR 204), so no between-rows abort check exists in the Mongo path — the only Mongo-specific abort observation lives inside `resolveValue` (T3.3).
+  - Widen the `lower(plan, ctx?)` override to accept and forward `ctx` to `adapter.lower`.
+  - The framework `RuntimeCore.execute` entry pre-check (m1 T1.8) covers `signal.aborted` short-circuit at execute-time; no Mongo-side duplicate is needed.
 - [ ] **T3.6** Run M3 Mongo runtime tests; iterate until green.
 - [ ] **T3.7** Internal review/refine gate with the project owner before M4.
 
