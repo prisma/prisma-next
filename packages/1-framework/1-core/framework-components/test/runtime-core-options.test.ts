@@ -104,7 +104,9 @@ describe('RuntimeCore.execute(plan, options?)', () => {
       observed = error;
     }
     expect(observed).toBeDefined();
+    expect(isRuntimeError(observed)).toBe(true);
     if (isRuntimeError(observed)) {
+      expect(observed.code).toBe('RUNTIME.ABORTED');
       expect(observed.cause).toBe(reason);
     }
   });
