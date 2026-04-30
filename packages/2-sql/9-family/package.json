@@ -18,6 +18,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/operations": "workspace:*",
+    "@prisma-next/psl-types": "workspace:*",
     "@prisma-next/sql-contract": "workspace:*",
     "@prisma-next/sql-contract-emitter": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/psl-printer": "workspace:*",
     "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",

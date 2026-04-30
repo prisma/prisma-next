@@ -10,6 +10,7 @@ import type {
   ControlStack,
   CoreSchemaView,
   OperationContext,
+  PslContractInferCapable,
   SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -22,6 +23,7 @@ import {
   VERIFY_CODE_TARGET_MISMATCH,
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
+import type { PslDocumentAst } from '@prisma-next/psl-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -37,6 +39,7 @@ import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
+import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
 
@@ -182,6 +185,7 @@ export interface SchemaVerifyOptions {
 export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql', SqlSchemaIR>,
     SchemaViewCapable<SqlSchemaIR>,
+    PslContractInferCapable<SqlSchemaIR>,
     SqlFamilyInstanceState {
   validateContract(contractJson: unknown): Contract;
 
@@ -206,6 +210,8 @@ export interface SqlControlFamilyInstance
     readonly driver: ControlDriverInstance<'sql', string>;
     readonly contract?: unknown;
   }): Promise<SqlSchemaIR>;
+
+  inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
@@ -571,6 +577,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       readonly contract?: unknown;
     }): Promise<SqlSchemaIR> {
       return getControlAdapter().introspect(options.driver, options.contract);
+    },
+
+    inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
+      return sqlSchemaIrToPslAst(schemaIR);
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
