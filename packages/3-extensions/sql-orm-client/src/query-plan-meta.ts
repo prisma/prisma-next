@@ -1,14 +1,13 @@
 import type { Contract, PlanMeta } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { AnyQueryAst, ParamRef } from '@prisma-next/sql-relational-core/ast';
+import { type AnyQueryAst, collectOrderedParamRefs } from '@prisma-next/sql-relational-core/ast';
 import type { SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 
-export function deriveParamsFromAst(ast: { collectParamRefs(): ParamRef[] }): {
+export function deriveParamsFromAst(ast: AnyQueryAst): {
   params: unknown[];
 } {
-  const collectedParams = [...new Set(ast.collectParamRefs())];
   return {
-    params: collectedParams.map((p) => p.value),
+    params: collectOrderedParamRefs(ast).map((p) => p.value),
   };
 }
 

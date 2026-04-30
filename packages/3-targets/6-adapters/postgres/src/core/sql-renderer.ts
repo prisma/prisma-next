@@ -6,6 +6,7 @@ import {
   type AnyQueryAst,
   type BinaryExpr,
   type ColumnRef,
+  collectOrderedParamRefs,
   type DeleteAst,
   type InsertAst,
   type InsertValue,
@@ -124,16 +125,12 @@ export function renderLoweredSql(
   contract: PostgresContract,
   codecLookup: CodecLookup,
 ): { readonly sql: string; readonly params: readonly unknown[] } {
-  const collectedParamRefs = ast.collectParamRefs();
+  const orderedRefs = collectOrderedParamRefs(ast);
   const indexMap = new Map<ParamRef, number>();
-  const params: unknown[] = [];
-  for (const ref of collectedParamRefs) {
-    if (indexMap.has(ref)) {
-      continue;
-    }
-    indexMap.set(ref, params.length + 1);
-    params.push(ref.value);
-  }
+  const params: unknown[] = orderedRefs.map((ref, i) => {
+    indexMap.set(ref, i + 1);
+    return ref.value;
+  });
   const pim: ParamIndexMap = { indexMap, codecLookup };
 
   const node = ast;

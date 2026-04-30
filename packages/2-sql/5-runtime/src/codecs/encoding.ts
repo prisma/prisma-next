@@ -1,9 +1,8 @@
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import type {
-  AnyQueryAst,
-  Codec,
-  CodecRegistry,
-  ParamRef,
+import {
+  type Codec,
+  type CodecRegistry,
+  collectOrderedParamRefs,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
@@ -33,18 +32,6 @@ function wrapEncodeFailure(
   );
   wrapped.cause = error;
   throw wrapped;
-}
-
-function paramRefsByValueOrder(ast: AnyQueryAst): ReadonlyArray<ParamRef> {
-  const seen = new Set<ParamRef>();
-  const ordered: ParamRef[] = [];
-  for (const ref of ast.collectParamRefs()) {
-    if (!seen.has(ref)) {
-      seen.add(ref);
-      ordered.push(ref);
-    }
-  }
-  return ordered;
 }
 
 /**
@@ -111,7 +98,7 @@ export async function encodeParams(
   const metadata: ParamMetadata[] = new Array(paramCount).fill(NO_METADATA);
 
   if (plan.ast) {
-    const refs = paramRefsByValueOrder(plan.ast);
+    const refs = collectOrderedParamRefs(plan.ast);
     for (let i = 0; i < paramCount && i < refs.length; i++) {
       const ref = refs[i];
       if (ref) {

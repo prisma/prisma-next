@@ -4,6 +4,7 @@ import type { SqlOperationEntry } from '@prisma-next/sql-operations';
 import {
   AndExpr,
   type AnyExpression as AstExpression,
+  collectOrderedParamRefs,
   IdentifierRef,
   OrderByItem,
   ProjectionItem,
@@ -131,16 +132,7 @@ export function buildQueryPlan<Row = unknown>(
   ast: import('@prisma-next/sql-relational-core/ast').AnyQueryAst,
   ctx: BuilderContext,
 ): SqlQueryPlan<Row> {
-  const paramRefs = ast.collectParamRefs();
-  const seen = new Set<import('@prisma-next/sql-relational-core/ast').ParamRef>();
-  const uniqueRefs: import('@prisma-next/sql-relational-core/ast').ParamRef[] = [];
-  for (const ref of paramRefs) {
-    if (!seen.has(ref)) {
-      seen.add(ref);
-      uniqueRefs.push(ref);
-    }
-  }
-  const paramValues = uniqueRefs.map((r) => r.value);
+  const paramValues = collectOrderedParamRefs(ast).map((r) => r.value);
 
   const meta: PlanMeta = Object.freeze({
     target: ctx.target,
