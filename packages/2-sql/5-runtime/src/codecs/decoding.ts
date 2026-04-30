@@ -1,13 +1,19 @@
-import { isRuntimeError, runtimeError } from '@prisma-next/framework-components/runtime';
+import {
+  isRuntimeError,
+  runtimeAborted,
+  runtimeError,
+} from '@prisma-next/framework-components/runtime';
 import type {
   AnyQueryAst,
   Codec,
   CodecRegistry,
   ProjectionItem,
+  SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
+import { raceAgainstAbort } from './race-against-abort';
 
 type ColumnRef = { table: string; column: string };
 
@@ -157,27 +163,49 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
  * Decodes a single field. Single-armed: every cell takes the same path —
  * `codec.decode → await → JSON-Schema validate → return plain value` — so
  * sync- and async-authored codecs are indistinguishable to callers.
+ *
+ * The optional row-level `rowCtx` is repackaged into a per-cell
+ * `SqlCodecCallContext` whose `column = { table, name }` is a structural
+ * projection of the per-cell `ColumnRef = { table, column }` resolved from
+ * the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure`
+ * uses for envelope construction — one resolution per cell, two consumers).
+ * Cells the runtime cannot resolve to a single underlying column (aggregate
+ * aliases, computed projections without a simple ref) get
+ * `column: undefined`, matching the spec contract that the runtime never
+ * silently defaults this field.
  */
 async function decodeField(
   alias: string,
   wireValue: unknown,
-  ctx: DecodeContext,
+  decodeCtx: DecodeContext,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
+  rowCtx: SqlCodecCallContext | undefined,
 ): Promise<unknown> {
   if (wireValue === null) {
     return null;
   }
 
-  const codec = ctx.codecs.get(alias);
+  const codec = decodeCtx.codecs.get(alias);
   if (!codec) {
     return wireValue;
   }
 
-  const ref = ctx.columnRefs.get(alias);
+  const ref = decodeCtx.columnRefs.get(alias);
+
+  // Build a per-cell ctx only when a row-level ctx was supplied. The cell-level
+  // `column` is a `SqlColumnRef = { table, name }` projection of the resolved
+  // `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses
+  // below — no double work). Cells the runtime cannot resolve (aggregate
+  // aliases, computed projections without a simple ref) get `column: undefined`.
+  const cellCtx: SqlCodecCallContext | undefined = rowCtx
+    ? ref
+      ? { ...rowCtx, column: { table: ref.table, name: ref.column } }
+      : rowCtx
+    : undefined;
 
   let decoded: unknown;
   try {
-    decoded = await codec.decode(wireValue);
+    decoded = await codec.decode(wireValue, cellCtx);
   } catch (error) {
     wrapDecodeFailure(error, alias, ref, codec, wireValue);
   }
@@ -200,23 +228,40 @@ async function decodeField(
  * Failures are wrapped in `RUNTIME.DECODE_FAILED` with `{ table, column,
  * codec }` (or `{ alias, codec }` when no column ref is resolvable) and the
  * original error attached on `cause`.
+ *
+ * When the optional `rowCtx.signal` is provided:
+ *
+ * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED`
+ *   (`{ phase: 'decode' }`) before any `codec.decode` call is made.
+ * - **Mid-flight aborts** race the per-cell `Promise.all` against the
+ *   signal so the runtime returns promptly even when codec bodies ignore
+ *   it. In-flight bodies that ignore the signal complete in the
+ *   background (cooperative cancellation).
+ * - Existing `RUNTIME.DECODE_FAILED` envelopes from codec bodies pass
+ *   through unchanged (no double wrap).
  */
 export async function decodeRow(
   row: Record<string, unknown>,
   plan: SqlExecutionPlan,
   registry: CodecRegistry,
   jsonValidators?: JsonSchemaValidatorRegistry,
+  rowCtx?: SqlCodecCallContext,
 ): Promise<Record<string, unknown>> {
-  const ctx = buildDecodeContext(plan, registry);
+  const signal = rowCtx?.signal;
+  if (signal?.aborted) {
+    throw runtimeAborted('decode', signal.reason);
+  }
 
-  const aliases = ctx.aliases ?? Object.keys(row);
+  const decodeCtx = buildDecodeContext(plan, registry);
 
-  if (ctx.aliases !== undefined) {
-    for (const alias of ctx.aliases) {
+  const aliases = decodeCtx.aliases ?? Object.keys(row);
+
+  if (decodeCtx.aliases !== undefined) {
+    for (const alias of decodeCtx.aliases) {
       if (!Object.hasOwn(row, alias)) {
         throw runtimeError('RUNTIME.DECODE_FAILED', `Row missing projection alias "${alias}"`, {
           alias,
-          expectedAliases: ctx.aliases,
+          expectedAliases: decodeCtx.aliases,
           presentKeys: Object.keys(row),
         });
       }
@@ -230,16 +275,18 @@ export async function decodeRow(
     const alias = aliases[i] as string;
     const wireValue = row[alias];
 
-    if (ctx.includeAliases.has(alias)) {
+    if (decodeCtx.includeAliases.has(alias)) {
       includeIndices.push({ index: i, alias, value: wireValue });
       tasks.push(Promise.resolve(undefined));
       continue;
     }
 
-    tasks.push(decodeField(alias, wireValue, ctx, jsonValidators));
+    tasks.push(decodeField(alias, wireValue, decodeCtx, jsonValidators, rowCtx));
   }
 
-  const settled = await Promise.all(tasks);
+  const settled = signal
+    ? await raceAgainstAbort(Promise.all(tasks), signal, 'decode')
+    : await Promise.all(tasks);
 
   // Include aggregates are decoded synchronously after concurrent codec
   // dispatch settles, so any decode failures upstream propagate first.
