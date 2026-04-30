@@ -658,14 +658,35 @@ async function executeMigrationStatusCommand(
   const pendingCount = edgeStatuses.filter((e) => e.status === 'pending').length;
   const appliedCount = edgeStatuses.filter((e) => e.status === 'applied').length;
 
+  let appliedInvariants: readonly string[] | undefined;
+  let missingInvariants: readonly string[] | undefined;
+  let effectiveRequired = new Set<string>();
+  if (mode === 'online') {
+    const requiredSet = new Set(requiredInvariants);
+    appliedInvariants = markerInvariants.filter((id) => requiredSet.has(id)).sort();
+    const appliedSet = new Set(appliedInvariants);
+    missingInvariants = requiredInvariants.filter((id) => !appliedSet.has(id));
+    effectiveRequired = new Set(missingInvariants);
+  }
+
+  // The marker can match the structural target while still missing required
+  // invariants — for example, a self-edge that provides X, applied via a ref
+  // declaring X. `pendingCount` (structural) says zero in that case but
+  // `effectiveRequired` is non-empty, so up-to-date messaging would mislead.
+  const hasInvariantWork = effectiveRequired.size > 0;
+  const missingList = [...effectiveRequired].sort().join(', ');
+
   let summary: string;
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       summary = `${bundles.length} migration(s) on disk`;
     } else if (activeRefHash && markerHash !== undefined) {
-      summary = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
-    } else if (pendingCount === 0) {
+      const distance = summarizeRefDistance(graph, markerHash, activeRefHash, activeRefName!);
+      summary = hasInvariantWork ? `${distance} — missing invariant(s): ${missingList}` : distance;
+    } else if (pendingCount === 0 && !hasInvariantWork) {
       summary = `Database is up to date (${appliedCount} migration${appliedCount !== 1 ? 's' : ''} applied)`;
+    } else if (pendingCount === 0 && hasInvariantWork) {
+      summary = `Missing invariant(s): ${missingList} — run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply`;
     } else if (markerHash === undefined) {
       summary = `${pendingCount} pending migration(s) — database has no marker`;
     } else {
@@ -691,6 +712,15 @@ async function executeMigrationStatusCommand(
         message: `${pendingCount} migration(s) pending`,
         hints: ["Run 'prisma-next migration apply' to apply pending migrations"],
       });
+    } else if (hasInvariantWork) {
+      diagnostics.push({
+        code: 'MIGRATION.INVARIANTS_PENDING',
+        severity: 'info',
+        message: `Missing required invariant(s): ${missingList}`,
+        hints: [
+          `Run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
+        ],
+      });
     } else {
       diagnostics.push({
         code: 'MIGRATION.UP_TO_DATE',
@@ -699,17 +729,6 @@ async function executeMigrationStatusCommand(
         hints: [],
       });
     }
-  }
-
-  let appliedInvariants: readonly string[] | undefined;
-  let missingInvariants: readonly string[] | undefined;
-  let effectiveRequired = new Set<string>();
-  if (mode === 'online') {
-    const requiredSet = new Set(requiredInvariants);
-    appliedInvariants = markerInvariants.filter((id) => requiredSet.has(id)).sort();
-    const appliedSet = new Set(appliedInvariants);
-    missingInvariants = requiredInvariants.filter((id) => !appliedSet.has(id));
-    effectiveRequired = new Set(missingInvariants);
   }
 
   let pathDecision: MigrationStatusResult['pathDecision'];

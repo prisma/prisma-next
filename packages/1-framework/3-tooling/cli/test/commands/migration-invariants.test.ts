@@ -18,12 +18,29 @@ import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-he
  * Marker-subtraction and NO_INVARIANT_PATH live in the journey suite.
  */
 
-const mocks = vi.hoisted(() => ({
-  loadConfig: vi.fn(),
-}));
+const mocks = vi.hoisted(() => {
+  const readMarkerMock = vi.fn();
+  const connectMock = vi.fn().mockResolvedValue(undefined);
+  const closeMock = vi.fn().mockResolvedValue(undefined);
+  return {
+    loadConfig: vi.fn(),
+    readMarkerMock,
+    connectMock,
+    closeMock,
+    createControlClientMock: vi.fn(() => ({
+      connect: connectMock,
+      readMarker: readMarkerMock,
+      close: closeMock,
+    })),
+  };
+});
 
 vi.mock('../../src/config-loader', () => ({
   loadConfig: mocks.loadConfig,
+}));
+
+vi.mock('../../src/control-api/client', () => ({
+  createControlClient: mocks.createControlClientMock,
 }));
 
 const FROM_HASH = 'sha256:empty';
@@ -81,6 +98,7 @@ function setupConfigMock(): void {
 async function setupFixture(opts: {
   refInvariants: readonly string[];
   edgeInvariants?: readonly string[];
+  selfEdgeInvariant?: string;
 }): Promise<InvariantFixture> {
   const cwd = await mkdtemp(join(tmpdir(), 'cli-invariant-'));
 
@@ -105,6 +123,25 @@ async function setupFixture(opts: {
     },
     ops,
   );
+
+  if (opts.selfEdgeInvariant) {
+    const selfEdgeDir = join(migrationsDir, '00002_self_edge');
+    await writeAttestedPackage(
+      selfEdgeDir,
+      {
+        from: TO_HASH,
+        to: TO_HASH,
+        kind: 'regular',
+        fromContract: createContract(),
+        toContract: createContract(),
+        hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
+        labels: [],
+        providedInvariants: [opts.selfEdgeInvariant],
+        createdAt: CREATED_AT,
+      },
+      [dataOp(opts.selfEdgeInvariant)],
+    );
+  }
 
   // Ref pointing at the only attested migration's destination, declaring the
   // ref-side invariants.
@@ -169,6 +206,7 @@ describe(
 
     afterAll(() => {
       vi.doUnmock('../../src/config-loader');
+      vi.doUnmock('../../src/control-api/client');
       vi.resetModules();
     });
 
@@ -214,6 +252,62 @@ describe(
       expect(jsonLine).toBeDefined();
       const envelope = JSON.parse(jsonLine!) as { meta?: { code?: string } };
       expect(envelope.meta?.code).toBe('MIGRATION.UNKNOWN_INVARIANT');
+    });
+
+    it('migration status --ref reports INVARIANTS_PENDING when marker matches target but is missing required invariants', async () => {
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const fixture = await setupFixture({
+        refInvariants: ['real-id'],
+        edgeInvariants: [],
+        selfEdgeInvariant: 'real-id',
+      });
+      tempDirs.push(fixture.cwd);
+      process.chdir(fixture.cwd);
+
+      mocks.readMarkerMock.mockResolvedValueOnce({
+        storageHash: TO_HASH,
+        profileHash: TO_HASH,
+        contractJson: null,
+        canonicalVersion: null,
+        updatedAt: new Date(CREATED_AT),
+        appTag: null,
+        meta: {},
+        invariants: [],
+      });
+
+      const exitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      );
+
+      expect(exitCode).toBe(0);
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const envelope = JSON.parse(jsonLine!) as {
+        ok: boolean;
+        mode: string;
+        summary: string;
+        diagnostics: Array<{ code: string; severity: string; message: string }>;
+        requiredInvariants: readonly string[];
+        appliedInvariants?: readonly string[];
+        missingInvariants?: readonly string[];
+      };
+      expect(envelope.ok).toBe(true);
+      expect(envelope.mode).toBe('online');
+      expect(envelope.requiredInvariants).toEqual(['real-id']);
+      expect(envelope.appliedInvariants).toEqual([]);
+      expect(envelope.missingInvariants).toEqual(['real-id']);
+      expect(envelope.summary).toMatch(/missing invariant\(s\): real-id/i);
+      // No spurious UP_TO_DATE — pending invariant work means not up to date.
+      expect(envelope.diagnostics.map((d) => d.code)).not.toContain('MIGRATION.UP_TO_DATE');
+      expect(envelope.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'MIGRATION.INVARIANTS_PENDING',
+            severity: 'info',
+            message: 'Missing required invariant(s): real-id',
+          }),
+        ]),
+      );
     });
 
     it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
