@@ -1,4 +1,8 @@
-import type { AsyncIterableResult } from '@prisma-next/framework-components/runtime';
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import type {
+  AsyncIterableResult,
+  RuntimeExecuteOptions,
+} from '@prisma-next/framework-components/runtime';
 import {
   checkMiddlewareCompatibility,
   RuntimeCore,
@@ -20,7 +24,29 @@ export interface MongoRuntimeOptions {
 }
 
 export interface MongoRuntime {
-  execute<Row>(plan: MongoQueryPlan<Row>): AsyncIterableResult<Row>;
+  /**
+   * Execute a `MongoQueryPlan` and return an async iterable of rows.
+   *
+   * The optional `options.signal` is threaded through
+   * `lower → adapter.lower → resolveValue → codec.encode` so codec authors
+   * who forward the signal to their underlying SDK get true cancellation
+   * of in-flight network calls. The runtime additionally observes the
+   * signal at two boundaries:
+   *
+   * - **Already-aborted at entry** — first `next()` throws
+   *   `RUNTIME.ABORTED { phase: 'stream' }` before any work is done.
+   *   (Inherited from `RuntimeCore.execute`.)
+   * - **Mid-encode abort** — surfaces as
+   *   `RUNTIME.ABORTED { phase: 'encode' }` from inside `resolveValue`'s
+   *   per-level `Promise.all` race.
+   *
+   * Mongo's read path does not go through codecs (per ADR 204), so there
+   * is no `phase: 'decode'` boundary on the Mongo side.
+   */
+  execute<Row>(
+    plan: MongoQueryPlan<Row>,
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row>;
   close(): Promise<void>;
 }
 
@@ -50,9 +76,12 @@ class MongoRuntimeImpl
     this.#driver = options.driver;
   }
 
-  protected override async lower(plan: MongoQueryPlan): Promise<MongoExecutionPlan> {
+  protected override async lower(
+    plan: MongoQueryPlan,
+    ctx?: CodecCallContext,
+  ): Promise<MongoExecutionPlan> {
     return {
-      command: await this.#adapter.lower(plan),
+      command: await this.#adapter.lower(plan, ctx),
       meta: plan.meta,
     };
   }
