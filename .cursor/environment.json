@@ -1,0 +1,8 @@
+{
+  "$schema": "https://www.cursor.com/schemas/environment.schema.json",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": ".."
+  },
+  "install": "corepack enable\ncorepack prepare pnpm@10.27.0 --activate\npnpm install"
+}
