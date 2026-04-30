@@ -14,9 +14,8 @@ import { type ImportRequirement, jsonToTsSource, renderImports } from '@prisma-n
 import type { PostgresOpFactoryCall } from './op-factory-call';
 
 export interface RenderMigrationMeta {
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
-  readonly kind?: string;
   readonly labels?: readonly string[];
 }
 
@@ -84,9 +83,6 @@ function buildDescribeMethod(meta: RenderMigrationMeta): string {
   lines.push('    return {');
   lines.push(`      from: ${JSON.stringify(meta.from)},`);
   lines.push(`      to: ${JSON.stringify(meta.to)},`);
-  if (meta.kind) {
-    lines.push(`      kind: ${JSON.stringify(meta.kind)},`);
-  }
   if (meta.labels && meta.labels.length > 0) {
     lines.push(`      labels: ${jsonToTsSource(meta.labels)},`);
   }

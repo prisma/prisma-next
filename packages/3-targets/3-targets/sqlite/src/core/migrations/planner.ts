@@ -51,11 +51,11 @@ export class SqliteMigrationPlanner
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash?: string;
+    readonly fromHash?: string | null;
     readonly fromContract?: unknown;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): SqlitePlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? '');
+    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? null);
   }
 
   emptyMigration(context: MigrationScaffoldContext): TypeScriptRenderableSqliteMigration {
@@ -65,7 +65,10 @@ export class SqliteMigrationPlanner
     });
   }
 
-  private planSql(options: SqlMigrationPlannerPlanOptions, fromHash: string): SqlitePlanResult {
+  private planSql(
+    options: SqlMigrationPlannerPlanOptions,
+    fromHash: string | null,
+  ): SqlitePlanResult {
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) return policyResult;
 

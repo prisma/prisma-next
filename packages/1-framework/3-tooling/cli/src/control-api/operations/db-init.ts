@@ -85,7 +85,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     policy,
     // `db init` does not produce a `migration.ts`, so the from-hash on the
     // resulting plan is never surfaced to authoring — pass empty string.
-    fromHash: '',
+    fromHash: null,
     frameworkComponents,
   });
 

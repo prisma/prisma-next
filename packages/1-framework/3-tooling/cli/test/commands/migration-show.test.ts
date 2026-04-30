@@ -55,7 +55,6 @@ function createMetadata(
   return {
     from,
     to,
-    kind: 'regular',
     fromContract,
     toContract,
     hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -152,10 +151,9 @@ describe('resolveByHashPrefix', () => {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
         metadata: {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc123',
-          kind: 'regular',
           fromContract: null,
           toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -181,10 +179,9 @@ describe('resolveByHashPrefix', () => {
         dirName: '20260101_100000_first',
         dirPath: '/tmp/first',
         metadata: {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc111',
-          kind: 'regular',
           fromContract: null,
           toContract: contract,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -201,7 +198,6 @@ describe('resolveByHashPrefix', () => {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
           migrationHash: 'sha256:abc222',
-          kind: 'regular',
           fromContract: contract,
           toContract: contract,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -226,10 +222,9 @@ describe('resolveByHashPrefix', () => {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
         metadata: {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc123def456',
-          kind: 'regular',
           fromContract: null,
           toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -258,10 +253,9 @@ describe('resolveByHashPrefix', () => {
         dirName: '20260101_100000_only',
         dirPath: '/tmp/only',
         metadata: {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:hash-a',
           migrationHash: 'sha256:abc999000000',
-          kind: 'regular',
           fromContract: null,
           toContract: createContract(),
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -288,10 +282,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_add_user',
         dirPath: 'migrations/20260101_100000_add_user',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
@@ -304,8 +297,7 @@ describe('formatMigrationShowOutput', () => {
     const stripped = stripAnsi(output);
 
     expect(stripped).toContain('20260101_100000_add_user');
-    expect(stripped).toContain('kind: regular');
-    expect(stripped).toContain(`from: ${EMPTY_CONTRACT_HASH}`);
+    expect(stripped).toContain('from: (baseline)');
     expect(stripped).toContain('to:   sha256:hash-a');
     expect(stripped).toContain('migrationHash: sha256:edge-abc');
     expect(stripped).toContain('2026-01-01T10:00:00.000Z');
@@ -317,10 +309,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
@@ -349,10 +340,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
           {
@@ -379,10 +369,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
@@ -404,10 +393,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
@@ -429,10 +417,9 @@ describe('formatMigrationShowOutput', () => {
       {
         dirName: '20260101_100000_test',
         dirPath: 'migrations/20260101_100000_test',
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         migrationHash: 'sha256:edge-abc',
-        kind: 'regular',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],
         sql: [],

@@ -43,7 +43,12 @@ export function reconstructGraph(packages: readonly MigrationPackage[]): Migrati
   const migrationByHash = new Map<string, MigrationEdge>();
 
   for (const pkg of packages) {
-    const { from, to } = pkg.metadata;
+    // Manifest `from` is `string | null` (null = baseline). The graph layer
+    // is the marker/path layer where "no prior state" is encoded as the
+    // EMPTY_CONTRACT_HASH sentinel; bridge here so pathfinding stays string-
+    // keyed.
+    const from = pkg.metadata.from ?? EMPTY_CONTRACT_HASH;
+    const { to } = pkg.metadata;
 
     if (from === to) {
       throw errorSameSourceAndTarget(pkg.dirPath, from);

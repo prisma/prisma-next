@@ -85,7 +85,7 @@ describe('PostgresMigrationPlanner authoring surface', () => {
       const planner = makeFrameworkPlanner();
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: '',
+        fromHash: null,
         toHash: 'sha256:to',
       });
 

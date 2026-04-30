@@ -75,7 +75,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: '',
+        fromHash: null,
         frameworkComponents: [],
       });
 
@@ -92,7 +92,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: '',
+        fromHash: null,
         frameworkComponents: [],
       });
 
@@ -129,7 +129,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       const planner = createSqliteMigrationPlanner();
       const empty = planner.emptyMigration({
         packageDir: '/tmp/migration-pkg',
-        fromHash: '',
+        fromHash: null,
         toHash: 'sha256:to',
       });
 
@@ -162,7 +162,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['widening', 'destructive'] },
-        fromHash: '',
+        fromHash: null,
         frameworkComponents: [],
       });
 

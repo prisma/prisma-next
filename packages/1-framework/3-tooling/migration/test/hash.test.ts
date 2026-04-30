@@ -107,7 +107,7 @@ describe('computeMigrationHash', () => {
 
   it('changes when metadata.from changes', () => {
     const ops = createTestOps();
-    const m1 = createTestMetadata({ from: 'sha256:empty' });
+    const m1 = createTestMetadata({ from: null });
     const m2 = createTestMetadata({ from: 'sha256:different' });
     expect(computeMigrationHash(m1, ops)).not.toBe(computeMigrationHash(m2, ops));
   });
@@ -173,9 +173,8 @@ describe('verifyMigrationHash', () => {
     // package (e.g. the planner before write) still have coverage.
     const ops = createTestOps();
     const baseMetadata = {
-      from: 'sha256:empty',
+      from: null,
       to: 'sha256:abc123',
-      kind: 'regular' as const,
       fromContract: null,
       toContract: createTestContract(),
       hints: { used: [], applied: [], plannerVersion: '0.0.1' },

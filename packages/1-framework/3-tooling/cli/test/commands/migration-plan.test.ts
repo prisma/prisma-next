@@ -3,7 +3,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createContract, createSqlContract } from '@prisma-next/contract/testing';
 import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import {
   formatMigrationDirName,
@@ -93,9 +92,8 @@ describe('migration plan — core flow', () => {
     const metadata = await writeTestPackage(
       packageDir,
       {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:test-hash',
-        kind: 'regular',
         fromContract: null,
         toContract,
         hints: {
@@ -112,10 +110,9 @@ describe('migration plan — core flow', () => {
 
     const pkg = await readMigrationPackage(packageDir);
 
-    expect(pkg.metadata.from).toBe(EMPTY_CONTRACT_HASH);
+    expect(pkg.metadata.from).toBeNull();
     expect(pkg.metadata.to).toBe('sha256:test-hash');
     expect(pkg.metadata.migrationHash).toBe(metadata.migrationHash);
-    expect(pkg.metadata.kind).toBe('regular');
     expect(pkg.metadata.fromContract).toBeNull();
     expect(pkg.ops).toHaveLength(1);
     expect(pkg.ops[0]!.id).toBe('table.user');
@@ -132,9 +129,8 @@ describe('migration plan — core flow', () => {
     await writeTestPackage(
       packageDir,
       {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:same-hash',
-        kind: 'regular',
         fromContract: null,
         toContract: contract,
         hints: {
@@ -197,9 +193,8 @@ describe('migration plan — core flow', () => {
       await writeTestPackage(
         path1,
         {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:hash-a',
-          kind: 'regular',
           fromContract: null,
           toContract: contractA,
           hints: {
@@ -223,7 +218,6 @@ describe('migration plan — core flow', () => {
         {
           from: 'sha256:hash-a',
           to: 'sha256:hash-b',
-          kind: 'regular',
           fromContract: contractA,
           toContract: contractB,
           hints: {
@@ -280,9 +274,8 @@ describe('--from hash lookup', () => {
     await writeTestPackage(
       packageDir,
       {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:known-hash',
-        kind: 'regular',
         fromContract: null,
         toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -309,9 +302,8 @@ describe('--from hash lookup', () => {
     await writeTestPackage(
       packageDir,
       {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:abcdef1234567890',
-        kind: 'regular',
         fromContract: null,
         toContract: contract,
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -341,9 +333,8 @@ describe('--from hash lookup', () => {
     await writeTestPackage(
       packageDir,
       {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:abcdef1234567890',
-        kind: 'regular',
         fromContract: null,
         toContract: contract,
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -377,9 +368,8 @@ describe('--from hash lookup', () => {
       await writeTestPackage(
         join(migrationsDir, dir1),
         {
-          from: EMPTY_CONTRACT_HASH,
+          from: null,
           to: 'sha256:abc111',
-          kind: 'regular',
           fromContract: null,
           toContract: contractA,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -396,7 +386,6 @@ describe('--from hash lookup', () => {
         {
           from: 'sha256:abc111',
           to: 'sha256:abc222',
-          kind: 'regular',
           fromContract: contractA,
           toContract: contractB,
           hints: { used: [], applied: [], plannerVersion: '1.0.0' },

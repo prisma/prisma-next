@@ -47,18 +47,32 @@ describe('Migration', () => {
       expect(m.destination).toEqual({ storageHash: 'hashTo' });
     });
 
-    it('returns a null origin when from is empty (origin-less plan)', () => {
+    it('returns a null origin when from is null (baseline plan)', () => {
       class InitialMigration extends Migration {
         readonly targetId = 'test';
         override get operations() {
           return [];
         }
         override describe() {
-          return { from: '', to: 'sha256:to' };
+          return { from: null, to: 'sha256:to' };
         }
       }
 
       expect(new InitialMigration().origin).toBeNull();
+    });
+
+    it('wraps from as a storage-hash origin when describe() returns a string', () => {
+      class NonBaselineMigration extends Migration {
+        readonly targetId = 'test';
+        override get operations() {
+          return [];
+        }
+        override describe() {
+          return { from: 'sha256:abc', to: 'sha256:def' };
+        }
+      }
+
+      expect(new NonBaselineMigration().origin).toEqual({ storageHash: 'sha256:abc' });
     });
   });
 
@@ -119,7 +133,11 @@ describe('Migration', () => {
 describe('buildMigrationArtifacts', () => {
   function makeMigration(
     operations: unknown,
-    meta: { readonly from: string; readonly to: string; readonly labels?: readonly string[] } = {
+    meta: {
+      readonly from: string | null;
+      readonly to: string;
+      readonly labels?: readonly string[];
+    } = {
       from: 'abc',
       to: 'def',
     },
@@ -149,7 +167,6 @@ describe('buildMigrationArtifacts', () => {
     expect(metadata.from).toBe('abc');
     expect(metadata.to).toBe('def');
     expect(metadata.migrationHash).toMatch(/^sha256:[a-f0-9]{64}$/);
-    expect(metadata.kind).toBe('regular');
     expect(metadata.labels).toEqual([]);
     expect(metadata.createdAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     expect(metadata.fromContract).toBeNull();
@@ -163,7 +180,6 @@ describe('buildMigrationArtifacts', () => {
     const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      kind: 'regular',
       fromContract: { storage: { storageHash: 'sha256:from' }, marker: 'preserved-from' } as never,
       toContract: { storage: { storageHash: 'sha256:to' }, marker: 'preserved-to' } as never,
       hints: {
@@ -195,7 +211,6 @@ describe('buildMigrationArtifacts', () => {
     const existingMetadata: Partial<MigrationMetadata> = {
       from: 'sha256:from',
       to: 'sha256:to',
-      kind: 'regular',
       fromContract: { storage: { storageHash: 'sha256:from' } } as never,
       toContract: { storage: { storageHash: 'sha256:to' } } as never,
       hints: {

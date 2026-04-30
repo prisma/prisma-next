@@ -181,10 +181,9 @@ export function formatMigrationApplyCommandOutput(
 interface MigrationShowResult {
   readonly dirName: string;
   readonly dirPath: string;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly migrationHash: string;
-  readonly kind: string;
   readonly createdAt: string;
   readonly operations: readonly {
     readonly id: string;
@@ -208,8 +207,7 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
   const formatDimText = (text: string) => formatDim(useColor, text);
 
   lines.push(`${formatGreen('✔')} ${result.dirName}`);
-  lines.push(`${formatDimText(`  kind: ${result.kind}`)}`);
-  lines.push(`${formatDimText(`  from: ${result.from}`)}`);
+  lines.push(`${formatDimText(`  from: ${result.from ?? '(baseline)'}`)}`);
   lines.push(`${formatDimText(`  to:   ${result.to}`)}`);
   lines.push(`${formatDimText(`  migrationHash: ${result.migrationHash}`)}`);
   lines.push(`${formatDimText(`  created: ${result.createdAt}`)}`);

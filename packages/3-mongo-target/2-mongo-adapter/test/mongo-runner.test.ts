@@ -95,7 +95,7 @@ function bareContract(storageHash: string): MongoContract {
 function planForContract(
   contract: ReturnType<typeof makeContract>,
   origin: MongoSchemaIR = new MongoSchemaIR([]),
-  fromHash = '',
+  fromHash: string | null = null,
 ) {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({

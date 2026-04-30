@@ -208,16 +208,15 @@ describe('renderCallsToTypeScript', () => {
     expect(importLine).toContain('createIndex');
   });
 
-  it('includes kind in describe when specified', () => {
+  it('renders `from: null` for baseline migrations', () => {
     const calls = [new DropCollectionCall('users')];
 
     const output = renderTypeScript(calls, {
-      from: 'sha256:abc',
+      from: null,
       to: 'sha256:def',
-      kind: 'baseline',
     });
 
-    expect(output).toContain('"baseline"');
+    expect(output).toContain('from: null');
   });
 
   it('handles empty calls array', () => {

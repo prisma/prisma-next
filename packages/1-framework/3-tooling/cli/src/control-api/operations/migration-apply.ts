@@ -79,15 +79,19 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
 
   const firstMigration = pendingMigrations[0]!;
   const lastMigration = pendingMigrations[pendingMigrations.length - 1]!;
-  if (firstMigration.from !== originHash || lastMigration.to !== destinationHash) {
+  // Manifest `from` is `string | null` (null = baseline). The live-marker
+  // layer encodes "no prior state" as EMPTY_CONTRACT_HASH; bridge here so the
+  // string comparisons below work uniformly.
+  const firstFromMarker = firstMigration.from ?? EMPTY_CONTRACT_HASH;
+  if (firstFromMarker !== originHash || lastMigration.to !== destinationHash) {
     return notOk({
       code: 'MIGRATION_PATH_NOT_FOUND' as const,
       summary: 'Migration apply path does not match requested origin and destination',
-      why: `Path resolved as ${firstMigration.from} -> ${lastMigration.to}, but requested ${originHash} -> ${destinationHash}`,
+      why: `Path resolved as ${firstFromMarker} -> ${lastMigration.to}, but requested ${originHash} -> ${destinationHash}`,
       meta: {
         originHash,
         destinationHash,
-        pathOrigin: firstMigration.from,
+        pathOrigin: firstFromMarker,
         pathDestination: lastMigration.to,
       },
     });
@@ -96,18 +100,19 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
   for (let i = 1; i < pendingMigrations.length; i++) {
     const previous = pendingMigrations[i - 1]!;
     const current = pendingMigrations[i]!;
-    if (previous.to !== current.from) {
+    const currentFromMarker = current.from ?? EMPTY_CONTRACT_HASH;
+    if (previous.to !== currentFromMarker) {
       return notOk({
         code: 'MIGRATION_PATH_NOT_FOUND' as const,
         summary: 'Migration apply path contains a discontinuity between adjacent migrations',
-        why: `Migration "${previous.dirName}" ends at ${previous.to}, but next migration "${current.dirName}" starts at ${current.from}`,
+        why: `Migration "${previous.dirName}" ends at ${previous.to}, but next migration "${current.dirName}" starts at ${currentFromMarker}`,
         meta: {
           originHash,
           destinationHash,
           previousDirName: previous.dirName,
           previousTo: previous.to,
           currentDirName: current.dirName,
-          currentFrom: current.from,
+          currentFrom: currentFromMarker,
           discontinuityIndex: i,
         },
       });
@@ -135,11 +140,11 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] as const,
     };
 
-    // EMPTY_CONTRACT_HASH means "no prior state" — the runner expects origin: null
-    // for a fresh database (no marker present).
+    // Manifest `from === null` means "no prior state" — the runner expects
+    // `origin: null` for a fresh database (no marker present).
     const plan = {
       targetId,
-      origin: migration.from === EMPTY_CONTRACT_HASH ? null : { storageHash: migration.from },
+      origin: migration.from === null ? null : { storageHash: migration.from },
       destination: { storageHash: migration.to },
       operations,
     };

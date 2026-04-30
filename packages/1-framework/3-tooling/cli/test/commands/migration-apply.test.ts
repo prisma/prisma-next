@@ -36,7 +36,7 @@ async function createTempDir(prefix: string): Promise<string> {
 async function writeAttestedMigration(
   migrationsDir: string,
   opts: {
-    from: string;
+    from: string | null;
     to: string;
     fromContract: Contract | null;
     toContract: Contract;
@@ -50,7 +50,6 @@ async function writeAttestedMigration(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: opts.from,
     to: opts.to,
-    kind: 'regular',
     fromContract: opts.fromContract,
     toContract: opts.toContract,
     hints: {
@@ -92,7 +91,7 @@ describe(
       });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: contractA,
@@ -143,7 +142,7 @@ describe(
       });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: contractA,
@@ -206,7 +205,7 @@ describe(
       });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: contractA,
@@ -240,7 +239,7 @@ describe(
       await mkdir(migrationsDir, { recursive: true });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: createContract(),
@@ -264,7 +263,7 @@ describe(
       await mkdir(migrationsDir, { recursive: true });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: createContract(),
@@ -292,7 +291,7 @@ describe(
       await mkdir(migrationsDir, { recursive: true });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: createContract(),
@@ -308,7 +307,6 @@ describe(
       const baseMetadata = {
         from: 'sha256:hash-a',
         to: EMPTY_CONTRACT_HASH,
-        kind: 'regular' as const,
         fromContract: createContract(),
         toContract: createContract(),
         hints: { used: [], applied: [], plannerVersion: '1.0.0' },
@@ -354,7 +352,7 @@ describe(
       });
 
       await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: contractA,
@@ -392,7 +390,7 @@ describe(
       const contractB = createContract();
 
       const m1 = await writeAttestedMigration(migrationsDir, {
-        from: EMPTY_CONTRACT_HASH,
+        from: null,
         to: 'sha256:hash-a',
         fromContract: null,
         toContract: contractA,
@@ -422,7 +420,9 @@ describe(
       for (const migration of path) {
         const pkg = attested.find((p) => p.dirName === migration.dirName);
         expect(pkg).toBeDefined();
-        expect(pkg!.metadata.from).toBe(migration.from);
+        // The graph edge translates baseline `null` → EMPTY_CONTRACT_HASH;
+        // the manifest still carries `null`, so bridge here for comparison.
+        expect(pkg!.metadata.from ?? EMPTY_CONTRACT_HASH).toBe(migration.from);
         expect(pkg!.metadata.to).toBe(migration.to);
       }
 

@@ -71,7 +71,6 @@ describe(
       const manifest = JSON.parse(readFileSync(resolve(migrationDir, 'migration.json'), 'utf-8'));
 
       expect(manifest.migrationHash).toMatch(/^sha256:/);
-      expect(manifest.kind).toBe('regular');
       expect(manifest.labels).toEqual(['add-product-validation']);
       expect(manifest.from).toMatch(/^sha256:/);
       expect(manifest.to).toMatch(/^sha256:/);

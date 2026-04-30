@@ -5,7 +5,6 @@ import {
   createControlStack,
   type MigrationPlanOperation,
 } from '@prisma-next/framework-components/control';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
@@ -58,7 +57,7 @@ interface MigrationPlanOptions extends CommonCommandOptions {
 export interface MigrationPlanResult {
   readonly ok: boolean;
   readonly noOp: boolean;
-  readonly from: string;
+  readonly from: string | null;
   readonly to: string;
   readonly dir?: string;
   readonly operations: readonly {
@@ -160,7 +159,7 @@ async function executeMigrationPlanCommand(
 
   // Read existing migrations and determine "from" contract
   let fromContract: Contract | null = null;
-  let fromHash: string = EMPTY_CONTRACT_HASH;
+  let fromHash: string | null = null;
   let fromContractSourceDir: string | null = null;
 
   try {
@@ -252,7 +251,6 @@ async function executeMigrationPlanCommand(
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash' | 'providedInvariants'> = {
     from: fromHash,
     to: toStorageHash,
-    kind: 'regular',
     fromContract,
     toContract: toContractJson,
     hints: {
