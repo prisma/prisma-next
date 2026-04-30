@@ -164,8 +164,8 @@ async function decodeField(
   ctx: DecodeContext,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
 ): Promise<unknown> {
-  if (wireValue === null || wireValue === undefined) {
-    return wireValue;
+  if (wireValue === null) {
+    return null;
   }
 
   const codec = ctx.codecs.get(alias);
@@ -210,6 +210,18 @@ export async function decodeRow(
   const ctx = buildDecodeContext(plan, registry);
 
   const aliases = ctx.aliases ?? Object.keys(row);
+
+  if (ctx.aliases !== undefined) {
+    for (const alias of ctx.aliases) {
+      if (!Object.hasOwn(row, alias)) {
+        throw runtimeError('RUNTIME.DECODE_FAILED', `Row missing projection alias "${alias}"`, {
+          alias,
+          expectedAliases: ctx.aliases,
+          presentKeys: Object.keys(row),
+        });
+      }
+    }
+  }
 
   const tasks: Promise<unknown>[] = [];
   const includeIndices: { index: number; alias: string; value: unknown }[] = [];

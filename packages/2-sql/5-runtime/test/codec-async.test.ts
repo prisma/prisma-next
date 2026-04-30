@@ -528,6 +528,42 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
 
+  it('throws RUNTIME.DECODE_FAILED for AST-backed plan when row is missing a projection alias', async () => {
+    const registry = createCodecRegistry();
+    const plan = buildAstPlan({
+      projections: [{ alias: 'id' }, { alias: 'email' }],
+    });
+
+    await expect(decodeRow({ id: 1 }, plan, registry)).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+      details: {
+        alias: 'email',
+        expectedAliases: ['id', 'email'],
+        presentKeys: ['id'],
+      },
+    });
+  });
+
+  it('preserves wire null for AST-backed plans (distinct from missing alias)', async () => {
+    const registry = createCodecRegistry();
+    const plan = buildAstPlan({
+      projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
+    });
+    registry.register(
+      codec({
+        typeId: 'test/should-not-run@1',
+        targetTypes: ['text'],
+        encode: (v: string) => v,
+        decode: () => {
+          throw new Error('codec must not be invoked for null wire values');
+        },
+      }),
+    );
+
+    const result = await decodeRow({ id: null }, plan, registry);
+    expect(result).toEqual({ id: null });
+  });
+
   it('decodeField is single-armed: same path for sync and async codec authors', async () => {
     const registry = createCodecRegistry();
     const buildCodec = (
