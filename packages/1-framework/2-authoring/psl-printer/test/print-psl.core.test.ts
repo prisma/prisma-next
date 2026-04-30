@@ -1,7 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/print-psl';
-import { makeOptions } from './print-psl-test-helpers';
+import { printPslLegacy as printPsl } from '../src/legacy-shim';
 
 describe('printPsl', () => {
   it('empty schema', () => {
@@ -9,7 +8,7 @@ describe('printPsl', () => {
       tables: {},
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
       "
@@ -34,7 +33,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -52,7 +51,6 @@ describe('printPsl', () => {
   it('custom header', () => {
     const schemaIR: SqlSchemaIR = { tables: {}, dependencies: [] };
     const result = printPsl(schemaIR, {
-      ...makeOptions(schemaIR),
       header: '// Custom header line',
     });
     expect(result).toMatchInlineSnapshot(`
@@ -82,7 +80,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -120,7 +118,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -162,8 +160,8 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result1 = printPsl(schemaIR, makeOptions(schemaIR));
-    const result2 = printPsl(schemaIR, makeOptions(schemaIR));
+    const result1 = printPsl(schemaIR);
+    const result2 = printPsl(schemaIR);
     expect(result1).toBe(result2);
     expect(result1.indexOf('ATable')).toBeLessThan(result1.indexOf('BTable'));
   });

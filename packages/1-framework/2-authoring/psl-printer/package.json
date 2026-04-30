@@ -16,6 +16,8 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
+    "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/psl-types": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/utils": "workspace:*"
   },
@@ -35,9 +37,9 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs"
     },
-    "./postgres": {
-      "types": "./dist/postgres.d.mts",
-      "import": "./dist/postgres.mjs"
+    "./legacy": {
+      "types": "./dist/legacy.d.mts",
+      "import": "./dist/legacy.mjs"
     },
     "./package.json": "./package.json"
   },

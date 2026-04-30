@@ -1,7 +1,6 @@
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import { describe, expect, it } from 'vitest';
-import { printPsl } from '../src/print-psl';
-import { makeOptions } from './print-psl-test-helpers';
+import { printPslLegacy as printPsl } from '../src/legacy-shim';
 
 describe('printPsl', () => {
   it('escapes inferred relation field names that would start with a digit', () => {
@@ -42,7 +41,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -113,7 +112,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -170,7 +169,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -205,7 +204,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -243,7 +242,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -281,7 +280,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -315,7 +314,7 @@ describe('printPsl', () => {
       },
       dependencies: [],
     };
-    const result = printPsl(schemaIR, makeOptions(schemaIR));
+    const result = printPsl(schemaIR);
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
@@ -356,7 +355,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    expect(() => printPsl(schemaIR, makeOptions(schemaIR))).toThrowErrorMatchingInlineSnapshot(`
+    expect(() => printPsl(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
       [Error: PSL model name collisions detected:
       - model "UserProfile" from tables "user_profile", "UserProfile"]
     `);
@@ -390,7 +389,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    expect(() => printPsl(schemaIR, makeOptions(schemaIR))).toThrowErrorMatchingInlineSnapshot(`
+    expect(() => printPsl(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
       [Error: PSL top-level name collisions detected:
       - identifier "UserRole" from table "user_role" collides with enum type "user_role"]
     `);
@@ -418,7 +417,7 @@ describe('printPsl', () => {
       dependencies: [],
     };
 
-    expect(() => printPsl(schemaIR, makeOptions(schemaIR))).toThrowErrorMatchingInlineSnapshot(`
+    expect(() => printPsl(schemaIR)).toThrowErrorMatchingInlineSnapshot(`
       [Error: PSL enum name collisions detected:
       - enum "UserRole" from enum types "user_role", "UserRole"]
     `);
