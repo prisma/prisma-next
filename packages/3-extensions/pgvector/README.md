@@ -90,7 +90,7 @@ export const contract = defineContract({
 });
 ```
 
-The `vector(N)` factory is registered through the unified `CodecDescriptor<{ length: number }>` shape — `paramsSchema` validates the dimension at the contract boundary, `renderOutputType: ({ length }) => 'Vector<' + length + '>'` produces the column's TS type for `contract.d.ts`, and the curried `factory` materializes the runtime codec at context construction. See [ADR 207 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the descriptor model. For undimensioned vector columns (rare; typically only valid in legacy schemas where `vector` was declared without a dimension), use `vectorColumn` instead.
+The `vector(N)` factory is registered through the unified `CodecDescriptor<{ length: number }>` shape — `paramsSchema` validates the dimension at the contract boundary, `renderOutputType: ({ length }) => 'Vector<' + length + '>'` produces the column's TS type for `contract.d.ts`, and the curried `factory` materializes the runtime codec at context construction. See [ADR 208 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the descriptor model. For undimensioned vector columns (rare; typically only valid in legacy schemas where `vector` was declared without a dimension), use `vectorColumn` instead.
 
 ### Runtime Setup
 

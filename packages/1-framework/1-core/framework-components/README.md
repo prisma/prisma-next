@@ -67,22 +67,22 @@ Aborts surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'enc
 
 See [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) for the full design.
 
-## Higher-order codecs (`CodecDescriptor`, `Ctx`, `synthesizeNonParameterizedDescriptor`)
+## Higher-order codecs (`CodecDescriptor`, `CodecInstanceContext`, `synthesizeNonParameterizedDescriptor`)
 
 Codec metadata, parameterized-codec registration, and runtime materialization live on a unified `CodecDescriptor<P>`:
 
 ```ts
-import type { CodecDescriptor, Ctx } from '@prisma-next/framework-components/codec';
+import type { CodecDescriptor, CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import { synthesizeNonParameterizedDescriptor, voidParamsSchema } from '@prisma-next/framework-components/codec';
 ```
 
-- `CodecDescriptor<P = void>` carries `codecId`, `traits`, `targetTypes`, `meta`, `paramsSchema: StandardSchemaV1<P>`, optional `renderOutputType`, and a curried `factory: (P) => (Ctx) => Codec`. Non-parameterized codecs use `P = void` and a constant factory; parameterized codecs use a non-empty `P` (e.g. `{ length: number }` for pgvector).
-- `Ctx` (`{ name; usedAt: ReadonlyArray<{ table; column }> }`) is supplied by the runtime when materializing a per-instance codec. Pack authors close over it inside the factory; they never construct it. This is the **per-materialization** context, sibling to the **per-call** `CodecCallContext` documented above.
+- `CodecDescriptor<P = void>` carries `codecId`, `traits`, `targetTypes`, `meta`, `paramsSchema: StandardSchemaV1<P>`, optional `renderOutputType`, and a curried `factory: (P) => (CodecInstanceContext) => Codec`. Non-parameterized codecs use `P = void` and a constant factory; parameterized codecs use a non-empty `P` (e.g. `{ length: number }` for pgvector).
+- `CodecInstanceContext` (family-agnostic, `{ name }` only) is supplied by the runtime when materializing a per-instance codec. Pack authors close over it inside the factory; they never construct it. This is the **per-materialization** context, sibling to the **per-call** `CodecCallContext` documented above. Family-specific extensions augment it — the SQL family ships `SqlCodecInstanceContext extends CodecInstanceContext` in `@prisma-next/sql-relational-core/ast`, adding `usedAt: ReadonlyArray<{ table; column }>` for SQL-domain codecs that need column-set metadata.
 - `synthesizeNonParameterizedDescriptor(codec)` wraps an existing `Codec` (with its async `encode`/`decode` per ADR 204) into a `CodecDescriptor<void>` whose constant factory returns the same shared codec instance for every column. The synthesis bridge keeps non-parameterized codec contributors on the legacy `codecs:` slot while the unified descriptor map remains the single read source for codec-id-keyed metadata.
 
 `paramsSchema` is typed as Standard Schema (`StandardSchemaV1<P>`), not arktype-specific. arktype `Type`s satisfy the shape via their `~standard` getter, so existing arktype-typed descriptors satisfy the new shape transparently while `framework-components` itself takes no dependency on arktype.
 
-See [ADR 207 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the full design.
+See [ADR 208 — Higher-order codecs for parameterized types](../../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the full design.
 
 ## Why SPI types live here (dependency inversion)
 

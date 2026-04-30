@@ -1,4 +1,10 @@
-# ADR 207 — Higher-order codecs for parameterized types
+# ADR 208 — Higher-order codecs for parameterized types
+
+## Context
+
+ADR 207 (`cfe1b6dee`, [PR #400](https://github.com/prisma/prisma-next/pull/400) / TML-2330) was claimed by *Codec call context: per-query AbortSignal and column metadata* on a parallel branch; this ADR took the next free slot at 208.
+
+The framework codec layering documented here mirrors PR #400's family-extension split: the framework `CodecInstanceContext` is family-agnostic (`{ name }` only); the SQL `SqlCodecInstanceContext` extends it with `usedAt: ReadonlyArray<{ table; column }>` in `sql-relational-core`. PR #400 shipped the same pattern at the per-call context: framework-level `CodecCallContext` (signal-only); SQL-level `SqlCodecCallContext extends CodecCallContext` adding `column?: SqlColumnRef`. The two split-points (per-instance materialization here, per-call dispatch in PR #400) share one principle — SQL-domain vocabulary lives in the SQL family layer; family-agnostic code uses the family-agnostic base.
 
 ## At a glance
 
@@ -34,7 +40,7 @@ export interface CodecDescriptor<P = void> {
   readonly meta?: CodecMeta;
   readonly paramsSchema: StandardSchemaV1<P>;
   readonly renderOutputType?: (params: P) => string | undefined;
-  readonly factory: (params: P) => (ctx: Ctx) => Codec;
+  readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
 }
 ```
 
@@ -77,16 +83,23 @@ const pgTextCodec: CodecDescriptor<void> = {
 
 Whether a codec id "is parameterized" stops being a registration-time distinction; it's a property of `P` on the descriptor. The descriptor map indexes every descriptor by `codecId`; both `descriptorFor(codecId)` (codec-id-keyed metadata reads) and `forColumn(table, column)` (column-aware dispatch reads) resolve through the same map without branching.
 
-`Ctx` is a small framework-supplied input the curried factory closes over:
+`CodecInstanceContext` is a small framework-supplied input the curried factory closes over. The base shape is family-agnostic; SQL-family extensions augment it with domain-shaped column-set metadata.
 
 ```ts
-export interface Ctx {
+// packages/1-framework/1-core/framework-components/src/codec-types.ts
+export interface CodecInstanceContext {
   readonly name: string;
+}
+
+// packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts
+export interface SqlCodecInstanceContext extends CodecInstanceContext {
   readonly usedAt: ReadonlyArray<{ readonly table: string; readonly column: string }>;
 }
 ```
 
-Pack authors never construct it. The runtime synthesizes it at contract-load time: `name` is the named-instance identity (the `storage.types` entry name, an `<anon:t.c>` for inline-`typeParams` columns, or a `<shared:codecId>` sentinel for non-parameterized codecs); `usedAt` is plural so a `storage.types` entry shared across multiple columns can derive shared per-instance state from the aggregated set (e.g. a column-scoped encryption codec deriving one key for every column referencing the entry).
+Pack authors never construct it. The runtime synthesizes it at contract-load time: `name` is the family-agnostic instance identity (in SQL, the `storage.types` entry name, an `<anon:t.c>` for inline-`typeParams` columns, or a `<shared:codecId>` sentinel for non-parameterized codecs); the SQL-extended `usedAt` is plural so a `storage.types` entry shared across multiple columns can derive shared per-instance state from the aggregated set (e.g. a column-scoped encryption codec deriving one key for every column referencing the entry). SQL extensions that consume `usedAt` author against `SqlCodecInstanceContext`; extensions that don't read it stay on the family-agnostic base.
+
+The split mirrors PR #400's `CodecCallContext` / `SqlCodecCallContext` precedent for the per-call context: SQL-domain vocabulary lives in `sql-relational-core`; framework-components stays family-agnostic.
 
 `paramsSchema` is typed as **Standard Schema** (`StandardSchemaV1<P>`), not arktype-specific. The arktype `Type` already implements Standard Schema via its `~standard` getter, so existing arktype-typed descriptors satisfy the new shape transparently while `framework-components` itself takes no dependency on arktype. The runtime calls `paramsSchema['~standard'].validate(typeParams)` synchronously and rejects Promise-returning validators with `RUNTIME.TYPE_PARAMS_INVALID`.
 
@@ -96,11 +109,11 @@ The same `vector(1536)` participates in four code paths. Each reads a different 
 
 ### 1. Column authoring
 
-`vector(1536)` returns a `ColumnTypeDescriptor` carrying both the data the contract IR needs (`codecId: 'pg/vector@1'`, `nativeType: 'vector'`, `typeParams: { length: 1536 }`) and, for codecs that need it, the curried factory itself, threaded through a first-class `type: (ctx: Ctx) => Codec<…>` slot. The contract-authoring builder consumes the data part for the IR; the `type` slot is authoring-time only and is never serialized to `contract.json`.
+`vector(1536)` returns a `ColumnTypeDescriptor` carrying both the data the contract IR needs (`codecId: 'pg/vector@1'`, `nativeType: 'vector'`, `typeParams: { length: 1536 }`) and, for codecs that need it, the curried factory itself, threaded through a first-class `type: (ctx: CodecInstanceContext) => Codec<…>` slot. The contract-authoring builder consumes the data part for the IR; the `type` slot is authoring-time only and is never serialized to `contract.json`.
 
 ### 2. No-emit type resolution
 
-`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` follows `typeRef` through `storage.types`, then synthetically applies `Ctx` to the column's `type` slot at the type level and reads the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this produces `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']`. Nullability is reattached uniformly.
+`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` follows `typeRef` through `storage.types`, then synthetically applies `CodecInstanceContext` to the column's `type` slot at the type level and reads the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this produces `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']`. Nullability is reattached uniformly.
 
 ### 3. Emit-path rendering
 
@@ -145,7 +158,7 @@ Both problems share a root cause: the type-level facts about a parameterized col
 
 ### Trade-offs
 
-- **`ColumnTypeDescriptor` grew an authoring-time `type` slot.** The optional `type?: (ctx: Ctx) => Codec` field is the price of letting the no-emit resolver read the factory's return type without reaching into the runtime codec registry. The slot is structurally optional, ignored by the IR serializer, and never appears in `contract.json`.
+- **`ColumnTypeDescriptor` grew an authoring-time `type` slot.** The optional `type?: (ctx: CodecInstanceContext) => Codec` field is the price of letting the no-emit resolver read the factory's return type without reaching into the runtime codec registry. The slot is structurally optional, ignored by the IR serializer, and never appears in `contract.json`.
 - **Per-library extensions own JSON-with-schema.** A schema-typed JSON column is not a postgres-adapter concept; it's a per-library concept. The cost is one more import for users who want a typed JSON column; the benefit is that each library ships a lossless pipeline rather than a generic Standard-Schema-driven shape that's lossy for narrowed types.
 - **Encode-side `forCodecId` legacy fallback (carved out, AC-5-deferred).** `ParamRef` carries `codecId` but not `(table, column)` today, so encode-side dispatch consults `contractCodecs.forCodecId(codecId)` instead of `forColumn`. The fallback works for the parameterized codecs shipped at this ADR's landing because their encode is per-instance-stateless w.r.t. params (pgvector formats `[v1,v2,…]` regardless of declared length; arktype-json's encode is `JSON.stringify`). The carve-out is documented at the registry boundary in `relational-core/src/ast/codec-types.ts:101-129` and retires under TML-2357 once `ParamRef.refs` is threaded through column-bound construction sites.
 - **Heterogeneous-`P` registry boundary.** `descriptorFor(codecId): CodecDescriptor<P>` is structurally heterogeneous across codec ids — `P` is `void` for `pg/text@1`, `{ length: number }` for `pg/vector@1`, `{ expression; jsonIr }` for `arktype/json@1`, etc. The registry's interface methods cannot be honestly typed at the registry level without `<any>` at the boundary; consumers narrow per codec id at the call site. A typed-dispatch / sealed-visitor refactor would eliminate the suppressions but is not in scope; the registry interface uses `CodecDescriptor<any>` with documented one-line rationale comments at the four production sites.
