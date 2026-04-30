@@ -22,6 +22,16 @@ The work fits one milestone — it's a single coherent structural change. Tasks 
 
 Delivers the headline behaviour: typed reads through the ORM and query-builder return decoded JS values (notably hex `_id` strings), with structured `RUNTIME.DECODE_FAILED` envelopes on codec failure. Validated end-to-end via `mongodb-memory-server`-backed integration tests.
 
+**Validation gate:**
+
+- `pnpm build` — affected Mongo packages export new types; tsdown must regenerate `dist/*.d.mts` so downstream consumers (orm, query-builder, mongo extension, integration tests) can typecheck against them.
+- `pnpm typecheck` — repo-wide; catches consumer call sites that break on the new required `MongoRuntimeOptions.codecs` field (mongo extension, query-builder/orm internal callers, runtime test setup, etc.).
+- `pnpm test:packages` — workspace-scoped tests, excludes examples/. Covers the new `decodeMongoRow` unit tests, the headline `mongodb-memory-server` integration test, and ensures no regressions in adjacent Mongo packages.
+- `pnpm lint:deps` — guards layering as new exports flow from `query-ast` into lanes and runtime.
+- `pnpm lint` — repo-wide biome.
+
+If any gate fails, surface to the orchestrator before declaring the milestone done. Cross-package gates are essential here because the new required `codecs` field on `MongoRuntimeOptions` is a public-export change that consumers (extension, tests, examples) must adopt.
+
 **Tasks:**
 
 #### Structural types (foundation)
