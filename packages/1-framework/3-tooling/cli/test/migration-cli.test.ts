@@ -252,7 +252,7 @@ describe('MigrationCLI.run', () => {
     expect(manifest.migrationHash).toMatch(/^sha256:/);
   });
 
-  it('falls back to a synthesized manifest when the existing migration.json is unparseable', async () => {
+  it('exits non-zero with MIGRATION.INVALID_JSON when migration.json is unparseable', async () => {
     loadConfigMock.mockResolvedValue({
       family: { familyId: 'sql' },
       target: { targetId: 'postgres' },
@@ -261,15 +261,20 @@ describe('MigrationCLI.run', () => {
     });
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
-    writeFileSync(join(workDir, 'migration.json'), '{ this is not json');
+    const malformed = '{ this is not json';
+    writeFileSync(join(workDir, 'migration.json'), malformed);
 
     await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
 
-    const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
-    expect(manifest.from).toBe('sha256:from');
-    expect(manifest.to).toBe('sha256:to');
-    expect(manifest.fromContract).toBeNull();
-    expect(manifest.toContract).toEqual({ storage: { storageHash: 'sha256:to' } });
+    expect(process.exitCode).toBe(1);
+    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
+    expect(stderrText).toContain('Invalid JSON in migration file');
+    expect(stderrText).toContain(join(workDir, 'migration.json'));
+
+    expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
+
+    const onDisk = readFileSync(join(workDir, 'migration.json'), 'utf-8');
+    expect(onDisk).toBe(malformed);
   });
 
   it('forwards --config=<path> (equals form) to loadConfig', async () => {

@@ -1,1 +1,1 @@
-export { MigrationToolsError } from '../errors';
+export { errorInvalidJson, MigrationToolsError } from '../errors';

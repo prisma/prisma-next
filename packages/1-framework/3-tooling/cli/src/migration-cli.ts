@@ -41,6 +41,7 @@ import { fileURLToPath } from 'node:url';
 import { CliStructuredError, errorMigrationCliInvalidConfigArg } from '@prisma-next/errors/control';
 import { errorMigrationTargetMismatch } from '@prisma-next/errors/migration';
 import { createControlStack } from '@prisma-next/framework-components/control';
+import { errorInvalidJson, MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import {
   buildMigrationArtifacts,
@@ -186,7 +187,7 @@ export class MigrationCLI {
 
       serializeMigrationToDisk(instance, migrationDir, args.dryRun);
     } catch (err) {
-      if (CliStructuredError.is(err)) {
+      if (CliStructuredError.is(err) || MigrationToolsError.is(err)) {
         process.stderr.write(`${err.message}: ${err.why}\n`);
       } else {
         process.stderr.write(`${err instanceof Error ? err.message : String(err)}\n`);
@@ -219,8 +220,8 @@ function readExistingMetadata(metadataPath: string): Partial<MigrationMetadata> 
   }
   try {
     return JSON.parse(raw) as Partial<MigrationMetadata>;
-  } catch {
-    return null;
+  } catch (e) {
+    throw errorInvalidJson(metadataPath, e instanceof Error ? e.message : String(e));
   }
 }
 
