@@ -29,8 +29,8 @@ This guide defines how Prisma Next's CLI behaves and looks. It exists to keep ou
 
 The CLI follows the Unix convention of separating human-readable decoration from machine-readable data:
 
-- **stdout** — data output only (`ui.output()`). This is what scripts and pipes capture.
-- **stderr** — all decoration (Clack spinners, logs, notes, intro/outro). Visible in terminal, invisible in pipes.
+- **stdout** — the data the caller asked for. This is what scripts and pipes capture. Includes successful `ui.output()` payloads, `--version` output, and explicitly-requested `--help` (see below).
+- **stderr** — decoration around some other operation (Clack spinners, logs, notes, intro/outro), warnings, errors, and help printed as part of an error (e.g. unknown-command usage hints). Visible in terminal, invisible in pipes.
 
 ### Rules
 
@@ -41,6 +41,7 @@ The CLI follows the Unix convention of separating human-readable decoration from
 5. **Data commands** (verify, emit, introspect, status) call both decoration (stderr) and `ui.output()` (stdout). In interactive mode, decoration is visible on stderr; `ui.output()` writes to stdout only when the command has data to emit (gated by `--json`).
 6. **Never write data to stderr** — decoration methods are for human context only.
 7. **Never write decoration to stdout** — it breaks pipes, `$(...)` captures, and `> file` redirects.
+8. **`--help` and `--version` are data when explicitly requested.** When the user invokes `prisma-next --help` (or any subcommand `--help`) or `prisma-next --version`, the rendered text **is** the data the caller asked for and goes to **stdout** with exit code 0. This makes `prisma-next --help | less`, `prisma-next --help > usage.txt`, and `diff <(prisma-next --help) <(prisma-next --version)` all work as expected — matching POSIX, GNU coreutils, git, and npm. **Help printed as part of an error** (unknown command, missing subcommand, bad flag) is decoration around that error and goes to **stderr** with the corresponding non-zero exit code. The user did not invoke `--help` in those cases — the CLI is voluntarily showing usage to help them recover, which is decoration. Same printed bytes; different invocation intent; different stream.
 
 ### How it works in practice
 
@@ -65,6 +66,7 @@ The CLI checks `process.stdout.isTTY` once at startup to determine the output mo
   - Root help (`prisma-next --help`): Shows "prisma next" title with subcommands listed
   - Command help (`prisma-next db verify --help`): Shows "next <command> ➜ <description>" with options, subcommands, and docs URLs
   - Help formatters are in `packages/1-framework/3-tooling/cli/src/utils/formatters/` (multiple focused modules)
+- **Routing**: explicit `--help` (and `--version`) prints to **stdout** with exit code 0; help printed as part of an error (unknown command, missing subcommand, bad flag) prints to **stderr** with the corresponding non-zero exit code. See [Output Conventions](#output-conventions-composable-cli-output) rule 8 for the rationale.
 - **Fixed-Width Columns**: All two-column output (help, styled headers) uses fixed 20-character left column width for consistent alignment
 - **Text Wrapping**: Right column wraps at 90 characters using `wrap-ansi` for ANSI-aware wrapping that preserves color codes
 - **Default Values**: Options with default values display `default: <value>` on the following line (dimmed)
@@ -141,7 +143,7 @@ This is a deliberate divergence from clig.dev §Arguments §Confirmation. AI age
 
 Exit codes are a **coarse classification** of command outcomes, intended for shell-level branching (`if ! prisma-next ...; then`) and CI gates. Fine-grained discrimination uses **PN error codes** — every structured error carries one, and scripts that need to react to a specific failure mode (e.g. "retry on `PN-CLI-5004` but fail on `PN-CLI-5003`") MUST match on the PN code.
 
-Streams are covered in [Output Conventions](#output-conventions-composable-cli-output): stdout is data-only; stderr carries decoration, warnings, errors, and help.
+Streams are covered in [Output Conventions](#output-conventions-composable-cli-output): stdout carries the data the caller asked for (including explicit `--help` / `--version`); stderr carries decoration, warnings, errors, and help-as-decoration (e.g. usage hints printed alongside an unknown-command error).
 
 ### Reserved (CLI-wide)
 

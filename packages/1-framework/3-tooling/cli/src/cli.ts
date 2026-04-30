@@ -50,8 +50,18 @@ program.configureOutput({
   writeErr: () => {
     // Suppress all default error output - we handle errors in exitOverride
   },
-  writeOut: () => {
-    // Suppress all default output - our custom formatters handle everything
+  writeOut: (str) => {
+    // Commander routes explicitly-requested `--help` (success-path help)
+    // through writeOut; per the Style Guide § Output Conventions rule 8,
+    // user-requested help is data and goes to stdout. Error-path help
+    // (e.g. usage shown after an unknown command) goes through writeErr,
+    // which stays suppressed because we render that ourselves with the
+    // matching error envelope.
+    //
+    // Explicit `--version` is short-circuited before `program.parse()`
+    // (see the argv pre-scan at the bottom of this file), so it does not
+    // reach this writer.
+    process.stdout.write(str);
   },
 });
 
@@ -261,14 +271,25 @@ const helpCommand = new Command('help')
   .action(() => {
     const flags = parseGlobalFlags({});
     const helpText = formatRootHelp({ program, flags });
-    // Help is decoration → stderr
-    process.stderr.write(`${helpText}\n`);
+    // The `help` command was invoked explicitly: help is the data the
+    // caller asked for. Per Style Guide § Output Conventions rule 8,
+    // explicit help goes to stdout with exit code 0.
+    process.stdout.write(`${helpText}\n`);
     process.exit(0);
   });
 
 program.addCommand(helpCommand);
 
-// Set help as the default action when no command is provided
+// Set help as the default action when no command is provided. The user
+// did not invoke `--help`; we are voluntarily showing usage to help them
+// recover from an underspecified invocation, so the help text is
+// decoration around an implicit "what did you want me to do?" and goes
+// to stderr (Style Guide § Output Conventions rule 8).
+//
+// FOLLOW-UP: the exit code here is 0 today, but a no-arg invocation is
+// arguably a usage error (PRECONDITION → exit 2) for consistency with
+// the unknown-command path. Out of scope for the explicit-help routing
+// work; revisit when tightening exit-code semantics across the CLI.
 program.action(() => {
   const flags = parseGlobalFlags({});
   const helpText = formatRootHelp({ program, flags });
@@ -304,7 +325,12 @@ if (args.length > 0) {
       process.stderr.write(`${helpText}\n`);
       process.exit(2);
     } else if (command.commands.length > 0 && args.length === 1) {
-      // Parent command called with no subcommand - show help and exit with 0
+      // Parent command called with no subcommand. Same shape as the
+      // no-args case above: the user did not request help, we are
+      // voluntarily rendering it as decoration around an underspecified
+      // invocation, so it goes to stderr per Style Guide § Output
+      // Conventions rule 8. Exit code 0 today; the FOLLOW-UP note on
+      // `program.action` applies here too (arguably should be 2).
       const flags = parseGlobalFlags({});
       const helpText = formatCommandHelp({ command, flags });
       process.stderr.write(`${helpText}\n`);
