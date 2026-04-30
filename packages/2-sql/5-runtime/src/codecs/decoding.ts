@@ -8,6 +8,7 @@ import type {
   AnyQueryAst,
   Codec,
   CodecRegistry,
+  ContractCodecRegistry,
   ProjectionItem,
   SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
@@ -40,7 +41,45 @@ function projectionListFromAst(ast: AnyQueryAst): ReadonlyArray<ProjectionItem> 
   return ast.returning;
 }
 
-function buildDecodeContext(plan: SqlExecutionPlan, registry: CodecRegistry): DecodeContext {
+/**
+ * Resolve the per-cell codec for a projection item.
+ *
+ * Phase B: when a `(table, column)` ref is available for the projection,
+ * prefer `contractCodecs.forColumn(table, column)` — that's the per-
+ * instance resolved codec materialized from the codec descriptor's
+ * factory at context-construction time (carries any per-instance state
+ * such as the compiled JSON-Schema validator). When the projection
+ * resolves to a non-`column-ref` expression (computed projections, raw
+ * SQL aliases) but still carries a codec id (ADR 205 stamps every
+ * `ProjectionItem` with the producer's codec id), fall back to the
+ * codec-id-keyed `forCodecId(codecId)` lookup, which itself falls back
+ * to the legacy `CodecRegistry` for codec ids the contract walk
+ * couldn't resolve.
+ *
+ * Codec-registry-unification spec § AC-4.
+ */
+function resolveProjectionCodec(
+  item: ProjectionItem,
+  registry: CodecRegistry,
+  contractCodecs: ContractCodecRegistry | undefined,
+): Codec | undefined {
+  if (item.expr.kind === 'column-ref' && contractCodecs) {
+    const byColumn = contractCodecs.forColumn(item.expr.table, item.expr.column);
+    if (byColumn) return byColumn;
+  }
+  if (item.codecId) {
+    const fromContract = contractCodecs?.forCodecId(item.codecId);
+    if (fromContract) return fromContract;
+    return registry.get(item.codecId);
+  }
+  return undefined;
+}
+
+function buildDecodeContext(
+  plan: SqlExecutionPlan,
+  registry: CodecRegistry,
+  contractCodecs: ContractCodecRegistry | undefined,
+): DecodeContext {
   if (!isAstBackedPlan(plan)) {
     return {
       aliases: undefined,
@@ -68,11 +107,9 @@ function buildDecodeContext(plan: SqlExecutionPlan, registry: CodecRegistry): De
   for (const item of projection) {
     aliases.push(item.alias);
 
-    if (item.codecId) {
-      const codec = registry.get(item.codecId);
-      if (codec) {
-        codecs.set(item.alias, codec);
-      }
+    const codec = resolveProjectionCodec(item, registry, contractCodecs);
+    if (codec) {
+      codecs.set(item.alias, codec);
     }
 
     if (item.expr.kind === 'column-ref') {
@@ -252,11 +289,12 @@ export async function decodeRow(
   registry: CodecRegistry,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
   rowCtx: SqlCodecCallContext,
+  contractCodecs?: ContractCodecRegistry,
 ): Promise<Record<string, unknown>> {
   checkAborted(rowCtx, 'decode');
   const signal = rowCtx.signal;
 
-  const decodeCtx = buildDecodeContext(plan, registry);
+  const decodeCtx = buildDecodeContext(plan, registry, contractCodecs);
 
   const aliases = decodeCtx.aliases ?? Object.keys(row);
 
