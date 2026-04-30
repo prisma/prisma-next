@@ -131,10 +131,13 @@ flowchart TD
 - Exports column descriptors for built-in types and enum helpers (`enumType`, `enumColumn(typeRef, nativeType)`)
 - Parameterized helpers: `charColumn(length)`, `varcharColumn(length)`, `numericColumn(precision, scale?)`, `bitColumn(length)`, `varbitColumn(length)`, `timeColumn(precision?)`, `timetzColumn(precision?)`, `intervalColumn(precision?)`
 
-- Exports JSON helpers:
-  - `jsonColumn`, `jsonbColumn`
-  - `json(schema?)`, `jsonb(schema?)` where `schema` is a Standard Schema value (e.g., Arktype)
-  - When a schema is provided, `typeParams` metadata is derived from the schema's `~standard` interface
+- Exports raw JSON helpers:
+  - `jsonColumn`, `jsonbColumn` — untyped raw JSON / JSONB column descriptors
+  - For schema-typed JSON columns, use the per-library extension package
+    (`@prisma-next/extension-arktype-json` for arktype). The
+    schema-accepting `json(schema)` / `jsonb(schema)` overloads
+    previously shipped here retired in Phase C of the
+    codec-registry-unification project.
 
 ## Dependencies
 
@@ -277,7 +280,8 @@ Both `json` and `jsonb` accept any valid JSON value:
 ### Authoring helpers
 
 ```typescript
-import { json, jsonb } from '@prisma-next/adapter-postgres/column-types';
+import { jsonbColumn } from '@prisma-next/adapter-postgres/column-types';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
 import { type as arktype } from 'arktype';
 
 const auditPayloadSchema = arktype({
@@ -287,26 +291,28 @@ const auditPayloadSchema = arktype({
 
 table('event', (t) =>
   t
-    .column('payload', { type: jsonb(auditPayloadSchema), nullable: false })
-    .column('raw', { type: json(), nullable: true }),
+    // Schema-typed JSONB via the per-library extension package.
+    .column('payload', { type: arktypeJson(auditPayloadSchema), nullable: false })
+    // Untyped raw JSONB via the adapter's static descriptor.
+    .column('raw', { type: jsonbColumn, nullable: true }),
 );
 ```
 
 ### Typed fallback behavior
 
-- If a schema value is provided, emitted `contract.d.ts` derives a concrete type from that schema.
-- If no schema is provided, emitted type falls back to `JsonValue`.
+- For schema-typed columns, use a per-library extension package
+  (e.g. `@prisma-next/extension-arktype-json`). The emit-path renderer
+  reads the schema's `expression` from typeParams and produces a concrete
+  TS type in `contract.d.ts`.
+- For untyped columns (`jsonColumn`, `jsonbColumn`), the emitted type
+  falls back to `JsonValue`.
 - Runtime values still encode/decode as JSON-compatible values.
-
-### Standard Schema integration
-
-`json(schema)` and `jsonb(schema)` accept Standard Schema values. Arktype schemas work out of the box via their Standard Schema adapter (`schema['~standard']`).
 
 ## Exports
 
 - `./adapter`: Adapter implementation (`createPostgresAdapter`)
 - `./codec-types`: PostgreSQL codec types (`CodecTypes`, `JsonValue`, `dataTypes`)
-- `./column-types`: Column type descriptors and authoring helpers (`json`, `jsonb`, `jsonColumn`, `jsonbColumn`, `enumType`, `enumColumn`, `textColumn`, `int4Column`, etc.)
+- `./column-types`: Column type descriptors and authoring helpers (`jsonColumn`, `jsonbColumn`, `enumType`, `enumColumn`, `textColumn`, `int4Column`, etc.)
 - `./types`: PostgreSQL-specific types
 - `./control`: Control-plane entry point (adapter descriptor)
 - `./runtime`: Runtime-plane entry point (runtime adapter descriptor)

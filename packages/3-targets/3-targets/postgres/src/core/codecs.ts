@@ -40,7 +40,6 @@ import {
   PG_VARBIT_CODEC_ID,
   PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
-import { renderTypeScriptTypeFromJsonSchema } from './json-schema-type-expression';
 
 const lengthParamsSchema = arktype({
   length: 'number.integer > 0',
@@ -85,19 +84,13 @@ function renderPrecision(typeName: string, typeParams: Record<string, unknown>):
   return `${typeName}<${precision}>`;
 }
 
-function renderJsonOutputType(typeParams: Record<string, unknown>): string {
-  const typeName = typeParams['type'];
-  if (typeof typeName === 'string' && typeName.trim().length > 0) {
-    return typeName.trim();
-  }
-  const schema = typeParams['schemaJson'];
-  if (schema && typeof schema === 'object') {
-    return renderTypeScriptTypeFromJsonSchema(schema);
-  }
-  throw new Error(
-    `renderOutputType: JSON codec typeParams must contain "type" (string) or "schemaJson" (object), got keys: ${Object.keys(typeParams).join(', ')}`,
-  );
-}
+// Phase C: postgres' raw json/jsonb codecs no longer carry a
+// `renderOutputType` slot — the schema-typed JSON surface that drove
+// `typeParams: { schemaJson, type? }` retired in favor of the per-library
+// extension package (`@prisma-next/extension-arktype-json`). Untyped
+// json/jsonb columns have no typeParams; the framework emit path falls
+// through to the generic `CodecTypes['pg/jsonb@1']['output']` accessor
+// (which resolves to `JsonValue` via the codec-types map).
 
 function aliasCodec<
   Id extends string,
@@ -562,7 +555,6 @@ const pgJsonCodec = codec({
   encode: (value: string | JsonValue): string => JSON.stringify(value),
   decode: (wire: string | JsonValue): JsonValue =>
     typeof wire === 'string' ? JSON.parse(wire) : wire,
-  renderOutputType: renderJsonOutputType,
   meta: {
     db: {
       sql: {
@@ -581,7 +573,6 @@ const pgJsonbCodec = codec({
   encode: (value: string | JsonValue): string => JSON.stringify(value),
   decode: (wire: string | JsonValue): JsonValue =>
     typeof wire === 'string' ? JSON.parse(wire) : wire,
-  renderOutputType: renderJsonOutputType,
   meta: {
     db: {
       sql: {
