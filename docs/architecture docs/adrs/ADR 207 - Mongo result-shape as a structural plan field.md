@@ -188,7 +188,7 @@ mongoQuery(contract).rawCommand(new RawAggregateCommand('users', [...]))
 // Synthetic codec whose decode throws.
 RuntimeError {
   code: 'RUNTIME.DECODE_FAILED',
-  message: "Failed to decode field users.address.city with codec 'mongo/string@1': boom",
+  message: "Failed to decode field address.city in collection 'users' with codec 'mongo/string@1': boom",
   details: {
     collection: 'users',
     path: 'address.city',
