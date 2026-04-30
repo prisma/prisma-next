@@ -109,6 +109,14 @@ export interface PslModel {
   readonly fields: readonly PslField[];
   readonly attributes: readonly PslModelAttribute[];
   readonly span: PslSpan;
+  /**
+   * Optional leading comment line emitted above the `model` keyword by the
+   * printer. Producers (e.g. `sqlSchemaIrToPslAst`) attach introspection
+   * advisories such as "// WARNING: This table has no primary key in the
+   * database" here. The parser leaves this field unset; round-tripping a
+   * parsed schema does not re-attach comments.
+   */
+  readonly comment?: string;
 }
 
 export interface PslEnumValue {

@@ -249,12 +249,22 @@ function buildModel(
     modelAttributes.push(buildMapAttribute('model', mapName));
   }
 
+  // Surface introspection advisory: tables without a primary key cannot serve
+  // as the right-hand side of a `findUnique`-style query downstream, so the
+  // user should add an `@id` policy. This warning has shipped since
+  // `contract infer` was introduced and is part of the spec § A9 byte-identity
+  // contract for SQL output.
+  const comment = table.primaryKey
+    ? undefined
+    : '// WARNING: This table has no primary key in the database';
+
   return {
     kind: 'model',
     name: modelName,
     fields,
     attributes: modelAttributes,
     span: SYNTHETIC_SPAN,
+    ...(comment !== undefined ? { comment } : {}),
   };
 }
 

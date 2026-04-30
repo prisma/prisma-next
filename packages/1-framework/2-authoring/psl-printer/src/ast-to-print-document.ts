@@ -124,7 +124,7 @@ function modelToPrinterModel(model: PslModel): PrinterModel {
     mapName,
     fields: printerFields,
     modelAttributes: modelAttrStrings,
-    comment: undefined,
+    comment: model.comment,
   };
 }
 

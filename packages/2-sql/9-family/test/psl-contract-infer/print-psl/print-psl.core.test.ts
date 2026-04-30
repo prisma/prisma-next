@@ -77,6 +77,7 @@ describe('printPsl', () => {
     expect(result).toMatchInlineSnapshot(`
       "// This file was introspected from the database. Do not edit manually.
 
+      // WARNING: This table has no primary key in the database
       model AuditLog {
         event     String
         timestamp DateTime
