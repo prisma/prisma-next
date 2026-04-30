@@ -25,26 +25,31 @@ import { describeWithMongoDB } from './setup';
 // Contract fixture — Products + Orders, purpose-built for pipeline testing
 // ---------------------------------------------------------------------------
 
+type ScalarField<TCodecId extends string> = {
+  readonly type: { readonly kind: 'scalar'; readonly codecId: TCodecId };
+  readonly nullable: false;
+};
+
 type PipelineContract = MongoContract & {
   readonly models: {
     readonly Product: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly name: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly category: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly price: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly tags: { readonly codecId: 'mongo/array@1'; readonly nullable: false };
-        readonly createdAt: { readonly codecId: 'mongo/date@1'; readonly nullable: false };
+        readonly _id: ScalarField<'mongo/objectId@1'>;
+        readonly name: ScalarField<'mongo/string@1'>;
+        readonly category: ScalarField<'mongo/string@1'>;
+        readonly price: ScalarField<'mongo/double@1'>;
+        readonly tags: ScalarField<'mongo/array@1'>;
+        readonly createdAt: ScalarField<'mongo/date@1'>;
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'products' };
     };
     readonly Order: {
       readonly fields: {
-        readonly _id: { readonly codecId: 'mongo/objectId@1'; readonly nullable: false };
-        readonly productName: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
-        readonly quantity: { readonly codecId: 'mongo/double@1'; readonly nullable: false };
-        readonly status: { readonly codecId: 'mongo/string@1'; readonly nullable: false };
+        readonly _id: ScalarField<'mongo/objectId@1'>;
+        readonly productName: ScalarField<'mongo/string@1'>;
+        readonly quantity: ScalarField<'mongo/double@1'>;
+        readonly status: ScalarField<'mongo/string@1'>;
       };
       readonly relations: Record<string, never>;
       readonly storage: { readonly collection: 'orders' };
@@ -65,6 +70,11 @@ type TestCodecTypes = {
 type TestTypeMaps = MongoTypeMaps<TestCodecTypes>;
 type TContract = MongoContractWithTypeMaps<PipelineContract, TestTypeMaps>;
 
+const scalarField = <TCodecId extends string>(codecId: TCodecId) => ({
+  type: { kind: 'scalar' as const, codecId },
+  nullable: false,
+});
+
 const contractJson = {
   target: 'mongo',
   targetFamily: 'mongo',
@@ -72,22 +82,22 @@ const contractJson = {
   models: {
     Product: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        name: { codecId: 'mongo/string@1', nullable: false },
-        category: { codecId: 'mongo/string@1', nullable: false },
-        price: { codecId: 'mongo/double@1', nullable: false },
-        tags: { codecId: 'mongo/array@1', nullable: false },
-        createdAt: { codecId: 'mongo/date@1', nullable: false },
+        _id: scalarField('mongo/objectId@1'),
+        name: scalarField('mongo/string@1'),
+        category: scalarField('mongo/string@1'),
+        price: scalarField('mongo/double@1'),
+        tags: scalarField('mongo/array@1'),
+        createdAt: scalarField('mongo/date@1'),
       },
       relations: {},
       storage: { collection: 'products' },
     },
     Order: {
       fields: {
-        _id: { codecId: 'mongo/objectId@1', nullable: false },
-        productName: { codecId: 'mongo/string@1', nullable: false },
-        quantity: { codecId: 'mongo/double@1', nullable: false },
-        status: { codecId: 'mongo/string@1', nullable: false },
+        _id: scalarField('mongo/objectId@1'),
+        productName: scalarField('mongo/string@1'),
+        quantity: scalarField('mongo/double@1'),
+        status: scalarField('mongo/string@1'),
       },
       relations: {},
       storage: { collection: 'orders' },

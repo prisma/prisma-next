@@ -1,6 +1,7 @@
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm } from '@prisma-next/mongo-orm';
 import { MongoFieldFilter } from '@prisma-next/mongo-query-ast/execution';
+import { ObjectId } from 'mongodb';
 import { expect, expectTypeOf, it } from 'vitest';
 import type { Contract } from './fixtures/generated/contract';
 import ormContractJson from './fixtures/generated/contract.json';
@@ -49,8 +50,9 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
 
   it('include() on a reference relation returns related docs via $lookup', async () => {
     const db = ctx.client.db(ctx.dbName);
+    const userId = new ObjectId();
     await db.collection('users').insertOne({
-      _id: 'u1' as never,
+      _id: userId,
       name: 'Alice',
       email: 'alice@example.com',
       addresses: [],
@@ -58,7 +60,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     await db.collection('tasks').insertOne({
       title: 'Fix bug',
       type: 'bug',
-      assigneeId: 'u1',
+      assigneeId: userId,
       severity: 'high',
       comments: [],
     });
@@ -100,9 +102,9 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     await db.collection('tasks').insertOne({
       title: 'Fix bug',
       type: 'bug',
-      assigneeId: 'u1',
+      assigneeId: new ObjectId(),
       severity: 'high',
-      comments: [{ _id: 'c1', text: 'Found it!', createdAt: new Date('2025-01-01') }],
+      comments: [{ _id: new ObjectId(), text: 'Found it!', createdAt: new Date('2025-01-01') }],
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
@@ -115,18 +117,19 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
 
   it('all() on a polymorphic root returns all variants', async () => {
     const db = ctx.client.db(ctx.dbName);
+    const assigneeId = new ObjectId();
     await db.collection('tasks').insertMany([
       {
         title: 'Fix crash',
         type: 'bug',
-        assigneeId: 'u1',
+        assigneeId,
         severity: 'critical',
         comments: [],
       },
       {
         title: 'Add dark mode',
         type: 'feature',
-        assigneeId: 'u1',
+        assigneeId,
         priority: 'medium',
         targetRelease: 'v2.0',
         comments: [],
@@ -152,7 +155,7 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     await db.collection('tasks').insertOne({
       title: 'Fix crash',
       type: 'bug',
-      assigneeId: 'u1',
+      assigneeId: new ObjectId(),
       severity: 'critical',
       comments: [],
     });
@@ -241,8 +244,9 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
 
   it('full flow: ORM -> typed AST -> runtime -> driver -> typed results', async () => {
     const db = ctx.client.db(ctx.dbName);
+    const userId = new ObjectId();
     await db.collection('users').insertOne({
-      _id: 'u1' as never,
+      _id: userId,
       name: 'Alice',
       email: 'alice@example.com',
       addresses: [{ street: '123 Main', city: 'Town', zip: '00000' }],
@@ -250,10 +254,10 @@ describeWithMongoDB('mongoOrm integration', (ctx) => {
     await db.collection('tasks').insertOne({
       title: 'Ship it',
       type: 'feature',
-      assigneeId: 'u1',
+      assigneeId: userId,
       priority: 'high',
       targetRelease: 'v1.0',
-      comments: [{ _id: 'c1', text: 'LGTM', createdAt: new Date() }],
+      comments: [{ _id: new ObjectId(), text: 'LGTM', createdAt: new Date() }],
     });
 
     const orm = mongoOrm({ contract, executor: ctx.runtime });
