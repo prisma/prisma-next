@@ -30,7 +30,7 @@ const arktypeJsonPackMetaBase = {
       // boundary. We thread an emit-only `Codec` instance carrying the
       // `renderOutputType` here so the lookup resolves; runtime
       // materialization goes through the unified descriptor's
-      // `factory: (P) => (Ctx) => Codec`, never through this shim.
+      // `factory: (P) => (CodecInstanceContext) => Codec`, never through this shim.
       codecInstances: [arktypeJsonEmitCodec],
       import: {
         package: '@prisma-next/extension-arktype-json/codec-types',

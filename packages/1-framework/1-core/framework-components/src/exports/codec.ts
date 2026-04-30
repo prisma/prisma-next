@@ -2,10 +2,10 @@ export type {
   Codec,
   CodecCallContext,
   CodecDescriptor,
+  CodecInstanceContext,
   CodecLookup,
   CodecMeta,
   CodecTrait,
-  Ctx,
 } from '../shared/codec-types';
 export {
   emptyCodecLookup,

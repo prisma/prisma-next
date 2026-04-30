@@ -1,6 +1,6 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { Ctx } from '@prisma-next/framework-components/codec';
+import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
@@ -42,8 +42,9 @@ function makeVectorCodec(meta?: Record<string, unknown>): Codec {
 function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
   // The factory returns a per-instance codec whose `meta.length` carries
   // the parameter — so tests can observe per-instance differentiation.
-  const factory: (params: { length: number }) => (ctx: Ctx) => Codec = (params) => (_ctx) =>
-    makeVectorCodec({ length: params.length });
+  const factory: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec =
+    (params) => (_ctx) =>
+      makeVectorCodec({ length: params.length });
 
   const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
     {
