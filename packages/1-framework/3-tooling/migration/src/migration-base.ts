@@ -8,9 +8,11 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
+import { errorInvalidOperationEntry } from './errors';
 import { computeMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import type { MigrationHints, MigrationMetadata } from './metadata';
+import { MigrationOpSchema } from './op-schema';
 import type { MigrationOps } from './package';
 
 export interface MigrationMeta {
@@ -215,6 +217,13 @@ export function buildMigrationArtifacts(
   const ops = instance.operations;
   if (!Array.isArray(ops)) {
     throw new Error('operations must be an array');
+  }
+
+  for (let index = 0; index < ops.length; index++) {
+    const result = MigrationOpSchema(ops[index]);
+    if (result instanceof type.errors) {
+      throw errorInvalidOperationEntry(index, result.summary);
+    }
   }
 
   const rawMeta: unknown = instance.describe();
