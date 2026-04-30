@@ -55,7 +55,13 @@ export async function resolveValue(
       const codec = codecs.get(value.codecId);
       if (codec?.encode) {
         try {
-          return await codec.encode(value.value, ctx);
+          // Race even leaf scalar encodes against the signal so a leaf
+          // `MongoParamRef` (e.g. a simple field filter, or any leaf reached
+          // from `MongoAdapterImpl.#resolveDocument()` outside an enclosing
+          // `Promise.all`) surfaces `RUNTIME.ABORTED` promptly instead of
+          // blocking on a slow codec body.
+          const encoded = codec.encode(value.value, ctx);
+          return signal ? await raceAgainstAbort(encoded, signal, 'encode') : await encoded;
         } catch (error) {
           wrapEncodeFailure(error, value, codec.id);
         }

@@ -36,7 +36,8 @@ describe('resolveValue — CodecCallContext threading', () => {
 
     const ctx: CodecCallContext = { signal: new AbortController().signal };
     await resolveValue(new MongoParamRef('hello', { codecId: 'test/observe@1' }), registry, ctx);
-    expect(observed).toEqual([ctx]);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]).toBe(ctx);
   });
 
   it('preserves ctx identity across nested object/array branches (recursive walk)', async () => {
