@@ -610,17 +610,26 @@ describe(
         'Mongo-Q.03: new branch B',
       ).toBe(0);
       const branchBDir = findMigrationDirBySlug(ctx, 'branch_b_no_invariant');
-      const draftB = JSON.parse(readFileSync(join(branchBDir, 'migration.json'), 'utf-8')) as {
+      const branchBManifestPath = join(branchBDir, 'migration.json');
+      const branchBManifest = JSON.parse(readFileSync(branchBManifestPath, 'utf-8')) as {
         from: string;
         to: string;
+        toContract?: unknown;
+        fromContract?: unknown;
       };
-      // Use a synthetic CB hash so the migration declares a *different* destination
-      // than branch A. The contract files share the same hash, so we synthesize a
-      // sibling-branch destination hash that's structurally different.
+      // Synthesize a CB hash so branch B lands at a destination distinct from
+      // branch A. The contract files share the same hash, so we cannot get a
+      // real second hash without a second contract fixture; clearing the
+      // toContract bookend lets emit accept the synthetic destination.
       const cbHash = `sha256:${'b'.repeat(64)}`;
       writeFileSync(
+        branchBManifestPath,
+        `${JSON.stringify({ ...branchBManifest, toContract: null }, null, 2)}\n`,
+        'utf-8',
+      );
+      writeFileSync(
         join(branchBDir, 'migration.ts'),
-        renderIndexOnlyMigrationTs(draftB.from, cbHash),
+        renderIndexOnlyMigrationTs(branchBManifest.from, cbHash),
       );
       expect(
         (await migrationEmit(ctx, ['--dir', branchBDir])).exitCode,
