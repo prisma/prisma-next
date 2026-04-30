@@ -141,6 +141,27 @@ Each was a case where intent visibility, applied at the review checkpoint, would
 
 ---
 
+## The infer-the-spec-you-just-deleted pattern
+
+**Shape:** The close-out checkpoint sequences as: delete `projects/<project>/` first; then delegate the close-out review via `drive-pr-local-review`. The reviewer arrives at a branch with no in-repo canonical spec. `drive-pr-local-review`'s § 2 "Establish expectations" step then *infers* a spec from the PR body + diff + commit messages, writes an inferred `spec.md` into the review artifact directory, and verifies the inferred spec's ACs against the diff. The verification passes because **the inferred spec was derived from the same diff being reviewed** — the ACs are tautologically PASS. The user's original spec — with its rejected alternatives, locked decisions, non-goals, and intent that doesn't fully survive the diff — was deleted before the reviewer could read it.
+
+**Why this matters:** the close-out review's job is to verify that the *cumulative* project satisfies the user's original intent. Inferring the spec from the diff makes the review structurally incapable of catching scope drift, dropped non-goals, or rejected alternatives the project re-introduced. The reviewer's "SATISFIED with 8 of 9 ACs PASS" verdict reads correctly but means nothing — the AC list is whatever the reviewer deduced from the diff, not the user's standard.
+
+The defect is sequencing: delete-then-review collapses the only checkpoint that's supposed to verify against intent. Move-then-review preserves the canonical spec as input to the review.
+
+**Watch for:**
+- Close-out reviews whose spec is marked "inferred" or "constructed by reviewer" in their preamble notice.
+- Close-out reviews whose AC scoreboard maps cleanly to the diff with no surprises — that's a tell that ACs and diff were derived from the same source.
+- Any close-out commit that does `git rm -r projects/<project>/` BEFORE the close-out review delegation runs.
+
+**Orchestrator action:** sequence the close-out as **move-then-review**, not delete-then-review. Move `projects/<project>/` to `wip/<project>/` first (the move is a single `git mv`; the destination is gitignored, so the project's content is untracked from git but locally retained on disk). Delegate the close-out review with the canonical spec at its moved location (`wip/<project>/spec.md`) explicitly passed as input; tell the reviewer "do not write a new spec.md; the canonical one is at `wip/<project>/spec.md`." This is codified in `SKILL.md § Project close-out checkpoint § Step 2` (move) and § Step 3 (review with explicit spec pointer).
+
+The move-not-delete approach has a second benefit: post-close-out the user can grep, read, or copy from the moved project artifacts locally without recovering from `git show`. Useful for filing follow-up tickets that reference original task IDs, auditing decisions made during the loop, or recovering a finding's context.
+
+**Origin:** codec-registry-unification close-out — the orchestrator's Step-2 close-out review (per the close-out checkpoint codified earlier in the same session) ran AFTER the project directory was deleted, so the reviewer inferred the spec from PR body + diff + commit messages. The reviewer's "APPROVE WITH FOLLOW-UPS, 5 of 9 ACs PASS, 4 deferred to TML-2357" verdict was structurally correct against the inferred spec but the user immediately flagged that the inferred spec wasn't anchored to the original — a circular verification. The user's directive: "Do not delete the project artifacts, move them whole to `wip/` so they're deleted from git but retained on disk. The close-out reviewer you spawned has *inferred* the project spec, which is stupid. We deleted all the acceptance criteria then asked it to recreate them." The codified fix splits the close-out into Steps 2 (move) and 3 (review-with-canonical-spec).
+
+---
+
 ## The noise-finding pattern
 
 **Shape:** A reviewer files a finding whose recommended action is "consider for a future phase," "address in m4 when X is reshaped," "out of scope but worth tracking," or "no action — surfacing for awareness." The finding is technically correct (the observation is real, the framing is fair) but its recommended action does not translate into an in-PR task for the implementer. The implementer's next delegation prompt now contains a finding they cannot act on.
