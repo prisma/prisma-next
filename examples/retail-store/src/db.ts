@@ -1,10 +1,16 @@
-import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
+import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { createTelemetryMiddleware } from '@prisma-next/middleware-telemetry';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import { mongoOrm, mongoRaw } from '@prisma-next/mongo-orm';
 import { mongoQuery } from '@prisma-next/mongo-query-builder';
-import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
+import {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
+  createMongoRuntime,
+  type MongoRuntime,
+} from '@prisma-next/mongo-runtime';
+import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import type { Contract } from './contract';
 import contractJson from './contract.json' with { type: 'json' };
 
@@ -14,15 +20,15 @@ const query = mongoQuery<Contract>({ contractJson });
 const raw = mongoRaw({ contract });
 
 export async function createClient(connectionUri: string, dbName: string) {
-  const codecs = createDefaultMongoCodecRegistry();
-  const adapter = createMongoAdapter(codecs);
+  const stack = createMongoExecutionStack({
+    target: mongoRuntimeTarget,
+    adapter: mongoRuntimeAdapter,
+  });
+  const context = createMongoExecutionContext({ contract, stack });
   const driver = await createMongoDriver(connectionUri, dbName);
   const runtime = createMongoRuntime({
-    adapter,
+    context,
     driver,
-    codecs,
-    contract,
-    targetId: 'mongo',
     middleware: [createTelemetryMiddleware()],
   });
   const orm = mongoOrm({ contract, executor: runtime });
