@@ -162,6 +162,36 @@ The move-not-delete approach has a second benefit: post-close-out the user can g
 
 ---
 
+## The `git mv`-to-gitignored-path pattern
+
+**Shape:** A protocol or commit script reaches for `git mv` to relocate tracked files to a gitignored destination, expecting the gitignore rule to eject them from tracking (so the move both relocates the files on disk *and* untracks them from git). It doesn't. `git mv projects/foo wip/foo` records a rename in git's index — the files remain tracked under their new path. `.gitignore` is a filter for *untracked* paths; it doesn't apply to anything already in the index, regardless of where the index entry points.
+
+The mistake is intuitive and silent: `git ls-files` still lists the moved files; `git status` reports nothing unusual; the destination directory looks identical to a properly-untracked state on the filesystem. The error surfaces only when someone later inspects what's tracked, or when the gitignored destination's contents start showing up in `git diff` output unexpectedly.
+
+**Why this matters here:** the close-out checkpoint's Step 2 (move project artifacts to `wip/`) is structurally meaningless if the move keeps files tracked. The whole point is "get the project's content out of git but keep it on disk for local reference"; a `git mv` accomplishes only the second half.
+
+**Watch for:**
+- Any close-out script that does `git mv projects/<project> wip/<project>`. Confirm with `git ls-files | grep <project>` after the commit; if anything matches, the move was wrong.
+- Any protocol document that describes "move to a gitignored location" without specifying the underlying primitive.
+
+**Orchestrator action:** use the `git rm --cached -r` + plain `mv` sequence:
+
+```bash
+mkdir -p wip                                  # destination parent must exist before mv
+git rm --cached -r projects/<project>         # untrack from index; files stay on disk
+mv projects/<project> wip/<project>           # plain filesystem rename, invisible to git
+git status --short                            # only "D  projects/..." entries; wip/ is gitignored, so invisible
+git commit -m '...'                           # commit only the deletions
+```
+
+Verify with three checks: `git ls-files | grep <project>` returns nothing; `find . -path '*/wip/<project>/*'` lists every file at its new location; `git check-ignore -v wip/<project>/spec.md` confirms the new path is recognized as gitignored.
+
+Codified in `SKILL.md § Project close-out checkpoint § Step 2 → How to do the move correctly`.
+
+**Origin:** codec-registry-unification close-out follow-up — the orchestrator's first version of `SKILL.md § Step 2` described the move as "single `git mv` to a gitignored destination" without verifying the primitive. The user immediately challenged: "Are you sure that's how `git mv` works? Why not just use `git rm --cached` and regular `mv`?" An empirical test confirmed `git mv` keeps files tracked. The fix updates the SKILL with the correct primitive, the verification checks, and an explicit "don't use `git mv`" warning so the next implementer doesn't reach for the obvious-but-wrong tool.
+
+---
+
 ## The noise-finding pattern
 
 **Shape:** A reviewer files a finding whose recommended action is "consider for a future phase," "address in m4 when X is reshaped," "out of scope but worth tracking," or "no action — surfacing for awareness." The finding is technically correct (the observation is real, the framing is fair) but its recommended action does not translate into an in-PR task for the implementer. The implementer's next delegation prompt now contains a finding they cannot act on.

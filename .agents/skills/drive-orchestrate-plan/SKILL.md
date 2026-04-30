@@ -436,16 +436,37 @@ Read `reviews/code-review.md`, `reviews/system-design-review.md`, and `reviews/w
 
 If something load-bearing has no durable home yet, **pause the close-out**. Either: (a) ask the implementer to add it during the close-out round (small additions to ADR or README); or (b) record it in the orchestrator's process notes (`wip/<project>-close-out-notes.md`, gitignored) for the user to triage post-close-out. (a) is preferred whenever the implementer can do it within the close-out scope without ballooning the round.
 
-### Step 2 — Move project artifacts to `wip/`
+### Step 2 — Move project artifacts to `wip/` (untrack-then-mv)
 
-**Move, don't delete.** Relocate the entire `projects/<project>/` directory to `wip/<project>/` as a single `git mv` (or equivalent). The artifacts (`spec.md`, `plan.md`, `design/`, `assets/`, `reviews/`) all survive on disk; the `wip/` location is gitignored, so the project's content is untracked from git but locally retained.
+**Move, don't delete.** Relocate the entire `projects/<project>/` directory to `wip/<project>/`. The artifacts (`spec.md`, `plan.md`, `design/`, `assets/`, `reviews/`) all survive on disk; the `wip/` location is gitignored, so the project's content is untracked from git but locally retained.
 
 Two reasons this is mandatory before Step 3:
 
 - **The close-out reviewer needs the original `spec.md` as canonical input.** If the spec is gone, `drive-pr-local-review` infers one from PR body + diff — and the inferred spec's ACs are derived from the same diff being reviewed, which is a tautology. The user authored the spec with intent that doesn't fully survive the diff (rejected alternatives, locked decisions, non-goals); the reviewer must verify against the original.
 - **Move-not-delete preserves the audit trail for the user.** After the project closes, the user may want to inspect the original artifacts (e.g. to file follow-up tickets that reference original task IDs, to audit a decision made during the loop, to recover a finding's context). `wip/<project>/` is the natural local home; the user can grep, read, or copy from it without recovering from `git show`.
 
-The git move is a clean rename in the index — git tracks it as a rename, not a delete-plus-add (the move and the eventual untrack should be separate commits in case anyone wants to bisect).
+#### How to do the move correctly
+
+**Don't use `git mv`.** Git's tracking is path-independent: `git mv projects/foo wip/foo` records a rename and keeps the file *tracked* under `wip/foo` regardless of `.gitignore` rules. Gitignore is a filter for untracked paths, not an ejector for tracked ones. After a `git mv` to a gitignored path, `git ls-files` would still report the moved files as tracked, defeating the entire purpose.
+
+The correct primitive is `git rm --cached -r` (untrack from the index, leave on disk) followed by a plain `mv` (filesystem rename, invisible to git):
+
+```bash
+mkdir -p wip                                  # ensure destination parent exists
+git rm --cached -r projects/<project>         # untrack from git; files stay on disk
+mv projects/<project> wip/<project>           # plain filesystem rename
+git status --short                            # should show "D  projects/<project>/..." entries only;
+                                              # wip/<project>/ is invisible (gitignored)
+git commit -m '...'                           # commit only the deletions
+```
+
+After the commit:
+
+- `git ls-files | grep <project>` returns nothing — the project is gone from git.
+- `find . -type f -path '*/wip/<project>/*'` lists every file at its new location.
+- `git check-ignore -v wip/<project>/spec.md` confirms the new path is gitignored — future `git status` ignores it.
+
+Verify with all three checks. If `git mv` is used by mistake, the moved files remain tracked under the new path and the close-out is structurally wrong; revert and redo with the `rm --cached`-then-`mv` sequence.
 
 ### Step 3 — Branch-scoped close-out review (mandatory)
 
