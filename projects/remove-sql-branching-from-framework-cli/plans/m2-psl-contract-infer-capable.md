@@ -29,6 +29,13 @@ Create `packages/2-sql/9-family/src/core/psl-contract-infer/` (or similar) conta
     - Builds the `PslDocumentAst` directly: `PslModel`, `PslField`, `PslEnum`, `PslAttribute` nodes with appropriate `span` placeholders (synthetic spans, since this is a generated AST not a parsed one).
 - The supporting helpers (`name-transforms.ts`, `mapDefault`, etc. that are still useful) move alongside.
 
+**M1-bridge cleanup as part of 2.1.** M1 added two optional fields to `PslDocumentAst` (`headerComment`) and `PslModel` (`comment`) to support the `printPslLegacy` serialize-parse-reprint round-trip. Once `sqlSchemaIrToPslAst` constructs the AST directly (not via parse), these legacy fields should not be needed by the SQL family's M2 path:
+
+- The introspection "no PK" model warning the SQL family wants on top of the model can be expressed as part of the AST natively (e.g., a synthetic comment node, or just dropped — verify that the existing `validatePrintableSqlSchemaIR` warning text isn't load-bearing for any consumer).
+- The default header line override is not needed once the legacy shim is deleted; `printPsl(ast)` can carry its built-in default unmodified.
+
+If M2 confirms these fields are no longer used after the SQL family's direct AST construction takes over, **delete them from `@prisma-next/psl-types`** as part of 2.1's cleanup. If M2 surfaces a reason they're still needed, leave them and update the spec/plan to reflect the new long-term shape.
+
 Add `@prisma-next/psl-types` (or `@prisma-next/psl-parser`, depending on M1's OQ-1 decision) to `packages/2-sql/9-family/package.json` for the AST types.
 
 If M1 took approach (a) (kept a `legacy-shim.ts` in the printer): delete `legacy-shim.ts` and the printer's old `printPsl` overload.
