@@ -9,7 +9,10 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  MigrationPlanOperation,
   OperationContext,
+  OperationPreview,
+  OperationPreviewCapable,
   PslContractInferCapable,
   SchemaViewCapable,
   SignDatabaseResult,
@@ -39,6 +42,7 @@ import type {
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
 } from './migrations/types';
+import { sqlOperationsToPreview } from './operation-preview';
 import { sqlSchemaIrToPslAst } from './psl-contract-infer/sql-schema-ir-to-psl-ast';
 import { verifySqlSchema } from './schema-verify/verify-sql-schema';
 import { collectSupportedCodecTypeIds } from './verify';
@@ -186,6 +190,7 @@ export interface SqlControlFamilyInstance
   extends ControlFamilyInstance<'sql', SqlSchemaIR>,
     SchemaViewCapable<SqlSchemaIR>,
     PslContractInferCapable<SqlSchemaIR>,
+    OperationPreviewCapable,
     SqlFamilyInstanceState {
   validateContract(contractJson: unknown): Contract;
 
@@ -212,6 +217,8 @@ export interface SqlControlFamilyInstance
   }): Promise<SqlSchemaIR>;
 
   inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst;
+
+  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
 }
 
 export type SqlFamilyInstance = SqlControlFamilyInstance;
@@ -581,6 +588,10 @@ export function createSqlFamilyInstance<TTargetId extends string>(
 
     inferPslContract(schemaIR: SqlSchemaIR): PslDocumentAst {
       return sqlSchemaIrToPslAst(schemaIR);
+    },
+
+    toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
+      return sqlOperationsToPreview(operations);
     },
 
     toSchemaView(schema: SqlSchemaIR): CoreSchemaView {
