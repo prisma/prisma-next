@@ -1441,6 +1441,9 @@ importers:
 
   packages/2-mongo-family/6-transport/mongo-lowering:
     dependencies:
+      '@prisma-next/framework-components':
+        specifier: workspace:*
+        version: link:../../../1-framework/1-core/framework-components
       '@prisma-next/mongo-query-ast':
         specifier: workspace:*
         version: link:../../4-query/query-ast

@@ -1,3 +1,4 @@
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type {
   MongoAggExpr,
@@ -140,16 +141,17 @@ export function lowerAggExpr(expr: MongoAggExpr): unknown {
 export async function lowerFilter(
   filter: MongoFilterExpr,
   codecs?: MongoCodecRegistry,
+  ctx?: CodecCallContext,
 ): Promise<Document> {
   switch (filter.kind) {
     case 'field':
-      return { [filter.field]: { [filter.op]: await resolveValue(filter.value, codecs) } };
+      return { [filter.field]: { [filter.op]: await resolveValue(filter.value, codecs, ctx) } };
     case 'and':
-      return { $and: await Promise.all(filter.exprs.map((e) => lowerFilter(e, codecs))) };
+      return { $and: await Promise.all(filter.exprs.map((e) => lowerFilter(e, codecs, ctx))) };
     case 'or':
-      return { $or: await Promise.all(filter.exprs.map((e) => lowerFilter(e, codecs))) };
+      return { $or: await Promise.all(filter.exprs.map((e) => lowerFilter(e, codecs, ctx))) };
     case 'not':
-      return { $nor: [await lowerFilter(filter.expr, codecs)] };
+      return { $nor: [await lowerFilter(filter.expr, codecs, ctx)] };
     case 'exists':
       return { [filter.field]: { $exists: filter.exists } };
     case 'expr':
@@ -205,10 +207,11 @@ function lowerWindowField(wf: MongoWindowField): Record<string, unknown> {
 export async function lowerStage(
   stage: MongoPipelineStage,
   codecs?: MongoCodecRegistry,
+  ctx?: CodecCallContext,
 ): Promise<Record<string, unknown>> {
   switch (stage.kind) {
     case 'match':
-      return { $match: await lowerFilter(stage.filter, codecs) };
+      return { $match: await lowerFilter(stage.filter, codecs, ctx) };
     case 'project': {
       const projection: Record<string, unknown> = {};
       for (const [key, val] of Object.entries(stage.projection)) {
@@ -230,7 +233,9 @@ export async function lowerStage(
       if (stage.localField !== undefined) lookup['localField'] = stage.localField;
       if (stage.foreignField !== undefined) lookup['foreignField'] = stage.foreignField;
       if (stage.pipeline) {
-        lookup['pipeline'] = await Promise.all(stage.pipeline.map((s) => lowerStage(s, codecs)));
+        lookup['pipeline'] = await Promise.all(
+          stage.pipeline.map((s) => lowerStage(s, codecs, ctx)),
+        );
       }
       if (stage.let_) {
         lookup['let'] = lowerExprRecord(stage.let_);
@@ -271,7 +276,9 @@ export async function lowerStage(
     case 'unionWith': {
       const unionWith: Record<string, unknown> = { coll: stage.collection };
       if (stage.pipeline) {
-        unionWith['pipeline'] = await Promise.all(stage.pipeline.map((s) => lowerStage(s, codecs)));
+        unionWith['pipeline'] = await Promise.all(
+          stage.pipeline.map((s) => lowerStage(s, codecs, ctx)),
+        );
       }
       return { $unionWith: unionWith };
     }
@@ -301,7 +308,7 @@ export async function lowerStage(
       if (stage.spherical !== undefined) geoNear['spherical'] = stage.spherical;
       if (stage.maxDistance !== undefined) geoNear['maxDistance'] = stage.maxDistance;
       if (stage.minDistance !== undefined) geoNear['minDistance'] = stage.minDistance;
-      if (stage.query) geoNear['query'] = await lowerFilter(stage.query, codecs);
+      if (stage.query) geoNear['query'] = await lowerFilter(stage.query, codecs, ctx);
       if (stage.key !== undefined) geoNear['key'] = stage.key;
       if (stage.distanceMultiplier !== undefined)
         geoNear['distanceMultiplier'] = stage.distanceMultiplier;
@@ -311,7 +318,9 @@ export async function lowerStage(
     case 'facet': {
       const facetEntries = Object.entries(stage.facets);
       const facetPipelines = await Promise.all(
-        facetEntries.map(([, pipeline]) => Promise.all(pipeline.map((s) => lowerStage(s, codecs)))),
+        facetEntries.map(([, pipeline]) =>
+          Promise.all(pipeline.map((s) => lowerStage(s, codecs, ctx))),
+        ),
       );
       const facet: Record<string, unknown> = {};
       for (let i = 0; i < facetEntries.length; i++) {
@@ -336,6 +345,7 @@ export async function lowerStage(
         graphLookup['restrictSearchWithMatch'] = await lowerFilter(
           stage.restrictSearchWithMatch,
           codecs,
+          ctx,
         );
       return { $graphLookup: graphLookup };
     }
@@ -344,7 +354,7 @@ export async function lowerStage(
       if (stage.on !== undefined) merge['on'] = stage.on;
       if (stage.whenMatched !== undefined) {
         merge['whenMatched'] = Array.isArray(stage.whenMatched)
-          ? await Promise.all(stage.whenMatched.map((s) => lowerStage(s, codecs)))
+          ? await Promise.all(stage.whenMatched.map((s) => lowerStage(s, codecs, ctx)))
           : stage.whenMatched;
       }
       if (stage.whenNotMatched !== undefined) merge['whenNotMatched'] = stage.whenNotMatched;
@@ -415,6 +425,7 @@ export async function lowerStage(
 export async function lowerPipeline(
   stages: ReadonlyArray<MongoPipelineStage>,
   codecs?: MongoCodecRegistry,
+  ctx?: CodecCallContext,
 ): Promise<Array<Record<string, unknown>>> {
-  return Promise.all(stages.map((s) => lowerStage(s, codecs)));
+  return Promise.all(stages.map((s) => lowerStage(s, codecs, ctx)));
 }
