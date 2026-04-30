@@ -11,6 +11,39 @@ import type { O } from 'ts-toolbelt';
 export type { CodecCallContext, CodecTrait } from '@prisma-next/framework-components/codec';
 
 /**
+ * SQL-family addressing of a single column. The decode site populates a
+ * `SqlColumnRef` whenever it can resolve the cell to a single underlying
+ * `(table, column)` (the typical case for projected columns from a
+ * single-table source); cells the runtime cannot resolve (aggregate
+ * aliases, include aggregate fields, computed projections without a
+ * simple ref) get `column = undefined`.
+ *
+ * The shape is a structural projection of the runtime's `ColumnRef` so
+ * the SQL decode site can reuse the resolution it already performs for
+ * `RUNTIME.DECODE_FAILED` envelope construction without allocating
+ * twice per cell.
+ */
+export interface SqlColumnRef {
+  readonly table: string;
+  readonly name: string;
+}
+
+/**
+ * SQL-family per-call context. Extends the framework {@link CodecCallContext}
+ * (which carries `signal` only) with `column?: SqlColumnRef`, populated
+ * on **decode** call sites that can resolve a single underlying column
+ * ref. Encode call sites currently leave `column` undefined (encode-time
+ * column context is the middleware's domain).
+ *
+ * SQL codec authors writing a `(value, ctx)` author function for the SQL
+ * `codec()` factory observe this type. The framework codec dispatch
+ * surface (and Mongo) sees only the base `CodecCallContext`.
+ */
+export interface SqlCodecCallContext extends CodecCallContext {
+  readonly column?: SqlColumnRef;
+}
+
+/**
  * Descriptor for parameterized codecs that require type parameter validation.
  * Shared between adapter (compile-time) and runtime layers to avoid duplication.
  *
@@ -55,6 +88,12 @@ export interface CodecMeta {
  * optional parameterized-codec descriptor (`paramsSchema` + `init`) for
  * codecs that require type-parameter validation (e.g. `pg/vector@1`).
  *
+ * `encode` and `decode` are redeclared here to narrow the per-call
+ * context to the SQL-family {@link SqlCodecCallContext} (adds
+ * `column?: SqlColumnRef`). TypeScript treats method-syntax declarations
+ * bivariantly, so the SQL narrowing is structurally compatible with the
+ * framework {@link BaseCodec} super-interface.
+ *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
  */
@@ -66,6 +105,8 @@ export interface Codec<
   TParams = Record<string, unknown>,
   THelper = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
+  encode(value: TInput, ctx?: SqlCodecCallContext): Promise<TWire>;
+  decode(wire: TWire, ctx?: SqlCodecCallContext): Promise<TInput>;
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -229,10 +270,10 @@ export function codec<
     targetTypes: readonly string[];
     encode?:
       | ((value: TInput) => TWire | Promise<TWire>)
-      | ((value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>);
+      | ((value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>);
     decode:
       | ((wire: TWire) => TInput | Promise<TInput>)
-      | ((wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>);
+      | ((wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>);
     meta?: CodecMeta;
     paramsSchema?: Type<TParams>;
     init?: (params: TParams) => THelper;
@@ -248,8 +289,8 @@ export function codec<
   // The union typing on `config.encode` / `config.decode` (single- or two-
   // arg authors) preserves TInput inference at call sites; widen to the
   // two-arg shape inside the factory body so the lift can forward ctx.
-  type CtxEncode = (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
-  type CtxDecode = (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
+  type CtxEncode = (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
+  type CtxDecode = (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
   const userEncode: CtxEncode =
     (config.encode as CtxEncode | undefined) ?? ((value: TInput) => value as unknown as TWire);
   const userDecode: CtxDecode = config.decode as CtxDecode;
