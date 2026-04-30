@@ -25,7 +25,10 @@ import type {
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
-import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
+import type {
+  CodecDescriptorRegistry,
+  JsonSchemaValidatorRegistry,
+} from '@prisma-next/sql-relational-core/query-lane-context';
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
@@ -137,6 +140,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
   private readonly driver: SqlDriver<unknown>;
   private readonly familyAdapter: RuntimeFamilyAdapter<Contract<SqlStorage>>;
   private readonly codecRegistry: CodecRegistry;
+  private readonly codecDescriptors: CodecDescriptorRegistry;
   private readonly jsonSchemaValidators: JsonSchemaValidatorRegistry | undefined;
   private readonly sqlCtx: SqlMiddlewareContext;
   private readonly verify: RuntimeVerifyOptions;
@@ -172,6 +176,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this.driver = driver;
     this.familyAdapter = new SqlFamilyAdapter(context.contract, adapter.profile);
     this.codecRegistry = context.codecs;
+    this.codecDescriptors = context.codecDescriptors;
     this.jsonSchemaValidators = context.jsonSchemaValidators;
     this.sqlCtx = sqlCtx;
     this.verify = verify;
@@ -181,7 +186,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     this._telemetry = null;
 
     if (verify.mode === 'startup') {
-      validateCodecRegistryCompleteness(this.codecRegistry, context.contract);
+      validateCodecRegistryCompleteness(this.codecDescriptors, context.contract);
       this.codecRegistryValidated = true;
     }
   }
@@ -402,7 +407,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
   private ensureCodecRegistryValidated(): void {
     if (!this.codecRegistryValidated) {
-      validateCodecRegistryCompleteness(this.codecRegistry, this.contract);
+      validateCodecRegistryCompleteness(this.codecDescriptors, this.contract);
       this.codecRegistryValidated = true;
     }
   }
