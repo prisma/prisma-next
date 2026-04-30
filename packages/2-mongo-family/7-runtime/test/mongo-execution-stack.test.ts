@@ -1,0 +1,169 @@
+import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
+import { isRuntimeError } from '@prisma-next/framework-components/runtime';
+import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
+import { describe, expect, it } from 'vitest';
+import {
+  createMongoExecutionContext,
+  createMongoExecutionStack,
+  type MongoRuntimeExtensionDescriptor,
+} from '../src/mongo-execution-stack';
+
+const STANDARD_CODEC_IDS = [
+  'mongo/objectId@1',
+  'mongo/string@1',
+  'mongo/double@1',
+  'mongo/int32@1',
+  'mongo/bool@1',
+  'mongo/date@1',
+  'mongo/vector@1',
+];
+
+describe('createMongoExecutionStack', () => {
+  it('builds a stack from target + adapter (no extensions, no driver)', () => {
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    expect(stack.target).toBe(mongoRuntimeTarget);
+    expect(stack.adapter).toBe(mongoRuntimeAdapter);
+    expect(stack.driver).toBeUndefined();
+    expect(stack.extensionPacks).toEqual([]);
+  });
+
+  it('exposes the supplied extension packs', () => {
+    const pack: MongoRuntimeExtensionDescriptor<'mongo'> = {
+      kind: 'extension',
+      id: 'test-pack',
+      familyId: 'mongo',
+      targetId: 'mongo',
+      version: '0.0.1',
+      codecs: () => createMongoCodecRegistry(),
+      create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+    };
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+      extensionPacks: [pack],
+    });
+    expect(stack.extensionPacks).toEqual([pack]);
+  });
+});
+
+describe('createMongoExecutionContext', () => {
+  it('aggregates the seven standard wire-type codecs from the adapter descriptor', () => {
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    const context = createMongoExecutionContext({ contract: {}, stack });
+    for (const id of STANDARD_CODEC_IDS) {
+      expect(context.codecs.get(id), `codec ${id} should be registered`).toBeDefined();
+    }
+  });
+
+  it('folds extension-pack codec contributions into the same registry', () => {
+    const customCodec = mongoCodec({
+      typeId: 'test/custom@1',
+      targetTypes: ['custom'],
+      decode: (wire: string) => `decoded:${wire}`,
+      encode: (value: string) => value,
+    });
+    const pack: MongoRuntimeExtensionDescriptor<'mongo'> = {
+      kind: 'extension',
+      id: 'extension-with-codec',
+      familyId: 'mongo',
+      targetId: 'mongo',
+      version: '0.0.1',
+      codecs: () => {
+        const registry = createMongoCodecRegistry();
+        registry.register(customCodec);
+        return registry;
+      },
+      create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+    };
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+      extensionPacks: [pack],
+    });
+    const context = createMongoExecutionContext({ contract: {}, stack });
+    expect(context.codecs.get('test/custom@1')).toBe(customCodec);
+    expect(context.codecs.get('mongo/string@1')).toBeDefined();
+  });
+
+  it('throws RUNTIME.DUPLICATE_CODEC when two contributors declare the same codec id', () => {
+    const conflictingCodec = mongoCodec({
+      typeId: 'mongo/string@1',
+      targetTypes: ['string'],
+      decode: (wire: string) => wire,
+      encode: (value: string) => value,
+    });
+    const conflictingPack: MongoRuntimeExtensionDescriptor<'mongo'> = {
+      kind: 'extension',
+      id: 'extension-string-conflict',
+      familyId: 'mongo',
+      targetId: 'mongo',
+      version: '0.0.1',
+      codecs: () => {
+        const registry = createMongoCodecRegistry();
+        registry.register(conflictingCodec);
+        return registry;
+      },
+      create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+    };
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+      extensionPacks: [conflictingPack],
+    });
+
+    let caught: unknown;
+    try {
+      createMongoExecutionContext({ contract: {}, stack });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeDefined();
+    if (!isRuntimeError(caught)) throw new Error('expected runtime error');
+    expect(caught.code).toBe('RUNTIME.DUPLICATE_CODEC');
+    expect(caught.message).toContain('mongo/string@1');
+    expect(caught.message).toContain('extension-string-conflict');
+    expect(caught.message).toContain('mongo');
+    expect(caught.details).toMatchObject({
+      codecId: 'mongo/string@1',
+      existingOwner: 'mongo',
+      incomingOwner: 'extension-string-conflict',
+    });
+  });
+
+  it('returns a frozen { contract, codecs, stack } object', () => {
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    const contract = { models: {} };
+    const context = createMongoExecutionContext({ contract, stack });
+    expect(Object.isFrozen(context)).toBe(true);
+    expect(context.contract).toBe(contract);
+    expect(context.stack).toBe(stack);
+  });
+});
+
+describe('runtime adapter descriptor', () => {
+  it('declares the seven standard Mongo codec instances on codecInstances', () => {
+    const codecInstances = mongoRuntimeAdapter.types?.codecTypes?.codecInstances ?? [];
+    expect(codecInstances.map((c) => c.id).sort()).toEqual([...STANDARD_CODEC_IDS].sort());
+  });
+
+  it('create(stack) returns an instance whose lower() delegates to the standard adapter', async () => {
+    const stack = createMongoExecutionStack({
+      target: mongoRuntimeTarget,
+      adapter: mongoRuntimeAdapter,
+    });
+    const adapterInstance = mongoRuntimeAdapter.create(stack);
+    expect(adapterInstance.familyId).toBe('mongo');
+    expect(adapterInstance.targetId).toBe('mongo');
+    expect(typeof adapterInstance.lower).toBe('function');
+  });
+});
