@@ -1,14 +1,16 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import type {
-  AsyncIterableResult,
-  RuntimeExecuteOptions,
-} from '@prisma-next/framework-components/runtime';
 import {
+  AsyncIterableResult,
+  checkAborted,
   checkMiddlewareCompatibility,
   RuntimeCore,
+  type RuntimeExecuteOptions,
+  runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
+import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
+import { decodeMongoRow } from './codecs/decoding';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
 
@@ -19,6 +21,7 @@ export interface MongoRuntimeOptions {
   readonly driver: MongoDriver;
   readonly contract: unknown;
   readonly targetId: string;
+  readonly codecs: MongoCodecRegistry;
   readonly middleware?: readonly MongoMiddleware[];
   readonly mode?: 'strict' | 'permissive';
 }
@@ -40,8 +43,10 @@ export interface MongoRuntime {
    *   `RUNTIME.ABORTED { phase: 'encode' }` from inside `resolveValue`'s
    *   per-level `Promise.all` race.
    *
-   * Mongo's read path does not go through codecs (per ADR 204), so there
-   * is no `phase: 'decode'` boundary on the Mongo side.
+   * Mongo's read path does decode rows via `resultShape` (per ADR 207),
+   * but the decode boundary does not currently observe the signal — codec
+   * `decode` is sync-lifted in the standard registry. A future tightening
+   * could add a `phase: 'decode'` boundary if async decoders ship.
    */
   execute<Row>(
     plan: MongoQueryPlan<Row>,
@@ -56,6 +61,7 @@ class MongoRuntimeImpl
 {
   readonly #adapter: MongoAdapter;
   readonly #driver: MongoDriver;
+  readonly #codecs: MongoCodecRegistry;
 
   constructor(options: MongoRuntimeOptions) {
     const middleware = options.middleware ? [...options.middleware] : [];
@@ -74,6 +80,7 @@ class MongoRuntimeImpl
 
     this.#adapter = options.adapter;
     this.#driver = options.driver;
+    this.#codecs = options.codecs;
   }
 
   protected override async lower(
@@ -83,11 +90,46 @@ class MongoRuntimeImpl
     return {
       command: await this.#adapter.lower(plan, ctx),
       meta: plan.meta,
+      ...(plan.resultShape !== undefined ? { resultShape: plan.resultShape } : {}),
     };
   }
 
   protected override runDriver(exec: MongoExecutionPlan): AsyncIterable<Record<string, unknown>> {
     return this.#driver.execute<Record<string, unknown>>(exec.command);
+  }
+
+  override execute<Row>(
+    plan: MongoQueryPlan & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row> {
+    const self = this;
+    const signal = options?.signal;
+    const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
+    const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      checkAborted(codecCtx, 'stream');
+      const compiled = await self.runBeforeCompile(plan);
+      const exec = await self.lower(compiled, codecCtx);
+      const stream = runWithMiddleware<MongoExecutionPlan, Record<string, unknown>>(
+        exec,
+        self.middleware,
+        self.ctx,
+        () => self.runDriver(exec),
+      );
+      for await (const rawRow of stream) {
+        if (exec.resultShape === undefined) {
+          yield rawRow as Row;
+        } else {
+          const decoded = await decodeMongoRow(
+            rawRow,
+            exec.resultShape,
+            self.#codecs,
+            plan.collection,
+          );
+          yield decoded as Row;
+        }
+      }
+    };
+    return new AsyncIterableResult(generator());
   }
 
   override async close(): Promise<void> {

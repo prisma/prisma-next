@@ -1,6 +1,7 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
+import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { timeouts } from '@prisma-next/test-utils';
 import { MongoClient } from 'mongodb';
 import { MongoMemoryReplSet } from 'mongodb-memory-server';
@@ -11,6 +12,7 @@ export interface MongodContext {
   readonly dbName: string;
   readonly client: MongoClient;
   readonly runtime: MongoRuntime;
+  readonly codecs: MongoCodecRegistry;
   readonly stubMeta: PlanMeta;
 }
 
@@ -32,15 +34,17 @@ export async function withMongod<T>(fn: (ctx: MongodContext) => Promise<T>): Pro
   const client = new MongoClient(connectionUri);
   await client.connect();
 
-  const adapter = createMongoAdapter();
+  const codecs = createDefaultMongoCodecRegistry();
+  const adapter = createMongoAdapter(codecs);
   const driver = await createMongoDriver(connectionUri, dbName);
-  const runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo' });
+  const runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo', codecs });
 
   const ctx: MongodContext = {
     connectionUri,
     dbName,
     client,
     runtime,
+    codecs,
     stubMeta,
   };
 

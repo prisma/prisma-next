@@ -1,9 +1,12 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
+import { createMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
 import type { MongoMiddleware } from '../src/mongo-middleware';
 import { createMongoRuntime } from '../src/mongo-runtime';
+
+const testCodecs = createMongoCodecRegistry();
 
 const baseMeta: PlanMeta = {
   target: 'mongo',
@@ -62,6 +65,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: createMockDriver([{ _id: '1', name: 'Alice' }]),
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -77,6 +81,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const runtime = createMongoRuntime({
       adapter: createMockAdapter(),
       driver: createMockDriver([{ _id: '1' }]),
+      codecs: testCodecs,
       contract: {},
       targetId: 'mongo',
     });
@@ -103,6 +108,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: createMockDriver([]),
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -138,6 +144,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: failingDriver,
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -172,6 +179,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: failingDriver,
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -205,6 +213,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: failingDriver,
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -229,6 +238,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -253,6 +263,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: createMockDriver([]),
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
       mode: 'permissive',
     });
@@ -282,6 +293,7 @@ describe('MongoRuntime middleware lifecycle', () => {
       driver: createMockDriver([]),
       contract: {},
       targetId: 'mongo',
+      codecs: testCodecs,
       middleware: [middleware],
     });
 
@@ -302,6 +314,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         driver: createMockDriver(),
         contract: {},
         targetId: 'mongo',
+        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -315,6 +328,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         driver: createMockDriver(),
         contract: {},
         targetId: 'mongo',
+        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).not.toThrow();
@@ -334,6 +348,7 @@ describe('MongoRuntime middleware compatibility validation', () => {
         driver: createMockDriver(),
         contract: {},
         targetId: 'mongo',
+        codecs: testCodecs,
         middleware: [middleware],
       }),
     ).toThrow(

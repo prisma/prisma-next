@@ -1,4 +1,5 @@
 import type { ExecutionPlan } from '@prisma-next/framework-components/runtime';
+import type { MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
 import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
 
 /**
@@ -19,9 +20,9 @@ import type { AnyMongoWireCommand } from '@prisma-next/mongo-wire';
  * Lives in the runtime layer (alongside `MongoRuntime`) because the wire
  * command shape lives in the transport layer (`@prisma-next/mongo-wire`),
  * which the lanes layer (`mongo-query-ast`, where `MongoQueryPlan` lives)
- * cannot depend on. M1 establishes this type; `MongoRuntime.execute` does
- * not yet accept it as input — that adoption lands in M4.
+ * cannot depend on.
  */
 export interface MongoExecutionPlan<Row = unknown> extends ExecutionPlan<Row> {
   readonly command: AnyMongoWireCommand;
+  readonly resultShape?: MongoResultShape;
 }
