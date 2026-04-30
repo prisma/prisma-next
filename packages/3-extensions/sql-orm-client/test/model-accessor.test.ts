@@ -468,7 +468,7 @@ describe('createModelAccessor', () => {
               '~standard': {
                 version: 1 as const,
                 vendor: 'test',
-                validate: (value: unknown) => ({ value: value as void }),
+                validate: (_value: unknown) => ({ value: undefined }),
               },
             },
             // The trait-gating tests don't materialize codecs; the
