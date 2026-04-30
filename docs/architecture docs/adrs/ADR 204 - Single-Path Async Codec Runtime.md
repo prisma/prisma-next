@@ -216,12 +216,21 @@ The single-path always-await design does not preclude either mitigation; both ca
 
 ## Cross-family scope notes
 
-Mongo decode is **out of scope** for this work. Today, the Mongo runtime does not decode rows: documents pass through from the driver directly, and `decodeRow`-like machinery does not exist on the Mongo side. Adding a Mongo decode path is a substantial piece of orthogonal work that needs its own shaping (projection-aware document walker, async dispatch model, result-shape decisions) and is intentionally not bundled here.
+Mongo decode is **in place** as of TML-2324: the Mongo runtime walks a structural `MongoResultShape` attached to `MongoQueryPlan` / `MongoExecutionPlan` (see `packages/2-mongo-family/4-query/query-ast/src/result-shape.ts`), dispatches leaf decodes via `Promise.all` per row, and maps failures to `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. Lanes populate `resultShape` for flat typed reads; raw commands omit it so rows pass through unchanged. SQL continues to use `meta.annotations` / `meta.projectionTypes`; Mongo does not use those fields for decode.
 
-Concretely, in this ADR:
+The earlier "Mongo decode out of scope" note below is **historical** — it described the state before this work landed.
+
+---
+_Historical note (pre–TML-2324):_
+
+Mongo decode was **out of scope** for the original ADR 204 work. At that time, the Mongo runtime did not decode rows: documents passed through from the driver directly, and `decodeRow`-like machinery did not exist on the Mongo side.
+
+---
+
+Concretely, in this ADR’s original encode-focused slice:
 
 - **In scope (Mongo):** the encode-side runtime invocation pattern. `resolveValue`, `MongoAdapter.lower()`, and `MongoRuntime.execute()` are reshaped to async + `Promise.all` for consistency with SQL.
-- **Out of scope (Mongo):** any decode-side machinery, including a Mongo `decodeRow`, projection walker, or result-shape decoding. When future Mongo-row-decoding work begins, the natural plug-in point is a Mongo analog of `decodeRow`/`decodeField` that mirrors the SQL pattern (always-await, `Promise.all` per row, JSON-Schema validation against the resolved value).
+- **Decode (Mongo), follow-up to this ADR:** row decoding now uses structural `MongoResultShape` and `decodeMongoRow` in `@prisma-next/mongo-runtime` (TML-2324); JSON-Schema validation on decoded cells remains SQL-only for now.
 - **In scope (cross-family):** the structural identity of `Codec` and `MongoCodec`, and the structural reusability of a single `codec({...})` module across both runtimes' encode paths.
 
 ## References
