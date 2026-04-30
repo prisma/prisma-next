@@ -23,11 +23,11 @@ that:
 
 ## Why a per-library extension
 
-The codec-registry-unification spec routes JSON-with-schema through per-
+The unified `CodecDescriptor` model routes JSON-with-schema through per-
 library extension packages: arktype-json now, future zod / valibot
 extensions when each has a clean serialize / rehydrate story. The Postgres
 adapter retains only the storage-level `jsonColumn` / `jsonbColumn`
-descriptors (untyped raw JSON). See [spec § Case J](../../../wip/codec-registry-unification/spec.md).
+descriptors (untyped raw JSON). See [ADR 207 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
 
 ## Usage
 

@@ -159,7 +159,7 @@ flowchart TD
 - [ADR 068 - Error mapping to RuntimeError](../../../../docs/architecture%20docs/adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md)
 - [ADR 112 - Target Extension Packs](../../../../docs/architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
 - [ADR 114 - Extension codecs & branded types](../../../../docs/architecture%20docs/adrs/ADR%20114%20-%20Extension%20codecs%20&%20branded%20types.md)
-- [ADR 163 - Postgres JSON and JSONB typed columns](../../../../docs/architecture%20docs/adrs/ADR%20163%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md)
+- [ADR 168 - Postgres JSON and JSONB typed columns](../../../../docs/architecture%20docs/adrs/ADR%20168%20-%20Postgres%20JSON%20and%20JSONB%20typed%20columns.md). Schema-typed JSON columns now ship from per-library extension packages (`@prisma-next/extension-arktype-json` for arktype); see [ADR 207 - Higher-order codecs for parameterized types](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
 
 ## Usage
 

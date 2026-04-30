@@ -69,7 +69,7 @@ Add vector columns to your contract and enable the namespace via pack refs:
 import { int4Column, textColumn } from '@prisma-next/adapter-postgres/column-types';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
-import { vectorColumn } from '@prisma-next/extension-pgvector/column-types';
+import { vector, vectorColumn } from '@prisma-next/extension-pgvector/column-types';
 import pgvector from '@prisma-next/extension-pgvector/pack';
 import postgres from '@prisma-next/target-postgres/pack';
 
@@ -82,12 +82,15 @@ export const contract = defineContract({
       fields: {
         id: field.column(int4Column).id(),
         title: field.column(textColumn),
-        embedding: field.column(vectorColumn).optional(),
+        // Dimensioned vector — `field.embedding` resolves to `Vector<1536>`.
+        embedding: field.column(vector(1536)).optional(),
       },
     }).sql({ table: 'post' }),
   },
 });
 ```
+
+The `vector(N)` factory is registered through the unified `CodecDescriptor<{ length: number }>` shape — `paramsSchema` validates the dimension at the contract boundary, `renderOutputType: ({ length }) => 'Vector<' + length + '>'` produces the column's TS type for `contract.d.ts`, and the curried `factory` materializes the runtime codec at context construction. See [ADR 207 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) for the descriptor model. For undimensioned vector columns (rare; typically only valid in legacy schemas where `vector` was declared without a dimension), use `vectorColumn` instead.
 
 ### Runtime Setup
 
