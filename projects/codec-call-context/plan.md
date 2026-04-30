@@ -125,18 +125,21 @@ Mirror M2 for the Mongo encode dispatch. Demonstrable via Mongo runtime tests co
 
 **Tasks:**
 
+- [ ] **T3.0** Promote the m2 `race-against-abort` helper from `packages/2-sql/5-runtime/src/codecs/race-against-abort.ts` to a shared framework location (`packages/1-framework/1-core/framework-components/src/runtime/race-against-abort.ts` or similar) and export it via `framework-components/runtime`. Rationale: the helper's sentinel-identity attribution is load-bearing for AC-ERR4 and identical to what m3's Mongo `resolveValue` `Promise.all` race needs. Avoids duplicating the helper or pulling cross-family imports in m3. SQL-side import path updated to consume the framework export. Not invasive: pure relocation + re-export, no behavioural change. This is the right moment to do it (m3 is the second consumer; doing it now keeps the abort-race contract consolidated before m3 builds on it).
 - [ ] **T3.1** Write tests for `resolveValue(value, codecs, ctx?)`:
   - Each codec's `encode(value, ctx)` receives the same `ctx` instance.
   - No-ctx case is bit-for-bit identical (regression).
   - Mid-encode abort throws `RUNTIME.ABORTED` (`{ phase: 'encode' }`).
   - Recursive walk preserves `ctx` identity across nested object/array branches.
+  - Already-aborted signal at `resolveValue` entry short-circuits (mock codec call counter == 0).
 - [ ] **T3.2** Write tests for `MongoRuntime.execute(plan, options?)`:
   - Already-aborted signal short-circuits.
   - Signal threads through `lower → adapter.lower → resolveValue` to each codec call.
 - [ ] **T3.3** Update [`packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts):
   - Accept `ctx?: CodecCallContext` (the framework type, signal-only) as a third arg. Mongo does not extend `CodecCallContext` in this project.
+  - Pre-check `ctx?.signal?.aborted` at entry; throw via `runtimeAborted('encode', ctx.signal.reason)` if already aborted.
   - Forward `ctx` to `codec.encode(value, ctx)`.
-  - Forward `ctx` recursively to nested `resolveValue` calls so identity is preserved.
+  - Forward `ctx` recursively to nested `resolveValue` calls so identity is preserved (the recursive walk is the Mongo analog of SQL `encodeParams`'s flat `Promise.all`; race the per-level Promise.all against the framework `raceAgainstAbort(ctx.signal, …)` helper from T3.0 so cooperative cancellation works the same way).
 - [ ] **T3.4** Update [`packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts) and [`packages/3-mongo-target/2-mongo-adapter/src/lowering.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/lowering.ts):
   - `MongoAdapter.lower(plan, ctx?: CodecCallContext)` accepts and forwards `ctx` to its internal `resolveValue` calls.
 - [ ] **T3.5** Update [`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts):
