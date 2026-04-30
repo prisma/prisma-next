@@ -995,3 +995,69 @@ describe('resolveFieldType', () => {
     expect(result.input).toBe("CodecTypes['pg/char@1']['input']");
   });
 });
+
+describe('generateBothFieldTypesMaps with resolveFieldTypeParams', () => {
+  // Phase A: SQL `typeRef`-shaped columns carry their `typeParams` on a named
+  // `storage.types[ref]` entry rather than inline on the framework's domain
+  // `ContractField`. The framework emit path consults a per-family resolver
+  // (`EmissionSpi.resolveFieldTypeParams`) to recover those typeParams so the
+  // codec's `renderOutputType` runs and the parameterized output type is
+  // emitted instead of the generic `CodecTypes[...]['output']` fallback.
+
+  it('uses resolved typeParams from the family resolver when domain field has none', () => {
+    const lookup = stubCodecLookup({
+      'pg/vector@1': stubCodec({
+        id: 'pg/vector@1',
+        renderOutputType: (p) => `Vector<${p['length']}>`,
+      }),
+    });
+    const models: Record<string, ContractModel> = {
+      Post: {
+        fields: {
+          embedding: {
+            nullable: true,
+            type: { kind: 'scalar', codecId: 'pg/vector@1' },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const resolveFieldTypeParams = (
+      modelName: string,
+      fieldName: string,
+    ): Record<string, unknown> | undefined =>
+      modelName === 'Post' && fieldName === 'embedding' ? { length: 1536 } : undefined;
+    const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
+    expect(result.output).toContain('readonly embedding: Vector<1536> | null');
+    expect(result.output).not.toContain("CodecTypes['pg/vector@1']['output']");
+  });
+
+  it('prefers inline typeParams over the resolver (regression guard)', () => {
+    const lookup = stubCodecLookup({
+      'pg/vector@1': stubCodec({
+        id: 'pg/vector@1',
+        renderOutputType: (p) => `Vector<${p['length']}>`,
+      }),
+    });
+    const models: Record<string, ContractModel> = {
+      Post: {
+        fields: {
+          embedding: {
+            nullable: false,
+            type: { kind: 'scalar', codecId: 'pg/vector@1', typeParams: { length: 768 } },
+          },
+        },
+        relations: {},
+        storage: {},
+      },
+    };
+    const resolveFieldTypeParams = (
+      _modelName: string,
+      _fieldName: string,
+    ): Record<string, unknown> | undefined => ({ length: 1536 });
+    const result = generateBothFieldTypesMaps(models, lookup, resolveFieldTypeParams);
+    expect(result.output).toContain('readonly embedding: Vector<768>');
+    expect(result.output).not.toContain('Vector<1536>');
+  });
+});
