@@ -34,19 +34,23 @@ See **Slices and dependencies** below for the arc from today's structural routin
   - *Depends on:* M2 (edges must carry invariants for the primitive to consume).
   - *Enables:* M4.
 
-- **M4. Wire it all together in the CLI.** `migration apply --ref` and `migration status --ref` compute `effectiveRequired = ref.invariants − marker.invariants` and route through the new pathfinder. Structured errors (`NO_INVARIANT_PATH`, `UNKNOWN_INVARIANT`) land with actionable `fix` text. Apply threads `manifest.providedInvariants` through `SqlMigrationRunnerExecuteOptions.invariants` so M1's marker union fires on each applied edge. Status displays required / applied / missing.
+- **M4. Wire it all together in the CLI.** `migration apply --ref` and `migration status --ref` compute `effectiveRequired = ref.invariants − marker.invariants` and route through the new pathfinder. Structured errors (`NO_INVARIANT_PATH`, `UNKNOWN_INVARIANT`) land with actionable `fix` text. The runner derives `providedInvariants` from `plan.operations` directly (single source of truth — M2's per-op `invariantId` is what the runner unions into the marker; no parallel option channel). Status displays required / applied / missing.
   - *Depends on:* M1, M2, M3.
   - *Delivers:* the end-user feature.
+
+- **M5. Close-out.** Verify acceptance against the spec's ACs; migrate durable decisions into ADRs; clean up transient artefacts. See §Close-out for the ADR work and the spec/plan deletion checklist.
+  - *Depends on:* M4 merged + soak time.
+  - *Delivers:* durable documentation; closes the umbrella.
 
 **Dependency graph.**
 
 ```
 M1 ─────────────────────────────┐
-                                ├──► M4
+                                ├──► M4 ──► M5
 M2 ──► M3 ─────────────────────┘
 ```
 
-M1 and M2 are independent — either can land first, neither blocks the other. M3 waits for M2. M4 is the integration slice and waits for M1, M2, and M3.
+M1 and M2 are independent — either can land first, neither blocks the other. M3 waits for M2. M4 is the integration slice and waits for M1, M2, and M3. M5 closes out after M4 has merged and soaked.
 
 # Worked example
 
@@ -533,6 +537,37 @@ Invariant IDs aren't personal data. No impact.
 ## Analytics
 
 None. Routing is CLI-local.
+
+# Close-out (M5)
+
+After M4 merges and the feature has soaked, verify the spec's ACs against landed code, migrate the durable decisions into ADRs, and delete the transient spec/plan artefacts. The plan's Milestone 5 task list owns the procedural checklist; this section enumerates the design decisions that need an ADR home and the existing ADRs that need amendments.
+
+## ADR work
+
+**Amend ADR 001 (Migrations as Edges).** ADR 001 currently states that "`fromHash` must differ from `toHash` to keep graph semantics unambiguous." M4 relaxed that rule: a migration package may declare `from === to` if and only if it carries at least one `data`-class operation. Pure data migrations against the current contract hash (e.g. "normalise emails to lowercase") are now expressible without faking a no-op schema diff. The amendment should:
+- State the relaxed rule and the data-op gate.
+- Note that the pathfinder treats self-edges as covering edges when a required invariant matches; structural `findPath` still returns the empty path because that's structurally shortest.
+- Note the runner's narrowed upfront skip (`origin === destination` is no longer a skip signal) and the post-hoc no-op skip scoped to self-edges (preserves audit-trail behavior for `db update` no-ops).
+
+**Add a new ADR for invariant-aware routing.** Captures the decisions that aren't already covered by ADR 001's amendment:
+- **D4: split identity.** `name` keeps its display/diagnostic role on `DataTransformOperation`; `invariantId?: string` is the opt-in routing identity. Renaming `name` is safe; renaming `invariantId` is a deliberate, reviewable act with a clear blast radius.
+- **Marker stores applied-at-least-once, not currently-true.** `marker.invariants` is set-semantic and monotonic — set-union on every successful apply, never shrinks. Rollbacks don't remove the id. The data transform's `check` is the authority for "data currently satisfies X"; the marker is the authority for "X has been applied at least once historically." Two claims, two sources of truth.
+- **Server-side merge for invariants.** Postgres uses a self-referential `array(select distinct unnest(invariants ‖ $N::text[]) order by 1)` UPDATE; Mongo uses an aggregation pipeline (`$setUnion + $sortArray`). Single-statement atomicity at the storage layer, no client-side CAS-on-invariants retry loop.
+- **CLI marker subtraction.** `effectiveRequired = ref.invariants − marker.invariants` is the single line that makes ref-driven re-applies idempotent. Combined with the M3 pathfinder's empty-required equivalence, the second `apply --ref` becomes byte-identical to a structural BFS.
+- **Discriminated `FindPathOutcome`.** `findPathWithDecision` returns `{ kind: 'ok' | 'unreachable' | 'unsatisfiable' }`. The pathfinder owns the structural fallback BFS; callers consume `outcome.missing` and `outcome.structuralPath` directly. No CLI-side disambiguation.
+- **Runner derives invariants from ops.** The runner reads `plan.operations`'s data ops via `deriveProvidedInvariants` rather than accepting a parallel `invariants?` channel from the caller. Removes a class of "forgot to thread the option" bugs; verify ensures manifest and ops agree at load time.
+
+**Update ADR 001's reference list** to point at the new invariant-aware-routing ADR for the routing semantics that build on top of "migrations as edges."
+
+**Decision: combined or separate?** ADR 001 amendment is small (one paragraph + a self-edge note); the new ADR is substantive. Recommend keeping them separate so the new ADR doesn't bury the self-edge relaxation in a side note, and so future readers landing on ADR 001 see the rule update inline.
+
+## Acceptance walk-through
+
+Walk every AC in §Acceptance Criteria against landed code; link each to the test that covers it. Use the plan's Test Coverage table as the checklist. Any ACs not green at this point block the close-out PR; M5 doesn't paper over uncovered ACs.
+
+## Artefact cleanup
+
+Per the plan: delete the spec and plan files once the durable decisions have been absorbed into ADRs and any inbound references have been updated. Do **not** delete `projects/graph-based-migrations/` as a whole — other specs remain active. The `data-migrations-spec.md` pruning was done ahead of schedule; re-verify nothing has crept back in.
 
 # References
 
