@@ -10,6 +10,7 @@ type AnyMongoContract = MongoContractWithTypeMaps<MongoContract, MongoTypeMaps>;
 // Hoisted mocks so they are observable from inside vi.mock() factories.
 const mocks = vi.hoisted(() => ({
   createMongoAdapter: vi.fn(),
+  createDefaultMongoCodecRegistry: vi.fn(),
   createMongoRuntime: vi.fn(),
   driverFromConnection: vi.fn(),
   driverFromDb: vi.fn(),
@@ -20,6 +21,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('@prisma-next/adapter-mongo', () => ({
   createMongoAdapter: mocks.createMongoAdapter,
+  createDefaultMongoCodecRegistry: mocks.createDefaultMongoCodecRegistry,
 }));
 
 vi.mock('@prisma-next/mongo-runtime', () => ({
@@ -57,6 +59,7 @@ describe('mongo() facade', () => {
     for (const fn of Object.values(mocks)) fn.mockReset();
 
     mocks.validateMongoContract.mockReturnValue({ contract: fakeContract });
+    mocks.createDefaultMongoCodecRegistry.mockReturnValue({ id: 'shared-codecs' });
     mocks.createMongoAdapter.mockReturnValue({ id: 'adapter' });
     mocks.driverFromConnection.mockResolvedValue({ id: 'driver-from-url' });
     mocks.driverFromDb.mockReturnValue({ id: 'driver-from-db' });
@@ -93,6 +96,13 @@ describe('mongo() facade', () => {
       'mydb',
     );
     expect(mocks.createMongoRuntime).toHaveBeenCalledTimes(1);
+    expect(mocks.createDefaultMongoCodecRegistry).toHaveBeenCalledTimes(1);
+    expect(mocks.createMongoAdapter).toHaveBeenCalledWith({ id: 'shared-codecs' });
+    expect(mocks.createMongoRuntime).toHaveBeenCalledWith(
+      expect.objectContaining({
+        codecs: { id: 'shared-codecs' },
+      }),
+    );
   });
 
   it('builds the runtime exactly once across concurrent first calls (lazy memoisation)', async () => {

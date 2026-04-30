@@ -7,6 +7,7 @@ import type {
 } from '@prisma-next/framework-components/runtime';
 import { RuntimeCore } from '@prisma-next/framework-components/runtime';
 import { createTelemetryMiddleware, type TelemetryEvent } from '@prisma-next/middleware-telemetry';
+import { createMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { createMongoRuntime } from '@prisma-next/mongo-runtime';
@@ -144,6 +145,7 @@ describe('cross-family middleware proof', () => {
       ]),
       contract: {},
       targetId: 'mongo',
+      codecs: createMongoCodecRegistry(),
       middleware: [middleware],
     });
 
@@ -177,6 +179,7 @@ describe('cross-family middleware proof', () => {
       driver: createMockMongoDriver([{ _id: '1' }]),
       contract: {},
       targetId: 'mongo',
+      codecs: createMongoCodecRegistry(),
       middleware: [middleware],
     });
 
