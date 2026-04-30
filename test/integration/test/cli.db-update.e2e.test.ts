@@ -164,14 +164,15 @@ withTempDir(({ createTempDir }) => {
             },
           });
 
-          const previewStatements =
-            (
-              payload as {
-                plan?: {
-                  preview?: { statements?: ReadonlyArray<{ language: string; text: string }> };
+          const previewStatements = (
+            payload as {
+              plan: {
+                preview: {
+                  statements: ReadonlyArray<{ language: string; text: string }>;
                 };
-              }
-            ).plan?.preview?.statements ?? [];
+              };
+            }
+          ).plan.preview.statements;
           const sqlStatements = previewStatements.filter((s) => s.language === 'sql');
           expect(sqlStatements.length).toBeGreaterThan(0);
         });
