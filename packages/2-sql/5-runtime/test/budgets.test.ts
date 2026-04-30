@@ -225,17 +225,23 @@ describe('budgets middleware', () => {
       async () => {
         const ast = SelectAst.from(userTable)
           .withProjection([ProjectionItem.of('id', idCol)])
-          .withLimit(5);
+          .withLimit(10);
         const plan = createPlan({ ast });
         const mw = budgets({
-          maxRows: 10_000,
+          maxRows: 4,
           defaultTableRows: 10_000,
           tableRows: { user: 5 },
         });
         const ctx = createMiddlewareContext();
 
-        await mw.beforeExecute?.(plan, ctx);
-        expect(ctx.log.warn).not.toHaveBeenCalled();
+        // estimatedRows: 5 can only come from tableRows[ast.from.name].
+        // If FROM lookup fell back to defaultTableRows (10_000), the limit
+        // would dominate Math.min and surface estimatedRows: 10 instead.
+        await expect(mw.beforeExecute?.(plan, ctx)).rejects.toMatchObject({
+          code: 'BUDGET.ROWS_EXCEEDED',
+          category: 'BUDGET',
+          details: expect.objectContaining({ source: 'ast', estimatedRows: 5 }),
+        });
       },
       timeouts.default,
     );
