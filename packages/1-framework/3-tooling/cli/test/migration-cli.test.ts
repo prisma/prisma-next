@@ -1,10 +1,18 @@
 /**
  * Unit tests for `MigrationCLI.run` (the migration-file CLI entrypoint).
- * Covers diagnostic surfaces (target mismatch, config not found) and the
- * dry-run / write paths via mocked `loadConfig` +
- * `createControlStack`. The heavier "full migration round-trips to disk"
- * path is exercised by the existing example-migration round-trip tests
- * (target-postgres).
+ *
+ * **Tests-first**: this file asserts the post-clipanion contract for
+ * `MigrationCLI.run`. The implementation lands in plan m4
+ * (`projects/migration-cli-arg-parser/plan.md` § Commit 4); until then
+ * `MigrationCLI.run` is a stub that throws, so most cases below will
+ * fail at runtime. That's the audit trail of contract → implementation
+ * the project's tests-first sequencing requires.
+ *
+ * Test-doubles approach: `BufferStream` collects output written via
+ * `write`/`end`; `argv` is injected explicitly. No `process.argv` /
+ * `process.stdout` / `process.stderr` mutation, no `vi.spyOn` on
+ * process globals — the new public surface accepts an injectable
+ * `{ argv, stdout, stderr }` so tests can capture in-process.
  */
 
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
@@ -30,6 +38,34 @@ vi.mock('@prisma-next/framework-components/control', async () => {
 });
 
 const { MigrationCLI } = await import('../src/migration-cli');
+
+/**
+ * Minimal `Writable`-shaped buffer for capturing CLI output in-process.
+ * Implements the surface clipanion's `Cli.run({ stdout, stderr })`
+ * needs: `write(chunk, ...)` returns `true` and `end(chunk?, ...)`
+ * accepts an optional final chunk. The `.text` getter joins everything
+ * written so assertions can use `.toContain(...)` / `.toMatch(...)`.
+ */
+class BufferStream {
+  private readonly chunks: string[] = [];
+
+  write(chunk: unknown): boolean {
+    if (chunk !== undefined && chunk !== null) {
+      this.chunks.push(typeof chunk === 'string' ? chunk : String(chunk));
+    }
+    return true;
+  }
+
+  end(chunk?: unknown): void {
+    if (chunk !== undefined && chunk !== null) {
+      this.write(chunk);
+    }
+  }
+
+  get text(): string {
+    return this.chunks.join('');
+  }
+}
 
 class FakeMigration extends Migration {
   readonly targetId: string;
@@ -84,52 +120,57 @@ class StackHungryWrongTargetMigration extends Migration {
   }
 }
 
-let stderrSpy: ReturnType<typeof vi.spyOn>;
-let stdoutSpy: ReturnType<typeof vi.spyOn>;
-let originalArgv: typeof process.argv;
-let originalExitCode: typeof process.exitCode;
 let workDir: string;
 let migrationFile: string;
 
 beforeEach(() => {
   workDir = mkdtempSync(join(tmpdir(), 'migrationcli-test-'));
   migrationFile = join(workDir, 'migration.ts');
-  originalArgv = process.argv;
-  originalExitCode = process.exitCode;
-  // The entrypoint guard compares `realpathSync(import.meta.url)` against
-  // `realpathSync(process.argv[1])`; pointing both at the temp file makes
-  // the guard fire so the runner actually executes its body.
-  process.argv = ['node', migrationFile];
   // The serializer needs an actual file at the migration path so that
-  // realpathSync resolves both sides identically.
+  // realpathSync resolves both sides identically when the entrypoint
+  // guard compares `realpathSync(import.meta.url)` against
+  // `realpathSync(argv[1])`.
   writeFileSync(migrationFile, '');
-  stderrSpy = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
-  stdoutSpy = vi.spyOn(process.stdout, 'write').mockImplementation(() => true);
   loadConfigMock.mockReset();
   createControlStackMock.mockReset();
 });
 
 afterEach(() => {
   rmSync(workDir, { recursive: true, force: true });
-  process.argv = originalArgv;
-  process.exitCode = originalExitCode;
-  stderrSpy.mockRestore();
-  stdoutSpy.mockRestore();
 });
+
+/**
+ * Returns the canonical "looks like an entrypoint invocation" argv
+ * shape: `['node', migrationFile, ...extra]`. The entrypoint guard
+ * compares `realpathSync(import.meta.url)` to `realpathSync(argv[1])`,
+ * so pointing `argv[1]` at the temp file makes the guard fire and the
+ * runner executes its body.
+ */
+function entrypointArgv(...extra: readonly string[]): readonly string[] {
+  return ['node', migrationFile, ...extra];
+}
+
+const okConfig = {
+  family: { familyId: 'sql' },
+  target: { targetId: 'postgres' },
+  adapter: { kind: 'adapter' },
+  extensionPacks: [],
+};
 
 describe('MigrationCLI.run', () => {
   it('writes ops.json + migration.json under the migration directory on success', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv(),
+      stdout,
+      stderr,
+    });
 
-    expect(process.exitCode).not.toBe(1);
+    expect(exitCode).toBe(0);
     const ops = JSON.parse(readFileSync(join(workDir, 'ops.json'), 'utf-8'));
     expect(ops).toEqual([]);
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
@@ -137,93 +178,138 @@ describe('MigrationCLI.run', () => {
   });
 
   it('prints artifacts to stdout in --dry-run mode without writing files', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
-    process.argv = ['node', migrationFile, '--dry-run'];
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--dry-run'),
+      stdout,
+      stderr,
+    });
 
-    expect(process.exitCode).not.toBe(1);
+    expect(exitCode).toBe(0);
     expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
-    const stdoutCalls = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stdoutCalls).toContain('--- migration.json ---');
-    expect(stdoutCalls).toContain('--- ops.json ---');
+    expect(stdout.text).toContain('--- migration.json ---');
+    expect(stdout.text).toContain('--- ops.json ---');
   });
 
   it('emits PN-MIG-2006 with both target ids when migration target ≠ config target', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, WrongTargetMigration);
+    const exitCode = await MigrationCLI.run(
+      pathToFileURL(migrationFile).href,
+      WrongTargetMigration,
+      { argv: entrypointArgv(), stdout, stderr },
+    );
 
-    expect(process.exitCode).toBe(1);
-    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stderrText).toContain('"mongo"');
-    expect(stderrText).toContain('"postgres"');
-    expect(stderrText).toContain('Migration target does not match config target');
+    expect(exitCode).toBe(1);
+    expect(stderr.text).toContain('"mongo"');
+    expect(stderr.text).toContain('"postgres"');
+    expect(stderr.text).toContain('Migration target does not match config target');
   });
 
   it('exits non-zero with the loader diagnostic when config is missing', async () => {
     loadConfigMock.mockRejectedValue(errorConfigFileNotFound('/path/to/prisma-next.config.ts'));
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv(),
+      stdout,
+      stderr,
+    });
 
-    expect(process.exitCode).toBe(1);
-    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stderrText).toMatch(/config|prisma-next/i);
+    expect(exitCode).toBe(1);
+    expect(stderr.text).toMatch(/config|prisma-next/i);
   });
 
   it('no-ops silently when the file is being imported (not the entrypoint)', async () => {
-    process.argv = ['node', '/some/other/file.js'];
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: ['node', '/some/other/file.js'],
+      stdout,
+      stderr,
+    });
 
+    expect(exitCode).toBe(0);
     expect(loadConfigMock).not.toHaveBeenCalled();
     expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
+    expect(stdout.text).toBe('');
+    expect(stderr.text).toBe('');
   });
 
-  it('prints help and exits cleanly on --help', async () => {
-    process.argv = ['node', migrationFile, '--help'];
+  it('renders --help to stdout and exits 0', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--help'),
+      stdout,
+      stderr,
+    });
 
+    expect(exitCode).toBe(0);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    const stdoutText = stdoutSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stdoutText).toContain('Usage');
+    expect(stdout.text).toContain('Usage');
+  });
+
+  it('routes --help output to stdout, never to stderr', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--help'),
+      stdout,
+      stderr,
+    });
+
+    // Regression guard for the corrected Style Guide rule 8: explicit
+    // `--help` is data, so it must land on stdout. Help text on stderr
+    // would break shell pipelines that consume it as data.
+    expect(stderr.text).not.toContain('Usage');
   });
 
   it('forwards --config <path> to loadConfig', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
-    process.argv = ['node', migrationFile, '--config', '/explicit/config.ts'];
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config', '/explicit/config.ts'),
+      stdout,
+      stderr,
+    });
 
+    expect(exitCode).toBe(0);
     expect(loadConfigMock).toHaveBeenCalledWith('/explicit/config.ts');
   });
 
-  it('preserves contract bookends from a previously-scaffolded migration.json', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
+  it('forwards --config=<path> (equals form) to loadConfig', async () => {
+    loadConfigMock.mockResolvedValue(okConfig);
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config=/equals/config.ts'),
+      stdout,
+      stderr,
     });
+
+    expect(exitCode).toBe(0);
+    expect(loadConfigMock).toHaveBeenCalledWith('/equals/config.ts');
+  });
+
+  it('preserves contract bookends from a previously-scaffolded migration.json', async () => {
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
     const existing = {
@@ -239,8 +325,15 @@ describe('MigrationCLI.run', () => {
     };
     writeFileSync(join(workDir, 'migration.json'), JSON.stringify(existing, null, 2));
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv(),
+      stdout,
+      stderr,
+    });
 
+    expect(exitCode).toBe(0);
     const manifest = JSON.parse(readFileSync(join(workDir, 'migration.json'), 'utf-8'));
     expect(manifest.fromContract).toEqual(existing.fromContract);
     expect(manifest.toContract).toEqual(existing.toContract);
@@ -253,23 +346,23 @@ describe('MigrationCLI.run', () => {
   });
 
   it('exits non-zero with MIGRATION.INVALID_JSON when migration.json is unparseable', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
 
     const malformed = '{ this is not json';
     writeFileSync(join(workDir, 'migration.json'), malformed);
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv(),
+      stdout,
+      stderr,
+    });
 
-    expect(process.exitCode).toBe(1);
-    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stderrText).toContain('Invalid JSON in migration file');
-    expect(stderrText).toContain(join(workDir, 'migration.json'));
+    expect(exitCode).toBe(1);
+    expect(stderr.text).toContain('Invalid JSON in migration file');
+    expect(stderr.text).toContain(join(workDir, 'migration.json'));
 
     expect(() => readFileSync(join(workDir, 'ops.json'))).toThrow();
 
@@ -277,59 +370,100 @@ describe('MigrationCLI.run', () => {
     expect(onDisk).toBe(malformed);
   });
 
-  it('forwards --config=<path> (equals form) to loadConfig', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
+  it('rejects --config when followed by another flag with PN-CLI-4012 and exit 2', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config', '--dry-run'),
+      stdout,
+      stderr,
     });
-    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
-    process.argv = ['node', migrationFile, '--config=/equals/config.ts'];
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
-
-    expect(loadConfigMock).toHaveBeenCalledWith('/equals/config.ts');
+    expect(exitCode).toBe(2);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('--config');
+    expect(stderr.text).toContain('--dry-run');
   });
 
-  it('rejects --config when followed by another flag instead of a path', async () => {
-    process.argv = ['node', migrationFile, '--config', '--dry-run'];
+  it('rejects a bare trailing --config with PN-CLI-4012 and exit 2', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--config'),
+      stdout,
+      stderr,
+    });
 
-    expect(process.exitCode).toBe(1);
+    expect(exitCode).toBe(2);
     expect(loadConfigMock).not.toHaveBeenCalled();
-    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stderrText).toContain('--config');
-    expect(stderrText).toContain('--dry-run');
-  });
-
-  it('rejects a bare trailing --config with no path argument', async () => {
-    process.argv = ['node', migrationFile, '--config'];
-
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration);
-
-    expect(process.exitCode).toBe(1);
-    expect(loadConfigMock).not.toHaveBeenCalled();
-    const stderrText = stderrSpy.mock.calls.map((c: unknown[]) => String(c[0])).join('');
-    expect(stderrText).toContain('--config');
+    expect(stderr.text).toContain('PN-CLI-4012');
+    expect(stderr.text).toContain('--config');
   });
 
   it('rejects target-mismatched migrations before any stack-driven construction', async () => {
-    loadConfigMock.mockResolvedValue({
-      family: { familyId: 'sql' },
-      target: { targetId: 'postgres' },
-      adapter: { kind: 'adapter' },
-      extensionPacks: [],
-    });
+    loadConfigMock.mockResolvedValue(okConfig);
     const adapterCreate = vi.fn(() => ({}));
     createControlStackMock.mockReturnValue({ adapter: { create: adapterCreate } });
     StackHungryWrongTargetMigration.stackUsed = false;
 
-    await MigrationCLI.run(pathToFileURL(migrationFile).href, StackHungryWrongTargetMigration);
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+    const exitCode = await MigrationCLI.run(
+      pathToFileURL(migrationFile).href,
+      StackHungryWrongTargetMigration,
+      { argv: entrypointArgv(), stdout, stderr },
+    );
 
-    expect(process.exitCode).toBe(1);
+    expect(exitCode).toBe(1);
     expect(StackHungryWrongTargetMigration.stackUsed).toBe(false);
     expect(adapterCreate).not.toHaveBeenCalled();
+  });
+
+  it('rejects unknown flags with PN-CLI-4013 and exit 2', async () => {
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv('--frobnicate'),
+      stdout,
+      stderr,
+    });
+
+    expect(exitCode).toBe(2);
+    expect(loadConfigMock).not.toHaveBeenCalled();
+    expect(stderr.text).toContain('PN-CLI-4013');
+    expect(stderr.text).toContain('--frobnicate');
+    // The known-flag list should be rendered for copy-pastability so
+    // the user can spot the typo without `--help`.
+    expect(stderr.text).toContain('--help');
+    expect(stderr.text).toContain('--dry-run');
+    expect(stderr.text).toContain('--config');
+  });
+
+  it('uses injected argv exclusively, never reading process.argv', async () => {
+    // Regression guard for the stream-injection contract: when argv is
+    // injected, the runner must not fall back to process.argv. In
+    // vitest, process.argv[1] points at vitest's own binary — if the
+    // implementation read it, the entrypoint guard
+    // (realpathSync(argv[1]) === realpathSync(importMetaUrl)) would
+    // not match and the runner would silently no-op, leaving
+    // loadConfigMock uncalled. The injected argv points argv[1] at
+    // migrationFile, so the guard fires and loadConfig is called.
+    loadConfigMock.mockResolvedValue(okConfig);
+    createControlStackMock.mockReturnValue({ adapter: { create: () => ({}) } });
+
+    const stdout = new BufferStream();
+    const stderr = new BufferStream();
+    const exitCode = await MigrationCLI.run(pathToFileURL(migrationFile).href, FakeMigration, {
+      argv: entrypointArgv(),
+      stdout,
+      stderr,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(loadConfigMock).toHaveBeenCalled();
   });
 });
