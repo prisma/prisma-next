@@ -144,6 +144,47 @@ describe('sqlSchemaIrToPslAst', () => {
     expect(arg && arg.kind === 'positional' ? arg.value : '').toContain('now()');
   });
 
+  it('attaches a "no primary key" warning comment for tables without a primary key', () => {
+    const schemaIR = ir({
+      tables: {
+        audit_log: {
+          name: 'audit_log',
+          columns: {
+            event: { name: 'event', nativeType: 'text', nullable: false },
+          },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+    const auditLog = ast.models.find((m) => m.name === 'AuditLog');
+    expect(auditLog?.comment).toBe('// WARNING: This table has no primary key in the database');
+  });
+
+  it('omits the no-primary-key comment for tables with a primary key', () => {
+    const schemaIR = ir({
+      tables: {
+        user: {
+          name: 'user',
+          columns: {
+            id: { name: 'id', nativeType: 'int4', nullable: false },
+          },
+          primaryKey: { columns: ['id'] },
+          foreignKeys: [],
+          uniques: [],
+          indexes: [],
+        },
+      },
+    });
+
+    const ast = sqlSchemaIrToPslAst(schemaIR);
+    const user = ast.models.find((m) => m.name === 'User');
+    expect(user?.comment).toBeUndefined();
+  });
+
   it('renders a representative two-table schema with FK relation deterministically', () => {
     const schemaIR = ir({
       tables: {
