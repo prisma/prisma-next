@@ -1,4 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
+import type { Codec, Ctx } from '@prisma-next/framework-components/codec';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
@@ -41,8 +42,9 @@ const jsonTypeParamsSchema = arktype({
 type JsonTypeParams = typeof jsonTypeParamsSchema.infer;
 
 /**
- * Helper returned by the JSON/JSONB `init` hook.
- * Contains a compiled JSON Schema validate function for runtime conformance checks.
+ * Per-instance JSON-validator state attached to the resolved JSON/JSONB
+ * codec. The `'json-validator'` `CodecTrait` gates the framework's
+ * extraction of `validate` from the resolved codec at context-build time.
  */
 export type JsonCodecHelper = { readonly validate: JsonSchemaValidateFn };
 
@@ -56,24 +58,53 @@ function createPostgresMutationDefaultGenerators() {
   }));
 }
 
-function initJsonCodecHelper(params: JsonTypeParams): JsonCodecHelper {
-  return { validate: compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>) };
+/**
+ * Build a parameterized JSON/JSONB descriptor whose factory wraps the
+ * existing async json/jsonb codec with a per-instance compiled JSON
+ * Schema validator. The resolved codec carries `validate` as a per-
+ * instance state and declares the `'json-validator'` trait so the
+ * framework's `JsonSchemaValidatorRegistry` builder can extract it.
+ *
+ * The wire-format `encode`/`decode` behavior is unchanged from the legacy
+ * non-parameterized codec — JSON encode is `JSON.stringify`, decode is
+ * `JSON.parse` — which is why the AC-5 `forCodecId` fallback works for
+ * encode-side dispatch without column refs (encode is per-instance-
+ * stateless w.r.t. params; only decode-time validation depends on the
+ * compiled validator). Codec-registry-unification spec § Phase B § Risks.
+ */
+function buildJsonCodecDescriptor(
+  codecId: typeof PG_JSON_CODEC_ID | typeof PG_JSONB_CODEC_ID,
+  baseCodec: Codec,
+  targetType: 'json' | 'jsonb',
+): RuntimeParameterizedCodecDescriptor<JsonTypeParams> {
+  const factory = (params: JsonTypeParams) => {
+    const validate = compileJsonSchemaValidator(params.schemaJson as Record<string, unknown>);
+    const baseTraits: ReadonlyArray<string> = baseCodec.traits ?? [];
+    const traitsArr = Array.from(new Set([...baseTraits, 'json-validator']));
+    const traits = Object.freeze(traitsArr) as NonNullable<Codec['traits']>;
+    const resolvedCodec: Codec & JsonCodecHelper = {
+      ...baseCodec,
+      traits,
+      validate,
+    };
+    return (_ctx: Ctx) => resolvedCodec;
+  };
+
+  return {
+    codecId,
+    traits: ['json-validator', ...(baseCodec.traits ?? [])],
+    targetTypes: [targetType],
+    paramsSchema: jsonTypeParamsSchema,
+    factory,
+  };
 }
 
-const parameterizedCodecDescriptors = [
-  {
-    codecId: PG_JSON_CODEC_ID,
-    paramsSchema: jsonTypeParamsSchema,
-    init: initJsonCodecHelper,
-  },
-  {
-    codecId: PG_JSONB_CODEC_ID,
-    paramsSchema: jsonTypeParamsSchema,
-    init: initJsonCodecHelper,
-  },
-] as const satisfies ReadonlyArray<
-  RuntimeParameterizedCodecDescriptor<JsonTypeParams, JsonCodecHelper>
->;
+const parameterizedCodecDescriptors: ReadonlyArray<
+  RuntimeParameterizedCodecDescriptor<JsonTypeParams>
+> = [
+  buildJsonCodecDescriptor(PG_JSON_CODEC_ID, codecDefinitions.json.codec, 'json'),
+  buildJsonCodecDescriptor(PG_JSONB_CODEC_ID, codecDefinitions.jsonb.codec, 'jsonb'),
+];
 
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
   {
