@@ -2,6 +2,12 @@ import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
 import { mongoCodec } from '../src/codecs';
 
+test('Mongo uses the framework CodecCallContext directly (signal-only, no `column`)', () => {
+  type Keys = keyof CodecCallContext;
+  expectTypeOf<Keys>().toEqualTypeOf<'signal'>();
+  expectTypeOf<Keys>().not.toExtend<'column'>();
+});
+
 test('mongoCodec() accepts a `(value, ctx)` encode author', () => {
   const c = mongoCodec({
     typeId: 'demo/ctx-encode@1',
