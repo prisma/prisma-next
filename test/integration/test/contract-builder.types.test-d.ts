@@ -392,7 +392,7 @@ test('contract structure type matches Contract', () => {
   expectTypeOf(contract).toHaveProperty('storage');
 });
 
-test('arktypeJson and jsonbColumn preserve JsonValue fallback in no-emit type path', () => {
+test('arktypeJson and jsonbColumn currently resolve to never in no-emit type path (known gap)', () => {
   // Phase C: schema-typed JSON ships from per-library extension packages
   // now (`@prisma-next/extension-arktype-json` for arktype). The
   // adapter's `jsonbColumn` is the untyped fallback.

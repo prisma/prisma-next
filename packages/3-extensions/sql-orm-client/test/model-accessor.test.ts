@@ -46,6 +46,56 @@ describe('createModelAccessor', () => {
     );
   }
 
+  function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
+    const registry = createCodecRegistry();
+    for (const [id, traits] of Object.entries(entries)) {
+      registry.register(
+        codec({
+          typeId: id,
+          targetTypes: [],
+          traits,
+          encode: (v: JsonValue) => v,
+          decode: (v: JsonValue) => v,
+        }),
+      );
+    }
+    return registry;
+  }
+
+  function makeDescriptors(
+    entries: Record<string, readonly CodecTrait[]>,
+  ): typeof context.codecDescriptors {
+    const map = new Map(
+      Object.entries(entries).map(([codecId, traits]) => [
+        codecId,
+        {
+          codecId,
+          traits,
+          targetTypes: [] as readonly string[],
+          paramsSchema: {
+            '~standard': {
+              version: 1 as const,
+              vendor: 'test',
+              validate: (_value: unknown) => ({ value: undefined }),
+            },
+          },
+          // The trait-gating tests don't materialize codecs; the
+          // factory is shape-only and never invoked.
+          factory: () => () => {
+            throw new Error('test descriptor factory not exercised');
+          },
+        },
+      ]),
+    );
+    return {
+      descriptorFor: (id) => map.get(id),
+      values: function* () {
+        yield* map.values();
+      },
+      byTargetType: () => Object.freeze([]),
+    };
+  }
+
   it('creates scalar comparison operators and maps fields to columns', () => {
     const user = createModelAccessor(context, 'User');
     const post = createModelAccessor(context, 'Post');
@@ -438,56 +488,6 @@ describe('createModelAccessor', () => {
   });
 
   describe('runtime trait-gating', () => {
-    function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
-      const registry = createCodecRegistry();
-      for (const [id, traits] of Object.entries(entries)) {
-        registry.register(
-          codec({
-            typeId: id,
-            targetTypes: [],
-            traits,
-            encode: (v: JsonValue) => v,
-            decode: (v: JsonValue) => v,
-          }),
-        );
-      }
-      return registry;
-    }
-
-    function makeDescriptors(
-      entries: Record<string, readonly CodecTrait[]>,
-    ): typeof context.codecDescriptors {
-      const map = new Map(
-        Object.entries(entries).map(([codecId, traits]) => [
-          codecId,
-          {
-            codecId,
-            traits,
-            targetTypes: [] as readonly string[],
-            paramsSchema: {
-              '~standard': {
-                version: 1 as const,
-                vendor: 'test',
-                validate: (_value: unknown) => ({ value: undefined }),
-              },
-            },
-            // The trait-gating tests don't materialize codecs; the
-            // factory is shape-only and never invoked.
-            factory: () => () => {
-              throw new Error('test descriptor factory not exercised');
-            },
-          },
-        ]),
-      );
-      return {
-        descriptorFor: (id) => map.get(id),
-        values: function* () {
-          yield* map.values();
-        },
-        byTargetType: () => Object.freeze([]),
-      };
-    }
-
     it('only creates equality methods when codec has equality trait', () => {
       const codecs = makeRegistry({ 'pg/int4@1': ['equality'] });
       const codecDescriptors = makeDescriptors({ 'pg/int4@1': ['equality'] });
@@ -623,24 +623,15 @@ describe('createModelAccessor', () => {
         impl: () => undefined as never,
       });
 
-      const codecs = createCodecRegistry();
-      for (const [id, traits] of Object.entries({
+      const traitsByCodec: Record<string, readonly CodecTrait[]> = {
         'pg/text@1': ['equality', 'textual'],
         'pg/int4@1': ['equality'],
         'pg/bool@1': ['equality', 'boolean'],
-      } as Record<string, readonly CodecTrait[]>)) {
-        codecs.register(
-          codec({
-            typeId: id,
-            targetTypes: [],
-            traits,
-            encode: (v: JsonValue) => v,
-            decode: (v: JsonValue) => v,
-          }),
-        );
-      }
+      };
+      const codecs = makeRegistry(traitsByCodec);
+      const codecDescriptors = makeDescriptors(traitsByCodec);
 
-      const ctx = { ...context, queryOperations, codecs };
+      const ctx = { ...context, queryOperations, codecs, codecDescriptors };
       const user = createModelAccessor(ctx, 'User');
       const post = createModelAccessor(ctx, 'Post');
 
