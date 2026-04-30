@@ -109,6 +109,7 @@ export class CollectionHandle<
       collection: ctx.collection,
       stages: [],
       storageHash: ctx.storageHash,
+      modelName: modelName as string,
     });
     this.#ctx = ctx;
     this.#modelName = modelName;
@@ -345,6 +346,7 @@ export class FilteredCollection<
       collection: ctx.collection,
       stages: [new MongoMatchStage(leading)],
       storageHash: ctx.storageHash,
+      modelName: modelName as string,
     });
     this.#ctx = ctx;
     this.#modelName = modelName;

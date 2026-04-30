@@ -1,4 +1,4 @@
-import { createMongoAdapter } from '@prisma-next/adapter-mongo';
+import { createDefaultMongoCodecRegistry, createMongoAdapter } from '@prisma-next/adapter-mongo';
 import { createMongoDriver } from '@prisma-next/driver-mongo';
 import { createMongoRuntime, type MongoRuntime } from '@prisma-next/mongo-runtime';
 import { timeouts } from '@prisma-next/test-utils';
@@ -27,9 +27,10 @@ describe(
       client = new MongoClient(replSet.getUri());
       await client.connect();
 
-      const adapter = createMongoAdapter();
+      const codecs = createDefaultMongoCodecRegistry();
+      const adapter = createMongoAdapter(codecs);
       const driver = await createMongoDriver(replSet.getUri(), dbName);
-      runtime = createMongoRuntime({ adapter, driver, contract: {}, targetId: 'mongo' });
+      runtime = createMongoRuntime({ adapter, driver, codecs, contract: {}, targetId: 'mongo' });
     }, timeouts.spinUpMongoMemoryServer);
 
     beforeEach(async () => {
