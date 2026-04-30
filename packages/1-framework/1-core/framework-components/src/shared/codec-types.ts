@@ -6,27 +6,27 @@ export type CodecTrait = 'equality' | 'order' | 'boolean' | 'numeric' | 'textual
  * Per-call context the runtime threads to every `codec.encode` /
  * `codec.decode` invocation for a single `runtime.execute()` call.
  *
- * Two fields land in this version:
+ * The framework-level shape is family-agnostic and carries one field:
  *
- * - `signal?: AbortSignal` — per-query cancellation. The runtime returns a
- *   `RUNTIME.ABORTED` envelope when the signal aborts; codec authors who
- *   forward `signal` to their underlying SDK get true cancellation of
- *   in-flight network calls.
- * - `column?: { table, name }` — populated on **decode** call sites that can
- *   resolve a single underlying column ref. Encode call sites currently
- *   pass `undefined` (encode-time column context is the middleware's
- *   domain). Codecs that require column identity must handle `undefined`
- *   explicitly — the runtime never silently defaults this field.
+ * - `signal?: AbortSignal` — per-query cancellation. The runtime returns
+ *   a `RUNTIME.ABORTED` envelope when the signal aborts; codec authors
+ *   who forward `signal` to their underlying SDK get true cancellation
+ *   of in-flight network calls.
  *
- * The interface is named explicitly (not inlined) so future fields can land
- * additively without breaking codec author signatures.
+ * Family layers extend this base with their own shape-of-call metadata:
+ * the SQL family adds `column?: SqlColumnRef` via `SqlCodecCallContext`
+ * (see `@prisma-next/sql-relational-core`). Mongo currently uses this
+ * framework type unchanged. Column metadata is intentionally **not** on
+ * the framework type — it is a SQL-family concept rooted in SQL's
+ * `(table, column)` addressing model and would not generalise to other
+ * families.
+ *
+ * The interface is named explicitly (not inlined) so future framework
+ * fields and family extensions can land additively without breaking
+ * codec author signatures.
  */
 export interface CodecCallContext {
   readonly signal?: AbortSignal;
-  readonly column?: {
-    readonly table: string;
-    readonly name: string;
-  };
 }
 
 /**

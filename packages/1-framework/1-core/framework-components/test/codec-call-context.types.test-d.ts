@@ -1,23 +1,21 @@
 import { expectTypeOf, test } from 'vitest';
 import type { Codec, CodecCallContext } from '../src/codec-types';
 
-test('CodecCallContext is the shared per-call context shape', () => {
+test('CodecCallContext is signal-only at the framework level', () => {
   type Signal = NonNullable<CodecCallContext['signal']>;
   expectTypeOf<Signal>().toEqualTypeOf<AbortSignal>();
-  type Column = NonNullable<CodecCallContext['column']>;
-  expectTypeOf<Column>().toEqualTypeOf<{
-    readonly table: string;
-    readonly name: string;
-  }>();
 });
 
-test('CodecCallContext has exactly two optional fields (signal, column)', () => {
+test('CodecCallContext has exactly one optional field (signal)', () => {
   type Keys = keyof CodecCallContext;
-  expectTypeOf<Keys>().toEqualTypeOf<'signal' | 'column'>();
+  expectTypeOf<Keys>().toEqualTypeOf<'signal'>();
   type SignalIsOptional = undefined extends CodecCallContext['signal'] ? true : false;
-  type ColumnIsOptional = undefined extends CodecCallContext['column'] ? true : false;
   expectTypeOf<SignalIsOptional>().toEqualTypeOf<true>();
-  expectTypeOf<ColumnIsOptional>().toEqualTypeOf<true>();
+});
+
+test('CodecCallContext does not declare a `column` field (SQL-family concept)', () => {
+  type Keys = keyof CodecCallContext;
+  expectTypeOf<Keys>().not.toExtend<'column'>();
 });
 
 test('Codec.encode accepts an optional CodecCallContext as a second argument', () => {

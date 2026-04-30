@@ -13,7 +13,7 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     expect(await c.encode('hi')).toBe('HI');
   });
 
-  it('forwards ctx to a `(value, ctx)` encode author', async () => {
+  it('forwards ctx (signal-only) to a `(value, ctx)` encode author', async () => {
     let observed: CodecCallContext | undefined;
     const c = mongoCodec({
       typeId: 'demo/ctx-encode@1',
@@ -25,17 +25,13 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
       decode: (wire: string) => wire,
     });
     const controller = new AbortController();
-    const ctx: CodecCallContext = {
-      signal: controller.signal,
-      column: { table: 'users', name: 'email' },
-    };
+    const ctx: CodecCallContext = { signal: controller.signal };
     await c.encode('x', ctx);
     expect(observed).toBe(ctx);
     expect(observed?.signal).toBe(controller.signal);
-    expect(observed?.column).toEqual({ table: 'users', name: 'email' });
   });
 
-  it('forwards ctx to a `(value, ctx)` decode author', async () => {
+  it('forwards ctx (signal-only) to a `(value, ctx)` decode author', async () => {
     let observed: CodecCallContext | undefined;
     const c = mongoCodec({
       typeId: 'demo/ctx-decode@1',
@@ -47,14 +43,10 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
       },
     });
     const controller = new AbortController();
-    const ctx: CodecCallContext = {
-      signal: controller.signal,
-      column: { table: 'orders', name: 'total' },
-    };
+    const ctx: CodecCallContext = { signal: controller.signal };
     await c.decode('x', ctx);
     expect(observed).toBe(ctx);
     expect(observed?.signal).toBe(controller.signal);
-    expect(observed?.column).toEqual({ table: 'orders', name: 'total' });
   });
 
   it('preserves AbortSignal identity through the lifted method', async () => {
