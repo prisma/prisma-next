@@ -1,5 +1,6 @@
 import {
   isRuntimeError,
+  raceAgainstAbort,
   runtimeAborted,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
@@ -13,7 +14,6 @@ import type {
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import type { JsonSchemaValidatorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
 import { validateJsonValue } from './json-schema-validation';
-import { raceAgainstAbort } from './race-against-abort';
 
 type ColumnRef = { table: string; column: string };
 

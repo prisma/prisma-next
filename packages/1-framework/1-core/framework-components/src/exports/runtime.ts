@@ -1,5 +1,6 @@
 export { AsyncIterableResult } from '../execution/async-iterable-result';
 export type { ExecutionPlan, QueryPlan, ResultType } from '../execution/query-plan';
+export { raceAgainstAbort } from '../execution/race-against-abort';
 export { runWithMiddleware } from '../execution/run-with-middleware';
 export type { RuntimeCoreOptions } from '../execution/runtime-core';
 export { RuntimeCore } from '../execution/runtime-core';

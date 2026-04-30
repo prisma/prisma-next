@@ -1,12 +1,12 @@
-import type { RuntimeAbortedPhase } from '@prisma-next/framework-components/runtime';
-import { runtimeAborted } from '@prisma-next/framework-components/runtime';
+import type { RuntimeAbortedPhase } from './runtime-error';
+import { runtimeAborted } from './runtime-error';
 
 /**
- * Race a per-cell `Promise.all` against the supplied abort signal so that
- * the runtime returns `RUNTIME.ABORTED` promptly even when codec bodies
- * ignore the signal. In-flight bodies that ignore the signal are abandoned
- * and run to completion in the background — the cooperative-cancellation
- * contract documented in ADR 204.
+ * Race a per-cell `Promise.all` (or any other in-flight work promise) against
+ * the supplied abort signal so the runtime returns `RUNTIME.ABORTED` promptly
+ * even when codec bodies ignore the signal. In-flight bodies that ignore the
+ * signal are abandoned and run to completion in the background — the
+ * cooperative-cancellation contract documented in ADR 204.
  *
  * The call site MUST pre-check `signal.aborted` and short-circuit before
  * invoking this helper; this function assumes the signal is not already
@@ -16,14 +16,19 @@ import { runtimeAborted } from '@prisma-next/framework-components/runtime';
  * to the abort path.)
  *
  * Distinguishing the rejection source is load-bearing for AC-ERR4
- * (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` pass through
- * unchanged). The semantically equivalent `abortable(signal)` helper in
+ * (`RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` pass through unchanged).
+ * The semantically equivalent `abortable(signal)` helper in
  * `@prisma-next/utils` rejects with `signal.reason ?? new DOMException(...)`,
  * which is not stably distinguishable from a codec-thrown error by identity
  * alone (a fresh fallback DOMException is allocated per call). We instead
- * track abort attribution with a unique sentinel: only the `onAbort`
- * listener installed here ever rejects with the sentinel, so an
- * `error === sentinel` identity check after the race is unambiguous.
+ * track abort attribution with a unique sentinel: only the `onAbort` listener
+ * installed here ever rejects with the sentinel, so an `error === sentinel`
+ * identity check after the race is unambiguous.
+ *
+ * Lives in `framework-components` (rather than the SQL family, where it
+ * originated in m2) so every family runtime that needs cooperative
+ * cancellation around a codec-dispatch `Promise.all` (SQL encode + decode
+ * today, Mongo encode in m3) shares the same attribution logic.
  */
 export async function raceAgainstAbort<T>(
   work: Promise<T>,

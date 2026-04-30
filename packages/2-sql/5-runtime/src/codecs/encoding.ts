@@ -1,4 +1,8 @@
-import { runtimeAborted, runtimeError } from '@prisma-next/framework-components/runtime';
+import {
+  raceAgainstAbort,
+  runtimeAborted,
+  runtimeError,
+} from '@prisma-next/framework-components/runtime';
 import {
   type Codec,
   type CodecRegistry,
@@ -6,7 +10,6 @@ import {
   collectOrderedParamRefs,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
-import { raceAgainstAbort } from './race-against-abort';
 
 interface ParamMetadata {
   readonly codecId: string | undefined;
