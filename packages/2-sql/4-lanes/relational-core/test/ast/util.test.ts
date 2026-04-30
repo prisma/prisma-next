@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { compact } from '../../src/ast/util';
+import {
+  AndExpr,
+  BinaryExpr,
+  ColumnRef,
+  ParamRef,
+  ProjectionItem,
+  SelectAst,
+  TableSource,
+} from '../../src/ast/types';
+import { collectOrderedParamRefs, compact } from '../../src/ast/util';
 
 describe('ast/util', () => {
   describe('compact', () => {
@@ -125,6 +134,61 @@ describe('ast/util', () => {
         b: false,
         c: '',
       });
+    });
+  });
+
+  describe('collectOrderedParamRefs', () => {
+    function selectWithRefs(...where: Parameters<typeof AndExpr.of>[0]): SelectAst {
+      return SelectAst.from(TableSource.named('user'))
+        .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
+        .withWhere(AndExpr.of(where));
+    }
+
+    it('returns refs in first-encounter (depth-first) order', () => {
+      const a = ParamRef.of('a');
+      const b = ParamRef.of('b');
+      const c = ParamRef.of('c');
+      const ast = selectWithRefs(
+        BinaryExpr.eq(ColumnRef.of('user', 'a'), a),
+        BinaryExpr.eq(ColumnRef.of('user', 'b'), b),
+        BinaryExpr.eq(ColumnRef.of('user', 'c'), c),
+      );
+
+      expect(collectOrderedParamRefs(ast)).toEqual([a, b, c]);
+    });
+
+    it('dedupes by ParamRef identity (same instance referenced twice)', () => {
+      const shared = ParamRef.of(1);
+      const ast = selectWithRefs(
+        BinaryExpr.eq(ColumnRef.of('user', 'a'), shared),
+        BinaryExpr.eq(ColumnRef.of('user', 'b'), shared),
+      );
+
+      expect(collectOrderedParamRefs(ast)).toEqual([shared]);
+    });
+
+    it('keeps distinct ParamRef instances even when their values are equal', () => {
+      const left = ParamRef.of(1);
+      const right = ParamRef.of(1);
+      const ast = selectWithRefs(
+        BinaryExpr.eq(ColumnRef.of('user', 'a'), left),
+        BinaryExpr.eq(ColumnRef.of('user', 'b'), right),
+      );
+
+      const refs = collectOrderedParamRefs(ast);
+      expect(refs).toHaveLength(2);
+      expect(refs[0]).toBe(left);
+      expect(refs[1]).toBe(right);
+    });
+
+    it('returns an empty frozen array when the AST has no params', () => {
+      const ast = SelectAst.from(TableSource.named('user')).withProjection([
+        ProjectionItem.of('id', ColumnRef.of('user', 'id')),
+      ]);
+
+      const refs = collectOrderedParamRefs(ast);
+      expect(refs).toEqual([]);
+      expect(Object.isFrozen(refs)).toBe(true);
     });
   });
 });
