@@ -1,9 +1,15 @@
 export type {
   MigratableTargetDescriptor,
+  OperationPreviewCapable,
   PslContractInferCapable,
   SchemaViewCapable,
 } from '../control-capabilities';
-export { hasMigrations, hasPslContractInfer, hasSchemaView } from '../control-capabilities';
+export {
+  hasMigrations,
+  hasOperationPreview,
+  hasPslContractInfer,
+  hasSchemaView,
+} from '../control-capabilities';
 export type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -40,6 +46,10 @@ export type {
   SerializedQueryPlan,
   TargetMigrationsCapability,
 } from '../control-migration-types';
+export type {
+  OperationPreview,
+  OperationPreviewStatement,
+} from '../control-operation-preview';
 export type {
   BaseSchemaIssue,
   EmitContractResult,

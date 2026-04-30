@@ -1,7 +1,8 @@
 import type { PslDocumentAst } from '@prisma-next/psl-types';
 import type { ControlTargetDescriptor } from './control-descriptors';
 import type { ControlFamilyInstance } from './control-instances';
-import type { TargetMigrationsCapability } from './control-migration-types';
+import type { MigrationPlanOperation, TargetMigrationsCapability } from './control-migration-types';
+import type { OperationPreview } from './control-operation-preview';
 import type { CoreSchemaView } from './control-schema-view';
 
 export interface MigratableTargetDescriptor<
@@ -48,5 +49,23 @@ export function hasPslContractInfer<TFamilyId extends string, TSchemaIR>(
   return (
     'inferPslContract' in instance &&
     typeof (instance as Record<string, unknown>)['inferPslContract'] === 'function'
+  );
+}
+
+/**
+ * Capability declaring that a family can render a textual preview of migration
+ * operations for the CLI's "DDL preview" output. SQL families emit
+ * `language: 'sql'` statements; Mongo families emit `language: 'mongodb-shell'`.
+ */
+export interface OperationPreviewCapable {
+  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview;
+}
+
+export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
+  instance: ControlFamilyInstance<TFamilyId, TSchemaIR>,
+): instance is ControlFamilyInstance<TFamilyId, TSchemaIR> & OperationPreviewCapable {
+  return (
+    'toOperationPreview' in instance &&
+    typeof (instance as Record<string, unknown>)['toOperationPreview'] === 'function'
   );
 }
