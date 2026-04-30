@@ -1,7 +1,38 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { CodecRegistry } from './ast/codec-types';
+import type { CodecRegistry, ContractCodecRegistry } from './ast/codec-types';
+
+/**
+ * Codec-id-keyed accessor for descriptor metadata. The unified read API
+ * for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`) — non-
+ * branching for parameterized vs. non-parameterized codecs since every
+ * codec ships as (or is synthesized into) a `CodecDescriptor`.
+ *
+ * See codec-registry-unification spec § Decision and AC-3.
+ */
+export interface CodecDescriptorRegistry {
+  /**
+   * Descriptors carry distinct param shapes per codec id; the registry is
+   * heterogeneous and the consumer narrows per codec.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
+  descriptorFor(codecId: string): CodecDescriptor<any> | undefined;
+  /**
+   * All registered descriptors. Used by `validateCodecRegistryCompleteness`
+   * and other startup-time consumers that enumerate descriptors.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
+  values(): IterableIterator<CodecDescriptor<any>>;
+  /**
+   * Descriptors indexed by `targetTypes[i]` (each scalar type the codec
+   * advertises). Multiple descriptors may map to the same scalar type;
+   * ordering reflects registration order.
+   */
+  // biome-ignore lint/suspicious/noExplicitAny: heterogeneous descriptor map; consumer narrows per codec.
+  byTargetType(targetType: string): readonly CodecDescriptor<any>[];
+}
 
 /**
  * Registry of initialized type helpers from storage.types.
@@ -73,7 +104,30 @@ export type MutationDefaultsOptions = {
  */
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
+  /**
+   * Codec registry indexed by codec id. Source of shared, non-parameterized
+   * codec instances; also used as the codec-id-only fallback at the
+   * `forCodecId` boundary while AC-5's `ParamRef.refs` plumbing remains
+   * deferred (TML-2357).
+   */
   readonly codecs: CodecRegistry;
+  /**
+   * Contract-bound codec registry built once at context-construction time
+   * by walking the contract's columns and resolving each to its per-
+   * instance codec (parameterized columns) or the shared codec from the
+   * legacy registry (non-parameterized columns). The dispatch path
+   * (`encodeParam` / `decodeRow`) consults `forColumn(table, column)`
+   * when the call site has the ref, falling back to `forCodecId(codecId)`
+   * otherwise. Codec-registry-unification spec § AC-4.
+   */
+  readonly contractCodecs: ContractCodecRegistry;
+  /**
+   * Codec-id-keyed descriptor map. Single source of truth for codec-id-
+   * keyed metadata (`traits`, `targetTypes`, `meta`) — every codec,
+   * parameterized or not, resolves through this map without branching.
+   * Codec-registry-unification spec § AC-3.
+   */
+  readonly codecDescriptors: CodecDescriptorRegistry;
   readonly queryOperations: SqlOperationRegistry;
   /**
    * Type helper registry for parameterized types.

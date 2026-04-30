@@ -113,6 +113,55 @@ export interface Codec<
 }
 
 /**
+ * Contract-bound codec registry.
+ *
+ * The dispatch interface for encode/decode at runtime: built once at
+ * `ExecutionContext` construction time by walking the contract's
+ * `storage.tables[].columns[]` and resolving each column to either a per-
+ * instance parameterized codec (via `descriptor.factory(typeParams)(ctx)`)
+ * or the shared codec instance from the legacy `CodecRegistry` (for non-
+ * parameterized codecs). The dispatch path calls
+ * `forColumn(table, column).encode/decode(...)` and doesn't know whether
+ * the codec is parameterized.
+ *
+ * `forCodecId(codecId)` is a fallback for sites that don't carry the
+ * `(table, column)` ref through to the encode/decode call site —
+ * primarily the param-encoding path, where `ParamRef.refs` is not
+ * populated by the SQL builder today (every `ParamRef` carries `codecId`
+ * but not the column it relates to). For the parameterized codecs shipped
+ * at Phase B, encode is per-instance-stateless (pgvector formats
+ * `[v1,v2,v3]` regardless of length; JSON's `encode` is `JSON.stringify`
+ * regardless of schema), so a codec-id-keyed lookup yields a structurally
+ * equivalent encoder; the fallback is the bridge that lets the legacy
+ * `codecs:` registration retire from the dispatch path while staying as
+ * the codec-id-only source for now.
+ *
+ * The encode-side fallback is the AC-5-deferred carve-out documented in
+ * the codec-registry-unification spec § Non-functional constraints.
+ * TML-2357 retires the fallback by threading `ParamRef.refs` through
+ * column-bound construction sites.
+ */
+export interface ContractCodecRegistry {
+  /**
+   * Resolve the codec for `(table, column)`. Returns the per-instance
+   * parameterized codec for parameterized columns, the shared codec for
+   * non-parameterized columns, or `undefined` if the column is unknown
+   * or the codec isn't registered.
+   */
+  forColumn(table: string, column: string): Codec | undefined;
+
+  /**
+   * Resolve a codec by id. Returns the same codec instance the legacy
+   * `CodecRegistry.get(codecId)` would return — for non-parameterized
+   * codecs that's the shared instance; for parameterized codecs that's
+   * a representative resolved instance. Used by sites that don't carry
+   * `(table, column)` through to the encode/decode call site (the AC-5
+   * carve-out path).
+   */
+  forCodecId(codecId: string): Codec | undefined;
+}
+
+/**
  * Registry interface for codecs organized by ID and by contract scalar type.
  *
  * The registry allows looking up codecs by their namespaced ID or by the
