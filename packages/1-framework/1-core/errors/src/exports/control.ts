@@ -12,6 +12,7 @@ export {
   errorFileNotFound,
   errorJsonFormatNotSupported,
   errorMigrationCliInvalidConfigArg,
+  errorMigrationCliUnknownFlag,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,

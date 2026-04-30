@@ -399,6 +399,28 @@ export function errorMigrationCliInvalidConfigArg(options?: {
 }
 
 /**
+ * The migration-file CLI received a flag it does not recognise. Surfaced as a
+ * structured error so consumers can render their own "did you mean"
+ * suggestions from `meta.knownFlags` rather than parsing the message.
+ *
+ * Designed to wrap clipanion's `UnknownSyntaxError` at the parser boundary:
+ * pass the offending token as `flag` and the option declarations as
+ * `knownFlags`.
+ */
+export function errorMigrationCliUnknownFlag(options: {
+  readonly flag: string;
+  readonly knownFlags: readonly string[];
+}): CliStructuredError {
+  const knownList = options.knownFlags.join(', ');
+  return new CliStructuredError('4013', 'Unknown migration CLI flag', {
+    domain: 'CLI',
+    why: `Unknown flag \`${options.flag}\`.`,
+    fix: `Known flags: ${knownList}. Run with \`--help\` to see the full list.`,
+    meta: { flag: options.flag, knownFlags: options.knownFlags },
+  });
+}
+
+/**
  * Config validation error (missing required fields).
  */
 export function errorConfigValidation(

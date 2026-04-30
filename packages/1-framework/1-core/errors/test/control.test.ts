@@ -12,6 +12,7 @@ import {
   errorFileNotFound,
   errorJsonFormatNotSupported,
   errorMigrationCliInvalidConfigArg,
+  errorMigrationCliUnknownFlag,
   errorMigrationPlanningFailed,
   errorQueryRunnerFactoryRequired,
   errorTargetMigrationNotSupported,
@@ -385,6 +386,40 @@ describe('Config Errors', () => {
     expect(error.code).toBe('4012');
     expect(error.why).toContain('--dry-run');
     expect(error.meta).toEqual({ nextToken: '--dry-run' });
+  });
+
+  it('errorMigrationCliUnknownFlag produces a PN-CLI-4013 envelope', () => {
+    const error = errorMigrationCliUnknownFlag({
+      flag: '--frobnicate',
+      knownFlags: ['--dry-run', '--config', '--help'],
+    });
+    const envelope = error.toEnvelope();
+    expect(error.code).toBe('4013');
+    expect(error.domain).toBe('CLI');
+    expect(error.message).toBe('Unknown migration CLI flag');
+    expect(envelope.code).toBe('PN-CLI-4013');
+    expect(error.why).toContain('--frobnicate');
+  });
+
+  it('errorMigrationCliUnknownFlag round-trips flag and knownFlags through meta', () => {
+    const error = errorMigrationCliUnknownFlag({
+      flag: '--frobnicate',
+      knownFlags: ['--dry-run', '--config', '--help'],
+    });
+    expect(error.meta).toEqual({
+      flag: '--frobnicate',
+      knownFlags: ['--dry-run', '--config', '--help'],
+    });
+  });
+
+  it('errorMigrationCliUnknownFlag fix text names every known flag and points to --help', () => {
+    const error = errorMigrationCliUnknownFlag({
+      flag: '--frobnicate',
+      knownFlags: ['--dry-run', '--config', '--help'],
+    });
+    expect(error.fix).toContain('--dry-run');
+    expect(error.fix).toContain('--config');
+    expect(error.fix).toContain('--help');
   });
 });
 
