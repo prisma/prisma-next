@@ -209,8 +209,8 @@ The runtime encodes parameters and decodes cells via `Promise.all`. For sync-lif
 
 This is **acceptable but not safe at scale**. The standard-library `Promise.all` also propagates the first rejection without cancelling already-dispatched bodies; their results are discarded but the IO still runs to completion. Mitigations are intentionally deferred:
 
-- **Concurrency control (rate limit, batched dispatch).** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The likely landing is a per-codec-or-per-trait dispatcher that bounds in-flight requests and lifts the public `Promise.all` shape into a configurable scheduler.
-- **`AbortSignal` plumbing.** Tracked under the same ticket. The natural seam is plumbing an `AbortSignal` through the runtime context onto each codec call so the scheduler can cancel pending bodies on the first rejection or on user-initiated cancellation.
+- **Concurrency control (rate limit, batched dispatch).** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330) and [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The likely landing is a per-codec-or-per-trait dispatcher that bounds in-flight requests and lifts the public `Promise.all` shape into a configurable scheduler.
+- **`AbortSignal` plumbing.** **Resolved by [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](./ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).** The codec dispatch surface now threads a per-execute `CodecCallContext` (`{ signal? }` at the framework level; `SqlCodecCallContext extends CodecCallContext { column? }` at the SQL layer) to every `codec.encode` / `codec.decode` call, and `runtime.execute(plan, { signal })` surfaces `RUNTIME.ABORTED` with cooperative cancellation. None of the seven walk-back constraints below are reintroduced.
 
 The single-path always-await design does not preclude either mitigation; both can land additively without changing the codec author surface.
 
