@@ -135,7 +135,10 @@ async function getPlannedDdlSql(options: {
       throw new Error(`dbInit plan failed: ${result.failure.summary}`);
     }
 
-    const sqlStatements = result.value.plan.sql ?? [];
+    const sqlStatements =
+      result.value.plan.preview?.statements
+        .filter((s) => s.language === 'sql')
+        .map((s) => s.text) ?? [];
     return sqlStatements.join(';\n\n');
   } finally {
     await controlClient.close();

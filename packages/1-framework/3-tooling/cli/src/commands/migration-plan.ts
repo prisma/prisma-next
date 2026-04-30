@@ -3,7 +3,9 @@ import type { Contract } from '@prisma-next/contract/types';
 import { getEmittedArtifactPaths } from '@prisma-next/emitter';
 import {
   createControlStack,
+  hasOperationPreview,
   type MigrationPlanOperation,
+  type OperationPreview,
 } from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
@@ -20,7 +22,6 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { join, relative } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { extractSqlDdl } from '../control-api/operations/extract-sql-ddl';
 import {
   type CliErrorConflict,
   CliStructuredError,
@@ -65,7 +66,12 @@ export interface MigrationPlanResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql?: readonly string[];
+  /**
+   * Family-agnostic textual preview of the migration plan operations.
+   * Replaces the previous `sql?: readonly string[]` field; consumers should
+   * read `result.preview?.statements`.
+   */
+  readonly preview?: OperationPreview;
   readonly summary: string;
   /**
    * When true, `migration.ts` was written but contains unfilled
@@ -364,7 +370,9 @@ async function executeMigrationPlanCommand(
       return ok(result);
     }
 
-    const sql = extractSqlDdl(plannedOps);
+    const preview = hasOperationPreview(familyInstance)
+      ? familyInstance.toOperationPreview(plannedOps)
+      : undefined;
     const result: MigrationPlanResult = {
       ok: true,
       noOp: false,
@@ -376,7 +384,7 @@ async function executeMigrationPlanCommand(
         label: op.label,
         operationClass: op.operationClass,
       })),
-      sql,
+      ...(preview !== undefined ? { preview } : {}),
       summary: `Planned ${plannedOps.length} operation(s)`,
       timings: { total: Date.now() - startTime },
     };
@@ -503,14 +511,14 @@ function formatMigrationPlanOutput(result: MigrationPlanResult, flags: GlobalFla
     `Next: review ${green_(result.dir ?? '<dir>')} if needed, then run ${green_('prisma-next migration apply')}.`,
   );
 
-  if (result.sql && result.sql.length > 0) {
+  if (result.preview && result.preview.statements.length > 0) {
     lines.push('');
     lines.push(dim_('DDL preview'));
     lines.push('');
-    for (const statement of result.sql) {
-      const trimmed = statement.trim();
+    for (const statement of result.preview.statements) {
+      const trimmed = statement.text.trim();
       if (!trimmed) continue;
-      const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+      const line = statement.language === 'sql' && !trimmed.endsWith(';') ? `${trimmed};` : trimmed;
       lines.push(line);
     }
   }

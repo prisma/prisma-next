@@ -8,10 +8,10 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbInitResult, DbInitSuccess, OnControlProgress } from '../types';
-import { extractOperationStatements } from './extract-operation-statements';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 /**
@@ -195,12 +195,14 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
 
   // Plan mode - don't execute
   if (mode === 'plan') {
-    const planSql = extractOperationStatements(familyInstance.familyId, migrationPlan.operations);
+    const preview = hasOperationPreview(familyInstance)
+      ? familyInstance.toOperationPreview(migrationPlan.operations)
+      : undefined;
     const result: DbInitSuccess = {
       mode: 'plan',
       plan: {
         operations: stripOperations(migrationPlan.operations),
-        ...ifDefined('sql', planSql),
+        ...ifDefined('preview', preview),
       },
       destination: {
         storageHash: migrationPlan.destination.storageHash,

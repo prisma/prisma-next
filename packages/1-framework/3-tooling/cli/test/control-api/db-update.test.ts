@@ -26,6 +26,10 @@ function createMockFamilyInstance(overrides?: {
     readMarker: overrides?.readMarker ?? (async () => null),
     introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
     validateContract: (ir: unknown) => ir as Contract,
+    // Stub `OperationPreviewCapable` so `executeDbUpdate` produces an empty
+    // preview when no operations carry SQL execute steps. Mirrors the SQL
+    // family's behaviour in the empty-input case.
+    toOperationPreview: () => ({ statements: [] }),
   } as unknown as ControlFamilyInstance<'sql', unknown>;
 }
 
@@ -164,7 +168,7 @@ describe('executeDbUpdate', () => {
     if (result.ok) {
       expect(result.value.mode).toBe('plan');
       expect(result.value.plan.operations).toHaveLength(1);
-      expect(result.value.plan.sql).toEqual([]);
+      expect(result.value.plan.preview).toEqual({ statements: [] });
       expect(result.value.destination.storageHash).toBe('sha256:dest');
       expect(result.value.execution).toBeUndefined();
       expect(result.value.marker).toBeUndefined();

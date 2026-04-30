@@ -289,7 +289,9 @@ describe('formatMigrationShowOutput', () => {
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
         ],
-        sql: ['CREATE TABLE "user" (id int4 NOT NULL)'],
+        preview: {
+          statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
+        },
         summary: '1 operation(s)',
       },
       flags,
@@ -321,7 +323,7 @@ describe('formatMigrationShowOutput', () => {
             operationClass: 'destructive',
           },
         ],
-        sql: [],
+        preview: { statements: [] },
         summary: '2 operation(s)',
       },
       flags,
@@ -351,7 +353,9 @@ describe('formatMigrationShowOutput', () => {
             operationClass: 'destructive',
           },
         ],
-        sql: ['ALTER TABLE "post" DROP COLUMN "legacy"'],
+        preview: {
+          statements: [{ text: 'ALTER TABLE "post" DROP COLUMN "legacy"', language: 'sql' }],
+        },
         summary: '1 operation(s)',
       },
       flags,
@@ -376,7 +380,9 @@ describe('formatMigrationShowOutput', () => {
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
         ],
-        sql: ['CREATE TABLE "user" (id int4 NOT NULL)'],
+        preview: {
+          statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
+        },
         summary: '1 operation(s)',
       },
       flags,
@@ -400,7 +406,9 @@ describe('formatMigrationShowOutput', () => {
         operations: [
           { id: 'table.user', label: 'Create table "user"', operationClass: 'additive' },
         ],
-        sql: ['CREATE TABLE "user" (id int4 NOT NULL)'],
+        preview: {
+          statements: [{ text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' }],
+        },
         summary: '1 operation(s)',
       },
       flags,
@@ -422,7 +430,7 @@ describe('formatMigrationShowOutput', () => {
         migrationHash: 'sha256:edge-abc',
         createdAt: '2026-01-01T10:00:00.000Z',
         operations: [],
-        sql: [],
+        preview: { statements: [] },
         summary: '0 operation(s)',
       },
       flags,

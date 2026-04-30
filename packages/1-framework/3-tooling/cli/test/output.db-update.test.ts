@@ -300,3 +300,58 @@ describe('formatMigrationJson', () => {
     expect(lines[1]).toMatch(/^ {2}"/);
   });
 });
+
+describe('formatMigrationPlanOutput — DDL preview rendering', () => {
+  // Byte-identity bar from spec § A9 / OQ-4: SQL output must be unchanged from
+  // the pre-M3 `sql: string[]` rendering. The legacy renderer trimmed each
+  // statement and appended `;` if missing, one statement per line under the
+  // `DDL preview` header.
+  it('renders SQL statements identically to the legacy `sql[]` rendering', () => {
+    const result = createPlanResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
+        preview: {
+          statements: [
+            { text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' },
+            { text: 'ALTER TABLE "post" ADD COLUMN name text;', language: 'sql' },
+          ],
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('DDL preview');
+    expect(stripped).toContain('CREATE TABLE "user" (id int4 NOT NULL);');
+    expect(stripped).toContain('ALTER TABLE "post" ADD COLUMN name text;');
+    // Pre-existing trailing `;` must not be doubled.
+    expect(stripped).not.toContain('ADD COLUMN name text;;');
+  });
+
+  it('renders `mongodb-shell` statements verbatim without trailing `;`', () => {
+    const result = createPlanResult({
+      plan: {
+        targetId: 'mongo',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
+        preview: {
+          statements: [
+            {
+              text: 'db.users.createIndex({ "email": 1 }, { unique: true })',
+              language: 'mongodb-shell',
+            },
+            { text: 'db.users.dropIndex("email_1")', language: 'mongodb-shell' },
+          ],
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('DDL preview');
+    expect(stripped).toContain('db.users.createIndex({ "email": 1 }, { unique: true })');
+    expect(stripped).toContain('db.users.dropIndex("email_1")');
+    // Mongo shell lines must not be suffixed with `;`.
+    expect(stripped).not.toContain('createIndex({ "email": 1 }, { unique: true });');
+  });
+});
