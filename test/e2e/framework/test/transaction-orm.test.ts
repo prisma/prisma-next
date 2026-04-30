@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import arktypeJson from '@prisma-next/extension-arktype-json/runtime';
 import pgvector from '@prisma-next/extension-pgvector/runtime';
 import postgres from '@prisma-next/postgres/runtime';
 import type { Runtime } from '@prisma-next/sql-runtime';
@@ -28,7 +29,11 @@ async function withPostgresClient(
   const contractJson = await loadContractJson();
   await withDevDatabase(async ({ connectionString }) => {
     await runDbInit({ connectionString, contractJsonPath });
-    const db = postgres<Contract>({ contractJson, url: connectionString, extensions: [pgvector] });
+    const db = postgres<Contract>({
+      contractJson,
+      url: connectionString,
+      extensions: [pgvector, arktypeJson],
+    });
     let runtime: Runtime | undefined;
     try {
       runtime = await db.connect();

@@ -29,6 +29,7 @@
     "@prisma-next/contract": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
     "@prisma-next/driver-sqlite": "workspace:*",
+    "@prisma-next/extension-arktype-json": "workspace:*",
     "@prisma-next/extension-pgvector": "workspace:*",
     "@prisma-next/family-sql": "workspace:*",
     "@prisma-next/framework-components": "workspace:*",

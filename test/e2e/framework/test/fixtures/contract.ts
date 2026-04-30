@@ -6,8 +6,8 @@ import {
   int4Column,
   int8Column,
   intervalColumn,
-  json,
-  jsonb,
+  jsonbColumn,
+  jsonColumn,
   numericColumn,
   textColumn,
   timeColumn,
@@ -17,6 +17,8 @@ import {
   varcharColumn,
 } from '@prisma-next/adapter-postgres/column-types';
 import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import { arktypeJson } from '@prisma-next/extension-arktype-json/column-types';
+import arktypeJsonPack from '@prisma-next/extension-arktype-json/pack';
 import { vector } from '@prisma-next/extension-pgvector/column-types';
 import pgvectorPack from '@prisma-next/extension-pgvector/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
@@ -24,21 +26,14 @@ import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { uuidv7 } from '@prisma-next/ids';
 import { defineContract, field, model, rel } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
+import { type } from 'arktype';
 
-const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack]);
+const postgresCodecLookup = extractCodecLookup([postgresAdapter, pgvectorPack, arktypeJsonPack]);
 
-const profileSchema = {
-  '~standard': {
-    jsonSchema: {
-      output: () => ({
-        type: 'object',
-        properties: { name: { type: 'string' }, age: { type: 'number' } },
-        required: ['name', 'age'],
-      }),
-    },
-  },
-  expression: '{ name: string; age: number }',
-};
+const profileSchema = type({
+  name: 'string',
+  age: 'number',
+});
 
 const UserBase = model('User', {
   fields: {
@@ -46,7 +41,7 @@ const UserBase = model('User', {
     email: field.column(varcharColumn(255)).unique({ name: 'user_email_key' }),
     createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
     updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
-    profile: field.column(jsonb()).optional(),
+    profile: field.column(jsonbColumn).optional(),
   },
 });
 
@@ -58,7 +53,7 @@ const PostBase = model('Post', {
     createdAt: field.column(timestamptzColumn).defaultSql('now()').column('created_at'),
     updatedAt: field.column(timestamptzColumn).optional().column('update_at'),
     published: field.column(boolColumn),
-    meta: field.column(json()).optional(),
+    meta: field.column(jsonColumn).optional(),
   },
 });
 
@@ -140,8 +135,8 @@ export const contract = defineContract({
         rating: field.column(float8Column).default(3.14),
         active: field.column(boolColumn).default(true),
         bigCount: field.column(int8Column).default(9007199254740991).column('big_count'),
-        metadata: field.column(jsonb()).default({ key: 'default' }),
-        tags: field.column(jsonb()).default(['alpha', 'beta']),
+        metadata: field.column(jsonbColumn).default({ key: 'default' }),
+        tags: field.column(jsonbColumn).default(['alpha', 'beta']),
       },
     }).sql({ table: 'literal_defaults' }),
 
@@ -149,7 +144,7 @@ export const contract = defineContract({
       fields: {
         id: field.column(int4Column).defaultSql('autoincrement()').id(),
         embedding: field.column(vector(1536)),
-        profile: field.column(jsonb(profileSchema)),
+        profile: field.column(arktypeJson(profileSchema)),
       },
     }).sql({ table: 'embedding' }),
   },
