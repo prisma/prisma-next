@@ -154,7 +154,7 @@ test('RuntimeMiddlewareContext has contract, mode, log, now, contentHash', () =>
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('now');
   expectTypeOf<RuntimeMiddlewareContext>().toHaveProperty('contentHash');
   expectTypeOf<RuntimeMiddlewareContext['contentHash']>().toBeFunction();
-  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().returns.toBeString();
+  expectTypeOf<RuntimeMiddlewareContext['contentHash']>().returns.resolves.toBeString();
 });
 
 test('RuntimeMiddleware familyId and targetId are optional', () => {

@@ -330,7 +330,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     const middleware: MongoMiddleware = {
       name: 'content-hash-tester',
       async beforeExecute(plan, ctx) {
-        observedKeys.push(ctx.contentHash(plan));
+        observedKeys.push(await ctx.contentHash(plan));
       },
     };
 
@@ -349,7 +349,7 @@ describe('MongoRuntime middleware lifecycle', () => {
     }
 
     expect(observedKeys).toHaveLength(2);
-    expect(observedKeys[0]).toMatch(/^blake2b512:[0-9a-f]{128}$/);
+    expect(observedKeys[0]).toMatch(/^sha512:[0-9a-f]{128}$/);
     expect(observedKeys[0]).toBe(observedKeys[1]);
   });
 });

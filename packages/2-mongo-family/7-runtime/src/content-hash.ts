@@ -43,6 +43,6 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  *
  * @internal
  */
-export function computeMongoContentHash(exec: MongoExecutionPlan): string {
+export function computeMongoContentHash(exec: MongoExecutionPlan): Promise<string> {
   return hashContent(`${exec.meta.storageHash}|${canonicalStringify({ ...exec.command })}`);
 }

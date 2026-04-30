@@ -25,7 +25,7 @@ const mockCtx: RuntimeMiddlewareContext = {
   mode: 'strict',
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
-  contentHash: () => 'mock-hash',
+  contentHash: async () => 'mock-hash',
 };
 
 async function* yieldRows<R>(rows: ReadonlyArray<R>): AsyncGenerator<R, void, unknown> {

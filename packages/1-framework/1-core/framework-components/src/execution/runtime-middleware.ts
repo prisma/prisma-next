@@ -24,10 +24,14 @@ export interface RuntimeMiddlewareContext {
    * - SQL: `meta.storageHash` + `exec.sql` + `canonicalStringify(exec.params)`
    * - Mongo: `meta.storageHash` + `canonicalStringify(exec.command)`
    *
+   * The method is `async` because the underlying digest helper
+   * (`hashContent`) uses the WebCrypto API, whose `crypto.subtle.digest`
+   * primitive is asynchronous by design.
+   *
    * The returned string is intended to be consumed directly as a `Map` key
    * — it is not (and should not be) further hashed by callers.
    */
-  contentHash(exec: ExecutionPlan): string;
+  contentHash(exec: ExecutionPlan): Promise<string>;
 }
 
 export interface AfterExecuteResult {

@@ -36,6 +36,6 @@ import { hashContent } from '@prisma-next/utils/hash-content';
  *
  * @internal
  */
-export function computeSqlContentHash(exec: SqlExecutionPlan): string {
+export function computeSqlContentHash(exec: SqlExecutionPlan): Promise<string> {
   return hashContent(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
 }
