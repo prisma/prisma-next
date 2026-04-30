@@ -43,7 +43,7 @@ You do **not** implement code changes in this role. You **decide what to do** by
 
    **Compound review bodies**: `pull_request_review` targets often contain multiple distinct findings in a single body — especially from automated reviewers like CodeRabbit. These include "outside diff range" comments (which couldn't be posted as inline threads), actionable comments, and nitpick comments. **You must read the full-body text** of every `pull_request_review` target and decompose it into individual findings. For each distinct finding:
    - Add a new action to `review-actions.json` with a sub-indexed actionId (e.g., `A02a_PRR_...`, `A02b_PRR_...`).
-   - All sub-actions share the same `target` (the parent review's nodeId) but get their own `summary`, `targetFiles`, `decision`, etc.
+   - All sub-actions share the same `target` (the parent review's nodeId, kind `pull_request_review`) but get their own `summary`, `targetFiles`, `decision`, etc. **Sub-actions inherit the parent's "no inline thread" admin behavior**: the implement phase posts each sub-action's "On it" / "Done" as a top-level PR issue comment via `post-review-thread-reply.mjs` (auto-detected from the `PRR_…` node id) and **does not** call `resolve-review-thread.mjs` — there is no thread to resolve. Record the issue-comment id returned by the helper in each sub-action's `done` record.
    - Set the parent scaffold action to `not_actionable` with summary "Decomposed into sub-actions A02a–A02c" (or similar).
    - **Never blanket-dismiss** a review body as "automated summary" without reading it first. Automated reviewers embed real findings in their body text.
 
