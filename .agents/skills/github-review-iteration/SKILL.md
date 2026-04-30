@@ -137,7 +137,7 @@ Minimum v2 shape:
 {
   "version": 2,
   "pr": { "url": "https://github.com/OWNER/REPO/pull/123", "nodeId": "PR_kw..." },
-  "reviewState": { "path": "review-state.json", "fetchedAt": "..." },
+  "reviewState": { "path": "review-state.json", "fetchedAt": "...", "version": 2 },
   "actions": [
     {
       "actionId": "A-001",
