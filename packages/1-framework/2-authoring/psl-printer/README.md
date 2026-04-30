@@ -8,7 +8,7 @@ Prints Prisma Schema Language (PSL) from `PslDocumentAst` (`@prisma-next/psl-typ
 
 ## Overview
 
-`@prisma-next/psl-printer` renders deterministic PSL text from the parser AST for brownfield authoring and introspection flows. A temporary `./legacy` entry (removed in M2) still validates SQL introspection IR and prints via AST for Postgres-only callers.
+`@prisma-next/psl-printer` renders deterministic PSL text from a `PslDocumentAst` (defined in `@prisma-next/psl-types`). The package is target-agnostic: SQL → AST construction lives in the SQL family (`@prisma-next/family-sql`'s `inferPslContract` capability).
 
 ## Responsibilities
 
@@ -19,13 +19,10 @@ Prints Prisma Schema Language (PSL) from `PslDocumentAst` (`@prisma-next/psl-typ
 ## Dependencies
 
 - **Depends on**
-  - `@prisma-next/contract`
-  - `@prisma-next/psl-parser`
   - `@prisma-next/psl-types`
-  - `@prisma-next/sql-schema-ir` (legacy shim only; single gateway module under `src/`)
-  - `@prisma-next/utils`
 - **Used by**
-  - `@prisma-next/cli` (`contract infer` uses `./legacy` until M2)
+  - `@prisma-next/cli` (consumes `printPsl(ast)` after the SQL family produces the AST)
+  - `@prisma-next/family-sql` (tests; consumes the printer to verify AST construction)
 
 ## Related Docs
 

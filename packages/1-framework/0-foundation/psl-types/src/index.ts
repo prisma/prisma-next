@@ -109,8 +109,6 @@ export interface PslModel {
   readonly fields: readonly PslField[];
   readonly attributes: readonly PslModelAttribute[];
   readonly span: PslSpan;
-  /** Parser leaves unset; printer legacy pipeline may attach introspection warnings. */
-  readonly comment?: string;
 }
 
 export interface PslEnumValue {
@@ -163,8 +161,6 @@ export interface PslDocumentAst {
   readonly compositeTypes: readonly PslCompositeType[];
   readonly types?: PslTypesBlock;
   readonly span: PslSpan;
-  /** When set, overrides the printer default header line (legacy SQL introspection path). */
-  readonly headerComment?: string;
 }
 
 export interface ParsePslDocumentInput {
