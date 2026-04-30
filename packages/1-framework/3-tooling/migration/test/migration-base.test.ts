@@ -284,6 +284,101 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
+  it('throws MIGRATION.STALE_CONTRACT_BOOKENDS when existing.fromContract.storage.storageHash !== meta.from', () => {
+    const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
+    const existingMetadata: Partial<MigrationMetadata> = {
+      fromContract: { storage: { storageHash: 'sha256:stale-from' } } as never,
+      toContract: { storage: { storageHash: 'sha256:to' } } as never,
+    };
+
+    expect(() =>
+      buildMigrationArtifacts(
+        makeMigration(ops, { from: 'sha256:fresh-from', to: 'sha256:to' }),
+        existingMetadata,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.STALE_CONTRACT_BOOKENDS',
+        details: expect.objectContaining({
+          side: 'from',
+          metaHash: 'sha256:fresh-from',
+          contractHash: 'sha256:stale-from',
+        }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('throws MIGRATION.STALE_CONTRACT_BOOKENDS when existing.toContract.storage.storageHash !== meta.to', () => {
+    const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
+    const existingMetadata: Partial<MigrationMetadata> = {
+      fromContract: { storage: { storageHash: 'sha256:from' } } as never,
+      toContract: { storage: { storageHash: 'sha256:stale-to' } } as never,
+    };
+
+    expect(() =>
+      buildMigrationArtifacts(
+        makeMigration(ops, { from: 'sha256:from', to: 'sha256:fresh-to' }),
+        existingMetadata,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.STALE_CONTRACT_BOOKENDS',
+        details: expect.objectContaining({
+          side: 'to',
+          metaHash: 'sha256:fresh-to',
+          contractHash: 'sha256:stale-to',
+        }),
+      }) as unknown as Error,
+    );
+  });
+
+  it('skips the from-side bookend check when meta.from is empty and existing.fromContract is null', () => {
+    const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
+    const existingMetadata: Partial<MigrationMetadata> = {
+      fromContract: null,
+      toContract: { storage: { storageHash: 'sha256:to' } } as never,
+    };
+
+    expect(() =>
+      buildMigrationArtifacts(makeMigration(ops, { from: '', to: 'sha256:to' }), existingMetadata),
+    ).not.toThrow();
+  });
+
+  it('does not throw when existing bookends agree with meta', () => {
+    const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
+    const existingMetadata: Partial<MigrationMetadata> = {
+      fromContract: { storage: { storageHash: 'sha256:from' } } as never,
+      toContract: { storage: { storageHash: 'sha256:to' } } as never,
+    };
+
+    expect(() =>
+      buildMigrationArtifacts(
+        makeMigration(ops, { from: 'sha256:from', to: 'sha256:to' }),
+        existingMetadata,
+      ),
+    ).not.toThrow();
+  });
+
+  it('throws when existing.toContract.storage.storageHash is missing', () => {
+    const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
+    const existingMetadata: Partial<MigrationMetadata> = {
+      fromContract: { storage: { storageHash: 'sha256:from' } } as never,
+      toContract: {} as never,
+    };
+
+    expect(() =>
+      buildMigrationArtifacts(
+        makeMigration(ops, { from: 'sha256:from', to: 'sha256:to' }),
+        existingMetadata,
+      ),
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'MIGRATION.STALE_CONTRACT_BOOKENDS',
+        details: expect.objectContaining({ side: 'to' }),
+      }) as unknown as Error,
+    );
+  });
+
   it('throws a clear error when describe() returns invalid metadata', () => {
     expect(() =>
       buildMigrationArtifacts(

@@ -8,7 +8,7 @@ import type {
 } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type } from 'arktype';
-import { errorInvalidOperationEntry } from './errors';
+import { errorInvalidOperationEntry, errorStaleContractBookends } from './errors';
 import { computeMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import type { MigrationHints, MigrationMetadata } from './metadata';
@@ -164,6 +164,8 @@ function buildAttestedMetadata(
   ops: MigrationOps,
   existing: Partial<MigrationMetadata> | null,
 ): MigrationMetadata {
+  assertBookendsMatchMeta(meta, existing);
+
   const baseMetadata: Omit<MigrationMetadata, 'migrationHash'> = {
     from: meta.from,
     to: meta.to,
@@ -184,6 +186,49 @@ function buildAttestedMetadata(
 
   const migrationHash = computeMigrationHash(baseMetadata, ops);
   return { ...baseMetadata, migrationHash };
+}
+
+/**
+ * Verify each preserved contract bookend in `existing` agrees with the
+ * corresponding side of `describe()`'s output. A mismatch indicates the
+ * migration's `describe()` was edited after `migration plan` scaffolded
+ * the package, leaving a self-inconsistent manifest. Failing fast at
+ * write-time turns a silent foot-gun into an actionable diagnostic.
+ *
+ * Skipped when a side's `existing.<side>Contract` is null/absent (the
+ * synthesis path stays open for origin-less initial migrations and for
+ * bare `migration.ts` runs from scratch). When a bookend is *present*
+ * but its `storage.storageHash` is missing, that's treated as a
+ * mismatch — a malformed bookend is not equivalent to "no bookend".
+ *
+ * This check is paired with TML-2274, which removes `fromContract` /
+ * `toContract` from the manifest entirely; once that lands, this
+ * function and its error code are deleted.
+ */
+function assertBookendsMatchMeta(
+  meta: MigrationMeta,
+  existing: Partial<MigrationMetadata> | null,
+): void {
+  if (existing?.fromContract != null) {
+    const contractHash = existing.fromContract.storage?.storageHash ?? '';
+    if (contractHash !== meta.from) {
+      throw errorStaleContractBookends({
+        side: 'from',
+        metaHash: meta.from,
+        contractHash,
+      });
+    }
+  }
+  if (existing?.toContract != null) {
+    const contractHash = existing.toContract.storage?.storageHash ?? '';
+    if (contractHash !== meta.to) {
+      throw errorStaleContractBookends({
+        side: 'to',
+        metaHash: meta.to,
+        contractHash,
+      });
+    }
+  }
 }
 
 /**

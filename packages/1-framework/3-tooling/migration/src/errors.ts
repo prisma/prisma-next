@@ -110,6 +110,23 @@ export function errorInvalidOperationEntry(index: number, reason: string): Migra
   );
 }
 
+export function errorStaleContractBookends(args: {
+  readonly side: 'from' | 'to';
+  readonly metaHash: string;
+  readonly contractHash: string;
+}): MigrationToolsError {
+  const { side, metaHash, contractHash } = args;
+  return new MigrationToolsError(
+    'MIGRATION.STALE_CONTRACT_BOOKENDS',
+    'Migration manifest contract bookends disagree with describe()',
+    {
+      why: `migration.json stores ${side}Contract.storage.storageHash "${contractHash}", but describe() returned meta.${side} = "${metaHash}". The bookend is stale — most likely the migration's describe() was edited after the package was scaffolded by \`migration plan\`.`,
+      fix: 'Re-run `migration plan` to regenerate the package with fresh contract bookends, or restore the directory from version control.',
+      details: { side, metaHash, contractHash },
+    },
+  );
+}
+
 export function errorInvalidSlug(slug: string): MigrationToolsError {
   return new MigrationToolsError('MIGRATION.INVALID_NAME', 'Invalid migration name', {
     why: `The slug "${slug}" contains no valid characters after sanitization (only a-z, 0-9 are kept).`,
