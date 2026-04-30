@@ -513,6 +513,12 @@ class MongoCollectionImpl<
       offset: undefined,
     });
     const ids: unknown[] = [];
+    // Strip resultShape so the runtime yields wire-level _id values (e.g. ObjectId)
+    // rather than decoded hex strings. The follow-up $in filter in updateAll wraps
+    // these in bare MongoParamRefs with no codecId; round-tripping a decoded string
+    // back through the adapter would require attaching the field's codecId, which
+    // we don't do here. Do not "tidy" the destructure away — the prefetch+modify+
+    // re-read flow depends on it.
     const { resultShape: _rs, ...planWithoutShape } = idQuery.#compile();
     for await (const row of this.#executor.execute(planWithoutShape)) {
       ids.push((row as Record<string, unknown>)['_id']);
