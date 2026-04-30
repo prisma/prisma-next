@@ -8,6 +8,7 @@ import { realpathSync } from 'node:fs';
 const EXIT_SUCCESS = 0;
 const EXIT_OPERATIONAL = 1;
 const EXIT_CLI = 2;
+const SUBPROCESS_TIMEOUT_MS = 30_000;
 
 function parseCliArgs(argv) {
   const args = argv.slice(2);
@@ -54,7 +55,16 @@ function parsePrUrl(url) {
 }
 
 function run(command, args) {
-  return spawnSync(command, args, { encoding: 'utf8' });
+  const result = spawnSync(command, args, { encoding: 'utf8', timeout: SUBPROCESS_TIMEOUT_MS });
+  if (result.error?.code === 'ETIMEDOUT') {
+    throw new Error(
+      `error: ${command} timed out after ${SUBPROCESS_TIMEOUT_MS / 1000} seconds`,
+    );
+  }
+  if (result.signal) {
+    throw new Error(`error: ${command} was terminated by signal ${result.signal}`);
+  }
+  return result;
 }
 
 function hasRepoScope(output) {
