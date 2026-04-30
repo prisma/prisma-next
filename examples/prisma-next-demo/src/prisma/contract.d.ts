@@ -71,7 +71,7 @@ export type FieldOutputTypes = {
     readonly title: CodecTypes['pg/text@1']['output'];
     readonly userId: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly embedding: CodecTypes['pg/vector@1']['output'] | null;
+    readonly embedding: Vector<1536> | null;
   };
   readonly Task: {
     readonly id: Char<36>;
@@ -87,7 +87,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: CodecTypes['pg/enum@1']['output'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressOutput | null;
   };
 };
