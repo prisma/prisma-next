@@ -151,7 +151,7 @@ describe('filters', () => {
           factory: () => () => ({}) as never,
         }),
       },
-    } as typeof context;
+    } as unknown as typeof context;
 
     expect(() => shorthandToWhereExpr(stubbedContext, 'User', { email: 'a@b.com' })).toThrow(
       /does not support equality comparisons/,
@@ -177,7 +177,7 @@ describe('filters', () => {
         ...context.codecDescriptors,
         descriptorFor: () => undefined,
       },
-    } as typeof context;
+    } as unknown as typeof context;
 
     expect(() => shorthandToWhereExpr(stubbedContext, 'User', { email: 'a@b.com' })).toThrow(
       /does not support equality comparisons/,
