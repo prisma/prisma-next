@@ -497,9 +497,15 @@ function buildContractCodecRegistry(
             };
             // `synthesizeNonParameterizedDescriptor` produces a
             // `CodecDescriptor<void>` whose factory ignores its params
-            // and ctx; passing `undefined` is safe and matches the
-            // descriptor's typed `void` parameter.
-            cached = (descriptor.factory as (params: void) => (ctx: Ctx) => Codec)(undefined)(ctx);
+            // and ctx; the runtime's `void` value is `undefined`. The
+            // structural cast goes through `unknown` to satisfy the
+            // heterogeneous-`P` registry boundary (the factory's
+            // declared `P` is `any` here; the consumer narrows per
+            // codec id). Per spec § Non-functional constraints.
+            const voidFactory = descriptor.factory as unknown as (
+              params: undefined,
+            ) => (ctx: Ctx) => Codec;
+            cached = voidFactory(undefined)(ctx);
             byCodecId.set(column.codecId, cached);
           }
           resolvedCodec = cached;

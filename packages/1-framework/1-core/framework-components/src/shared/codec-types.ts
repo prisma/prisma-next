@@ -219,8 +219,13 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
  * steps aside.
  */
 export function synthesizeNonParameterizedDescriptor(codec: Codec): CodecDescriptor<void> {
-  const resolvedCtxFactory: (ctx: Ctx) => Codec = () => codec;
-  const sharedFactory: (params: void) => (ctx: Ctx) => Codec = () => resolvedCtxFactory;
+  // The descriptor's `factory: (params: void) => (ctx: Ctx) => Codec` is a
+  // constant for non-parameterized codecs — `params` is never read and the
+  // returned ctx-applier always yields the same shared codec. We rely on
+  // the descriptor's typed `factory` slot to infer the signatures rather
+  // than naming `void` locally (biome's `noConfusingVoidType` flags `void`
+  // outside return positions).
+  const sharedFactory = () => () => codec;
   // Family-extended codecs (SQL `Codec`) carry an optional `meta` field
   // that the base interface doesn't declare. Read it through a structural
   // narrow so the synthesizer forwards it to the descriptor without losing
