@@ -119,7 +119,43 @@ const secretCodec = codec({
 });
 ```
 
-See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
+#### Codec call context (`ctx`)
+
+Codec authors may optionally take a second `ctx?: SqlCodecCallContext` argument on `encode` / `decode`. The runtime threads one context per `runtime.execute(plan, { signal })` call:
+
+- **`ctx.signal`** — the same `AbortSignal` reference at every codec call in one execute. Forward it to network SDKs so aborted queries stop talking to the underlying service.
+- **`ctx.column`** (decode-side only) — `{ table, name }` for cells the runtime can resolve to a single column ref; `undefined` for aggregate aliases, computed projections, and other unresolvable cells. Encode-side `ctx.column` is always `undefined` (encode-time column enrichment is the middleware's domain).
+
+```ts
+// Forward ctx.signal to a network call so aborted queries stop the SDK.
+const kmsSecretCodec = codec({
+  typeId: 'pg/kms-secret@1',
+  targetTypes: ['text'],
+  encode: async (v: string, ctx) =>
+    kms.encrypt({ plaintext: v }, { signal: ctx?.signal }),
+  decode: async (w: string, ctx) =>
+    kms.decrypt({ ciphertext: w }, { signal: ctx?.signal }),
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+
+// Use ctx.column on decode to construct an envelope value carrying (table, name).
+const envelopeCodec = codec({
+  typeId: 'pg/envelope@1',
+  targetTypes: ['text'],
+  encode: async (v: string) => v,
+  decode: async (w: string, ctx) => ({
+    value: w,
+    column: ctx?.column,
+  }),
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+```
+
+Existing single-arg authors (e.g. `(v: string) => v`) continue to compile and run unchanged. Aborts surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`; codec bodies that ignore the signal complete in the background (cooperative cancellation).
+
+See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) and [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
 
 ### AST Surface (`ast/*` via `exports/ast.ts`)
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`
