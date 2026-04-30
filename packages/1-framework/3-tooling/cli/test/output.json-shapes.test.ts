@@ -147,6 +147,7 @@ describe('MigrationStatusResult JSON shape', () => {
       contractHash: 'sha256:contract',
       summary: '0 migration(s) on disk',
       diagnostics: [],
+      requiredInvariants: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
@@ -155,6 +156,7 @@ describe('MigrationStatusResult JSON shape', () => {
         "migrations",
         "mode",
         "ok",
+        "requiredInvariants",
         "summary",
         "targetHash",
       ]
@@ -182,6 +184,7 @@ describe('MigrationStatusResult JSON shape', () => {
       },
       summary: 'At ref "production" target',
       diagnostics: [],
+      requiredInvariants: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
@@ -193,6 +196,7 @@ describe('MigrationStatusResult JSON shape', () => {
         "ok",
         "pathDecision",
         "refs",
+        "requiredInvariants",
         "summary",
         "targetHash",
       ]

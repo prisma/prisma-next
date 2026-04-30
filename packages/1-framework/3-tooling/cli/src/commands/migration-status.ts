@@ -85,11 +85,11 @@ export interface MigrationStatusResult {
   readonly targetHash: string;
   readonly contractHash: string;
   readonly refs?: readonly StatusRef[];
-  /** Required invariants, sorted ascending. Present only when --ref is used and the ref declares any. */
-  readonly requiredInvariants?: readonly string[];
-  /** Invariants the marker has applied at least once, intersected with required for display relevance. */
+  /** Required invariants from the active ref, sorted ascending. Always present (`[]` when no `--ref` or the ref declares none) — knowable offline. */
+  readonly requiredInvariants: readonly string[];
+  /** Invariants the marker has applied at least once, intersected with required for display relevance. Present only in `mode === 'online'`; absent when offline (the marker is unknown, not empty). */
   readonly appliedInvariants?: readonly string[];
-  /** required − applied. Empty when the marker has covered every required invariant. */
+  /** required − applied. Present only in `mode === 'online'`; absent when offline. */
   readonly missingInvariants?: readonly string[];
   readonly pathDecision?: {
     readonly fromHash: string;
@@ -395,6 +395,8 @@ async function executeMigrationStatusCommand(
     }
   }
 
+  const requiredInvariants: readonly string[] = [...(activeRefEntry?.invariants ?? [])].sort();
+
   const statusRefs: StatusRef[] = Object.entries(allRefs).map(([name, entry]) => ({
     name,
     hash: entry.hash,
@@ -491,6 +493,7 @@ async function executeMigrationStatusCommand(
       contractHash,
       summary: 'No migrations found',
       diagnostics,
+      requiredInvariants,
     });
   }
 
@@ -589,6 +592,7 @@ async function executeMigrationStatusCommand(
       summary: `${bundles.length} migration(s) on disk`,
       diagnostics,
       markerHash,
+      requiredInvariants,
       ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
     });
   }
@@ -629,6 +633,7 @@ async function executeMigrationStatusCommand(
       summary: `${bundles.length} migration(s) on disk`,
       diagnostics,
       ...ifDefined('markerHash', markerHash),
+      requiredInvariants,
       ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
       graph,
       bundles,
@@ -696,12 +701,10 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  const refInvariants = activeRefEntry?.invariants ?? [];
-  const requiredInvariants = refInvariants.length > 0 ? [...refInvariants].sort() : undefined;
   let appliedInvariants: readonly string[] | undefined;
   let missingInvariants: readonly string[] | undefined;
   let effectiveRequired = new Set<string>();
-  if (requiredInvariants !== undefined) {
+  if (mode === 'online') {
     const requiredSet = new Set(requiredInvariants);
     appliedInvariants = markerInvariants.filter((id) => requiredSet.has(id)).sort();
     const appliedSet = new Set(appliedInvariants);
@@ -710,10 +713,11 @@ async function executeMigrationStatusCommand(
   }
 
   let pathDecision: MigrationStatusResult['pathDecision'];
-  if (mode === 'online' && markerHash !== undefined) {
+  if (mode === 'online') {
+    const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
     const outcome = findPathWithDecision(
       graph,
-      markerHash,
+      originHash,
       targetHash,
       activeRefName,
       effectiveRequired,
@@ -749,7 +753,7 @@ async function executeMigrationStatusCommand(
     summary,
     diagnostics,
     ...ifDefined('markerHash', markerHash),
-    ...ifDefined('requiredInvariants', requiredInvariants),
+    requiredInvariants,
     ...ifDefined('appliedInvariants', appliedInvariants),
     ...ifDefined('missingInvariants', missingInvariants),
     ...(statusRefs.length > 0 ? { refs: statusRefs } : {}),
@@ -878,9 +882,13 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
     lines.push(result.summary);
   }
 
-  if (result.requiredInvariants && result.requiredInvariants.length > 0) {
-    lines.push(`${c(dim, 'applied  ')}${formatInvariantList(result.appliedInvariants ?? [])}`);
-    lines.push(`${c(dim, 'missing  ')}${formatInvariantList(result.missingInvariants ?? [])}`);
+  if (result.requiredInvariants.length > 0) {
+    if (result.appliedInvariants !== undefined && result.missingInvariants !== undefined) {
+      lines.push(`${c(dim, 'applied  ')}${formatInvariantList(result.appliedInvariants)}`);
+      lines.push(`${c(dim, 'missing  ')}${formatInvariantList(result.missingInvariants)}`);
+    } else {
+      lines.push(`${c(dim, 'applied  ')}(unknown — connect a database to evaluate)`);
+    }
   }
 
   const warnings = result.diagnostics?.filter((d) => d.severity === 'warn') ?? [];
