@@ -6,6 +6,7 @@ export default defineConfig({
     'src/exports/codec-types.ts',
     'src/exports/control.ts',
     'src/exports/migration.ts',
+    'src/exports/runtime.ts',
     'src/exports/schema-verify.ts',
   ],
 });

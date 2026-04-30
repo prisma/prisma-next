@@ -517,6 +517,12 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-mongo-target/1-mongo-target/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "targets",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/3-mongo-target/2-mongo-adapter/src/core/**",
       "domain": "targets",
       "layer": "adapters",
@@ -530,6 +536,12 @@
     },
     {
       "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/index.ts",
+      "domain": "targets",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-mongo-target/2-mongo-adapter/src/exports/runtime.ts",
       "domain": "targets",
       "layer": "adapters",
       "plane": "runtime"

@@ -51,6 +51,7 @@
     ".": "./dist/index.mjs",
     "./codec-types": "./dist/codec-types.mjs",
     "./control": "./dist/control.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",

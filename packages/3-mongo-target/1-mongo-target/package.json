@@ -20,6 +20,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/migration-tools": "workspace:*",
     "@prisma-next/ts-render": "workspace:*",
+    "@prisma-next/mongo-codec": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-lowering": "workspace:*",
     "@prisma-next/mongo-query-ast": "workspace:*",
@@ -48,6 +49,7 @@
     "./control": "./dist/control.mjs",
     "./migration": "./dist/migration.mjs",
     "./pack": "./dist/pack.mjs",
+    "./runtime": "./dist/runtime.mjs",
     "./schema-verify": "./dist/schema-verify.mjs",
     "./package.json": "./package.json"
   },
