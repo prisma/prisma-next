@@ -27,7 +27,7 @@ Evaluation criteria:
 | In-process testable (no `process.exit`, injectable streams, returns exit codes) | hard requirement | Commander pain we are deliberately not buying again |
 | Generates `--help` from the same option declaration the parser uses | strong preference | Ticket calls this out explicitly |
 | Surfaces unknown flags / parse failures as structured, throwable errors | strong preference | Required to route failures through our PN-coded envelope |
-| Active maintenance, production track record on multiple runtimes | strong preference | Yarn Berry runs clipanion in production on Node and Bun |
+| Stable in production; not actively iterating | accept-with-eyes-open | clipanion is feature-complete from the maintainer's perspective; last commit Sept 2024; the 4.x line has been in RC since July 2023; community-reported issues accumulate without upstream response. Mitigated by: zero runtime deps, tiny stable API surface, bounded blast radius (one file), exact-version pin, and the maintainer continuing to ship clipanion in Yarn Berry. We accept this trade-off knowing it; alternatives score worse on the same axis (cac is *more* dead; citty's parser is `node:util`; Commander has the friction we're trying to leave). See [research/commander-friction-points.md § Concrete evaluation criteria](research/commander-friction-points.md) criterion 10. |
 
 Rejected candidates:
 
@@ -196,7 +196,8 @@ A reviewer should be able to confirm each of the following:
 | clipanion's class-based command syntax doesn't compose well with our `MigrationCLI.run` factory shape | Low | Low | The single `Command` subclass for the migration-file CLI is internal; it doesn't need to be exported. The factory remains the public surface. |
 | `clipanion` adds non-trivial install size to every authored `migration.ts` consumer | Low | Low | clipanion is a dep of `@prisma-next/cli`, which is already a dep of every project that uses `prisma-next`. No new install for end users. |
 | Test rewrite drops coverage by accident | Medium | Medium | AC6 enumerates the exact 14 scenarios that must continue to pass + 2 new scenarios; reviewer can grep for them. |
-| Bun/Deno compatibility regression slips through | Low | Medium | Out of CI scope (no Bun/Deno testing today); take it on faith from clipanion's production track record on Bun via Yarn Berry. Adding a smoke test on Bun is a follow-up project. |
+| Bun/Deno compatibility regression slips through | Low | Medium | Out of CI scope (no Bun/Deno testing today); rely on clipanion's runtime-agnostic platform-shim architecture (`platform/browser.ts` + `platform/node.ts`) and on Yarn Berry shipping clipanion on Bun. Adding a smoke test on Bun is a follow-up project. |
+| Upstream clipanion is slow / unresponsive to issues | Medium | Low–Medium | Last clipanion commit Sept 2024; 4.x has been in RC since 2023; issue tracker has open quality-relevant bugs (notably [#176 errors-to-stdout](https://github.com/arcanis/clipanion/issues/176)). Mitigations: (1) we already work around #176 by using `cli.process` parse-only and owning error rendering; (2) we pin to exact `4.0.0-rc.4` so upstream regressions don't auto-propagate; (3) clipanion is one TypeScript package with zero runtime deps — vendoring or replacing is bounded work; (4) we use a tiny stable API slice (`Cli.from([Cmd]).process(args)`, `cli.usage(...)`, three `Option` factories, duck-typed `UnknownSyntaxError`). If upstream pace becomes a blocker, swap clipanion in `migration-cli.ts` is a half-day's work. |
 | `printMigrationHelp` deletion breaks something we didn't grep for | Very low | Low | Confirmed via codebase grep that `MigrationCLI.run` is the only consumer. |
 
 ## Validation

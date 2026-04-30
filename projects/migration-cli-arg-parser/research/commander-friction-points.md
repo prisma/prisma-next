@@ -371,11 +371,44 @@ candidates against these specific friction points:
 9. **Is the parser implementation runtime-agnostic** (no `node:*`
    imports, or platform-shim layer like clipanion's `platform/`)?
    This matters for Bun/Deno support.
-10. **Is the library actively maintained?** Not just last release date,
-    but active issue triage.
+10. **Is the library on a healthy maintenance trajectory?** Not just
+    last release date, but: are issues being triaged and fixed; is the
+    upstream responsive to community reports; is there an obvious
+    successor or fork if the maintainer disengages? A "feature-complete
+    but slow" library can be acceptable for a tiny stable API slice;
+    it is risky for a large surface that needs to evolve.
 
 A library that scores ≥8/10 on this is a clear win over Commander.
-≤5/10 means we'd be trading one set of friction for another. (For the
-record: clipanion scores 9/10 on this rubric. The only weakness is
-class-based command syntax being slightly more ceremonial than
-defineCommand-style; that's a taste call.)
+≤5/10 means we'd be trading one set of friction for another.
+
+For the record: **clipanion scores ~7/10** on this rubric. It passes
+criteria 1–9 cleanly and has the testability properties Commander
+lacks. The weak axis is criterion 10:
+
+- Last commit on the default branch was 2024-09-06 (~8 months at the
+  time of writing), and the 4.x line has been in RC since
+  2023-07-27 (~14 months as RC at last publish).
+- Community-reported issues accumulate without being closed by upstream.
+  Notable open issues include
+  [#176 — Errors go to stdout instead of stderr](https://github.com/arcanis/clipanion/issues/176) (which the migration-CLI swap
+  works around by using `cli.process` parse-only),
+  [#178 — Invalid `lib/platform/node.mjs` due to require statement](https://github.com/arcanis/clipanion/issues/178), and
+  [#177 — Help/usage describes first path only, duplicated](https://github.com/arcanis/clipanion/issues/177).
+- The maintainer (Maël Nison) continues to ship clipanion in Yarn
+  Berry, so the package is stable and production-tested at the version
+  Yarn pins, but there is no signal of active feature development on
+  the standalone library.
+
+This makes clipanion's profile **"feature-complete with periodic bumps
+when Yarn needs them"**, not "actively maintained" in the iterating-on-
+community-issues sense. For our use case (a tiny, stable migration-file
+CLI surface, single file, exact-version-pinned) the trade is
+acceptable: blast radius is bounded, and ripping clipanion out and
+replacing it is roughly a half-day's work if the maintenance situation
+ever blocks us. For a larger surface (e.g. a future Commander
+replacement in `@prisma-next/cli`), the same trade is more
+load-bearing — re-evaluate criterion 10 against the candidate set
+before adopting clipanion at that scope.
+
+The other (taste-call) weakness is class-based command syntax being
+slightly more ceremonial than `defineCommand`-style.
