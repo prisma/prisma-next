@@ -452,12 +452,6 @@ export interface MigrationApplyStep {
   readonly to: string;
   readonly toContract: Contract;
   readonly operations: readonly MigrationPlanOperation[];
-  /**
-   * Invariant ids this migration provides (the manifest's `providedInvariants`).
-   * Threaded into the runner so the marker write unions them in atomically.
-   * Defaults to `[]` when the field is omitted.
-   */
-  readonly invariants?: readonly string[];
 }
 
 /**

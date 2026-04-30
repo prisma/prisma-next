@@ -12,12 +12,10 @@ import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vites
 import { executeCommand, getExitCode, setupCommandMocks } from '../utils/test-helpers';
 
 /**
- * Integration coverage for invariant-aware ref routing in `migration apply`
- * and `migration status`. Specifically, the F15 UNKNOWN_INVARIANT pre-check
- * — the only invariant-routing diagnostic reachable without a real DB
- * connection. Marker-subtraction and NO_INVARIANT_PATH paths require a live
- * runner / control client and are exercised by the M3 unit tests (covering
- * the pathfinder primitive) plus the M1 marker tests.
+ * Integration coverage for the UNKNOWN_INVARIANT pre-check in
+ * `migration apply --ref` and `migration status --ref` — the only
+ * invariant-routing diagnostic reachable without a real DB connection.
+ * Marker-subtraction and NO_INVARIANT_PATH live in the journey suite.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -219,10 +217,9 @@ describe(
     });
 
     it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {
-      // F8 regression-guard analogue: a ref with no invariants must not trip
-      // the pre-check. The command continues to its next failure mode (in this
-      // mock setup, the driver's no-op connect; we just assert it gets past
-      // the pre-check by checking the error code is NOT UNKNOWN_INVARIANT).
+      // A ref with no invariants must not trip the pre-check. The command
+      // continues to its next failure mode (driver no-op connect in this
+      // mock setup); we just assert the error code is NOT UNKNOWN_INVARIANT.
       const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
       const fixture = await setupFixture({
         refInvariants: [],

@@ -121,10 +121,6 @@ export interface PathDecisionResult {
   }[];
 }
 
-/**
- * Collect every `invariantId` declared by an edge in the graph. Used by
- * apply/status to run the F15 UNKNOWN_INVARIANT pre-check before routing.
- */
 export function collectDeclaredInvariants(graph: MigrationGraph): ReadonlySet<string> {
   const declared = new Set<string>();
   for (const edges of graph.forwardChain.values()) {

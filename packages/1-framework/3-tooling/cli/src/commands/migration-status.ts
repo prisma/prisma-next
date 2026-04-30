@@ -456,8 +456,6 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  // F15 — UNKNOWN_INVARIANT pre-check. Same severity as `migration apply`:
-  // a misconfigured ref fails fast across both commands.
   if (activeRefEntry && activeRefEntry.invariants.length > 0) {
     const declared = collectDeclaredInvariants(graph);
     const unknown = activeRefEntry.invariants.filter((id) => !declared.has(id));
@@ -465,7 +463,7 @@ async function executeMigrationStatusCommand(
       return notOk(
         mapMigrationToolsError(
           errorUnknownInvariant({
-            ...(activeRefName !== undefined ? { refName: activeRefName } : {}),
+            ...ifDefined('refName', activeRefName),
             unknown,
             declared: [...declared].sort(),
           }),
@@ -698,9 +696,6 @@ async function executeMigrationStatusCommand(
     }
   }
 
-  // Compute the three invariant sets when --ref is in play and the ref
-  // declares any. Display vocabulary is "applied" (F14): the marker tracks
-  // applied-at-least-once, not currently-true-of-data.
   const refInvariants = activeRefEntry?.invariants ?? [];
   const requiredInvariants = refInvariants.length > 0 ? [...refInvariants].sort() : undefined;
   let appliedInvariants: readonly string[] | undefined;
@@ -729,7 +724,7 @@ async function executeMigrationStatusCommand(
       return notOk(
         mapMigrationToolsError(
           errorNoInvariantPath({
-            ...(activeRefName !== undefined ? { refName: activeRefName } : {}),
+            ...ifDefined('refName', activeRefName),
             required: [...effectiveRequired].sort(),
             missing: outcome.missing,
             structuralPath: outcome.structuralPath.map((edge) => ({
@@ -743,9 +738,6 @@ async function executeMigrationStatusCommand(
         ),
       );
     }
-    // outcome.kind === 'unreachable' — leave pathDecision undefined; the
-    // existing display chain logic (resolveDisplayChain + diagnostics)
-    // already surfaces unreachable-marker / divergence cases.
   }
 
   const result: MigrationStatusResult = {
@@ -886,9 +878,6 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
     lines.push(result.summary);
   }
 
-  // D12 mode annotation: applied / missing are derivable from the marker; surface
-  // them alongside the existing summary when --ref is in play. `required` is on
-  // the header (visible pre-DB).
   if (result.requiredInvariants && result.requiredInvariants.length > 0) {
     lines.push(`${c(dim, 'applied  ')}${formatInvariantList(result.appliedInvariants ?? [])}`);
     lines.push(`${c(dim, 'missing  ')}${formatInvariantList(result.missingInvariants ?? [])}`);

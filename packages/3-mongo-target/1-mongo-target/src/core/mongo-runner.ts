@@ -10,6 +10,7 @@ import type {
   MigrationRunnerResult,
   OperationContext,
 } from '@prisma-next/framework-components/control';
+import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
@@ -72,12 +73,6 @@ export interface MongoMigrationRunnerExecuteOptions {
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   readonly strictVerification?: boolean;
   readonly context?: OperationContext;
-  /**
-   * Invariant ids contributed by this apply (the migration's `providedInvariants`).
-   * The runner unions these into `marker.invariants` atomically with the marker write.
-   * Defaults to `[]` for marker-only flows.
-   */
-  readonly invariants?: readonly string[];
 }
 
 function runnerFailure(
@@ -188,9 +183,7 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
-    // Sort + dedupe so the initMarker path writes a stable initial value.
-    // updateMarker merges server-side, so no client-side union is needed.
-    const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
+    const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
     const existingInvariantSet = new Set(existingMarker?.invariants ?? []);
     const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
       existingInvariantSet.has(id),

@@ -13,6 +13,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { DataTransformOperation } from '@prisma-next/framework-components/control';
+import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -616,9 +617,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    // Sort + dedupe so the INSERT path writes a stable initial value.
-    // UPDATE merges server-side, so no client-side union is needed.
-    const incomingInvariants = Array.from(new Set(options.invariants ?? [])).sort();
+    const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
     const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:

@@ -322,7 +322,7 @@ withTempDir(({ createTempDir }) => {
         const offlineState = parseJsonOutput<{ markerHash?: string }>(statusOffline);
         expect(offlineState.markerHash, 'P.05: marker did not advance to C2').not.toBe(c2Hash);
 
-        // P.06: status --ref prod is fatal too (parity with apply, F15).
+        // P.06: status --ref prod is fatal too (parity with apply).
         const statusFail = await runMigrationStatus(ctx, ['--ref', 'prod', '--json']);
         expect(statusFail.exitCode, 'P.06: status exits 1').toBe(1);
         const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);

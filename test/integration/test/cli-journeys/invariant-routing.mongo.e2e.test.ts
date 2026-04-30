@@ -550,7 +550,7 @@ describe(
       const offlineState = parseJsonOutput<{ markerHash?: string }>(statusOffline);
       expect(offlineState.markerHash, 'Mongo-P.05: marker did not advance to C2').not.toBe(c2Hash);
 
-      // Mongo-P.06: status --ref also fatal (parity with apply, F15).
+      // Mongo-P.06: status --ref also fatal (parity with apply).
       const statusFail = await migrationStatus(ctx, ['--ref', 'prod', '--json']);
       expect(statusFail.exitCode, 'Mongo-P.06: status exits 1').toBe(1);
       const statusEnvelope = parseJsonOutput<{ meta?: { code?: string } }>(statusFail);

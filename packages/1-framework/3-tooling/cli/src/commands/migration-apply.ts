@@ -8,6 +8,7 @@ import { findPathWithDecision } from '@prisma-next/migration-tools/migration-gra
 import type { MigrationPackage } from '@prisma-next/migration-tools/package';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
+import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 
@@ -97,7 +98,6 @@ function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
     to: pkg.metadata.to,
     toContract: pkg.metadata.toContract,
     operations: pkg.ops,
-    invariants: pkg.metadata.providedInvariants,
   };
 }
 
@@ -139,16 +139,13 @@ async function executeMigrationApplyCommand(
     );
   }
 
-  let destinationHash: string;
-  let refName: string | undefined;
   let refEntry: RefEntry | undefined;
+  let envelopeHash: string | undefined;
+  const refName = options.ref;
 
-  if (options.ref) {
-    refName = options.ref;
+  if (refName) {
     try {
-      const refs = await readRefs(refsDir);
-      refEntry = resolveRef(refs, refName);
-      destinationHash = refEntry.hash;
+      refEntry = resolveRef(await readRefs(refsDir), refName);
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -157,8 +154,7 @@ async function executeMigrationApplyCommand(
     }
   } else {
     try {
-      const envelope = await readContractEnvelope(config);
-      destinationHash = envelope.storageHash;
+      envelopeHash = (await readContractEnvelope(config)).storageHash;
     } catch (error) {
       return notOk(
         errorRuntime('Current contract is unavailable', {
@@ -168,6 +164,7 @@ async function executeMigrationApplyCommand(
       );
     }
   }
+  const destinationHash = refEntry?.hash ?? envelopeHash!;
 
   if (!flags.json && !flags.quiet) {
     const details: Array<{ label: string; value: string }> = [
@@ -204,8 +201,6 @@ async function executeMigrationApplyCommand(
     throw error;
   }
 
-  // F15 — UNKNOWN_INVARIANT pre-check before any DB activity. Refs that name
-  // an id no migration declares fail loudly and consistently across commands.
   if (refEntry && refEntry.invariants.length > 0) {
     const declared = collectDeclaredInvariants(migrations.graph);
     const unknown = refEntry.invariants.filter((id) => !declared.has(id));
@@ -213,7 +208,7 @@ async function executeMigrationApplyCommand(
       return notOk(
         mapMigrationToolsError(
           errorUnknownInvariant({
-            ...(refName !== undefined ? { refName } : {}),
+            ...ifDefined('refName', refName),
             unknown,
             declared: [...declared].sort(),
           }),
@@ -303,13 +298,9 @@ async function executeMigrationApplyCommand(
       );
     }
 
-    // --- Resolve path and apply ---
-
     // "No marker" means the database is fresh — start from the empty contract hash.
     const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
 
-    // F13 — subtract invariants the marker has already accumulated so re-applies
-    // don't re-require already-covered invariants.
     const appliedInvariants = new Set(marker?.invariants ?? []);
     const effectiveRequired = new Set(
       (refEntry?.invariants ?? []).filter((id) => !appliedInvariants.has(id)),
@@ -326,7 +317,7 @@ async function executeMigrationApplyCommand(
       return notOk(
         mapMigrationToolsError(
           errorNoInvariantPath({
-            ...(refName !== undefined ? { refName } : {}),
+            ...ifDefined('refName', refName),
             required: [...effectiveRequired].sort(),
             missing: outcome.missing,
             structuralPath: outcome.structuralPath.map((edge) => ({
@@ -349,12 +340,10 @@ async function executeMigrationApplyCommand(
         }),
       );
     }
-    const decision = outcome.decision;
 
-    const pendingPath = decision.selectedPath;
-    const pathDecision = toPathDecisionResult(decision);
+    const pathDecision = toPathDecisionResult(outcome.decision);
 
-    if (pendingPath.length === 0) {
+    if (outcome.decision.selectedPath.length === 0) {
       return ok({
         ok: true,
         migrationsApplied: 0,
@@ -369,7 +358,7 @@ async function executeMigrationApplyCommand(
 
     const bundleByDir = new Map(migrations.bundles.map((b) => [b.dirName, b]));
     const pendingMigrations: MigrationApplyStep[] = [];
-    for (const migration of pendingPath) {
+    for (const migration of outcome.decision.selectedPath) {
       const pkg = bundleByDir.get(migration.dirName);
       if (!pkg) {
         return notOk(
@@ -403,7 +392,7 @@ async function executeMigrationApplyCommand(
     return ok({
       ok: true,
       migrationsApplied: value.migrationsApplied,
-      migrationsTotal: pendingPath.length,
+      migrationsTotal: outcome.decision.selectedPath.length,
       markerHash: value.markerHash,
       applied: value.applied,
       summary: value.summary,

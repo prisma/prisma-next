@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import { basename, dirname, relative } from 'pathe';
 
 /**
@@ -323,7 +324,7 @@ export function errorNoInvariantPath(args: {
         required,
         missing,
         structuralPath,
-        ...(refName !== undefined ? { refName } : {}),
+        ...ifDefined('refName', refName),
       },
     },
   );
@@ -346,7 +347,7 @@ export function errorUnknownInvariant(args: {
       details: {
         unknown,
         declared,
-        ...(refName !== undefined ? { refName } : {}),
+        ...ifDefined('refName', refName),
       },
     },
   );

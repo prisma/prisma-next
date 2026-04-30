@@ -13,6 +13,7 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import { type ContractMarkerRow, parseContractMarkerRow } from '@prisma-next/family-sql/verify';
+import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
 import { ok, okVoid } from '@prisma-next/utils/result';
@@ -507,7 +508,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     // the way Postgres does. Merge client-side under the runner's
     // BEGIN EXCLUSIVE — sort + dedupe so the JSON-encoded value is stable.
     const merged = new Set<string>(existingMarker?.invariants ?? []);
-    for (const inv of options.invariants ?? []) merged.add(inv);
+    for (const inv of deriveProvidedInvariants(options.plan.operations)) merged.add(inv);
     const invariants = Array.from(merged).sort();
     const writeStatements = buildWriteMarkerStatements({
       storageHash: options.plan.destination.storageHash,
