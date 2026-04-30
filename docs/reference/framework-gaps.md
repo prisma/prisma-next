@@ -30,6 +30,8 @@ Severity:
 
 ### G1 — Codecs receive no per-call column metadata
 
+> **Status: 🟡 Partially resolved (2026-04-30).** Decode-side `(table, name)` is now plumbed via `SqlCodecCallContext.column` — see [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). SQL codec authors that take a `(value, ctx)` author signature on `decode` observe `ctx.column = { table, name }` for cells the runtime can resolve, and `undefined` for unresolvable cells (aggregate aliases, computed projections). Encode-side richer column metadata (search-mode flags, full column descriptors) stays open: encode-time enrichment is the middleware's domain — the per-cell `ctx.column` is intentionally undefined on encode because the same encode site encodes parameters for predicates and expressions whose column identity is ambiguous. See *Middleware-driven param transformation* ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)). The original problem statement below stands as historical context; the integration's `dataType → first matching ColumnBinding` workaround can be replaced for the decode path today.
+
 **Symptom.** A contract that has two encrypted columns of the same JS data type (e.g. `users.email` with `equality: true` and `users.notes` with `freeTextSearch: true`, both `string`) silently encrypts both under the **first** matching column's index configuration. The wrong indexes get attached to the cipher; equality lookups on `email` work, free-text search on `notes` is silently broken.
 
 **Why the extension needs this.** CipherStash's `bulkEncrypt` is a **column-aware operation**: the cipher payload it produces embeds the column's `(table, column)` identity (the SDK reads `i.t` / `i.c` off the cipher) **and** an index payload whose shape depends on the column's enabled search modes. The same plaintext value `'alice@example.com'` encrypts *differently* for `users.email` (`equality: true` → cipher carries the HMAC index payload) than for `users.notes` (`freeTextSearch: true` → cipher carries the bloom-filter payload). So at encode time the codec **must** know the destination column. The framework's `encode(value)` signature gives it only the value.
@@ -192,6 +194,8 @@ This unblocks every "destructive op needs to look at the diff" extension, not ju
 ---
 
 ### G4 — Per-cell `Promise.all` codec dispatch is unbounded for network-backed codecs
+
+> **Status: 🔴 Open (2026-04-30).** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The codec-call-context project ([ADR 207](../architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md)) intentionally did not address concurrency control or bulk-codec dispatch — it lands the per-call `ctx` seam that a future bulk dispatcher / concurrency cap can use, but the existing `Promise.all` shape is unchanged. Microtask-coalescing batchers in extension code (the CipherStash workaround below) remain the operational path until the framework grows a `bulkEncode` / `bulkDecode` slot or a per-codec concurrency cap.
 
 **Symptom.** Without a workaround, an `INSERT` of 100 rows × 3 encrypted cells issues 300 concurrent `bulkEncrypt` round-trips against ZeroKMS — the codec runtime treats each cell as an independent encode and `Promise.all`s them. ZeroKMS rate-limits, the request fan-out flatlines the database connection, the user sees mysterious latency.
 
@@ -415,6 +419,8 @@ Tracked upstream under [TML-2329](https://linear.app/prisma-company/issue/TML-23
 ---
 
 ### G10 — `AbortSignal` not plumbed to codec calls
+
+> **Status: ✅ Resolved (2026-04-30).** [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) lands the framework `CodecCallContext = { signal? }` and threads it from `runtime.execute(plan, { signal })` through every codec dispatch site (SQL `encodeParams` / `decodeRow` / between-rows stream loop; Mongo `resolveValue` recursive walk). Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to their underlying SDK (e.g. `bulkEncrypt({ signal: ctx.signal })`). Aborts surface as `RUNTIME.ABORTED { phase: 'encode' | 'decode' | 'stream' }` with `cause = signal.reason` (or a synthesised `DOMException('AbortError')`). Cooperative cancellation: the runtime returns promptly via the abort race; in-flight codec bodies that ignore the signal complete in the background. The integration's "codecs simply ignore cancellation" workaround below can be replaced today. The original problem statement stands as historical context.
 
 **Symptom.** A query that's been cancelled (HTTP request aborted, transaction timeout) still completes its in-flight `bulkEncrypt` against ZeroKMS. The work is wasted, the budget is spent, the latency is incurred.
 
