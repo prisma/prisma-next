@@ -77,7 +77,8 @@ function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
  * an `AbortError` `DOMException` so the envelope always exposes a cause.
  */
 export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown): RuntimeErrorEnvelope {
-  const resolvedCause = cause ?? new DOMException('The operation was aborted.', 'AbortError');
+  const resolvedCause =
+    cause === undefined ? new DOMException('The operation was aborted.', 'AbortError') : cause;
   const envelope = runtimeError(RUNTIME_ABORTED, `Operation aborted during ${phase}`, { phase });
   return Object.assign(envelope, { cause: resolvedCause });
 }
