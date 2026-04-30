@@ -23,8 +23,12 @@ describe('static context (no runtime)', () => {
     expect((ast.from as TableSource).name).toBe('user');
     expect(ast.limit).toBe(1);
     expect(ast.projection).toHaveLength(2);
-    expect(ast.projection[0]).toEqual(ProjectionItem.of('id', IdentifierRef.of('id')));
-    expect(ast.projection[1]).toEqual(ProjectionItem.of('email', IdentifierRef.of('email')));
+    expect(ast.projection[0]).toEqual(
+      ProjectionItem.of('id', IdentifierRef.of('id'), 'sql/char@1'),
+    );
+    expect(ast.projection[1]).toEqual(
+      ProjectionItem.of('email', IdentifierRef.of('email'), 'pg/text@1'),
+    );
   });
 
   it('building query plans does not instantiate adapter, target, or extensions', () => {
