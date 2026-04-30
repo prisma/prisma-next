@@ -145,7 +145,8 @@ async function executeMigrationApplyCommand(
 
   if (refName) {
     try {
-      refEntry = resolveRef(await readRefs(refsDir), refName);
+      const refs = await readRefs(refsDir);
+      refEntry = resolveRef(refs, refName);
     } catch (error) {
       if (MigrationToolsError.is(error)) {
         return notOk(mapMigrationToolsError(error));
@@ -154,7 +155,8 @@ async function executeMigrationApplyCommand(
     }
   } else {
     try {
-      envelopeHash = (await readContractEnvelope(config)).storageHash;
+      const envelope = await readContractEnvelope(config);
+      envelopeHash = envelope.storageHash;
     } catch (error) {
       return notOk(
         errorRuntime('Current contract is unavailable', {
