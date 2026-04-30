@@ -2,12 +2,13 @@
 
 ## Summary
 
-Introduce `CodecCallContext` as the shared per-call context object the runtime threads to every `codec.encode` / `codec.decode` call. Two fields land in this project:
+Introduce `CodecCallContext` as the shared per-call context object the runtime threads to every `codec.encode` / `codec.decode` call, with a family-extension pattern. Two fields land in this project, split by layer:
 
-- `signal?: AbortSignal` — per-query cancellation. The runtime returns a `RUNTIME.ABORTED` envelope when the signal aborts; codec authors who forward the signal to their underlying SDK get true cancellation of in-flight network calls.
-- `column?: { table, name }` — populated on **decode** call sites that can resolve a single underlying column ref; lets codecs construct return values that carry column identity (e.g. envelopes that know what to bulk-decrypt against).
+- **Framework `CodecCallContext`** (in `framework-components`): `signal?: AbortSignal` only. Per-query cancellation; the runtime returns a `RUNTIME.ABORTED` envelope when the signal aborts; codec authors who forward the signal to their underlying SDK get true cancellation of in-flight network calls.
+- **`SqlCodecCallContext extends CodecCallContext`** (in `relational-core`): adds `column?: SqlColumnRef` (`{ table, name }`). Populated on SQL **decode** call sites that can resolve a single underlying column ref; lets SQL codecs construct return values that carry column identity (e.g. envelopes that know what to bulk-decrypt against).
+- **Mongo** uses framework `CodecCallContext` directly (no `MongoCodecCallContext` in this project).
 
-No concurrency cap, no bulk-codec interface, no traits, no encode-side column plumbing — just two fields on one shared context object, threaded through the existing dispatch sites.
+No concurrency cap, no bulk-codec interface, no traits, no encode-side column plumbing — just one shared context object per query, threaded through the existing dispatch sites, with the SQL family extending it for column metadata.
 
 **Spec:** [spec.md](spec.md)
 
@@ -34,25 +35,27 @@ Each milestone leaves the workspace **fully green**: `pnpm typecheck`, `pnpm tes
 
 ### Milestone 1 (m1): Codec interface + factory + framework runtime entry
 
-Establishes the `CodecCallContext` shape (both fields), the optional `ctx` arg on `Codec.encode` / `Codec.decode`, the factory's acceptance of ctx-bearing author functions, and the `RuntimeCore.execute(plan, options?)` signature. Demonstrable via interface-shape and factory unit tests.
+Establishes the framework `CodecCallContext` shape (signal-only), the SQL family extension `SqlCodecCallContext` (adding `column`), the optional `ctx` arg on the framework `Codec.encode` / `Codec.decode` (narrowed to `SqlCodecCallContext` on the SQL `Codec` interface), the factories' acceptance of ctx-bearing author functions, and the `RuntimeCore.execute(plan, options?)` signature. Demonstrable via interface-shape and factory unit tests.
 
 **Tasks:**
 
-- [ ] **T1.1** Write tests pinning the public `Codec` interface shape: `encode(value, ctx?)` / `decode(wire, ctx?)`, where `ctx` has type `CodecCallContext = { readonly signal?: AbortSignal; readonly column?: { readonly table: string; readonly name: string } }`. Verify the existing single-arg call sites (`codec.encode(value)`) continue to typecheck.
-- [ ] **T1.2** Write tests for `codec()` factory accepting both author arities:
+- [ ] **T1.1** Write tests pinning the public framework `Codec` interface shape: `encode(value, ctx?)` / `decode(wire, ctx?)`, where `ctx: CodecCallContext = { readonly signal?: AbortSignal }` (signal-only at the framework level, no `column`). Write tests pinning the SQL `Codec` interface narrows to `ctx?: SqlCodecCallContext` (`{ readonly signal?: AbortSignal; readonly column?: SqlColumnRef }`). Verify the existing single-arg call sites (`codec.encode(value)`) continue to typecheck for both.
+- [ ] **T1.2** Write tests for `codec()` (SQL) factory accepting both author arities:
   - `(value) => …` (single-arg author) lifts as before.
-  - `(value, ctx) => …` (ctx-bearing author) preserves ctx through the lifted method (signal + column).
+  - `(value, ctx: SqlCodecCallContext) => …` (ctx-bearing author) preserves ctx through the lifted method (signal + column).
   - The `ctx.signal` reference passed to the codec is the same instance the runtime supplies (identity preservation).
+  - Symmetric tests for `mongoCodec()` factory using `(value, ctx: CodecCallContext) => …` (no `column`).
 - [ ] **T1.3** Write tests pinning ADR 204 walk-back constraints: no `TRuntime` generic; no `runtime` / `kind` discriminator on the public interface; no conditional return types.
 - [ ] **T1.4** Update [`packages/1-framework/1-core/framework-components/src/codec-types.ts`](../../packages/1-framework/1-core/framework-components/src/codec-types.ts):
-  - Define `CodecCallContext = { readonly signal?: AbortSignal; readonly column?: { readonly table: string; readonly name: string } }` and export it.
-  - Update the `Codec` interface: `encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>`; `decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>`.
-- [ ] **T1.5** Update [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts) `codec()` factory:
-  - Accept author functions of either arity.
-  - Lift via `async (value, ctx) => userEncode(value, ctx)` (preserves ctx through the lift).
-  - Identity default for omitted `encode` continues to work.
-- [ ] **T1.6** Update [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts`](../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts) `mongoCodec()` factory the same way.
-- [ ] **T1.7** Add `RUNTIME.ABORTED` to the runtime error code list in [`packages/1-framework/1-core/framework-components/src`](../../packages/1-framework/1-core/framework-components/src) (search-and-add wherever envelope codes are enumerated).
+  - Define `CodecCallContext = { readonly signal?: AbortSignal }` (signal-only, family-agnostic) and export it.
+  - Update the framework `Codec` interface: `encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>`; `decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>`.
+  - **Do not** add a `column` field. Column metadata is a SQL-family concept and lives on `SqlCodecCallContext` in the SQL layer.
+- [ ] **T1.5** Update [`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts):
+  - Define `SqlColumnRef = { readonly table: string; readonly name: string }` and `SqlCodecCallContext extends CodecCallContext { readonly column?: SqlColumnRef }`; export both.
+  - Narrow the SQL `Codec` interface (which already extends the framework `BaseCodec`) by redeclaring `encode` and `decode` with `ctx?: SqlCodecCallContext`. The framework method is parameter-bivariant on object types, so the narrowed override is structurally compatible; if TypeScript's strict checks complain, fall back to declaring the SQL interface as `Codec<TInput, TWire>` extending `BaseCodec<TInput, TWire>` and rely on the union-arity factory for type inference at call sites.
+  - Update `codec()` factory: accept author functions of either arity (`(value)` or `(value, ctx: SqlCodecCallContext)`); lift via `async (value, ctx) => userEncode(value, ctx)` (preserves ctx through the lift). Identity default for omitted `encode` continues to work.
+- [ ] **T1.6** Update [`packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts`](../../packages/2-mongo-family/1-foundation/mongo-codec/src/codecs.ts) `mongoCodec()` factory the same way, but the ctx-bearing arity uses framework `CodecCallContext` (no Mongo extension in this project).
+- [ ] **T1.7** Land the `RUNTIME.ABORTED` artifact set in [`packages/1-framework/1-core/framework-components/src/runtime-error.ts`](../../packages/1-framework/1-core/framework-components/src/runtime-error.ts). Runtime error codes are not enumerated in a single registry; the codes live as string literals at call sites. The right artifacts are: a `RUNTIME_ABORTED = 'RUNTIME.ABORTED' as const` constant, a `RuntimeAbortedPhase = 'encode' | 'decode' | 'stream'` discriminator, and a `runtimeAborted(phase, cause?)` envelope-construction helper colocated with `runtimeError`. (The helper construction was originally framed as part of T2.8, but it lands here in m1 because T1.8's entry pre-check needs a construction site — see T2.8 note.)
 - [ ] **T1.8** Update [`packages/1-framework/1-core/framework-components/src/runtime-core.ts`](../../packages/1-framework/1-core/framework-components/src/runtime-core.ts) `RuntimeCore`:
   - `execute<Row>(plan, options?: { signal?: AbortSignal }): AsyncIterableResult<Row>`.
   - Pass the signal through to `lower(plan, ctx?)` (one new optional arg) and into the row-stream wrapper.
@@ -75,16 +78,16 @@ The SQL runtime accepts and threads the per-`execute` signal through every codec
 
 **Tasks:**
 
-- [ ] **T2.1** Write tests for `encodeParams(plan, registry, ctx?)` threading:
-  - Each codec's `encode(value, ctx)` receives the same `ctx` instance.
+- [ ] **T2.1** Write tests for `encodeParams(plan, registry, ctx?: SqlCodecCallContext)` threading:
+  - Each codec's `encode(value, ctx)` receives the same `ctx` instance; the runtime leaves `ctx.column` undefined on encode (encode-side column context is the middleware's domain).
   - When `ctx` is undefined, behavior is bit-for-bit identical to today (regression).
   - When `ctx.signal` aborts mid-`Promise.all`, the call rejects with `RUNTIME.ABORTED` (`{ phase: 'encode' }`); cause carries the abort reason.
   - Already-aborted signal at entry short-circuits before any codec call (verified with mock codec call counter).
-- [ ] **T2.2** Write tests for `decodeRow(row, plan, registry, validators, ctx?)` and `decodeField` threading:
+- [ ] **T2.2** Write tests for `decodeRow(row, plan, registry, validators, ctx?: SqlCodecCallContext)` and `decodeField` threading:
   - Each codec's `decode(wire, ctx)` receives a `ctx` whose `signal` is the same instance across encode and decode of the query.
-  - `ctx.column = { table, name }` is populated for cells whose `ColumnRef` resolves at the decode site (matching the existing per-cell `ColumnRef` resolution used for `RUNTIME.DECODE_FAILED` envelopes).
+  - `ctx.column = { table, name }` (a `SqlColumnRef` projected from the resolved per-cell `ColumnRef`) is populated for cells whose `ColumnRef` resolves at the decode site (matching the existing per-cell `ColumnRef` resolution used for `RUNTIME.DECODE_FAILED` envelopes).
   - `ctx.column = undefined` for cells the runtime cannot resolve to a single `(table, name)` (aggregate aliases, include aggregate fields, computed projections without a simple ref).
-  - The `ctx.column` value passed to the codec is `===`-equal to the `ColumnRef` already resolved for error wrapping (no double resolution).
+  - The `ctx.column` value passed to the codec is sourced from the same `ColumnRef` resolution used for error wrapping (no duplicate resolution; if `SqlColumnRef` is a structural projection rather than the `ColumnRef` itself, the test pins `column.table === resolvedRef.table && column.name === resolvedRef.name`).
   - No-ctx case is bit-for-bit identical (regression).
   - Mid-decode abort throws `RUNTIME.ABORTED` (`{ phase: 'decode' }`).
 - [ ] **T2.3** Write tests for the `executeAgainstQueryable` for-await loop:
@@ -94,20 +97,18 @@ The SQL runtime accepts and threads the per-`execute` signal through every codec
   - A fixture codec that calls a fake fetch with the forwarded signal observes the fake fetch abort when the runtime's signal aborts.
   - A fixture codec that ignores `ctx.signal` keeps running (a `setTimeout`-based body completes after the abort) without breaking the runtime's `RUNTIME.ABORTED` return.
 - [ ] **T2.5** Update [`packages/2-sql/5-runtime/src/codecs/encoding.ts`](../../packages/2-sql/5-runtime/src/codecs/encoding.ts):
-  - `encodeParam(value, descriptor, paramIndex, registry, ctx?)` accepts and forwards `ctx` to `codec.encode(value, ctx)`.
-  - `encodeParams(plan, registry, ctx?)` accepts `ctx`, pre-checks `ctx?.signal?.aborted`, races the `Promise.all` against `abortable(ctx.signal)` when present, throws `RUNTIME.ABORTED` envelope on abort.
+  - `encodeParam(value, descriptor, paramIndex, registry, ctx?: SqlCodecCallContext)` accepts and forwards `ctx` to `codec.encode(value, ctx)`. Encode call sites do not populate `ctx.column`.
+  - `encodeParams(plan, registry, ctx?: SqlCodecCallContext)` accepts `ctx`, pre-checks `ctx?.signal?.aborted`, races the `Promise.all` against `abortable(ctx.signal)` when present, throws `RUNTIME.ABORTED` envelope on abort.
 - [ ] **T2.6** Update [`packages/2-sql/5-runtime/src/codecs/decoding.ts`](../../packages/2-sql/5-runtime/src/codecs/decoding.ts):
-  - `decodeField(...args, ctx?)` accepts the row-level `ctx` (signal-bearing) and packages a per-cell `ctx` whose `column` is the resolved `ColumnRef` (or `undefined` if unresolved). Forwards the per-cell `ctx` to `codec.decode(wire, ctx)`.
-  - The per-cell `ColumnRef` is the same value used by `wrapDecodeFailure` for envelope construction — share the resolution, do not duplicate.
-  - `decodeRow(row, plan, registry, validators, ctx?)` accepts the row-level `ctx`, pre-checks `ctx?.signal?.aborted`, races the per-cell `Promise.all` against `abortable(ctx.signal)`, throws `RUNTIME.ABORTED` envelope on abort.
+  - `decodeField(...args, ctx?: SqlCodecCallContext)` accepts the row-level `ctx` (signal-bearing, no `column`) and packages a per-cell `SqlCodecCallContext` whose `column = { table, name }` is sourced from the resolved `ColumnRef` (or `undefined` if unresolved). Forwards the per-cell ctx to `codec.decode(wire, ctx)`.
+  - The per-cell `ColumnRef` is the same value used by `wrapDecodeFailure` for envelope construction — share the resolution, do not duplicate. (The `SqlColumnRef` value passed to the codec is a structural projection of the resolved `ColumnRef`; if `ColumnRef`'s public shape already satisfies `SqlColumnRef`, reuse the same object.)
+  - `decodeRow(row, plan, registry, validators, ctx?: SqlCodecCallContext)` accepts the row-level `ctx`, pre-checks `ctx?.signal?.aborted`, races the per-cell `Promise.all` against `abortable(ctx.signal)`, throws `RUNTIME.ABORTED` envelope on abort.
 - [ ] **T2.7** Update [`packages/2-sql/5-runtime/src/sql-runtime.ts`](../../packages/2-sql/5-runtime/src/sql-runtime.ts):
   - `SqlRuntimeImpl.execute(plan, options?)` accepts the options bag.
-  - `executeAgainstQueryable` builds a single query-level `ctx: { signal }` (the `column` field is populated per-cell at the decode site).
+  - `executeAgainstQueryable` builds a single query-level `ctx: SqlCodecCallContext = { signal }` (the `column` field is populated per-cell at the decode site).
   - The for-await row loop checks `signal.aborted` between rows and exits with `RUNTIME.ABORTED` (`{ phase: 'stream' }`).
-  - `lower(plan, ctx?)` accepts and forwards `ctx` to `encodeParams`.
-- [ ] **T2.8** Add `RUNTIME.ABORTED` envelope construction:
-  - Helper `runtimeAborted(phase: 'encode' | 'decode' | 'stream', cause?: unknown)` produces the envelope with `{ phase }` in details and `cause` set to `signal.reason ?? new DOMException(...)`.
-  - Helper colocated with the existing `runtimeError` factory in `framework-components/runtime`.
+  - `lower(plan, ctx?: SqlCodecCallContext)` accepts and forwards `ctx` to `encodeParams`.
+- [ ] **T2.8** Use the existing `runtimeAborted(phase, cause?)` helper (landed in m1 under T1.7) at the SQL throw sites added in T2.5 / T2.6 / T2.7. The helper itself is already in place in [`packages/1-framework/1-core/framework-components/src/runtime-error.ts`](../../packages/1-framework/1-core/framework-components/src/runtime-error.ts) — m2's job is the family-side wiring that calls it (no fresh helper construction).
 - [ ] **T2.9** Run M2 SQL runtime tests; iterate until green.
 - [ ] **T2.10** Internal review/refine gate with the project owner before M3.
 
@@ -133,11 +134,11 @@ Mirror M2 for the Mongo encode dispatch. Demonstrable via Mongo runtime tests co
   - Already-aborted signal short-circuits.
   - Signal threads through `lower → adapter.lower → resolveValue` to each codec call.
 - [ ] **T3.3** Update [`packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts):
-  - Accept `ctx?: CodecCallContext` as a third arg.
+  - Accept `ctx?: CodecCallContext` (the framework type, signal-only) as a third arg. Mongo does not extend `CodecCallContext` in this project.
   - Forward `ctx` to `codec.encode(value, ctx)`.
   - Forward `ctx` recursively to nested `resolveValue` calls so identity is preserved.
 - [ ] **T3.4** Update [`packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts) and [`packages/3-mongo-target/2-mongo-adapter/src/lowering.ts`](../../packages/3-mongo-target/2-mongo-adapter/src/lowering.ts):
-  - `MongoAdapter.lower(plan, ctx?)` accepts and forwards `ctx` to its internal `resolveValue` calls.
+  - `MongoAdapter.lower(plan, ctx?: CodecCallContext)` accepts and forwards `ctx` to its internal `resolveValue` calls.
 - [ ] **T3.5** Update [`packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`](../../packages/2-mongo-family/7-runtime/src/mongo-runtime.ts):
   - `MongoRuntime.execute(plan, options?)` accepts the options bag.
   - `lower(plan, ctx?)` accepts and forwards `ctx` to `adapter.lower`.
@@ -158,10 +159,10 @@ Document the decision and resolve the related cross-references.
 **Tasks:**
 
 - [ ] **T4.1** Draft a new ADR (e.g. *ADR 0NN — Codec call context: per-query AbortSignal + column metadata*) covering:
-  - The `CodecCallContext` shape and its future-extensibility intent.
+  - The framework `CodecCallContext` shape (signal-only) and the family-extension pattern (`SqlCodecCallContext` adds `column`; Mongo doesn't extend today). Articulate the layering rationale: per-call shape-of-call metadata that's family-specific (SQL's `(table, column)` addressing) lives in the family layer; only family-agnostic call-time metadata (cancellation) belongs at the framework level.
   - The per-`execute` signal contract; cooperative-cancellation semantics (the runtime returns promptly; in-flight bodies are abandoned).
   - The `RUNTIME.ABORTED` envelope and its `phase` values.
-  - The decode-side column-context contract: when `ctx.column` is populated, when it's `undefined`, and the explicit decision to leave encode-side column context to middleware (linking to *Middleware-driven param transformation*).
+  - The decode-side column-context contract on the SQL family: when `ctx.column` is populated, when it's `undefined`, and the explicit decision to leave encode-side column context to middleware (linking to *Middleware-driven param transformation*).
   - Walk-back framing: the addition does not preclude later concurrency-cap / bulk-codec / per-instance work; it does not introduce any of ADR 204's seven walk-back constraints.
 - [ ] **T4.2** Update [ADR 204 §"Risks & mitigations"](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md): add a "Resolved by ADR 0NN" pointer for the AbortSignal half. The concurrency-cap half remains "tracked under TML-2330 / framework-gaps G4."
 - [ ] **T4.3** Update [`docs/reference/framework-gaps.md`](../../docs/reference/framework-gaps.md):

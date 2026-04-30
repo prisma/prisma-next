@@ -1,11 +1,11 @@
 # Summary
 
-Introduce a single `CodecCallContext` object that the runtime threads through every `codec.encode` / `codec.decode` call. The context unifies two pieces of per-query, per-cell metadata that codecs need but cannot get today:
+Introduce a `CodecCallContext` object that the runtime threads through every `codec.encode` / `codec.decode` call, with a family-extension pattern so SQL-specific shape-of-call metadata stays in the SQL layer:
 
-1. **`signal: AbortSignal`** — per-query cancellation, so codecs that perform network I/O (KMS, Vault, audit-trail-bound types) can forward cancellation to their underlying SDK and the runtime can stop yielding rows promptly when the caller aborts.
-2. **`column: { table, name }`** — the (table, column) the cell belongs to, populated for **decode** calls so codecs can construct return values that carry column identity (e.g. an envelope handle that knows what to bulk-decrypt against).
+1. **`signal: AbortSignal` (framework, all families)** — per-query cancellation, so codecs that perform network I/O (KMS, Vault, audit-trail-bound types) can forward cancellation to their underlying SDK and the runtime can stop yielding rows promptly when the caller aborts.
+2. **`column: { table, name }` (SQL only, via `SqlCodecCallContext extends CodecCallContext`)** — the (table, column) the cell belongs to, populated for **decode** calls so SQL codecs can construct return values that carry column identity (e.g. an envelope handle that knows what to bulk-decrypt against).
 
-No concurrency cap, no bulk-codec interface, no traits — just plumbing two fields on one shared context object.
+No concurrency cap, no bulk-codec interface, no traits — just plumbing one shared context object per query, with a SQL-family extension that adds the column ref.
 
 # Description
 
@@ -15,7 +15,7 @@ The single-path async codec runtime ([ADR 204](../../docs/architecture%20docs/ad
 
 Independently, [`docs/reference/framework-gaps.md`](../../docs/reference/framework-gaps.md) G1 ("Codecs receive no per-call column metadata") describes a related gap from the CipherStash integration's perspective: a codec's `decode(wire)` call has no way to know which `(table, column)` the cell came from, which prevents the codec from returning a value that carries enough context to participate in later bulk operations.
 
-This project addresses both gaps with one structural change: introduce `CodecCallContext` as the shared per-call context object, and thread one instance per `execute()` invocation through every codec dispatch site. The two fields it carries today are independent in semantics but share the same plumbing — same call sites, same identity guarantee, same factory contract for codec authors.
+This project addresses both gaps with one structural change: introduce `CodecCallContext` as the shared per-call context object at the framework level (signal-only), introduce `SqlCodecCallContext` in the SQL layer (extending it with the column ref), and thread one ctx per `execute()` invocation through every codec dispatch site. The two fields share the same plumbing — same call sites, same identity guarantee for `signal`, same factory contract for codec authors — but the SQL-specific column metadata stays inside the SQL family per the framework/family layering convention (the framework `Codec` interface is target-agnostic and cannot encode SQL's `(table, column)` addressing model). Mongo today uses the framework `CodecCallContext` directly without extension.
 
 For the canonical motivating use case — CipherStash's ZeroKMS-backed encrypted-storage codec — the combination unlocks two patterns at the extension layer:
 
@@ -37,17 +37,36 @@ This project intentionally **does not** address two related concerns:
    - The framework-level `RuntimeCore.execute` and the `RuntimeExecutor<TPlan>` interface accept the same options shape so SQL and Mongo share one signature.
    - Omitting `signal` (or passing `undefined`) preserves today's behavior bit-for-bit.
 
-2. **Codec query-time methods accept an optional context object.**
-   - `Codec.encode(value, ctx?)` and `Codec.decode(wire, ctx?)` where `ctx: CodecCallContext`.
-   - `CodecCallContext` shape:
-     ```ts
-     export interface CodecCallContext {
-       readonly signal?: AbortSignal;
-       readonly column?: { readonly table: string; readonly name: string };
-     }
-     ```
+2. **Codec query-time methods accept an optional context object, family-extensible.**
+
+   The base context lives in `framework-components` and is family-agnostic:
+
+   ```ts
+   // packages/1-framework/1-core/framework-components/src/codec-types.ts
+   export interface CodecCallContext {
+     readonly signal?: AbortSignal;
+   }
+   ```
+
+   Each family extends the base with its own shape-of-call metadata. SQL adds the column ref:
+
+   ```ts
+   // packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts
+   export interface SqlColumnRef {
+     readonly table: string;
+     readonly name: string;
+   }
+   export interface SqlCodecCallContext extends CodecCallContext {
+     readonly column?: SqlColumnRef;
+   }
+   ```
+
+   Mongo continues to use the framework `CodecCallContext` directly today (its read path doesn't go through `codec.decode`; its encode site has no column-context need); a `MongoCodecCallContext` placeholder is not introduced by this project.
+
+   - The framework `Codec.encode(value, ctx?: CodecCallContext)` / `Codec.decode(wire, ctx?: CodecCallContext)` admit only the family-agnostic context. Framework code that dispatches codecs sees only `signal`.
+   - The SQL `Codec` interface (which already extends the framework `BaseCodec` in [`relational-core/src/ast/codec-types.ts`](../../packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts) with SQL-specific metadata) narrows `encode`/`decode` to use `SqlCodecCallContext`. SQL codec authors writing for the SQL factory get the SQL-specific ctx.
    - The argument is strictly additive: codec authors who ignore `ctx` continue to work unchanged.
-   - The factory (`codec()` in `relational-core`, `mongoCodec()` in `mongo-codec`) accepts author functions that take either `(value)` or `(value, ctx)` and lifts both shapes uniformly. Sync authoring continues to work identically.
+   - The factory (`codec()` in `relational-core`, `mongoCodec()` in `mongo-codec`) accepts author functions that take either `(value)` or `(value, ctx)` and lifts both shapes uniformly. The SQL factory's ctx-bearing arity types `ctx` as `SqlCodecCallContext`; the Mongo factory uses base `CodecCallContext`. Sync authoring continues to work identically.
 
 3. **The runtime threads the per-`execute` signal to every codec call for that query.**
    - SQL encode path: `execute → lower → encodeParams → encodeParam → codec.encode(value, ctx)`.
@@ -55,11 +74,12 @@ This project intentionally **does not** address two related concerns:
    - Mongo encode path: `execute → lower → resolveValue → codec.encode(value, ctx)`.
    - Each codec call receives a `ctx` whose `signal` is the same `AbortSignal` instance for the lifetime of that `execute` call.
 
-4. **The runtime populates `ctx.column` on decode calls.**
-   - SQL decode: `ctx.column = { table, name }` is populated whenever the decode site can resolve a column ref for the cell (which is the case for projected columns from a single-table source; the existing per-cell `ColumnRef` resolution in `decodeRow` provides this).
-   - Cells that the runtime cannot resolve to a single `(table, column)` (e.g. computed projections, aggregates, includes) have `ctx.column = undefined`. This is observable to codecs; codecs that require column identity must handle `undefined` explicitly (no implicit defaulting).
-   - Mongo decode is out of scope per ADR 204 (Mongo's read path doesn't go through codec.decode).
-   - **Encode-side `ctx.column` is not populated by this project.** Encode-time column context is the middleware's domain (see *Middleware-driven param transformation*); the codec interface remains symmetric in shape (the field exists on both encode and decode contexts) but encode call sites pass `undefined`.
+4. **The SQL runtime populates `ctx.column` on decode calls.**
+   - SQL decode builds a per-cell `SqlCodecCallContext` whose `column = { table, name }` is populated whenever the decode site can resolve a `ColumnRef` for the cell (which is the case for projected columns from a single-table source; the existing per-cell `ColumnRef` resolution in `decodeRow` provides this).
+   - Cells that the runtime cannot resolve to a single `(table, name)` (e.g. computed projections, aggregates, includes) have `ctx.column = undefined`. This is observable to codecs; codecs that require column identity must handle `undefined` explicitly (no implicit defaulting).
+   - Mongo decode is out of scope per ADR 204 (Mongo's read path doesn't go through `codec.decode`); Mongo does not extend `CodecCallContext` in this project.
+   - **Encode-side `ctx.column` is not populated by this project.** Encode-time column context is the middleware's domain (see *Middleware-driven param transformation*); the SQL `SqlCodecCallContext` shape allows the field on encode but the runtime always leaves it `undefined` there.
+   - The framework `CodecCallContext` has no `column` field at all; column metadata is a SQL-family concept and lives only on `SqlCodecCallContext`.
 
 5. **The runtime stops yielding rows promptly when the signal aborts.**
    - The for-await row loop in `executeAgainstQueryable` checks `signal.aborted` between rows and exits with `RUNTIME.ABORTED`.
@@ -80,9 +100,10 @@ This project intentionally **does not** address two related concerns:
    - A codec that ignores `ctx.signal` continues to work; its body runs to completion if abort fires mid-call. The runtime still returns `RUNTIME.ABORTED` to the caller.
    - A codec that forwards `ctx.signal` to its underlying SDK (e.g. `kmsClient.send(cmd, { abortSignal: ctx.signal })`) sees the in-flight HTTPS call cancel.
 
-9. **Column-context use is opt-in for codec authors.**
-   - The framework guarantees `ctx.column` is populated when resolvable on decode; what the codec does with it is the author's choice.
+9. **Column-context use is opt-in for SQL codec authors.**
+   - The SQL runtime guarantees `ctx.column` is populated when resolvable on decode (via `SqlCodecCallContext`); what the codec does with it is the author's choice.
    - A codec that ignores `ctx.column` continues to work; the field's presence does not change the codec's contract for any value type today.
+   - Mongo codec authors do not see `ctx.column` (the framework `CodecCallContext` has no such field).
 
 ## Non-Functional Requirements
 
@@ -118,18 +139,19 @@ This project intentionally **does not** address two related concerns:
 - [ ] `RuntimeCore.execute` accepts and forwards the signal to `lower` (encode-side) and through `runWithMiddleware` (decode/stream side).
 - [ ] SQL `SqlRuntimeImpl.execute`, `executeAgainstQueryable`, `lower` accept the signal.
 - [ ] Mongo `MongoRuntime.execute` and `MongoAdapter.lower` accept the signal.
-- [ ] The public `Codec` interface in `framework-components` declares `encode(value, ctx?: CodecCallContext): Promise<TWire>` and `decode(wire, ctx?: CodecCallContext): Promise<TInput>`, where `CodecCallContext = { readonly signal?: AbortSignal; readonly column?: { readonly table: string; readonly name: string } }`.
-- [ ] The SQL and Mongo `Codec` interfaces extend the framework one and inherit the `ctx?` arg unchanged.
-- [ ] `codec()` and `mongoCodec()` factories accept author functions of either arity (`(value) => …` or `(value, ctx) => …`) and produce a `Codec` whose method signatures match the public interface.
+- [ ] The public `Codec` interface in `framework-components` declares `encode(value, ctx?: CodecCallContext): Promise<TWire>` and `decode(wire, ctx?: CodecCallContext): Promise<TInput>`, where `CodecCallContext = { readonly signal?: AbortSignal }` (signal-only at the framework level).
+- [ ] The SQL `Codec` interface (in `relational-core/src/ast/codec-types.ts`) redeclares `encode`/`decode` with `ctx?: SqlCodecCallContext`, where `SqlCodecCallContext extends CodecCallContext` adds `readonly column?: SqlColumnRef` and `SqlColumnRef = { readonly table: string; readonly name: string }`.
+- [ ] The Mongo `Codec` type continues to use the framework `CodecCallContext` directly (no Mongo-specific extension introduced by this project).
+- [ ] `codec()` (SQL) accepts author functions of either arity (`(value) => …` or `(value, ctx: SqlCodecCallContext) => …`); `mongoCodec()` accepts author functions of either arity with `ctx: CodecCallContext`. Both factories produce a `Codec` whose method signatures match the public interface for that family.
 - [ ] Adding the `ctx` arg does not break any existing codec author site (compatibility verified by typecheck of in-tree codecs).
 
 ## Plumbing
 
-- [ ] `encodeParams(plan, registry, ctx?)` accepts and threads `ctx` to each `encodeParam` → `codec.encode`. `ctx.column` is `undefined` for encode call sites.
-- [ ] `decodeRow(row, plan, registry, jsonValidators, ctx?)` accepts and threads `ctx` to each `decodeField` → `codec.decode`, populating `ctx.column = { table, name }` from the existing per-cell `ColumnRef` resolution where available, and `undefined` otherwise.
-- [ ] `resolveValue(value, codecs, ctx?)` accepts and threads `ctx` to each leaf `codec.encode` call. `ctx.column` is `undefined` (encode-side).
+- [ ] `encodeParams(plan, registry, ctx?: SqlCodecCallContext)` accepts and threads `ctx` to each `encodeParam` → `codec.encode`. `ctx.column` is left `undefined` for encode call sites (encode-time column metadata is the middleware's domain).
+- [ ] `decodeRow(row, plan, registry, jsonValidators, ctx?: SqlCodecCallContext)` accepts and threads `ctx` to each `decodeField` → `codec.decode`, building a per-cell `SqlCodecCallContext` whose `column = { table, name }` is populated from the existing per-cell `ColumnRef` resolution where available, and `undefined` otherwise.
+- [ ] `resolveValue(value, codecs, ctx?: CodecCallContext)` (Mongo) accepts and threads `ctx` to each leaf `codec.encode` call. The Mongo path uses the base framework `CodecCallContext` (no `column`).
 - [ ] The `signal` field of every per-cell `ctx` is the *same `AbortSignal` instance* throughout a single `execute()` invocation (so a codec receiving it observes a stable signal identity across encode and decode of the same query).
-- [ ] When `ctx.signal` is undefined and `ctx.column` is undefined, all dispatch sites behave bit-for-bit identically to today (pinned by regression tests against existing snapshot fixtures).
+- [ ] When `ctx.signal` is undefined and (for SQL decode) `ctx.column` is undefined, all dispatch sites behave bit-for-bit identically to today (pinned by regression tests against existing snapshot fixtures).
 
 ## Abort semantics
 
@@ -142,10 +164,10 @@ This project intentionally **does not** address two related concerns:
 
 ## Column-context semantics
 
-- [ ] A SQL decode call for a projected column from a single-table source receives `ctx.column = { table, name }` matching the underlying column ref (verified with a fixture codec that records observed `ctx.column` values per call).
+- [ ] A SQL decode call for a projected column from a single-table source receives a `SqlCodecCallContext` whose `column = { table, name }` matches the underlying column ref (verified with a fixture codec that records observed `ctx.column` values per call).
 - [ ] A SQL decode call for a column the runtime cannot resolve to a single `(table, name)` (e.g. an aggregate alias, an `include` aggregate field, a computed projection without a simple ref) receives `ctx.column = undefined`.
-- [ ] An encode call (SQL `encodeParams`, Mongo `resolveValue`) receives `ctx.column = undefined`.
-- [ ] The `ctx.column` value passed to `codec.decode` for a given cell is `===`-equal to the `ColumnRef` already resolved at the decode site for `RUNTIME.DECODE_FAILED` envelope construction (no double resolution, no shape drift).
+- [ ] A SQL encode call (`encodeParams`) receives a `SqlCodecCallContext` with `column = undefined`. A Mongo encode call (`resolveValue`) receives a base `CodecCallContext` (no `column` field).
+- [ ] The `ctx.column` value passed to `codec.decode` for a given cell is sourced from the same `ColumnRef` resolution the decode site already performs for `RUNTIME.DECODE_FAILED` envelope construction (no double resolution, no shape drift). The `SqlColumnRef` shape (`{ table, name }`) is a structural projection of `ColumnRef` and the implementation does not allocate it twice per cell when both sites are needed.
 - [ ] A codec that ignores `ctx.column` continues to produce identical output to today (verified by regression tests against existing decode fixtures).
 
 ## Error envelope
@@ -158,10 +180,10 @@ This project intentionally **does not** address two related concerns:
 ## Documentation
 
 - [ ] A new ADR (e.g. *ADR 0NN — Codec call context: per-query AbortSignal + column metadata*) documents:
-  - The `CodecCallContext` shape and its future-extensibility intent.
+  - The framework `CodecCallContext` shape (signal-only) and the family-extension pattern (`SqlCodecCallContext` adds `column`; Mongo doesn't extend today).
   - The per-`execute` signal contract and the cooperative-cancellation semantics.
   - The `RUNTIME.ABORTED` envelope and `phase` values.
-  - The decode-side column-context contract: when `ctx.column` is populated, when it's `undefined`, and why encode-side is the middleware's domain.
+  - The decode-side column-context contract on the SQL family: when `ctx.column` is populated, when it's `undefined`, and why encode-side is the middleware's domain.
   - The walk-back framing: this addition does not preclude later concurrency-cap / bulk-codec / per-instance work.
 - [ ] [ADR 204](../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) §"Risks & mitigations" is updated with a "Resolved by" pointer to the new ADR for the AbortSignal half. The concurrency-cap half remains "tracked under [TML-2330] / framework-gaps G4."
 - [ ] [`docs/reference/framework-gaps.md`](../../docs/reference/framework-gaps.md):
@@ -219,7 +241,7 @@ This project intentionally **does not** address two related concerns:
 
 None blocking. Items below are deliberate scoping calls captured for completeness:
 
-- **`CodecCallContext` shape today is `{ signal?, column? }`.** Future fields (richer column metadata for G1; observability hooks; cancellation reason metadata) are anticipated and the shape is named explicitly so its extension is non-breaking. Adding fields later does not change the codec author surface for existing codecs.
+- **`CodecCallContext` shape today is `{ signal? }` at the framework level; `SqlCodecCallContext` extends it with `{ column? }` at the SQL family.** Future framework-level fields (observability hooks, cancellation reason metadata) and future SQL-level fields (richer column metadata for G1, codec annotations, nullability hints) are anticipated and the shapes are named explicitly so their extension is non-breaking. Adding fields later does not change the codec author surface for existing codecs.
 - **Driver-level cancellation** (forwarding signal into the SQL/Mongo driver so an in-flight `pg` query or aggregation pipeline is killed at the connection level) is a follow-up. The codec story stands on its own; driver-level cancellation is its own ticket.
 - **Transaction-scoped signal composition.** A future enhancement could let `runtime.transaction({ signal })` create a transaction whose statements inherit cancellation; per-statement signals would compose via `AbortSignal.any([txSignal, stmtSignal])`. Out of scope here.
 - **Linear ticket title.** TML-2330's title says "rate limit + AbortSignal"; the rate-limit half is removed from this project's scope. Update the ticket to "Codec call context: per-query AbortSignal + column metadata" or similar; recorded as a project task.
