@@ -13,7 +13,61 @@ Three independent throws, plus one schema-extraction refactor that two of them d
 
 Each phase is test-first: red → green → commit.
 
-## Phase 1 — Extract `op-schema.ts`
+## Milestone identifiers
+
+Phase numbers double as orchestration milestone identifiers. The skill expects `m<N>`-style IDs; this plan uses `m1` … `m5` as aliases for Phase 1 … Phase 5.
+
+| Milestone | Phase                                                              |
+|-----------|--------------------------------------------------------------------|
+| `m1`      | Phase 1 — Extract `op-schema.ts`                                   |
+| `m2`      | Phase 2 — Operation-entry validation in `buildMigrationArtifacts`  |
+| `m3`      | Phase 3 — Bookend-mismatch validation in `buildMigrationArtifacts` |
+| `m4`      | Phase 4 — Parse-error fast-fail in `MigrationCLI`                  |
+| `m5`      | Phase 5 — Wrap-up                                                  |
+
+## Validation gates
+
+Each milestone declares an explicit validation gate — the harness commands that must all pass before the milestone is considered done. Inferred from the project's existing `pnpm` scripts and the surface each milestone touches.
+
+**`m1` (op-schema extraction; touches only `@prisma-next/migration-tools`):**
+
+- `pnpm --filter @prisma-next/migration-tools typecheck`
+- `pnpm --filter @prisma-next/migration-tools test`
+- `pnpm --filter @prisma-next/migration-tools lint`
+
+**`m2` (operation-entry validation; touches only `@prisma-next/migration-tools`):**
+
+- `pnpm --filter @prisma-next/migration-tools typecheck`
+- `pnpm --filter @prisma-next/migration-tools test`
+- `pnpm --filter @prisma-next/migration-tools lint`
+
+**`m3` (bookend-mismatch validation; touches only `@prisma-next/migration-tools`):**
+
+- `pnpm --filter @prisma-next/migration-tools typecheck`
+- `pnpm --filter @prisma-next/migration-tools test`
+- `pnpm --filter @prisma-next/migration-tools lint`
+
+**`m4` (CLI parse-error fast-fail; touches `@prisma-next/cli` and may touch `@prisma-next/migration-tools` exports):**
+
+- `pnpm --filter @prisma-next/cli typecheck`
+- `pnpm --filter @prisma-next/cli test`
+- `pnpm --filter @prisma-next/cli lint`
+- `pnpm --filter @prisma-next/migration-tools typecheck` (in case a subpath export was added)
+- `pnpm --filter @prisma-next/migration-tools test`
+- `pnpm --filter @prisma-next/migration-tools lint`
+
+**`m5` (wrap-up; verifies the whole branch is clean):**
+
+- `pnpm typecheck:packages`
+- `pnpm test:packages`
+- `pnpm lint:packages`
+- `pnpm lint:deps`
+- `pnpm --filter @prisma-next/migration-tools build` (refresh declarations)
+- Spot-check: re-emit one example migration locally to confirm the happy path still works end-to-end.
+
+A gate failure is a hard pause: surface to the orchestrator. Pre-existing flakes/failures unrelated to the milestone are escalated rather than silently fixed.
+
+## Phase 1 — Extract `op-schema.ts` (`m1`)
 
 Pure refactor. No behaviour change.
 
@@ -31,7 +85,7 @@ Pure refactor. No behaviour change.
 **Commit**
 - `refactor(migration-tools): extract MigrationOpSchema into op-schema.ts`
 
-## Phase 2 — Operation-entry validation in `buildMigrationArtifacts`
+## Phase 2 — Operation-entry validation in `buildMigrationArtifacts` (`m2`)
 
 Depends on Phase 1.
 
@@ -55,7 +109,7 @@ Depends on Phase 1.
 **Commit**
 - `feat(migration-tools): validate operation entries in buildMigrationArtifacts`
 
-## Phase 3 — Bookend-mismatch validation in `buildMigrationArtifacts`
+## Phase 3 — Bookend-mismatch validation in `buildMigrationArtifacts` (`m3`)
 
 Independent of Phases 1–2.
 
@@ -80,7 +134,7 @@ Independent of Phases 1–2.
 **Commit**
 - `feat(migration-tools): fail-fast on stale contract bookends in buildMigrationArtifacts`
 
-## Phase 4 — Parse-error fast-fail in `MigrationCLI`
+## Phase 4 — Parse-error fast-fail in `MigrationCLI` (`m4`)
 
 Independent of Phases 1–3.
 
@@ -102,7 +156,7 @@ Independent of Phases 1–3.
 **Commit**
 - `feat(cli): fail-fast on unparseable migration.json in MigrationCLI`
 
-## Phase 5 — Wrap-up
+## Phase 5 — Wrap-up (`m5`)
 
 **Tasks**
 - Run `pnpm test:packages` from the repo root. Fix any incidental breakage.
