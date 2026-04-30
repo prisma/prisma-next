@@ -6,7 +6,6 @@ import {
   contract,
   createMigrationPlan,
   createTestDatabase,
-  emptySchema,
   familyInstance,
   formatRunnerFailure,
   frameworkComponents,
@@ -20,79 +19,6 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
 
   afterEach(() => {
     testDb?.cleanup();
-  });
-
-  it('skips operations when marker matches destination (migration-apply re-run)', async () => {
-    testDb = createTestDatabase();
-    const { driver } = testDb;
-    const planner = sqliteTargetDescriptor.createPlanner(familyInstance);
-    const runner = sqliteTargetDescriptor.createRunner(familyInstance);
-
-    const initialPlan = planner.plan({
-      contract,
-      schema: emptySchema,
-      policy: INIT_ADDITIVE_POLICY,
-      fromContract: null,
-      frameworkComponents,
-    });
-    if (initialPlan.kind !== 'success') throw new Error('expected initial planner success');
-    const firstResult = await runner.execute({
-      plan: initialPlan.plan,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
-    });
-    if (!firstResult.ok) throw new Error(formatRunnerFailure(firstResult.failure));
-
-    // Re-run with origin set — should skip even a dangerous operation
-    const planWithFailingStep = createMigrationPlan<SqlitePlanTargetDetails>({
-      targetId: 'sqlite',
-      origin: toPlanContractInfo(contract),
-      destination: toPlanContractInfo(contract),
-      operations: [
-        {
-          id: 'noop.explode',
-          label: 'Would fail if executed',
-          summary: 'Skipped because marker matches destination',
-          operationClass: 'additive',
-          target: { id: 'sqlite', details: { schema: 'main', objectType: 'table', name: 'user' } },
-          precheck: [],
-          execute: [
-            {
-              description: 'explode',
-              sql: "SELECT raise(FAIL, 'must not execute')",
-            },
-          ],
-          postcheck: [],
-        },
-      ],
-    });
-
-    const idempotencyResult = await runner.execute({
-      plan: planWithFailingStep,
-      driver,
-      destinationContract: contract,
-      policy: INIT_ADDITIVE_POLICY,
-      frameworkComponents,
-      strictVerification: false,
-    });
-    if (!idempotencyResult.ok) throw new Error(formatRunnerFailure(idempotencyResult.failure));
-    expect(idempotencyResult.value).toMatchObject({
-      operationsPlanned: 1,
-      operationsExecuted: 0,
-    });
-
-    const ledgerCount = await driver.query<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM _prisma_ledger',
-    );
-    expect(ledgerCount.rows[0]!.cnt).toBe(2);
-
-    const ledgerRow = await driver.query<{ operations: string }>(
-      'SELECT operations FROM _prisma_ledger ORDER BY id DESC LIMIT 1',
-    );
-    expect(JSON.parse(ledgerRow.rows[0]!.operations)).toEqual([]);
   });
 
   it('skips operation when postcheck is already satisfied before execution', async () => {

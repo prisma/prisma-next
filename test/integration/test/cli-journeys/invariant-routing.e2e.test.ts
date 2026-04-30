@@ -26,6 +26,7 @@ import {
   runContractEmit,
   runMigrationApply,
   runMigrationEmit,
+  runMigrationNew,
   runMigrationPlan,
   runMigrationPlanAndEmit,
   runMigrationStatus,
@@ -542,6 +543,156 @@ withTempDir(({ createTempDir }) => {
           markerAfterReapply.rows[0]?.['invariants'],
           'R.05: invariants unchanged after re-apply (set union with already-present id is a no-op)',
         ).toEqual([INVARIANT_ID]);
+      },
+      timeouts.spinUpPpgDev,
+    );
+  });
+
+  describe('Journey S: self-edge migration — pure data transform with no schema change', () => {
+    const db = useDevDatabase();
+
+    const NORMALIZED_EMAIL = 'normalized@example.com';
+
+    // Self-edges (from === to) carry only data ops. The pathfinder treats
+    // them as routing-visible when they declare an invariantId, and the
+    // runner runs them on `migration apply --ref` even though the marker's
+    // storage hash never changes.
+    it(
+      'migration new --from <currentHash> scaffolds self-edge → fill in dataTransform → apply normalizes data and accumulates marker.invariants',
+      async () => {
+        const ctx: JourneyContext = setupJourney({
+          connectionString: db.connectionString,
+          createTempDir,
+        });
+
+        expect((await runContractEmit(ctx)).exitCode, 'S.01: emit C1').toBe(0);
+        const plan0 = await runMigrationPlanAndEmit(ctx, ['--name', 'init', '--json']);
+        expect(plan0.exitCode, 'S.01: plan init').toBe(0);
+        const c1Hash = parseJsonOutput<{ to: string }>(plan0).to;
+        expect((await runMigrationApply(ctx)).exitCode, 'S.01: apply init').toBe(0);
+
+        await sql(
+          db.connectionString,
+          `INSERT INTO "public"."user" (id, email) VALUES (1, 'Alice@Example.COM'), (2, 'BOB@TEST.org')`,
+        );
+
+        const newResult = await runMigrationNew(ctx, [
+          '--name',
+          'lowercase-emails',
+          '--from',
+          c1Hash,
+        ]);
+        expect(newResult.exitCode, 'S.02: migration new --from <c1>').toBe(0);
+
+        const migrationsDir = join(ctx.testDir, 'migrations');
+        const migrationDir = join(
+          migrationsDir,
+          readdirSync(migrationsDir)
+            .filter((d) => d.includes('lowercase_emails'))
+            .sort()
+            .at(-1)!,
+        );
+
+        const draftManifest = JSON.parse(
+          readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+        ) as { from: string; to: string };
+        expect(draftManifest.from, 'S.03: scaffold has from === to').toBe(c1Hash);
+        expect(draftManifest.to).toBe(c1Hash);
+
+        const handAuthored = `import postgresAdapter from '@prisma-next/adapter-postgres/runtime';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import postgresTarget from '@prisma-next/target-postgres/runtime';
+import { sql } from '@prisma-next/sql-builder/runtime';
+import { createExecutionContext, createSqlExecutionStack } from '@prisma-next/sql-runtime';
+import endContract from './end-contract.json' with { type: 'json' };
+
+const db = sql({
+  context: createExecutionContext({
+    contract: endContract,
+    stack: createSqlExecutionStack({ target: postgresTarget, adapter: postgresAdapter }),
+  }),
+});
+
+export default class M extends Migration {
+  override describe() {
+    return { from: ${JSON.stringify(c1Hash)}, to: ${JSON.stringify(c1Hash)} };
+  }
+
+  override get operations() {
+    return [
+      this.dataTransform(endContract, 'normalize-user-email', {
+        invariantId: 'normalize-user-email',
+        check: () => db.user.select('id').where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')).limit(1),
+        run: () => db.user.update({ email: '${NORMALIZED_EMAIL}' }).where((f, fns) => fns.ne(f.email, '${NORMALIZED_EMAIL}')),
+      }),
+    ];
+  }
+}
+
+MigrationCLI.run(import.meta.url, M);
+`;
+        writeFileSync(join(migrationDir, 'migration.ts'), handAuthored);
+        const emitResult = await runMigrationEmit(ctx, ['--dir', migrationDir]);
+        expect(emitResult.exitCode, `S.04: emit: ${emitResult.stdout}\n${emitResult.stderr}`).toBe(
+          0,
+        );
+
+        const manifestAfter = JSON.parse(
+          readFileSync(join(migrationDir, 'migration.json'), 'utf-8'),
+        );
+        expect(
+          manifestAfter.providedInvariants,
+          'S.04: providedInvariants on self-edge manifest',
+        ).toEqual(['normalize-user-email']);
+
+        writeRefFile(ctx, 'prod', c1Hash, ['normalize-user-email']);
+
+        const applyRef = await runMigrationApply(ctx, ['--ref', 'prod', '--json']);
+        expect(
+          applyRef.exitCode,
+          `S.05: apply --ref prod: ${applyRef.stdout}\n${applyRef.stderr}`,
+        ).toBe(0);
+        const applyResult = parseJsonOutput<{
+          markerHash: string;
+          applied: readonly {
+            dirName: string;
+            from: string;
+            to: string;
+            operationsExecuted: number;
+          }[];
+          pathDecision?: {
+            satisfiedInvariants: readonly string[];
+            selectedPath: readonly { from: string; to: string; invariants: readonly string[] }[];
+          };
+        }>(applyRef);
+        expect(applyResult.markerHash, 'S.05: marker still at C1').toBe(c1Hash);
+        expect(applyResult.applied[0]?.operationsExecuted, 'S.05: data transform executed').toBe(1);
+        expect(
+          applyResult.pathDecision?.satisfiedInvariants,
+          'S.05: self-edge satisfies the invariant',
+        ).toEqual(['normalize-user-email']);
+        const selectedEdge = applyResult.pathDecision?.selectedPath.at(-1);
+        expect(selectedEdge?.from, 'S.05: from === c1Hash').toBe(c1Hash);
+        expect(selectedEdge?.to, 'S.05: to === c1Hash (self-edge)').toBe(c1Hash);
+        expect(selectedEdge?.invariants).toEqual(['normalize-user-email']);
+
+        const rows = await sql(
+          db.connectionString,
+          `SELECT id, email FROM "public"."user" ORDER BY id`,
+        );
+        expect(rows.rows, 'S.06: emails normalized').toEqual([
+          { id: 1, email: NORMALIZED_EMAIL },
+          { id: 2, email: NORMALIZED_EMAIL },
+        ]);
+
+        const markerRow = await sql(
+          db.connectionString,
+          `SELECT invariants FROM "prisma_contract"."marker" WHERE id = 1`,
+        );
+        expect(
+          markerRow.rows[0]?.['invariants'],
+          'S.07: marker.invariants accumulated the id',
+        ).toEqual(['normalize-user-email']);
       },
       timeouts.spinUpPpgDev,
     );

@@ -128,9 +128,14 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         return markerCheck;
       }
 
-      // db update (origin: null) always applies; migration-apply (origin set) skips if marker matches.
+      // db update (origin: null) always applies; migration-apply (origin set,
+      // origin !== destination) skips if marker already matches destination.
+      // Self-edges (origin === destination) intentionally bypass the skip:
+      // the migration is data-only, and the data transform's own check
+      // decides whether `run` fires.
       const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-      const skipOperations = markerAtDestination && options.plan.origin != null;
+      const isSelfEdge = options.plan.origin?.storageHash === options.plan.destination.storageHash;
+      const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
       let applyValue: ApplyPlanSuccessValue;
 
       if (skipOperations) {

@@ -79,7 +79,9 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         }
 
         const markerAtDestination = this.markerMatchesDestination(existingMarker, options.plan);
-        const skipOperations = markerAtDestination && options.plan.origin != null;
+        const isSelfEdge =
+          options.plan.origin?.storageHash === options.plan.destination.storageHash;
+        const skipOperations = markerAtDestination && options.plan.origin != null && !isSelfEdge;
 
         let operationsExecuted: number;
         let executedOperations: readonly SqlMigrationPlanOperation<SqlitePlanTargetDetails>[];

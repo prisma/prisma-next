@@ -6,7 +6,6 @@ import {
   createDriver,
   createMigrationPlan,
   createTestDatabase,
-  emptySchema,
   familyInstance,
   frameworkComponents,
   type PostgresControlDriver,
@@ -40,99 +39,6 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
       await driver.close();
       driver = undefined;
     }
-  });
-
-  describe('when the marker already matches the destination contract (idempotency)', () => {
-    it(
-      'skips executing operations for migration-apply plans (origin set) and still writes marker and ledger',
-      { timeout: testTimeout },
-      async () => {
-        const planner = postgresTargetDescriptor.createPlanner(familyInstance);
-        const runner = postgresTargetDescriptor.createRunner(familyInstance);
-        const initialPlan = planner.plan({
-          contract,
-          schema: emptySchema,
-          policy: INIT_ADDITIVE_POLICY,
-          fromContract: null,
-          frameworkComponents,
-        });
-        if (initialPlan.kind !== 'success') {
-          throw new Error('expected initial planner success');
-        }
-        await runner.execute({
-          plan: initialPlan.plan,
-          driver: driver!,
-          destinationContract: contract,
-          policy: INIT_ADDITIVE_POLICY,
-          frameworkComponents,
-        });
-
-        // Simulate a migration-apply re-run: origin is set (non-null) so the runner
-        // should skip operations when the marker already matches the destination.
-        // db update (origin: null) always applies because the planner handles
-        // idempotency through introspection.
-        const planWithFailingStep = createMigrationPlan<PostgresPlanTargetDetails>({
-          targetId: 'postgres',
-          origin: toPlanContractInfo(contract),
-          destination: toPlanContractInfo(contract),
-          operations: [
-            {
-              id: 'noop.explode',
-              label: 'Would fail if executed',
-              summary: 'This operation must be skipped when marker matches destination',
-              operationClass: 'additive',
-              target: {
-                id: 'postgres',
-                details: {
-                  schema: 'public',
-                  objectType: 'table',
-                  name: 'user',
-                },
-              },
-              precheck: [],
-              execute: [
-                {
-                  description: 'explode',
-                  sql: 'select 1/0',
-                },
-              ],
-              postcheck: [],
-            },
-          ],
-        });
-
-        const idempotencyResult = await runner.execute({
-          plan: planWithFailingStep,
-          driver: driver!,
-          destinationContract: contract,
-          policy: INIT_ADDITIVE_POLICY,
-          frameworkComponents,
-        });
-        expect(idempotencyResult.ok).toBe(true);
-        if (idempotencyResult.ok) {
-          expect(idempotencyResult.value).toMatchObject({
-            operationsPlanned: 1,
-            operationsExecuted: 0,
-          });
-        }
-
-        const markerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.marker where id = $1',
-          [1],
-        );
-        expect(markerCount.rows[0]?.count).toBe('1');
-
-        const ledgerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.ledger',
-        );
-        expect(ledgerCount.rows[0]?.count).toBe('2');
-
-        const ledgerRow = await driver!.query<{ operations: unknown }>(
-          'select operations from prisma_contract.ledger order by id desc limit 1',
-        );
-        expect(ledgerRow.rows[0]?.operations).toEqual([]);
-      },
-    );
   });
 
   describe('when the operation postcheck is already satisfied before execution (idempotency)', () => {
