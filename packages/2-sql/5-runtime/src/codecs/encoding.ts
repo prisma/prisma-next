@@ -6,8 +6,8 @@ import {
 import {
   type Codec,
   type CodecRegistry,
-  type SqlCodecCallContext,
   collectOrderedParamRefs,
+  type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 
