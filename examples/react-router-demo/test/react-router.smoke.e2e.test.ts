@@ -1,8 +1,8 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { stat } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { existsSync } from 'node:fs';
+import { readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
+import { dirname, join } from 'pathe';
 import { createServer, type ViteDevServer } from 'vite';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -76,7 +76,7 @@ describe('react-router-demo smoke (e2e)', () => {
   let originalSchema: string | null = null;
 
   beforeEach(async () => {
-    originalSchema = readFileSync(schemaPath, 'utf-8');
+    originalSchema = await readFile(schemaPath, 'utf-8');
     dev = await createDevDatabase();
     await withClient(dev.connectionString, async (client) => {
       await client.query(TEST_SCHEMA_SQL);
@@ -95,7 +95,7 @@ describe('react-router-demo smoke (e2e)', () => {
       const preRevertMtime = existsSync(contractJsonPath)
         ? (await stat(contractJsonPath)).mtimeMs
         : null;
-      writeFileSync(schemaPath, originalSchema);
+      await writeFile(schemaPath, originalSchema);
       originalSchema = null;
       if (server) {
         await waitForFileMtimeChange(
@@ -170,7 +170,7 @@ describe('react-router-demo smoke (e2e)', () => {
       );
       // Guard against schema reformats silently breaking the test.
       expect(editedSchema).not.toBe(originalSchema);
-      writeFileSync(schemaPath, editedSchema);
+      await writeFile(schemaPath, editedSchema);
 
       const reEmit = await waitForFileMtimeChange(
         contractJsonPath,
@@ -179,7 +179,7 @@ describe('react-router-demo smoke (e2e)', () => {
       );
       expect(reEmit).toBe(true);
 
-      const updatedContract: unknown = JSON.parse(readFileSync(contractJsonPath, 'utf-8'));
+      const updatedContract: unknown = JSON.parse(await readFile(contractJsonPath, 'utf-8'));
       expect(updatedContract).toMatchObject({
         storage: {
           tables: {
