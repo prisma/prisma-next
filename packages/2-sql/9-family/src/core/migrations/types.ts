@@ -243,14 +243,21 @@ export interface SqlMigrationPlannerPlanOptions {
   readonly policy: MigrationOperationPolicy;
   readonly schemaName?: string;
   /**
-   * The "from" contract (state the planner assumes the database starts at).
-   * Only `migration plan` supplies this; `db update` / `db init` reconcile
-   * against the live schema with no old contract. Strategies that need
-   * from/to column-shape comparisons (unsafe type change, nullability
+   * The "from" contract (state the planner assumes the database starts at),
+   * or `null` for reconciliation flows that have no prior contract.
+   *
+   * Required at every call site so the structural fact "I have a prior
+   * contract / I don't" is visible in the type. `migration plan` supplies
+   * the previous bundle's `metadata.toContract`; `db update` / `db init`
+   * reconcile against the live schema and pass `null`. Strategies that
+   * need from/to column-shape comparisons (unsafe type change, nullability
    * tightening) use this to decide whether to emit `dataTransform`
-   * placeholders.
+   * placeholders; they short-circuit when it is `null`.
+   *
+   * Planners also derive the "from" identity they stamp onto the produced
+   * plan's `describe()` as `fromContract?.storage.storageHash ?? null`.
    */
-  readonly fromContract?: Contract<SqlStorage> | null;
+  readonly fromContract: Contract<SqlStorage> | null;
   /**
    * Active framework components participating in this composition.
    * SQL targets can interpret this list to derive database dependencies.

@@ -291,20 +291,22 @@ export interface MigrationPlanner<
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
     /**
-     * Storage hash of the "from" contract (the state the planner assumes the
-     * database starts at), or `null` for a baseline plan with no prior state.
-     * Planners use this to populate `describe()` on the produced plan so the
-     * rendered `migration.ts` has correct `from`/`to` metadata.
-     */
-    readonly fromHash: string | null;
-    /**
      * The "from" contract (the state the planner assumes the database starts
-     * at). Planners pass this to data-safety strategies so they can compare
-     * `from` and `to` column shapes (e.g. to detect unsafe type changes).
-     * `db update` / `db init` reconcile against the live schema and have no
-     * "from" contract; only `migration plan` provides one.
+     * at), or `null` for a baseline plan with no prior state.
+     *
+     * Planners derive any "from" identity they need to stamp onto the
+     * produced plan's `describe()` from `fromContract?.storage.storageHash
+     * ?? null`. They also pass this to data-safety strategies so they can
+     * compare `from` and `to` column shapes (e.g. to detect unsafe type
+     * changes).
+     *
+     * Required at every call site to make the structural fact "I have a
+     * prior contract / I don't" visible in the type. Reconciliation
+     * commands (`db init`, `db update`) introspect a live schema and pass
+     * `null`; authoring commands (`migration plan`) pass the previous
+     * bundle's `metadata.toContract`.
      */
-    readonly fromContract?: unknown;
+    readonly fromContract: Contract | null;
     /**
      * Active framework components participating in this composition.
      * Families/targets can interpret this list to derive family-specific metadata.
