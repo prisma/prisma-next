@@ -64,6 +64,10 @@ If any gate fails, stop and surface to the orchestrator before declaring done.
 - **Side-quests:** <none authorized | "fix X if you encounter it; commit separately with scope-note" | etc.>
 - **Read-only constraints:** do not edit `code-review.md`, `system-design-review.md`, `walkthrough.md`, `spec.md`, or `plan.md`. Those are not yours.
 
+## Heartbeats
+
+Write to `wip/heartbeats/implementer.txt` on the cadence in `<skill-dir>/agents/implementer.md § Heartbeats`: at round start, before/after every long-running shell call (>~1 min), at each task/commit boundary, and at least every ~5 minutes otherwise. The orchestrator reads this file between turns to detect a stalled round; without it, a hung round wastes minutes before the user has to intervene manually. `mkdir -p wip/heartbeats` once at round start; overwrite the file each ping.
+
 ## Deferral protocol
 
 You may **not** unilaterally defer or descope any task. If you hit a blocker:
@@ -137,6 +141,7 @@ Begin.
 - Explicit-staging commits, no amend, no push without authorization.
 - Side-quests: <none authorized | "fix X if you encounter it; commit separately with scope-note">.
 - Read-only on review artifacts and on `spec.md` / `plan.md`.
+- Heartbeats to `wip/heartbeats/implementer.txt` per `<skill-dir>/agents/implementer.md § Heartbeats` (at round start, before/after long shell calls, at commit boundaries, every ~5 min otherwise).
 
 Begin.
 ```

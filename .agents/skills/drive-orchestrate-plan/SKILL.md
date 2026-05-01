@@ -179,7 +179,7 @@ This continuity rule applies to the **implementer and reviewer**, who participat
 
 ## The artifact contract
 
-The on-disk artifacts that decouple the three agents (each lives under `projects/{project}/`):
+The on-disk artifacts that decouple the three agents:
 
 ```text
 projects/{project}/
@@ -191,7 +191,13 @@ projects/{project}/
 │   ├── system-design-review.md      # architectural review (reviewer-refreshed every round)
 │   └── walkthrough.md               # semantic narrative (reviewer-refreshed every round)
 └── learnings.md                     # patterns surfaced this run (orchestrator-maintained; see § Project learnings)
+
+wip/heartbeats/                      # transient subagent liveness signals (gitignored; one file per role)
+├── implementer.txt                  # implementer's current step + last-progress + next-step (overwritten each ping)
+└── reviewer.txt                     # reviewer's current step + last-progress + next-step (overwritten each ping)
 ```
+
+The `projects/{project}/` artifacts are durable round-by-round outputs; the `wip/heartbeats/` files are ephemeral liveness pings (see § Heartbeats). Both flow through the orchestrator's awareness, but only the former survive to PR-review time.
 
 `code-review.md` carries a § Subagent IDs section directly under the AC scoreboard recording the persistent implementer + reviewer IDs (see § Subagent continuity). The orchestrator owns this section under the write carve-out documented in the read/write matrix below; the reviewer treats it as read-only.
 
@@ -218,6 +224,74 @@ The walkthrough is the user's **primary review surface** for any single round. I
 [^1]: The orchestrator has a write carve-out for two specific subsections of `code-review.md`: § Subagent IDs (records the persistent implementer + reviewer subagent IDs — see § Subagent continuity) and § Orchestrator notes (records visible verdict overrides per § Loop algorithm step 7). Everything else under `code-review.md` is reviewer-only RW.
 
 The implementer **never** edits `spec.md` or `plan.md` — those are the orchestrator's surface for translating user decisions into structure. The reviewer is **read-only on code and tests** — review-only constraint.
+
+## Heartbeats
+
+Long-running subagent rounds occasionally hang — the model stalls inside a long shell call, gets stuck in a tool-call loop, or simply stops emitting tokens for reasons opaque to the orchestrator. Without a forward signal, the orchestrator cannot tell hung from working from "still legitimately churning on a slow gate". The user is left to notice and intervene manually — and by then minutes have been wasted.
+
+The fix is small: every long-running subagent writes a **heartbeat file** on a fixed cadence. The orchestrator can consult it between turns to spot a stalled subagent without polling.
+
+### Heartbeat file shape
+
+Each persistent subagent owns one heartbeat file:
+
+- **Implementer:** `wip/heartbeats/implementer.txt`
+- **Reviewer:** `wip/heartbeats/reviewer.txt`
+
+Path is under `wip/` so it is gitignored (the file is a transient operational signal, not a shipped artifact). One file per role; rewritten in place each ping.
+
+Each ping overwrites the file with a self-contained snapshot:
+
+```text
+ts: <ISO 8601 UTC timestamp>
+role: <implementer|reviewer>
+agent_id: <subagent ID>
+round: <milestone + round identifier, e.g. m3 R2>
+phase: <step the subagent is currently in, e.g. "running pnpm test:packages" / "resolving rebase conflict in decoding.ts" / "writing F4 finding">
+last_progress: <last concrete action with citation, e.g. "committed cd5ae1afe" / "edited packages/2-sql/5-runtime/src/codecs/encoding.ts:8" / "ran pnpm typecheck (124/124 pass)">
+next_step: <expected next concrete action, e.g. "run pnpm test:packages" / "stage + commit T3.5" / "write code-review.md F-numbered findings">
+expected_duration: <coarse estimate, e.g. "~30s" / "~5min" / "long-running test suite, ~10min">
+```
+
+The format is plain `key: value` per line — no JSON, no nested structure — so a quick `head` from the orchestrator's terminal reads the snapshot in one glance.
+
+### Heartbeat cadence
+
+Subagents update the file at every one of these triggers:
+
+1. **At the start of the round**, before doing any other work (so the orchestrator can immediately see who is running).
+2. **Before each long-running shell call.** The "long-running" bar is anything expected to take more than ~1 minute: `pnpm install`, `pnpm test:*`, `pnpm build`, `pnpm typecheck` cold-cache, large `git rebase`, etc. The heartbeat says what the call is, why it's long, and the expected duration so the orchestrator knows when to start worrying.
+3. **After each long-running shell call returns**, recording the result (pass / fail / which test failed). This closes the loop — the next ping shows the orchestrator that the long call completed and progress continues.
+4. **At each task / finding / commit boundary.** The implementer pings on commit; the reviewer pings on each F-number filed and on each artifact written.
+5. **At least every ~5 minutes during any other work.** Even when no shell-call boundary triggers a ping, the subagent should not go more than 5 min without one — if it has been thinking about the same finding or the same edit for 5 min, it pings to record its current hypothesis and what it's about to try.
+
+The cadence rule is **at least every 5 minutes**; subagents may ping more often, especially around transitions. A ping is cheap — one file write — and the redundant ones cost nothing.
+
+### Reading heartbeats from the orchestrator side
+
+Between turns (or whenever uncertainty surfaces), the orchestrator can:
+
+```bash
+head -n 10 wip/heartbeats/*.txt
+```
+
+to see the freshness and current step of each persistent subagent. Two cases of interest:
+
+- **Stale heartbeat (`ts` more than ~10 min old)**: the subagent has likely hung. Surface to the user with the last `phase` / `last_progress` / `next_step` so the user can decide whether to wait, kill, or intervene. Do not silently kill — a slow legitimate gate (e.g. cold-cache `pnpm test:e2e` against real Postgres) can take longer than the heartbeat cadence and is the subagent's responsibility to flag with `expected_duration`.
+- **Fresh heartbeat but `phase` unchanged across multiple checks**: the subagent is making no real progress despite emitting heartbeats — likely stuck in a tight loop. Same surface-to-user pattern applies; the `phase` and `last_progress` together tell you whether it's repeatedly attempting the same action.
+
+The orchestrator never modifies heartbeat files. They are subagent-owned; the orchestrator is read-only.
+
+### Read/write matrix update
+
+| Artifact                          | Orchestrator | Implementer    | Reviewer       |
+|-----------------------------------|--------------|----------------|----------------|
+| `wip/heartbeats/implementer.txt`  | R            | RW             | —              |
+| `wip/heartbeats/reviewer.txt`     | R            | —              | RW             |
+
+### Why files, not transcript-emitted status lines
+
+A heartbeat in the subagent's own response message is invisible to the orchestrator until the subagent's `Task` call returns. By the time you can read it, the round is already over — the heartbeat exists only retrospectively. A file-based heartbeat is the opposite: written mid-round, readable by the orchestrator at any moment without waiting for the subagent's reply.
 
 ## Findings discipline
 
@@ -454,6 +528,7 @@ Keep entries terse. The point is to compress a calibration into a recognizable s
 These are the cross-cutting invariants the orchestrator is responsible for enforcing across every loop iteration.
 
 - **Resume the persistent implementer and reviewer across rounds.** One implementer ID and one reviewer ID per project, recorded in `code-review.md § Subagent IDs`. Resume via your harness's resume mechanism on every round after the first; spawn fresh only in the cases enumerated in § Subagent continuity. A fresh subagent every round produces procedural anomalies (work that looks "already done" because nobody remembers who did it) and recurring context re-derivation cost.
+- **Subagents heartbeat; orchestrator consults heartbeats when uncertainty surfaces.** Every implementer and reviewer round writes to `wip/heartbeats/<role>.txt` at the cadence in § Heartbeats (start of round, before/after long shell calls, at task/finding/commit boundaries, at least every ~5 min). When the orchestrator suspects a subagent has hung, or whenever a round runs visibly longer than expected, run `head -n 10 wip/heartbeats/*.txt` and read the snapshots before deciding to wait, kill, or intervene. Stale (`ts` > ~10 min old) or unchanged-`phase`-across-checks heartbeats are the canonical "subagent stuck" signal. Surface the snapshot to the user rather than silently killing — a slow legitimate gate is the subagent's responsibility to flag via `expected_duration`, and overruling that without seeing the snapshot is a foot-gun.
 - **On a resumed round, the delegation prompt is a follow-up message, not a fresh delegation.** The subagent has its full prior transcript. Use the `Resume mode` section of the templates: skip persona/spec/plan re-pointers; restate only round-specific context (round identifier, new findings, validation gates, decisions standing).
 - **Fresh subagent fallback**: when a prior subagent ID is no longer accessible (resume fails), spawn fresh, append the new ID under § Subagent IDs with a swap note recording when and why, and continue.
 - **Implementer flags > silent descope.** If the implementer surfaces a deferral request, treat it as a hard pause; do not delegate review with the deferral unaddressed.

@@ -53,6 +53,33 @@ When you receive a resumed follow-up:
 6. **Run the milestone's validation gates** as documented in `plan.md`. The set varies by project — typically a typecheck command, the test command(s) covering the milestone's surface, lint, and a build command if the milestone could break the build. Do not declare done until every gate passes.
 7. **Re-read your work** before reporting back. Confirm: every task in scope is committed, every validation gate passed, the commit log tells a coherent story.
 
+## Heartbeats
+
+You write to `wip/heartbeats/implementer.txt` on a fixed cadence so the orchestrator can detect a stalled round without waiting for your delegation call to return. The file is overwritten in place each ping; one file per role.
+
+**Cadence (at least these triggers):**
+
+1. **First action of the round** — before reading the spec / plan. The heartbeat says you are starting and what you intend to do first.
+2. **Before each long-running shell call** (anything expected to take > ~1 minute: `pnpm install`, `pnpm test:*`, `pnpm build`, cold-cache `pnpm typecheck`, large `git rebase`). The heartbeat names the call and the `expected_duration` so the orchestrator knows when to start worrying.
+3. **After each long-running shell call returns** — record the result (pass / fail / which test failed). This closes the loop and tells the orchestrator the call finished.
+4. **At each task / commit boundary** — note which task you just landed and the commit SHA.
+5. **At least every ~5 minutes during any other work** — including model-side reasoning. If you have been thinking about the same edit or the same conflict resolution for 5 min, write a heartbeat recording your current hypothesis and the next step you plan to take.
+
+**Format** (overwrite, plain `key: value` per line):
+
+```text
+ts: <ISO 8601 UTC timestamp, e.g. 2026-05-01T13:42:17Z>
+role: implementer
+agent_id: <your subagent ID>
+round: <milestone + round identifier, e.g. m3 R2>
+phase: <step you are currently in, e.g. "running pnpm test:packages" or "resolving rebase conflict in decoding.ts">
+last_progress: <last concrete action with citation, e.g. "committed cd5ae1afe" or "edited packages/2-sql/5-runtime/src/codecs/encoding.ts:8">
+next_step: <expected next concrete action, e.g. "run pnpm test:packages" or "stage + commit T3.5">
+expected_duration: <coarse estimate, e.g. "~30s" or "~5min" or "long-running test suite, ~10min">
+```
+
+Use `mkdir -p wip/heartbeats` once at round start; subsequent pings just overwrite the file. Pings are cheap — one file write — so erring on the side of more pings is correct.
+
 ## Pushback policy
 
 When a finding from a prior round (passed in the round-context section of your prompt) conflicts with evidence you have:

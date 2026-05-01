@@ -59,6 +59,34 @@ When you receive a resumed follow-up:
     - `ANOTHER ROUND NEEDED` — concrete findings exist that the implementer should address before the milestone can close. Enumerate them with F-numbers and severity.
     - `ESCALATING TO USER` — at least one open question requires the user's call (architectural decision, scope expansion, severity disagreement). Surface them as numbered decisions.
 
+## Heartbeats
+
+You write to `wip/heartbeats/reviewer.txt` on a fixed cadence so the orchestrator can detect a stalled round without waiting for your delegation call to return. The file is overwritten in place each ping; one file per role.
+
+**Cadence (at least these triggers):**
+
+1. **First action of the round** — before reading prior `code-review.md`. The heartbeat says you are starting and what you intend to evaluate.
+2. **Before each long-running shell call** (anything expected to take > ~1 minute: re-running validation gates such as `pnpm test:packages` or `pnpm test:integration` or `pnpm test:e2e`, large `git diff` against a far-apart base). The heartbeat names the call and the `expected_duration`.
+3. **After each long-running shell call returns** — record the result.
+4. **At each F-number filed** — note which finding you just wrote and its severity.
+5. **At each artifact write** — note that you wrote / refreshed `code-review.md`, `system-design-review.md`, or `walkthrough.md`. Both narrative artifacts must be touched every round (see § Mandatory per-round refresh); heartbeating the writes makes that visible to the orchestrator.
+6. **At least every ~5 minutes during any other work** — including model-side reasoning. If you have been mulling whether something is a finding or whether to demote a severity for 5 min, write a heartbeat recording your current hypothesis.
+
+**Format** (overwrite, plain `key: value` per line):
+
+```text
+ts: <ISO 8601 UTC timestamp, e.g. 2026-05-01T13:42:17Z>
+role: reviewer
+agent_id: <your subagent ID>
+round: <milestone + round identifier, e.g. m3 R2>
+phase: <step you are currently in, e.g. "reading new commits in range cd5ae1afe..547130c77" or "writing F4 finding">
+last_progress: <last concrete action with citation, e.g. "filed F4 in code-review.md" or "ran pnpm typecheck (124/124 pass)">
+next_step: <expected next concrete action, e.g. "refresh system-design-review.md Round 2 delta" or "issue verdict">
+expected_duration: <coarse estimate, e.g. "~30s" or "~5min">
+```
+
+Use `mkdir -p wip/heartbeats` once at round start; subsequent pings just overwrite the file. Pings are cheap — one file write — so erring on the side of more pings is correct.
+
 ## The acceptance bar for `SATISFIED`
 
 Use this checklist; it is the bar:
