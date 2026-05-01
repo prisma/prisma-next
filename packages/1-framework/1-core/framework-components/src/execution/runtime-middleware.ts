@@ -43,18 +43,44 @@ export interface AfterExecuteResult {
 }
 
 /**
+ * Marker interface for family-specific param-ref mutators threaded into
+ * `beforeExecute` as the third argument. The framework treats the mutator
+ * opaquely — it allocates and forwards the family's mutator instance so
+ * `runWithMiddleware` can stay family-agnostic. SQL extends this with
+ * `SqlParamRefMutator` (over `ParamRef`); Mongo extends with
+ * `MongoParamRefMutator` (over `MongoParamRef`).
+ *
+ * Extension authors target the family-specific mutator type, not this
+ * marker.
+ */
+export type ParamRefMutator = {};
+
+/**
  * Family-agnostic middleware SPI parameterized over the plan marker.
  *
  * `TPlan` defaults to the framework `QueryPlan` marker so a generic
  * middleware (e.g. cross-family telemetry) can be authored without
  * naming a family. Family-specific middleware (`SqlMiddleware`,
  * `MongoMiddleware`) narrow `TPlan` to their concrete plan type.
+ *
+ * `TMutator` is the family-specific {@link ParamRefMutator} the runtime
+ * threads into `beforeExecute(plan, ctx, params)` as a third argument.
+ * Existing `(plan)` / `(plan, ctx)` middleware bodies continue to compile
+ * — TypeScript permits assigning a function with fewer parameters to a
+ * function-typed slot that declares more. The third arg is additive.
  */
-export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
+export interface RuntimeMiddleware<
+  TPlan extends QueryPlan = QueryPlan,
+  TMutator extends ParamRefMutator = ParamRefMutator,
+> {
   readonly name: string;
   readonly familyId?: string;
   readonly targetId?: string;
-  beforeExecute?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
+  beforeExecute?(
+    plan: TPlan,
+    ctx: RuntimeMiddlewareContext,
+    params?: TMutator,
+  ): void | Promise<void>;
   onRow?(row: Record<string, unknown>, plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
   afterExecute?(
     plan: TPlan,

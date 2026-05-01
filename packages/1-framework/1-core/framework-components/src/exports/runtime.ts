@@ -13,6 +13,7 @@ export {
 } from '../execution/runtime-error';
 export type {
   AfterExecuteResult,
+  ParamRefMutator,
   RuntimeExecuteOptions,
   RuntimeExecutor,
   RuntimeLog,

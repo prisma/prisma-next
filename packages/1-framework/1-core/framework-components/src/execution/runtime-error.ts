@@ -15,11 +15,20 @@ export interface RuntimeErrorEnvelope extends Error {
  * - `'decode'` — abort fired during `decodeRow` / `decodeField`.
  * - `'stream'` — abort fired between rows or before any codec call
  *   (already-aborted at entry).
+ * - `'beforeExecute'` / `'afterExecute'` / `'onRow'` — abort fired
+ *   on entry to or during the corresponding middleware phase
+ *   (cooperative cancellation per the param-transform seam).
  */
 export const RUNTIME_ABORTED = 'RUNTIME.ABORTED' as const;
 
 /** Discriminator placed in `details.phase` of a `RUNTIME.ABORTED` envelope. */
-export type RuntimeAbortedPhase = 'encode' | 'decode' | 'stream';
+export type RuntimeAbortedPhase =
+  | 'encode'
+  | 'decode'
+  | 'stream'
+  | 'beforeExecute'
+  | 'afterExecute'
+  | 'onRow';
 
 /**
  * Type guard for the runtime-error envelope produced by `runtimeError`.
