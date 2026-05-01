@@ -365,7 +365,7 @@ describe('decodeMongoRow', () => {
   it('passes through subdocument keys the nested document shape does not describe', async () => {
     // The pass-through invariant is structurally additive at every depth, not
     // just the top level. A nested `kind: 'document'` slot decodes the keys
-    // its `fields` enumerates and round-trips the rest. ADR 207 promises
+    // its `fields` enumerates and round-trips the rest. ADR 209 promises
     // future lane work threading concrete value-object subtrees is purely
     // additive, which requires this.
     const registry = registryWithDefaults();
