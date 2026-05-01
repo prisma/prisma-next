@@ -49,11 +49,11 @@ Three changes, each tightly scoped:
 
 **1. Add `params` to the SQL step type.** `SqlMigrationPlanOperationStep` currently carries `{ sql, description, meta? }` and the runner calls `driver.query(step.sql)` with no parameters. Data transforms produce queries with interpolated values from the query builder (where clauses, update sets, defaults), and reusing the driver's parameter binder is strictly safer than rolling a per-driver literal serializer for every type the builder produces. Extend the step type with optional `params?: readonly unknown[]` and thread it through `runExpectationSteps`, `runExecuteSteps`, and `expectationsAreSatisfied`. Pure plumbing, no behavior change for existing call sites.
 
-**2. Lower `createDataTransform` to the unified shape.** At factory time, take the user's check query plan and emit two wrappings: `SELECT EXISTS (<check.sql>) AS ok` for precheck (asserts "work to do"), `SELECT NOT EXISTS (<check.sql>) AS ok` for postcheck (asserts "work done"). The run query plans become execute steps, each with their `params` threaded through. Drop the dead `boolean` branches: narrow `DataTransformOperation.check` from `SerializedQueryPlan | boolean | null` to `SerializedQueryPlan | null` (or fold the field away with the rest of the interface).
+**2. Lower `createDataTransform` to the unified shape.** At factory time, take the user's check query plan and emit two wrappings: `SELECT EXISTS (<check.sql>) AS ok` for precheck (asserts "work to do"), `SELECT NOT EXISTS (<check.sql>) AS ok` for postcheck (asserts "work done"). The run query plans become execute steps, each with their `params` threaded through. The factory's return type changes from `DataTransformOperation` to `SqlMigrationPlanOperation` — the user-facing parameter API is unchanged, only the produced op shape moves.
 
-**3. Delete the runner branch.** Remove `isDataTransformOperation`, the `operationClass === 'data'` dispatch at `runner.ts:239–249`, and the `executeDataTransform` helper at `runner.ts:311–384`. The dispatch becomes dead code as soon as step 2 lands (the type guard explicitly checks for `'check' in op && 'run' in op`, which the new lowered shape doesn't satisfy), so step 3 is pure dead-code removal.
+**3. Delete the runner branch and `DataTransformOperation`.** Remove `isDataTransformOperation`, the `operationClass === 'data'` dispatch at `runner.ts:239–249`, and the `executeDataTransform` helper at `runner.ts:311–384`. Delete the `DataTransformOperation` interface outright — no transitional alias. The dispatch becomes dead code as soon as step 2 lands (the type guard explicitly checks for `'check' in op && 'run' in op`, which the new lowered shape doesn't satisfy), so step 3 is pure dead-code removal.
 
-`operationClass: 'data'` stays in `MigrationOperationClass`. It's the policy/CI/audit discriminator that gates whether destructive data work is allowed in a given run, and the spec's original "make backfills carry the surrounding DDL class" idea was unmotivated outside of class-flow IR concerns. `DataTransformOperation` itself collapses to nothing — every field on the unified op shape is already on the base `SqlMigrationPlanOperation`, with `invariantId` already moving onto base ops post-#404 (manifest-emit reads it; the runner reads `plan.providedInvariants` independently).
+`operationClass: 'data'` stays in `MigrationOperationClass`. It's the policy/CI/audit discriminator that gates whether destructive data work is allowed in a given run, and the spec's original "make backfills carry the surrounding DDL class" idea was unmotivated outside of class-flow IR concerns. `DataTransformOperation` itself has nothing left to carry — every field on the unified op shape is already on the base `SqlMigrationPlanOperation`, with `invariantId` already moving onto base ops post-#404 (manifest-emit reads it; the runner reads `plan.providedInvariants` independently).
 
 A side-effect of the unification: the `runner.ts:184–192` TODO closes for free. After the dispatch deletes, a self-edge data transform whose effect is already in place trips the regular loop's pre-satisfied-skip, which does not increment `operationsExecuted`. `isSelfEdgeNoOp` then fires correctly and the marker + ledger writes are skipped, where today they get written even though nothing observable happened.
 
@@ -67,10 +67,9 @@ A side-effect of the unification: the `runner.ts:184–192` TODO closes for free
   - `execute` = `<run plans>` mapped to steps, `params` preserved
   - `postcheck` = `[{ sql: 'SELECT NOT EXISTS (<check.sql>) AS ok', params: <check.params>, description }]`
 - **FR3.** The Postgres runner has a single execution loop. `isDataTransformOperation`, the `operationClass === 'data'` dispatch at `runner.ts:239–249`, and `executeDataTransform` (`runner.ts:311–384`) are deleted.
-- **FR4.** `DataTransformOperation.check` no longer accepts `boolean`. The dead `=== true` and `=== false` branches in the runner are removed in the same step that deletes `executeDataTransform`.
-- **FR5.** `operationClass: 'data'` remains in `MigrationOperationClass`. Policy gating, CI checks, and the marker/ledger paths that read it continue to work unchanged.
-- **FR6.** `DataTransformOperation` collapses. The `name`, `source`, `check`, and `run` fields are removed; `invariantId` lives on the SQL op the same way it did before (the manifest emitter reads it for `plan.providedInvariants`). Identity for diagnostics flows through `id` (`data_migration.<name>`) and `label`.
-- **FR7.** `ops.json` fixtures emitted by the unified pipeline replace the old DT-shaped fixtures and apply successfully end-to-end.
+- **FR4.** `operationClass: 'data'` remains in `MigrationOperationClass`. Policy gating, CI checks, and the marker/ledger paths that read it continue to work unchanged.
+- **FR5.** `DataTransformOperation` deletes outright — no transitional alias. `createDataTransform` returns `SqlMigrationPlanOperation`. `invariantId` lives on the SQL op the same way it did before (the manifest emitter reads it for `plan.providedInvariants`). Identity for diagnostics flows through `id` (`data_migration.<name>`) and `label`. The dead `=== true` and `=== false` branches in the runner go with the rest of `executeDataTransform`.
+- **FR6.** All in-tree migration fixtures (DT-bearing and otherwise) are re-emitted by the unified pipeline. No `ops.json` schema-version field is introduced; fixture re-emission is the migration strategy. Old `ops.json` files do not need a migration adapter.
 
 ## Non-Functional Requirements
 
@@ -94,11 +93,11 @@ A side-effect of the unification: the `runner.ts:184–192` TODO closes for free
 - [ ] **AC2.** _Idempotent re-apply of a data transform skips its op via the unified pre-satisfied-skip path._ Apply a migration with a DT against a DB where the DT's effect is already in place; the runner records a `postcheck_pre_satisfied` skip record without re-running the execute step. Covers NFR1.
 - [ ] **AC3.** _A failing data transform produces a postcheck failure with operation context._ Apply a DT whose `run` does not resolve the violation the `check` describes; the runner returns `POSTCHECK_FAILED` with `meta.operationId === 'data_migration.<name>'` and a step description naming the DT. Covers NFR1, NFR4.
 - [ ] **AC4.** _Self-edge data-transform no-op detection works._ Apply a self-edge migration whose only operation is a DT whose effect is already in place; the marker `updated_at` is byte-identical and the ledger row count is unchanged. Closes the `runner.ts:184–192` TODO. Covers NFR2.
-- [ ] **AC5.** _`operationClass: 'data'` is preserved._ The enum still includes `'data'`; a policy that omits `'data'` still rejects DT-bearing plans. Covers FR5.
+- [ ] **AC5.** _`operationClass: 'data'` is preserved._ The enum still includes `'data'`; a policy that omits `'data'` still rejects DT-bearing plans. Covers FR4.
 - [ ] **AC6.** _`Step.params` threaded through driver execution._ A DT whose run carries parameter values executes with those values bound through `driver.query(sql, params)`, not inlined into SQL text. Covers FR1.
-- [ ] **AC7.** _Dead boolean check branches are removed._ `DataTransformOperation.check` does not accept `boolean`; no runtime branch on `op.check === true` or `op.check === false` remains. Covers FR4.
-- [ ] **AC8.** _Existing Postgres migration test surfaces pass._ Unit tests under `packages/3-targets/3-targets/postgres/test/migrations/`, integration tests under `packages/3-targets/6-adapters/postgres/test/migrations/`, and `test/integration/test/cli-journeys/data-transform.e2e.test.ts` all pass. Covers FR2, FR6, FR7.
-- [ ] **AC9.** _`ops.json` fixtures match the new shape._ Running `pnpm fixtures:check` after the change passes; in-tree fixtures for DT-bearing migrations have been re-emitted to the unified shape. Covers FR7.
+- [ ] **AC7.** _`DataTransformOperation` is gone._ The interface is not exported from `@prisma-next/framework-components` or any downstream package; no runtime branch on `op.check === true` or `op.check === false` remains. Covers FR5.
+- [ ] **AC8.** _Existing Postgres migration test surfaces pass._ Unit tests under `packages/3-targets/3-targets/postgres/test/migrations/`, integration tests under `packages/3-targets/6-adapters/postgres/test/migrations/`, and `test/integration/test/cli-journeys/data-transform.e2e.test.ts` all pass. Covers FR2, FR5.
+- [ ] **AC9.** _All in-tree fixtures are re-emitted to the new shape._ Running `pnpm fixtures:check` after the change passes; every DT-bearing migration fixture in the tree carries the unified precheck/execute/postcheck shape. Covers FR6.
 
 # Other Considerations
 
@@ -134,5 +133,9 @@ N/A.
 
 # Open Questions
 
-1. **`ops.json` schema versioning.** The original ticket suggested introducing a `schemaVersion` field as a forcing function. Given the prototype scope and that all in-tree fixtures will be re-emitted by `pnpm fixtures:check`, the working assumption is to skip schema versioning for now and rely on fixture re-emission. Confirm before starting if a `schemaVersion` field is wanted regardless.
-2. **`DataTransformOperation` deletion vs. transitional alias.** The spec says the interface deletes outright. If any downstream consumer (CLI formatters, JSON output shapes, tests) imports the type by name, deletion may be sequenced as: type alias → call-site updates → alias deletion. Five-minute grep before starting commit 2 will resolve which form is needed.
+None. All decisions are pinned above.
+
+Two items were resolved before drafting:
+
+1. **`ops.json` schema versioning** → no schema-version field; re-emit all in-tree migration fixtures. Captured in FR6 / AC9.
+2. **`DataTransformOperation` deletion** → outright, no transitional alias. Any downstream consumer that imports the type updates in the same commit. Captured in FR5 / AC7.

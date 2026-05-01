@@ -37,7 +37,7 @@ Acceptance criteria in the spec drive test cases. Existing test surfaces cover m
 | AC4  | TC-4  | Self-edge no-op DT (extends PR #404 idempotency suite)                                                         | Integration     | M1        | After apply, marker `updated_at` is byte-identical; ledger row count unchanged. Confirms `isSelfEdgeNoOp` fires correctly                  |
 | AC5  | TC-5  | Policy gating: a `MigrationOperationPolicy` whose `allowedOperationClasses` omits `'data'`                     | Unit            | M1        | Plan with a DT op rejected with `POLICY_VIOLATION`; the enum still contains `'data'`                                                       |
 | AC6  | TC-6  | Parameterised DT run: spy on `driver.query` for a DT whose run carries non-empty params                        | Integration     | M1        | `driver.query` invoked with `(sql, params)` where `params` is the lowered values; SQL text contains `$1`, `$2`, ... not literal values     |
-| AC7  | TC-7  | Type narrowing: `DataTransformOperation.check` no longer accepts `boolean`                                     | Type / source   | M1        | `check: SerializedQueryPlan \| null` only; no `op.check === true \| false` branches in the runner                                          |
+| AC7  | TC-7  | Source check: `DataTransformOperation` is deleted outright (no transitional alias)                             | Manual / source | M1        | The `DataTransformOperation` symbol is not exported from `framework-components` or any downstream package; no runtime branch on `op.check === true \| false` survives anywhere |
 | AC8  | TC-8  | Existing migration test surfaces pass: unit, adapter integration, e2e                                          | Pre-existing    | M1        | `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration`, `pnpm test:e2e` all green; `data-transform.e2e.test.ts` passes unchanged  |
 | AC9  | TC-9  | Fixtures match new shape                                                                                       | Pre-existing    | M1        | `pnpm fixtures:check` passes; in-tree fixtures for DT-bearing migrations show the new precheck/execute/postcheck shape                     |
 
@@ -49,23 +49,26 @@ The whole project is one milestone delivered as one PR with three commits. Each 
 
 **Tasks:**
 
-- [ ] **1.1** _Five-minute pre-work grep._ Resolve spec **Open Question 2**: search for downstream consumers of `DataTransformOperation` (CLI formatters, JSON output shapes, tests). Determines whether commit 3 deletes the interface outright or routes through a transitional `type DataTransformOperation = SqlMigrationPlanOperation` alias plus call-site updates. _(unblocks: 3.4)_
-- [ ] **1.2** _Add `Step.params` and thread through_ — extend `SqlMigrationPlanOperationStep` with optional `params?: readonly unknown[]`; update `runExpectationSteps`, `runExecuteSteps`, `expectationsAreSatisfied` to call `driver.query(step.sql, step.params ?? [])`. Run `pnpm typecheck` + `pnpm test:packages` to confirm no behavior change for existing callers. **Commit boundary 1.** _(satisfies: TC-6 plumbing)_
-- [ ] **1.3** _Lower `createDataTransform` to unified shape_ — at the factory, take the user `check` plan and emit:
+- [ ] **1.1** _Add `Step.params` and thread through_ — extend `SqlMigrationPlanOperationStep` with optional `params?: readonly unknown[]`; update `runExpectationSteps`, `runExecuteSteps`, `expectationsAreSatisfied` to call `driver.query(step.sql, step.params ?? [])`. Run `pnpm typecheck` + `pnpm test:packages` to confirm no behavior change for existing callers. **Commit boundary 1.** _(satisfies: TC-6 plumbing)_
+- [ ] **1.2** _Lower `createDataTransform` to unified shape_ — at the factory, take the user `check` plan and emit:
   - `precheck = [{ sql: \`SELECT EXISTS (${check.sql}) AS ok\`, params: check.params, description: \`Check ${name} has work to do\` }]`
   - `execute = run.map(plan => ({ sql: plan.sql, params: plan.params, description: \`Run ${name}\` }))`
   - `postcheck = [{ sql: \`SELECT NOT EXISTS (${check.sql}) AS ok\`, params: check.params, description: \`Verify ${name} resolved all violations\` }]`
-  Narrow `DataTransformOperation.check` field type from `SerializedQueryPlan | boolean | null` to `SerializedQueryPlan | null`. Update unit tests for `createDataTransform` to assert the new shape. _(satisfies: TC-2, TC-3, TC-6, TC-7)_
-- [ ] **1.4** _Re-emit in-tree fixtures_ — run `pnpm fixtures:check` (or whichever script the repo uses) and commit the regenerated `ops.json` fixtures alongside 1.3. Verify `data-transform.e2e.test.ts` and the adapter idempotency tests pass on the new fixtures. **Commit boundary 2.** _(satisfies: TC-9)_
-- [ ] **1.5** _Delete the runner branch_ — remove from `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`:
-  - `isDataTransformOperation` type guard at `:47–57`
-  - `operationClass === 'data'` dispatch block at `:239–249`
-  - `executeDataTransform` helper at `:311–384`
-  - The TODO comment at `:184–192`
-  Drop the unused `DataTransformOperation` import. _(satisfies: TC-1, TC-7)_
-- [ ] **1.6** _Collapse the type_ — based on 1.1's grep, either delete `DataTransformOperation` outright or leave it as `type DataTransformOperation = SqlMigrationPlanOperation` until call sites migrate. Drop `name`, `source`, `check`, `run` fields. `invariantId` stays where the manifest emitter reads it. _(satisfies: TC-7)_
-- [ ] **1.7** _Confirm self-edge repair_ — verify the existing PR #404 self-edge no-op idempotency test (`packages/3-targets/6-adapters/postgres/test/migrations/runner.idempotency.integration.test.ts`) still passes and now exercises the natural code path (no DT-special workaround). If the test was previously passing only because of the TODO'd `operationsExecuted` over-counting masking, refine its assertion to pin the new behavior explicitly. **Commit boundary 3.** _(satisfies: TC-4)_
-- [ ] **1.8** _Close-out_ — verify all ACs (above), update the Linear issue with the merged-PR link (the GitHub integration auto-transitions on merge as long as the branch name carries `tml-2292`), strip any references to `projects/unify-data-transforms/` from elsewhere in the repo (no long-lived docs are produced by this project — the spec is internal to the project workspace), and delete `projects/unify-data-transforms/` in the close-out commit (or PR if collected separately).
+  Change the factory's return type from `DataTransformOperation` to `SqlMigrationPlanOperation`. Update unit tests for `createDataTransform` to assert the new shape. _(satisfies: TC-2, TC-3, TC-6)_
+- [ ] **1.3** _Re-emit all in-tree migration fixtures_ — run `pnpm fixtures:check` and commit every regenerated `ops.json` (DT-bearing and otherwise) alongside 1.2. Verify `data-transform.e2e.test.ts` and the adapter idempotency tests pass on the new fixtures. **Commit boundary 2.** _(satisfies: TC-9)_
+- [ ] **1.4** _Delete the DT machinery_ — single-commit removal:
+  - From `packages/3-targets/3-targets/postgres/src/core/migrations/runner.ts`:
+    - `isDataTransformOperation` type guard at `:47–57`
+    - `operationClass === 'data'` dispatch block at `:239–249`
+    - `executeDataTransform` helper at `:311–384`
+    - The TODO comment at `:184–192`
+  - From `packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts`:
+    - `DataTransformOperation` interface — outright deletion, no transitional alias
+  - Audit and update any remaining importers of `DataTransformOperation` in the same commit (most should already be unreachable after 1.2).
+  - Drop the unused `DataTransformOperation` import from `runner.ts` and from `data-transform.ts` if still present.
+  _(satisfies: TC-1, TC-7)_
+- [ ] **1.5** _Confirm self-edge repair_ — verify the existing PR #404 self-edge no-op idempotency test (`packages/3-targets/6-adapters/postgres/test/migrations/runner.idempotency.integration.test.ts`) still passes and now exercises the natural code path (no DT-special workaround). If the test was previously passing only because of the TODO'd `operationsExecuted` over-counting masking, refine its assertion to pin the new behavior explicitly. **Commit boundary 3.** _(satisfies: TC-4)_
+- [ ] **1.6** _Close-out_ — verify all ACs (above), update the Linear issue with the merged-PR link (the GitHub integration auto-transitions on merge as long as the branch name carries `tml-2292`), strip any references to `projects/unify-data-transforms/` from elsewhere in the repo (no long-lived docs are produced by this project — the spec is internal to the project workspace), and delete `projects/unify-data-transforms/` in the close-out commit (or PR if collected separately).
 
 **Validation gate:**
 
@@ -80,7 +83,7 @@ All six commands must pass on the head commit before merging. The first three ar
 
 ## Open Items
 
-- **Spec Open Question 1** — `ops.json` schema versioning. Default assumption: rely on fixture re-emission, no `schemaVersion` field. Confirm with reviewer at PR-open.
-- **Spec Open Question 2** — `DataTransformOperation` deletion vs. transitional alias. Resolved by task 1.1 (the pre-work grep) before commit 3.
-- **Follow-up filed** — diagnostic enrichment for postcheck failures (an optional `step.diagnostic` query) if users miss the today-only "remaining violations" count. Out of scope here; track as a separate ticket if it surfaces.
-- **Follow-up filed** — DDL parameterisation: migrate `SetDefaultCall`, `AddCheckConstraintCall`, partial-index predicates, and other planner sites that currently inline user values onto `Step.params`. Out of scope here; this project only enables it.
+The two spec-level open questions are resolved (no `ops.json` schema-version field — re-emit all fixtures; `DataTransformOperation` deletes outright with no transitional alias). Remaining items are follow-ups, not blockers:
+
+- **Follow-up** — diagnostic enrichment for postcheck failures (an optional `step.diagnostic` query) if users miss the today-only "remaining violations" count. Out of scope here; track as a separate ticket if it surfaces.
+- **Follow-up** — DDL parameterisation: migrate `SetDefaultCall`, `AddCheckConstraintCall`, partial-index predicates, and other planner sites that currently inline user values onto `Step.params`. Out of scope here; this project only enables it.
