@@ -12,8 +12,21 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
+import { aliasDescriptor } from '@prisma-next/framework-components/codec';
 import type { Codec, CodecMeta, CodecTrait } from '@prisma-next/sql-relational-core/ast';
-import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
+import {
+  codec,
+  codecDescriptor,
+  defineCodecDescriptors,
+  defineCodecs,
+  sqlCharDescriptor,
+  sqlCodecDefinitions,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlTextDescriptor,
+  sqlTimestampDescriptor,
+  sqlVarcharDescriptor,
+} from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import {
@@ -656,3 +669,407 @@ export const codecDefinitions = codecs.codecDefinitions;
 export const dataTypes = codecs.dataTypes;
 
 export type CodecTypes = typeof codecs.CodecTypes;
+
+// ---------------------------------------------------------------------------
+// Native CodecDescriptor exports (TML-2357 T2.3). Each postgres target codec
+// gains a sibling `*Descriptor` authored via `codecDescriptor()` (or composed
+// from a SQL base descriptor via `aliasDescriptor`). The legacy codec
+// exports above still flow through the `codecDefinitions[k].codec` surface
+// the postgres adapter + extension consumers read; both shapes ship until
+// the M2 cleanup commit collapses to descriptor-only.
+// ---------------------------------------------------------------------------
+
+const pgTextDescriptor = codecDescriptor<
+  typeof PG_TEXT_CODEC_ID,
+  readonly ['equality', 'order', 'textual'],
+  string,
+  string
+>({
+  codecId: PG_TEXT_CODEC_ID,
+  targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
+});
+
+const pgCharDescriptor = aliasDescriptor(sqlCharDescriptor, {
+  codecId: PG_CHAR_CODEC_ID,
+  targetTypes: ['character'],
+  meta: { db: { sql: { postgres: { nativeType: 'character' } } } },
+});
+
+const pgVarcharDescriptor = aliasDescriptor(sqlVarcharDescriptor, {
+  codecId: PG_VARCHAR_CODEC_ID,
+  targetTypes: ['character varying'],
+  meta: { db: { sql: { postgres: { nativeType: 'character varying' } } } },
+});
+
+const pgIntDescriptor = aliasDescriptor(sqlIntDescriptor, {
+  codecId: PG_INT_CODEC_ID,
+  targetTypes: ['int4'],
+  meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
+});
+
+const pgFloatDescriptor = aliasDescriptor(sqlFloatDescriptor, {
+  codecId: PG_FLOAT_CODEC_ID,
+  targetTypes: ['float8'],
+  meta: { db: { sql: { postgres: { nativeType: 'double precision' } } } },
+});
+
+const pgInt4Descriptor = codecDescriptor<
+  typeof PG_INT4_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+>({
+  codecId: PG_INT4_CODEC_ID,
+  targetTypes: ['int4'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
+});
+
+const pgInt2Descriptor = codecDescriptor<
+  typeof PG_INT2_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+>({
+  codecId: PG_INT2_CODEC_ID,
+  targetTypes: ['int2'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'smallint' } } } },
+});
+
+const pgInt8Descriptor = codecDescriptor<
+  typeof PG_INT8_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+>({
+  codecId: PG_INT8_CODEC_ID,
+  targetTypes: ['int8'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'bigint' } } } },
+});
+
+const pgFloat4Descriptor = codecDescriptor<
+  typeof PG_FLOAT4_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+>({
+  codecId: PG_FLOAT4_CODEC_ID,
+  targetTypes: ['float4'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'real' } } } },
+});
+
+const pgFloat8Descriptor = codecDescriptor<
+  typeof PG_FLOAT8_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  number,
+  number
+>({
+  codecId: PG_FLOAT8_CODEC_ID,
+  targetTypes: ['float8'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'double precision' } } } },
+});
+
+const pgNumericDescriptor = codecDescriptor<
+  typeof PG_NUMERIC_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  string | number,
+  string,
+  { readonly precision: number; readonly scale?: number }
+>({
+  codecId: PG_NUMERIC_CODEC_ID,
+  targetTypes: ['numeric', 'decimal'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value) => value,
+  decode: (wire) => (typeof wire === 'number' ? String(wire) : wire),
+  paramsSchema: numericParamsSchema,
+  renderOutputType: (typeParams) => {
+    const precision = typeParams.precision;
+    if (precision === undefined) return undefined;
+    if (
+      typeof precision !== 'number' ||
+      !Number.isFinite(precision) ||
+      !Number.isInteger(precision)
+    ) {
+      throw new Error(
+        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
+      );
+    }
+    const scale = typeParams.scale;
+    return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
+  },
+  meta: { db: { sql: { postgres: { nativeType: 'numeric' } } } },
+});
+
+const pgTimestampDescriptor = codecDescriptor<
+  typeof PG_TIMESTAMP_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date,
+  Date,
+  { readonly precision?: number }
+>({
+  codecId: PG_TIMESTAMP_CODEC_ID,
+  targetTypes: ['timestamp'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  encodeJson: (value) => value.toISOString(),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+    }
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+    }
+    return date;
+  },
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) =>
+    renderPrecision('Timestamp', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'timestamp without time zone' } } } },
+});
+
+const pgTimestamptzDescriptor = codecDescriptor<
+  typeof PG_TIMESTAMPTZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date,
+  Date,
+  { readonly precision?: number }
+>({
+  codecId: PG_TIMESTAMPTZ_CODEC_ID,
+  targetTypes: ['timestamptz'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  encodeJson: (value) => value.toISOString(),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+    }
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+    }
+    return date;
+  },
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) =>
+    renderPrecision('Timestamptz', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'timestamp with time zone' } } } },
+});
+
+const pgTimeDescriptor = codecDescriptor<
+  typeof PG_TIME_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string,
+  { readonly precision?: number }
+>({
+  codecId: PG_TIME_CODEC_ID,
+  targetTypes: ['time'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Time', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'time' } } } },
+});
+
+const pgTimetzDescriptor = codecDescriptor<
+  typeof PG_TIMETZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string,
+  { readonly precision?: number }
+>({
+  codecId: PG_TIMETZ_CODEC_ID,
+  targetTypes: ['timetz'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) =>
+    renderPrecision('Timetz', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'timetz' } } } },
+});
+
+const pgBoolDescriptor = codecDescriptor<
+  typeof PG_BOOL_CODEC_ID,
+  readonly ['equality', 'boolean'],
+  boolean,
+  boolean
+>({
+  codecId: PG_BOOL_CODEC_ID,
+  targetTypes: ['bool'],
+  traits: ['equality', 'boolean'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  meta: { db: { sql: { postgres: { nativeType: 'boolean' } } } },
+});
+
+const pgBitDescriptor = codecDescriptor<
+  typeof PG_BIT_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string,
+  { readonly length?: number }
+>({
+  codecId: PG_BIT_CODEC_ID,
+  targetTypes: ['bit'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('Bit', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'bit' } } } },
+});
+
+const pgVarbitDescriptor = codecDescriptor<
+  typeof PG_VARBIT_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string,
+  { readonly length?: number }
+>({
+  codecId: PG_VARBIT_CODEC_ID,
+  targetTypes: ['bit varying'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('VarBit', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'bit varying' } } } },
+});
+
+const pgEnumDescriptor = codecDescriptor<
+  typeof PG_ENUM_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string,
+  { readonly values?: readonly unknown[] }
+>({
+  codecId: PG_ENUM_CODEC_ID,
+  targetTypes: ['enum'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => wire,
+  renderOutputType: (typeParams) => {
+    const values = typeParams.values;
+    if (!Array.isArray(values)) {
+      throw new Error(
+        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
+      );
+    }
+    return values
+      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+      .join(' | ');
+  },
+});
+
+const pgIntervalDescriptor = codecDescriptor<
+  typeof PG_INTERVAL_CODEC_ID,
+  readonly ['equality', 'order'],
+  string | Record<string, unknown>,
+  string,
+  { readonly precision?: number }
+>({
+  codecId: PG_INTERVAL_CODEC_ID,
+  targetTypes: ['interval'],
+  traits: ['equality', 'order'],
+  encode: (value) => value,
+  decode: (wire) => (typeof wire === 'string' ? wire : JSON.stringify(wire)),
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) =>
+    renderPrecision('Interval', typeParams as Record<string, unknown>),
+  meta: { db: { sql: { postgres: { nativeType: 'interval' } } } },
+});
+
+const pgJsonDescriptor = codecDescriptor<
+  typeof PG_JSON_CODEC_ID,
+  readonly [],
+  string | JsonValue,
+  JsonValue
+>({
+  codecId: PG_JSON_CODEC_ID,
+  targetTypes: ['json'],
+  traits: [],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: { db: { sql: { postgres: { nativeType: 'json' } } } },
+});
+
+const pgJsonbDescriptor = codecDescriptor<
+  typeof PG_JSONB_CODEC_ID,
+  readonly ['equality'],
+  string | JsonValue,
+  JsonValue
+>({
+  codecId: PG_JSONB_CODEC_ID,
+  targetTypes: ['jsonb'],
+  traits: ['equality'],
+  encode: (value) => JSON.stringify(value),
+  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  meta: { db: { sql: { postgres: { nativeType: 'jsonb' } } } },
+});
+
+const codecDescriptorsBuilder = defineCodecDescriptors()
+  .add('char', sqlCharDescriptor)
+  .add('varchar', sqlVarcharDescriptor)
+  .add('int', sqlIntDescriptor)
+  .add('float', sqlFloatDescriptor)
+  .add('sql-text', sqlTextDescriptor)
+  .add('sql-timestamp', sqlTimestampDescriptor)
+  .add('text', pgTextDescriptor)
+  .add('character', pgCharDescriptor)
+  .add('character varying', pgVarcharDescriptor)
+  .add('integer', pgIntDescriptor)
+  .add('double precision', pgFloatDescriptor)
+  .add('int4', pgInt4Descriptor)
+  .add('int2', pgInt2Descriptor)
+  .add('int8', pgInt8Descriptor)
+  .add('float4', pgFloat4Descriptor)
+  .add('float8', pgFloat8Descriptor)
+  .add('numeric', pgNumericDescriptor)
+  .add('timestamp', pgTimestampDescriptor)
+  .add('timestamptz', pgTimestamptzDescriptor)
+  .add('time', pgTimeDescriptor)
+  .add('timetz', pgTimetzDescriptor)
+  .add('bool', pgBoolDescriptor)
+  .add('bit', pgBitDescriptor)
+  .add('bit varying', pgVarbitDescriptor)
+  .add('interval', pgIntervalDescriptor)
+  .add('enum', pgEnumDescriptor)
+  .add('json', pgJsonDescriptor)
+  .add('jsonb', pgJsonbDescriptor);
+
+/**
+ * Descriptor view of the postgres target codecs, keyed by scalar name.
+ * Mirrors {@link codecDefinitions} for the descriptor shape (TML-2357
+ * T2.3); the runtime contributor protocol switches to consume this map
+ * once the unified `codecs:` slot lands later in M2.
+ */
+export const codecDescriptorDefinitions = codecDescriptorsBuilder.codecDefinitions;
+
+/**
+ * Flat array of every postgres target codec descriptor — ready to feed
+ * into a contributor's unified `codecs:` slot.
+ */
+export const codecDescriptorList = codecDescriptorsBuilder.descriptors;
