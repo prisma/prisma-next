@@ -41,8 +41,9 @@ export function getDb(): Db {
 // Drop the cached client whenever Vite re-executes this module so HMR after a
 // contract re-emit rebuilds the runtime against the fresh contractJson instead
 // of reusing the stale one.
-// TODO(APR-VP3-07): replace this example-local cache with a hash-keyed dev
+// TODO(TML-2368): replace this example-local cache with a hash-keyed dev
 // helper shared across frameworks.
+// https://linear.app/prisma-company/issue/TML-2368
 if (import.meta.hot) {
   import.meta.hot.dispose(async () => {
     if (cached) {
