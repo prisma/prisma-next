@@ -18,32 +18,32 @@ test('CodecCallContext does not declare a `column` field (SQL-family concept)', 
   expectTypeOf<Keys>().not.toExtend<'column'>();
 });
 
-test('Codec.encode accepts an optional CodecCallContext as a second argument', () => {
+test('Codec.encode requires a CodecCallContext as a second argument', () => {
   type EncodeParams = Parameters<Codec<'demo/x@1', readonly [], string, string>['encode']>;
   expectTypeOf<EncodeParams[0]>().toEqualTypeOf<string>();
-  expectTypeOf<EncodeParams[1]>().toEqualTypeOf<CodecCallContext | undefined>();
+  expectTypeOf<EncodeParams[1]>().toEqualTypeOf<CodecCallContext>();
 });
 
-test('Codec.decode accepts an optional CodecCallContext as a second argument', () => {
+test('Codec.decode requires a CodecCallContext as a second argument', () => {
   type DecodeParams = Parameters<Codec<'demo/x@1', readonly [], string, string>['decode']>;
   expectTypeOf<DecodeParams[0]>().toEqualTypeOf<string>();
-  expectTypeOf<DecodeParams[1]>().toEqualTypeOf<CodecCallContext | undefined>();
+  expectTypeOf<DecodeParams[1]>().toEqualTypeOf<CodecCallContext>();
 });
 
-test('single-arg encode/decode call sites still typecheck (additive arg)', () => {
+test('encode/decode call sites accept an explicit ctx (signal optional inside the ctx)', () => {
   type StringCodec = Codec<'demo/text@1', readonly [], string, string>;
-  // The codec interface only declares the method signature; we exercise it
-  // here by asserting the call shape compiles for both arities.
-  const encodeNoCtx = (c: StringCodec, v: string): Promise<string> => c.encode(v);
   const encodeWithCtx = (c: StringCodec, v: string, ctx: CodecCallContext): Promise<string> =>
     c.encode(v, ctx);
-  const decodeNoCtx = (c: StringCodec, w: string): Promise<string> => c.decode(w);
   const decodeWithCtx = (c: StringCodec, w: string, ctx: CodecCallContext): Promise<string> =>
     c.decode(w, ctx);
-  void encodeNoCtx;
+  // An empty ctx is legal — `signal` is the only field today and is optional
+  // inside the context shape.
+  const encodeWithEmptyCtx = (c: StringCodec, v: string): Promise<string> => c.encode(v, {});
+  const decodeWithEmptyCtx = (c: StringCodec, w: string): Promise<string> => c.decode(w, {});
   void encodeWithCtx;
-  void decodeNoCtx;
   void decodeWithCtx;
+  void encodeWithEmptyCtx;
+  void decodeWithEmptyCtx;
 });
 
 // ADR 204 walk-back constraints — pinned here so future refactors cannot

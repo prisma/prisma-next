@@ -10,7 +10,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
-    expect(await c.encode('hi')).toBe('HI');
+    expect(await c.encode('hi', {})).toBe('HI');
   });
 
   it('forwards ctx (signal + column) to a `(value, ctx)` encode author', async () => {
@@ -73,10 +73,10 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     expect(observedSignal).toBe(controller.signal);
   });
 
-  it('omitted ctx surfaces as undefined to a ctx-bearing author', async () => {
+  it('forwards an empty ctx (no signal, no column) as-is to a ctx-bearing author', async () => {
     let observed: unknown = 'sentinel';
     const c = codec({
-      typeId: 'demo/undef-ctx@1',
+      typeId: 'demo/empty-ctx@1',
       targetTypes: ['text'],
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
@@ -84,8 +84,9 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
       },
       decode: (wire: string) => wire,
     });
-    await c.encode('x');
-    expect(observed).toBeUndefined();
+    const ctx: SqlCodecCallContext = {};
+    await c.encode('x', ctx);
+    expect(observed).toBe(ctx);
   });
 
   it('async ctx-bearing encode resolves with the produced value', async () => {

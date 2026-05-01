@@ -105,8 +105,8 @@ export interface Codec<
   TParams = Record<string, unknown>,
   THelper = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
-  encode(value: TInput, ctx?: SqlCodecCallContext): Promise<TWire>;
-  decode(wire: TWire, ctx?: SqlCodecCallContext): Promise<TInput>;
+  encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
+  decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -269,8 +269,8 @@ export function codec<
   config: {
     typeId: Id;
     targetTypes: readonly string[];
-    encode: (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
-    decode: (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
+    encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
     meta?: CodecMeta;
     paramsSchema?: Type<TParams>;
     init?: (params: TParams) => THelper;
@@ -279,10 +279,12 @@ export function codec<
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
-  // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
-  // signal) constructs `codecCtx = undefined`, so authors must accept
-  // undefined. Authors that don't reference ctx are still legal because
-  // function parameters are bivariant on optional trailing args.
+  // The runtime allocates one `SqlCodecCallContext` per `runtime.execute()`
+  // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
+  // and threads it as a non-optional reference to every codec call. The
+  // author surface keeps the second parameter optional so single-arg
+  // `(value) => …` authors continue to satisfy the signature via
+  // TypeScript's bivariance for trailing parameters.
   const userEncode = config.encode;
   const userDecode = config.decode;
   // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the

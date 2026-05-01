@@ -10,7 +10,7 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: (wire: string) => wire,
     });
 
-    const encoded = c.encode!('hello');
+    const encoded = c.encode!('hello', {});
     expect(encoded).toBeInstanceOf(Promise);
     expect(await encoded).toBe('HELLO');
   });
@@ -23,7 +23,7 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: (wire: string) => wire.toLowerCase(),
     });
 
-    const decoded = c.decode('WORLD');
+    const decoded = c.decode('WORLD', {});
     expect(decoded).toBeInstanceOf(Promise);
     expect(await decoded).toBe('world');
   });
@@ -36,7 +36,7 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: (wire: string) => wire,
     });
 
-    const encoded = c.encode!('hello');
+    const encoded = c.encode!('hello', {});
     expect(encoded).toBeInstanceOf(Promise);
     expect(await encoded).toBe('HELLO');
   });
@@ -49,7 +49,7 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: async (wire: string) => wire.toLowerCase(),
     });
 
-    const decoded = c.decode('WORLD');
+    const decoded = c.decode('WORLD', {});
     expect(decoded).toBeInstanceOf(Promise);
     expect(await decoded).toBe('world');
   });
@@ -62,10 +62,10 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: async (wire: string) => wire.toUpperCase(),
     });
 
-    expect(c.encode!('a')).toBeInstanceOf(Promise);
-    expect(c.decode('a')).toBeInstanceOf(Promise);
-    expect(await c.encode!('a')).toBe('a');
-    expect(await c.decode('a')).toBe('A');
+    expect(c.encode!('a', {})).toBeInstanceOf(Promise);
+    expect(c.decode('a', {})).toBeInstanceOf(Promise);
+    expect(await c.encode!('a', {})).toBe('a');
+    expect(await c.decode('a', {})).toBe('A');
   });
 
   it('accepts a mix of async encode + sync decode', async () => {
@@ -76,10 +76,10 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
       decode: (wire: string) => wire,
     });
 
-    expect(c.encode!('a')).toBeInstanceOf(Promise);
-    expect(c.decode('a')).toBeInstanceOf(Promise);
-    expect(await c.encode!('a')).toBe('A');
-    expect(await c.decode('a')).toBe('a');
+    expect(c.encode!('a', {})).toBeInstanceOf(Promise);
+    expect(c.decode('a', {})).toBeInstanceOf(Promise);
+    expect(await c.encode!('a', {})).toBe('A');
+    expect(await c.decode('a', {})).toBe('a');
   });
 
   it('passes encodeJson and decodeJson through as synchronous methods', () => {

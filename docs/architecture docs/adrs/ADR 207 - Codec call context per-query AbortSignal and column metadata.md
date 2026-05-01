@@ -96,9 +96,9 @@ export interface SqlCodecCallContext extends CodecCallContext {
 }
 ```
 
-The framework `Codec` declares `encode(value, ctx?: CodecCallContext)` / `decode(wire, ctx?: CodecCallContext)`. The SQL `Codec` redeclares both methods with `ctx?: SqlCodecCallContext`. Method-syntax declarations are bivariant under TypeScript's `strictFunctionTypes`, so the SQL interface narrows the parameter type without an unsound cast.
+The framework `Codec` declares `encode(value, ctx: CodecCallContext)` / `decode(wire, ctx: CodecCallContext)`. The SQL `Codec` redeclares both methods with `ctx: SqlCodecCallContext`. Method-syntax declarations are bivariant under TypeScript's `strictFunctionTypes`, so the SQL interface narrows the parameter type without an unsound cast.
 
-Existing single-arg codec authors compile and run unchanged. Two-arg authors observe the per-call context.
+Only the user-facing `runtime.execute(plan, { signal? })` boundary keeps `signal` optional; every internal interface flowing from there — including the codec dispatch surface — declares `ctx` as **non-optional**. The runtime allocates one `CodecCallContext` per `runtime.execute()` call (an empty `{}` when no `signal` was supplied) and threads it as a non-optional reference to every codec call. Codec authors who write `(value) => …` continue to compile via TypeScript's bivariance for trailing parameters, so single-arg author ergonomics are unchanged. Two-arg authors observe the per-call context.
 
 ### `runtime.execute(plan, { signal? })`
 
@@ -244,7 +244,7 @@ ADR 204 enumerates seven shapes the public codec surface must not regrow as conc
 | ADR 204 walk-back constraint                                                                         | Held?                                                                                |
 | ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | No `TRuntime` generic on `Codec`                                                                     | Held — `Codec` retains exactly four type parameters.                                 |
-| No `kind` / `runtime` discriminator field on `Codec`                                                 | Held — `ctx?` is a method parameter, not an interface field.                         |
+| No `kind` / `runtime` discriminator field on `Codec`                                                 | Held — `ctx` is a method parameter, not an interface field.                          |
 | No conditional return types on `encode` / `decode`                                                   | Held — return types remain `Promise<TWire>` / `Promise<TInput>` regardless of arity. |
 | No exported sync-vs-async predicates                                                                 | Held — no new predicates exported.                                                   |
 | No `Codec.context` alias tying context shape to async-ness                                           | Held — `CodecCallContext` is a named context interface, not a `Codec.context` alias. |
@@ -252,7 +252,7 @@ ADR 204 enumerates seven shapes the public codec surface must not regrow as conc
 | `Codec` retains exactly four type parameters                                                         | Held.                                                                                |
 
 
-The optional second-arg shape doesn't tie context to async-ness or runtime-shape; it adds a per-call value the dispatch surface threads orthogonally. The future additive `codecSync()` opt-in ADR 204 framed remains available — `codecSync({ encode: (value, ctx?) => … })` is the natural extension if the sync fast-path lands later.
+The required second-arg shape on the `Codec` interface doesn't tie context to async-ness or runtime-shape; it adds a per-call value the dispatch surface threads orthogonally. Single-arg author functions remain legal via bivariance for trailing parameters. The future additive `codecSync()` opt-in ADR 204 framed remains available — `codecSync({ encode: (value, ctx) => … })` is the natural extension if the sync fast-path lands later.
 
 ## References and implementation pointers
 

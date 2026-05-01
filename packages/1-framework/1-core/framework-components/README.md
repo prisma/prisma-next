@@ -38,7 +38,7 @@ There is no `runtime` / `kind` / equivalent async marker on the interface and no
 
 ### Codec call context (`ctx`)
 
-Codecs receive a second options argument; you may ignore it. The runtime allocates one `CodecCallContext` per `execute()` call and threads the same reference to every codec dispatch site. The framework `CodecCallContext` is signal-only:
+Codecs receive a second `ctx` options argument; you may ignore it. The runtime allocates one `CodecCallContext` per `execute()` call and threads the same reference to every codec dispatch site as a non-optional argument — when no `signal` is supplied the runtime still threads an empty `{}`, never `undefined`. The framework `CodecCallContext` is signal-only:
 
 ```ts
 export interface CodecCallContext {
@@ -46,7 +46,16 @@ export interface CodecCallContext {
 }
 ```
 
-Family layers extend it where they have a per-call concept that doesn't generalise. SQL declares `SqlCodecCallContext extends CodecCallContext { column?: SqlColumnRef }` (see `@prisma-next/sql-relational-core`); Mongo continues to use the framework type directly. Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to network SDKs:
+The internal `Codec` interface declares the parameter as required:
+
+```ts
+encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
+decode(wire: TWire, ctx: CodecCallContext): Promise<TInput>;
+```
+
+Codec authors who write `(value) => …` continue to compile via TypeScript's bivariance for trailing parameters; nothing at the author surface changes.
+
+Family layers extend the context where they have a per-call concept that doesn't generalise. SQL declares `SqlCodecCallContext extends CodecCallContext { column?: SqlColumnRef }` (see `@prisma-next/sql-relational-core`); Mongo continues to use the framework type directly. Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to network SDKs:
 
 ```ts
 // Sketch — actual factory lives in a family package (codec() / mongoCodec()).

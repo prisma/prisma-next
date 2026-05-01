@@ -67,16 +67,18 @@ export function mongoCodec<
     typeId: Id;
     targetTypes: readonly string[];
     traits?: TTraits;
-    encode: (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
-    decode: (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
+    encode: (value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>;
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
-  // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
-  // signal) constructs `codecCtx = undefined`, so authors must accept
-  // undefined. Authors that don't reference ctx are still legal because
-  // function parameters are bivariant on optional trailing args.
+  // The runtime allocates one `CodecCallContext` per `runtime.execute()`
+  // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
+  // and threads it as a non-optional reference to every codec call. The
+  // author surface keeps the second parameter optional so single-arg
+  // `(value) => …` authors continue to satisfy the signature via
+  // TypeScript's bivariance for trailing parameters.
   const userEncode = config.encode;
   const userDecode = config.decode;
   const widenedConfig = config as {

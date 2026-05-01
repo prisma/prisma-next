@@ -16,8 +16,8 @@ describe('codec factory', () => {
       targetTypes: testCodec.targetTypes,
       hasEncode: testCodec.encode !== undefined,
       hasDecode: testCodec.decode !== undefined,
-      encodeResult: await testCodec.encode('hello'),
-      decodeResult: await testCodec.decode('WORLD'),
+      encodeResult: await testCodec.encode('hello', {}),
+      decodeResult: await testCodec.decode('WORLD', {}),
     }).toMatchObject({
       id: 'test/type@1',
       targetTypes: ['text'],

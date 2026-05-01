@@ -15,8 +15,8 @@ describe('mongoCodec()', () => {
     expect(codec.id).toBe('test/string@1');
     expect(codec.targetTypes).toEqual(['string']);
     expect(codec.traits).toBeUndefined();
-    expect(await codec.decode('hello')).toBe('hello');
-    expect(await codec.encode('hello')).toBe('hello');
+    expect(await codec.decode('hello', {})).toBe('hello');
+    expect(await codec.encode('hello', {})).toBe('hello');
   });
 
   it('creates a codec with encode and decode', async () => {
@@ -27,8 +27,8 @@ describe('mongoCodec()', () => {
       encode: (value: string) => value.toLowerCase(),
     });
 
-    expect(await codec.decode('hello')).toBe('HELLO');
-    expect(await codec.encode('HELLO')).toBe('hello');
+    expect(await codec.decode('hello', {})).toBe('HELLO');
+    expect(await codec.encode('HELLO', {})).toBe('hello');
   });
 
   it('lifts sync author functions to Promise-returning methods', () => {
@@ -39,8 +39,8 @@ describe('mongoCodec()', () => {
       encode: (value: string) => value,
     });
 
-    const decoded = codec.decode('x');
-    const encoded = codec.encode('y');
+    const decoded = codec.decode('x', {});
+    const encoded = codec.encode('y', {});
     expect(typeof (decoded as { then?: unknown }).then).toBe('function');
     expect(typeof (encoded as { then?: unknown }).then).toBe('function');
   });
@@ -53,8 +53,8 @@ describe('mongoCodec()', () => {
       encode: async (value: string) => `encoded:${value}`,
     });
 
-    expect(await codec.decode('a')).toBe('decoded:a');
-    expect(await codec.encode('b')).toBe('encoded:b');
+    expect(await codec.decode('a', {})).toBe('decoded:a');
+    expect(await codec.encode('b', {})).toBe('encoded:b');
   });
 });
 

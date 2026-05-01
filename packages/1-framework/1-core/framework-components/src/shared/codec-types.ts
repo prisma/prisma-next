@@ -70,10 +70,10 @@ export interface Codec<
   readonly targetTypes: readonly string[];
   /** Semantic traits for operator gating (e.g. equality, order, numeric). */
   readonly traits?: TTraits;
-  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation; family layers may narrow the ctx to extend it (e.g. SQL adds `column`). */
-  encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>;
-  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The optional {@link CodecCallContext} carries per-query cancellation; family layers may narrow the ctx to extend it (e.g. SQL adds `column`). */
-  decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>;
+  /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(value) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
+  encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
+  /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(wire) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
+  decode(wire: TWire, ctx: CodecCallContext): Promise<TInput>;
   /** Converts a JS value to a JSON-safe representation for contract serialization. Synchronous; called during contract emission. */
   encodeJson(value: TInput): JsonValue;
   /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `validateContract`. */

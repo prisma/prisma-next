@@ -1,3 +1,4 @@
+import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { codecDefinitions } from '../src/core/codecs';
 
@@ -37,86 +38,86 @@ describe('adapter-postgres codecs', () => {
 
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
-      encode: (value: Date) => Promise<Date>;
-      decode: (wire: Date) => Promise<Date>;
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
 
     it('encodes Date values as-is', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.encode(date)).toBe(date);
+      expect(await timestampCodec.encode(date, {})).toBe(date);
     });
 
     it('decodes Date values as-is', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.decode(date)).toBe(date);
+      expect(await timestampCodec.decode(date, {})).toBe(date);
     });
   });
 
   describe('sql-timestamp codec', () => {
     const timestampCodec = codecDefinitions['sql-timestamp'].codec as {
-      encode: (value: Date) => Promise<Date>;
-      decode: (wire: Date) => Promise<Date>;
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
 
     it('round-trips Date values', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.encode(date)).toBe(date);
-      expect(await timestampCodec.decode(date)).toBe(date);
+      expect(await timestampCodec.encode(date, {})).toBe(date);
+      expect(await timestampCodec.decode(date, {})).toBe(date);
     });
   });
 
   describe('timestamptz codec', () => {
     const timestamptzCodec = codecDefinitions.timestamptz.codec as {
-      encode: (value: Date) => Promise<Date>;
-      decode: (wire: Date) => Promise<Date>;
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
 
     it('round-trips Date values', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestamptzCodec.encode(date)).toBe(date);
-      expect(await timestamptzCodec.decode(date)).toBe(date);
+      expect(await timestamptzCodec.encode(date, {})).toBe(date);
+      expect(await timestamptzCodec.decode(date, {})).toBe(date);
     });
   });
 
   describe('json codec', () => {
     const jsonCodec = codecDefinitions.json.codec as {
-      encode: (value: unknown) => Promise<string>;
-      decode: (wire: string | unknown) => Promise<unknown>;
+      encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string | unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
     };
 
     it('encodes object to JSON string', async () => {
-      expect(await jsonCodec.encode({ key: 'value', nested: { ok: true } })).toBe(
+      expect(await jsonCodec.encode({ key: 'value', nested: { ok: true } }, {})).toBe(
         '{"key":"value","nested":{"ok":true}}',
       );
     });
 
     it('decodes JSON string to object', async () => {
-      expect(await jsonCodec.decode('{"key":"value"}')).toEqual({ key: 'value' });
+      expect(await jsonCodec.decode('{"key":"value"}', {})).toEqual({ key: 'value' });
     });
 
     it('passes through already-decoded values', async () => {
-      expect(await jsonCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
+      expect(await jsonCodec.decode({ key: 'value' }, {})).toEqual({ key: 'value' });
     });
   });
 
   describe('jsonb codec', () => {
     const jsonbCodec = codecDefinitions.jsonb.codec as {
-      encode: (value: unknown) => Promise<string>;
-      decode: (wire: string | unknown) => Promise<unknown>;
+      encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string | unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
     };
 
     it('encodes arrays and null values', async () => {
-      expect(await jsonbCodec.encode([1, null, { active: false }])).toBe(
+      expect(await jsonbCodec.encode([1, null, { active: false }], {})).toBe(
         '[1,null,{"active":false}]',
       );
     });
 
     it('decodes JSON string to array', async () => {
-      expect(await jsonbCodec.decode('[1,true,{"x":1}]')).toEqual([1, true, { x: 1 }]);
+      expect(await jsonbCodec.decode('[1,true,{"x":1}]', {})).toEqual([1, true, { x: 1 }]);
     });
 
     it('passes through already-decoded values', async () => {
-      expect(await jsonbCodec.decode({ key: 'value' })).toEqual({ key: 'value' });
+      expect(await jsonbCodec.decode({ key: 'value' }, {})).toEqual({ key: 'value' });
     });
   });
 
@@ -127,11 +128,11 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'enum', value: 'ADMIN' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecDefinitions[scalar].codec as {
-        encode: (input: string) => Promise<string>;
-        decode: (input: string) => Promise<string>;
+        encode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
+        decode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
       };
-      expect(await codec.encode(value)).toBe(value);
-      expect(await codec.decode(value)).toBe(value);
+      expect(await codec.encode(value, {})).toBe(value);
+      expect(await codec.decode(value, {})).toBe(value);
     });
 
     it.each([
@@ -142,175 +143,175 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'float8', value: Math.E },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
       const codec = codecDefinitions[scalar].codec as {
-        encode: (input: number) => Promise<number>;
-        decode: (input: number) => Promise<number>;
+        encode: (input: number, ctx: SqlCodecCallContext) => Promise<number>;
+        decode: (input: number, ctx: SqlCodecCallContext) => Promise<number>;
       };
-      expect(await codec.encode(value)).toBe(value);
-      expect(await codec.decode(value)).toBe(value);
+      expect(await codec.encode(value, {})).toBe(value);
+      expect(await codec.decode(value, {})).toBe(value);
     });
 
     it('keeps boolean values unchanged', async () => {
       const boolCodec = codecDefinitions.bool.codec as {
-        encode: (input: boolean) => Promise<boolean>;
-        decode: (input: boolean) => Promise<boolean>;
+        encode: (input: boolean, ctx: SqlCodecCallContext) => Promise<boolean>;
+        decode: (input: boolean, ctx: SqlCodecCallContext) => Promise<boolean>;
       };
-      expect(await boolCodec.encode(true)).toBe(true);
-      expect(await boolCodec.decode(false)).toBe(false);
+      expect(await boolCodec.encode(true, {})).toBe(true);
+      expect(await boolCodec.decode(false, {})).toBe(false);
     });
   });
 
   describe('character codec', () => {
     const charCodec = codecDefinitions.character.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = 'A';
-      const encoded = await charCodec.encode(value);
+      const encoded = await charCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = 'Z';
-      const decoded = await charCodec.decode(value);
+      const decoded = await charCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('character varying codec', () => {
     const varcharCodec = codecDefinitions['character varying'].codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = 'hello';
-      const encoded = await varcharCodec.encode(value);
+      const encoded = await varcharCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = 'world';
-      const decoded = await varcharCodec.decode(value);
+      const decoded = await varcharCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('numeric codec', () => {
     const numericCodec = codecDefinitions.numeric.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string | number) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string | number, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '123.45';
-      const encoded = await numericCodec.encode(value);
+      const encoded = await numericCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes number to string', async () => {
-      const decoded = await numericCodec.decode(42);
+      const decoded = await numericCodec.decode(42, {});
       expect(decoded).toBe('42');
     });
   });
 
   describe('time codec', () => {
     const timeCodec = codecDefinitions.time.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '12:34:56';
-      const encoded = await timeCodec.encode(value);
+      const encoded = await timeCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = '23:59:59';
-      const decoded = await timeCodec.decode(value);
+      const decoded = await timeCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('timetz codec', () => {
     const timetzCodec = codecDefinitions.timetz.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '12:34:56+02';
-      const encoded = await timetzCodec.encode(value);
+      const encoded = await timetzCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = '23:59:59-05';
-      const decoded = await timetzCodec.decode(value);
+      const decoded = await timetzCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('bit codec', () => {
     const bitCodec = codecDefinitions.bit.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '1010';
-      const encoded = await bitCodec.encode(value);
+      const encoded = await bitCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = '0101';
-      const decoded = await bitCodec.decode(value);
+      const decoded = await bitCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('bit varying codec', () => {
     const varbitCodec = codecDefinitions['bit varying'].codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '11110000';
-      const encoded = await varbitCodec.encode(value);
+      const encoded = await varbitCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = '00001111';
-      const decoded = await varbitCodec.decode(value);
+      const decoded = await varbitCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
   });
 
   describe('interval codec', () => {
     const intervalCodec = codecDefinitions.interval.codec as {
-      encode: (value: string) => Promise<string>;
-      decode: (wire: string | Record<string, unknown>) => Promise<string>;
+      encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
+      decode: (wire: string | Record<string, unknown>, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
       const value = '1 day';
-      const encoded = await intervalCodec.encode(value);
+      const encoded = await intervalCodec.encode(value, {});
       expect(encoded).toBe(value);
     });
 
     it('decodes string as-is', async () => {
       const value = '2 hours';
-      const decoded = await intervalCodec.decode(value);
+      const decoded = await intervalCodec.decode(value, {});
       expect(decoded).toBe(value);
     });
 
     it('serializes object wire values to JSON strings', async () => {
-      const decoded = await intervalCodec.decode({ hours: 2, minutes: 30 });
+      const decoded = await intervalCodec.decode({ hours: 2, minutes: 30 }, {});
       expect(decoded).toBe('{"hours":2,"minutes":30}');
     });
   });
@@ -485,14 +486,14 @@ describe('adapter-postgres codecs', () => {
 
   describe('numeric codec decode', () => {
     const numericCodec = codecDefinitions.numeric.codec as {
-      decode: (wire: string | number) => Promise<string>;
+      decode: (wire: string | number, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it.each([
       { wire: 42, expected: '42' },
       { wire: '123.45', expected: '123.45' },
     ])('decodes $wire to $expected', async ({ wire, expected }) => {
-      expect(await numericCodec.decode(wire)).toBe(expected);
+      expect(await numericCodec.decode(wire, {})).toBe(expected);
     });
   });
 });

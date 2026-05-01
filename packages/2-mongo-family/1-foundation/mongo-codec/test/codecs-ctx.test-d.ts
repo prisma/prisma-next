@@ -16,7 +16,7 @@ test('mongoCodec() accepts a `(value, ctx)` encode author', () => {
     decode: (wire: string) => wire,
   });
   expectTypeOf(c.encode).toBeFunction();
-  expectTypeOf<Parameters<typeof c.encode>[1]>().toEqualTypeOf<CodecCallContext | undefined>();
+  expectTypeOf<Parameters<typeof c.encode>[1]>().toEqualTypeOf<CodecCallContext>();
 });
 
 test('mongoCodec() accepts a `(value, ctx)` decode author', () => {
@@ -26,7 +26,7 @@ test('mongoCodec() accepts a `(value, ctx)` decode author', () => {
     encode: (value: string) => value,
     decode: (wire: string, _ctx?: CodecCallContext) => wire,
   });
-  expectTypeOf<Parameters<typeof c.decode>[1]>().toEqualTypeOf<CodecCallContext | undefined>();
+  expectTypeOf<Parameters<typeof c.decode>[1]>().toEqualTypeOf<CodecCallContext>();
 });
 
 test('mongoCodec() accepts a single-arg `(value)` encode author and exposes a Promise method', () => {
@@ -37,4 +37,20 @@ test('mongoCodec() accepts a single-arg `(value)` encode author and exposes a Pr
     decode: (wire: string) => wire,
   });
   expectTypeOf<ReturnType<typeof c.encode>>().toExtend<Promise<string>>();
+});
+
+test('MongoCodec.encode and MongoCodec.decode require a ctx argument', () => {
+  const c = mongoCodec({
+    typeId: 'demo/require-ctx@1',
+    targetTypes: ['string'],
+    encode: (value: string) => value,
+    decode: (wire: string) => wire,
+  });
+  // @ts-expect-error — ctx is non-optional on the MongoCodec interface
+  c.encode('x');
+  // @ts-expect-error — ctx is non-optional on the MongoCodec interface
+  c.decode('x');
+  // Legal: explicit ctx (signal is the only field today and is optional inside the ctx).
+  void c.encode('x', {});
+  void c.decode('x', {});
 });
