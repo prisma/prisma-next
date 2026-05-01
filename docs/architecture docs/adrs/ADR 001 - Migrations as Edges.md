@@ -17,7 +17,11 @@ Represent each migration as a directed edge in a graph of data contracts:
 - edges are applicable only when the database marker equals `fromHash`
 - edges contain a deterministic set of schema operations plus optional node tasks for data work
 - node tasks are verified steps attached to a contract change but do not themselves define the graph topology
-- `fromHash` must differ from `toHash` to keep graph semantics unambiguous
+- **Contract-hash self-edges.** A migration may declare `fromHash === toHash` **only when** its operation list includes at least one `data`-class operation (pure data migrations at the same contract hash). Structural-only pseudo-edges remain invalid; the invariant keeps “empty migrations as edges” from collapsing ordering guarantees.
+- **Pathfinder vs structural routing.** With non-empty required invariants ([ADR 208 — Invariant-aware migration routing](./ADR 208 - Invariant-aware migration routing.md)), the invariant-aware search may traverse a **self-edge** whose manifest lists the needed `invariantId`s; structural `findPath` still prefers the empty path when `fromHash === toHash` because zero edges is strictly shortest — structural and invariant-aware callers use distinct entry points (`findPath` / `findPathWithInvariants`).
+- **Runner upfront skip narrowed.** Matching `plan.origin === plan.destination` (marker already at destination) is **not** sufficient to skip executing work: **self-edges** (same hash on origin and destination) still run unless a **post-hoc self-edge no-op** applies.
+- **Post-hoc no-op skip (self-edge only).** After execution, implementations may skip marker and ledger writes when the plan is a self-edge with **nothing executed** (`operationsExecuted === 0`: no ops or every op skipped because postchecks were already satisfied) **and** the edge brings **no new** routing invariants versus the marker (incoming `providedInvariants` ⊆ existing marker set). That does **not** trigger merely because a data transform's `run` branch did nothing: data ops still count toward `operationsExecuted` when the executor entered the operation. Tightening to “did useful work” would change the public semantics of `operationsExecuted` — left for a deliberate follow-up.
+- **`fromHash ≠ toHash` remains the norm** for structural schema moves; self-edges are the narrow carve-out above.
 
 The database stores a contract marker:
 - current `coreHash` (and `profileHash`), marker schema version, and a ledger entry per applied edge or task
@@ -104,9 +108,13 @@ The storage overhead is minimal (contracts are small JSON files) while providing
 - attractive for small systems but hides orchestration decisions
 - hard to enforce pre and post checks and to audit what actually ran
 
-### Allowing empty migrations as edges with `fromHash == toHash`
-- collapses graph semantics and ordering guarantees
-- better expressed as node tasks attached to the current contract
+### Reject structural-only migrations with `fromHash == toHash` without a carve-out *(superseded for data ops)*
+
+The naive “never allow self-edges” rule appeared in earlier drafts to avoid collapsing graph semantics. **Amendment:** self-edges are allowed when gated by **`data`-class operations** ([ADR 208](./ADR 208 - Invariant-aware migration routing.md) — invariant-aware routing and marker merge). Structural-only duplicates remain rejected.
+
+### Allowing empty migrations as edges with `fromHash == toHash` with no data ops
+
+- still rejected — use attested operation lists; a self-edge without `data` ops is not a valid edge package.
 
 ## Consequences
 
@@ -153,3 +161,7 @@ The storage overhead is minimal (contracts are small JSON files) while providing
 ## Decision record
 
 We adopt a contract-graph model where migrations are edges from `fromHash` to `toHash`, with node tasks for data work. Applicability is enforced by a database marker and per-operation verifications. This enables deterministic planning, safe application, squashing and baselines, and a preflight-first CI story suitable for both humans and agents.
+
+## References
+
+- [ADR 208 — Invariant-aware migration routing](./ADR 208 - Invariant-aware migration routing.md) — routing-visible data transforms (`invariantId`), ref-driven path selection, marker applied-invariants, and `FindPathOutcome` semantics built on this edge model.
