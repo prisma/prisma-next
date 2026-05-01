@@ -828,13 +828,19 @@ export function createMigrationStatusCommand(): Command {
 
       const exitCode = handleResult(result, flags, ui, (statusResult) => {
         if (flags.json) {
+          // Strip non-JSON-shape fields before emitting. These belong to
+          // the in-memory result so the human renderer can avoid
+          // recomputing them, but they would either bloat the wire format
+          // (graph, bundles, edgeStatuses) or expose internals
+          // (activeRefHash, activeRefName, diverged) that consumers should
+          // read off `pathDecision` / `refs` instead.
           const {
-            graph: _g,
-            bundles: _b,
-            edgeStatuses: _es,
-            activeRefHash: _arh,
-            activeRefName: _arn,
-            diverged: _d,
+            graph: _graph,
+            bundles: _bundles,
+            edgeStatuses: _edgeStatuses,
+            activeRefHash: _activeRefHash,
+            activeRefName: _activeRefName,
+            diverged: _diverged,
             ...jsonResult
           } = statusResult;
           ui.output(JSON.stringify(jsonResult, null, 2));
