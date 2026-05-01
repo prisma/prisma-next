@@ -95,7 +95,6 @@ async function setupFixture(opts: {
     {
       from: FROM_HASH,
       to: TO_HASH,
-      kind: 'regular',
       fromContract: null,
       toContract: createContract(),
       hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
