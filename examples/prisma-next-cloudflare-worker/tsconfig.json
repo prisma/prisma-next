@@ -9,6 +9,7 @@
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "test/**/*.d.ts",
     "scripts/**/*.ts",
     "prisma/**/*.ts",
     "prisma-next.config.ts",

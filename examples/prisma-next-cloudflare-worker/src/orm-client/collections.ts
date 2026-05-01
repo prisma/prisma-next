@@ -21,12 +21,7 @@ export class PostCollection extends Collection<Contract, 'Post'> {
   }
 }
 
-export class TaskCollection extends Collection<Contract, 'Task'> {
-  bugs() {
-    return this.variant('Bug');
-  }
-
-  features() {
-    return this.variant('Feature');
-  }
-}
+// Note: a `TaskCollection` would mirror the demo, but `Task` queries fail
+// against the discriminated schema (`column "bug.id" does not exist`); the
+// class-table-inheritance code path is broken at the ORM layer and tracked
+// as pre-existing drift in M3 R2 — wire it in when the framework supports it.

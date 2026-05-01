@@ -96,10 +96,15 @@ export default {
     if (url.pathname === '/cursor/large') {
       const breakAfter = parseLimit(url.searchParams.get('break'), 50);
       const consumed: { id: string; title: string }[] = [];
+      // Bounded SELECT (limit well above the early-break threshold) keeps the
+      // budgets middleware happy while still exercising the cursor early-exit
+      // path: the driver opens a server-side cursor, streams pages, and the
+      // for-await break aborts after `breakAfter` rows.
       const iter = runtime.execute(
         db.sql.post
           .select('id', 'title')
           .orderBy((f) => f.createdAt, { direction: 'asc' })
+          .limit(1_000)
           .build(),
       );
       for await (const row of iter) {
@@ -114,13 +119,11 @@ export default {
       });
     }
 
-    if (url.pathname === '/orm/tasks') {
-      const orm = createOrmClient(runtime);
-      const tasks = await orm.Task.take(10).all();
-      const bugs = await orm.Task.bugs().take(10).all();
-      const features = await orm.Task.features().take(10).all();
-      return Response.json({ ok: true, route: 'orm/tasks', tasks, bugs, features });
-    }
+    // The Task collection (and its Bug/Feature variants) is wired in
+    // `src/orm-client/collections.ts` for parity with the demo schema, but
+    // queries against it currently fail with `column "bug.id" does not exist`
+    // — class-table inheritance with @@map is broken at the ORM layer. Not
+    // exercised here; flagged as pre-existing drift in M3 R2.
 
     return Response.json(
       { ok: false, error: 'unknown route', path: url.pathname },

@@ -3,7 +3,7 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import type { Runtime } from '@prisma-next/sql-runtime';
 import type { Contract } from '../prisma/contract.d';
 import { db } from '../prisma/db';
-import { PostCollection, TaskCollection, UserCollection } from './collections';
+import { PostCollection, UserCollection } from './collections';
 
 const context = db.context as ExecutionContext<Contract>;
 
@@ -14,7 +14,6 @@ export function createOrmClient(runtime: Runtime) {
     collections: {
       User: UserCollection,
       Post: PostCollection,
-      Task: TaskCollection,
     },
   });
 }
