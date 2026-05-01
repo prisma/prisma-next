@@ -136,7 +136,13 @@ describe('toPathDecisionResult', () => {
   });
 
   it('defaults requiredInvariants and satisfiedInvariants to empty arrays', () => {
-    const result = toPathDecisionResult(decision());
+    // PathDecision declares these arrays required; wire inputs may omit keys.
+    // Exercise the ?? [] fallback inside toPathDecisionResult.
+    const input = { ...(decision() as unknown as Record<string, unknown>) };
+    delete input['requiredInvariants'];
+    delete input['satisfiedInvariants'];
+    // last-resort cast: PathDecision is strict; we omit keys to exercise ?? [] in implementation
+    const result = toPathDecisionResult(input as unknown as PathDecision);
     expect(result.requiredInvariants).toEqual([]);
     expect(result.satisfiedInvariants).toEqual([]);
   });

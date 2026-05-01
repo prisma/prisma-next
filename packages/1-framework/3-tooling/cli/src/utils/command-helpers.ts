@@ -159,8 +159,8 @@ export function toPathDecisionResult(decision: PathDecision): PathDecisionResult
     toHash: decision.toHash,
     alternativeCount: decision.alternativeCount,
     tieBreakReasons: decision.tieBreakReasons,
-    requiredInvariants: decision.requiredInvariants,
-    satisfiedInvariants: decision.satisfiedInvariants,
+    requiredInvariants: decision.requiredInvariants ?? [],
+    satisfiedInvariants: decision.satisfiedInvariants ?? [],
     ...ifDefined('refName', decision.refName),
     selectedPath: decision.selectedPath.map((entry) => ({
       dirName: entry.dirName,
