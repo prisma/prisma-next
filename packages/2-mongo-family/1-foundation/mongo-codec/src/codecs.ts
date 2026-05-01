@@ -14,9 +14,10 @@ export type MongoCodecTrait = CodecTrait;
  * an application value and the JSON form stored in contract artifacts.
  *
  * Same shape as the framework codec base — see `Codec` in
- * `@prisma-next/framework-components/codec` for the contract. The alias
- * exists so Mongo-specific metadata can be added here in future without
- * touching the framework base.
+ * `@prisma-next/framework-components/codec` for the contract. Static
+ * codec-id-keyed metadata (`traits`, `targetTypes`) lives on the
+ * unified `CodecDescriptor`; Mongo's full migration to descriptor-side
+ * registration is tracked under TML-2324.
  */
 export type MongoCodec<
   Id extends string = string,
@@ -87,12 +88,6 @@ export function mongoCodec<
   };
   return {
     id: config.typeId,
-    targetTypes: config.targetTypes,
-    ...ifDefined(
-      'traits',
-      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
-    ),
-    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: (value, ctx) => {
       try {
         return Promise.resolve(userEncode(value, ctx));

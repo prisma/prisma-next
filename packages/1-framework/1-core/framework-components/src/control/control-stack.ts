@@ -269,10 +269,32 @@ export function assembleControlMutationDefaults(
   };
 }
 
+/**
+ * Structural narrow of the legacy fields the codec instance still
+ * physically carries while the runtime `Codec` interface narrowed to
+ * id + behavior. SQL `codec()` / Mongo `mongoCodec()` factories still
+ * emit `targetTypes` (and SQL emits `renderOutputType`) on the runtime
+ * object — the narrow reads what's there to populate
+ * {@link CodecLookup.targetTypesFor} and
+ * {@link CodecLookup.renderOutputTypeFor}. Replaced when every codec
+ * ships a native descriptor (TML-2357 M2).
+ */
+type LegacyCodecInstanceMeta = {
+  readonly targetTypes?: readonly string[];
+  readonly meta?: import('../shared/codec-types').CodecMeta;
+  readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
+};
+
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
   const byId = new Map<string, import('../shared/codec-types').Codec>();
+  const targetTypesById = new Map<string, readonly string[]>();
+  const metaById = new Map<string, import('../shared/codec-types').CodecMeta>();
+  const renderersById = new Map<
+    string,
+    (params: Record<string, unknown>) => string | undefined
+  >();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecInstances = descriptor.types?.codecTypes?.codecInstances;
@@ -288,9 +310,32 @@ export function extractCodecLookup(
       });
       owners.set(codec.id, descriptorId);
       byId.set(codec.id, codec);
+      // The runtime `Codec` interface no longer declares `targetTypes`
+      // or `renderOutputType`, but the SQL/Mongo factories still emit
+      // them physically on the runtime object. Read them through a
+      // structural narrow so the assembled `CodecLookup` continues to
+      // surface codec-id-keyed metadata to consumers (emit-path
+      // `renderOutputType` lookup, Mongo `derive-json-schema.ts`'s
+      // BSON-type resolution) while the descriptor migration progresses.
+      // Retires when every codec ships a native descriptor (TML-2357 M2).
+      const legacyMeta = codec as unknown as LegacyCodecInstanceMeta;
+      if (Array.isArray(legacyMeta.targetTypes)) {
+        targetTypesById.set(codec.id, legacyMeta.targetTypes);
+      }
+      if (legacyMeta.meta !== undefined) {
+        metaById.set(codec.id, legacyMeta.meta);
+      }
+      if (typeof legacyMeta.renderOutputType === 'function') {
+        renderersById.set(codec.id, legacyMeta.renderOutputType);
+      }
     }
   }
-  return { get: (id) => byId.get(id) };
+  return {
+    get: (id) => byId.get(id),
+    targetTypesFor: (id) => targetTypesById.get(id),
+    metaFor: (id) => metaById.get(id),
+    renderOutputTypeFor: (id, params) => renderersById.get(id)?.(params),
+  };
 }
 
 export function validateScalarTypeCodecIds(

@@ -513,7 +513,12 @@ describe('createControlStack', () => {
 describe('validateScalarTypeCodecIds', () => {
   it('returns errors for unregistered codec IDs', () => {
     const descriptors = new Map([['String', 'missing/codec@1']]);
-    const lookup = { get: () => undefined };
+    const lookup: CodecLookup = {
+      get: () => undefined,
+      targetTypesFor: () => undefined,
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
+    };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toHaveLength(1);
     expect(errors[0]).toMatch(/Scalar type "String" references codec "missing\/codec@1"/);
@@ -526,13 +531,15 @@ describe('validateScalarTypeCodecIds', () => {
         id === 'test/text@1'
           ? {
               id,
-              targetTypes: ['text'],
               encode: async (v: unknown) => v,
               decode: async (v: unknown) => v,
               encodeJson: (v: unknown) => v as JsonValue,
               decodeJson: (v: JsonValue) => v,
             }
           : undefined,
+      targetTypesFor: (id: string) => (id === 'test/text@1' ? ['text'] : undefined),
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
     };
     const errors = validateScalarTypeCodecIds(descriptors, lookup);
     expect(errors).toEqual([]);

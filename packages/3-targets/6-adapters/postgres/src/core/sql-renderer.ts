@@ -22,7 +22,6 @@ import {
   type ParamRef,
   type ProjectionItem,
   type SelectAst,
-  type Codec as SqlCodec,
   type SubqueryExpr,
   type UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
@@ -80,12 +79,7 @@ function renderTypedParam(
   if (codecId === undefined) {
     return `$${index}`;
   }
-  // SQL codecs extend the framework `Codec` base with an optional
-  // `meta: CodecMeta`; the framework `CodecLookup.get` returns the base type,
-  // so we narrow to `SqlCodec` to read `meta`. Every codec actually
-  // registered into a SQL codec lookup conforms to `SqlCodec`.
-  const codec = codecLookup.get(codecId) as SqlCodec | undefined;
-  if (codec === undefined) {
+  if (codecLookup.get(codecId) === undefined) {
     throw new Error(
       `Postgres lowering: ParamRef carries codecId "${codecId}" but the ` +
         'assembled codec lookup has no entry for it. This usually indicates ' +
@@ -95,11 +89,23 @@ function renderTypedParam(
         "if it's a builtin.",
     );
   }
-  const nativeType = codec.meta?.db?.sql?.postgres?.nativeType;
-  if (nativeType !== undefined && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
+  // The framework `CodecLookup.metaFor` returns the family-agnostic
+  // `CodecMeta` whose `db` is `Record<string, unknown>`. The SQL family
+  // populates a narrower shape with `db.sql.<dialect>.nativeType:
+  // string`; navigate that path defensively and string-check the leaf.
+  const meta = codecLookup.metaFor(codecId);
+  const dbRecord = meta?.db;
+  const sqlBlock = isRecord(dbRecord) ? dbRecord['sql'] : undefined;
+  const dialectBlock = isRecord(sqlBlock) ? sqlBlock['postgres'] : undefined;
+  const nativeType = isRecord(dialectBlock) ? dialectBlock['nativeType'] : undefined;
+  if (typeof nativeType === 'string' && !POSTGRES_INFERRABLE_NATIVE_TYPES.has(nativeType)) {
     return `$${index}::${nativeType}`;
   }
   return `$${index}`;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
 }
 
 /**

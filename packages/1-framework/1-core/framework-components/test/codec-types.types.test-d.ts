@@ -31,29 +31,24 @@ test('decodeJson is required and synchronous', () => {
   expectTypeOf<DecodeJsonReturn>().not.toExtend<Promise<unknown>>();
 });
 
-test('renderOutputType is optional and synchronous', () => {
-  type Render = NonNullable<Codec['renderOutputType']>;
-  expectTypeOf<Render>().toBeFunction();
-  expectTypeOf<ReturnType<Render>>().toEqualTypeOf<string | undefined>();
-  // optional on the interface
-  type IsOptional = undefined extends Codec['renderOutputType'] ? true : false;
-  expectTypeOf<IsOptional>().toEqualTypeOf<true>();
+test('Codec instance carries only id + the four conversion methods', () => {
+  // The runtime instance is narrowed to id + behavior (TML-2357 AC-3);
+  // codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`,
+  // `renderOutputType`) lives on `CodecDescriptor` keyed by codecId.
+  // The phantom `TTraits` carrier is keyed by a non-public unique
+  // symbol so it stays out of `keyof Codec` for string keys.
+  type CodecStringKeys = Extract<keyof Codec, string>;
+  const expectedKeys = ['id', 'encode', 'decode', 'encodeJson', 'decodeJson'] as const;
+  type ExpectedKeys = (typeof expectedKeys)[number];
+  expectTypeOf<CodecStringKeys>().toEqualTypeOf<ExpectedKeys>();
 });
 
-test('Codec carries no async marker (no runtime/kind/TRuntime fields)', () => {
-  type CodecKeys = keyof Codec;
-  const expectedKeys = [
-    'id',
-    'targetTypes',
-    'traits',
-    'encode',
-    'decode',
-    'encodeJson',
-    'decodeJson',
-    'renderOutputType',
-  ] as const;
-  type ExpectedKeys = (typeof expectedKeys)[number];
-  expectTypeOf<CodecKeys>().toEqualTypeOf<ExpectedKeys>();
+test('Codec instance does not carry traits / targetTypes / meta / renderOutputType', () => {
+  type C = Codec;
+  expectTypeOf<C>().not.toHaveProperty('traits');
+  expectTypeOf<C>().not.toHaveProperty('targetTypes');
+  expectTypeOf<C>().not.toHaveProperty('meta');
+  expectTypeOf<C>().not.toHaveProperty('renderOutputType');
 });
 
 test('Codec carries four generics: encode TInput → TWire, decode TWire → TInput', () => {

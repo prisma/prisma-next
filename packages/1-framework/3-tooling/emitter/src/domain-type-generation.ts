@@ -256,12 +256,9 @@ export function resolveFieldType(
         type.typeParams && Object.keys(type.typeParams).length > 0 ? type.typeParams : undefined;
       const effectiveTypeParams = inlineTypeParams ?? resolvedTypeParams;
       if (codecLookup && effectiveTypeParams && Object.keys(effectiveTypeParams).length > 0) {
-        const codec = codecLookup.get(type.codecId);
-        if (codec?.renderOutputType) {
-          const rendered = codec.renderOutputType(effectiveTypeParams);
-          if (rendered && isSafeTypeExpression(rendered)) {
-            outputResolved = rendered;
-          }
+        const rendered = codecLookup.renderOutputTypeFor(type.codecId, effectiveTypeParams);
+        if (rendered && isSafeTypeExpression(rendered)) {
+          outputResolved = rendered;
         }
       }
       const codecAccessor = `CodecTypes[${serializeValue(type.codecId)}]`;

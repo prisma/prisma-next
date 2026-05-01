@@ -321,7 +321,20 @@ function buildCodecDescriptorRegistry(
 
   for (const codec of codecRegistry.values()) {
     if (byId.has(codec.id)) continue;
-    registerInIndices(synthesizeNonParameterizedDescriptor(codec) as unknown as AnyDescriptor);
+    // The framework `Codec` instance no longer carries codec-id-keyed
+    // static metadata (`traits`, `targetTypes`, `meta`); the SQL `Codec`
+    // extension still surfaces them as a transitional compatibility
+    // shape (see `@prisma-next/sql-relational-core/ast` § Codec). Thread
+    // the SQL-side values explicitly into the synthesis bridge so the
+    // resulting descriptor exposes the same metadata it did when the
+    // bridge read them off the codec instance directly. Both ends of
+    // this plumbing retire alongside the synthesis bridge in TML-2357 M2.
+    const descriptor = synthesizeNonParameterizedDescriptor(codec, {
+      traits: codec.traits ?? [],
+      targetTypes: codec.targetTypes,
+      ...(codec.meta !== undefined ? { meta: codec.meta } : {}),
+    });
+    registerInIndices(descriptor as unknown as AnyDescriptor);
   }
 
   return {

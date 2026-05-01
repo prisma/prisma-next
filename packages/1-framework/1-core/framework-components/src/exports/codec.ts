@@ -6,6 +6,7 @@ export type {
   CodecLookup,
   CodecMeta,
   CodecTrait,
+  NonParameterizedDescriptorMeta,
 } from '../shared/codec-types';
 export {
   emptyCodecLookup,

@@ -139,13 +139,20 @@ export interface CodecMeta {
  * bivariantly, so the SQL narrowing is structurally compatible with the
  * framework {@link BaseCodec} super-interface.
  *
- * Note: `paramsSchema` and `init` here are the legacy adapter-level slots
- * mirrored from {@link CodecParamsDescriptor}. The runtime materialization
- * path uses `RuntimeParameterizedCodecDescriptor` (in
+ * `traits` and `targetTypes` are redeclared here because the framework
+ * {@link BaseCodec} no longer carries them — they live on the unified
+ * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}
+ * as the codec-id-keyed source of truth. The instance-side fields stay
+ * here in M1 so the legacy `CodecRegistry` registration slot keeps
+ * working and `synthesizeNonParameterizedDescriptor` can thread them
+ * into descriptors at context-construction. Deletes alongside the
+ * synthesis bridge in TML-2357 M2.
+ *
+ * Note: `meta`, `paramsSchema`, and `init` are the legacy adapter-level
+ * slots mirrored from {@link CodecParamsDescriptor}. The runtime
+ * materialization path uses `RuntimeParameterizedCodecDescriptor` (in
  * `@prisma-next/sql-runtime`) via the unified `CodecDescriptor<P>` shape;
- * codec-self-carried `paramsSchema`/`init` retire under TML-2357 (T3.5.2
- * narrows the runtime `Codec` interface; T3.5.4 collapses the parallel
- * registration slots).
+ * codec-self-carried `meta`/`paramsSchema`/`init` retire under TML-2357.
  *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
@@ -157,16 +164,18 @@ export interface Codec<
   TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TInput> {
+> extends BaseCodec<Id, TWire, TInput> {
   encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
+  /** Transitional. See file-level comment. */
+  readonly traits?: TTraits;
+  /** Transitional. See file-level comment. */
+  readonly targetTypes: readonly string[];
+  /** Transitional. See file-level comment. */
   readonly meta?: CodecMeta;
+  /** Transitional. See file-level comment. */
   readonly paramsSchema?: Type<TParams>;
-  /**
-   * Predecessor init hook. Retirement tracked under TML-2357 (T3.5.2 /
-   * T3.5.4); the unified runtime descriptor's
-   * `factory: (P) => (CodecInstanceContext) => Codec` is the replacement.
-   */
+  /** Transitional. See file-level comment. */
   readonly init?: (params: TParams) => THelper;
 }
 

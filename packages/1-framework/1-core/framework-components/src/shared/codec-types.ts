@@ -64,32 +64,47 @@ export interface CodecCallContext {
  * - **Wire** (`TWire`): the format exchanged with the database driver.
  * - **JSON** (`JsonValue`): a JSON-safe form used in contract artifacts.
  *
+ * The runtime instance carries only its `id` (the descriptor's `codecId`,
+ * set by the factory) and the four conversion methods. Static metadata
+ * (`traits`, `targetTypes`, `meta`) and the build-time `renderOutputType`
+ * renderer live on the {@link CodecDescriptor} keyed by `codecId` — the
+ * read-surface single source of truth. Consumers that need them resolve
+ * through `descriptorFor(codecId)`.
+ *
  * Codec methods split into two groups:
  *
  * - **Query-time** methods (`encode`, `decode`) run per row/parameter at the
  *   IO boundary; they are required and Promise-returning. The per-family
  *   codec factory accepts sync or async author functions and lifts sync
  *   ones to Promise-shaped methods automatically.
- * - **Build-time** methods (`encodeJson`, `decodeJson`, `renderOutputType`)
- *   run when the contract is serialized, loaded, or when client types are
- *   emitted. They stay synchronous so contract validation and client
- *   construction are synchronous.
+ * - **Build-time** methods (`encodeJson`, `decodeJson`) run when the
+ *   contract is serialized or loaded. They stay synchronous so contract
+ *   validation and client construction are synchronous.
  *
- * Target-family codec interfaces extend this base with target-shaped
- * metadata.
+ * Target-family codec interfaces extend this base; family-specific
+ * concerns (e.g. the SQL `column?` per-call context) layer on through
+ * the `CodecCallContext` extension pattern.
  */
+/**
+ * Phantom marker symbol for the {@link Codec} `TTraits` generic. The
+ * trait set is type-encoded on the codec generic so downstream helpers
+ * (`CodecTraits<C>`, trait-gated operator surfaces, family extensions)
+ * can thread it without the instance carrying a runtime `traits` field.
+ * Runtime source of truth is {@link CodecDescriptor.traits}; the slot
+ * here is `undefined` and exists only as a type-level carrier.
+ */
+declare const codecTraitsPhantom: unique symbol;
+
 export interface Codec<
   Id extends string = string,
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TInput = unknown,
 > {
-  /** Unique codec identifier in `namespace/name@version` format (e.g. `pg/timestamptz@1`). */
+  /** Unique codec identifier in `namespace/name@version` format (e.g. `pg/timestamptz@1`). The factory sets this to the descriptor's `codecId`; consumers use it as a back-reference for descriptor lookups and for decode-error diagnostics. */
   readonly id: Id;
-  /** Database-native type names this codec handles (e.g. `['timestamptz']`). */
-  readonly targetTypes: readonly string[];
-  /** Semantic traits for operator gating (e.g. equality, order, numeric). */
-  readonly traits?: TTraits;
+  /** Phantom carrier for the `TTraits` generic; see {@link codecTraitsPhantom}. */
+  readonly [codecTraitsPhantom]?: TTraits;
   /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(value) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
   encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
   /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(wire) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
@@ -98,17 +113,42 @@ export interface Codec<
   encodeJson(value: TInput): JsonValue;
   /** Converts a JSON representation back to the JS input type. Synchronous; called during contract loading via `validateContract`. */
   decodeJson(json: JsonValue): TInput;
-  /** Produces the TypeScript output type expression for a field given its `typeParams`. Synchronous; used during contract.d.ts emission. */
-  renderOutputType?(typeParams: Record<string, unknown>): string | undefined;
 }
 
+/**
+ * Codec-id-keyed read surface threaded into emit and authoring paths.
+ *
+ * - `get(id)` returns the runtime {@link Codec} instance for the codec
+ *   id (used by `validateContract` for `decodeJson` of literal column
+ *   defaults).
+ * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes`
+ *   metadata the runtime instance no longer carries (TML-2357 AC-3).
+ *   Returns the same array `CodecDescriptor.targetTypes` would; for
+ *   Mongo (whose registration doesn't yet resolve through the unified
+ *   descriptor map — TML-2324) the family-side assembly populates this
+ *   directly from the contributor's codec metadata.
+ * - `metaFor(id)` exposes the codec-id-keyed `meta` (e.g. SQL-side
+ *   `db.sql.postgres.nativeType`) the runtime instance no longer
+ *   carries.
+ * - `renderOutputTypeFor(id, params)` exposes the codec-id-keyed
+ *   `renderOutputType` renderer the runtime instance no longer carries.
+ *   Returns `undefined` when the codec doesn't render a custom type or
+ *   when the codec id is unknown.
+ */
 export interface CodecLookup {
   get(id: string): Codec | undefined;
+  targetTypesFor(id: string): readonly string[] | undefined;
+  metaFor(id: string): CodecMeta | undefined;
+  renderOutputTypeFor(id: string, params: Record<string, unknown>): string | undefined;
 }
 
 export const emptyCodecLookup: CodecLookup = {
   get: () => undefined,
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
+
 
 /**
  * Family-agnostic per-instance context supplied by the framework when
@@ -226,6 +266,21 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
 };
 
 /**
+ * Static descriptor metadata threaded into {@link synthesizeNonParameterizedDescriptor}.
+ *
+ * The runtime {@link Codec} instance no longer carries codec-id-keyed
+ * static metadata (`traits`, `targetTypes`, `meta`); the synthesis bridge
+ * receives them explicitly from the call site that has the contributor
+ * context. The bridge itself retires under TML-2357 once every codec
+ * contributor ships a {@link CodecDescriptor} natively.
+ */
+export interface NonParameterizedDescriptorMeta {
+  readonly traits: readonly CodecTrait[];
+  readonly targetTypes: readonly string[];
+  readonly meta?: CodecMeta;
+}
+
+/**
  * Synthesize a `CodecDescriptor<void>` for a non-parameterized codec
  * runtime instance. The factory is constant — every call returns the same
  * shared codec instance — so columns sharing this codec id share one
@@ -234,10 +289,16 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
  * Codec-registry-unification spec § Decision (Case T — non-parameterized
  * text codec). This is the bridge while non-parameterized codec
  * contributors still register through the legacy `codecs:` slot; once they
- * migrate to ship descriptors directly (TML-2357 T3.5.3), this synthesis
+ * migrate to ship descriptors directly (TML-2357 T2.7), this synthesis
  * steps aside.
+ *
+ * The runtime instance no longer carries `traits`/`targetTypes`/`meta`;
+ * the call site supplies them via {@link NonParameterizedDescriptorMeta}.
  */
-export function synthesizeNonParameterizedDescriptor(codec: Codec): CodecDescriptor<void> {
+export function synthesizeNonParameterizedDescriptor(
+  codec: Codec,
+  meta: NonParameterizedDescriptorMeta,
+): CodecDescriptor<void> {
   // The descriptor's `factory: (params: void) => (ctx: CodecInstanceContext)
   // => Codec` is a constant for non-parameterized codecs — `params` is
   // never read and the returned ctx-applier always yields the same shared
@@ -245,17 +306,12 @@ export function synthesizeNonParameterizedDescriptor(codec: Codec): CodecDescrip
   // signatures rather than naming `void` locally (biome's
   // `noConfusingVoidType` flags `void` outside return positions).
   const sharedFactory = () => () => codec;
-  // Family-extended codecs (SQL `Codec`) carry an optional `meta` field
-  // that the base interface doesn't declare. Read it through a structural
-  // narrow so the synthesizer forwards it to the descriptor without losing
-  // type safety on the base shape.
-  const codecMeta = (codec as { readonly meta?: CodecMeta }).meta;
   return {
     codecId: codec.id,
-    traits: codec.traits ?? [],
-    targetTypes: codec.targetTypes,
+    traits: meta.traits,
+    targetTypes: meta.targetTypes,
     paramsSchema: voidParamsSchema,
     factory: sharedFactory,
-    ...(codecMeta !== undefined ? { meta: codecMeta } : {}),
+    ...(meta.meta !== undefined ? { meta: meta.meta } : {}),
   };
 }
