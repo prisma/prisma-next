@@ -183,6 +183,11 @@ export function findPathWithInvariants(
     readonly node: string;
     readonly covered: ReadonlySet<string>;
   }
+  // `\0` is a safe segment separator: `validateInvariantId` rejects any id
+  // containing whitespace or control characters (NUL is U+0000), and node
+  // hashes are hex strings. Distinct `(node, covered)` tuples therefore
+  // map to distinct strings. If `validateInvariantId` is ever relaxed,
+  // re-confirm dedup correctness here.
   const stateKey = (s: InvState): string => {
     if (s.covered.size === 0) return `${s.node}\0`;
     return `${s.node}\0${[...s.covered].sort().join('\0')}`;
