@@ -84,7 +84,11 @@ If you return without both files reflecting HEAD, the orchestrator will treat th
 
 ## Read-only constraint reminder
 
-You may **only** modify files under `projects/{project}/reviews/`. Do **not** edit code, tests, `spec.md`, or `plan.md`. If you observe a trivial fix you're tempted to make: file as F<N> with a one-line "recommended fix" snippet instead — provided the finding meets the § Findings discipline bar.
+You may **only** modify files under `projects/{project}/reviews/` and `wip/heartbeats/reviewer.txt` (the heartbeat snapshot — see below). Do **not** edit code, tests, `spec.md`, or `plan.md`. If you observe a trivial fix you're tempted to make: file as F<N> with a one-line "recommended fix" snippet instead — provided the finding meets the § Findings discipline bar.
+
+## Heartbeats
+
+Write to `wip/heartbeats/reviewer.txt` on the cadence in `<skill-dir>/agents/reviewer.md § Heartbeats`: at round start, before/after every long-running shell call (>~1 min, e.g. re-running validation gates), at each F-number filed, at each artifact write, and at least every ~5 minutes otherwise. The orchestrator reads this file between turns to detect a stalled round; without it, a hung round wastes minutes before the user has to intervene manually. `mkdir -p wip/heartbeats` once at round start; overwrite the file each ping.
 
 ## Return shape
 
@@ -141,6 +145,7 @@ Pull the diff via `git show <sha>` or `git diff <prior-head>..HEAD`.
 
 - All three review artifacts touched (`code-review.md`, `system-design-review.md`, `walkthrough.md`) — mandatory.
 - Findings must be addressable in this PR (see § Findings discipline). No `informational` severity.
+- Heartbeats to `wip/heartbeats/reviewer.txt` per `<skill-dir>/agents/reviewer.md § Heartbeats` (at round start, before/after long shell calls, at each F-number, at each artifact write, every ~5 min otherwise).
 
 Begin.
 ````
