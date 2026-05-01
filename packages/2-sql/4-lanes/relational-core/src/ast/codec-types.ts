@@ -248,7 +248,9 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  *
  * Author `encode` and `decode` as sync or async functions; the factory
  * produces a {@link Codec} whose query-time methods follow the boundary
- * contract documented on `Codec`.
+ * contract documented on `Codec`. Authors receive a second `ctx` options
+ * argument carrying the SQL-family per-call context; ignore it if you
+ * don't need it.
  *
  * Both `encode` and `decode` are required so `TInput` and `TWire` are
  * always covered by an explicit author function — the factory installs
@@ -267,12 +269,8 @@ export function codec<
   config: {
     typeId: Id;
     targetTypes: readonly string[];
-    encode:
-      | ((value: TInput) => TWire | Promise<TWire>)
-      | ((value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>);
-    decode:
-      | ((wire: TWire) => TInput | Promise<TInput>)
-      | ((wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>);
+    encode: (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
     meta?: CodecMeta;
     paramsSchema?: Type<TParams>;
     init?: (params: TParams) => THelper;
@@ -282,15 +280,11 @@ export function codec<
 ): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
   // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
-  // signal) constructs `codecCtx = undefined`, so two-arg authors must
-  // accept undefined. The union typing on `config.encode` /
-  // `config.decode` (single- or two-arg authors) preserves TInput
-  // inference at call sites; widen to the two-arg shape inside the
-  // factory body so the lift can forward ctx.
-  type CtxEncode = (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
-  type CtxDecode = (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
-  const userEncode = config.encode as CtxEncode;
-  const userDecode = config.decode as CtxDecode;
+  // signal) constructs `codecCtx = undefined`, so authors must accept
+  // undefined. Authors that don't reference ctx are still legal because
+  // function parameters are bivariant on optional trailing args.
+  const userEncode = config.encode;
+  const userDecode = config.decode;
   // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the
   // boundary; widen back to the generic shape inside the factory body.
   const widenedConfig = config as {

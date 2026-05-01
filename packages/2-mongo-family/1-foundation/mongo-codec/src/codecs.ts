@@ -48,6 +48,8 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  * Author `encode` and `decode` as sync or async functions; the factory
  * produces a {@link MongoCodec} whose query-time methods follow the
  * boundary contract documented on the framework {@link BaseCodec}.
+ * Authors receive a second `ctx` options argument carrying the per-call
+ * context; ignore it if you don't need it.
  *
  * Both `encode` and `decode` are required so `TInput` and `TWire` are
  * always covered by an explicit author function — the factory installs
@@ -65,26 +67,18 @@ export function mongoCodec<
     typeId: Id;
     targetTypes: readonly string[];
     traits?: TTraits;
-    encode:
-      | ((value: TInput) => TWire | Promise<TWire>)
-      | ((value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>);
-    decode:
-      | ((wire: TWire) => TInput | Promise<TInput>)
-      | ((wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>);
+    encode: (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
-  // signal) constructs `codecCtx = undefined`, so two-arg authors must
-  // accept undefined. The union typing on `config.encode` /
-  // `config.decode` (single- or two-arg authors) preserves TInput
-  // inference at call sites; widen to the two-arg shape inside the
-  // factory body so the lift can forward ctx.
-  type CtxEncode = (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
-  type CtxDecode = (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
-  const userEncode = config.encode as CtxEncode;
-  const userDecode = config.decode as CtxDecode;
+  // signal) constructs `codecCtx = undefined`, so authors must accept
+  // undefined. Authors that don't reference ctx are still legal because
+  // function parameters are bivariant on optional trailing args.
+  const userEncode = config.encode;
+  const userDecode = config.decode;
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;
     decodeJson?: (json: JsonValue) => TInput;
