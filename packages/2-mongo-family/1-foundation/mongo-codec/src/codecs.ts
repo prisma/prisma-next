@@ -67,17 +67,20 @@ export function mongoCodec<
     traits?: TTraits;
     encode:
       | ((value: TInput) => TWire | Promise<TWire>)
-      | ((value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>);
+      | ((value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>);
     decode:
       | ((wire: TWire) => TInput | Promise<TInput>)
-      | ((wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>);
+      | ((wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>);
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
-  // The union typing on `config.encode` / `config.decode` (single- or two-
-  // arg authors) preserves TInput inference at call sites; widen to the
-  // two-arg shape inside the factory body so the lift can forward ctx.
+  // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
+  // signal) constructs `codecCtx = undefined`, so two-arg authors must
+  // accept undefined. The union typing on `config.encode` /
+  // `config.decode` (single- or two-arg authors) preserves TInput
+  // inference at call sites; widen to the two-arg shape inside the
+  // factory body so the lift can forward ctx.
   type CtxEncode = (value: TInput, ctx?: CodecCallContext) => TWire | Promise<TWire>;
   type CtxDecode = (wire: TWire, ctx?: CodecCallContext) => TInput | Promise<TInput>;
   const userEncode = config.encode as CtxEncode;
