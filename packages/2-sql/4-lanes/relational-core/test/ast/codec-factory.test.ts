@@ -82,19 +82,6 @@ describe('codec() factory — query-time methods are Promise-returning', () => {
     expect(await c.decode('a')).toBe('a');
   });
 
-  it('installs an identity encode default when encode is omitted', async () => {
-    const c = codec({
-      typeId: 'demo/identity-default@1',
-      targetTypes: ['text'],
-      decode: (wire: string) => wire,
-    });
-
-    expect(c.encode).toBeDefined();
-    const encoded = c.encode!('hello');
-    expect(encoded).toBeInstanceOf(Promise);
-    expect(await encoded).toBe('hello');
-  });
-
   it('passes encodeJson and decodeJson through as synchronous methods', () => {
     const c = codec({
       typeId: 'demo/json-passthrough@1',

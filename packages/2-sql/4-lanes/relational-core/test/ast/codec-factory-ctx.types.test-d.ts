@@ -78,7 +78,7 @@ test('factory preserves union-input TInput inference for `string | Date`-style a
   // canonical `pg/timestamptz`-style codec authors `encode` as
   // `(value: string | Date) => string`, expects `TInput = string` from
   // `decode`'s return, and then `JsonRoundTripConfig<TInput>` keeps the
-  // identity defaults legal.
+  // `encodeJson`/`decodeJson` identity defaults legal.
   const c = codec({
     typeId: 'demo/union-input@1',
     targetTypes: ['text'],
