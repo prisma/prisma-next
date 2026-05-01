@@ -21,7 +21,7 @@ export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtim
       email: data.email,
       displayName: data.displayName,
       kind: data.kind,
-      createdAt: (data.createdAt ?? new Date()) as UserRow['createdAt'],
+      createdAt: data.createdAt ?? new Date(),
     },
     update: {
       email: data.email,

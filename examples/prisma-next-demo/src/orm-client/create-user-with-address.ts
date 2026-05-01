@@ -24,7 +24,7 @@ export async function ormClientCreateUserWithAddress(
     email: data.email,
     displayName: data.displayName,
     kind: data.kind,
-    createdAt: data.createdAt as UserRow['createdAt'],
+    createdAt: data.createdAt,
     address: data.address,
   });
 }
