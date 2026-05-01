@@ -1,8 +1,16 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { describe, expect, it, vi } from 'vitest';
+import type {
+  MongoExecutionContext,
+  MongoExecutionStack,
+  MongoRuntimeAdapterDescriptor,
+  MongoRuntimeAdapterInstance,
+  MongoRuntimeTargetDescriptor,
+} from '../src/mongo-execution-stack';
 import { createMongoRuntime } from '../src/mongo-runtime';
 
 const baseMeta: PlanMeta = {
@@ -43,6 +51,40 @@ function recordingAdapter(): RecordingAdapter {
   return { adapter, observed, callCount };
 }
 
+function makeContext(adapter: MongoAdapter): MongoExecutionContext {
+  const codecs: MongoCodecRegistry = createMongoCodecRegistry();
+  const adapterInstance: MongoRuntimeAdapterInstance<'mongo'> = {
+    familyId: 'mongo',
+    targetId: 'mongo',
+    lower: adapter.lower.bind(adapter),
+  };
+  const target: MongoRuntimeTargetDescriptor<'mongo'> = {
+    kind: 'target',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
+  };
+  const adapterDescriptor: MongoRuntimeAdapterDescriptor<'mongo'> = {
+    kind: 'adapter',
+    id: 'mongo',
+    familyId: 'mongo',
+    targetId: 'mongo',
+    version: '0.0.1',
+    codecs: () => createMongoCodecRegistry(),
+    create: () => adapterInstance,
+  };
+  const stack: MongoExecutionStack<'mongo'> = {
+    target,
+    adapter: adapterDescriptor,
+    driver: undefined,
+    extensionPacks: [],
+  };
+  return Object.freeze({ contract: {}, codecs, stack });
+}
+
 function rowsDriver(rows: Record<string, unknown>[] = []): MongoDriver {
   return {
     execute: vi.fn(async function* <Row>() {
@@ -66,10 +108,8 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
   it('execute(plan) with no options threads a ctx whose signal is undefined', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
-      adapter,
+      context: makeContext(adapter),
       driver: rowsDriver([{ _id: '1' }]),
-      contract: {},
-      targetId: 'mongo',
     });
 
     const rows = await drain(runtime.execute(createPlan()));
@@ -81,10 +121,8 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
   it('execute(plan, undefined) and execute(plan, {}) thread ctx with undefined signal', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
-      adapter,
+      context: makeContext(adapter),
       driver: rowsDriver([]),
-      contract: {},
-      targetId: 'mongo',
     });
 
     await drain(runtime.execute(createPlan(), undefined));
@@ -97,10 +135,8 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
   it('threads { signal } through execute → lower → adapter.lower as a CodecCallContext (signal identity preserved)', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
-      adapter,
+      context: makeContext(adapter),
       driver: rowsDriver([{ _id: '1' }]),
-      contract: {},
-      targetId: 'mongo',
     });
 
     const controller = new AbortController();
@@ -115,10 +151,8 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
     const { adapter, callCount } = recordingAdapter();
     const driver = rowsDriver([{ _id: '1' }]);
     const runtime = createMongoRuntime({
-      adapter,
+      context: makeContext(adapter),
       driver,
-      contract: {},
-      targetId: 'mongo',
     });
 
     const controller = new AbortController();

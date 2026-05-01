@@ -1,3 +1,4 @@
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MongoFieldShape, MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
 import type { MongoCodecLookup } from '../mongo-execution-stack';
@@ -40,6 +41,7 @@ export async function decodeMongoRow(
   shape: MongoResultShape,
   registry: MongoCodecLookup,
   collection: string,
+  ctx: CodecCallContext = {},
 ): Promise<unknown> {
   if (shape.kind === 'unknown') {
     return row;
@@ -65,7 +67,7 @@ export async function decodeMongoRow(
     tasks.push(
       (async () => {
         try {
-          assign(await codec.decode(wire));
+          assign(await codec.decode(wire, ctx));
         } catch (error) {
           wrapDecodeFailure(error, collection, path, codecId, wire);
         }
