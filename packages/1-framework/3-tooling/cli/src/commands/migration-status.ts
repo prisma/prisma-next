@@ -88,7 +88,14 @@ export interface MigrationStatusResult {
   readonly refs?: readonly StatusRef[];
   /** Required invariants from the active ref, sorted ascending. Always present (`[]` when no `--ref` or the ref declares none) — knowable offline. */
   readonly requiredInvariants: readonly string[];
-  /** Invariants the marker has applied at least once, intersected with required for display relevance. Present only in `mode === 'online'`; absent when offline (the marker is unknown, not empty). */
+  /**
+   * Invariants the marker has applied at least once, intersected with
+   * `requiredInvariants` for display relevance. JSON consumers see only the
+   * subset overlapping the active ref's required set — the full unfiltered
+   * marker invariant list lives on `marker.invariants` (control plane) and
+   * is not surfaced here. Present only in `mode === 'online'`; absent when
+   * offline (the marker is unknown, not empty).
+   */
   readonly appliedInvariants?: readonly string[];
   /** required − applied. Present only in `mode === 'online'`; absent when offline. */
   readonly missingInvariants?: readonly string[];
