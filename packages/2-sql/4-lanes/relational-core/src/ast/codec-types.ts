@@ -2,14 +2,21 @@ import type { JsonValue } from '@prisma-next/contract/types';
 import type {
   Codec as BaseCodec,
   CodecCallContext,
+  CodecDescriptor,
   CodecInstanceContext,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
-export type { CodecCallContext, CodecTrait } from '@prisma-next/framework-components/codec';
+export type {
+  CodecCallContext,
+  CodecDescriptor,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 
 /**
  * SQL-family addressing of a single column. The decode site populates a
@@ -648,4 +655,364 @@ export function createCodecRegistry(): CodecRegistry {
  */
 export function defineCodecs(): CodecDefBuilder<Record<never, never>> {
   return new CodecDefBuilderImpl({});
+}
+
+/**
+ * Spec accepted by the SQL `codecDescriptor()` factory. Mirrors the
+ * fields on the framework {@link CodecDescriptor} plus author-side
+ * `encode`/`decode` (and, when `TInput` is not JSON-safe,
+ * `encodeJson`/`decodeJson`).
+ *
+ * `TParams` defaults to `void` for non-parameterized codecs;
+ * `paramsSchema` and `renderOutputType` are then both omitted (the
+ * factory supplies the framework's {@link voidParamsSchema} and there
+ * is no per-codec emit-path renderer).
+ *
+ * `paramsSchema` is a Standard Schema validator that runs at the JSON
+ * boundary (`contract.json` → runtime). `renderOutputType` is the
+ * emit-path hook the framework consults to produce the TypeScript
+ * output type expression for `contract.d.ts`.
+ *
+ * Replaces the legacy `codec()` factory's spec, which produced a
+ * `Codec` with codec-id-keyed metadata fields on the instance. Per
+ * TML-2357 M2, contributors ship `CodecDescriptor`s through the unified
+ * `codecs:` slot; the descriptor's `factory` materializes the resolved
+ * runtime codec on demand.
+ */
+type CodecDescriptorSpecBase<
+  Id extends string,
+  TTraits extends readonly CodecTrait[],
+  TWire,
+  TInput,
+> = {
+  readonly codecId: Id;
+  readonly targetTypes: readonly string[];
+  readonly traits?: TTraits;
+  readonly meta?: CodecMeta;
+  readonly encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
+  readonly decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
+};
+
+/**
+ * Conditional bundle for `encodeJson`/`decodeJson` on the descriptor
+ * spec — same JSON-safety conditional as the legacy `codec()` factory.
+ */
+type DescriptorJsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
+  ? {
+      encodeJson?: (value: TInput) => JsonValue;
+      decodeJson?: (json: JsonValue) => TInput;
+    }
+  : {
+      encodeJson: (value: TInput) => JsonValue;
+      decodeJson: (json: JsonValue) => TInput;
+    };
+
+export type CodecDescriptorSpec<
+  Id extends string,
+  TTraits extends readonly CodecTrait[],
+  TWire,
+  TInput,
+  TParams,
+> = CodecDescriptorSpecBase<Id, TTraits, TWire, TInput> &
+  DescriptorJsonRoundTripConfig<TInput> & {
+    readonly paramsSchema?: StandardSchemaV1<TParams>;
+    readonly renderOutputType?: (params: TParams) => string | undefined;
+  };
+
+/**
+ * Construct a SQL codec descriptor from author functions and codec-id-
+ * keyed metadata.
+ *
+ * Author `encode` and `decode` as sync or async functions; the factory
+ * promise-lifts them onto the framework-required `Promise<…>` boundary
+ * shape (per ADR 204). Authors receive a second `ctx` options argument
+ * carrying the SQL-family per-call context; ignore it if you don't
+ * need it.
+ *
+ * For non-parameterized codecs (`TParams` defaults to `void`), the
+ * descriptor's `factory` is constant — every call returns the same
+ * shared codec instance for every column sharing the codec id. The
+ * framework's {@link voidParamsSchema} validates the absent params at
+ * the JSON boundary.
+ *
+ * For parameterized codecs, supply a `paramsSchema` validating the
+ * params shape. The current implementation closes the resolved codec
+ * over the same shared instance regardless of `params` — sufficient for
+ * today's parameterized codecs (e.g. pgvector) where `params` is a
+ * metadata bag rather than a per-call closure dependency. Codec authors
+ * who need per-instance state can wrap `codecDescriptor()` with their
+ * own factory closure.
+ *
+ * `encodeJson` and `decodeJson` default to identity **only when
+ * `TInput` is assignable to `JsonValue`**; otherwise both are required
+ * so the contract artifact stays JSON-safe.
+ *
+ * Replaces the legacy `codec()` factory under TML-2357 M2; the legacy
+ * factory deletes once every consumer migrates.
+ */
+export function codecDescriptor<
+  Id extends string,
+  const TTraits extends readonly CodecTrait[] = readonly [],
+  TWire = unknown,
+  TInput = unknown,
+  TParams = void,
+>(spec: CodecDescriptorSpec<Id, TTraits, TWire, TInput, TParams>): CodecDescriptor<TParams> {
+  const identity = (v: unknown) => v;
+  const userEncode = spec.encode;
+  const userDecode = spec.decode;
+  const widenedSpec = spec as {
+    readonly encodeJson?: (value: TInput) => JsonValue;
+    readonly decodeJson?: (json: JsonValue) => TInput;
+  };
+  const traits = spec.traits
+    ? (Object.freeze([...spec.traits]) as readonly CodecTrait[])
+    : (Object.freeze([]) as readonly CodecTrait[]);
+
+  const buildSqlCodec = (): Codec<Id, TTraits, TWire, TInput> =>
+    ({
+      id: spec.codecId,
+      encode: (value, ctx) => {
+        try {
+          return Promise.resolve(userEncode(value, ctx));
+        } catch (error) {
+          return Promise.reject(error);
+        }
+      },
+      decode: (wire, ctx) => {
+        try {
+          return Promise.resolve(userDecode(wire, ctx));
+        } catch (error) {
+          return Promise.reject(error);
+        }
+      },
+      encodeJson: (widenedSpec.encodeJson ?? identity) as (value: TInput) => JsonValue,
+      decodeJson: (widenedSpec.decodeJson ?? identity) as (json: JsonValue) => TInput,
+    }) as Codec<Id, TTraits, TWire, TInput>;
+
+  const sharedCodec = buildSqlCodec();
+  const factory: CodecDescriptor<TParams>['factory'] = () => () => sharedCodec;
+
+  // `voidParamsSchema` validates `void`/`undefined` params; widen
+  // through `unknown` to populate the descriptor's
+  // `StandardSchemaV1<TParams>` slot when the caller didn't supply a
+  // `paramsSchema` (TParams defaults to `void`). The runtime validation
+  // contract is preserved — the framework supplies no params at the
+  // call boundary for non-parameterized codecs.
+  const paramsSchema = (spec.paramsSchema ??
+    (voidParamsSchema as unknown as StandardSchemaV1<TParams>)) as StandardSchemaV1<TParams>;
+
+  return {
+    codecId: spec.codecId,
+    traits,
+    targetTypes: spec.targetTypes,
+    paramsSchema,
+    factory,
+    ...(spec.meta !== undefined ? { meta: spec.meta } : {}),
+    ...(spec.renderOutputType !== undefined ? { renderOutputType: spec.renderOutputType } : {}),
+  };
+}
+
+/**
+ * Type helpers to extract codec types from a {@link CodecDescriptor}.
+ *
+ * The descriptor's runtime `factory` returns a {@link Codec} (the SQL-
+ * family extension of the framework `BaseCodec`); these helpers project
+ * the generic args back into a structural type-level surface for builder
+ * consumers (e.g. `dataTypes`, `descriptorCodecDefinitions`).
+ */
+type DescriptorResolvedCodec<D> =
+  D extends CodecDescriptor<infer _P> ? ReturnType<ReturnType<D['factory']>> : never;
+
+export type DescriptorCodecId<D> = D extends CodecDescriptor<unknown> ? D['codecId'] : never;
+
+export type DescriptorCodecInput<D> =
+  DescriptorResolvedCodec<D> extends BaseCodec<string, readonly CodecTrait[], unknown, infer In>
+    ? In
+    : never;
+
+export type DescriptorCodecTraits<D> =
+  DescriptorResolvedCodec<D> extends BaseCodec<string, infer TTraits, unknown, unknown>
+    ? TTraits[number] & CodecTrait
+    : never;
+
+/**
+ * Type helper to extract codec types from a descriptor builder instance
+ * keyed by scalar name.
+ */
+export type ExtractDescriptorCodecTypes<
+  ScalarNames extends {
+    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+  } = Record<never, never>,
+> = {
+  readonly [K in keyof ScalarNames as DescriptorCodecId<ScalarNames[K]>]: {
+    readonly input: DescriptorCodecInput<ScalarNames[K]>;
+    readonly output: DescriptorCodecInput<ScalarNames[K]>;
+    readonly traits: DescriptorCodecTraits<ScalarNames[K]>;
+  };
+};
+
+/**
+ * Builder interface for declaring codec descriptors keyed by an
+ * authoring-time scalar name. Produces the structural artifacts
+ * (`codecDefinitions`, `dataTypes`, `CodecTypes`) consumed by
+ * contributors and the contract authoring surface.
+ *
+ * Replaces {@link CodecDefBuilder} under TML-2357 M2; the legacy builder
+ * deletes once every consumer migrates.
+ */
+export interface CodecDescriptorBuilder<
+  ScalarNames extends {
+    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+  } = Record<never, never>,
+> {
+  readonly CodecTypes: ExtractDescriptorCodecTypes<ScalarNames>;
+
+  add<ScalarName extends string, D extends CodecDescriptor<unknown>>(
+    scalarName: ScalarName,
+    descriptor: D,
+  ): CodecDescriptorBuilder<
+    O.Overwrite<ScalarNames, Record<ScalarName, D>> & Record<ScalarName, D>
+  >;
+
+  /**
+   * The shipped descriptors as a tuple, ready to feed straight into a
+   * contributor's unified `codecs:` slot.
+   */
+  readonly descriptors: ReadonlyArray<CodecDescriptor<unknown>>;
+
+  readonly codecDefinitions: {
+    readonly [K in keyof ScalarNames]: {
+      readonly codecId: DescriptorCodecId<ScalarNames[K]>;
+      readonly scalar: K;
+      readonly descriptor: ScalarNames[K];
+      readonly input: DescriptorCodecInput<ScalarNames[K]>;
+      readonly output: DescriptorCodecInput<ScalarNames[K]>;
+      readonly jsType: DescriptorCodecInput<ScalarNames[K]>;
+    };
+  };
+
+  readonly dataTypes: {
+    readonly [K in keyof ScalarNames]: {
+      readonly [Id in keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>]: Id;
+    }[keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>];
+  };
+}
+
+class CodecDescriptorBuilderImpl<
+  ScalarNames extends {
+    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+  } = Record<never, never>,
+> implements CodecDescriptorBuilder<ScalarNames>
+{
+  private readonly _descriptors: ScalarNames;
+
+  public readonly CodecTypes: ExtractDescriptorCodecTypes<ScalarNames>;
+  public readonly dataTypes: {
+    readonly [K in keyof ScalarNames]: {
+      readonly [Id in keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>]: Id;
+    }[keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>];
+  };
+
+  constructor(descriptors: ScalarNames) {
+    this._descriptors = descriptors;
+
+    const codecTypes: Record<
+      string,
+      { readonly input: unknown; readonly output: unknown; readonly traits: unknown }
+    > = {};
+    for (const [, descriptor] of Object.entries(this._descriptors)) {
+      const d = descriptor as CodecDescriptor<unknown>;
+      codecTypes[d.codecId] = {
+        input: undefined as unknown as DescriptorCodecInput<typeof d>,
+        output: undefined as unknown as DescriptorCodecInput<typeof d>,
+        traits: undefined as unknown as DescriptorCodecTraits<typeof d>,
+      };
+    }
+    this.CodecTypes = codecTypes as ExtractDescriptorCodecTypes<ScalarNames>;
+
+    // biome-ignore lint/suspicious/noExplicitAny: dynamic key mapping requires any
+    const dataTypes = {} as any;
+    for (const key in this._descriptors) {
+      if (Object.hasOwn(this._descriptors, key)) {
+        const d = this._descriptors[key] as CodecDescriptor<unknown>;
+        dataTypes[key] = d.codecId;
+      }
+    }
+    this.dataTypes = dataTypes as {
+      readonly [K in keyof ScalarNames]: {
+        readonly [Id in keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>]: Id;
+      }[keyof ExtractDescriptorCodecTypes<Record<K, ScalarNames[K]>>];
+    };
+  }
+
+  add<ScalarName extends string, D extends CodecDescriptor<unknown>>(
+    scalarName: ScalarName,
+    descriptor: D,
+  ): CodecDescriptorBuilder<
+    O.Overwrite<ScalarNames, Record<ScalarName, D>> & Record<ScalarName, D>
+  > {
+    return new CodecDescriptorBuilderImpl({
+      ...this._descriptors,
+      [scalarName]: descriptor,
+    } as O.Overwrite<ScalarNames, Record<ScalarName, D>> & Record<ScalarName, D>);
+  }
+
+  get descriptors(): ReadonlyArray<CodecDescriptor<unknown>> {
+    return Object.values(this._descriptors as Record<string, CodecDescriptor<unknown>>);
+  }
+
+  get codecDefinitions(): {
+    readonly [K in keyof ScalarNames]: {
+      readonly codecId: DescriptorCodecId<ScalarNames[K]>;
+      readonly scalar: K;
+      readonly descriptor: ScalarNames[K];
+      readonly input: DescriptorCodecInput<ScalarNames[K]>;
+      readonly output: DescriptorCodecInput<ScalarNames[K]>;
+      readonly jsType: DescriptorCodecInput<ScalarNames[K]>;
+    };
+  } {
+    const result: Record<
+      string,
+      {
+        codecId: string;
+        scalar: string;
+        descriptor: CodecDescriptor<unknown>;
+        input: unknown;
+        output: unknown;
+        jsType: unknown;
+      }
+    > = {};
+
+    for (const [scalarName, descriptor] of Object.entries(this._descriptors)) {
+      const d = descriptor as CodecDescriptor<unknown>;
+      result[scalarName] = {
+        codecId: d.codecId,
+        scalar: scalarName,
+        descriptor: d,
+        input: undefined as unknown as DescriptorCodecInput<typeof d>,
+        output: undefined as unknown as DescriptorCodecInput<typeof d>,
+        jsType: undefined as unknown as DescriptorCodecInput<typeof d>,
+      };
+    }
+
+    return result as {
+      readonly [K in keyof ScalarNames]: {
+        readonly codecId: DescriptorCodecId<ScalarNames[K]>;
+        readonly scalar: K;
+        readonly descriptor: ScalarNames[K];
+        readonly input: DescriptorCodecInput<ScalarNames[K]>;
+        readonly output: DescriptorCodecInput<ScalarNames[K]>;
+        readonly jsType: DescriptorCodecInput<ScalarNames[K]>;
+      };
+    };
+  }
+}
+
+/**
+ * Create a new codec descriptor builder. Replaces {@link defineCodecs}
+ * under TML-2357 M2; the legacy builder deletes once every consumer
+ * migrates.
+ */
+export function defineCodecDescriptors(): CodecDescriptorBuilder<Record<never, never>> {
+  return new CodecDescriptorBuilderImpl({});
 }
