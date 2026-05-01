@@ -299,6 +299,18 @@ export type FindPathOutcome =
     };
 
 /**
+ * Routing context for {@link findPathWithDecision}. Both fields are optional;
+ * `refName` is only used to decorate the resulting `PathDecision` for the
+ * JSON envelope, and `required` defaults to an empty set (purely structural
+ * routing). They are passed via a single options object so the call sites
+ * cannot silently swap two adjacent string parameters.
+ */
+export interface FindPathWithDecisionOptions {
+  readonly refName?: string;
+  readonly required?: ReadonlySet<string>;
+}
+
+/**
  * Find the shortest path from `fromHash` to `toHash` and return structured
  * path-decision metadata for machine-readable output. When `required` is
  * non-empty, the returned path is the shortest one whose edges collectively
@@ -312,9 +324,9 @@ export function findPathWithDecision(
   graph: MigrationGraph,
   fromHash: string,
   toHash: string,
-  refName?: string,
-  required: ReadonlySet<string> = new Set(),
+  options: FindPathWithDecisionOptions = {},
 ): FindPathOutcome {
+  const { refName, required = new Set<string>() } = options;
   const requiredInvariants = [...required].sort();
 
   if (fromHash === toHash && required.size === 0) {

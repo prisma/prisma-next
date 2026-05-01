@@ -735,13 +735,10 @@ async function executeMigrationStatusCommand(
   let pathDecision: MigrationStatusResult['pathDecision'];
   if (mode === 'online') {
     const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
-    const outcome = findPathWithDecision(
-      graph,
-      originHash,
-      targetHash,
-      activeRefName,
-      effectiveRequired,
-    );
+    const outcome = findPathWithDecision(graph, originHash, targetHash, {
+      ...ifDefined('refName', activeRefName),
+      required: effectiveRequired,
+    });
     if (outcome.kind === 'ok') {
       pathDecision = toPathDecisionResult(outcome.decision);
     } else if (outcome.kind === 'unsatisfiable') {

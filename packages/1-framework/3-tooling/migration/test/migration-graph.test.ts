@@ -479,7 +479,7 @@ describe('findPathWithDecision', () => {
   it('includes ref metadata when provided', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, 'H1', 'H2', 'production');
+    const result = findPathWithDecision(graph, 'H1', 'H2', { refName: 'production' });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.refName).toBe('production');
@@ -528,7 +528,7 @@ describe('findPathWithDecision', () => {
   it('output shape matches expected keys', () => {
     const packages = chain([E, 'H1', 'm1'], ['H1', 'H2', 'm2']);
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, E, 'H2', 'staging');
+    const result = findPathWithDecision(graph, E, 'H2', { refName: 'staging' });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(Object.keys(result.decision).sort()).toMatchInlineSnapshot(`
@@ -577,7 +577,7 @@ describe('findPathWithDecision', () => {
   it('requiredInvariants reflects the caller-supplied set, sorted', () => {
     const packages = [pkgWithInvariants(E, 'H1', 'm1', { invariants: ['Y', 'X'] })];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, E, 'H1', undefined, new Set(['Y', 'X']));
+    const result = findPathWithDecision(graph, E, 'H1', { required: new Set(['Y', 'X']) });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.requiredInvariants).toEqual(['X', 'Y']);
@@ -589,7 +589,7 @@ describe('findPathWithDecision', () => {
       pkgWithInvariants('A', 'B', 'm2', { invariants: ['Y'] }),
     ];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, E, 'B', undefined, new Set(['X', 'Y']));
+    const result = findPathWithDecision(graph, E, 'B', { required: new Set(['X', 'Y']) });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.satisfiedInvariants).toEqual(['X', 'Y']);
@@ -602,7 +602,7 @@ describe('findPathWithDecision', () => {
       pkgWithInvariants('A', 'B', 'm2'),
     ];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, E, 'B', undefined, new Set(['X']));
+    const result = findPathWithDecision(graph, E, 'B', { required: new Set(['X']) });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.satisfiedInvariants).toEqual(['X']);
@@ -619,7 +619,7 @@ describe('findPathWithDecision', () => {
       pkgWithInvariants('C', 'D', 'm_right_close', { invariants: ['X'] }),
     ];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, 'A', 'D', undefined, new Set(['X']));
+    const result = findPathWithDecision(graph, 'A', 'D', { required: new Set(['X']) });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual([
@@ -637,7 +637,7 @@ describe('findPathWithDecision', () => {
       pkgWithInvariants('H1', 'H_off', 'm_offpath', { invariants: ['X'] }),
     ];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, 'H1', 'H3', undefined, new Set(['X']));
+    const result = findPathWithDecision(graph, 'H1', 'H3', { required: new Set(['X']) });
     expect(result.kind).toBe('unsatisfiable');
     if (result.kind !== 'unsatisfiable') return;
     expect(result.structuralPath.map((e) => e.dirName)).toEqual(['m_shortcut']);
@@ -653,7 +653,7 @@ describe('findPathWithDecision', () => {
       pkgWithInvariants('H1', 'H_off', 'm_offpath', { invariants: ['Y'] }),
     ];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, E, 'H3', undefined, new Set(['X', 'Y']));
+    const result = findPathWithDecision(graph, E, 'H3', { required: new Set(['X', 'Y']) });
     expect(result.kind).toBe('unsatisfiable');
     if (result.kind !== 'unsatisfiable') return;
     expect(result.missing).toEqual(['Y']);
@@ -662,7 +662,7 @@ describe('findPathWithDecision', () => {
   it('returns unreachable when from → to is structurally unreachable, regardless of required', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
-    expect(findPathWithDecision(graph, 'H1', 'H99', undefined, new Set(['X']))).toEqual({
+    expect(findPathWithDecision(graph, 'H1', 'H99', { required: new Set(['X']) })).toEqual({
       kind: 'unreachable',
     });
   });
@@ -670,7 +670,7 @@ describe('findPathWithDecision', () => {
   it('returns unsatisfiable on a no-op transition (from === to) when no self-edge covers required', () => {
     const packages = chain([E, 'H1', 'm1']);
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, 'H1', 'H1', undefined, new Set(['X']));
+    const result = findPathWithDecision(graph, 'H1', 'H1', { required: new Set(['X']) });
     expect(result.kind).toBe('unsatisfiable');
     if (result.kind !== 'unsatisfiable') return;
     expect(result.structuralPath).toEqual([]);
@@ -679,7 +679,7 @@ describe('findPathWithDecision', () => {
   it('preserves existing routing outcome when required is empty', () => {
     const packages = [pkgWithInvariants(E, 'H1', 'm1'), pkgWithInvariants('H1', 'H2', 'm2')];
     const graph = reconstructGraph(packages);
-    const withEmpty = findPathWithDecision(graph, E, 'H2', undefined, new Set());
+    const withEmpty = findPathWithDecision(graph, E, 'H2', { required: new Set() });
     const withoutRequired = findPathWithDecision(graph, E, 'H2');
     expect(withEmpty.kind).toBe('ok');
     expect(withoutRequired.kind).toBe('ok');
@@ -692,7 +692,7 @@ describe('findPathWithDecision', () => {
   it('selects a self-edge that covers the required invariant when from === to', () => {
     const packages = [pkg(E, 'H1', 'm0'), pkgSelfEdge('H1', 'm_self', { invariants: ['X'] })];
     const graph = reconstructGraph(packages);
-    const result = findPathWithDecision(graph, 'H1', 'H1', undefined, new Set(['X']));
+    const result = findPathWithDecision(graph, 'H1', 'H1', { required: new Set(['X']) });
     expect(result.kind).toBe('ok');
     if (result.kind !== 'ok') return;
     expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual(['m_self']);

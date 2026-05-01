@@ -310,13 +310,10 @@ async function executeMigrationApplyCommand(
       (refEntry?.invariants ?? []).filter((id) => !appliedInvariants.has(id)),
     );
 
-    const outcome = findPathWithDecision(
-      migrations.graph,
-      originHash,
-      destinationHash,
-      refName,
-      effectiveRequired,
-    );
+    const outcome = findPathWithDecision(migrations.graph, originHash, destinationHash, {
+      ...ifDefined('refName', refName),
+      required: effectiveRequired,
+    });
     if (outcome.kind === 'unsatisfiable') {
       return notOk(
         mapMigrationToolsError(
