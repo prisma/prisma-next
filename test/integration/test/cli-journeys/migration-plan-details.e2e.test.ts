@@ -12,7 +12,6 @@
  */
 
 import { join } from 'node:path';
-import { EMPTY_CONTRACT_HASH } from '@prisma-next/migration-tools/constants';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
@@ -69,7 +68,10 @@ withTempDir(({ createTempDir }) => {
 
         expect(result.ok, 'H.02: ok flag').toBe(true);
         expect(result.noOp, 'H.02: not a noop').toBe(false);
-        expect(result.from, 'H.02: from is empty hash').toBe(EMPTY_CONTRACT_HASH);
+        // Baseline migrations are encoded as `from: null` end-to-end; the live-
+        // marker layer still uses `EMPTY_CONTRACT_HASH` for "no marker present"
+        // but the manifest / plan-result surface no longer carries the sentinel.
+        expect(result.from, 'H.02: from is null (baseline)').toBeNull();
         expect(result.to, 'H.02: to is defined').toBeDefined();
         expect(result.dir, 'H.02: dir is defined').toBeDefined();
         expect(result.operations.length, 'H.02: has operations').toBeGreaterThan(0);
@@ -92,7 +94,7 @@ withTempDir(({ createTempDir }) => {
         ).resolves.toBeDefined();
 
         // H.04: chain linkage
-        expect(packages[0]!.metadata.from, 'H.04: from empty').toBe(EMPTY_CONTRACT_HASH);
+        expect(packages[0]!.metadata.from, 'H.04: from is null (baseline)').toBeNull();
         expect(packages[0]!.metadata.to, 'H.04: to matches plan output').toBe(result.to);
       },
       timeouts.spinUpPpgDev,
@@ -160,7 +162,7 @@ withTempDir(({ createTempDir }) => {
         const packages = await readMigrationsDir(migrationsDir);
         expect(packages, 'I.04: two migration packages').toHaveLength(2);
 
-        const destructivePkg = packages.find((p) => p.metadata.from !== EMPTY_CONTRACT_HASH)!;
+        const destructivePkg = packages.find((p) => p.metadata.from !== null)!;
         const destructiveOps = destructivePkg.ops.filter(
           (op) => op.operationClass === 'destructive',
         );

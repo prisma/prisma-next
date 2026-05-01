@@ -906,7 +906,7 @@ describe('ControlClient progress emission', () => {
         pendingMigrations: [
           {
             dirName: '001_init',
-            from: 'sha256:empty',
+            from: null,
             to: 'sha256:abc',
             toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
@@ -986,7 +986,7 @@ describe('ControlClient progress emission', () => {
         pendingMigrations: [
           {
             dirName: '001_init',
-            from: 'sha256:empty',
+            from: null,
             to: 'sha256:abc',
             toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],
@@ -1045,7 +1045,7 @@ describe('ControlClient progress emission', () => {
         pendingMigrations: [
           {
             dirName: '001_init',
-            from: 'sha256:empty',
+            from: null,
             to: 'sha256:aaa',
             toContract: createContract(),
             operations: [{ id: 'op1', label: 'CREATE TABLE', operationClass: 'additive' }],

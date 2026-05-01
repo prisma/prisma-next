@@ -347,7 +347,7 @@ describe('buildMigrationArtifacts', () => {
     );
   });
 
-  it('skips the from-side bookend check when meta.from is empty and existing.fromContract is null', () => {
+  it('skips the from-side bookend check when meta.from is null (baseline) and existing.fromContract is null', () => {
     const ops = [{ id: 'op1', label: 'Op', operationClass: 'additive' }];
     const existingMetadata: Partial<MigrationMetadata> = {
       fromContract: null,
@@ -355,7 +355,10 @@ describe('buildMigrationArtifacts', () => {
     };
 
     expect(() =>
-      buildMigrationArtifacts(makeMigration(ops, { from: '', to: 'sha256:to' }), existingMetadata),
+      buildMigrationArtifacts(
+        makeMigration(ops, { from: null, to: 'sha256:to' }),
+        existingMetadata,
+      ),
     ).not.toThrow();
   });
 
