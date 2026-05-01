@@ -27,7 +27,8 @@ create table if not exists prisma_contract.marker (
   canonical_version int,
   updated_at timestamptz not null default now(),
   app_tag text,
-  meta jsonb not null default '{}'
+  meta jsonb not null default '{}',
+  invariants text[] not null default '{}'
 );
 create table if not exists "user" (
   id uuid primary key default gen_random_uuid(),
