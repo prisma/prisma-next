@@ -119,6 +119,8 @@ describe('postgresServerless', () => {
 
   it('does not expose orm/runtime/transaction at runtime', () => {
     const db = postgresServerless({ contract });
+    // Probe runtime keys the typed surface intentionally hides so the negative
+    // assertion can index them by string without tripping the type checker.
     const indexable = db as unknown as Record<string, unknown>;
     expect(indexable['orm']).toBeUndefined();
     expect(indexable['runtime']).toBeUndefined();
