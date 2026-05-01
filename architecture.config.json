@@ -445,6 +445,48 @@
       "plane": "shared"
     },
     {
+      "glob": "packages/3-extensions/cipherstash/src/core/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/middleware/**",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/exports/index.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/exports/column-types.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/exports/control.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/exports/runtime.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/3-extensions/cipherstash/src/exports/middleware.ts",
+      "domain": "extensions",
+      "layer": "adapters",
+      "plane": "runtime"
+    },
+    {
       "glob": "packages/2-mongo-family/1-foundation/**",
       "domain": "mongo",
       "layer": "foundation",
