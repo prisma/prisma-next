@@ -277,7 +277,6 @@ async function executeMigrationPlanCommand(
       contract: toContractJson,
       schema: fromSchema,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'] },
-      fromHash,
       fromContract,
       frameworkComponents,
     });

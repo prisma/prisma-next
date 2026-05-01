@@ -83,10 +83,11 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
     contract,
     schema: schemaIR,
     policy,
-    // `db update` does not produce a `migration.ts`, so the from-hash on the
-    // resulting plan is never surfaced to authoring — pass null (the
-    // baseline encoding for `MigrationPlanner.plan({ fromHash })`).
-    fromHash: null,
+    // `db update` reconciles against the live introspected schema; there is
+    // no prior contract to derive a "from" identity from. The required
+    // `fromContract: null` makes that structural fact visible at the call
+    // site (vs. silently letting the planner default to a baseline plan).
+    fromContract: null,
     frameworkComponents,
   });
   if (plannerResult.kind === 'failure') {
