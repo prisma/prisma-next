@@ -18,7 +18,15 @@ import postgres from '@prisma-next/target-postgres/control';
 // example specifically replaces with a single env-gated config).
 import { contract } from './prisma/contract';
 
-const useTs = process.env['PRISMA_NEXT_CONTRACT_SOURCE'] === 'ts';
+const rawContractSource = process.env['PRISMA_NEXT_CONTRACT_SOURCE'];
+const contractSource =
+  rawContractSource === undefined || rawContractSource === '' ? 'psl' : rawContractSource;
+if (contractSource !== 'psl' && contractSource !== 'ts') {
+  throw new Error(
+    `PRISMA_NEXT_CONTRACT_SOURCE must be 'ts' or 'psl' (got: ${JSON.stringify(contractSource)}).`,
+  );
+}
+const useTs = contractSource === 'ts';
 
 // Note: `extensionPacks` is optional and intentionally omitted. The schema
 // property is `extensionPacks` (not `extensions` — `validateConfig` rejects
