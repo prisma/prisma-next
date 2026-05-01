@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "prisma-next-cloudflare-worker",
+  "main": "src/worker.ts",
+  "compatibility_date": "2025-07-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "hyperdrive": [
+    {
+      // Production binding ID is provisioned in M4 task 4.2 via `wrangler hyperdrive create`.
+      // For local dev (`wrangler dev`) and CI (vitest-pool-workers) the binding's
+      // localConnectionString is sourced from .dev.vars (see README).
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "$LOCAL_DATABASE_URL"
+    }
+  ]
+}
