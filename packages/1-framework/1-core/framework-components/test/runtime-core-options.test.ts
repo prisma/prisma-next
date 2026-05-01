@@ -1,6 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { CodecCallContext } from '../src/codec-types';
+import type { CodecCallContext } from '../src/shared/codec-types';
 import type { ExecutionPlan, QueryPlan } from '../src/execution/query-plan';
 import { RuntimeCore } from '../src/execution/runtime-core';
 import { isRuntimeError } from '../src/execution/runtime-error';
