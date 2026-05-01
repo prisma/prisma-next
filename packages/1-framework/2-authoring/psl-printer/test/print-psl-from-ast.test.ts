@@ -683,7 +683,7 @@ describe('printPslFromAst', () => {
   });
 
   it('parser → printer → parser round-trip for a small schema', () => {
-    const source = `// This file was introspected from the database. Do not edit manually.
+    const source = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
 model User {
   id    Int    @id

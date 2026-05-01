@@ -15,7 +15,7 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
       "
     `);
   });
@@ -40,7 +40,7 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model User {
         id    Int     @id
@@ -75,7 +75,7 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       // WARNING: This table has no primary key in the database
       model AuditLog {
@@ -112,7 +112,7 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       model OrderItem {
         orderId   Int @map("order_id")

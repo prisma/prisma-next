@@ -12,8 +12,13 @@ import type { PrintDocument } from './print-document';
 import { escapePslString } from './serialize-print-document';
 import type { PrinterEnum, PrinterField, PrinterModel, PrinterNamedType } from './types';
 
+// `contract infer` produces a starting-point PSL contract from a live database
+// schema; the user is expected to edit it (rename models/fields, tighten types,
+// add `@id` where introspection couldn't infer one, etc.) and then run
+// `contract emit` to produce the canonical artifacts. The header invites that
+// workflow rather than warning against it.
 const DEFAULT_AST_PRINT_HEADER =
-  '// This file was introspected from the database. Do not edit manually.';
+  '// Contract inferred from the live database schema. Edit as needed, then run `prisma-next contract emit`.';
 
 export function astDocumentToPrintDocument(ast: PslDocumentAst): PrintDocument {
   const modelNames = new Set(ast.models.map((m) => m.name));

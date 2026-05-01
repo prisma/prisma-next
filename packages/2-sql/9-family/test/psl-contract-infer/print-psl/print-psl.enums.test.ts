@@ -38,7 +38,7 @@ describe('printPsl', () => {
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum UserRole {
         USER
@@ -95,7 +95,7 @@ describe('printPsl', () => {
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum DeploymentStatus {
         READY
@@ -148,7 +148,7 @@ describe('printPsl', () => {
 
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
-      "// This file was introspected from the database. Do not edit manually.
+      "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum Role {
         value
