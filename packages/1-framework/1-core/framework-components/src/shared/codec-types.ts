@@ -149,7 +149,6 @@ export const emptyCodecLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-
 /**
  * Family-agnostic per-instance context supplied by the framework when
  * applying a higher-order codec factory. Allows stateful codecs (e.g.
@@ -313,5 +312,44 @@ export function synthesizeNonParameterizedDescriptor(
     paramsSchema: voidParamsSchema,
     factory: sharedFactory,
     ...(meta.meta !== undefined ? { meta: meta.meta } : {}),
+  };
+}
+
+/**
+ * Compose a derived {@link CodecDescriptor} from an existing base
+ * descriptor by overlaying a new `codecId`, a new `targetTypes` set, and
+ * optional new `meta`. The alias's `factory` delegates to the base
+ * factory, then rewrites `id` on the resolved codec so per-instance
+ * decode-error envelopes report the alias id.
+ *
+ * Replaces the legacy `aliasCodec` helper (TML-2357 T2.1) — composes at
+ * the descriptor level rather than the codec-instance level so a single
+ * registration slot ships the alias.
+ *
+ * Per-instance state on the base codec (closure-captured params,
+ * derived helpers) is shared by the alias because the alias's factory
+ * passes its `params` straight through to the base factory and reuses
+ * the resulting codec's behavior.
+ */
+export function aliasDescriptor<P>(
+  base: CodecDescriptor<P>,
+  overrides: {
+    readonly codecId: string;
+    readonly targetTypes: readonly string[];
+    readonly meta?: CodecMeta;
+  },
+): CodecDescriptor<P> {
+  const factory: CodecDescriptor<P>['factory'] = (params) => (ctx) => {
+    const baseCodec = base.factory(params)(ctx);
+    return { ...baseCodec, id: overrides.codecId };
+  };
+  return {
+    codecId: overrides.codecId,
+    traits: base.traits,
+    targetTypes: overrides.targetTypes,
+    paramsSchema: base.paramsSchema,
+    factory,
+    ...(overrides.meta !== undefined ? { meta: overrides.meta } : {}),
+    ...(base.renderOutputType !== undefined ? { renderOutputType: base.renderOutputType } : {}),
   };
 }

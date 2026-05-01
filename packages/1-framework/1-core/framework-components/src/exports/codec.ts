@@ -9,6 +9,7 @@ export type {
   NonParameterizedDescriptorMeta,
 } from '../shared/codec-types';
 export {
+  aliasDescriptor,
   emptyCodecLookup,
   synthesizeNonParameterizedDescriptor,
   voidParamsSchema,
