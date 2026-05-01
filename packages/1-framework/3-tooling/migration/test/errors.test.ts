@@ -72,6 +72,20 @@ describe('errorNoInvariantPath', () => {
     });
     expect(err.fix).toMatch(/dataTransform/i);
   });
+
+  it('renders required and missing distinctly under partial coverage', () => {
+    // Partial coverage: required covers 3, structuralPath only provides 2.
+    // The why message must list the full required set and the missing
+    // subset separately so an operator can tell at a glance which ones
+    // failed.
+    const err = errorNoInvariantPath({
+      required: ['a', 'b', 'c'],
+      missing: ['c'],
+      structuralPath: baseStructural,
+    });
+    expect(err.why).toContain('required=["a", "b", "c"]');
+    expect(err.why).toContain('missing=["c"]');
+  });
 });
 
 describe('errorUnknownInvariant', () => {
