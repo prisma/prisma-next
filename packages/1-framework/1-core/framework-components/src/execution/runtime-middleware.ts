@@ -9,6 +9,25 @@ export interface RuntimeLog {
   debug?(event: unknown): void;
 }
 
+/**
+ * Per-execute context threaded through every middleware phase
+ * (`beforeExecute`, `onRow`, `afterExecute`). Allocated once per
+ * `runtime.execute()` call and shared by reference across all
+ * middleware in the chain.
+ *
+ * - `signal` carries the per-query `AbortSignal` -- the same
+ *   reference that `runtime.execute(plan, { signal })` was invoked
+ *   with, and the same reference threaded into the per-call
+ *   `CodecCallContext` (ADR 207). Middleware that wraps a
+ *   network-backed SDK forwards `ctx.signal` into that SDK to
+ *   propagate caller cancellation; pure-CPU middleware ignores it.
+ *
+ * Symmetric plumbing across all middleware phases (rather than only
+ * `beforeExecute`) is a deliberate choice: a middleware that wraps a
+ * downstream observability hook or post-processor in `afterExecute` /
+ * `onRow` needs the same cancellation reach as its `beforeExecute`
+ * counterpart.
+ */
 export interface RuntimeMiddlewareContext {
   readonly contract: unknown;
   readonly mode: 'strict' | 'permissive';
@@ -32,6 +51,13 @@ export interface RuntimeMiddlewareContext {
    * — it is not (and should not be) further hashed by callers.
    */
   contentHash(exec: ExecutionPlan): Promise<string>;
+  /**
+   * Per-execute cancellation signal threaded through every middleware
+   * phase. Middleware that wraps async work or downstream cancellable
+   * primitives should observe this and abort early when the consumer
+   * cancels.
+   */
+  readonly signal?: AbortSignal;
 }
 
 export interface AfterExecuteResult {
