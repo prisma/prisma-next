@@ -53,7 +53,7 @@ const kmsSecretCodec = mongoCodec({
 
 > **Note.** Mongo's read path doesn't go through `codec.decode` (per ADR 204 cross-family scope notes), so the `decode` signature above accepts `ctx` for parity with the codec interface but the runtime doesn't currently invoke `decode` on the Mongo read side. Encode-side `ctx.signal` is observed at every recursion level of `resolveValue` so a mid-encode abort surfaces as `RUNTIME.ABORTED { phase: 'encode' }`.
 
-Existing single-arg authors (e.g. `(v: string) => v`) continue to compile and run unchanged. Aborts surface to the caller as `RUNTIME.ABORTED`; codec bodies that ignore the signal complete in the background (cooperative cancellation).
+Codec bodies that ignore `ctx.signal` complete in the background (cooperative cancellation); aborts still surface to the caller as `RUNTIME.ABORTED`.
 
 See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the codec runtime's async boundary contract, and [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) for the per-call context shape.
 

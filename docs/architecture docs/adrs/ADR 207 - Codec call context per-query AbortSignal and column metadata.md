@@ -220,10 +220,6 @@ The first round of this work landed `column?: { table; name }` on the framework-
 
 Threading `signal` and `columnRef` as separate arguments would pin two unrelated slots on a method that callers may grow more demands on. A named context grows additively: future fields (observability, cancellation-reason metadata, plan handle) land without re-touching the method signature.
 
-### A single ctx-bearing config signature for the factory (no union)
-
-The `codec()` / `mongoCodec()` config types are a **union of single-arg and two-arg author functions**. A simpler design — a single ctx-bearing signature `(value, ctx?) => …` — would be cleaner, but it widens `TInput` for in-tree codecs whose author signatures are non-trivial. `sqlTimestampCodec`'s `(value: string | Date): string` infers `TInput = string` only when the signature is single-arg; under a union shape the inference behaviour is preserved. Type-test pins guard this property.
-
 ### Standard `abortable(signal)` instead of closure-local sentinel
 
 The natural way to race a promise against a signal is `Promise.race([work, abortable(signal)])`, where `abortable` rejects with `signal.reason ?? new DOMException(...)`. That makes the rejection source ambiguous: a codec body that itself throws a `DOMException` is not stably distinguishable from an abort. We use a closure-local sentinel object instead — only the listener installed in this call ever rejects with this object reference — and an `error === sentinel` identity check after the race is unambiguous. This is load-bearing: a codec that throws `RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` passes that envelope through unchanged, even when a signal is supplied. The abort race never rewraps a codec-thrown envelope.
