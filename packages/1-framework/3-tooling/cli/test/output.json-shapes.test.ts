@@ -185,13 +185,21 @@ describe('MigrationStatusResult JSON shape', () => {
       summary: 'At ref "production" target',
       diagnostics: [],
       requiredInvariants: [],
+      // Invariant-aware-routing fields are present in online mode even when
+      // the ref declares no invariants (both arrays empty). Pin them in the
+      // wire shape so a regression that drops either marker-derived array
+      // fails this assertion.
+      appliedInvariants: [],
+      missingInvariants: [],
     };
     expect(Object.keys(result).sort()).toMatchInlineSnapshot(`
       [
+        "appliedInvariants",
         "contractHash",
         "diagnostics",
         "markerHash",
         "migrations",
+        "missingInvariants",
         "mode",
         "ok",
         "pathDecision",
