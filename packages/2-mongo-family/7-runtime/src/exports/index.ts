@@ -16,5 +16,15 @@ export {
   createMongoExecutionStack,
 } from '../mongo-execution-stack';
 export type { MongoMiddleware, MongoMiddlewareContext } from '../mongo-middleware';
+export type {
+  MongoParamRefEntry,
+  MongoParamRefEntryUnion,
+  MongoParamRefHandle,
+  MongoParamRefMutator,
+} from '../mongo-param-ref-mutator';
+export {
+  createMongoParamRefMutator,
+  flattenMongoParamRefs,
+} from '../mongo-param-ref-mutator';
 export type { MongoRuntime, MongoRuntimeOptions } from '../mongo-runtime';
 export { createMongoRuntime } from '../mongo-runtime';
