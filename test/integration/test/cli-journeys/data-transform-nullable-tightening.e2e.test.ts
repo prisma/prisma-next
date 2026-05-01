@@ -144,8 +144,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(dataTransformOp, 'dataTransform op exists').toBeDefined();
         expect(dataTransformOp.operationClass).toBe('data');
-        expect(dataTransformOp.check).not.toBeNull();
-        expect(dataTransformOp.run).toHaveLength(1);
+        expect(dataTransformOp.precheck).toHaveLength(1);
+        expect(dataTransformOp.execute).toHaveLength(1);
+        expect(dataTransformOp.postcheck).toHaveLength(1);
 
         const setNotNullOp = opsAfterEmit.find((op: { id: string }) =>
           op.id.includes('setNotNull.user.name'),
