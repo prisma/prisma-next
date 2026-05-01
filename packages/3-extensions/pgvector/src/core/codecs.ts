@@ -75,3 +75,86 @@ export const dataTypes = codecs.dataTypes;
 
 // Export types derived from codecs builder
 export type CodecTypes = typeof codecs.CodecTypes;
+
+// ---------------------------------------------------------------------------
+// Native CodecDescriptor for pgvector (TML-2357 T2.5). The runtime
+// extension protocol still ships the legacy `parameterizedCodecs:` slot
+// alongside; the M2 cleanup commit collapses both into a single
+// `codecs:` slot returning descriptors.
+// ---------------------------------------------------------------------------
+
+import { codecDescriptor, defineCodecDescriptors } from '@prisma-next/sql-relational-core/ast';
+import { type as arktype } from 'arktype';
+import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
+
+const vectorParamsSchema = arktype({
+  length: 'number',
+}).narrow((params, ctx) => {
+  const { length } = params;
+  if (!Number.isInteger(length)) {
+    return ctx.mustBe('an integer');
+  }
+  if (length < 1 || length > VECTOR_MAX_DIM) {
+    return ctx.mustBe(`in the range [1, ${VECTOR_MAX_DIM}]`);
+  }
+  return true;
+});
+
+export const pgVectorDescriptor = codecDescriptor<
+  typeof VECTOR_CODEC_ID,
+  readonly ['equality'],
+  string,
+  number[],
+  { readonly length: number }
+>({
+  codecId: VECTOR_CODEC_ID,
+  targetTypes: ['vector'],
+  traits: ['equality'],
+  paramsSchema: vectorParamsSchema,
+  renderOutputType: (params) => `Vector<${params.length}>`,
+  encode: (value) => {
+    if (!Array.isArray(value)) {
+      throw new Error('Vector value must be an array of numbers');
+    }
+    if (!value.every((v) => typeof v === 'number')) {
+      throw new Error('Vector value must contain only numbers');
+    }
+    return `[${value.join(',')}]`;
+  },
+  decode: (wire) => {
+    if (typeof wire !== 'string') {
+      throw new Error('Vector wire value must be a string');
+    }
+    if (!wire.startsWith('[') || !wire.endsWith(']')) {
+      throw new Error(`Invalid vector format: expected "[...]", got "${wire}"`);
+    }
+    const content = wire.slice(1, -1).trim();
+    if (content === '') {
+      return [];
+    }
+    return content.split(',').map((v) => {
+      const num = Number.parseFloat(v.trim());
+      if (Number.isNaN(num)) {
+        throw new Error(`Invalid vector value: "${v}" is not a number`);
+      }
+      return num;
+    });
+  },
+  meta: { db: { sql: { postgres: { nativeType: 'vector' } } } },
+});
+
+const pgvectorDescriptorsBuilder = defineCodecDescriptors().add('vector', pgVectorDescriptor);
+
+/**
+ * Descriptor view of the pgvector codecs, keyed by scalar name. Mirrors
+ * {@link codecDefinitions} for the descriptor shape (TML-2357 T2.5);
+ * the runtime extension switches to consume this descriptor list once
+ * the unified `codecs:` slot lands later in M2.
+ */
+export const codecDescriptorDefinitions = pgvectorDescriptorsBuilder.codecDefinitions;
+
+/**
+ * Flat array of every pgvector codec descriptor — ready to feed into a
+ * contributor's unified `codecs:` slot.
+ */
+export const codecDescriptorList = pgvectorDescriptorsBuilder.descriptors;

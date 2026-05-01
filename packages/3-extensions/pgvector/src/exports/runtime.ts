@@ -1,53 +1,17 @@
-import type { Codec, CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   RuntimeParameterizedCodecDescriptor,
   SqlRuntimeExtensionDescriptor,
 } from '@prisma-next/sql-runtime';
-import { type as arktype } from 'arktype';
-import { codecDefinitions } from '../core/codecs';
-import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from '../core/constants';
+import { codecDefinitions, pgVectorDescriptor } from '../core/codecs';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
 
-const vectorParamsSchema = arktype({
-  length: 'number',
-}).narrow((params, ctx) => {
-  const { length } = params;
-  if (!Number.isInteger(length)) {
-    return ctx.mustBe('an integer');
-  }
-  if (length < 1 || length > VECTOR_MAX_DIM) {
-    return ctx.mustBe(`in the range [1, ${VECTOR_MAX_DIM}]`);
-  }
-  return true;
-});
-
-// pgvector's encode is parameter-independent (the wire format `[v1,v2,...]`
-// doesn't care about declared length), so the resolved codec for every
-// `(length)` instance is the same shared codec object today. The factory
-// returns it directly; `ctx` is unused. When a future refactor wants per-
-// instance state (e.g. capping wire length to declared dimension), the
-// closure over `params` is the place to add it.
-//
-// The factory parameter types as the family-agnostic
-// `CodecInstanceContext` because pgvector doesn't read the SQL-specific
-// `usedAt` field. The SQL runtime materializer passes a
-// `SqlCodecInstanceContext`; family-agnostic factories are structurally
-// compatible with the SQL extended type.
-const sharedVectorCodec: Codec = codecDefinitions.vector.codec;
-const vectorFactory = (_params: { readonly length: number }) => (_ctx: CodecInstanceContext) =>
-  sharedVectorCodec;
-
-const parameterizedCodecDescriptors = [
-  {
-    codecId: VECTOR_CODEC_ID,
-    traits: ['equality'] as const,
-    targetTypes: ['vector'] as const,
-    paramsSchema: vectorParamsSchema,
-    renderOutputType: (params: { readonly length: number }) => `Vector<${params.length}>`,
-    factory: vectorFactory,
-  },
-] as const satisfies ReadonlyArray<
+// pgvector ships its codec as a native `CodecDescriptor` (TML-2357 T2.5).
+// The legacy `parameterizedCodecs:` slot still echoes it through the
+// `RuntimeParameterizedCodecDescriptor<P>` alias for the SQL contributor
+// protocol; the M2 cleanup commit collapses both slots into the unified
+// `codecs:` slot.
+const parameterizedCodecDescriptors = [pgVectorDescriptor] as const satisfies ReadonlyArray<
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
 >;
 
