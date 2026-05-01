@@ -509,6 +509,28 @@ describe('findPathWithDecision', () => {
     expect(result.decision.alternativeCount).toBeGreaterThan(0);
   });
 
+  it('omits a tieBreakReason when the chosen edge is not the lexicographic winner (invariants forced the choice)', () => {
+    // Diamond: A → B → D and A → C → D, where C → D provides "X".
+    // With X required, the chosen edge at A is the one routed toward C
+    // (the non-first sorted candidate). The tie-break is *not* what made
+    // the decision — the invariant did — so tieBreakReasons must remain
+    // empty. alternativeCount still reports the converging-paths count.
+    const packages = [
+      pkgWithInvariants(E, 'A', 'm0'),
+      pkgWithInvariants('A', 'B', 'm_left'),
+      pkgWithInvariants('A', 'C', 'm_right'),
+      pkgWithInvariants('B', 'D', 'm_left2'),
+      pkgWithInvariants('C', 'D', 'm_right2', { invariants: ['X'] }),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'A', 'D', { required: new Set(['X']) });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual(['m_right', 'm_right2']);
+    expect(result.decision.tieBreakReasons).toEqual([]);
+    expect(result.decision.alternativeCount).toBeGreaterThan(0);
+  });
+
   it('does not count dead-end outgoing edges as alternatives', () => {
     // At H1 there are two outgoing edges: one reaches H3 (shortcut), one
     // leads to a dead-end (H_dead) that never converges back. The dead-end
