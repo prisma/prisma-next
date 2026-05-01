@@ -72,10 +72,9 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 
 **Tasks:**
 
-- [ ] **2.1 — Decide package shape: new package vs. new entrypoint within `@prisma-next/postgres`.**
-  - Option A: new package `@prisma-next/postgres-serverless` (cleanest separation; new entry under `packages/3-extensions/postgres-serverless/`; needs an `architecture.config.json` glob entry).
-  - Option B: new entrypoint within `@prisma-next/postgres` (e.g. `@prisma-next/postgres/serverless`); shares the existing package's deps and tsdown config; one less package to maintain but two facades exported from one package.
-  - Decision criteria: layering integrity (the serverless facade must not pull anything new the Node one doesn't already), discoverability (separate import path is clearer), and example/example-doc clarity. Maker decides at task start; record in commit message and this plan as an amendment.
+- [ ] **2.1 — Add the `serverless` entrypoint to `@prisma-next/postgres`.**
+  - Decision (locked): **new entrypoint within the existing `@prisma-next/postgres` package**, exported as `@prisma-next/postgres/serverless`. Same package because the serverless facade shares all runtime dependencies (`pg`, `pg-cursor`, the existing PN runtime stack) with the Node `postgres()` factory; there are no new transitive deps to isolate, so a separate package would add maintenance cost without architectural benefit.
+  - Concretely: add `src/runtime/postgres-serverless.ts` (or similar), wire it into `package.json` `exports` under `./serverless`, add a `tsdown.config.ts` entry for the new build target, and update `architecture.config.json` only if the new entrypoint's plane/layer assignment needs a glob it doesn't already have (likely no change since the new file lives inside the existing package's runtime plane).
 - [ ] **2.2 — Implement `postgresServerless<TContract>({ contractJson, extensions, middleware })` factory.**
   - Construction shape mirrors `postgres()`: validate contract via `validateContract`, build the SQL execution stack via `createSqlExecutionStack`, build the execution context via `createExecutionContext`, build `db.sql` via `sqlBuilder({ context })`. Exposes `sql`, `context`, `stack`, `contract`. Does not expose `orm`, `runtime()`, `transaction()`.
   - (Satisfies: TC-1, TC-12.)
@@ -94,9 +93,8 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
   - Existing `@prisma-next/postgres` tests pass unchanged.
   - (Satisfies: TC-1, TC-2, TC-7, TC-10, TC-12, TC-20, TC-25.)
 - [ ] **2.6 — Package layering.**
-  - If 2.1 picks Option A (new package): add `architecture.config.json` glob entry mirroring the existing `@prisma-next/postgres` plane/layer/domain assignment. `pnpm lint:deps` must pass.
-  - If 2.1 picks Option B (new entrypoint in existing package): no architecture.config.json change.
-  - Either way: no new cross-domain imports. Driver-layer files untouched.
+  - No `architecture.config.json` change expected (new entrypoint lives inside the existing `@prisma-next/postgres` package's runtime plane). Confirm by running `pnpm lint:deps` after the entrypoint is wired.
+  - No new cross-domain imports. Driver-layer files untouched.
   - (Satisfies: TC-26, TC-18.)
 - [ ] **2.7 — README updates per doc-maintenance rule.**
   - Update `packages/3-extensions/postgres/README.md` (or the new package's README) to mention both facades and link to the deployment guide once it exists.
@@ -185,7 +183,7 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 
 Carried forward from the spec or surfaced during planning. Most resolve during execution.
 
-1. **Package shape (Option A vs. B)** — decided in M2 task 2.1. Affects the import path users write (`@prisma-next/postgres-serverless/runtime` vs. `@prisma-next/postgres/serverless`) and `architecture.config.json` whether a new package glob is needed.
+1. **Package shape** — locked: new entrypoint `@prisma-next/postgres/serverless` within the existing package. No new package, no new architecture.config.json glob. (M2 task 2.1.)
 2. **Where to install `vitest-pool-workers`** — root devDependency vs. example-local. Decide in M3 task 3.4. Probably example-local.
 3. **Cloudflare account for the smoke test (M4 task 4.2)** — needs a Cloudflare account with a Hyperdrive entitlement and a Postgres origin. The maker provisions or borrows; not blocking M2-M3.
 4. **Whether to draft a new ADR** for the facade asymmetry. Decide in M4 task 4.4.
