@@ -94,6 +94,9 @@ function evaluateAstLints(ast: AnyQueryAst): LintFinding[] {
     case 'insert':
       break;
 
+    case 'raw-sql':
+      break;
+
     // v8 ignore next 2
     default:
       throw new Error(`Unsupported AST kind: ${(ast satisfies never as { kind: string }).kind}`);
