@@ -78,14 +78,13 @@ function makeContract(
 function planForContract(
   contract: ReturnType<typeof makeContract>,
   origin: MongoSchemaIR = new MongoSchemaIR([]),
-  fromHash: string | null = null,
 ): MigrationPlan {
   const planner = new MongoMigrationPlanner();
   const result = planner.plan({
     contract,
     schema: origin,
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-    fromHash,
+    fromContract: null,
     frameworkComponents: [],
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');

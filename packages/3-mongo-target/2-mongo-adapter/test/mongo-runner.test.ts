@@ -98,11 +98,15 @@ function planForContract(
   fromHash: string | null = null,
 ) {
   const planner = new MongoMigrationPlanner();
+  // The planner derives `plan.origin` from `fromContract?.storage.storageHash`.
+  // Tests that need a specific origin hash on the plan synthesize a fromContract
+  // bare-minimum-shape with that storageHash.
+  const fromContract = fromHash === null ? null : bareContract(fromHash);
   const result = planner.plan({
     contract,
     schema: origin,
     policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-    fromHash,
+    fromContract,
     frameworkComponents: [],
   });
   if (result.kind !== 'success') throw new Error('Planner failed unexpectedly');
@@ -808,7 +812,7 @@ describe('MongoMigrationRunner - E2E round-trip', () => {
       contract,
       schema: new MongoSchemaIR([]),
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
-      fromHash: 'sha256:00',
+      fromContract: bareContract('sha256:00'),
       frameworkComponents: [],
     });
     if (ddlResult.kind !== 'success') throw new Error('Planner failed');

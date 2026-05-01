@@ -73,7 +73,7 @@ function planSuccess(
     contract,
     schema,
     policy,
-    fromHash: 'sha256:00',
+    fromContract: null,
     frameworkComponents: [],
   });
   expect(result.kind).toBe('success');
@@ -279,7 +279,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -309,7 +309,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -332,7 +332,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ADDITIVE_ONLY_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -914,7 +914,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -933,7 +933,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -955,7 +955,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -981,7 +981,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -1009,7 +1009,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: origin,
         policy: ALL_CLASSES_POLICY,
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -1028,7 +1028,7 @@ describe('MongoMigrationPlanner', () => {
         contract,
         schema: emptyIR(),
         policy: { allowedOperationClasses: [] },
-        fromHash: 'sha256:00',
+        fromContract: null,
         frameworkComponents: [],
       });
       expect(result.kind).toBe('failure');
@@ -1372,6 +1372,37 @@ describe('MongoMigrationPlanner', () => {
       expect(collectionNames).toEqual(['tasks']);
       expect(collectionNames).not.toContain('bug');
       expect(collectionNames).not.toContain('feature');
+    });
+  });
+
+  describe('plan().plan.origin', () => {
+    it('reflects fromContract.storage.storageHash when fromContract is supplied', () => {
+      const contract = makeContract({});
+      const fromContract = makeContract({});
+      const result = planner.plan({
+        contract,
+        schema: emptyIR(),
+        policy: ALL_CLASSES_POLICY,
+        fromContract,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('success');
+      if (result.kind !== 'success') throw new Error('Expected success');
+      expect(result.plan.origin).toEqual({ storageHash: fromContract.storage.storageHash });
+    });
+
+    it('is null when fromContract is null', () => {
+      const contract = makeContract({});
+      const result = planner.plan({
+        contract,
+        schema: emptyIR(),
+        policy: ALL_CLASSES_POLICY,
+        fromContract: null,
+        frameworkComponents: [],
+      });
+      expect(result.kind).toBe('success');
+      if (result.kind !== 'success') throw new Error('Expected success');
+      expect(result.plan.origin).toBeNull();
     });
   });
 

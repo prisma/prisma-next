@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
   MigrationOperationClass,
@@ -225,7 +226,12 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash: string | null;
+    /**
+     * The "from" contract (state the planner assumes the database starts at),
+     * or `null` for reconciliation flows. Used to populate `describe().from`
+     * on the produced plan as `fromContract?.storage.storageHash ?? null`.
+     */
+    readonly fromContract: Contract | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'mongo', 'mongo'>>;
   }): MigrationPlannerResult {
     const contract = options.contract as MongoContract;
@@ -234,7 +240,7 @@ export class MongoMigrationPlanner implements MigrationPlanner<'mongo', 'mongo'>
     return {
       kind: 'success',
       plan: new PlannerProducedMongoMigration(result.calls, {
-        from: options.fromHash,
+        from: options.fromContract?.storage.storageHash ?? null,
         to: contract.storage.storageHash,
       }),
     };
