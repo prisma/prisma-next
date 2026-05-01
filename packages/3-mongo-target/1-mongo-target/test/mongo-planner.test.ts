@@ -27,7 +27,10 @@ const ADDITIVE_ONLY_POLICY: MigrationOperationPolicy = {
   allowedOperationClasses: ['additive'],
 };
 
-function makeContract(collections: Record<string, MongoStorageCollection>): MongoContract {
+function makeContract(
+  collections: Record<string, MongoStorageCollection>,
+  storageHash = 'sha256:test-storage',
+): MongoContract {
   return {
     target: 'mongo',
     targetFamily: 'mongo',
@@ -38,7 +41,7 @@ function makeContract(collections: Record<string, MongoStorageCollection>): Mong
     roots: {},
     models: {},
     storage: {
-      storageHash: 'sha256:test-storage',
+      storageHash,
       collections,
     },
   } as unknown as MongoContract;
@@ -1377,8 +1380,10 @@ describe('MongoMigrationPlanner', () => {
 
   describe('plan().plan.origin', () => {
     it('reflects fromContract.storage.storageHash when fromContract is supplied', () => {
-      const contract = makeContract({});
-      const fromContract = makeContract({});
+      // Distinct storage hashes so the assertion fails if `origin` is
+      // accidentally derived from `destination` instead of `fromContract`.
+      const contract = makeContract({}, 'sha256:destination-only');
+      const fromContract = makeContract({}, 'sha256:from-only');
       const result = planner.plan({
         contract,
         schema: emptyIR(),
@@ -1388,7 +1393,7 @@ describe('MongoMigrationPlanner', () => {
       });
       expect(result.kind).toBe('success');
       if (result.kind !== 'success') throw new Error('Expected success');
-      expect(result.plan.origin).toEqual({ storageHash: fromContract.storage.storageHash });
+      expect(result.plan.origin).toEqual({ storageHash: 'sha256:from-only' });
     });
 
     it('is null when fromContract is null', () => {
