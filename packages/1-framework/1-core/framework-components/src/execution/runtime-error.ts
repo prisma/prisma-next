@@ -72,13 +72,12 @@ function resolveCategory(code: string): RuntimeErrorEnvelope['category'] {
 
 /**
  * Construct a `RUNTIME.ABORTED` envelope. Phase distinguishes where the
- * abort was observed (encode / decode / stream); cause carries the native
- * abort reason (typically `signal.reason`) — when undefined we synthesize
- * an `AbortError` `DOMException` so the envelope always exposes a cause.
+ * abort was observed (encode / decode / stream); cause carries `signal.reason`
+ * verbatim from the platform — native abort produces a `DOMException`,
+ * explicit `controller.abort(reason)` produces whatever the caller passed.
+ * No synthesis happens here.
  */
 export function runtimeAborted(phase: RuntimeAbortedPhase, cause?: unknown): RuntimeErrorEnvelope {
-  const resolvedCause =
-    cause === undefined ? new DOMException('The operation was aborted.', 'AbortError') : cause;
   const envelope = runtimeError(RUNTIME_ABORTED, `Operation aborted during ${phase}`, { phase });
-  return Object.assign(envelope, { cause: resolvedCause });
+  return Object.assign(envelope, { cause });
 }

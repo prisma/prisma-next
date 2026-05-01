@@ -26,10 +26,9 @@ describe('runtimeAborted()', () => {
     expect(err.cause).toBe(reason);
   });
 
-  it('falls back to a DOMException when no cause is supplied', () => {
+  it('leaves cause undefined when no cause is supplied', () => {
     const err = runtimeAborted('stream');
-    expect(err.cause).toBeInstanceOf(DOMException);
-    expect((err.cause as DOMException).name).toBe('AbortError');
+    expect(err.cause).toBeUndefined();
   });
 
   it('passes through a string reason as-is on cause', () => {
