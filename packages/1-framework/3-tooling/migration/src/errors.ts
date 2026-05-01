@@ -296,6 +296,17 @@ export function errorProvidedInvariantsMismatch(
   );
 }
 
+/**
+ * Wire-shape edge surfaced through the JSON envelope's
+ * `meta.structuralPath` of `MIGRATION.NO_INVARIANT_PATH`. Slim by design —
+ * authoring metadata (`createdAt`, `labels`) lives on `MigrationEdge` but
+ * is intentionally dropped here so the envelope stays stable across
+ * graph-internal refactors.
+ *
+ * Stability: any field added here is part of the public CLI JSON contract.
+ * Callers (CLI consumers, agents) must be able to treat
+ * `(dirName, migrationHash, from, to, invariants)` as the canonical shape.
+ */
 export interface NoInvariantPathStructuralEdge {
   readonly dirName: string;
   readonly migrationHash: string;
