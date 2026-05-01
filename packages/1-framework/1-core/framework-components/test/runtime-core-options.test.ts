@@ -24,7 +24,7 @@ class CtxRecordingRuntime extends RuntimeCore<MockPlan, MockExec, RuntimeMiddlew
   observedCtx: CodecCallContext | undefined;
   lowerCalls = 0;
 
-  protected override lower(plan: MockPlan, ctx?: CodecCallContext): MockExec {
+  protected override lower(plan: MockPlan, ctx: CodecCallContext): MockExec {
     this.lowerCalls += 1;
     this.observedCtx = ctx;
     return { compiledId: plan.draftId, meta: plan.meta };
@@ -51,18 +51,20 @@ const ctxValue: RuntimeMiddlewareContext = {
 const plan: MockPlan = { draftId: 'd', meta };
 
 describe('RuntimeCore.execute(plan, options?)', () => {
-  it('accepts execute(plan) with no options (back-compat)', async () => {
+  it('accepts execute(plan) with no options and threads a ctx with undefined signal', async () => {
     const runtime = new CtxRecordingRuntime({ middleware: [], ctx: ctxValue });
     const out = await runtime.execute(plan).toArray();
     expect(out).toEqual([{ ok: true }]);
-    expect(runtime.observedCtx).toBeUndefined();
+    expect(runtime.observedCtx).toBeDefined();
+    expect(runtime.observedCtx?.signal).toBeUndefined();
   });
 
-  it('accepts execute(plan, undefined) and execute(plan, {})', async () => {
+  it('accepts execute(plan, undefined) and execute(plan, {}) with undefined signal', async () => {
     const runtime = new CtxRecordingRuntime({ middleware: [], ctx: ctxValue });
     await runtime.execute(plan, undefined).toArray();
     await runtime.execute(plan, {}).toArray();
-    expect(runtime.observedCtx).toBeUndefined();
+    expect(runtime.observedCtx).toBeDefined();
+    expect(runtime.observedCtx?.signal).toBeUndefined();
   });
 
   it('threads ctx (carrying the signal) into lower() when signal is present', async () => {

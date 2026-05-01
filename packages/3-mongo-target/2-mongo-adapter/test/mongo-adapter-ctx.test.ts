@@ -170,19 +170,23 @@ describe('MongoAdapter — CodecCallContext threading', () => {
     expect(observed).toEqual([ctx]);
   });
 
-  it('regression — omitting ctx is bit-for-bit identical to today (codec sees undefined ctx)', async () => {
+  it('threading an empty ctx forwards that same empty ctx to the codec', async () => {
     const observed: (CodecCallContext | undefined)[] = [];
     const adapter = createMongoAdapter(recordingRegistry(observed));
+    const ctx: CodecCallContext = {};
 
-    await adapter.lower({
-      collection: 'users',
-      command: new InsertOneCommand('users', {
-        name: new MongoParamRef('alice', { codecId: 'test/recorder@1' }),
-      }),
-      meta: baseMeta,
-    });
+    await adapter.lower(
+      {
+        collection: 'users',
+        command: new InsertOneCommand('users', {
+          name: new MongoParamRef('alice', { codecId: 'test/recorder@1' }),
+        }),
+        meta: baseMeta,
+      },
+      ctx,
+    );
 
-    expect(observed).toEqual([undefined]);
+    expect(observed).toEqual([ctx]);
   });
 
   it('already-aborted ctx surfaces RUNTIME.ABORTED { phase: encode } from inside resolveValue (no codec call)', async () => {

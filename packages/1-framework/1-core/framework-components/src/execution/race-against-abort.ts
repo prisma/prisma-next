@@ -1,5 +1,18 @@
+import type { CodecCallContext } from './codec-types';
 import type { RuntimeAbortedPhase } from './runtime-error';
 import { runtimeAborted } from './runtime-error';
+
+/**
+ * Throw a phase-tagged `RUNTIME.ABORTED` envelope if the supplied
+ * codec-call context is already aborted at the precheck site. Centralises
+ * the `if (ctx.signal?.aborted) throw runtimeAborted(...)` pattern that
+ * every codec dispatch site repeats.
+ */
+export function checkAborted(ctx: CodecCallContext, phase: RuntimeAbortedPhase): void {
+  if (ctx.signal?.aborted) {
+    throw runtimeAborted(phase, ctx.signal.reason);
+  }
+}
 
 /**
  * Race a per-cell `Promise.all` (or any other in-flight work promise) against

@@ -5,11 +5,11 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import {
   AsyncIterableResult,
+  checkAborted,
   checkMiddlewareCompatibility,
   RuntimeCore,
   type RuntimeExecuteOptions,
   type RuntimeLog,
-  runtimeAborted,
   runtimeError,
   runWithMiddleware,
 } from '@prisma-next/framework-components/runtime';
@@ -191,16 +191,15 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
    * encoded parameters ready for the driver. This is the single point at
    * which params transition from app-layer values to driver wire-format.
    *
-   * The optional `ctx?: SqlCodecCallContext` is forwarded to
-   * `encodeParams` so per-query cancellation reaches every codec body
-   * during parameter encoding. The framework abstract typed this as
-   * `CodecCallContext`; the SQL family narrows it to the SQL-specific
-   * extension. SQL params do not populate `ctx.column` — encode-side
-   * column metadata is the middleware's domain.
+   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so per-query
+   * cancellation reaches every codec body during parameter encoding. The
+   * framework abstract typed this as `CodecCallContext`; the SQL family
+   * narrows it to the SQL-specific extension. SQL params do not populate
+   * `ctx.column` — encode-side column metadata is the middleware's domain.
    */
   protected override async lower(
     plan: SqlQueryPlan,
-    ctx?: SqlCodecCallContext,
+    ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
@@ -258,18 +257,16 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
     const self = this;
     const signal = options?.signal;
-    // One ctx per execute() call — the same `signal` instance is shared by
+    // One ctx per execute() call — the same reference is shared by
     // encodeParams (lower), decodeRow (per-row), and the stream loop's
     // between-row checks. Per-cell ctx allocations inside decodeField add
-    // `column` for resolvable cells without re-wrapping the signal.
-    const codecCtx: SqlCodecCallContext | undefined = signal ? { signal } : undefined;
+    // `column` for resolvable cells without re-wrapping the signal. The
+    // ctx object is always allocated; the `signal` field is only included
+    // when a signal was supplied (exactOptionalPropertyTypes).
+    const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
-      // Pre-check at entry: an already-aborted caller observes
-      // RUNTIME.ABORTED on the first `next()` without any work being done.
-      if (signal?.aborted) {
-        throw runtimeAborted('stream', signal.reason);
-      }
+      checkAborted(codecCtx, 'stream');
 
       const exec: SqlExecutionPlan = isExecutionPlan(plan)
         ? Object.freeze({
@@ -316,9 +313,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         const iterator = stream[Symbol.asyncIterator]();
         try {
           while (true) {
-            if (signal?.aborted) {
-              throw runtimeAborted('stream', signal.reason);
-            }
+            checkAborted(codecCtx, 'stream');
             const next = await iterator.next();
             if (next.done) {
               break;

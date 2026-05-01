@@ -135,7 +135,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
       { value: 'y', codecId: 'test/passthrough@1' },
     ]);
 
-    expect(await encodeParams(p, registry)).toEqual(['wire:x', 'wire:y']);
+    expect(await encodeParams(p, registry, {})).toEqual(['wire:x', 'wire:y']);
   });
 
   it('already-aborted signal at entry short-circuits before any codec call', async () => {

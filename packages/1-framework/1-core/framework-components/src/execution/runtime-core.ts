@@ -75,12 +75,15 @@ export abstract class RuntimeCore<
    * Family-specific: SQL produces `{ sql, params, ast?, ... }`; Mongo
    * produces `{ command, ... }`.
    *
-   * The optional `ctx` carries per-query cancellation (and any future
-   * fields on `CodecCallContext`); concrete subclasses forward it to the
+   * `ctx` carries per-query cancellation (and any future fields on
+   * `CodecCallContext`); concrete subclasses forward it to the
    * encode-side codec dispatch site (e.g. SQL's `encodeParams` in m2,
-   * Mongo's `resolveValue` in m3).
+   * Mongo's `resolveValue` in m3). The runtime allocates one ctx per
+   * `execute()` call and threads the same reference everywhere; the
+   * `signal` field inside may be `undefined`, but the ctx object itself
+   * is always present.
    */
-  protected abstract lower(plan: TPlan, ctx?: CodecCallContext): TExec | Promise<TExec>;
+  protected abstract lower(plan: TPlan, ctx: CodecCallContext): TExec | Promise<TExec>;
 
   /**
    * Drive the underlying transport for a lowered `TExec`. Yields raw rows
@@ -102,7 +105,11 @@ export abstract class RuntimeCore<
   ): AsyncIterableResult<Row> {
     const self = this;
     const signal = options?.signal;
-    const codecCtx: CodecCallContext | undefined = signal ? { signal } : undefined;
+    // One ctx per execute() call. The ctx object is always allocated; the
+    // `signal` field is only included when a signal was supplied (required
+    // under exactOptionalPropertyTypes — `{ signal: undefined }` would not
+    // satisfy `signal?: AbortSignal`).
+    const codecCtx: CodecCallContext = signal === undefined ? {} : { signal };
 
     async function* generator(): AsyncGenerator<Row, void, unknown> {
       // Pre-check the signal at entry so an already-aborted caller observes

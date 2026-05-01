@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { raceAgainstAbort } from '../src/execution/race-against-abort';
-import { isRuntimeError, runtimeError } from '../src/runtime-error';
+import { checkAborted, raceAgainstAbort } from '../src/execution/race-against-abort';
+import { isRuntimeError, runtimeError } from '../src/execution/runtime-error';
 
 function deferred<T>(): {
   promise: Promise<T>;
@@ -144,6 +144,34 @@ describe('raceAgainstAbort', () => {
     expect((error as { cause?: unknown }).cause).toBe(controller.signal.reason);
 
     work.resolve('late');
+  });
+});
+
+describe('checkAborted', () => {
+  it('returns silently when the ctx has no signal', () => {
+    expect(() => checkAborted({}, 'encode')).not.toThrow();
+  });
+
+  it('returns silently when the signal is not aborted', () => {
+    const controller = new AbortController();
+    expect(() => checkAborted({ signal: controller.signal }, 'decode')).not.toThrow();
+  });
+
+  it('throws RUNTIME.ABORTED tagged with the phase and signal.reason as cause', () => {
+    const controller = new AbortController();
+    const reason = new Error('caller cancelled');
+    controller.abort(reason);
+    let caught: unknown;
+    try {
+      checkAborted({ signal: controller.signal }, 'stream');
+    } catch (error) {
+      caught = error;
+    }
+    expect(caught).toMatchObject({
+      code: 'RUNTIME.ABORTED',
+      details: { phase: 'stream' },
+      cause: reason,
+    });
   });
 });
 

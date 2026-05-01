@@ -1,7 +1,7 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import {
+  checkAborted,
   raceAgainstAbort,
-  runtimeAborted,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
@@ -22,7 +22,7 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
  * and the original error attached on `cause`. An already-wrapped envelope is
  * re-thrown verbatim so nested resolvers don't double-wrap.
  *
- * The optional `ctx?: CodecCallContext` is forwarded verbatim to every
+ * `ctx: CodecCallContext` is forwarded verbatim to every
  * `codec.encode(value, ctx)` call. The same `ctx` reference is also passed
  * to nested `resolveValue` invocations so codec authors observe **signal
  * identity** across the entire recursive walk for one `runtime.execute()`.
@@ -42,16 +42,14 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
  */
 export async function resolveValue(
   value: MongoValue,
-  codecs?: MongoCodecRegistry,
-  ctx?: CodecCallContext,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
 ): Promise<unknown> {
-  const signal = ctx?.signal;
-  if (signal?.aborted) {
-    throw runtimeAborted('encode', signal.reason);
-  }
+  checkAborted(ctx, 'encode');
+  const signal = ctx.signal;
 
   if (value instanceof MongoParamRef) {
-    if (value.codecId && codecs) {
+    if (value.codecId) {
       const codec = codecs.get(value.codecId);
       if (codec?.encode) {
         try {

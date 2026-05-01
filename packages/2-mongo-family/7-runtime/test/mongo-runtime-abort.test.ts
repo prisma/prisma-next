@@ -23,15 +23,15 @@ function createPlan(overrides?: Partial<MongoQueryPlan>): MongoQueryPlan {
 
 interface RecordingAdapter {
   adapter: MongoAdapter;
-  observed: Array<CodecCallContext | undefined>;
+  observed: Array<CodecCallContext>;
   callCount: { current: number };
 }
 
 function recordingAdapter(): RecordingAdapter {
-  const observed: Array<CodecCallContext | undefined> = [];
+  const observed: Array<CodecCallContext> = [];
   const callCount = { current: 0 };
   const adapter = {
-    lower: vi.fn(async (plan: MongoQueryPlan, ctx?: CodecCallContext) => {
+    lower: vi.fn(async (plan: MongoQueryPlan, ctx: CodecCallContext) => {
       callCount.current += 1;
       observed.push(ctx);
       return {
@@ -63,7 +63,7 @@ async function drain(iter: AsyncIterable<unknown>): Promise<unknown[]> {
 }
 
 describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () => {
-  it('regression — execute(plan) with no options is bit-for-bit identical to today (adapter.lower sees undefined ctx)', async () => {
+  it('execute(plan) with no options threads a ctx whose signal is undefined', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
       adapter,
@@ -74,10 +74,11 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
 
     const rows = await drain(runtime.execute(createPlan()));
     expect(rows).toHaveLength(1);
-    expect(observed).toEqual([undefined]);
+    expect(observed).toHaveLength(1);
+    expect(observed[0]?.signal).toBeUndefined();
   });
 
-  it('regression — execute(plan, undefined) and execute(plan, {}) match the no-options shape (adapter.lower sees undefined ctx)', async () => {
+  it('execute(plan, undefined) and execute(plan, {}) thread ctx with undefined signal', async () => {
     const { adapter, observed } = recordingAdapter();
     const runtime = createMongoRuntime({
       adapter,
@@ -88,7 +89,9 @@ describe('MongoRuntime — execute(plan, options?) abort + ctx threading', () =>
 
     await drain(runtime.execute(createPlan(), undefined));
     await drain(runtime.execute(createPlan(), {}));
-    expect(observed).toEqual([undefined, undefined]);
+    expect(observed).toHaveLength(2);
+    expect(observed[0]?.signal).toBeUndefined();
+    expect(observed[1]?.signal).toBeUndefined();
   });
 
   it('threads { signal } through execute → lower → adapter.lower as a CodecCallContext (signal identity preserved)', async () => {

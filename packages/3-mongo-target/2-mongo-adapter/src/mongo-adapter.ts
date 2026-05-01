@@ -29,13 +29,13 @@ function isUpdatePipeline(
 }
 
 class MongoAdapterImpl implements MongoAdapter {
-  readonly #codecs: MongoCodecRegistry | undefined;
+  readonly #codecs: MongoCodecRegistry;
 
-  constructor(codecs?: MongoCodecRegistry) {
+  constructor(codecs: MongoCodecRegistry) {
     this.#codecs = codecs;
   }
 
-  async #resolveDocument(expr: MongoExpr, ctx?: CodecCallContext): Promise<Document> {
+  async #resolveDocument(expr: MongoExpr, ctx: CodecCallContext): Promise<Document> {
     const entries = Object.entries(expr);
     const resolved = await Promise.all(
       entries.map(([, val]) => resolveValue(val, this.#codecs, ctx)),
@@ -52,7 +52,7 @@ class MongoAdapterImpl implements MongoAdapter {
 
   async #lowerUpdate(
     update: MongoUpdateSpec,
-    ctx?: CodecCallContext,
+    ctx: CodecCallContext,
   ): Promise<Document | ReadonlyArray<Document>> {
     if (isUpdatePipeline(update)) {
       return Promise.all(update.map((stage) => lowerStage(stage, this.#codecs, ctx)));
@@ -60,7 +60,7 @@ class MongoAdapterImpl implements MongoAdapter {
     return this.#resolveDocument(update, ctx);
   }
 
-  async lower(plan: MongoQueryPlan, ctx?: CodecCallContext): Promise<AnyMongoWireCommand> {
+  async lower(plan: MongoQueryPlan, ctx: CodecCallContext): Promise<AnyMongoWireCommand> {
     const { command } = plan;
     switch (command.kind) {
       case 'insertOne':

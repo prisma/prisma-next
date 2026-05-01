@@ -55,6 +55,7 @@ describe('cross-family codec parity (T4.1)', () => {
     const mongoWire = await resolveValue(
       new MongoParamRef('abc-123', { codecId: 'shared/object-id-like@1' }),
       mongoRegistry,
+      {},
     );
 
     expect(mongoWire).toBe('wire:abc-123');

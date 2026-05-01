@@ -140,8 +140,8 @@ export function lowerAggExpr(expr: MongoAggExpr): unknown {
 
 export async function lowerFilter(
   filter: MongoFilterExpr,
-  codecs?: MongoCodecRegistry,
-  ctx?: CodecCallContext,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
 ): Promise<Document> {
   switch (filter.kind) {
     case 'field':
@@ -206,8 +206,8 @@ function lowerWindowField(wf: MongoWindowField): Record<string, unknown> {
 
 export async function lowerStage(
   stage: MongoPipelineStage,
-  codecs?: MongoCodecRegistry,
-  ctx?: CodecCallContext,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
 ): Promise<Record<string, unknown>> {
   switch (stage.kind) {
     case 'match':
@@ -424,8 +424,8 @@ export async function lowerStage(
 
 export async function lowerPipeline(
   stages: ReadonlyArray<MongoPipelineStage>,
-  codecs?: MongoCodecRegistry,
-  ctx?: CodecCallContext,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
 ): Promise<Array<Record<string, unknown>>> {
   return Promise.all(stages.map((s) => lowerStage(s, codecs, ctx)));
 }

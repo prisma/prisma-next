@@ -22,6 +22,12 @@ function testRegistry() {
   return registry;
 }
 
+function emptyRegistry() {
+  return createMongoCodecRegistry();
+}
+
+const noCtx = {} as const;
+
 function deferred<T>(): {
   promise: Promise<T>;
   resolve: (v: T) => void;
@@ -36,27 +42,27 @@ function deferred<T>(): {
 describe('resolveValue', () => {
   it('unwraps MongoParamRef without codec registry', async () => {
     const ref = new MongoParamRef('hello');
-    expect(await resolveValue(ref)).toBe('hello');
+    expect(await resolveValue(ref, emptyRegistry(), noCtx)).toBe('hello');
   });
 
   it('unwraps MongoParamRef without codecId even when registry is provided', async () => {
     const ref = new MongoParamRef('hello');
-    expect(await resolveValue(ref, testRegistry())).toBe('hello');
+    expect(await resolveValue(ref, testRegistry(), noCtx)).toBe('hello');
   });
 
   it('applies codec encode when MongoParamRef has codecId and registry has codec', async () => {
     const ref = new MongoParamRef('hello', { codecId: 'test/uppercase@1' });
-    expect(await resolveValue(ref, testRegistry())).toBe('HELLO');
+    expect(await resolveValue(ref, testRegistry(), noCtx)).toBe('HELLO');
   });
 
-  it('falls back to raw value when codecId is set but registry is not provided', async () => {
+  it('falls back to raw value when codecId is set but registry is empty', async () => {
     const ref = new MongoParamRef('hello', { codecId: 'test/uppercase@1' });
-    expect(await resolveValue(ref)).toBe('hello');
+    expect(await resolveValue(ref, emptyRegistry(), noCtx)).toBe('hello');
   });
 
   it('falls back to raw value when codecId is not in registry', async () => {
     const ref = new MongoParamRef('hello', { codecId: 'test/unknown@1' });
-    expect(await resolveValue(ref, testRegistry())).toBe('hello');
+    expect(await resolveValue(ref, testRegistry(), noCtx)).toBe('hello');
   });
 
   it('encodes nested MongoParamRef with codecId inside object', async () => {
@@ -64,29 +70,29 @@ describe('resolveValue', () => {
       name: new MongoParamRef('alice'),
       label: new MongoParamRef('greeting', { codecId: 'test/uppercase@1' }),
     };
-    const result = (await resolveValue(doc, testRegistry())) as Record<string, unknown>;
+    const result = (await resolveValue(doc, testRegistry(), noCtx)) as Record<string, unknown>;
     expect(result['name']).toBe('alice');
     expect(result['label']).toBe('GREETING');
   });
 
   it('encodes MongoParamRef with codecId inside array', async () => {
     const arr = [new MongoParamRef('a', { codecId: 'test/uppercase@1' }), new MongoParamRef('b')];
-    const result = (await resolveValue(arr, testRegistry())) as unknown[];
+    const result = (await resolveValue(arr, testRegistry(), noCtx)) as unknown[];
     expect(result[0]).toBe('A');
     expect(result[1]).toBe('b');
   });
 
   it('preserves null, primitive, and Date values', async () => {
-    expect(await resolveValue(null)).toBeNull();
-    expect(await resolveValue(42)).toBe(42);
-    expect(await resolveValue('raw')).toBe('raw');
+    expect(await resolveValue(null, emptyRegistry(), noCtx)).toBeNull();
+    expect(await resolveValue(42, emptyRegistry(), noCtx)).toBe(42);
+    expect(await resolveValue('raw', emptyRegistry(), noCtx)).toBe('raw');
     const d = new Date();
-    expect(await resolveValue(d)).toBe(d);
+    expect(await resolveValue(d, emptyRegistry(), noCtx)).toBe(d);
   });
 
   describe('async dispatch — codec encode + concurrent encoding', () => {
     it('returns a Promise', () => {
-      const result = resolveValue(new MongoParamRef('x'));
+      const result = resolveValue(new MongoParamRef('x'), emptyRegistry(), noCtx);
       expect(typeof (result as { then?: unknown }).then).toBe('function');
     });
 
@@ -123,7 +129,7 @@ describe('resolveValue', () => {
         b: new MongoParamRef('beta', { codecId: 'test/async-b@1' }),
       };
 
-      const resultPromise = resolveValue(doc, registry);
+      const resultPromise = resolveValue(doc, registry, noCtx);
 
       // Both encode functions must have started before either resolves —
       // i.e. dispatch is concurrent, not sequential.
@@ -162,7 +168,7 @@ describe('resolveValue', () => {
         new MongoParamRef('two', { codecId: 'test/seq@1' }),
       ];
 
-      const resultPromise = resolveValue(arr, registry);
+      const resultPromise = resolveValue(arr, registry, noCtx);
 
       await new Promise((r) => setImmediate(r));
       expect(callOrder).toEqual(['start:one', 'start:two']);
@@ -177,7 +183,7 @@ describe('resolveValue', () => {
     it('passes through non-MongoParamRef values unchanged (identity passthrough)', async () => {
       // A plain value with no MongoParamRef inside should round-trip identical structure.
       const input = { x: 1, y: [2, 3], z: { nested: 'leaf' } };
-      const result = await resolveValue(input);
+      const result = await resolveValue(input, emptyRegistry(), noCtx);
       expect(result).toEqual(input);
     });
   });
@@ -196,7 +202,9 @@ describe('resolveValue', () => {
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
-      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const rejection = (await resolveValue(ref, registry, noCtx).catch(
+        (e: unknown) => e,
+      )) as Error;
       expect(rejection).toBeInstanceOf(Error);
       const err = rejection as RuntimeErrorShape;
       expect(err.code).toBe('RUNTIME.ENCODE_FAILED');
@@ -222,7 +230,9 @@ describe('resolveValue', () => {
         codecId: 'test/failing@1',
         name: 'user.email',
       });
-      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const rejection = (await resolveValue(ref, registry, noCtx).catch(
+        (e: unknown) => e,
+      )) as Error;
       const err = rejection as RuntimeErrorShape;
       expect(err.details?.['label']).toBe('user.email');
       expect(err.message).toContain('user.email');
@@ -241,7 +251,9 @@ describe('resolveValue', () => {
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
-      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const rejection = (await resolveValue(ref, registry, noCtx).catch(
+        (e: unknown) => e,
+      )) as Error;
       const err = rejection as RuntimeErrorShape;
       expect(err.details?.['label']).toBe('test/failing@1');
     });
@@ -261,7 +273,9 @@ describe('resolveValue', () => {
       registry.register(innerCodec);
 
       const ref = new MongoParamRef('x', { codecId: 'test/already-wrapped@1' });
-      const rejection = (await resolveValue(ref, registry).catch((e: unknown) => e)) as Error;
+      const rejection = (await resolveValue(ref, registry, noCtx).catch(
+        (e: unknown) => e,
+      )) as Error;
       const err = rejection as RuntimeErrorShape;
       expect(err.code).toBe('RUNTIME.ENCODE_FAILED');
       expect(err.message).toBe('original');

@@ -35,7 +35,7 @@ const secretCodec = mongoCodec({
 
 ### Codec call context (`ctx`)
 
-Codec authors may optionally take a second `ctx?: CodecCallContext` argument on `encode`. The Mongo runtime threads one context per `mongoRuntime.execute(plan, { signal })` call. Mongo uses the framework `CodecCallContext` directly (signal-only); column metadata is SQL-family-specific and isn't part of Mongo's per-call shape today.
+Codecs receive a second options argument; you may ignore it. The Mongo runtime allocates one `CodecCallContext` per `mongoRuntime.execute(plan, { signal })` call and threads the same reference to every codec dispatch site. Mongo uses the framework `CodecCallContext` directly (signal-only); column metadata is SQL-family-specific and isn't part of Mongo's per-call shape today. The `signal` field on the ctx may be `undefined` when the caller didn't supply one.
 
 ```ts
 // Forward ctx.signal to a network SDK so aborted queries stop the round-trip.

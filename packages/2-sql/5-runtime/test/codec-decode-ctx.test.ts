@@ -204,27 +204,29 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     expect(observed?.column).toBeUndefined();
   });
 
-  it('regression — omitting ctx is bit-for-bit identical to today (no per-cell ctx allocation observed by codec)', async () => {
-    let observedArg: unknown = 'sentinel';
+  it('1-arg codec authors observe no behavioral change when ctx is the default empty ctx', async () => {
+    let invoked = 0;
+    let receivedWire: unknown;
     const registry = createCodecRegistry();
     registry.register(
       codec({
-        typeId: 'test/observe-no-ctx@1',
+        typeId: 'test/single-arg-author@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
-        decode: (w: string, ctx?: SqlCodecCallContext) => {
-          observedArg = ctx;
+        decode: (w: string) => {
+          invoked += 1;
+          receivedWire = w;
           return w;
         },
       }),
     );
 
-    const p = buildPlan([columnProjection('x', 'users', 'x', 'test/observe-no-ctx@1')]);
+    const p = buildPlan([columnProjection('x', 'users', 'x', 'test/single-arg-author@1')]);
 
-    const result = await decodeRow({ x: 'wire' }, p, registry);
+    const result = await decodeRow({ x: 'wire' }, p, registry, undefined, {});
     expect(result).toEqual({ x: 'wire' });
-    // No row-level ctx → no per-cell ctx allocation.
-    expect(observedArg).toBeUndefined();
+    expect(invoked).toBe(1);
+    expect(receivedWire).toBe('wire');
   });
 
   it('already-aborted signal at entry short-circuits before any codec call', async () => {

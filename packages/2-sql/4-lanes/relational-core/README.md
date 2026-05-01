@@ -121,7 +121,7 @@ const secretCodec = codec({
 
 #### Codec call context (`ctx`)
 
-Codec authors may optionally take a second `ctx?: SqlCodecCallContext` argument on `encode` / `decode`. The runtime threads one context per `runtime.execute(plan, { signal })` call:
+Codecs receive a second options argument; you may ignore it. The runtime allocates one `SqlCodecCallContext` per `runtime.execute(plan, { signal })` call and threads the same reference to every codec dispatch site:
 
 - **`ctx.signal`** — the same `AbortSignal` reference at every codec call in one execute. Forward it to network SDKs so aborted queries stop talking to the underlying service.
 - **`ctx.column`** (decode-side only) — `{ table, name }` for cells the runtime can resolve to a single column ref; `undefined` for aggregate aliases, computed projections, and other unresolvable cells. Encode-side `ctx.column` is always `undefined` (encode-time column enrichment is the middleware's domain).

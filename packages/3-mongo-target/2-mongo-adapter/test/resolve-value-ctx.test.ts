@@ -75,27 +75,31 @@ describe('resolveValue — CodecCallContext threading', () => {
     }
   });
 
-  it('regression — omitting ctx is bit-for-bit identical to today (no per-call ctx allocation observed by codec)', async () => {
-    let observedArg: unknown = 'sentinel';
+  it('1-arg codec authors observe no behavioral change when the ctx has no signal', async () => {
+    let invoked = 0;
+    let receivedValue: unknown;
     const registry = createMongoCodecRegistry();
     registry.register(
       mongoCodec({
-        typeId: 'test/observe-no-ctx@1',
+        typeId: 'test/single-arg-author@1',
         targetTypes: ['string'],
         decode: (w: string) => w,
-        encode: (v: string, ctx?: CodecCallContext) => {
-          observedArg = ctx;
+        encode: (v: string) => {
+          invoked += 1;
+          receivedValue = v;
           return v;
         },
       }),
     );
 
     const result = await resolveValue(
-      new MongoParamRef('x', { codecId: 'test/observe-no-ctx@1' }),
+      new MongoParamRef('x', { codecId: 'test/single-arg-author@1' }),
       registry,
+      {},
     );
     expect(result).toBe('x');
-    expect(observedArg).toBeUndefined();
+    expect(invoked).toBe(1);
+    expect(receivedValue).toBe('x');
   });
 
   it('already-aborted signal at entry short-circuits before any codec.encode call', async () => {

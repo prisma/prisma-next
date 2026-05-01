@@ -163,7 +163,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const promise = encodeParams(plan, registry);
+    const promise = encodeParams(plan, registry, {});
 
     expect(callOrder).toEqual(['encode-a-start', 'encode-b-start', 'encode-sync']);
 
@@ -189,7 +189,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       params: [{ value: 'hello', codecId: 'test/async@1' }],
     });
 
-    const result = await encodeParams(plan, registry);
+    const result = await encodeParams(plan, registry, {});
     const first = result[0];
     expect(typeof (first as { then?: unknown } | null | undefined)?.then).toBe('undefined');
     expect(first).toBe('wire:hello');
@@ -213,7 +213,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       params: [{ value: 'bad', codecId: 'test/explody@1', name: 'pname' }],
     });
 
-    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
+    await expect(encodeParams(plan, registry, {})).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       category: 'RUNTIME',
       severity: 'error',
@@ -243,7 +243,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       params: [{ value: 'x', codecId: 'test/explody@1' }],
     });
 
-    await expect(encodeParams(plan, registry)).rejects.toMatchObject({
+    await expect(encodeParams(plan, registry, {})).rejects.toMatchObject({
       code: 'RUNTIME.ENCODE_FAILED',
       details: { label: 'param[0]' },
     });
@@ -269,7 +269,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const result = await encodeParams(plan, registry);
+    const result = await encodeParams(plan, registry, {});
     expect([...result]).toEqual([null, null]);
   });
 
@@ -278,7 +278,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     const plan = buildAstPlan({
       params: [{ value: 'raw', codecId: 'test/missing@1' }],
     });
-    const result = await encodeParams(plan, registry);
+    const result = await encodeParams(plan, registry, {});
     expect([...result]).toEqual(['raw']);
   });
 
@@ -296,7 +296,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     );
 
     const plan = buildRawPlan(['Alice', 42]);
-    const result = await encodeParams(plan, registry);
+    const result = await encodeParams(plan, registry, {});
     expect([...result]).toEqual(['Alice', 42]);
   });
 
@@ -318,7 +318,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       ],
     });
 
-    const encoded = await encodeParams(plan, registry);
+    const encoded = await encodeParams(plan, registry, {});
     expect([...encoded]).toEqual(['wire:x', 'wire:y']);
   });
 });
@@ -403,7 +403,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     });
 
     const row = { a: 'A', b: 'B', n: 21 };
-    const promise = decodeRow(row, plan, registry);
+    const promise = decodeRow(row, plan, registry, undefined, {});
 
     expect(callOrder).toEqual(['decode-a-start', 'decode-b-start', 'decode-sync']);
 
@@ -429,7 +429,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'name', codecId: 'test/async@1' }],
     });
 
-    const result = await decodeRow({ name: 'alice' }, plan, registry);
+    const result = await decodeRow({ name: 'alice' }, plan, registry, undefined, {});
     expect(typeof (result['name'] as { then?: unknown } | null)?.then).toBe('undefined');
     expect(result['name']).toBe('decoded:alice');
   });
@@ -457,11 +457,17 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    const result = await decodeRow({ metadata: '{"name":"alice"}' }, plan, registry, validators);
+    const result = await decodeRow(
+      { metadata: '{"name":"alice"}' },
+      plan,
+      registry,
+      validators,
+      {},
+    );
     expect(result['metadata']).toEqual({ name: 'alice' });
 
     await expect(
-      decodeRow({ metadata: '{"age":30}' }, plan, registry, validators),
+      decodeRow({ metadata: '{"age":30}' }, plan, registry, validators, {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       details: {
@@ -497,7 +503,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    await expect(decodeRow({ explody: 'wire' }, plan, registry)).rejects.toMatchObject({
+    await expect(
+      decodeRow({ explody: 'wire' }, plan, registry, undefined, {}),
+    ).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       category: 'RUNTIME',
       severity: 'error',
@@ -524,7 +532,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     );
 
     const plan = buildRawPlan();
-    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry);
+    const result = await decodeRow({ id: 1, email: 'a@b.com' }, plan, registry, undefined, {});
     expect(result).toEqual({ id: 1, email: 'a@b.com' });
   });
 
@@ -534,7 +542,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'id' }, { alias: 'email' }],
     });
 
-    await expect(decodeRow({ id: 1 }, plan, registry)).rejects.toMatchObject({
+    await expect(decodeRow({ id: 1 }, plan, registry, undefined, {})).rejects.toMatchObject({
       code: 'RUNTIME.DECODE_FAILED',
       details: {
         alias: 'email',
@@ -560,7 +568,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
 
-    const result = await decodeRow({ id: null }, plan, registry);
+    const result = await decodeRow({ id: null }, plan, registry, undefined, {});
     expect(result).toEqual({ id: null });
   });
 
@@ -600,7 +608,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       ],
     });
 
-    const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry);
+    const result = await decodeRow({ syncCol: 'a', asyncCol: 'b' }, plan, registry, undefined, {});
     expect(result).toEqual({ syncCol: 'sync:a', asyncCol: 'async:b' });
   });
 });
@@ -623,7 +631,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
         params: [{ value: 'Alice', codecId: 'pg/secret@1', name: 'secret' }],
       });
 
-      const result = await encodeParams(plan, registry);
+      const result = await encodeParams(plan, registry, {});
       const wire = result[0];
       expect(typeof wire).toBe('string');
       expect(wire).not.toBe('Alice');
@@ -649,7 +657,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
         ],
       });
 
-      const result = await decodeRow({ secret: wire }, plan, registry);
+      const result = await decodeRow({ secret: wire }, plan, registry, undefined, {});
       expect(result['secret']).toBe('top-secret');
     },
   );
@@ -668,9 +676,13 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
       ],
     });
 
-    const rejection = await decodeRow({ secret: 'bad-payload' }, plan, registry).catch(
-      (e: unknown) => e,
-    );
+    const rejection = await decodeRow(
+      { secret: 'bad-payload' },
+      plan,
+      registry,
+      undefined,
+      {},
+    ).catch((e: unknown) => e);
     expect(rejection).toBeInstanceOf(Error);
     const err = rejection as Error & {
       code?: string;

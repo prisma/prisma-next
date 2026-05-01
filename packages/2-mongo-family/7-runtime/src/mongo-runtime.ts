@@ -78,7 +78,7 @@ class MongoRuntimeImpl
 
   protected override async lower(
     plan: MongoQueryPlan,
-    ctx?: CodecCallContext,
+    ctx: CodecCallContext,
   ): Promise<MongoExecutionPlan> {
     return {
       command: await this.#adapter.lower(plan, ctx),

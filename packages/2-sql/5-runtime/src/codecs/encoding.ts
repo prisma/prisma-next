@@ -1,6 +1,6 @@
 import {
+  checkAborted,
   raceAgainstAbort,
-  runtimeAborted,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
 import {
@@ -46,18 +46,19 @@ function wrapEncodeFailure(
  * `RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and the original
  * error attached on `cause`.
  *
- * The optional `ctx` is forwarded verbatim to `codec.encode` so codec authors
- * who opt into the `(value, ctx)` arity see the same `SqlCodecCallContext`
- * the runtime built for the surrounding `runtime.execute()` call. Encode
- * call sites do not populate `ctx.column` — encode-time column context is
- * the middleware's domain.
+ * `ctx` is forwarded verbatim to `codec.encode` so codec authors who opt
+ * into the `(value, ctx)` arity see the same `SqlCodecCallContext` the
+ * runtime built for the surrounding `runtime.execute()` call. The ctx is
+ * always present; its `signal` field may be `undefined`. Encode call
+ * sites do not populate `ctx.column` — encode-time column context is the
+ * middleware's domain.
  */
 export async function encodeParam(
   value: unknown,
   paramRef: { readonly codecId?: string; readonly name?: string },
   paramIndex: number,
   registry: CodecRegistry,
-  ctx?: SqlCodecCallContext,
+  ctx: SqlCodecCallContext,
 ): Promise<unknown> {
   return encodeParamValue(
     value,
@@ -73,7 +74,7 @@ async function encodeParamValue(
   metadata: ParamMetadata,
   paramIndex: number,
   registry: CodecRegistry,
-  ctx?: SqlCodecCallContext,
+  ctx: SqlCodecCallContext,
 ): Promise<unknown> {
   if (value === null || value === undefined) {
     return null;
@@ -100,7 +101,7 @@ async function encodeParamValue(
  * and async-authored codecs share the same path: `codec.encode → await →
  * return`. Param-level failures are wrapped in `RUNTIME.ENCODE_FAILED`.
  *
- * When the optional `ctx.signal` is provided:
+ * When `ctx.signal` is provided:
  *
  * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED`
  *   (`{ phase: 'encode' }`) before any `codec.encode` call is made — codecs
@@ -117,12 +118,10 @@ async function encodeParamValue(
 export async function encodeParams(
   plan: SqlExecutionPlan,
   registry: CodecRegistry,
-  ctx?: SqlCodecCallContext,
+  ctx: SqlCodecCallContext,
 ): Promise<readonly unknown[]> {
-  const signal = ctx?.signal;
-  if (signal?.aborted) {
-    throw runtimeAborted('encode', signal.reason);
-  }
+  checkAborted(ctx, 'encode');
+  const signal = ctx.signal;
 
   if (plan.params.length === 0) {
     return plan.params;

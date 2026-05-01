@@ -1,7 +1,7 @@
 import {
+  checkAborted,
   isRuntimeError,
   raceAgainstAbort,
-  runtimeAborted,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
 import type {
@@ -164,7 +164,7 @@ function decodeIncludeAggregate(alias: string, wireValue: unknown): unknown {
  * `codec.decode → await → JSON-Schema validate → return plain value` — so
  * sync- and async-authored codecs are indistinguishable to callers.
  *
- * The optional row-level `rowCtx` is repackaged into a per-cell
+ * The row-level `rowCtx` is repackaged into a per-cell
  * `SqlCodecCallContext` whose `column = { table, name }` is a structural
  * projection of the per-cell `ColumnRef = { table, column }` resolved from
  * the AST-backed `DecodeContext` (the same resolution `wrapDecodeFailure`
@@ -179,7 +179,7 @@ async function decodeField(
   wireValue: unknown,
   decodeCtx: DecodeContext,
   jsonValidators: JsonSchemaValidatorRegistry | undefined,
-  rowCtx: SqlCodecCallContext | undefined,
+  rowCtx: SqlCodecCallContext,
 ): Promise<unknown> {
   if (wireValue === null) {
     return null;
@@ -192,24 +192,21 @@ async function decodeField(
 
   const ref = decodeCtx.columnRefs.get(alias);
 
-  // Build a per-cell ctx only when a row-level ctx was supplied. The cell-level
-  // `column` is a `SqlColumnRef = { table, name }` projection of the resolved
-  // `ColumnRef = { table, column }` (same resolution `wrapDecodeFailure` uses
-  // below — no double work). Cells the runtime cannot resolve (aggregate
-  // aliases, computed projections without a simple ref) drop the `column`
-  // field entirely — explicitly cleared so a previously-populated
-  // `rowCtx.column` cannot leak through to unrelated cells when callers
-  // reuse a context object across cells. Destructuring (rather than
-  // `column: undefined`) is required because `SqlCodecCallContext.column`
-  // is declared `column?: SqlColumnRef` under `exactOptionalPropertyTypes`.
-  let cellCtx: SqlCodecCallContext | undefined;
-  if (rowCtx) {
-    if (ref) {
-      cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
-    } else {
-      const { column: _drop, ...rowCtxWithoutColumn } = rowCtx;
-      cellCtx = rowCtxWithoutColumn;
-    }
+  // Per-cell ctx: the cell-level `column` is a `SqlColumnRef = { table, name }`
+  // projection of the resolved `ColumnRef = { table, column }` (same
+  // resolution `wrapDecodeFailure` uses below — no double work). Cells the
+  // runtime cannot resolve (aggregate aliases, computed projections without
+  // a simple ref) drop the `column` field entirely — explicitly cleared so
+  // a previously-populated `rowCtx.column` cannot leak through to unrelated
+  // cells. Destructuring (rather than `column: undefined`) is required
+  // because `SqlCodecCallContext.column` is declared `column?: SqlColumnRef`
+  // under `exactOptionalPropertyTypes`.
+  let cellCtx: SqlCodecCallContext;
+  if (ref) {
+    cellCtx = { ...rowCtx, column: { table: ref.table, name: ref.column } };
+  } else {
+    const { column: _drop, ...rowCtxWithoutColumn } = rowCtx;
+    cellCtx = rowCtxWithoutColumn;
   }
 
   let decoded: unknown;
@@ -238,7 +235,7 @@ async function decodeField(
  * codec }` (or `{ alias, codec }` when no column ref is resolvable) and the
  * original error attached on `cause`.
  *
- * When the optional `rowCtx.signal` is provided:
+ * When `rowCtx.signal` is provided:
  *
  * - **Already-aborted at entry** short-circuits with `RUNTIME.ABORTED`
  *   (`{ phase: 'decode' }`) before any `codec.decode` call is made.
@@ -253,13 +250,11 @@ export async function decodeRow(
   row: Record<string, unknown>,
   plan: SqlExecutionPlan,
   registry: CodecRegistry,
-  jsonValidators?: JsonSchemaValidatorRegistry,
-  rowCtx?: SqlCodecCallContext,
+  jsonValidators: JsonSchemaValidatorRegistry | undefined,
+  rowCtx: SqlCodecCallContext,
 ): Promise<Record<string, unknown>> {
-  const signal = rowCtx?.signal;
-  if (signal?.aborted) {
-    throw runtimeAborted('decode', signal.reason);
-  }
+  checkAborted(rowCtx, 'decode');
+  const signal = rowCtx.signal;
 
   const decodeCtx = buildDecodeContext(plan, registry);
 
