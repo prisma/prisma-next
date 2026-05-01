@@ -820,10 +820,22 @@ export function codecDescriptor<
  * the generic args back into a structural type-level surface for builder
  * consumers (e.g. `dataTypes`, `descriptorCodecDefinitions`).
  */
+/**
+ * Variance-erased descriptor type used for heterogeneous storage in the
+ * descriptor builder and on the unified contributor `codecs:` slot. The
+ * descriptor's `factory` and `renderOutputType` are contravariant in
+ * `P`, so descriptors with different params shapes are not in a subtype
+ * relationship; collecting them into one container needs an explicit
+ * variance erasure rather than `CodecDescriptor<unknown>` (which is the
+ * narrowest, not the widest, of the family).
+ */
+// biome-ignore lint/suspicious/noExplicitAny: descriptor variance erasure — `P` is contravariant on the factory and renderOutputType slots, so heterogeneous descriptor storage cannot use `unknown`.
+export type AnyCodecDescriptor = CodecDescriptor<any>;
+
 type DescriptorResolvedCodec<D> =
   D extends CodecDescriptor<infer _P> ? ReturnType<ReturnType<D['factory']>> : never;
 
-export type DescriptorCodecId<D> = D extends CodecDescriptor<unknown> ? D['codecId'] : never;
+export type DescriptorCodecId<D> = D extends AnyCodecDescriptor ? D['codecId'] : never;
 
 export type DescriptorCodecInput<D> =
   DescriptorResolvedCodec<D> extends BaseCodec<string, readonly CodecTrait[], unknown, infer In>
@@ -841,7 +853,7 @@ export type DescriptorCodecTraits<D> =
  */
 export type ExtractDescriptorCodecTypes<
   ScalarNames extends {
-    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+    readonly [K in keyof ScalarNames]: AnyCodecDescriptor;
   } = Record<never, never>,
 > = {
   readonly [K in keyof ScalarNames as DescriptorCodecId<ScalarNames[K]>]: {
@@ -862,12 +874,12 @@ export type ExtractDescriptorCodecTypes<
  */
 export interface CodecDescriptorBuilder<
   ScalarNames extends {
-    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+    readonly [K in keyof ScalarNames]: AnyCodecDescriptor;
   } = Record<never, never>,
 > {
   readonly CodecTypes: ExtractDescriptorCodecTypes<ScalarNames>;
 
-  add<ScalarName extends string, D extends CodecDescriptor<unknown>>(
+  add<ScalarName extends string, D extends AnyCodecDescriptor>(
     scalarName: ScalarName,
     descriptor: D,
   ): CodecDescriptorBuilder<
@@ -878,7 +890,7 @@ export interface CodecDescriptorBuilder<
    * The shipped descriptors as a tuple, ready to feed straight into a
    * contributor's unified `codecs:` slot.
    */
-  readonly descriptors: ReadonlyArray<CodecDescriptor<unknown>>;
+  readonly descriptors: ReadonlyArray<AnyCodecDescriptor>;
 
   readonly codecDefinitions: {
     readonly [K in keyof ScalarNames]: {
@@ -900,7 +912,7 @@ export interface CodecDescriptorBuilder<
 
 class CodecDescriptorBuilderImpl<
   ScalarNames extends {
-    readonly [K in keyof ScalarNames]: CodecDescriptor<unknown>;
+    readonly [K in keyof ScalarNames]: AnyCodecDescriptor;
   } = Record<never, never>,
 > implements CodecDescriptorBuilder<ScalarNames>
 {
@@ -921,7 +933,7 @@ class CodecDescriptorBuilderImpl<
       { readonly input: unknown; readonly output: unknown; readonly traits: unknown }
     > = {};
     for (const [, descriptor] of Object.entries(this._descriptors)) {
-      const d = descriptor as CodecDescriptor<unknown>;
+      const d = descriptor as AnyCodecDescriptor;
       codecTypes[d.codecId] = {
         input: undefined as unknown as DescriptorCodecInput<typeof d>,
         output: undefined as unknown as DescriptorCodecInput<typeof d>,
@@ -934,7 +946,7 @@ class CodecDescriptorBuilderImpl<
     const dataTypes = {} as any;
     for (const key in this._descriptors) {
       if (Object.hasOwn(this._descriptors, key)) {
-        const d = this._descriptors[key] as CodecDescriptor<unknown>;
+        const d = this._descriptors[key] as AnyCodecDescriptor;
         dataTypes[key] = d.codecId;
       }
     }
@@ -945,7 +957,7 @@ class CodecDescriptorBuilderImpl<
     };
   }
 
-  add<ScalarName extends string, D extends CodecDescriptor<unknown>>(
+  add<ScalarName extends string, D extends AnyCodecDescriptor>(
     scalarName: ScalarName,
     descriptor: D,
   ): CodecDescriptorBuilder<
@@ -957,8 +969,8 @@ class CodecDescriptorBuilderImpl<
     } as O.Overwrite<ScalarNames, Record<ScalarName, D>> & Record<ScalarName, D>);
   }
 
-  get descriptors(): ReadonlyArray<CodecDescriptor<unknown>> {
-    return Object.values(this._descriptors as Record<string, CodecDescriptor<unknown>>);
+  get descriptors(): ReadonlyArray<AnyCodecDescriptor> {
+    return Object.values(this._descriptors as Record<string, AnyCodecDescriptor>);
   }
 
   get codecDefinitions(): {
@@ -976,7 +988,7 @@ class CodecDescriptorBuilderImpl<
       {
         codecId: string;
         scalar: string;
-        descriptor: CodecDescriptor<unknown>;
+        descriptor: AnyCodecDescriptor;
         input: unknown;
         output: unknown;
         jsType: unknown;
@@ -984,7 +996,7 @@ class CodecDescriptorBuilderImpl<
     > = {};
 
     for (const [scalarName, descriptor] of Object.entries(this._descriptors)) {
-      const d = descriptor as CodecDescriptor<unknown>;
+      const d = descriptor as AnyCodecDescriptor;
       result[scalarName] = {
         codecId: d.codecId,
         scalar: scalarName,
