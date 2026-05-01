@@ -375,22 +375,38 @@ export function findPathWithDecision(
   // Replaces a per-edge `findPath(e.to, toHash)` call inside the loop below,
   // which made the whole function O(|path| · (V + E)) instead of O(V + E).
   const reachesTarget = collectNodesReachingTarget(graph, toHash);
+  const coveragePrefixes = requiredCoveragePrefixes(required, path);
 
   const tieBreakReasons: string[] = [];
   let alternativeCount = 0;
 
-  for (const edge of path) {
+  for (let i = 0; i < path.length; i++) {
+    const edge = path[i]!;
     const outgoing = graph.forwardChain.get(edge.from);
     if (outgoing && outgoing.length > 1) {
       const reachable = outgoing.filter((e) => reachesTarget.has(e.to));
       if (reachable.length > 1) {
+        let comparisonPool: readonly MigrationEdge[] = reachable;
+        if (required.size > 0) {
+          const prefixSet = coveragePrefixes[i]!;
+          const viable = invariantViableAlternativesAtStep(required, prefixSet, reachable);
+          if (viable.length > 1) comparisonPool = viable;
+        }
+
         alternativeCount += reachable.length - 1;
         const sorted = sortedNeighbors(reachable);
-        if (sorted[0] && sorted[0].migrationHash === edge.migrationHash) {
+        if (sorted[0]?.migrationHash === edge.migrationHash) {
           if (reachable.some((e) => e.migrationHash !== edge.migrationHash)) {
-            tieBreakReasons.push(
-              `at ${edge.from}: ${reachable.length} candidates, selected by tie-break`,
-            );
+            const sortedViable = sortedNeighbors(comparisonPool);
+            if (
+              sortedViable.length > 1 &&
+              sortedViable[0]!.migrationHash === edge.migrationHash &&
+              sortedViable.some((e) => e.migrationHash !== edge.migrationHash)
+            ) {
+              tieBreakReasons.push(
+                `at ${edge.from}: ${comparisonPool.length} candidates, selected by tie-break`,
+              );
+            }
           }
         }
       }
@@ -424,6 +440,37 @@ function computeSatisfiedInvariants(
     }
   }
   return [...covered].sort();
+}
+
+/**
+ * For each edge on path, invariant coverage accumulated from earlier edges only —
+ * `(required ∩ ∪_{j<i} path[j].invariants)` represented as cumulative set along `required`,
+ * keyed as "full set of required ids satisfied before taking path[i]".
+ */
+function requiredCoveragePrefixes(
+  required: ReadonlySet<string>,
+  path: readonly MigrationEdge[],
+): readonly ReadonlySet<string>[] {
+  const prefixes: ReadonlySet<string>[] = [];
+  const acc = new Set<string>();
+  for (const edge of path) {
+    prefixes.push(acc);
+    for (const inv of edge.invariants) {
+      if (required.has(inv)) acc.add(inv);
+    }
+  }
+  return prefixes;
+}
+
+function invariantViableAlternativesAtStep(
+  required: ReadonlySet<string>,
+  coverageBeforeTakingEdge: ReadonlySet<string>,
+  outgoing: readonly MigrationEdge[],
+): readonly MigrationEdge[] {
+  if (required.size === 0) return [...outgoing];
+  return outgoing.filter((e) =>
+    [...required].every((id) => coverageBeforeTakingEdge.has(id) || e.invariants.includes(id)),
+  );
 }
 
 /**

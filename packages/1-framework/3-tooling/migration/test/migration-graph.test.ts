@@ -509,6 +509,23 @@ describe('findPathWithDecision', () => {
     expect(result.decision.alternativeCount).toBeGreaterThan(0);
   });
 
+  it('omits tieBreakReasons when invariant routing leaves only one locally viable candidate', () => {
+    const packages = [
+      pkgWithInvariants(E, 'A', 'm0'),
+      pkgWithInvariants('A', 'B', 'm_ab'),
+      pkgWithInvariants('A', 'C', 'm_ac', { invariants: ['X'] }),
+      pkgWithInvariants('B', 'H', 'm_bh'),
+      pkgWithInvariants('C', 'H', 'm_ch'),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'A', 'H', { required: new Set(['X']) });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual(['m_ac', 'm_ch']);
+    expect(result.decision.tieBreakReasons).toEqual([]);
+    expect(result.decision.alternativeCount).toBeGreaterThan(0);
+  });
+
   it('omits a tieBreakReason when the chosen edge is not the lexicographic winner (invariants forced the choice)', () => {
     // Diamond: A → B → D and A → C → D, where C → D provides "X".
     // With X required, the chosen edge at A is the one routed toward C
