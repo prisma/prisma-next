@@ -139,6 +139,15 @@ export interface SqlControlAdapterDescriptor<TTargetId extends string>
 export interface SqlMigrationPlanOperationStep {
   readonly description: string;
   readonly sql: string;
+  /**
+   * Optional parameter values bound at execution time. The runner forwards
+   * these to `driver.query(sql, params ?? [])`, so step authors can use
+   * placeholder syntax (`$1`, `$2`, …) instead of inlining literals into
+   * the SQL string. Reuses the driver's parameter binder rather than
+   * rolling per-target literal serialization for every type the planner
+   * may emit.
+   */
+  readonly params?: readonly unknown[];
   readonly meta?: AnyRecord;
 }
 
