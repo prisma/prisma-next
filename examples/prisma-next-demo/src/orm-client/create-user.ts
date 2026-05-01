@@ -20,7 +20,7 @@ export async function ormClientCreateUser(data: OrmClientCreateUserInput, runtim
     email: data.email,
     displayName: data.displayName,
     kind: data.kind,
-    createdAt: data.createdAt as UserRow['createdAt'],
+    createdAt: data.createdAt,
   });
 }
 
