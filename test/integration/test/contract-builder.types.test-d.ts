@@ -365,7 +365,7 @@ test('codec type inference via type option', () => {
   const _testRow: Row = {
     id: 1,
     email: 'test@example.com',
-    createdAt: '2024-01-01T00:00:00Z',
+    createdAt: new Date('2024-01-01T00:00:00Z'),
   } as Row;
 
   expectTypeOf(_testRow).toEqualTypeOf<Row>();

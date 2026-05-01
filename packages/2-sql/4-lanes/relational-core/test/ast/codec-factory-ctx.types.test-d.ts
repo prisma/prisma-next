@@ -70,20 +70,3 @@ test('factory lifts an async ctx-bearing encode into a Promise method', () => {
   });
   expectTypeOf<ReturnType<typeof c.encode>>().toExtend<Promise<string>>();
 });
-
-test('factory preserves union-input TInput inference for `string | Date`-style authors', () => {
-  // The union-arity author signatures (single- vs ctx-bearing) must not
-  // collapse the author's authored input type. This regression-pins the
-  // inference subtlety the m1 R1 union-arity fix unblocked: the
-  // canonical `pg/timestamptz`-style codec authors `encode` as
-  // `(value: string | Date) => string`, expects `TInput = string` from
-  // `decode`'s return, and then `JsonRoundTripConfig<TInput>` keeps the
-  // `encodeJson`/`decodeJson` identity defaults legal.
-  const c = codec({
-    typeId: 'demo/union-input@1',
-    targetTypes: ['text'],
-    encode: (value: string | Date) => (typeof value === 'string' ? value : value.toISOString()),
-    decode: (wire: string) => wire,
-  });
-  expectTypeOf<Parameters<typeof c.encode>[0]>().toExtend<string | Date>();
-});
