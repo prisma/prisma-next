@@ -1,0 +1,149 @@
+import type {
+  MongoContract,
+  MongoContractWithTypeMaps,
+  MongoTypeMaps,
+} from '@prisma-next/mongo-contract';
+
+/**
+ * Shared fixture contract for the decode integration tests.
+ *
+ * Lives in a typed `.ts` so it can drive `mongoQuery<TContract>(...)` row-type
+ * inference end-to-end. Call sites validate the JSON via
+ * `validateMongoContract(decodeFixtureContractJson)` to keep the runtime
+ * structural shape honest, then thread `TContract` through `mongoQuery` for
+ * the type-level path.
+ *
+ * `User` is a flat scalar shape; `Post` has a `userId` reference to `User`
+ * so the `include('user')` end-to-end test can exercise the `$lookup` path.
+ */
+export type DecodeFixtureContract = MongoContract & {
+  readonly models: {
+    readonly User: {
+      readonly fields: {
+        readonly _id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly name: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly email: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly createdAt: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/date@1' };
+          readonly nullable: false;
+        };
+        readonly embeddings: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/vector@1' };
+          readonly nullable: false;
+          readonly many: true;
+        };
+      };
+      readonly relations: Record<string, never>;
+      readonly storage: { readonly collection: 'users' };
+    };
+    readonly Post: {
+      readonly fields: {
+        readonly _id: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+        readonly title: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' };
+          readonly nullable: false;
+        };
+        readonly userId: {
+          readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/objectId@1' };
+          readonly nullable: false;
+        };
+      };
+      readonly relations: {
+        readonly user: {
+          readonly to: 'User';
+          readonly cardinality: 'N:1';
+          readonly on: {
+            readonly localFields: ['userId'];
+            readonly targetFields: ['_id'];
+          };
+        };
+      };
+      readonly storage: { readonly collection: 'posts' };
+    };
+  };
+  readonly roots: {
+    readonly users: 'User';
+    readonly posts: 'Post';
+  };
+};
+
+export type DecodeFixtureCodecTypes = {
+  readonly 'mongo/objectId@1': { readonly output: string };
+  readonly 'mongo/string@1': { readonly output: string };
+  readonly 'mongo/double@1': { readonly output: number };
+  readonly 'mongo/int32@1': { readonly output: number };
+  readonly 'mongo/bool@1': { readonly output: boolean };
+  readonly 'mongo/date@1': { readonly output: Date };
+  readonly 'mongo/vector@1': { readonly output: readonly number[] };
+};
+
+export type DecodeFixtureTypeMaps = MongoTypeMaps<DecodeFixtureCodecTypes>;
+export type TDecodeFixtureContract = MongoContractWithTypeMaps<
+  DecodeFixtureContract,
+  DecodeFixtureTypeMaps
+>;
+
+export const decodeFixtureContractJson = {
+  targetFamily: 'mongo' as const,
+  roots: { users: 'User', posts: 'Post' },
+  storage: {
+    collections: { users: {}, posts: {} },
+    storageHash: 'decode-integration-test',
+  },
+  models: {
+    User: {
+      storage: { collection: 'users' },
+      relations: {},
+      fields: {
+        _id: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+          nullable: false,
+        },
+        name: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        email: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        createdAt: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/date@1' },
+          nullable: false,
+        },
+        embeddings: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/vector@1' },
+          nullable: false,
+          many: true,
+        },
+      },
+    },
+    Post: {
+      storage: { collection: 'posts' },
+      relations: {
+        user: {
+          to: 'User',
+          cardinality: 'N:1',
+          on: { localFields: ['userId'], targetFields: ['_id'] },
+        },
+      },
+      fields: {
+        _id: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+          nullable: false,
+        },
+        title: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
+        userId: {
+          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
+          nullable: false,
+        },
+      },
+    },
+  },
+};
