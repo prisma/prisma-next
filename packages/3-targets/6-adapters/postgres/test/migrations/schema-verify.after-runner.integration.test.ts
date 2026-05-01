@@ -70,6 +70,7 @@ describe.sequential('Schema verification after runner - integration', () => {
       contract: contractInput,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 

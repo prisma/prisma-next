@@ -52,6 +52,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       contract,
       schema,
       policy: RECONCILIATION_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -104,6 +105,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       contract,
       schema,
       policy: WIDENING_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -155,6 +157,7 @@ describe('PostgresMigrationPlanner - reconciliation planning', () => {
       contract,
       schema,
       policy: WIDENING_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 

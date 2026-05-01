@@ -92,6 +92,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -160,6 +161,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -252,6 +254,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -311,6 +314,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [pgvectorDescriptor],
     });
 
@@ -369,6 +373,7 @@ describe('PostgresMigrationPlanner - storage types', () => {
         contract,
         schema: emptySchema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: [],
       }),
     ).toThrow(
