@@ -280,6 +280,63 @@ describe('createPostgresDefaultFunctionRegistry', () => {
     });
     expect(result).toMatchObject({ ok: false });
   });
+
+  // The arg-rejection diagnostics use `input.call.args[0]?.span ?? input.call.span`
+  // so a missing arg-side span falls back to the call-side span. Pin the
+  // fallback path for each lowerer that has it so the per-file branch
+  // coverage stays above 87%. We construct a "spanless" arg by deleting
+  // the property after construction — TypeScript otherwise enforces
+  // `span` as required.
+  function spanlessArg(raw: string) {
+    const a: { raw: string; span?: typeof stubSpan } = { raw, span: stubSpan };
+    delete a.span;
+    return a as { raw: string; span: typeof stubSpan };
+  }
+
+  it("uuid: invalid-version diagnostic falls back to the call's span when the arg lacks one", () => {
+    const handler = registry.get('uuid')!;
+    const result = handler.lower({
+      call: makeCall('uuid', [spanlessArg('5')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
+  });
+
+  it("cuid: invalid-version diagnostic falls back to the call's span when the arg lacks one", () => {
+    const handler = registry.get('cuid')!;
+    const result = handler.lower({
+      call: makeCall('cuid', [spanlessArg('3')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
+  });
+
+  it("nanoid: out-of-range diagnostic falls back to the call's span when the arg lacks one", () => {
+    const handler = registry.get('nanoid')!;
+    const result = handler.lower({
+      call: makeCall('nanoid', [spanlessArg('1')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
+  });
+
+  it("dbgenerated: non-string-literal diagnostic falls back to the call's span when the arg lacks one", () => {
+    const handler = registry.get('dbgenerated')!;
+    const result = handler.lower({
+      call: makeCall('dbgenerated', [spanlessArg('NOW()')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
+  });
+
+  it("dbgenerated: empty-string diagnostic falls back to the call's span when the arg lacks one", () => {
+    const handler = registry.get('dbgenerated')!;
+    const result = handler.lower({
+      call: makeCall('dbgenerated', [spanlessArg('"   "')]),
+      context: stubContext,
+    });
+    expect(result).toMatchObject({ ok: false, diagnostic: { span: stubSpan } });
+  });
 });
 
 describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
