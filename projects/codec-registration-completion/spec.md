@@ -102,8 +102,8 @@ What this case pins:
 
 ### AC-3. Runtime `Codec` instance narrowed
 
-- The `Codec` interface in `@prisma-next/framework-components/codec` declares only `id` and the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`).
-- `traits`, `targetTypes`, `meta`, and `renderOutputType?` are removed from the base interface and from every family-specific extension (SQL `Codec`, Mongo `MongoCodec`).
+- The `Codec` interface in `@prisma-next/framework-components/codec` declares only `id` and the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`). **(M1)**
+- `traits`, `targetTypes`, `meta`, and `renderOutputType?` are removed from the base interface in M1, and from every family-specific extension (SQL `Codec`, Mongo `MongoCodec`) in M2 alongside the synthesis-bridge deletion. The two-stage shape is intentional: M1 narrows the *framework* surface and migrates every framework-side consumer; family extensions retain optional transitional fields through M1 so the synthesis bridge (`synthesizeNonParameterizedDescriptor`) and `aliasCodec` keep working until M2 deletes both alongside the per-library descriptor migration. **(M1 framework / M2 family extensions)**
 - `encode`/`decode` retain their async signature with `CodecCallContext` per ADR 204; this work doesn't reshape the call surface.
 - Every consumer of the removed fields migrates to read them from `descriptorFor(codecId)`. Concrete sites (verified by grep on the post-merge baseline):
   - `packages/1-framework/1-core/framework-components/src/control/control-stack.ts` — `codec.id` reads stay; any `targetTypes`/`traits` consultation routes through descriptors.
