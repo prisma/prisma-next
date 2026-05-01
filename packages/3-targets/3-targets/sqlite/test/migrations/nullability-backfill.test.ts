@@ -89,6 +89,7 @@ describe('nullability-tightening backfill', () => {
       contract: tightenedEmailContract(),
       schema: nullableEmailSchema(),
       policy: { allowedOperationClasses: ['additive', 'destructive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -106,6 +107,7 @@ describe('nullability-tightening backfill', () => {
       contract: tightenedEmailContract(),
       schema: nullableEmailSchema(),
       policy: { allowedOperationClasses: ['additive', 'destructive', 'data'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -169,6 +171,7 @@ describe('nullability-tightening backfill', () => {
       contract,
       schema,
       policy: { allowedOperationClasses: ['additive', 'widening', 'data'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
