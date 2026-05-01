@@ -73,7 +73,7 @@ async function planAndApply(
     contract: destination,
     schema,
     policy: ALL_POLICY,
-    fromContract: null,
+    fromContract: origin,
     frameworkComponents: [],
   });
   if (result.kind !== 'success') {

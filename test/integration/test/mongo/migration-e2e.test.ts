@@ -327,7 +327,7 @@ describe('MongoDB migration E2E', { timeout: timeouts.spinUpMongoMemoryServer },
           contract: emptyContract,
           schema: dropSchema,
           policy: ALL_POLICY,
-          fromContract: null,
+          fromContract: indexedContract,
           frameworkComponents: [],
         });
         if (dropResult.kind !== 'success') throw new Error('Drop plan failed');
