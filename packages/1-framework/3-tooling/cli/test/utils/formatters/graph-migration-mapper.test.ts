@@ -312,6 +312,27 @@ describe('migrationGraphToRenderInput', () => {
     expect(result.options.spineTarget).toBe('∅');
   });
 
+  it('renders invariants in the edge label as JSON-quoted ids', () => {
+    const graph = buildGraph([
+      {
+        ...entry(ROOT, 'A', 'm1'),
+        invariants: ['users.email-unique', 'orders.total-non-negative'],
+      },
+    ]);
+    const result = migrationGraphToRenderInput(
+      makeInput({
+        graph,
+        mode: 'online',
+        markerHash: ROOT,
+        contractHash: 'A',
+        edgeStatuses: [{ dirName: 'm1', status: 'pending' }],
+      }),
+    );
+
+    const edge = result.graph.edges.find((e) => e.label?.startsWith('m1'));
+    expect(edge?.label).toBe('m1 ⧗  provides ["users.email-unique", "orders.total-non-negative"]');
+  });
+
   it('addPathBetween skips when nodes missing from graph', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
     const result = migrationGraphToRenderInput(

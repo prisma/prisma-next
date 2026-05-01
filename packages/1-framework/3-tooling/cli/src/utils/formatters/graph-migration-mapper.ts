@@ -107,7 +107,9 @@ export function migrationGraphToRenderInput(input: MigrationGraphInput): Migrati
       const status = statusByDirName.get(entry.dirName);
       const icon = status ? STATUS_ICON[status] : '';
       const invariantsSuffix =
-        entry.invariants.length > 0 ? `  provides [${entry.invariants.join(', ')}]` : '';
+        entry.invariants.length > 0
+          ? `  provides [${entry.invariants.map((id) => JSON.stringify(id)).join(', ')}]`
+          : '';
       const label = `${entry.dirName}${icon}${invariantsSuffix}`;
 
       edgeList.push({
