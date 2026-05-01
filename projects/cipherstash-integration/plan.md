@@ -86,13 +86,13 @@ A few things to note about this picture:
 
 **Goal.** Public user-facing `raw\`...\`` template-literal factory, layered on top of Project 1's `RawSqlExpr` AST node.
 
-**Status.** Spec drafted. Project-level plan not yet written.
+**Status.** Spec drafted; [plan drafted](sql-raw-factory/plan.md) — three milestones (M1 factory + `param()` → M2 `identifier(...)` escape hatch → M3 integration + close-out).
 
-**Gating.** Hard merge-block on Project 1's `raw-sql-ast-node` task landing on `main`. Shaping (spec, plan) and even local prototyping can happen in parallel with Project 1's execution; merge waits for the AST node.
+**Gating.** Hard merge-block on Project 1's M1 (`raw-sql-ast-node`) landing on `main`. Shaping and local prototyping can happen in parallel with Project 1's execution; merge waits for the AST node. M3's `AC-COMP3` test (cipherstash bulk-encrypt composition) additionally depends on Project 1's M2 having landed.
 
 **Independence from Project 1's MVP.** `sql-raw-factory` does not block any Project 1 task. Cipherstash's migration factories construct `RawSqlExpr` instances directly via the package-internal API; the public `raw\`...\`` factory is purely additive value for end users wanting to write raw SQL queries.
 
-**Done when.** `sql-raw-factory` acceptance criteria green (see [`sql-raw-factory/spec.md`](sql-raw-factory/spec.md)). Long-lived docs (whatever is appropriate) migrated to `docs/`.
+**Done when.** `sql-raw-factory` acceptance criteria green (see [`sql-raw-factory/spec.md`](sql-raw-factory/spec.md)). Long-lived docs migrated to `docs/`.
 
 ## Phase B (parallelizable) — Project 2
 
@@ -114,13 +114,12 @@ A few things to note about this picture:
 | Umbrella | [drafted](spec.md) | [drafted](plan.md) (this doc) | — | — |
 | Project 1 | [drafted](project-1/spec.md) (5 task specs all drafted) | [drafted](project-1/plan.md) | not started | Independent of #404 + #409; #400 + #402 already merged |
 | Project 2 | [stub](project-2/spec.md) | not started | not started | Gated on Project 1 + TML-2338 + TML-2339 |
-| `sql-raw-factory` | [drafted](sql-raw-factory/spec.md) | not started | not started | Mergeable after Project 1's `raw-sql-ast-node` lands (M1) |
+| `sql-raw-factory` | [drafted](sql-raw-factory/spec.md) | [drafted](sql-raw-factory/plan.md) | not started | Mergeable after Project 1's M1 lands (`raw-sql-ast-node`); three milestones (factory + param() → identifier(...) → integration + close-out) |
 
 # Open questions at the umbrella level
 
-1. **`sql-raw-factory` plan timing.** The component spec is stable. Its plan can be written at any point — does not need to wait on Project 1.
-2. **Project 2 shaping trigger.** Confirm: shape Project 2 only after Project 1 ships? Or earlier (in parallel with Project 1's execution) at the cost of likely rework when TML-2338 / TML-2339 lands?
-3. **Linear ticket redesign timing.** Currently deferred until the umbrella plan stabilizes. With Project 1's plan landed, the umbrella plan and Project 1's plan are both stable; Project 2's stub and `sql-raw-factory`'s spec are also drafted. Whether to redesign Linear tickets now (giving external stakeholders structure to track against) or wait for `sql-raw-factory`'s plan and Project 2's full shaping is a tactical call.
+1. **Project 2 shaping trigger.** Confirm: shape Project 2 only after Project 1 ships? Or earlier (in parallel with Project 1's execution) at the cost of likely rework when TML-2338 / TML-2339 lands?
+2. **Linear ticket redesign timing.** Currently deferred until the umbrella plan stabilizes. With the umbrella, Project 1, and `sql-raw-factory` plans all drafted, the umbrella plan is stable; Project 2 remains a stub. Whether to redesign Linear tickets now (giving external stakeholders structure to track against) or wait for Project 2's full shaping is a tactical call.
 
 # References
 
