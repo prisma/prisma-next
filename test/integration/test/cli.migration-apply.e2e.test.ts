@@ -389,7 +389,7 @@ withTempDir(({ createTempDir }) => {
             // Marker must remain at the first migration hash (resume point).
             const migrationsDir = join(testDir, 'migrations');
             const packages = await readMigrationsDir(migrationsDir);
-            const firstMigration = packages.find((p) => p.metadata.from === 'sha256:empty');
+            const firstMigration = packages.find((p) => p.metadata.from === null);
             const secondMigration = packages.find(
               (p) => p.metadata.to !== firstMigration?.metadata.to,
             );
