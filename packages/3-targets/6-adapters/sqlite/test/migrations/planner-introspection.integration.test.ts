@@ -112,6 +112,7 @@ describe('SQLite planner + introspection round-trip', () => {
         contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -169,6 +170,7 @@ describe('SQLite planner + introspection round-trip', () => {
         contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -224,6 +226,7 @@ describe('SQLite planner + introspection round-trip', () => {
         contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
+        fromContract: null,
         frameworkComponents: [],
       });
 

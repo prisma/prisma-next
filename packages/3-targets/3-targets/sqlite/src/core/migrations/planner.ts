@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlanner,
@@ -51,11 +52,20 @@ export class SqliteMigrationPlanner
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash?: string | null;
-    readonly fromContract?: unknown;
+    /**
+     * The "from" contract (state the planner assumes the database starts at),
+     * or `null` for reconciliation flows.
+     *
+     * Typed as the framework `Contract | null` to satisfy the
+     * `MigrationPlanner` interface contract; `planSql` narrows to the SQL
+     * shape via `SqlMigrationPlannerPlanOptions`. Used to populate
+     * `describe().from` on the produced plan as
+     * `fromContract?.storage.storageHash ?? null`.
+     */
+    readonly fromContract: Contract | null;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): SqlitePlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? null);
+    return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
   emptyMigration(context: MigrationScaffoldContext): TypeScriptRenderableSqliteMigration {
@@ -65,10 +75,7 @@ export class SqliteMigrationPlanner
     });
   }
 
-  private planSql(
-    options: SqlMigrationPlannerPlanOptions,
-    fromHash: string | null,
-  ): SqlitePlanResult {
+  private planSql(options: SqlMigrationPlannerPlanOptions): SqlitePlanResult {
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) return policyResult;
 
@@ -79,7 +86,7 @@ export class SqliteMigrationPlanner
     const result = planIssues({
       issues: schemaIssues,
       toContract: options.contract,
-      fromContract: options.fromContract ?? null,
+      fromContract: options.fromContract,
       codecHooks,
       storageTypes,
       schema: options.schema,
@@ -103,7 +110,10 @@ export class SqliteMigrationPlanner
       kind: 'success' as const,
       plan: new TypeScriptRenderableSqliteMigration(
         result.value.calls,
-        { from: fromHash, to: options.contract.storage.storageHash },
+        {
+          from: options.fromContract?.storage.storageHash ?? null,
+          to: options.contract.storage.storageHash,
+        },
         destination,
       ),
     };

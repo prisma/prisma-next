@@ -59,6 +59,7 @@ describe('SQLite migration planner', () => {
       contract,
       schema: emptySchema,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -105,6 +106,7 @@ describe('SQLite migration planner', () => {
       contract,
       schema: existingSchema,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -132,6 +134,7 @@ describe('SQLite migration planner', () => {
       contract,
       schema: emptySchema,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -149,6 +152,7 @@ describe('SQLite migration planner', () => {
       contract,
       schema: emptySchema,
       policy: { allowedOperationClasses: [] },
+      fromContract: null,
       frameworkComponents: [],
     });
     expect(result.kind).toBe('failure');

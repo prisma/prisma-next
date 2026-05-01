@@ -32,6 +32,16 @@ function createContract(): Contract<SqlStorage> {
   };
 }
 
+function fromContractWithHash(hash: string): Contract<SqlStorage> {
+  return {
+    ...createContract(),
+    storage: {
+      storageHash: coreHash(hash),
+      tables: {},
+    },
+  };
+}
+
 const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
 
 describe('SqliteMigrationPlanner authoring surface', () => {
@@ -42,7 +52,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: coreHash('sha256:from'),
+        fromContract: fromContractWithHash('sha256:from'),
         frameworkComponents: [],
       });
 
@@ -51,21 +61,36 @@ describe('SqliteMigrationPlanner authoring surface', () => {
       expect(result.plan.targetId).toBe('sqlite');
     });
 
-    it('describe() returns the supplied from/to meta', () => {
+    it('describe() returns the supplied from/to meta derived from fromContract', () => {
       const planner = createSqliteMigrationPlanner();
       const contract = createContract();
+      const fromContract = fromContractWithHash('sha256:from');
       const result = planner.plan({
         contract: contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: coreHash('sha256:from'),
+        fromContract,
         frameworkComponents: [],
       });
 
       if (result.kind !== 'success') throw new Error('expected success');
       const meta = result.plan.describe();
-      expect(meta.from).toBe(coreHash('sha256:from'));
+      expect(meta.from).toBe(fromContract.storage.storageHash);
       expect(meta.to).toBe(contract.storage.storageHash);
+    });
+
+    it('describe().from is null when fromContract is null', () => {
+      const planner = createSqliteMigrationPlanner();
+      const result = planner.plan({
+        contract: createContract(),
+        schema: emptySchema,
+        policy: { allowedOperationClasses: ['additive'] },
+        fromContract: null,
+        frameworkComponents: [],
+      });
+
+      if (result.kind !== 'success') throw new Error('expected success');
+      expect(result.plan.describe().from).toBeNull();
     });
 
     it('destination carries both storageHash and profileHash from the contract', () => {
@@ -75,7 +100,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: contract,
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: null,
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -92,7 +117,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: null,
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -109,7 +134,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: coreHash('sha256:from'),
+        fromContract: fromContractWithHash('sha256:from'),
         frameworkComponents: [],
       });
 
@@ -162,7 +187,7 @@ describe('SqliteMigrationPlanner authoring surface', () => {
         contract: createContract(),
         schema: emptySchema,
         policy: { allowedOperationClasses: ['widening', 'destructive'] },
-        fromHash: null,
+        fromContract: null,
         frameworkComponents: [],
       });
 

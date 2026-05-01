@@ -32,6 +32,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
     expect(result.kind).toBe('success');
@@ -86,6 +87,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
     if (initialPlan.kind !== 'success') throw new Error('expected initial planner success');
