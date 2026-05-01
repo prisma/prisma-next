@@ -13,7 +13,6 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -93,10 +92,13 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
      * `'data'` operation class, strategies that need from/to column-shape
      * comparisons (unsafe type change, nullability tightening) activate.
      *
-     * Used to populate `describe().from` on the produced plan as
+     * Typed as the framework `Contract | null` to satisfy the
+     * `MigrationPlanner` interface contract; `planSql` narrows to the SQL
+     * shape via `SqlMigrationPlannerPlanOptions`. Used to populate
+     * `describe().from` on the produced plan as
      * `fromContract?.storage.storageHash ?? null`.
      */
-    readonly fromContract: Contract<SqlStorage> | null;
+    readonly fromContract: Contract | null;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
