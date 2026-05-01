@@ -114,16 +114,17 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 **Tasks:**
 
 - [ ] **3.1 — Scaffold `examples/prisma-next-cloudflare-worker`.**
-  - `package.json`, `wrangler.jsonc` with `nodejs_compat`, `tsconfig.json`, `prisma-next.config.ts`. Schema mirrors `examples/prisma-next-demo`. Use `wrangler hyperdrive create` to provision the binding ID; the ID goes in `wrangler.jsonc`, the connection string goes in `.dev.vars` (gitignored).
+  - `package.json`, `wrangler.jsonc` with `nodejs_compat`, `tsconfig.json`, `prisma-next.config.ts`. Schema mirrors `examples/prisma-next-demo` **minus pgvector / `Embedding1536` / `Post.embedding`** — the serverless facade is the subject of this example, vector search is already covered by the Node demo, and PGlite (the engine `prisma dev` uses) does not ship pgvector. Keep `User` (with embedded `Address`), `Post`, `Task` + `Bug`/`Feature` discriminator.
+  - The Hyperdrive binding shape goes in `wrangler.jsonc` so the production deploy path exists. For M3 the binding's `localConnectionString` points at the local `prisma dev` TCP URL (sourced from `.dev.vars`, gitignored); `wrangler hyperdrive create` and a real binding ID are deferred to M4 task 4.2.
 - [ ] **3.2 — Implement Worker `fetch` handler.**
   - Module-scope: `const db = postgresServerless<Contract>({ contractJson, extensions, middleware })`.
   - Inside `fetch`: `await using runtime = await db.connect({ url: env.HYPERDRIVE.connectionString })`; route to one of: SQL DSL `select` via `runtime.execute(db.sql.user.select(...).build())`, ORM `findMany` via `createOrmClient(runtime).user.findMany(...)`, transaction via `withTransaction(runtime, ...)`.
   - (Satisfies: TC-3, TC-4, TC-5, TC-6, TC-8, TC-13, TC-14.)
 - [ ] **3.3 — Local dev wiring.**
-  - `wrangler.jsonc` references `localConnectionString` from `.dev.vars`. Add a script that brings up a local Postgres pre-seeded with the demo data (Docker Compose if available, or a `psql`-driven setup script — match what `examples/prisma-next-demo` uses for parity).
+  - Local Postgres is **`prisma dev`** (PGlite-backed PPg) — the dogfood-PPg path for this project. The example pulls `@prisma/dev` (catalog) as a devDep and exposes a `db:dev` (or similarly named) script that wraps `prisma dev` to start the local instance; the maker reads the TCP URL it prints (press `t` in the CLI, or `prisma dev ls`) and writes it into `.dev.vars` as the binding's `localConnectionString`. `wrangler.jsonc` references the localConnectionString via the Hyperdrive binding shape; `.dev.vars` is gitignored. Provide a seed script that mirrors the demo's seed (minus the pgvector inserts).
   - (Satisfies: TC-16, TC-24.)
 - [ ] **3.4 — `vitest-pool-workers` integration test.**
-  - Test file boots the Worker under `workerd` via `vitest-pool-workers`, points at a local Postgres, and exercises TC-3 through TC-6, TC-8, TC-9, TC-13, TC-14. Wire into CI via the existing test runner. Decide example-local vs. root devDependency for `vitest-pool-workers` — probably example-local to keep the root install slim.
+  - Test file boots the Worker under `workerd` via `vitest-pool-workers`, points at a local Postgres (`prisma dev`), and exercises TC-3 through TC-6, TC-8, TC-9, TC-13, TC-14. `@cloudflare/vitest-pool-workers` and `wrangler` are **example-local** devDependencies (locked: keep the root install slim; only this example needs them). Wire into the workspace test runner so `pnpm test:examples --filter prisma-next-cloudflare-worker` is the canonical invocation.
   - (Satisfies: TC-3 through TC-6, TC-8, TC-9, TC-13, TC-14, TC-19, TC-21.)
 - [ ] **3.5 — Example README.**
   - Setup steps (Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding, `.dev.vars`, `wrangler dev`, `wrangler deploy`), known limitations (transaction affinity, isolate memory limits), troubleshooting.
@@ -184,7 +185,7 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 Carried forward from the spec or surfaced during planning. Most resolve during execution.
 
 1. **Package shape** — locked: new entrypoint `@prisma-next/postgres/serverless` within the existing package. No new package, no new architecture.config.json glob. (M2 task 2.1.)
-2. **Where to install `vitest-pool-workers`** — root devDependency vs. example-local. Decide in M3 task 3.4. Probably example-local.
+2. **Where to install `vitest-pool-workers`** — locked: example-local devDependency in `examples/prisma-next-cloudflare-worker`. Keeps the root install slim; only this example needs the workerd test pool. (M3 task 3.4.)
 3. **Cloudflare account for the smoke test (M4 task 4.2)** — needs a Cloudflare account with a Hyperdrive entitlement and a Postgres origin. The maker provisions or borrows; not blocking M2-M3.
 4. **Whether to draft a new ADR** for the facade asymmetry. Decide in M4 task 4.4.
 5. **PPg as the smoke-test origin** — currently aspirational. If PPg's preflight or networking story isn't ready, fall back to Neon or AWS RDS. Spec is generic to any Postgres origin; PPg-specific verification can be a follow-up.
