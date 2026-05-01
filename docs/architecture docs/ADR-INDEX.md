@@ -122,6 +122,7 @@ This document provides a comprehensive index of all Architectural Decision Recor
 |-----|-------|-------------|------|
 | 065 | Adapter capability schema & negotiation v1 | Defines adapter capability schema and negotiation protocol | [ADR 065 - Adapter capability schema & negotiation v1.md](adrs/ADR%20065%20-%20Adapter%20capability%20schema%20&%20negotiation%20v1.md) |
 | 068 | Error mapping to RuntimeError | Establishes stable mapping from engine/driver errors to RuntimeError envelope | [ADR 068 - Error mapping to RuntimeError.md](adrs/ADR%20068%20-%20Error%20mapping%20to%20RuntimeError.md) |
+| 207 | Per-environment facade asymmetry | Records why `postgres()` (long-lived) and `postgresServerless()` (per-request) ship asymmetric runtime-bound surfaces — same authoring surface, different lifecycle ergonomics — and rejects AsyncLocalStorage / single-facade / per-product alternatives | [ADR 207 - Per-environment facade asymmetry.md](adrs/ADR%20207%20-%20Per-environment%20facade%20asymmetry.md) |
 
 ## Development & Tooling
 
