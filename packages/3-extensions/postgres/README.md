@@ -75,6 +75,14 @@ Simplified `defineConfig` that pre-wires all Postgres internals (family, target,
 - `db.context`
 - `db.stack`
 
+Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
+Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
+
+When URL binding is used, pool timeouts are configurable via `poolOptions`:
+
+- `poolOptions.connectionTimeoutMillis` (default `20_000`)
+- `poolOptions.idleTimeoutMillis` (default `30_000`)
+
 ### `@prisma-next/postgres/serverless`
 
 `@prisma-next/postgres/serverless` exposes `postgresServerless(...)` for per-request runtimes. The returned client exposes only:
@@ -86,14 +94,6 @@ Simplified `defineConfig` that pre-wires all Postgres internals (family, target,
 - `db.connect({ url })` — returns `Promise<Runtime & AsyncDisposable>`
 
 Each `connect()` call constructs a fresh `pg.Client` and a fresh `Runtime`. No `pg.Pool` is allocated. `[Symbol.asyncDispose]` calls `runtime.close()`, which closes the underlying client. `pg-cursor` is enabled by default; opt out via `cursor: { disabled: true }`.
-
-Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
-Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
-
-When URL binding is used, pool timeouts are configurable via `poolOptions`:
-
-- `poolOptions.connectionTimeoutMillis` (default `20_000`)
-- `poolOptions.idleTimeoutMillis` (default `30_000`)
 
 ## Responsibilities
 
