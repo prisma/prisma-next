@@ -190,6 +190,27 @@ describe('react-router-demo smoke (e2e)', () => {
         },
       });
 
+      // Pull a fresh `db.server` module via Vite's SSR module loader to prove
+      // that the framework runtime — not just the on-disk artifact — sees the
+      // newly emitted column. If the HMR dispose handler stopped invalidating
+      // the cached runtime (or the plugin failed to invalidate `db.server.ts`
+      // when `contract.json` changed), the module would still hold a reference
+      // to a stale `contract.json` and `select('nickname')` would synchronously
+      // throw `Column "nickname" not found in scope` from the SQL builder.
+      // ssrLoadModule's typed return is `Record<string, any>`; cast once to
+      // the narrow shape we exercise here so the rest of the test stays typed.
+      const freshModule = (await server.ssrLoadModule('/app/lib/db.server.ts')) as unknown as {
+        getDb: () => {
+          sql: {
+            user: {
+              select(...columns: readonly string[]): { build(): unknown };
+            };
+          };
+        };
+      };
+      const freshDb = freshModule.getDb();
+      expect(() => freshDb.sql.user.select('id', 'email', 'nickname').build()).not.toThrow();
+
       const followUpResponse = await fetch(`${baseUrl}/`);
       expect(followUpResponse.ok).toBe(true);
     },
