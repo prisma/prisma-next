@@ -5,6 +5,7 @@
 Collapse the redundant `fromHash` parameter into the existing `fromContract` parameter on `MigrationPlanner.plan(...)`. After the change, `fromContract: Contract | null` is the sole "from" identity input — required at every call site. Reconciliation commands (`db init`, `db update`) pass `null`; authoring commands (`migration plan`) pass the bookend they already have. Pure modeling fix: no observable behaviour change, no fixture regeneration.
 
 **Spec:** `projects/refactor-plan-api/spec.md`
+**Plan path:** `projects/refactor-plan-api/plans/plan.md` (orchestrator-expected location)
 
 ## Collaborators
 
