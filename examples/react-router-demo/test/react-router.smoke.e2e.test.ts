@@ -84,7 +84,7 @@ describe('react-router-demo smoke (e2e)', () => {
     vi.stubEnv('DATABASE_URL', dev.connectionString);
     // @prisma/dev (PGlite) rejects concurrent connections; cap the example's
     // pg pool at 1 only here so the production code path stays unconstrained.
-    vi.stubEnv('PRISMA_NEXT_DEMO_PG_POOL_MAX', '1');
+    vi.stubEnv('REACT_ROUTER_DEMO_PG_POOL_MAX', '1');
   });
 
   afterEach(async () => {

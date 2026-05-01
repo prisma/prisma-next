@@ -9,11 +9,11 @@ let cached: { db: Db; pool: Pool } | undefined;
 
 export function getDb(): Db {
   if (!cached) {
-    // PRISMA_NEXT_DEMO_PG_POOL_MAX, when set, caps the pool size. The smoke
+    // REACT_ROUTER_DEMO_PG_POOL_MAX, when set, caps the pool size. The smoke
     // test sets it to '1' so the example cohabits with @prisma/dev (PGlite),
     // which rejects concurrent connections. In production the pg default
     // applies and the framework's own pool sizing wins.
-    const poolMaxRaw = process.env['PRISMA_NEXT_DEMO_PG_POOL_MAX'];
+    const poolMaxRaw = process.env['REACT_ROUTER_DEMO_PG_POOL_MAX'];
     const pool = new Pool({
       connectionString: process.env['DATABASE_URL'],
       ...(poolMaxRaw === undefined ? {} : { max: Number(poolMaxRaw) }),
