@@ -242,6 +242,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {
@@ -314,6 +315,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {
