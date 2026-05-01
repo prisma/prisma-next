@@ -1,4 +1,3 @@
-import { existsSync } from 'node:fs';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { createDevDatabase, type DevDatabase, timeouts, withClient } from '@prisma-next/test-utils';
@@ -43,6 +42,10 @@ create table if not exists "post" (
 );
 `;
 
+// Single `stat()` with ENOENT swallowed — using `existsSync` + `stat` instead
+// would TOCTOU-race the emitter's atomic publish (temp-write + rename), which
+// briefly leaves no file at the target path. Treat ENOENT as "not yet"; rethrow
+// any other error so genuine I/O failures still surface.
 async function waitForFileMtimeChange(
   filePath: string,
   originalMtime: number | null,
@@ -50,10 +53,14 @@ async function waitForFileMtimeChange(
 ): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
-    if (existsSync(filePath)) {
+    try {
       const { mtimeMs } = await stat(filePath);
       if (originalMtime === null || mtimeMs > originalMtime) {
         return true;
+      }
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') {
+        throw error;
       }
     }
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -104,9 +111,14 @@ describe('react-router-demo smoke (e2e)', () => {
     // artifacts, then close the server so nothing is left mid-flight, then tear
     // down the dev database and unstub the env.
     if (originalSchema !== null) {
-      const preRevertMtime = existsSync(contractJsonPath)
-        ? (await stat(contractJsonPath)).mtimeMs
-        : null;
+      let preRevertMtime: number | null = null;
+      try {
+        preRevertMtime = (await stat(contractJsonPath)).mtimeMs;
+      } catch (error) {
+        if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
       await writeFile(schemaPath, originalSchema);
       originalSchema = null;
       if (server) {
