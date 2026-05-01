@@ -1,4 +1,4 @@
-# ADR 207 — Mongo result-shape as a structural plan field
+# ADR 209 — Mongo result-shape as a structural plan field
 
 > **Decision (in one sentence):** Mongo plans carry a recursive structural `resultShape` field that tells the runtime how to decode each row; if no `resultShape` is attached, the runtime yields the row from the driver verbatim.
 
