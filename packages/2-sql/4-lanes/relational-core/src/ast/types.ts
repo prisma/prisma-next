@@ -1626,7 +1626,60 @@ export class DeleteAst extends QueryAst {
   }
 }
 
-export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst;
+/**
+ * Raw-SQL query AST node carrying interpolated parameter / expression nodes
+ * embedded inside literal SQL fragments.
+ *
+ * `fragments` and `args` are interleaved during lowering:
+ * `fragments[0] + lower(args[0]) + fragments[1] + ... + fragments[n]`.
+ * Construction enforces `fragments.length === args.length + 1`.
+ *
+ * Extends {@link QueryAst} (whole-query AST, not a sub-expression).
+ * Construction does not validate that each arg is a `ParamRef` /
+ * `AnyExpression`: the type system already rejects bare values because
+ * `args` is typed `readonly AnyExpression[]`. The user-facing `raw\`...\``
+ * factory (separate `sql-raw-factory` component) layers stricter
+ * type-level rejection on top of this AST node.
+ */
+export class RawSqlExpr extends QueryAst {
+  readonly kind = 'raw-sql' as const;
+  readonly fragments: readonly string[];
+  readonly args: readonly AnyExpression[];
+
+  constructor(fragments: readonly string[], args: readonly AnyExpression[]) {
+    super();
+    if (fragments.length !== args.length + 1) {
+      throw new Error(
+        `RawSqlExpr: fragments.length must equal args.length + 1 (got fragments=${fragments.length}, args=${args.length})`,
+      );
+    }
+    this.fragments = Object.freeze([...fragments]);
+    this.args = Object.freeze([...args]);
+    this.freeze();
+  }
+
+  static of(fragments: readonly string[], args: readonly AnyExpression[]): RawSqlExpr {
+    return new RawSqlExpr(fragments, args);
+  }
+
+  override collectParamRefs(): ParamRef[] {
+    const refs: ParamRef[] = [];
+    for (const arg of this.args) {
+      if (arg.kind === 'param-ref') {
+        refs.push(arg);
+      } else {
+        refs.push(...arg.collectParamRefs());
+      }
+    }
+    return refs;
+  }
+
+  override toQueryAst(): AnyQueryAst {
+    return this;
+  }
+}
+
+export type AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst | RawSqlExpr;
 export type AnyFromSource = TableSource | DerivedTableSource;
 export type AnyExpression =
   | ColumnRef
@@ -1654,6 +1707,7 @@ export const queryAstKinds: ReadonlySet<string> = new Set<AnyQueryAst['kind']>([
   'insert',
   'update',
   'delete',
+  'raw-sql',
 ]);
 export const whereExprKinds: ReadonlySet<string> = new Set<AnyExpression['kind']>([
   'binary',
