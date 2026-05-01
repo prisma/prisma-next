@@ -48,6 +48,7 @@ function chain(...specs: Array<[string, string, string]>): MigrationPackage[] {
 interface PkgWithInvariantsOpts {
   readonly invariants?: readonly string[];
   readonly labels?: readonly string[];
+  readonly createdAt?: string;
 }
 
 function pkgWithInvariants(
@@ -56,7 +57,7 @@ function pkgWithInvariants(
   dirName: string,
   opts: PkgWithInvariantsOpts = {},
 ): MigrationPackage {
-  const uniqueCreatedAt = `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
+  const uniqueCreatedAt = opts.createdAt ?? `2026-02-25T14:00:00.000Z-${migrationCounter++}`;
   const metadata = createTestMetadata({
     from,
     to,
@@ -511,9 +512,28 @@ describe('findPathWithDecision', () => {
 
   it('omits tieBreakReasons when invariant routing leaves only one locally viable candidate', () => {
     const packages = [
-      pkgWithInvariants(E, 'A', 'm0'),
+      pkg(E, 'A', 'm0'),
       pkgWithInvariants('A', 'B', 'm_ab'),
       pkgWithInvariants('A', 'C', 'm_ac', { invariants: ['X'] }),
+      pkgWithInvariants('B', 'H', 'm_bh'),
+      pkgWithInvariants('C', 'H', 'm_ch'),
+    ];
+    const graph = reconstructGraph(packages);
+    const result = findPathWithDecision(graph, 'A', 'H', { required: new Set(['X']) });
+    expect(result.kind).toBe('ok');
+    if (result.kind !== 'ok') return;
+    expect(result.decision.selectedPath.map((e) => e.dirName)).toEqual(['m_ac', 'm_ch']);
+    expect(result.decision.tieBreakReasons).toEqual([]);
+    expect(result.decision.alternativeCount).toBeGreaterThan(0);
+  });
+
+  it('omits tieBreakReason when the chosen edge sorts first but is the sole invariant-viable fork', () => {
+    const early = '2026-02-26T09:59:58.001Z-fixture-ac';
+    const late = '2026-02-26T09:59:58.003Z-fixture-ab';
+    const packages = [
+      pkg(E, 'A', 'm0'),
+      pkgWithInvariants('A', 'B', 'm_ab', { createdAt: late }),
+      pkgWithInvariants('A', 'C', 'm_ac', { invariants: ['X'], createdAt: early }),
       pkgWithInvariants('B', 'H', 'm_bh'),
       pkgWithInvariants('C', 'H', 'm_ch'),
     ];

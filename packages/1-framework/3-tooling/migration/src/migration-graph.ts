@@ -390,7 +390,7 @@ export function findPathWithDecision(
         if (required.size > 0) {
           const prefixSet = coveragePrefixes[i]!;
           const viable = invariantViableAlternativesAtStep(required, prefixSet, reachable);
-          if (viable.length > 1) comparisonPool = viable;
+          comparisonPool = viable;
         }
 
         alternativeCount += reachable.length - 1;
@@ -454,7 +454,7 @@ function requiredCoveragePrefixes(
   const prefixes: ReadonlySet<string>[] = [];
   const acc = new Set<string>();
   for (const edge of path) {
-    prefixes.push(acc);
+    prefixes.push(new Set(acc));
     for (const inv of edge.invariants) {
       if (required.has(inv)) acc.add(inv);
     }
