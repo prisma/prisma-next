@@ -77,12 +77,31 @@ describe('worker — postgresServerless against Hyperdrive (local)', () => {
   });
 
   it('cursor early-break consumes only the requested rows (TC-9, AC-6)', async () => {
-    const res = await get('/cursor/large?break=7');
+    const breakAfter = 7;
+    const res = await get(`/cursor/large?break=${breakAfter}`);
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { ok: boolean; consumed: number; cancelled: boolean };
+    const body = (await res.json()) as {
+      ok: boolean;
+      consumed: number;
+      cancelled: boolean;
+      elapsedMs: number;
+      rowsTransmitted: number;
+    };
     expect(body.ok).toBe(true);
-    expect(body.consumed).toBe(7);
+    // global-setup seeds 10_000 posts. `consumed === breakAfter` proves the
+    // for-await loop exited via `break`, not via the iterator running out.
+    expect(body.consumed).toBe(breakAfter);
     expect(body.cancelled).toBe(true);
+    // The behavioral assertion that demonstrably fails when cursor is
+    // disabled: pg_stat_statements (queried by the route via a side-channel
+    // pg.Client) reports how many rows the server actually transmitted.
+    // With cursor enabled, only the first ~100-row batch is fetched before
+    // the early `break` closes the cursor. With cursor disabled, the driver
+    // buffers all 10_000 rows. Threshold of 500 leaves headroom for the
+    // default 100-row batch size + one round of refill jitter, while still
+    // failing decisively at 10_000.
+    expect(body.rowsTransmitted).toBeGreaterThan(0);
+    expect(body.rowsTransmitted).toBeLessThan(500);
   });
 
   it('returns 404 for unknown routes', async () => {

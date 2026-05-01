@@ -13,6 +13,12 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: prisma_next_cloudflare_worker
+    # pg_stat_statements lets the cursor integration test assert how many
+    # rows the server transmitted per logical statement — the only signal
+    # that distinguishes cursor-streamed from buffered execution from the
+    # test side. Loaded in shared_preload_libraries here so the extension
+    # can be CREATEd in test/global-setup.ts.
+    command: postgres -c shared_preload_libraries=pg_stat_statements
     ports:
       - '5433:5432'
     healthcheck:

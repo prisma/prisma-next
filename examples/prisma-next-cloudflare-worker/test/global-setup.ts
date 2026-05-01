@@ -95,6 +95,23 @@ async function applySchema(databaseUrl: string): Promise<void> {
 const ALICE_ID = '00000000-0000-4000-8000-000000000001';
 const BOB_ID = '00000000-0000-4000-8000-000000000002';
 
+// Sized to the budgets cap in `src/prisma/db.ts` (`tableRows.post: 10_000`)
+// — large enough that the cursor early-break test (`/cursor/large`) is
+// observably fast under cursor=on and observably slow under cursor=off.
+const POST_SEED_COUNT = 10_000;
+
+async function ensurePgStatStatements(databaseUrl: string): Promise<void> {
+  const client = new Client({ connectionString: databaseUrl });
+  await client.connect();
+  try {
+    // pg_stat_statements is preloaded via docker-compose's shared_preload_libraries;
+    // CREATE EXTENSION makes its catalog views queryable from the test session.
+    await client.query('CREATE EXTENSION IF NOT EXISTS pg_stat_statements');
+  } finally {
+    await client.end();
+  }
+}
+
 async function resetAndSeed(databaseUrl: string): Promise<void> {
   const client = new Client({ connectionString: databaseUrl });
   await client.connect();
@@ -111,16 +128,17 @@ async function resetAndSeed(databaseUrl: string): Promise<void> {
       [ALICE_ID, BOB_ID],
     );
 
-    const postRows: string[] = [];
-    for (let i = 0; i < 50; i++) {
-      const id = `10000000-0000-4000-8000-${(i + 1).toString().padStart(12, '0')}`;
-      const userId = i % 2 === 0 ? ALICE_ID : BOB_ID;
-      postRows.push(
-        `('${id}', 'Post ${i + 1}', '${userId}', '2026-04-${(10 + (i % 20)).toString().padStart(2, '0')}T10:00:00Z')`,
-      );
-    }
+    // Single set-based INSERT via generate_series — bulk-loads 10k rows in
+    // one round trip (much faster than batched multi-row VALUES).
     await client.query(
-      `INSERT INTO "post" (id, title, "userId", "createdAt") VALUES ${postRows.join(', ')}`,
+      `INSERT INTO "post" (id, title, "userId", "createdAt")
+       SELECT
+         '10000000-0000-4000-8000-' || lpad(g::text, 12, '0'),
+         'Post ' || g,
+         CASE WHEN g % 2 = 0 THEN $1 ELSE $2 END,
+         TIMESTAMPTZ '2026-04-01 00:00:00+00' + ((g % 365) * INTERVAL '1 hour')
+       FROM generate_series(1, $3::int) AS g`,
+      [ALICE_ID, BOB_ID, POST_SEED_COUNT],
     );
   } finally {
     await client.end();
@@ -133,6 +151,7 @@ export default async function setup({ provide }: GlobalSetupContext) {
 
   await ensureContainerReady(databaseUrl);
   await applySchema(databaseUrl);
+  await ensurePgStatStatements(databaseUrl);
   await resetAndSeed(databaseUrl);
 
   provide('database-url', databaseUrl);

@@ -1,4 +1,5 @@
 import { withTransaction } from '@prisma-next/sql-runtime';
+import { Client } from 'pg';
 import { createOrmClient } from './orm-client/client';
 import { db } from './prisma/db';
 
@@ -96,27 +97,64 @@ export default {
     if (url.pathname === '/cursor/large') {
       const breakAfter = parseLimit(url.searchParams.get('break'), 50);
       const consumed: { id: string; title: string }[] = [];
-      // Bounded SELECT (limit well above the early-break threshold) keeps the
-      // budgets middleware happy while still exercising the cursor early-exit
-      // path: the driver opens a server-side cursor, streams pages, and the
-      // for-await break aborts after `breakAfter` rows.
-      const iter = runtime.execute(
-        db.sql.post
-          .select('id', 'title')
-          .orderBy((f) => f.createdAt, { direction: 'asc' })
-          .limit(1_000)
-          .build(),
-      );
-      for await (const row of iter) {
-        consumed.push(row);
-        if (consumed.length >= breakAfter) break;
+      let cancelled = false;
+
+      // Open a side-channel pg.Client to instrument the cursor query via
+      // pg_stat_statements (loaded via shared_preload_libraries in
+      // docker-compose / CI). Two-client pattern: the runtime owns the
+      // primary connection that runs the SELECT; this observer connection
+      // resets stats before and reads them after, so the test can prove
+      // that with cursor enabled the server transmitted only ~one batch
+      // worth of rows (not the full LIMIT). With cursor disabled the
+      // observer would see the full ~10_000 rows row count.
+      const observer = new Client({ connectionString: env.HYPERDRIVE.connectionString });
+      await observer.connect();
+      try {
+        await observer.query('SELECT pg_stat_statements_reset()');
+
+        const t0 = Date.now();
+        // SELECT bounded to the post-table budget cap (10_000 — see
+        // `src/prisma/db.ts`). With cursor enabled the driver opens a
+        // server-side cursor and streams in ~100-row batches; an early
+        // `break` only fetches one batch and closes. With cursor disabled
+        // the driver buffers all 10_000 rows before the first yield.
+        const iter = runtime.execute(
+          db.sql.post
+            .select('id', 'title')
+            .orderBy((f) => f.createdAt, { direction: 'asc' })
+            .limit(10_000)
+            .build(),
+        );
+        for await (const row of iter) {
+          consumed.push(row);
+          if (consumed.length >= breakAfter) {
+            cancelled = true;
+            break;
+          }
+        }
+        const elapsedMs = Date.now() - t0;
+
+        // Sum rows over every statement that touched the post table since
+        // the reset above. pg_stat_statements normalizes parameters but
+        // preserves table names, so the LIKE filter is precise enough.
+        const statsResult = await observer.query<{ rows: string }>(
+          `SELECT COALESCE(SUM(rows), 0)::text AS rows
+           FROM pg_stat_statements
+           WHERE query ILIKE '%from%post%'`,
+        );
+        const rowsTransmitted = Number(statsResult.rows[0]?.rows ?? '0');
+
+        return Response.json({
+          ok: true,
+          route: 'cursor/large',
+          consumed: consumed.length,
+          cancelled,
+          elapsedMs,
+          rowsTransmitted,
+        });
+      } finally {
+        await observer.end();
       }
-      return Response.json({
-        ok: true,
-        route: 'cursor/large',
-        consumed: consumed.length,
-        cancelled: true,
-      });
     }
 
     // The Task collection (and its Bug/Feature variants) is wired in
