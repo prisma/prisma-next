@@ -20,6 +20,9 @@
     "test/**/*.ts",
     "prisma/**/*.ts",
     "prisma-next.config.ts",
+    "react-router.config.ts",
+    "vite.config.ts",
+    "vitest.config.ts",
     ".react-router/types/**/*"
   ],
   "exclude": ["dist", "build", "node_modules"]
