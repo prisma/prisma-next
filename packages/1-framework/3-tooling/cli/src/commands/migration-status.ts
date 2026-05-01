@@ -37,6 +37,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
   toPathDecisionResult,
+  toStructuralEdge,
 } from '../utils/command-helpers';
 import {
   type EdgeStatus,
@@ -750,13 +751,7 @@ async function executeMigrationStatusCommand(
             ...ifDefined('refName', activeRefName),
             required: [...effectiveRequired].sort(),
             missing: outcome.missing,
-            structuralPath: outcome.structuralPath.map((edge) => ({
-              dirName: edge.dirName,
-              migrationHash: edge.migrationHash,
-              from: edge.from,
-              to: edge.to,
-              invariants: edge.invariants,
-            })),
+            structuralPath: outcome.structuralPath.map(toStructuralEdge),
           }),
         ),
       );

@@ -36,6 +36,7 @@ import {
   setCommandExamples,
   targetSupportsMigrations,
   toPathDecisionResult,
+  toStructuralEdge,
 } from '../utils/command-helpers';
 import { formatMigrationApplyCommandOutput } from '../utils/formatters/migrations';
 import { formatStyledHeader } from '../utils/formatters/styled';
@@ -323,13 +324,7 @@ async function executeMigrationApplyCommand(
             ...ifDefined('refName', refName),
             required: [...effectiveRequired].sort(),
             missing: outcome.missing,
-            structuralPath: outcome.structuralPath.map((edge) => ({
-              dirName: edge.dirName,
-              migrationHash: edge.migrationHash,
-              from: edge.from,
-              to: edge.to,
-              invariants: edge.invariants,
-            })),
+            structuralPath: outcome.structuralPath.map(toStructuralEdge),
           }),
         ),
       );

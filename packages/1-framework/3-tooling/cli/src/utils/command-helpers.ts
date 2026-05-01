@@ -1,7 +1,8 @@
 import { readFile } from 'node:fs/promises';
 import type { ControlTargetDescriptor } from '@prisma-next/framework-components/control';
 import { hasMigrations } from '@prisma-next/framework-components/control';
-import type { MigrationGraph } from '@prisma-next/migration-tools/graph';
+import type { NoInvariantPathStructuralEdge } from '@prisma-next/migration-tools/errors';
+import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools/graph';
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
@@ -131,6 +132,22 @@ export function collectDeclaredInvariants(graph: MigrationGraph): ReadonlySet<st
     }
   }
   return declared;
+}
+
+/**
+ * Maps a `MigrationEdge` to the structural-edge shape used in the
+ * `MIGRATION.NO_INVARIANT_PATH` error envelope. Shared between
+ * `migration apply` and `migration status` so both commands surface
+ * the same JSON wire shape when an invariant-aware route is unsatisfiable.
+ */
+export function toStructuralEdge(edge: MigrationEdge): NoInvariantPathStructuralEdge {
+  return {
+    dirName: edge.dirName,
+    migrationHash: edge.migrationHash,
+    from: edge.from,
+    to: edge.to,
+    invariants: edge.invariants,
+  };
 }
 
 /**

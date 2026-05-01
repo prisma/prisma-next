@@ -1,4 +1,5 @@
 import { resolve } from 'node:path';
+import type { MigrationEdge } from '@prisma-next/migration-tools/graph';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { describe, expect, it } from 'vitest';
 import {
@@ -6,6 +7,7 @@ import {
   resolveContractPath,
   sanitizeErrorMessage,
   toPathDecisionResult,
+  toStructuralEdge,
 } from '../../src/utils/command-helpers';
 
 describe('maskConnectionUrl', () => {
@@ -191,5 +193,38 @@ describe('toPathDecisionResult', () => {
       'migrationHash',
       'to',
     ]);
+  });
+});
+
+describe('toStructuralEdge', () => {
+  function edge(overrides: Partial<MigrationEdge> = {}): MigrationEdge {
+    return {
+      from: 'sha256:from',
+      to: 'sha256:to',
+      migrationHash: 'mh:1',
+      dirName: 'm1',
+      createdAt: '2026-01-01T00:00:00.000Z',
+      labels: [],
+      invariants: [],
+      ...overrides,
+    };
+  }
+
+  it('extracts the wire-shape fields and drops authoring metadata', () => {
+    const result = toStructuralEdge(
+      edge({
+        labels: ['main'],
+        createdAt: '2026-02-01T00:00:00.000Z',
+        invariants: ['X', 'Y'],
+      }),
+    );
+    expect(Object.keys(result).sort()).toEqual([
+      'dirName',
+      'from',
+      'invariants',
+      'migrationHash',
+      'to',
+    ]);
+    expect(result.invariants).toEqual(['X', 'Y']);
   });
 });
