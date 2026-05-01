@@ -95,13 +95,9 @@ function bareContract(storageHash: string): MongoContract {
 function planForContract(
   contract: ReturnType<typeof makeContract>,
   origin: MongoSchemaIR = new MongoSchemaIR([]),
-  fromHash: string | null = null,
+  fromContract: MongoContract | null = null,
 ) {
   const planner = new MongoMigrationPlanner();
-  // The planner derives `plan.origin` from `fromContract?.storage.storageHash`.
-  // Tests that need a specific origin hash on the plan synthesize a fromContract
-  // bare-minimum-shape with that storageHash.
-  const fromContract = fromHash === null ? null : bareContract(fromHash);
   const result = planner.plan({
     contract,
     schema: origin,
@@ -301,7 +297,7 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, 'sha256:expected');
+    const plan = planForContract(contract, undefined, bareContract('sha256:expected'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
@@ -347,7 +343,7 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, 'sha256:something');
+    const plan = planForContract(contract, undefined, bareContract('sha256:something'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
@@ -371,7 +367,7 @@ describe('MongoMigrationRunner', () => {
     const contract = makeContract({
       users: { indexes: [{ keys: [{ field: 'email', direction: 1 }] }] },
     });
-    const plan = planForContract(contract, undefined, 'sha256:origin');
+    const plan = planForContract(contract, undefined, bareContract('sha256:origin'));
     const serialized = serializePlan(plan);
 
     const runner = makeRunner();
