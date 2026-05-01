@@ -1,0 +1,66 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type {
+  ControlDriverInstance,
+  ControlFamilyInstance,
+  TargetMigrationsCapability,
+} from '@prisma-next/framework-components/control';
+import { describe, expect, it, vi } from 'vitest';
+import { executeDbInit } from '../../src/control-api/operations/db-init';
+
+function createMockDriver() {
+  return {
+    close: vi.fn(),
+  } as unknown as ControlDriverInstance<'sql', 'postgres'>;
+}
+
+function createMockFamilyInstance() {
+  return {
+    familyId: 'sql',
+    readMarker: async () => null,
+    introspect: async () => ({ tables: {}, dependencies: [] }),
+    validateContract: (ir: unknown) => ir as Contract,
+    toOperationPreview: () => ({ statements: [] }),
+  } as unknown as ControlFamilyInstance<'sql', unknown>;
+}
+
+const dummyContract = { schemaVersion: '1', target: 'postgres' } as unknown as Contract;
+
+describe('executeDbInit', () => {
+  it('passes fromContract: null to planner.plan (no prior contract under reconciliation)', async () => {
+    const planFn = vi.fn().mockReturnValue({
+      kind: 'success',
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest' },
+        operations: [],
+      },
+    });
+
+    const migrations = {
+      createPlanner: () => ({ plan: planFn }),
+      createRunner: () => ({ execute: vi.fn() }),
+    } as unknown as TargetMigrationsCapability<
+      'sql',
+      'postgres',
+      ControlFamilyInstance<'sql', unknown>
+    >;
+
+    await executeDbInit({
+      driver: createMockDriver(),
+      familyInstance: createMockFamilyInstance(),
+      contract: dummyContract,
+      mode: 'plan',
+      migrations,
+      frameworkComponents: [],
+    });
+
+    expect(planFn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        // `db init` reconciles against the live introspected schema and has no
+        // prior contract; the required `fromContract: null` is the structural
+        // representation of "no origin contract" (AC-5).
+        fromContract: null,
+      }),
+    );
+  });
+});
