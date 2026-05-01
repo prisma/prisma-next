@@ -52,10 +52,10 @@ export interface MongoRuntime {
    *   `RUNTIME.ABORTED { phase: 'encode' }` from inside `resolveValue`'s
    *   per-level `Promise.all` race.
    *
-   * Mongo's read path does decode rows via `resultShape` (per ADR 207),
-   * but the decode boundary does not currently observe the signal — codec
-   * `decode` is sync-lifted in the standard registry. A future tightening
-   * could add a `phase: 'decode'` boundary if async decoders ship.
+   * Mongo's read path decodes rows via `resultShape` (per ADR 207). The
+   * same `CodecCallContext` is forwarded into each `codec.decode(wire, ctx)`
+   * call, so async decoders that respect the signal get cancellation; the
+   * runtime itself does not currently emit a `phase: 'decode'` envelope.
    */
   execute<Row>(
     plan: MongoQueryPlan<Row>,
@@ -141,6 +141,7 @@ class MongoRuntimeImpl
             exec.resultShape,
             self.#codecs,
             exec.command.collection,
+            codecCtx,
           );
           yield decoded as Row;
         }
