@@ -15,6 +15,8 @@ The cleavage:
 
 If `raw-sql-ast-node.spec.md` ships first (likely, since cipherstash needs it), this project consumes the public AST node API as-is. If for some reason this project ships first, it must also deliver the AST node — but the natural sequencing has the AST node landing first.
 
+**Linear:** [TML-2374](https://linear.app/prisma-company/issue/TML-2374) tracks `sql-raw-factory` at the component level. Milestone-level breakdown lives in [`plan.md`](plan.md). Component-level tracking only — no per-task or per-milestone Linear sub-issues.
+
 # Requirements
 
 ## Functional Requirements

@@ -15,7 +15,7 @@ The [umbrella plan](plan.md) sequences the three components and tracks status ac
 The three components share a single product narrative ("ship CipherStash for Prisma Next") and a tightly entangled dependency graph — Project 2 is a strict expansion of Project 1, and `sql-raw-factory` consumes the `RawSqlExpr` AST node that Project 1 introduces because cipherstash's migration factories needed it first. Treating them as one umbrella with three components rather than three independent projects:
 
 - **Single sequencing surface.** The umbrella plan answers "what lands first, what's in flight, what's blocked" for the whole integration in one place.
-- **Single Linear surface.** The existing `cipherstash-integration` Linear project is the umbrella; sub-issues are organized by component.
+- **Single Linear surface.** The existing `cipherstash-integration` Linear project is the umbrella; one ticket tracks each component ([TML-2373](https://linear.app/prisma-company/issue/TML-2373), [TML-2374](https://linear.app/prisma-company/issue/TML-2374), [TML-2375](https://linear.app/prisma-company/issue/TML-2375)).
 - **Bounded scope per component.** Each component has its own spec/plan and ships on its own PR cadence. The umbrella doesn't add coordination overhead; it just reflects the relationships that already exist.
 
 # Background
@@ -38,7 +38,7 @@ See [`project-1/spec.md`](project-1/spec.md) for the full requirements, acceptan
 
 Promotes cipherstash from "ships with hand-authored migration files" to "the migration planner generates the per-column DDL automatically from the contract." Expands the type and operator surface to match the full first-attempt scope. Out of scope for Project 1.
 
-See [`project-2/spec.md`](project-2/spec.md) — currently a stub; will be shaped properly after Project 1 ships and the framework dependencies it consumes ([TML-2338](https://linear.app/prisma-company/issue/TML-2338) / [TML-2339](https://linear.app/prisma-company/issue/TML-2339)) are merged.
+See [`project-2/spec.md`](project-2/spec.md) — currently a stub; tracked by [TML-2375](https://linear.app/prisma-company/issue/TML-2375). Will be shaped properly after Project 1 ships and the framework prerequisites are designed (`planTypeOperations` accepting `(table, column)` and prior-state contract for destructive DDL).
 
 ## `sql-raw-factory` — Public `raw\`...\`` SQL factory
 
@@ -88,23 +88,32 @@ The umbrella adopts a strict end-to-end-test gate as the cleavage between Projec
 
 # In-flight framework dependencies
 
-PRs and Linear tickets affecting more than one component:
+External PRs affecting more than one component:
 
-| PR | Linear | Subject | Status | Relevance |
-|---|---|---|---|---|
-| [#400](https://github.com/prisma/prisma-next/pull/400) | [TML-2330](https://linear.app/prisma-company/issue/TML-2330) | Codec call context + per-query `AbortSignal` (ADR 207) | Merged 2026-05-01 | Project 1 codec & middleware; Project 2 inherits |
-| [#402](https://github.com/prisma/prisma-next/pull/402) | [TML-2229](https://linear.app/prisma-company/issue/TML-2229) | Unified `CodecDescriptor<P>` (ADR 208) | Merged 2026-05-01 | Project 1 codec; Project 2 inherits |
-| [#404](https://github.com/prisma/prisma-next/pull/404) | — | Invariant-aware ref routing (M4) + self-edge support | Open | Project 1 migration factories carry `invariantId`; routing benefit is retroactive when #404 lands. Not a Project 1 dependency. |
-| [#409](https://github.com/prisma/prisma-next/pull/409) | — | `intercept` hook + `contentHash` on middleware | Open | Edits the same `RuntimeMiddleware` types as Project 1's middleware-param-transform task; whichever lands first, the other rebases. Not a Project 1 dependency. |
-| — | [TML-2338](https://linear.app/prisma-company/issue/TML-2338) | `(table, column)` to `planTypeOperations` | Not started | Project 2 only |
-| — | [TML-2339](https://linear.app/prisma-company/issue/TML-2339) | Prior-state contract for destructive `planTypeOperations` | Not started | Project 2 only |
-| — | [TML-2360](https://linear.app/prisma-company/issue/TML-2360) | Envelope-codec runtime pattern | Not started | Project 1 (consumer of param-transform seam) |
-| — | [TML-2359](https://linear.app/prisma-company/issue/TML-2359) | Mutable `beforeExecute` middleware (param-transform seam) | Not started | Project 1 framework SPI change |
-| — | [TML-2292](https://linear.app/prisma-company/issue/TML-2292) | Unify `DataTransformOperation` and `SqlMigrationPlanOperation` | Not started | Project 2 soft-dep; deferred |
+| PR | Subject | Status | Relevance |
+|---|---|---|---|
+| [#400](https://github.com/prisma/prisma-next/pull/400) | Codec call context + per-query `AbortSignal` (ADR 207) — was [TML-2330](https://linear.app/prisma-company/issue/TML-2330) | Merged 2026-05-01 | Project 1 codec & middleware; Project 2 inherits |
+| [#402](https://github.com/prisma/prisma-next/pull/402) | Unified `CodecDescriptor<P>` (ADR 208) — was [TML-2229](https://linear.app/prisma-company/issue/TML-2229) | Merged 2026-05-01 | Project 1 codec; Project 2 inherits |
+| [#404](https://github.com/prisma/prisma-next/pull/404) | Invariant-aware ref routing (M4) + self-edge support | Open | Project 1 migration factories carry `invariantId`; routing benefit is retroactive when #404 lands. Not a Project 1 dependency. |
+| [#409](https://github.com/prisma/prisma-next/pull/409) | `intercept` hook + `contentHash` on middleware | Open | Edits the same `RuntimeMiddleware` types as Project 1's middleware-param-transform task; whichever lands first, the other rebases. Not a Project 1 dependency. |
+
+Framework code-changes Project 2 will need (no longer separately tracked in Linear; described in [`project-2/spec.md`](project-2/spec.md)):
+
+- `planTypeOperations` accepting `(table, column)` — was TML-2338, cancelled.
+- `planTypeOperations` receiving prior-state contract for destructive DDL — was TML-2339, cancelled.
+- Unification of `DataTransformOperation` and `SqlMigrationPlanOperation` — TML-2292, soft Project 2 dep, deferred. Lives outside this umbrella.
 
 # Linear tracking
 
-Linear ticket redesign is deferred until the umbrella's plan stabilizes. The existing [Linear `cipherstash-integration` project](https://linear.app/prisma-company/project/cipherstash-integration-2c4f190e96ae) is the umbrella; child issues will be reorganized as work moves into the active phase.
+The [Linear `cipherstash-integration` project](https://linear.app/prisma-company/project/cipherstash-integration-2c4f190e96ae) holds three umbrella tickets, one per component:
+
+| Component | Linear |
+|---|---|
+| Project 1 — Searchable-encryption MVP | [TML-2373](https://linear.app/prisma-company/issue/TML-2373) |
+| `sql-raw-factory` — Public `raw\`...\`` factory | [TML-2374](https://linear.app/prisma-company/issue/TML-2374) |
+| Project 2 — Planner-driven DDL + expanded surface | [TML-2375](https://linear.app/prisma-company/issue/TML-2375) |
+
+Milestone-level breakdown lives in the per-component `plan.md` files; Linear tracks at the component level only.
 
 # References
 

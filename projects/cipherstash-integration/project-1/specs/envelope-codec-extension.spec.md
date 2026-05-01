@@ -363,7 +363,7 @@ The codec returns plaintext directly from `decode(wire)` and the middleware decr
 
 The CipherStash team's first integration. The codec body owns a shared queue and a `Promise.resolve().then(...)` flush; per-cell calls enqueue, the microtask flushes once per JS turn with one bulk SDK call.
 
-**Rejected** because the codec body ends up owning concurrency control, batch sizing, abort handling, and SDK error attribution — squeezed into the per-cell shape that doesn't fit any of them. Also opaque: future extensions implementing similar (Vault, AWS KMS, signing) each rediscover the same workaround. Moving the bulk dispatch to the middleware layer ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)) and the read-side coalescing to a standalone utility (`decryptAll`) keeps each concern at the right layer.
+**Rejected** because the codec body ends up owning concurrency control, batch sizing, abort handling, and SDK error attribution — squeezed into the per-cell shape that doesn't fit any of them. Also opaque: future extensions implementing similar (Vault, AWS KMS, signing) each rediscover the same workaround. Moving the bulk dispatch to the middleware layer (param-transform seam — see [middleware-param-transform task spec](middleware-param-transform.spec.md)) and the read-side coalescing to a standalone utility (`decryptAll`) keeps each concern at the right layer.
 
 ## Result-set transformer instead of envelopes
 

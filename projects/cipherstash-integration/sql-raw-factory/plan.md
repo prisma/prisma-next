@@ -141,7 +141,7 @@ The fuzz test (`AC-ID3`) is not random — it's a hand-curated table of adversar
   - A short architecture-doc note about the raw factory as a public surface (one paragraph in `docs/architecture docs/subsystems/<sql>.md` or similar).
   - The `RawArg`-as-SQL-injection-defense rationale, if it warrants a standalone note. The threat-surface caveat (`identifier(...)` is for trusted input) belongs in the package README.
 - **T3.3** Strip repo-wide references to `projects/cipherstash-integration/sql-raw-factory/**`. Replace with canonical `docs/` links or remove.
-- **T3.4** Linear ticket cleanup. If the umbrella's Linear redesign produced sql-raw-factory tickets, close them; transfer survivors.
+- **T3.4** Close [TML-2374](https://linear.app/prisma-company/issue/TML-2374) ("`sql-raw-factory`: public `raw\`...\`` template-literal factory").
 - **T3.5** Final sanity: `pnpm build`, `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration` (where applicable), `pnpm lint:deps` all green.
 - **T3.6** Delete `projects/cipherstash-integration/sql-raw-factory/`.
 

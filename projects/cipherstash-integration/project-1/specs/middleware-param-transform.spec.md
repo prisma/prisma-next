@@ -2,7 +2,7 @@
 
 Promote `beforeExecute` middleware to a **mutable param-transformation seam** — middleware can rewrite the values carried in the plan's outbound `ParamRef`s before encode runs, with access to the per-query `AbortSignal` from [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / [ADR 207](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). Unlocks bulk-everything patterns at the framework layer (bulk-encrypt for KMS-backed columns, bulk-sign for audit columns, bulk-validate for cross-column constraints) without each extension growing its own plan-walker or the codec interface growing a new trait.
 
-CipherStash bulk-encrypt — see the [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — is the **first concrete consumer** ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)), not the owner. This task spec belongs to [Project 1](../spec.md) of the [cipherstash-integration umbrella project](../../spec.md).
+CipherStash bulk-encrypt — see the [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — is the **first concrete consumer**, not the owner. This task spec belongs to [Project 1](../spec.md) of the [cipherstash-integration umbrella project](../../spec.md), tracked at the component level by [TML-2373](https://linear.app/prisma-company/issue/TML-2373).
 
 ## Grounding example
 
@@ -172,7 +172,7 @@ Mongo's middleware contract grows the same shape with a `MongoParamRefMutator` o
 
 ## What this enables
 
-- **Bulk-encrypt middleware for KMS-backed columns** ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)) — the first consumer; ~50 lines of middleware code instead of a microtask-coalescing batcher inside the codec body.
+- **Bulk-encrypt middleware for KMS-backed columns** (the cipherstash envelope-codec extension — see [envelope-codec-extension task spec](envelope-codec-extension.spec.md)) — the first consumer; ~50 lines of middleware code instead of a microtask-coalescing batcher inside the codec body.
 - **Audit-stamping middleware** that auto-populates `last_modified_by` / `created_at` from the runtime's session context, without each model declaring the column author-side.
 - **Cross-column validation** that reads multiple `ParamRef`s, validates a derived constraint, and short-circuits with an error envelope before encode runs.
 - **Bulk-sign middleware** that derives a row-level signature from N column values and stores the result in another `ParamRef`.
@@ -181,7 +181,7 @@ Mongo's middleware contract grows the same shape with a `MongoParamRefMutator` o
 
 - **No general AST-rewrite middleware.** Mutator scope is `ParamRef.value` slots only. SQL rewriting, projection mutation, plan restructuring stay reserved for the lowering layer or for explicit `beforeCompile` (which already exists for plan-shape transforms).
 - **No middleware-driven concurrency control.** Middleware runs sequentially in registration order; concurrency-bounding of the codec dispatch fan-out is a separate concern (currently tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330)).
-- **No bulk-decode middleware.** Decode-side bulk work uses a different pattern — codecs return envelope objects (per [TML-2360](https://linear.app/prisma-company/issue/TML-2360)) carrying handles, and user code calls bulk-decrypt utilities post-buffering. Middleware doesn't fit the streaming-decode boundary cleanly.
+- **No bulk-decode middleware.** Decode-side bulk work uses a different pattern — codecs return envelope objects (per the envelope-codec extension pattern — see [envelope-codec-extension task spec](envelope-codec-extension.spec.md)) carrying handles, and user code calls bulk-decrypt utilities post-buffering. Middleware doesn't fit the streaming-decode boundary cleanly.
 - **No new codec interface trait.** The codec interface stays per-cell and unchanged. Bulk semantics live at the middleware layer.
 
 ## Acceptance criteria
@@ -261,5 +261,5 @@ Don't carry the signal through to `afterExecute` or `onRow`.
 - [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). The codec-side context this seam complements; the `signal` plumbed by this project is the same reference. **Forthcoming** with [PR #400](https://github.com/prisma/prisma-next/pull/400) — the ADR file does not yet exist on `main` or this branch.
 - [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). The per-cell codec model this seam composes with (rather than replacing).
 - [TML-2330 / PR #400](https://github.com/prisma/prisma-next/pull/400) — the `CodecCallContext` plumbing prerequisite. The `signal` reference originates there.
-- [TML-2359](https://linear.app/prisma-company/issue/TML-2359) — this project's tracking ticket.
-- [TML-2360](https://linear.app/prisma-company/issue/TML-2360) — first concrete consumer; `projects/cipherstash-integration/specs/envelope-codec-extension.spec.md`.
+- [TML-2373](https://linear.app/prisma-company/issue/TML-2373) — Project 1 component-level tracking ticket. This task spec is one of five inside Project 1; tracked at the component level only.
+- [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — first concrete consumer of the param-transform seam (bulk-encrypt middleware).

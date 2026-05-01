@@ -1,6 +1,8 @@
 # Project 2 — Planner-driven DDL + expanded type/operator surface
 
-> **Status: stub.** Project 2 is a forward-reference held by the [umbrella spec](../spec.md) and the [Project 1 spec](../project-1/spec.md). It will be shaped properly (full description, requirements, acceptance criteria) after Project 1 ships and the framework dependencies it consumes ([TML-2338](https://linear.app/prisma-company/issue/TML-2338) / [TML-2339](https://linear.app/prisma-company/issue/TML-2339)) are merged. This file exists so the umbrella plan has something to point at.
+> **Status: stub.** Project 2 is a forward-reference held by the [umbrella spec](../spec.md) and the [Project 1 spec](../project-1/spec.md). It will be shaped properly (full description, requirements, acceptance criteria) after Project 1 ships and the framework prerequisites it consumes (per-column `planTypeOperations` input + prior-state contract for destructive DDL) are merged. This file exists so the umbrella plan has something to point at.
+>
+> **Linear:** [TML-2375](https://linear.app/prisma-company/issue/TML-2375). Component-level tracking only — no per-task or per-milestone Linear sub-issues.
 
 # Summary
 
@@ -19,8 +21,8 @@ The work splits along two axes:
 
 | Source | Subject | Project 2 dependency |
 |---|---|---|
-| [TML-2338](https://linear.app/prisma-company/issue/TML-2338) | `(table, column)` input to `planTypeOperations` | **Hard** — cipherstash's `planTypeOperations` arm needs the column identity to emit `eql_v2.add_search_config(...)` ops |
-| [TML-2339](https://linear.app/prisma-company/issue/TML-2339) | Prior-state contract supplied to `planTypeOperations` for destructive DDL | **Hard** — needed to plan search-config *drops* when a column's mode flag flips false |
+| Framework prerequisite | `(table, column)` input to `planTypeOperations` (was TML-2338, cancelled in Linear redesign — work is real, not separately tracked) | **Hard** — cipherstash's `planTypeOperations` arm needs the column identity to emit `eql_v2.add_search_config(...)` ops |
+| Framework prerequisite | Prior-state contract supplied to `planTypeOperations` for destructive DDL (was TML-2339, cancelled in Linear redesign — work is real, not separately tracked) | **Hard** — needed to plan search-config *drops* when a column's mode flag flips false |
 | [TML-2292](https://linear.app/prisma-company/issue/TML-2292) | Unify `DataTransformOperation` and `SqlMigrationPlanOperation` | **Soft** — Project 2 can ship before TML-2292 lands; if both land together the planner-emitted ops use the unified shape |
 | Project 1 | EQL bundle install, `EncryptedString` codec, search operators, `RawSqlExpr` AST node, `addSearchConfig` factory shape | **Hard** — Project 2 lifts Project 1's per-column factory output into planner-emitted ops |
 

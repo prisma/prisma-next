@@ -207,7 +207,7 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 - **T5.1** Verify all umbrella ACs (UMB1–UMB7) and per-task-spec ACs are green.
 - **T5.2** Migrate long-lived docs to `docs/`. Candidates: the envelope-codec extension pattern as an architecture-doc note (does not need a full ADR; documented in the package README is acceptable for the first KMS-backed extension); the `RawSqlExpr` AST node behavior as an addition to the existing SQL family architecture doc if relevant.
 - **T5.3** Strip repo-wide references to `projects/cipherstash-integration/project-1/**`. Where references are needed, replace with canonical `docs/` links (or with package READMEs).
-- **T5.4** Linear ticket cleanup. The umbrella's open question on Linear redesign resolves at this point — issues that were "track Project 1 work" close; issues that survive past Project 1 transfer to the Project 2 / `sql-raw-factory` workstreams.
+- **T5.4** Close [TML-2373](https://linear.app/prisma-company/issue/TML-2373) ("Project 1: Searchable-encryption MVP"). [TML-2374](https://linear.app/prisma-company/issue/TML-2374) (`sql-raw-factory`) and [TML-2375](https://linear.app/prisma-company/issue/TML-2375) (Project 2) continue under the umbrella.
 - **T5.5** Final sanity: `pnpm build`, `pnpm typecheck`, `pnpm test:packages`, `pnpm lint:deps` all green.
 - **T5.6** Delete `projects/cipherstash-integration/project-1/`. The umbrella's `spec.md` and `plan.md` continue to track the remaining components (Project 2, `sql-raw-factory`).
 
