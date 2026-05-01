@@ -389,7 +389,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     phase: 'precheck' | 'postcheck',
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
         return runnerFailure(
@@ -415,7 +415,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
       try {
-        await driver.query(step.sql);
+        await driver.query(step.sql, step.params ?? []);
       } catch (error: unknown) {
         // Catch SqlQueryError and include normalized metadata
         if (SqlQueryError.is(error)) {
@@ -479,7 +479,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       return false;
     }
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         return false;
       }
