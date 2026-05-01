@@ -249,9 +249,6 @@ importers:
       '@prisma-next/tsconfig':
         specifier: workspace:*
         version: link:../../packages/0-config/tsconfig
-      '@prisma/dev':
-        specifier: 'catalog:'
-        version: 0.19.1(typescript@5.9.3)
       '@types/node':
         specifier: 'catalog:'
         version: 24.10.4
