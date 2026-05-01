@@ -7,7 +7,6 @@ import {
   ARKTYPE_JSON_NATIVE_TYPE,
   arktypeJson,
   arktypeJsonCodec,
-  arktypeJsonEmitCodec,
 } from '../src/core/arktype-json-codec';
 import { arktypeJsonPackMeta } from '../src/core/pack-meta';
 
@@ -330,50 +329,6 @@ describe('decodeJson schema enforcement', () => {
   });
 });
 
-describe('arktypeJsonEmitCodec (emit-only shim)', () => {
-  // The emit-only codec carries `renderOutputType` so the framework
-  // emitter's `CodecLookup` can resolve the column's TS type at emit
-  // time. encode/decode are sentinels that throw if invoked — runtime
-  // materialization always goes through the descriptor's factory.
-  it('exposes the codec id and native type', () => {
-    expect(arktypeJsonEmitCodec.id).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(arktypeJsonEmitCodec.targetTypes).toEqual([ARKTYPE_JSON_NATIVE_TYPE]);
-    expect(arktypeJsonEmitCodec.traits).toEqual(['equality']);
-  });
-
-  it('renderOutputType returns expression for well-formed typeParams', () => {
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({
-        expression: '{ name: string }',
-        jsonIr: { domain: 'object' },
-      }),
-    ).toBe('{ name: string }');
-  });
-
-  it('renderOutputType returns undefined for malformed typeParams', () => {
-    expect(arktypeJsonEmitCodec.renderOutputType?.({ expression: 42, jsonIr: {} })).toBeUndefined();
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: null }),
-    ).toBeUndefined();
-    expect(
-      arktypeJsonEmitCodec.renderOutputType?.({ expression: 'x', jsonIr: 'str' }),
-    ).toBeUndefined();
-  });
-
-  it('encode/decode reject because runtime materialization goes through the descriptor', async () => {
-    await expect(arktypeJsonEmitCodec.encode('value', CALL_CTX)).rejects.toThrow(/emit-only/);
-    await expect(arktypeJsonEmitCodec.decode('wire', CALL_CTX)).rejects.toThrow(/emit-only/);
-  });
-
-  it('encodeJson/decodeJson throw because runtime materialization goes through the descriptor', () => {
-    // Mirrors `encode`/`decode`: a contract-load path that resolved to
-    // this emit-only stub must fail fast at the JSON boundary instead
-    // of silently returning unvalidated payloads.
-    expect(() => arktypeJsonEmitCodec.encodeJson('payload')).toThrow(/emit-only/);
-    expect(() => arktypeJsonEmitCodec.decodeJson({ a: 1 })).toThrow(/emit-only/);
-  });
-});
-
 describe('arktypeJsonPackMeta', () => {
   // Pack metadata threads the emit-only `Codec` instance into the
   // codec-id-keyed `CodecLookup` and declares the storage backing
@@ -384,10 +339,6 @@ describe('arktypeJsonPackMeta', () => {
     expect(arktypeJsonPackMeta.id).toBe('arktype-json');
     expect(arktypeJsonPackMeta.familyId).toBe('sql');
     expect(arktypeJsonPackMeta.targetId).toBe('postgres');
-  });
-
-  it('threads arktypeJsonEmitCodec into codecInstances for emit-path lookup', () => {
-    expect(arktypeJsonPackMeta.types.codecTypes.codecInstances).toContain(arktypeJsonEmitCodec);
   });
 
   it('declares jsonb storage backing for the codec id', () => {

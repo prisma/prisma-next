@@ -6,19 +6,14 @@
  * imports into emitted `contract.d.ts`, and `types.storage` declares the
  * codec id's storage backing (`jsonb` on Postgres).
  *
- * Per Phase B of codec-registry-unification, runtime materialization
- * flows through the unified descriptor map (`arktypeJsonCodec`
- * parameterized descriptor), not through the legacy runtime codec
- * lookup. This metadata still carries an emit-only `Codec` instance
- * (`arktypeJsonEmitCodec`) under `codecInstances` so the framework
- * emitter's codec-id-keyed `CodecLookup` can resolve `renderOutputType`
- * at emit time — that shim retires when the emit path consults the
- * descriptor map directly (TML-2357). Control-stack consumers read
- * codec metadata from `descriptorFor('arktype/json@1')`.
+ * Per TML-2357 M2, runtime materialization flows through the unified
+ * descriptor map (`arktypeJsonCodec` parameterized descriptor) and the
+ * emit path consults `descriptorFor('arktype/json@1').renderOutputType`
+ * directly — no per-library "emit-only Codec" stub on `codecInstances`.
  */
 
 import type { CodecTypes } from '../types/codec-types';
-import { ARKTYPE_JSON_CODEC_ID, arktypeJsonEmitCodec } from './arktype-json-codec';
+import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec';
 
 const arktypeJsonPackMetaBase = {
   kind: 'extension',
@@ -29,13 +24,6 @@ const arktypeJsonPackMetaBase = {
   capabilities: {},
   types: {
     codecTypes: {
-      // The emitter's `CodecLookup` is the codec-id-keyed source of
-      // truth for `renderOutputType` at the framework emit-path
-      // boundary. We thread an emit-only `Codec` instance carrying the
-      // `renderOutputType` here so the lookup resolves; runtime
-      // materialization goes through the unified descriptor's
-      // `factory: (P) => (CodecInstanceContext) => Codec`, never through this shim.
-      codecInstances: [arktypeJsonEmitCodec],
       import: {
         package: '@prisma-next/extension-arktype-json/codec-types',
         named: 'CodecTypes',
