@@ -380,36 +380,36 @@ export function findPathWithDecision(
   const tieBreakReasons: string[] = [];
   let alternativeCount = 0;
 
-  for (let i = 0; i < path.length; i++) {
-    const edge = path[i]!;
+  for (const [i, edge] of path.entries()) {
     const outgoing = graph.forwardChain.get(edge.from);
-    if (outgoing && outgoing.length > 1) {
-      const reachable = outgoing.filter((e) => reachesTarget.has(e.to));
-      if (reachable.length > 1) {
-        let comparisonPool: readonly MigrationEdge[] = reachable;
-        if (required.size > 0) {
-          const prefixSet = coveragePrefixes[i]!;
-          const viable = invariantViableAlternativesAtStep(required, prefixSet, reachable);
-          comparisonPool = viable;
-        }
+    if (!outgoing || outgoing.length <= 1) continue;
+    const reachable = outgoing.filter((e) => reachesTarget.has(e.to));
+    if (reachable.length <= 1) continue;
 
-        alternativeCount += reachable.length - 1;
-        const sorted = sortedNeighbors(reachable);
-        if (sorted[0]?.migrationHash === edge.migrationHash) {
-          if (reachable.some((e) => e.migrationHash !== edge.migrationHash)) {
-            const sortedViable = sortedNeighbors(comparisonPool);
-            if (
-              sortedViable.length > 1 &&
-              sortedViable[0]!.migrationHash === edge.migrationHash &&
-              sortedViable.some((e) => e.migrationHash !== edge.migrationHash)
-            ) {
-              tieBreakReasons.push(
-                `at ${edge.from}: ${comparisonPool.length} candidates, selected by tie-break`,
-              );
-            }
-          }
-        }
-      }
+    let comparisonPool: readonly MigrationEdge[] = reachable;
+    if (required.size > 0) {
+      // coveragePrefixes is built one-per-edge from path, so the index is
+      // always in range here; the explicit guard keeps the type narrowed
+      // without a non-null assertion.
+      const prefixSet = coveragePrefixes[i];
+      if (prefixSet === undefined) continue;
+      comparisonPool = invariantViableAlternativesAtStep(required, prefixSet, reachable);
+    }
+
+    alternativeCount += reachable.length - 1;
+    const sorted = sortedNeighbors(reachable);
+    if (sorted[0]?.migrationHash !== edge.migrationHash) continue;
+    if (!reachable.some((e) => e.migrationHash !== edge.migrationHash)) continue;
+
+    const sortedViable = sortedNeighbors(comparisonPool);
+    if (
+      sortedViable.length > 1 &&
+      sortedViable[0]?.migrationHash === edge.migrationHash &&
+      sortedViable.some((e) => e.migrationHash !== edge.migrationHash)
+    ) {
+      tieBreakReasons.push(
+        `at ${edge.from}: ${comparisonPool.length} candidates, selected by tie-break`,
+      );
     }
   }
 
