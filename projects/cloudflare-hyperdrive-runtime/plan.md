@@ -154,15 +154,13 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 
 **Tasks:**
 
-- [ ] **4.1 — Write the deployment guide under `docs/`** (path TBD with docs team — likely `docs/products/Deploying-to-Serverless-Runtimes.md` or similar). Sections per FR7: facade-asymmetry rationale, Cloudflare + Hyperdrive worked example, lifecycle expectations, generality across other per-request runtimes, migration story, known limitations. Cross-link from `docs/README.md` and `docs/onboarding/Getting-Started.md` if appropriate.
+- [x] **4.1 — Write the deployment guide under `docs/`** — landed at [`docs/Serverless Deployment Guide.md`](../../docs/Serverless%20Deployment%20Guide.md), cross-linked from `docs/README.md` under a new "Deploying" section. Sections per FR7: facade-asymmetry rationale (cross-linking ADR 207), Cloudflare + Hyperdrive worked example, generality across other per-request runtimes (table-of-pointers per spec non-goal), migrations-on-Node story, known limitations. Commit `74c8a7ce0`.
   - (Satisfies: TC-17.)
 - [ ] **4.2 — `wrangler deploy` smoke test.**
   - Deploy `examples/prisma-next-cloudflare-worker` to a real Cloudflare account against a real Hyperdrive config (PPg if available, otherwise Neon/RDS). Run all routes via real HTTPS request. Record outcomes in the audit doc / a temporary `assets/smoke-test-results.md`.
   - (Satisfies: TC-15.)
-- [ ] **4.3 — AC verification pass.**
-  - Walk every AC in `spec.md`, confirm corresponding TC has passed, link evidence (test file + line, doc anchor, deploy URL). Record in `projects/cloudflare-hyperdrive-runtime/assets/ac-verification.md` (transient; useful for the close-out PR description).
-- [ ] **4.4 — Decide on a new ADR.**
-  - The serverless facade asymmetry (drop `orm`/`runtime()`/`transaction` for per-request lifecycle) is a design decision worth recording as an ADR if the team agrees it's load-bearing. Draft under `docs/architecture docs/adrs/` if so. If not, the deployment guide carries the rationale.
+- [x] **4.3 — AC verification pass.** Recorded at [`assets/ac-verification.md`](./assets/ac-verification.md). Pulled from the reviewer's m4 R1 scoreboard at HEAD `74c8a7ce0`. Totals: **19 PASS / 0 FAIL / 1 NOT VERIFIED** (AC-12 only). All ACs except AC-12 are satisfied with on-disk evidence; AC-12 lands on m4 Stream B (real `wrangler deploy` smoke). Re-measure AC-20 against real Hyperdrive at the same time.
+- [x] **4.4 — Decide on a new ADR.** Decision (orchestrator, m4 R1, unattended): yes. The asymmetry is load-bearing for any future per-request runtime story (Lambda, Vercel, Deno, Bun) and any future per-family extension (mysql/mongo serverless), and `spec.md` doesn't survive close-out. Drafted as [`ADR 207 — Per-environment facade asymmetry`](../../docs/architecture%20docs/adrs/ADR%20207%20-%20Per-environment%20facade%20asymmetry.md), indexed under § Adapters & Targets in `ADR-INDEX.md`. Commit `9fec40bd5`. Decision rationale logged at `wip/unattended-decisions.md` entry 2.
 - [ ] **4.5 — Migrate long-lived docs into `docs/`.**
   - Deployment guide stays in `docs/`. ADR (if drafted) lives under `docs/architecture docs/adrs/`. Audit + AC-verification stay under `projects/` (transient).
 - [ ] **4.6 — Strip repo-wide references to `projects/cloudflare-hyperdrive-runtime/**`.**
