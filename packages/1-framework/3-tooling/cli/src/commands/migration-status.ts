@@ -907,7 +907,7 @@ function formatLegend(colorize: boolean): string {
   return c(dim, parts.join('  '));
 }
 
-function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): string {
+export function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): string {
   const c = (fn: (s: string) => string, s: string) => (colorize ? fn(s) : s);
   const lines: string[] = [];
 
@@ -915,11 +915,16 @@ function formatStatusSummary(result: MigrationStatusResult, colorize: boolean): 
   const pendingCount = result.migrations.filter((e) => e.status === 'pending').length;
 
   const hasWarnings = result.diagnostics?.some((d) => d.severity === 'warn') ?? false;
+  // INVARIANTS_PENDING is filed at severity 'info' (per ADR 208) so the
+  // warn-severity check above doesn't see it. It still represents pending
+  // work, so it must promote the summary off the success icon.
+  const hasInvariantPending =
+    result.diagnostics?.some((d) => d.code === 'MIGRATION.INVARIANTS_PENDING') ?? false;
 
   if (result.mode === 'online') {
     if (hasUnknown || hasWarnings) {
       lines.push(`${c(yellow, '⚠')} ${result.summary}`);
-    } else if (pendingCount === 0) {
+    } else if (pendingCount === 0 && !hasInvariantPending) {
       lines.push(`${c(cyan, '✔')} ${result.summary}`);
     } else {
       lines.push(`${c(yellow, '⧗')} ${result.summary}`);
