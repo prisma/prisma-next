@@ -121,7 +121,7 @@ const noninteractiveFlags = (overrides: Partial<GlobalFlags> = {}): GlobalFlags 
   ...overrides,
 });
 
-describe('runInit (interactive)', () => {
+describe('runInit (interactive)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -135,11 +135,11 @@ describe('runInit (interactive)', () => {
       .mockResolvedValueOnce('psl');
     vi.mocked(clack.text).mockResolvedValue('prisma/contract.prisma');
     vi.mocked(clack.confirm).mockResolvedValue(true);
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('scaffolds five files for postgres target', async () => {
     const exit = await runInitTest(tmpDir, {
@@ -515,18 +515,18 @@ describe('runInit (interactive)', () => {
 // FR2 / FR3 — Project hygiene + scaffold typechecks (M4)
 // ---------------------------------------------------------------------------
 
-describe('runInit hygiene + tsconfig (FR2 / FR3)', () => {
+describe('runInit hygiene + tsconfig (FR2 / FR3)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'init-hygiene-'));
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('writes a fresh tsconfig.json with types: ["node"] (FR2.2)', async () => {
     await runInitTest(tmpDir, {
@@ -838,18 +838,18 @@ describe('runInit hygiene + tsconfig (FR2 / FR3)', () => {
 // FR9 — Re-init cleanup
 // ---------------------------------------------------------------------------
 
-describe('runInit re-init cleanup (FR9)', () => {
+describe('runInit re-init cleanup (FR9)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'init-reinit-'));
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('deletes previously-emitted contract artefacts on re-init (FR9.1)', async () => {
     await runInitTest(tmpDir, {
@@ -1098,18 +1098,18 @@ describe('runInit re-init cleanup (FR9)', () => {
 // FR1 — Non-interactive scriptable mode (TML-2263 headline finding)
 // ---------------------------------------------------------------------------
 
-describe('runInit (non-interactive, FR1)', () => {
+describe('runInit (non-interactive, FR1)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'init-noninteractive-test-'));
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('runs without prompts when --target and --authoring are supplied (FR1.3)', async () => {
     const exit = await runInitTest(tmpDir, {
@@ -1369,7 +1369,7 @@ describe('runInit (non-interactive, FR1)', () => {
 // FR1.5 / FR10 — Structured JSON output
 // ---------------------------------------------------------------------------
 
-describe('runInit (--json output, FR1.5 / FR10.2)', () => {
+describe('runInit (--json output, FR1.5 / FR10.2)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
   let stdoutSpy: ReturnType<typeof vi.spyOn>;
   let captured: string[];
@@ -1387,12 +1387,12 @@ describe('runInit (--json output, FR1.5 / FR10.2)', () => {
       }
       return true;
     });
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     stdoutSpy.mockRestore();
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('writes a single JSON document to stdout with all required fields', async () => {
     const exit = await runInitTest(tmpDir, {
@@ -1489,134 +1489,138 @@ describe('isRecognisedPnpmResolutionError (FR7.2)', () => {
   });
 });
 
-describe('runInit pnpm → npm install fallback (FR7.2)', () => {
-  let tmpDir: string;
+describe(
+  'runInit pnpm → npm install fallback (FR7.2)',
+  { timeout: timeouts.databaseOperation },
+  () => {
+    let tmpDir: string;
 
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'init-fallback-test-'));
-    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
-    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
-    vi.clearAllMocks();
-  });
+    beforeEach(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'init-fallback-test-'));
+      writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+      writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+      vi.clearAllMocks();
+    }, timeouts.databaseOperation);
 
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
+    afterEach(() => {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }, timeouts.databaseOperation);
 
-  function captureStdout(): { writes: string[]; restore: () => void } {
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      if (typeof chunk === 'string') writes.push(chunk);
-      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
-      return true;
-    });
-    return { writes, restore: () => spy.mockRestore() };
-  }
+    function captureStdout(): { writes: string[]; restore: () => void } {
+      const writes: string[] = [];
+      const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+        if (typeof chunk === 'string') writes.push(chunk);
+        else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+        return true;
+      });
+      return { writes, restore: () => spy.mockRestore() };
+    }
 
-  function mockExecFile(handler: (cmd: string) => { stderr?: string } | null) {
-    vi.mocked(execFile).mockImplementation(
-      (cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
-        const callback = cb as (err: unknown, stdout?: string, stderr?: string) => void;
-        const result = handler(String(cmd));
-        if (result === null) {
-          callback(null, '', '');
-        } else {
-          callback(Object.assign(new Error(`${cmd} failed`), { stderr: result.stderr ?? '' }));
-        }
-        return undefined as never;
-      },
-    );
-  }
-
-  it('falls back to npm and emits a warning when pnpm leaks workspace:*', async () => {
-    mockExecFile((cmd) =>
-      cmd === 'pnpm'
-        ? {
-            stderr:
-              'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND In packages/foo: "@prisma-next/utils@workspace:*" is in the dependencies',
+    function mockExecFile(handler: (cmd: string) => { stderr?: string } | null) {
+      vi.mocked(execFile).mockImplementation(
+        (cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+          const callback = cb as (err: unknown, stdout?: string, stderr?: string) => void;
+          const result = handler(String(cmd));
+          if (result === null) {
+            callback(null, '', '');
+          } else {
+            callback(Object.assign(new Error(`${cmd} failed`), { stderr: result.stderr ?? '' }));
           }
-        : null,
-    );
-    const { writes, restore } = captureStdout();
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
-      });
-      expect(exit).toBe(INIT_EXIT_OK);
-
-      const npmAddCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
-      expect(npmAddCalls.length).toBe(2);
-
-      const parsed = JSON.parse(writes.join('').trim()) as {
-        warnings: string[];
-        packagesInstalled: { skipped: boolean };
-      };
-      expect(parsed.packagesInstalled.skipped).toBe(false);
-      expect(parsed.warnings.join('\n')).toMatch(/Falling back to `npm install`/);
-    } finally {
-      restore();
-    }
-  });
-
-  it('does not fall back when pnpm fails for an unrelated reason — exits INSTALL_FAILED with structured error', async () => {
-    mockExecFile((cmd) => (cmd === 'pnpm' ? { stderr: 'ENOTFOUND registry.npmjs.org' } : null));
-    const { writes, restore } = captureStdout();
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
-      });
-      expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
-
-      const npmCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
-      expect(npmCalls.length).toBe(0);
-
-      const parsed = JSON.parse(writes.join('').trim()) as {
-        ok: boolean;
-        code: string;
-        meta: { filesWritten: string[]; stderr: string[] };
-      };
-      expect(parsed.ok).toBe(false);
-      expect(parsed.code).toBe('PN-CLI-5007');
-      expect(parsed.meta.filesWritten).toEqual(
-        expect.arrayContaining(['prisma-next.config.ts', 'prisma/contract.prisma']),
+          return undefined as never;
+        },
       );
-      expect(parsed.meta.stderr.join('\n')).toMatch(/ENOTFOUND/);
-    } finally {
-      restore();
     }
-  });
 
-  it('escalates to INSTALL_FAILED when both pnpm AND the npm fallback fail', async () => {
-    mockExecFile(() => ({
-      stderr: 'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND followed by npm ETARGET',
-    }));
-    const { writes, restore } = captureStdout();
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
-      });
-      expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
+    it('falls back to npm and emits a warning when pnpm leaks workspace:*', async () => {
+      mockExecFile((cmd) =>
+        cmd === 'pnpm'
+          ? {
+              stderr:
+                'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND In packages/foo: "@prisma-next/utils@workspace:*" is in the dependencies',
+            }
+          : null,
+      );
+      const { writes, restore } = captureStdout();
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_OK);
 
-      const parsed = JSON.parse(writes.join('').trim()) as {
-        ok: boolean;
-        code: string;
-      };
-      expect(parsed.ok).toBe(false);
-      expect(parsed.code).toBe('PN-CLI-5007');
-    } finally {
-      restore();
-    }
-  });
-});
+        const npmAddCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
+        expect(npmAddCalls.length).toBe(2);
+
+        const parsed = JSON.parse(writes.join('').trim()) as {
+          warnings: string[];
+          packagesInstalled: { skipped: boolean };
+        };
+        expect(parsed.packagesInstalled.skipped).toBe(false);
+        expect(parsed.warnings.join('\n')).toMatch(/Falling back to `npm install`/);
+      } finally {
+        restore();
+      }
+    });
+
+    it('does not fall back when pnpm fails for an unrelated reason — exits INSTALL_FAILED with structured error', async () => {
+      mockExecFile((cmd) => (cmd === 'pnpm' ? { stderr: 'ENOTFOUND registry.npmjs.org' } : null));
+      const { writes, restore } = captureStdout();
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
+
+        const npmCalls = vi.mocked(execFile).mock.calls.filter((c) => c[0] === 'npm');
+        expect(npmCalls.length).toBe(0);
+
+        const parsed = JSON.parse(writes.join('').trim()) as {
+          ok: boolean;
+          code: string;
+          meta: { filesWritten: string[]; stderr: string[] };
+        };
+        expect(parsed.ok).toBe(false);
+        expect(parsed.code).toBe('PN-CLI-5007');
+        expect(parsed.meta.filesWritten).toEqual(
+          expect.arrayContaining(['prisma-next.config.ts', 'prisma/contract.prisma']),
+        );
+        expect(parsed.meta.stderr.join('\n')).toMatch(/ENOTFOUND/);
+      } finally {
+        restore();
+      }
+    });
+
+    it('escalates to INSTALL_FAILED when both pnpm AND the npm fallback fail', async () => {
+      mockExecFile(() => ({
+        stderr: 'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND followed by npm ETARGET',
+      }));
+      const { writes, restore } = captureStdout();
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_INSTALL_FAILED);
+
+        const parsed = JSON.parse(writes.join('').trim()) as {
+          ok: boolean;
+          code: string;
+        };
+        expect(parsed.ok).toBe(false);
+        expect(parsed.code).toBe('PN-CLI-5007');
+      } finally {
+        restore();
+      }
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // F02 / F07 / F09 — emit failure + secret redaction
 // ---------------------------------------------------------------------------
 
-describe('runInit emit failure (F02 / F07)', () => {
+describe('runInit emit failure (F02 / F07)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
@@ -1630,11 +1634,11 @@ describe('runInit emit failure (F02 / F07)', () => {
         return undefined as never;
       },
     );
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('exits EMIT_FAILED with PN-CLI-5008 and surfaces the underlying cause', async () => {
     const { executeContractEmit } = await import(
@@ -1870,173 +1874,177 @@ describe('buildCatalogWarnings (F03 message shape)', () => {
   });
 });
 
-describe('runInit catalog warning surface (F03 / FR7.3)', () => {
-  let tmpDir: string;
+describe(
+  'runInit catalog warning surface (F03 / FR7.3)',
+  { timeout: timeouts.databaseOperation },
+  () => {
+    let tmpDir: string;
 
-  beforeEach(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'init-catalog-runinit-'));
-    writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
-    // `pnpm-lock.yaml` makes the package-manager detector pick pnpm —
-    // catalog warnings only fire for pnpm runs.
-    writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
-    vi.clearAllMocks();
-    vi.mocked(execFile).mockImplementation(
-      (_cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
-        const callback = cb as (err: null) => void;
-        callback(null);
-        return undefined as never;
-      },
-    );
-  });
+    beforeEach(() => {
+      tmpDir = mkdtempSync(join(tmpdir(), 'init-catalog-runinit-'));
+      writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
+      // `pnpm-lock.yaml` makes the package-manager detector pick pnpm —
+      // catalog warnings only fire for pnpm runs.
+      writeFileSync(join(tmpDir, 'pnpm-lock.yaml'), '');
+      vi.clearAllMocks();
+      vi.mocked(execFile).mockImplementation(
+        (_cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+          const callback = cb as (err: null) => void;
+          callback(null);
+          return undefined as never;
+        },
+      );
+    }, timeouts.databaseOperation);
 
-  afterEach(() => {
-    rmSync(tmpDir, { recursive: true, force: true });
-  });
+    afterEach(() => {
+      rmSync(tmpDir, { recursive: true, force: true });
+    }, timeouts.databaseOperation);
 
-  it('surfaces a catalog override warning in --json output when pnpm-workspace.yaml pins our packages', async () => {
-    writeFileSync(
-      join(tmpDir, 'pnpm-workspace.yaml'),
-      ['catalog:', "  '@prisma-next/postgres': 1.0.0", '  prisma-next: 1.2.3', ''].join('\n'),
-    );
+    it('surfaces a catalog override warning in --json output when pnpm-workspace.yaml pins our packages', async () => {
+      writeFileSync(
+        join(tmpDir, 'pnpm-workspace.yaml'),
+        ['catalog:', "  '@prisma-next/postgres': 1.0.0", '  prisma-next: 1.2.3', ''].join('\n'),
+      );
 
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      if (typeof chunk === 'string') writes.push(chunk);
-      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
-      return true;
-    });
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
+      const writes: string[] = [];
+      const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+        if (typeof chunk === 'string') writes.push(chunk);
+        else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+        return true;
       });
-      expect(exit).toBe(INIT_EXIT_OK);
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_OK);
 
-      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
-      const allWarnings = parsed.warnings.join('\n');
-      expect(allWarnings).toMatch(/catalog overrides detected/);
-      expect(allWarnings).toContain('@prisma-next/postgres: 1.0.0');
-      expect(allWarnings).toContain('prisma-next: 1.2.3');
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it('does not surface a catalog warning when the workspace catalog has no relevant entries', async () => {
-    writeFileSync(
-      join(tmpDir, 'pnpm-workspace.yaml'),
-      ['catalog:', '  vitest: 4.0.0', ''].join('\n'),
-    );
-
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      if (typeof chunk === 'string') writes.push(chunk);
-      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
-      return true;
+        const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+        const allWarnings = parsed.warnings.join('\n');
+        expect(allWarnings).toMatch(/catalog overrides detected/);
+        expect(allWarnings).toContain('@prisma-next/postgres: 1.0.0');
+        expect(allWarnings).toContain('prisma-next: 1.2.3');
+      } finally {
+        spy.mockRestore();
+      }
     });
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
+
+    it('does not surface a catalog warning when the workspace catalog has no relevant entries', async () => {
+      writeFileSync(
+        join(tmpDir, 'pnpm-workspace.yaml'),
+        ['catalog:', '  vitest: 4.0.0', ''].join('\n'),
+      );
+
+      const writes: string[] = [];
+      const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+        if (typeof chunk === 'string') writes.push(chunk);
+        else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+        return true;
       });
-      expect(exit).toBe(INIT_EXIT_OK);
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_OK);
 
-      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
-      expect(parsed.warnings.join('\n')).not.toMatch(/catalog overrides detected/);
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it('still surfaces the catalog warning under --no-install (manual-steps path)', async () => {
-    writeFileSync(
-      join(tmpDir, 'pnpm-workspace.yaml'),
-      ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
-    );
-
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      if (typeof chunk === 'string') writes.push(chunk);
-      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
-      return true;
+        const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+        expect(parsed.warnings.join('\n')).not.toMatch(/catalog overrides detected/);
+      } finally {
+        spy.mockRestore();
+      }
     });
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: false },
-        flags: noninteractiveFlags({ json: true }),
+
+    it('still surfaces the catalog warning under --no-install (manual-steps path)', async () => {
+      writeFileSync(
+        join(tmpDir, 'pnpm-workspace.yaml'),
+        ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
+      );
+
+      const writes: string[] = [];
+      const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+        if (typeof chunk === 'string') writes.push(chunk);
+        else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+        return true;
       });
-      expect(exit).toBe(INIT_EXIT_OK);
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: false },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_OK);
 
-      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
-      expect(parsed.warnings.join('\n')).toMatch(/catalog overrides detected/);
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it('suppresses the catalog warning when the pnpm → npm fallback fires (npm bypasses the catalog)', async () => {
-    writeFileSync(
-      join(tmpDir, 'pnpm-workspace.yaml'),
-      ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
-    );
-    vi.mocked(execFile).mockImplementation(
-      (cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
-        const callback = cb as (err: unknown, stdout?: string, stderr?: string) => void;
-        if (cmd === 'pnpm') {
-          callback(
-            Object.assign(new Error('pnpm failed'), {
-              stderr:
-                'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND In packages/foo: "@prisma-next/utils@workspace:*"',
-            }),
-          );
-        } else {
-          callback(null, '', '');
-        }
-        return undefined as never;
-      },
-    );
-
-    const writes: string[] = [];
-    const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
-      if (typeof chunk === 'string') writes.push(chunk);
-      else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
-      return true;
+        const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+        expect(parsed.warnings.join('\n')).toMatch(/catalog overrides detected/);
+      } finally {
+        spy.mockRestore();
+      }
     });
-    try {
-      const exit = await runInitTest(tmpDir, {
-        options: { target: 'postgres', authoring: 'psl', install: true },
-        flags: noninteractiveFlags({ json: true }),
-      });
-      expect(exit).toBe(INIT_EXIT_OK);
 
-      const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
-      const allWarnings = parsed.warnings.join('\n');
-      // Fallback warning replaces the catalog warning so the user gets
-      // one consistent message rather than two contradictory ones.
-      expect(allWarnings).toMatch(/Falling back to `npm install`/);
-      expect(allWarnings).not.toMatch(/catalog overrides detected/);
-    } finally {
-      spy.mockRestore();
-    }
-  });
-});
+    it('suppresses the catalog warning when the pnpm → npm fallback fires (npm bypasses the catalog)', async () => {
+      writeFileSync(
+        join(tmpDir, 'pnpm-workspace.yaml'),
+        ['catalog:', '  prisma-next: 1.2.3', ''].join('\n'),
+      );
+      vi.mocked(execFile).mockImplementation(
+        (cmd: unknown, _args: unknown, _opts: unknown, cb: unknown) => {
+          const callback = cb as (err: unknown, stdout?: string, stderr?: string) => void;
+          if (cmd === 'pnpm') {
+            callback(
+              Object.assign(new Error('pnpm failed'), {
+                stderr:
+                  'ERR_PNPM_WORKSPACE_PKG_NOT_FOUND In packages/foo: "@prisma-next/utils@workspace:*"',
+              }),
+            );
+          } else {
+            callback(null, '', '');
+          }
+          return undefined as never;
+        },
+      );
+
+      const writes: string[] = [];
+      const spy = vi.spyOn(process.stdout, 'write').mockImplementation((chunk: unknown) => {
+        if (typeof chunk === 'string') writes.push(chunk);
+        else if (chunk instanceof Uint8Array) writes.push(Buffer.from(chunk).toString('utf-8'));
+        return true;
+      });
+      try {
+        const exit = await runInitTest(tmpDir, {
+          options: { target: 'postgres', authoring: 'psl', install: true },
+          flags: noninteractiveFlags({ json: true }),
+        });
+        expect(exit).toBe(INIT_EXIT_OK);
+
+        const parsed = JSON.parse(writes.join('').trim()) as { warnings: string[] };
+        const allWarnings = parsed.warnings.join('\n');
+        // Fallback warning replaces the catalog warning so the user gets
+        // one consistent message rather than two contradictory ones.
+        expect(allWarnings).toMatch(/Falling back to `npm install`/);
+        expect(allWarnings).not.toMatch(/catalog overrides detected/);
+      } finally {
+        spy.mockRestore();
+      }
+    });
+  },
+);
 
 // ---------------------------------------------------------------------------
 // FR6 — Hostile-input survival + atomic init
 // ---------------------------------------------------------------------------
 
-describe('runInit hostile inputs (FR6)', () => {
+describe('runInit hostile inputs (FR6)', { timeout: timeouts.databaseOperation }, () => {
   let tmpDir: string;
 
   beforeEach(() => {
     tmpDir = mkdtempSync(join(tmpdir(), 'init-hostile-'));
     writeFileSync(join(tmpDir, 'package.json'), JSON.stringify({ name: 'test-app' }));
     vi.clearAllMocks();
-  });
+  }, timeouts.databaseOperation);
 
   afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
-  });
+  }, timeouts.databaseOperation);
 
   it('merges into a JSONC tsconfig.json with comments and trailing commas (FR6.1)', async () => {
     // Real-world JSONC straight out of a Vite / TS-team-blessed template:

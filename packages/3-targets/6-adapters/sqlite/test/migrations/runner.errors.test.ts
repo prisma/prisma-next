@@ -5,6 +5,7 @@ import {
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
 } from '@prisma-next/target-sqlite/statement-builders';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -20,7 +21,7 @@ import {
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
 
-describe('SqliteMigrationRunner - Error Scenarios', () => {
+describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.databaseOperation }, () => {
   let testDb: TestDatabase;
 
   afterEach(() => {
