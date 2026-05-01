@@ -4,59 +4,83 @@
 
 Accepted. Apr 30, 2026.
 
-Extends [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) §"Risks & mitigations" by resolving the `AbortSignal` half it named as a known gap. The concurrency-cap half it also named stays open and tracked under [framework-gaps G4](../../reference/framework-gaps.md) / [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
+Codec query-time methods (`encode`, `decode`) gain an optional second argument: a per-call context object carrying `signal` (framework-level) and family-specific metadata such as SQL's `column` (family-level). The runtime's `execute(plan, { signal })` builds one context per call and threads it to every codec invocation, so codec authors can forward cancellation to their underlying SDK and identify the column at decode time. Resolves the `AbortSignal` half of [ADR 204](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) §"Risks & mitigations" and the decode-side half of [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata). The concurrency-cap half of ADR 204 §"Risks" stays open, tracked under [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs).
 
-## Context
+## Grounding example
 
-ADR 204 closed the codec-async-runtime question by treating codec query-time methods as uniformly Promise-returning at the public boundary and always awaiting them. It deliberately landed without two pieces of plumbing it knew were needed by the next class of codec authors:
+A codec author shipping an encrypted-JSON column type with cancellation and column-aware envelopes:
 
-- **Per-query cancellation.** `AbortSignal` is the standard browser-and-Node.js cancellation primitive, but the codec interface gave authors no way to receive one. KMS-backed codecs (CipherStash's ZeroKMS, Vault, similar) perform real network IO on every encode and decode; a query whose caller has cancelled (HTTP request aborted, transaction deadline expired, user navigation) still completes its in-flight HTTPS round-trip, consuming the budget for a result no one is waiting for.
-- **Decode-side column identity.** [framework-gaps G1](../../reference/framework-gaps.md) flagged that the decode site receives a wire value but no information about which `(table, column)` produced it. Envelope-pattern codecs (encrypted columns, signed columns, audit-stamped columns) need column identity at decode time to construct a return value that carries `(table, column)` for participating in subsequent operations the same way the underlying SDK does.
+```ts
+import { codec } from '@prisma-next/sql-relational-core/ast';
+import { encryptClient } from './encrypt-client';
 
-Both requirements meet at the same dispatch site — the per-cell `codec.encode` and `codec.decode` calls inside the runtime's encode/decode loops. Rather than threading two unrelated arguments through every call site, this ADR introduces **one** named context object the runtime threads to every codec call. Today the object carries a signal at the framework level, plus column metadata at the SQL family level. Tomorrow it can carry more without changing the codec author surface — the shape is named, not inlined.
+const encryptedJson = codec({
+  typeId: 'encrypted/json@1',
+  targetTypes: ['jsonb'],
 
-The shape lands as a **family-extension pattern** rather than a single framework type with all the fields, because column metadata's natural shape is family-specific. SQL identifies cells by `(table, column)`; Mongo identifies cells by document path; a future graph store would address by node/edge. Pinning a SQL-shaped `column` slot in the framework-agnostic codec context would push family-shape into the framework layer — a layering violation that the project's first round produced and the second round explicitly corrected. The corrective shape is the one this ADR records.
+  // Single-arg authors continue to compile and run unchanged.
+  // Two-arg authors observe the per-call context.
+  encode: async (value: JsonValue, ctx) => {
+    return encryptClient.encrypt(value, { signal: ctx?.signal });
+  },
+  decode: async (wire: string, ctx) => {
+    const plain = await encryptClient.decrypt(wire, { signal: ctx?.signal });
+    // SQL family ctx: column is { table, name } when the cell resolves to
+    // a single underlying column, undefined for aggregates / computed
+    // expressions / include aliases.
+    return { value: plain, column: ctx?.column };
+  },
+});
+```
+
+The call site supplies the signal once; the runtime forwards the same `AbortSignal` reference to every codec call inside that one query:
+
+```ts
+const controller = new AbortController();
+request.on('close', () => controller.abort(new Error('client disconnected')));
+
+for await (const row of db.execute(findDocumentsPlan, { signal: controller.signal })) {
+  // …
+}
+```
+
+If the request aborts mid-flight, the runtime returns promptly with a `RUNTIME.ABORTED` envelope (`{ code: 'RUNTIME.ABORTED', details: { phase }, cause }`). Codec bodies that forwarded `ctx.signal` to their SDK see the underlying network call cancel; bodies that ignored the signal complete normally in the background — the runtime does not try to terminate them.
+
+That's the entire user-visible surface. Everything below explains how it composes.
 
 ## Decision
 
-The codec dispatch surface gains a single per-call context object the runtime threads to every `codec.encode` / `codec.decode` invocation for one `runtime.execute()` call. The context is family-extensible: the framework declares a signal-only base, and family layers extend it with their own per-call metadata.
+The codec dispatch surface gains one named per-call context object that the runtime threads to every `codec.encode` / `codec.decode` invocation for one `runtime.execute()` call. Three load-bearing choices:
 
-Concretely:
+- **One context, family-extensible.** The framework declares a signal-only `CodecCallContext`. SQL extends it with `SqlCodecCallContext` adding `column?: SqlColumnRef`. Other families extend with their own per-call shape when they need to. There is exactly one optional parameter to thread, regardless of which fields a given family carries.
 
-1. **Framework — `CodecCallContext` is signal-only.** Declared as a named, exported interface with one optional readonly field (`signal?: AbortSignal`). Future framework-level fields (cancellation reason metadata, observability hooks) land additively.
+- **Runtime owns the context's lifetime.** `runtime.execute(plan, { signal? })` builds **one** `CodecCallContext` per call and forwards the same reference through encode, decode, and the streaming loop. Codec authors observe `signal` identity (`===`) at every call inside one execution.
 
-2. **SQL family — `SqlCodecCallContext extends CodecCallContext`.** Adds an optional `column?: SqlColumnRef`, where `SqlColumnRef = { readonly table: string; readonly name: string }`. The SQL `Codec` interface narrows `encode`/`decode` to `ctx?: SqlCodecCallContext`; the SQL `codec()` factory's ctx-bearing arity types `ctx` as `SqlCodecCallContext`.
+- **Cooperative cancellation, not termination.** When a signal aborts mid-flight, the runtime returns `RUNTIME.ABORTED` promptly via `raceAgainstAbort`; in-flight codec bodies that ignore the signal continue running in the background. Codec authors that wrap a network SDK forward `ctx.signal` to that SDK; the SDK aborts the wire-level call. The runtime never attempts to terminate the codec body itself.
 
-3. **Mongo family — no extension today.** Mongo's read path doesn't go through `codec.decode` (per ADR 204 cross-family scope notes), and Mongo's encode site has no column-context need. Mongo codec authors observe the framework `CodecCallContext` directly. The same family-extension pattern is available when Mongo grows a per-call concept that doesn't generalise (path expression, cluster shard hint, ACL handle).
+Everything else — the envelope shape, the abort observation boundaries, where `ctx.column` is populated — falls out from these three choices.
 
-4. **Codec interface admits the context as an optional second argument.** `encode(value, ctx?: CodecCallContext): Promise<TWire>` and `decode(wire, ctx?: CodecCallContext): Promise<TInput>`, both narrowed to `ctx?: SqlCodecCallContext` on the SQL `Codec`. Existing single-arg codec authors continue to compile and run unchanged.
+## Why
 
-5. **Factories accept either author arity.** `codec()` and `mongoCodec()` accept `(value)` or `(value, ctx)` (and `(wire)` or `(wire, ctx)`) author functions. The user-facing config types are a **union of the two arities**; the internal lift widens to the two-arg shape so the runtime's `(value, ctx) => userFn(value, ctx)` adapter can forward `ctx` uniformly to either form. The union is load-bearing — a single ctx-bearing config signature widens `TInput` for in-tree codecs whose author signatures are non-trivial (e.g. `sqlTimestampCodec`'s `(value: string | Date): string` infers `TInput=string` only when the signature is single-arg). The union preserves that inference behaviour.
+### The two gaps the dispatch site has to close
 
-6. **`runtime.execute(plan, options?)` accepts an optional `{ signal? }`.** The framework `RuntimeExecutor<TPlan>` SPI declares `execute<Row>(plan, options?: RuntimeExecuteOptions): AsyncIterableResult<Row>` where `RuntimeExecuteOptions = { readonly signal?: AbortSignal }`. The runtime builds **one** `CodecCallContext` per `execute` from `options.signal` and threads the same reference through the entire encode/decode dispatch — codec authors observe **signal identity** (`===`) at every codec call.
+Two independent codec-author needs surface at the same place — the per-cell `codec.encode` / `codec.decode` calls inside the runtime's encode and decode loops:
 
-7. **Runtime observes abort at boundaries that track the codec dispatch surface.** The runtime fast-fails already-aborted callers and races in-flight `Promise.all`s of codec calls against the signal. SQL has more dispatch sites and therefore more observation boundaries; Mongo has fewer because its read path doesn't decode.
+- **Per-query cancellation.** `AbortSignal` is the standard browser-and-Node.js cancellation primitive. KMS-backed codecs (CipherStash's ZeroKMS, Vault, similar) perform real network IO on every encode and decode; without a signal, a cancelled query still completes its in-flight HTTPS round-trip, consuming the network budget for a result no one is waiting for.
 
-   | Boundary | SQL phase | Mongo phase |
-   | --- | --- | --- |
-   | Entry pre-check (before any work) | `stream` | `stream` (inherited from `RuntimeCore.execute`) |
-   | Mid-encode (per-level `Promise.all` of codec encodes) | `encode` | `encode` |
-   | Mid-decode (per-cell `Promise.all` of codec decodes) | `decode` | — (no codec decode) |
-   | Between rows in stream loop | `stream` | — (no decode → no in-loop boundary) |
+- **Decode-side column identity.** Envelope-pattern codecs (encrypted columns, signed columns, audit-stamped columns) need `(table, column)` at decode time to construct return values that participate in subsequent operations the same way the underlying SDK does. Reverse-engineering column identity from runtime data shape is a correctness bug — see [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata) for the multi-column-per-data-type misattribution this avoids.
 
-   Phase tags map onto codec dispatch sites; families gain more phase tags as they gain more dispatch.
+### Why one ctx instead of two parameters
 
-8. **`RUNTIME.ABORTED` envelope.** Aborts surface as the standard error envelope shape with code `'RUNTIME.ABORTED'`, `details: { phase: 'encode' | 'decode' | 'stream' }`, and `cause` carrying `signal.reason` verbatim (or a synthesised `DOMException('The operation was aborted.', 'AbortError')` when the caller invoked `controller.abort()` with no argument). Constructed via the `runtimeAborted(phase, cause?)` helper in `framework-components/runtime` so every dispatch site produces an identically-shaped envelope.
+Threading `(signal, columnRef)` as separate arguments would pin two unrelated slots on a method that callers may grow more demands on. A named context is open: codec authors can grow new fields (observability hooks, cancellation-reason metadata, plan handle) by extending the type, without changing the codec method signature again.
 
-9. **Cooperative cancellation.** When the signal aborts mid-flight, the runtime returns `RUNTIME.ABORTED` promptly — but in-flight codec bodies that ignore the signal continue to run in the background and complete normally. The runtime does not attempt to terminate them; the `Promise.race(work, abortPromise)` shape simply abandons the unresolved `work`. Codec authors that wrap a network SDK should forward `ctx.signal` to the SDK so the SDK aborts the in-flight call (KMS round-trip, fetch, etc.); codec authors who don't, ignore it. This is the documented contract; it matches the standard cancellation semantics for `AbortSignal`-aware Promise APIs in the broader ecosystem.
+### Why family extension instead of one framework type
 
-10. **Decode-side `ctx.column` is populated for resolvable cells; encode-side stays undefined.** SQL's decode site populates `ctx.column = { table, name }` per cell from the existing `ColumnRef` resolution that `RUNTIME.DECODE_FAILED` envelope construction already runs. Cells that can't be resolved to a single column (aggregate aliases, computed projections, include-aggregate fields) pass `ctx.column = undefined`; codec authors that need column identity must handle the undefined case explicitly. Encode-side `ctx.column` is intentionally always undefined — encode-time column context is the middleware's domain (a middleware that walks a plan can attach richer column metadata to outbound parameters before encode begins; a codec encoding a value sees the per-call signal but no column identity, because the same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous).
+Column metadata's natural shape is family-specific. SQL identifies cells by `(table, column)`. Mongo identifies cells by document path. A future graph store would address by node/edge. Pinning a SQL-shaped `column` slot in the framework-agnostic codec context would push family shape into the framework layer — a layering violation. The shape we landed on splits cleanly: framework-agnostic concerns (signal) live on the framework type; family-shaped concerns (column-ref) live on the family type that extends it.
 
-11. **Abort-race attribution via sentinel identity.** The framework `raceAgainstAbort(work, signal, phase)` helper (in `framework-components/runtime`) races a codec-dispatch `Promise.all` against the abort signal, distinguishing the two rejection sources by **closure-local sentinel identity** rather than by rejection-value shape. The standard `abortable(signal)` foundation utility rejects with `signal.reason ?? new DOMException(...)`, which is not stably distinguishable from a codec-thrown error by identity alone. The sentinel pattern is load-bearing: it lets a codec body that throws `RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` pass that envelope through unchanged, even when a signal is supplied — the abort race never rewraps a codec-thrown envelope.
+## How it threads
 
-## Architecture
-
-### `CodecCallContext` shape (framework + SQL extension)
+### The types
 
 ```ts
 // packages/1-framework/1-core/framework-components/src/codec-types.ts
@@ -75,20 +99,11 @@ export interface SqlCodecCallContext extends CodecCallContext {
 }
 ```
 
-The SQL `Codec` interface narrows `encode`/`decode`'s `ctx` parameter to `SqlCodecCallContext` using **method syntax** (`encode(value, ctx?: SqlCodecCallContext): Promise<TWire>`). Method-syntax method signatures are treated bivariantly under TypeScript's `strictFunctionTypes`, which lets the SQL interface narrow the parameter type without an unsound cast. A future change to property syntax (`encode: (value, ctx?) => ...`) would unwind the narrowing and would be caught by the type-test pins in `codec-call-context.types.test-d.ts` and `codec-factory-ctx.types.test-d.ts`.
+The framework `Codec` declares `encode(value, ctx?: CodecCallContext)` / `decode(wire, ctx?: CodecCallContext)`. The SQL `Codec` redeclares both methods with `ctx?: SqlCodecCallContext`. Method-syntax declarations are bivariant under TypeScript's `strictFunctionTypes`, so the SQL interface narrows the parameter type without an unsound cast.
 
-### `Codec.encode` / `Codec.decode` admit `ctx?` (uniform across families)
+Existing single-arg codec authors compile and run unchanged. Two-arg authors observe the per-call context.
 
-```ts
-interface Codec<...> {
-  encode(value: TInput, ctx?: CodecCallContext): Promise<TWire>;
-  decode(wire: TWire, ctx?: CodecCallContext): Promise<TInput>;
-}
-```
-
-Strictly additive. Existing codec authors who never reference `ctx` continue to compile and run unchanged. Authors who want the context use either the `(value, ctx)` arity at the factory or the (sync/async) two-arg shape, and the factory's union-arity config preserves `TInput` inference for both.
-
-### `runtime.execute(plan, options?)` and the per-execute ctx
+### `runtime.execute(plan, { signal? })`
 
 ```ts
 // packages/1-framework/1-core/framework-components/src/runtime-middleware.ts
@@ -104,9 +119,42 @@ export interface RuntimeExecutor<TPlan extends QueryPlan> {
 }
 ```
 
-`RuntimeCore.execute` builds **one** `CodecCallContext` per call from `options.signal` and forwards it to the abstract `lower(plan, ctx?)`. SQL's `lower` forwards ctx into `encodeParams`; Mongo's `lower` forwards ctx into `MongoAdapter.lower → resolveValue`. The SQL runtime's per-row `decodeRow` receives the same ctx and constructs per-cell `SqlCodecCallContext` wrappers carrying `column = { table, name }` for resolvable cells. The same `signal` reference reaches every codec call in the entire `execute`.
+`RuntimeCore.execute` builds one `CodecCallContext` per call from `options.signal` and forwards it to the abstract `lower(plan, ctx?)`. SQL's `lower` forwards into `encodeParams`. Mongo's `lower` forwards into `MongoAdapter.lower → resolveValue`. SQL's per-row `decodeRow` receives the same ctx and constructs per-cell `SqlCodecCallContext` wrappers carrying `column = { table, name }` for resolvable cells. The same `signal` reference reaches every codec call.
 
-### `RUNTIME.ABORTED` envelope and `runtimeAborted(phase, cause?)`
+### Flow
+
+```text
+RuntimeCore.execute({ signal })
+  └─ codecCtx = { signal }
+     ├─ lower(plan, codecCtx)
+     │   ├─ SQL: encodeParams(plan, registry, codecCtx)
+     │   │       └─ raceAgainstAbort(Promise.all(codec.encode(v, ctx)), signal, 'encode')
+     │   └─ Mongo: adapter.lower(plan, codecCtx)
+     │             └─ resolveValue(value, codecs, codecCtx)
+     │                   └─ raceAgainstAbort(Promise.all(...), signal, 'encode')
+     │                       └─ codec.encode(v, ctx)
+     │
+     └─ stream (SQL only):
+         for await (rawRow of driver.cursor) {
+           if (signal.aborted) throw runtimeAborted('stream', signal.reason)
+           decodeRow(rawRow, exec, registry, validators, codecCtx)
+             └─ raceAgainstAbort(Promise.all(decodeField(...)), signal, 'decode')
+                   └─ codec.decode(wire, { ...rowCtx, column: { table, name } })
+         }
+```
+
+### Where the runtime observes abort
+
+| Boundary | SQL phase tag | Mongo phase tag |
+| --- | --- | --- |
+| Entry pre-check (before any work) | `stream` | `stream` (inherited from `RuntimeCore`) |
+| Mid-encode (per-level `Promise.all` of codec encodes) | `encode` | `encode` |
+| Mid-decode (per-cell `Promise.all` of codec decodes) | `decode` | — (Mongo read path doesn't decode) |
+| Between rows in the stream loop | `stream` | — |
+
+Phase tags map onto codec dispatch sites; families gain more tags as they gain more dispatch.
+
+### The error envelope
 
 ```ts
 // packages/1-framework/1-core/framework-components/src/runtime-error.ts
@@ -119,111 +167,103 @@ export function runtimeAborted(
 ): RuntimeErrorEnvelope;
 ```
 
-The helper builds an envelope with `code: 'RUNTIME.ABORTED'`, `details: { phase }`, and a `cause` that falls back to `new DOMException('The operation was aborted.', 'AbortError')` when no reason is supplied. The constant + helper are re-exported from `@prisma-next/framework-components/runtime`.
+`runtimeAborted(phase, cause?)` builds an envelope with `code: 'RUNTIME.ABORTED'`, `details: { phase }`, and `cause` carrying `signal.reason` verbatim — falling back to a fresh `DOMException('The operation was aborted.', 'AbortError')` only when no reason was supplied (i.e. `cause === undefined`). Falsy reasons (`null`, `false`, `0`, `''`) round-trip unchanged. Every dispatch site goes through this helper so the envelope shape is identical regardless of phase.
 
-### `raceAgainstAbort` — sentinel-identity attribution
+### Where `ctx.column` is populated
 
-```ts
-// packages/1-framework/1-core/framework-components/src/race-against-abort.ts
-export async function raceAgainstAbort<T>(
-  work: Promise<T>,
-  signal: AbortSignal,
-  phase: RuntimeAbortedPhase,
-): Promise<T>;
-```
+`SqlCodecCallContext.column` is populated **at decode time, for resolvable cells**:
 
-The helper allocates a closure-local sentinel object and registers an `abort` listener that rejects with the sentinel. After `Promise.race([work, abortPromise])`, an `error === sentinel` identity check is unambiguous: only the listener installed in this call ever rejects with this object reference. Any other rejection (codec-thrown envelope, plain Error, anything else) re-throws verbatim. Listener cleanup is belt-and-braces: `addEventListener('abort', onAbort, { once: true })` plus a `finally` block that explicitly removes the listener on the no-abort code path.
+- The SQL decoder projects `column = { table, name }` per cell from the same `ColumnRef` resolution that `RUNTIME.DECODE_FAILED` envelope construction already runs — one resolution per cell, two consumers.
+- Cells that don't resolve to a single underlying column (aggregate aliases, computed projections, include-aggregate fields) get `column: undefined`. Codec authors that need column identity must handle the undefined case explicitly; the runtime never silently defaults it.
+- When the runtime cannot project `column` for a cell, the per-cell ctx **drops the field entirely** rather than passing the row-level context through unchanged — preventing a previously-populated `rowCtx.column` from leaking into unrelated cells when callers reuse a context object.
 
-### Threading depth
+Encode-side `ctx.column` is intentionally always undefined. The same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware that walks a plan can attach richer column metadata to outbound parameters before encode begins (tracked under [TML-2359](https://linear.app/prisma-company/issue/TML-2359)).
 
-```text
-RuntimeCore.execute({ signal })
-  └─ codecCtx = { signal }
-     ├─ lower(plan, codecCtx)
-     │   ├─ SQL: encodeParams(plan, registry, codecCtx)
-     │   │       └─ raceAgainstAbort(Promise.all(codec.encode(v, ctx)), signal, 'encode')
-     │   └─ Mongo: adapter.lower(plan, codecCtx)
-     │             └─ resolveValue(value, codecs, codecCtx)
-     │                   └─ raceAgainstAbort(Promise.all(...), signal, 'encode')   (per recursion level)
-     │                       └─ codec.encode(v, ctx)
-     │
-     └─ stream (SQL only):
-         for await (rawRow of driver.cursor) {
-           if (signal.aborted) throw runtimeAborted('stream', signal.reason)
-           decodeRow(rawRow, exec, registry, validators, codecCtx)
-             └─ raceAgainstAbort(Promise.all(decodeField(...)), signal, 'decode')
-                   └─ codec.decode(wire, { ...rowCtx, column: { table, name } })
-         }
-```
+## What this enables
 
-## Walk-back framing
+- **KMS-backed codecs forward `ctx.signal` to their SDK.** `bulkEncrypt({ signal: ctx.signal })`, `fetch(url, { signal: ctx.signal })`. Aborted requests stop talking to the network service; cold-start budgets stop being consumed for results no one is waiting for; transaction deadlines propagate down to the codec's underlying IO.
+- **Envelope-pattern decryption.** A codec wrapping a wire value into a return object carrying column identity can construct that envelope from `ctx.column` directly, instead of reverse-engineering column identity from JS data type.
+- **Future bulk-encrypt / bulk-decrypt at the middleware layer.** The decode-side column metadata is now plumbed end-to-end; a future middleware that walks a plan can colocate per-column codec calls into bulk SDK calls without touching the codec author surface.
+- **Prompt cancellation for both families.** Mongo callers consuming long aggregations get prompt `RUNTIME.ABORTED { phase: 'stream' }` on already-aborted entry. SQL callers get the same plus prompt `phase: 'encode'` and `phase: 'decode'` mid-flight observation.
 
-ADR 204 names seven "walk-back constraints" — shapes the public codec surface must not regrow as concurrency / cancellation work lands. This addition does not regrow any of them:
+## Non-goals (deliberate)
 
-| Walk-back constraint | Status with ADR 207 |
+- **No concurrency cap, no rate limit, no batched dispatch.** A query that touches N rows × M codec'd cells still issues N × M concurrent codec calls. Bounding fan-out is tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The codec author surface is forward-compatible — a future `bulkEncode` / `bulkDecode` slot lands additively.
+- **No driver-level statement cancellation.** When the runtime returns `RUNTIME.ABORTED` mid-stream, the underlying database driver's in-flight statement is not cancelled at the wire level. Iterator-close cleanup runs (cursor released, connection returned to pool); the server may keep producing rows for a moment after the runtime stops consuming. Wiring `signal` into Postgres `pg_cancel_backend` / Mongo `killCursors` is separate work.
+- **No transaction-scoped abort composition.** Each `runtime.execute` builds its own per-execute context; the transaction wrapper doesn't compose deadline / cancel-on-rollback signals automatically. Callers compose their own controllers if they need transaction-scoped timeouts.
+- **No structured cancellation reason taxonomy.** `cause` carries `signal.reason` verbatim; no normalization, no enrichment.
+
+## Edge cases worth knowing
+
+### Cooperative cancellation, not termination
+
+`raceAgainstAbort(work, signal, phase)` returns `RUNTIME.ABORTED` as soon as the signal aborts, but the rejected `Promise.all` does not stop the underlying codec bodies. In-flight HTTPS round-trips, file reads, etc. continue to run and complete in the background. The contract codec authors are expected to honour: if your codec wraps a network SDK, forward `ctx.signal` to the SDK so the SDK aborts the wire-level call. If your codec is pure CPU work, ignore the signal and complete normally — abandoning a few microseconds of computation is fine.
+
+### Phase tags are sampled, not subscribed
+
+Between-rows `signal.aborted` checks are sampled at the SQL streaming for-await body. A signal that aborts immediately after a check passes won't trigger `phase: 'stream'`; the next `decodeRow`'s race triggers `phase: 'decode'` instead. The runtime cannot get into a stuck state — but the `phase` tag is a hint about which await observed the abort, not a hard guarantee. The cause chain (`error.cause === signal.reason`) and the envelope shape (`code === 'RUNTIME.ABORTED'`) are stable.
+
+### Driver iterator cleanup runs on abort
+
+When the streaming generator throws `RUNTIME.ABORTED`, the runtime explicitly calls `iterator.return?.()` in a `finally` block, which propagates cleanup down to the driver's `try/finally` (releasing cursors, returning connections). Drivers that yield rows via async iterators must clean up under iterator-close. This is not a new contract — it has always been required for normal `break`-out-of-for-await consumption — but `RUNTIME.ABORTED` makes it observable.
+
+### Ordering: abort check before next driver row
+
+The streaming loop is hand-driven (`while (true) { check; await iterator.next(); … }`) rather than `for-await-of`, so the between-rows abort check fires *before* the driver is asked for the next row. With `for-await-of`, the loop awaits `iterator.next()` first and the check fires after — leaving a window where one extra row is pulled even after the signal aborted.
+
+## Alternatives considered
+
+### A single `CodecCallContext` with a SQL-shaped `column` slot
+
+The first round of this work landed `column?: { table; name }` on the framework-level `CodecCallContext`. We rejected it on the second round: SQL's column identity is family-specific (Mongo identifies cells by document path, a future graph store by node/edge), so pinning a SQL slot at the framework level pushes family shape into the framework layer. The corrective shape — framework declares signal-only, families extend with their own per-call metadata — is what we landed.
+
+### Two parameters: `(value, signal, columnRef)`
+
+Threading `signal` and `columnRef` as separate arguments would pin two unrelated slots on a method that callers may grow more demands on. A named context grows additively: future fields (observability, cancellation-reason metadata, plan handle) land without re-touching the method signature.
+
+### A single ctx-bearing config signature for the factory (no union)
+
+The `codec()` / `mongoCodec()` config types are a **union of single-arg and two-arg author functions**. A simpler design — a single ctx-bearing signature `(value, ctx?) => …` — would be cleaner, but it widens `TInput` for in-tree codecs whose author signatures are non-trivial. `sqlTimestampCodec`'s `(value: string | Date): string` infers `TInput = string` only when the signature is single-arg; under a union shape the inference behaviour is preserved. Type-test pins guard this property.
+
+### Standard `abortable(signal)` instead of closure-local sentinel
+
+The natural way to race a promise against a signal is `Promise.race([work, abortable(signal)])`, where `abortable` rejects with `signal.reason ?? new DOMException(...)`. That makes the rejection source ambiguous: a codec body that itself throws a `DOMException` is not stably distinguishable from an abort. We use a closure-local sentinel object instead — only the listener installed in this call ever rejects with this object reference — and an `error === sentinel` identity check after the race is unambiguous. This is load-bearing: a codec that throws `RUNTIME.ENCODE_FAILED` / `RUNTIME.DECODE_FAILED` passes that envelope through unchanged, even when a signal is supplied. The abort race never rewraps a codec-thrown envelope.
+
+### Synchronous abort in the codec body
+
+We considered having the runtime forcibly terminate codec bodies on abort, by passing an `AbortSignal` that the codec is expected to throw on. Rejected: termination semantics for in-flight network IO live in the SDK, not the runtime. The cooperative-cancellation model — runtime returns promptly, codec bodies clean up via the SDK — matches every other `AbortSignal`-aware Promise API in the broader ecosystem and avoids the runtime trying to express semantics the codec body is the right place to own.
+
+### Encode-side `ctx.column`
+
+We considered populating `ctx.column` for encode calls too. Rejected: the same encode site encodes parameters for predicates, expressions, and aggregations whose column identity is ambiguous. Encode-time column context is the middleware's domain — a middleware can walk the plan and attach richer column metadata to outbound parameters before encode begins. Tracked under [TML-2359](https://linear.app/prisma-company/issue/TML-2359).
+
+### Eager driver-level cancellation
+
+We considered wiring `signal.aborted` directly into the driver's wire-level cancellation primitive (Postgres `pg_cancel_backend`, Mongo `killCursors`) so that `RUNTIME.ABORTED` cancels the server's in-flight statement too. Out of scope for this ADR — the ctx seam is the prerequisite, not the implementation. A future change wires the driver side; the runtime side is ready.
+
+### Interaction with ADR 204's walk-back constraints
+
+ADR 204 enumerates seven shapes the public codec surface must not regrow as concurrency / cancellation work lands. We considered each before landing this design:
+
+| ADR 204 walk-back constraint | Held? |
 | --- | --- |
-| No `TRuntime` generic on `Codec` | Held — `Codec` retains exactly four type parameters (`Id`, `TTraits`, `TWire`, `TInput`). |
+| No `TRuntime` generic on `Codec` | Held — `Codec` retains exactly four type parameters. |
 | No `kind` / `runtime` discriminator field on `Codec` | Held — `ctx?` is a method parameter, not an interface field. |
 | No conditional return types on `encode` / `decode` | Held — return types remain `Promise<TWire>` / `Promise<TInput>` regardless of arity. |
 | No exported sync-vs-async predicates | Held — no new predicates exported. |
-| No `Codec.context` alias tying the context shape to async-ness | Held — `CodecCallContext` is a named context interface, not a `Codec.context` alias; the context shape is independent of sync/async authoring. |
-| Codec author surface stays "may write sync or async; factory accepts both" — now plus optional `ctx` | Held — the factory accepts sync or async authors of either arity, lifts uniformly, no annotations. |
+| No `Codec.context` alias tying context shape to async-ness | Held — `CodecCallContext` is a named context interface, not a `Codec.context` alias. |
+| Codec author surface stays "may write sync or async; factory accepts both" — now plus optional `ctx` | Held — the factory accepts sync or async authors of either arity, lifts uniformly. |
 | `Codec` retains exactly four type parameters | Held. |
 
-The optional second-arg shape doesn't tie the context to async-ness or runtime-shape; it adds a per-call value the dispatch surface threads orthogonally. The future additive `codecSync()` opt-in ADR 204 framed remains available — `codecSync({ encode: (value, ctx?) => ... })` is the natural extension if the sync fast-path lands later.
+The optional second-arg shape doesn't tie context to async-ness or runtime-shape; it adds a per-call value the dispatch surface threads orthogonally. The future additive `codecSync()` opt-in ADR 204 framed remains available — `codecSync({ encode: (value, ctx?) => … })` is the natural extension if the sync fast-path lands later.
 
-## Consequences
+## References and implementation pointers
 
-### What this enables
-
-- **KMS-backed codecs can forward `ctx.signal` to their SDK.** `bulkEncrypt({ signal: ctx.signal })`, `fetch(url, { signal: ctx.signal })`. Aborted requests stop talking to the network service; cold-start budgets stop being consumed for results no one is waiting for; transaction deadlines propagate down to the codec's underlying IO.
-- **Envelope-pattern decryption.** A codec that wraps a wire value into a return object carrying column identity (`{ value, column: { table, name } }`) for downstream operations can construct that envelope from `ctx.column` at decode time. Without `ctx.column`, the codec had to reverse-engineer column identity from JS-runtime data type — see [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata) for the multi-column-per-dataType correctness bug this avoids.
-- **Cooperative cancellation latency without decode dispatch.** Mongo callers consuming long aggregations get prompt `RUNTIME.ABORTED { phase: 'stream' }` on already-aborted entry. SQL callers get the same plus prompt `phase: 'encode'` and `phase: 'decode'` mid-flight observation.
-- **Future bulk-encrypt / bulk-decrypt at the middleware layer.** The decode-side column metadata is now plumbed end-to-end; a future middleware that walks a plan can colocate per-column codec calls into bulk SDK calls without touching the codec author surface.
-
-### What this doesn't enable (deliberate non-goals)
-
-- **No concurrency cap, no rate limit, no batched dispatch.** ADR 204 §"Risks & mitigations" named both `AbortSignal` plumbing and concurrency control as deferred. This ADR addresses only the `AbortSignal` half. A query that touches N rows × M codec'd cells still issues N × M concurrent codec calls; bounding that fan-out is tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330) and [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). The codec author surface is forward-compatible — a future bulk-codec interface that registers `bulkEncode(values: TInput[], ctx?): Promise<TWire[]>` alongside `encode` lands additively without changing the per-call shape.
-- **No bulk-codec interface.** Codecs continue to declare `encode(value, ctx?)` and `decode(wire, ctx?)` as their per-cell dispatch surface. Microtask-coalescing batchers in extension code (the CipherStash workaround for G4) continue to be the operational path until the framework grows a `bulkEncode` / `bulkDecode` slot.
-- **No driver-level cancellation.** When the runtime returns `RUNTIME.ABORTED` mid-stream, the underlying database driver's in-flight statement (Postgres `pg-cursor`, Mongo `aggregate`, etc.) is not cancelled at the wire level. `IteratorClose` semantics ensure the driver's `try/finally` cleanup runs (releasing the cursor, returning the connection to the pool), but the server may still be doing work for a few more rows after the runtime has stopped consuming. Driver-level statement cancellation (Postgres `pg_cancel_backend`, Mongo `killCursors`) is a separate piece of work; the ctx seam is the prerequisite, not the implementation.
-- **No transaction-scoped abort composition.** Each `runtime.execute(plan, { signal })` builds its own per-execute context. Multiple statements inside a transaction that share the same caller signal each receive the same `signal` reference (caller passes it to each `execute` call), but the transaction wrapper itself doesn't compose a deadline / cancel-on-rollback / cancel-on-error signal automatically. Callers compose their own controllers if they need transaction-scoped timeouts.
-- **No structured cancellation reason taxonomy.** `cause` carries `signal.reason` verbatim; no normalization, no enrichment. If the framework ever grows reason metadata (e.g. `{ kind: 'transaction-deadline'; deadline: Date }`), it can land additively on `CodecCallContext` or the envelope's `details`.
-
-### Driver-implementer expectation
-
-The runtime relies on `IteratorClose` semantics — when the for-await body throws (because abort observation surfaced `RUNTIME.ABORTED`), JavaScript calls `.return()` on the underlying iterator, which propagates cleanup down to the driver's `try/finally` block. Postgres's `pg-cursor` does this correctly today (releases the cursor, returns the connection to the pool). Drivers that wrap an iterator without `try/finally` cleanup risk leaking driver-side resources on abort. The expectation is: drivers that yield rows via async iterators must clean up under iterator-close. This is not a new contract for the driver — it has always been required for normal `break`-out-of-for-await consumption — but the `RUNTIME.ABORTED` path makes it observable.
-
-### Phase-tag attribution is sampled, not subscribed
-
-Between-rows `signal.aborted` checks are **sampled** at the SQL `executeAgainstQueryable` for-await body, not subscribed via an `abort` listener. A signal that aborts immediately after the check passes will not trigger `phase: 'stream'`; the next `decodeRow`'s race will trigger `phase: 'decode'` instead. This is the intended behaviour (the runtime can't get into a stuck state), but the `phase` tag is a hint about which await caused the abort, not a hard guarantee. The cause chain (`error.cause === signal.reason`) and the envelope shape (`code === 'RUNTIME.ABORTED'`) are stable; the phase is best-effort.
-
-### Future work
-
-- **Concurrency cap / bulk-codec dispatcher.** Tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330). The codec author surface is ready (the `ctx` seam is forward-compatible with a future `bulkEncode` registration on the codec interface).
-- **Mongo per-row signal observation.** A consumer who passes a signal and consumes rows in a long-running for-await currently won't see the abort take effect at the runtime layer until the next driver row arrives or the consumer breaks out of the loop. If this becomes a latency concern, Mongo can grow its own between-rows check inside an `execute` override (matching SQL's pattern); the framework seam is unchanged.
-- **Driver-level statement cancellation.** A future change can wire `signal.aborted` into the underlying database driver's cancellation primitive (Postgres `pg_cancel_backend`, Mongo `killCursors`). The runtime side is ready; only the driver side is missing.
-- **Trait-gated redaction interaction.** If [TML-2329](https://linear.app/prisma-company/issue/TML-2329) lands a `redactWire` / `redactInput` trait, the `RUNTIME.ABORTED` envelope's `cause` chain (which today carries `signal.reason` verbatim) becomes part of that redaction policy's surface area. The current envelope shape doesn't preclude trait-gated redaction landing additively.
-
-## Implementation evidence
-
-The type and runtime declarations live at:
-
-- Framework `CodecCallContext`: `packages/1-framework/1-core/framework-components/src/codec-types.ts`.
-- SQL `SqlColumnRef` + `SqlCodecCallContext` + narrowed `Codec`: `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`.
-- `RUNTIME.ABORTED` constant + `runtimeAborted` helper: `packages/1-framework/1-core/framework-components/src/runtime-error.ts`.
-- `raceAgainstAbort` helper: `packages/1-framework/1-core/framework-components/src/race-against-abort.ts`.
-- `RuntimeCore.execute(plan, options?)` + per-execute ctx: `packages/1-framework/1-core/framework-components/src/runtime-core.ts`, `packages/1-framework/1-core/framework-components/src/runtime-middleware.ts`.
-- SQL runtime threading: `packages/2-sql/5-runtime/src/codecs/encoding.ts`, `packages/2-sql/5-runtime/src/codecs/decoding.ts`, `packages/2-sql/5-runtime/src/sql-runtime.ts`.
-- Mongo adapter / runtime threading: `packages/3-mongo-target/2-mongo-adapter/src/resolve-value.ts`, `packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`, `packages/2-mongo-family/7-runtime/src/mongo-runtime.ts`, `packages/2-mongo-family/6-transport/mongo-lowering/src/adapter-types.ts`.
-
-Behavioural and type-level test pins sit alongside each subject file under each package's `test/` directory. End-to-end abort coverage against real drivers lives at `test/integration/test/sql-builder/execution-abort.test.ts` and `test/integration/test/mongo/execution-abort.test.ts`. The full implementation history (m1 framework seam, m1 R2 layering correction, m2 SQL runtime threading, m3 Mongo runtime threading + `raceAgainstAbort` promotion, m4 docs) is tracked in PR [#400](https://github.com/prisma/prisma-next/pull/400) under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
-
-## References
-
-- [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Establishes the always-await codec runtime model and names `AbortSignal` plumbing as a known gap; this ADR resolves that half. The seven walk-back constraints are restated in the table above; this ADR introduces none.
+- [ADR 204 — Single-Path Async Codec Runtime](./ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). Establishes the always-await codec runtime model and names `AbortSignal` plumbing as a known gap; this ADR resolves that half.
 - [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md). Defines the envelope shape (`code`, `details`, `cause`) used by `RUNTIME.ABORTED`.
-- [framework-gaps G10 — `AbortSignal` not plumbed to codec calls](../../reference/framework-gaps.md#g10--abortsignal-not-plumbed-to-codec-calls). Resolved by this ADR.
-- [framework-gaps G1 — Codecs receive no per-call column metadata](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata). Decode-side `(table, name)` plumbed by this ADR; richer encode-side column metadata stays open as the middleware's domain — see *Middleware-driven param transformation* ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)).
-- [framework-gaps G4 — Per-cell `Promise.all` codec dispatch is unbounded](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). Stays open; concurrency cap / bulk-codec dispatch is tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
-- [TML-2330 — codec call context + concurrency](https://linear.app/prisma-company/issue/TML-2330). The implementation ticket; rate-limit half stays under this ticket.
+- [framework-gaps G10](../../reference/framework-gaps.md#g10--abortsignal-not-plumbed-to-codec-calls). Resolved by this ADR.
+- [framework-gaps G1](../../reference/framework-gaps.md#g1--codecs-receive-no-per-call-column-metadata). Decode-side `(table, name)` plumbed by this ADR; encode-side richer column metadata is the middleware's domain ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)).
+- [framework-gaps G4](../../reference/framework-gaps.md#g4--per-cell-promiseall-codec-dispatch-is-unbounded-for-network-backed-codecs). Stays open; concurrency cap / bulk-codec dispatch is tracked under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
 - [WHATWG `AbortSignal` / `AbortController`](https://dom.spec.whatwg.org/#interface-abortsignal). The cancellation primitive used end-to-end.
+
+Implementation lives across `framework-components` (`codec-types.ts`, `runtime-error.ts`, `race-against-abort.ts`, `runtime-core.ts`, `runtime-middleware.ts`), `relational-core/src/ast/codec-types.ts`, the SQL runtime's encode/decode/streaming paths, and the Mongo adapter / runtime threading. Behavioural and type-level test pins sit alongside each subject file under `test/`. End-to-end abort coverage against real drivers lives at `test/integration/test/sql-builder/execution-abort.test.ts` and `test/integration/test/mongo/execution-abort.test.ts`. Full implementation history is in PR [#400](https://github.com/prisma/prisma-next/pull/400) under [TML-2330](https://linear.app/prisma-company/issue/TML-2330).
