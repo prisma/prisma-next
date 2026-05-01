@@ -1,5 +1,5 @@
 import type { PrintDocument } from './print-document';
-import type { PrinterField, PrinterNamedType } from './types';
+import type { PrinterEnumValue, PrinterField, PrinterNamedType } from './types';
 
 const PSL_IDENTIFIER_PATTERN = /^[A-Za-z_]\w*$/;
 const ENUM_MEMBER_RESERVED_WORDS = new Set([
@@ -55,13 +55,27 @@ function serializeTypesBlock(namedTypes: readonly PrinterNamedType[]): string {
 function serializeEnum(e: {
   name: string;
   mapName?: string | undefined;
-  values: readonly string[];
+  values: readonly PrinterEnumValue[];
 }): string {
   const lines = [`enum ${e.name} {`];
   const usedNames = new Set<string>();
   for (const value of e.values) {
-    const memberName = normalizeEnumMemberName(value, usedNames);
-    lines.push(`  ${memberName}`);
+    const memberName = normalizeEnumMemberName(value.name, usedNames);
+    // Emit a per-member `@map("...")` whenever the printed identifier differs
+    // from the original storage label (e.g. PostgreSQL enum labels with
+    // hyphens that get normalised to camelCase, reserved words that get
+    // `_`-prefixed, or names that collide and get a numeric suffix), or when
+    // the AST carried an explicit `mapName` from a parsed source. Without
+    // this, parsing the emitted PSL would lose the original storage label and
+    // a subsequent `contract emit` would talk to the wrong DB enum value.
+    const explicitMap = value.mapName;
+    const storageLabel =
+      explicitMap !== undefined ? explicitMap : memberName !== value.name ? value.name : undefined;
+    if (storageLabel !== undefined) {
+      lines.push(`  ${memberName} @map("${escapePslString(storageLabel)}")`);
+    } else {
+      lines.push(`  ${memberName}`);
+    }
     usedNames.add(memberName);
   }
   if (e.mapName) {

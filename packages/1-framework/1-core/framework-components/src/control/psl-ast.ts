@@ -122,6 +122,16 @@ export interface PslModel {
 export interface PslEnumValue {
   readonly kind: 'enumValue';
   readonly name: string;
+  /**
+   * Optional storage label for the enum member, captured from a trailing
+   * `@map("...")` attribute on the member line. The parser populates this
+   * when the source PSL carries an explicit `@map`. Producers (e.g.
+   * `sqlSchemaIrToPslAst`) leave it unset; the printer emits `@map(...)`
+   * automatically when normalisation would change the printed member name
+   * (so an enum value `'in-progress'` becomes `inProgress @map("in-progress")`
+   * in PSL, preserving the round-trip).
+   */
+  readonly mapName?: string;
   readonly span: PslSpan;
 }
 

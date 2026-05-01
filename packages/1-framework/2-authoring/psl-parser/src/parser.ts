@@ -312,7 +312,11 @@ function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBound
       continue;
     }
 
-    const valueMatch = line.match(/^([A-Za-z_]\w*)$/);
+    // An enum member line is the bare member identifier, optionally followed
+    // by a `@map("storage-label")` attribute. The map attribute lets the
+    // printer round-trip enum values whose original storage label is not a
+    // valid PSL identifier (e.g. PostgreSQL enum labels with hyphens).
+    const valueMatch = line.match(/^([A-Za-z_]\w*)(?:\s+@map\(\s*"((?:[^"\\]|\\.)*)"\s*\))?$/);
     if (!valueMatch) {
       pushDiagnostic(context, {
         code: 'PSL_INVALID_ENUM_MEMBER',
@@ -322,9 +326,12 @@ function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBound
       continue;
     }
 
+    const mapName = valueMatch[2] !== undefined ? unescapePslString(valueMatch[2]) : undefined;
+
     values.push({
       kind: 'enumValue',
       name: valueMatch[1] ?? '',
+      ...(mapName !== undefined ? { mapName } : {}),
       span: createTrimmedLineSpan(context, lineIndex),
     });
   }
@@ -336,6 +343,37 @@ function parseEnumBlock(context: ParserContext, name: string, bounds: BlockBound
     attributes,
     span: createLineRangeSpan(context, bounds.startLine, bounds.endLine),
   };
+}
+
+/**
+ * Decode PSL escape sequences (`\\`, `\"`, `\'`, `\n`, `\r`) inside a
+ * quoted-literal body. The argument is the body of the literal with the
+ * surrounding quotes already stripped by the caller. Mirrors the inverse
+ * helper in `@prisma-next/psl-printer`'s `escapePslString` so a string
+ * round-trips parser → printer → parser unchanged.
+ */
+function unescapePslString(value: string): string {
+  let result = '';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value.charCodeAt(i);
+    if (ch !== 0x5c /* '\\' */ || i + 1 >= value.length) {
+      result += value[i];
+      continue;
+    }
+    const next = value[i + 1];
+    if (next === '\\' || next === '"' || next === "'") {
+      result += next;
+    } else if (next === 'n') {
+      result += '\n';
+    } else if (next === 'r') {
+      result += '\r';
+    } else {
+      result += '\\';
+      result += next;
+    }
+    i++;
+  }
+  return result;
 }
 
 function parseTypesBlock(context: ParserContext, bounds: BlockBounds): PslTypesBlock {

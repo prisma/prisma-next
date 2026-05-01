@@ -94,15 +94,21 @@ describe('printPsl', () => {
     };
 
     const result = printPslFromSql(schemaIR);
+    // Each normalised member preserves the original Postgres storage label
+    // via per-member `@map(...)`. Without this, parsing the emitted PSL
+    // would lose the original spelling and a subsequent `contract emit`
+    // would talk to the wrong DB enum value (e.g. `inProgress` instead of
+    // `'in-progress'`). `READY` is already a valid PSL identifier and
+    // matches its storage label, so no `@map` is needed there.
     expect(result).toMatchInlineSnapshot(`
       "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum DeploymentStatus {
         READY
-        inProgress
-        _2fa
-        _default
-        inProgress2
+        inProgress @map("in-progress")
+        _2fa @map("2FA")
+        _default @map("default")
+        inProgress2 @map("inProgress")
 
         @@map("deployment_status")
       }
@@ -147,11 +153,15 @@ describe('printPsl', () => {
     };
 
     const result = printPslFromSql(schemaIR);
+    // The enum *type* name `Role` is already PSL-safe so no enum-level
+    // `@@map(...)` is emitted, but the *member* `'!!!'` is normalised to
+    // `value` and so carries a per-member `@map("!!!")` to preserve the
+    // original storage label across the parse-print round-trip.
     expect(result).toMatchInlineSnapshot(`
       "// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
 
       enum Role {
-        value
+        value @map("!!!")
       }
 
       model User {

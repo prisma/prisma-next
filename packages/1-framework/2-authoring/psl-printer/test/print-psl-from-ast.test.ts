@@ -371,9 +371,12 @@ describe('printPslFromAst', () => {
       span: span(0),
     };
     const out = printPslFromAst(ast);
-    expect(out).toContain('inProgress');
-    expect(out).toContain('_123leading');
-    expect(out).toContain('_enum');
+    // Each normalised member preserves the original storage label via
+    // `@map(...)` so the round-trip (parse → print → parse) does not lose
+    // the database-side spelling — see the dedicated round-trip test below.
+    expect(out).toContain('inProgress @map("in-progress")');
+    expect(out).toContain('_123leading @map("123leading")');
+    expect(out).toContain('_enum @map("enum")');
   });
 
   it('appends a numeric suffix to duplicate normalised enum member names', () => {
@@ -397,8 +400,59 @@ describe('printPslFromAst', () => {
       span: span(0),
     };
     const out = printPslFromAst(ast);
-    expect(out).toMatch(/fooBar\b/);
-    expect(out).toMatch(/fooBar2\b/);
+    // The first member keeps the camelCased identifier; the colliding second
+    // member is suffixed with `2`. Both carry an `@map(...)` to preserve their
+    // distinct original storage labels.
+    expect(out).toContain('fooBar @map("foo bar")');
+    expect(out).toContain('fooBar2 @map("foo-bar")');
+  });
+
+  it('preserves normalised enum members across a parser → printer → parser round-trip', () => {
+    // Regression for the previously-lossy `serializeEnum` codepath. Postgres
+    // enum labels often contain hyphens (`'in-progress'`), reserved PSL words
+    // (`'enum'`), or leading digits (`'2x'`) — all of which the printer
+    // normalises into a valid PSL identifier on emission. Without the
+    // per-member `@map(...)`, parsing the emitted PSL would lose the original
+    // storage label and a subsequent `contract emit` would talk to the wrong
+    // value in the live database.
+    const ast: PslDocumentAst = {
+      kind: 'document',
+      sourceId: 't',
+      models: [],
+      enums: [
+        {
+          kind: 'enum',
+          name: 'Status',
+          values: [
+            { kind: 'enumValue', name: 'in-progress', span: span(0) },
+            { kind: 'enumValue', name: 'enum', span: span(1) },
+            { kind: 'enumValue', name: 'done', span: span(2) },
+          ],
+          attributes: [],
+          span: span(0),
+        },
+      ],
+      compositeTypes: [],
+      span: span(0),
+    };
+
+    const printed1 = printPslFromAst(ast);
+    const parsed = parsePslDocument({ schema: printed1, sourceId: 'r' });
+    expect(parsed.ok).toBe(true);
+
+    const enumNode = parsed.ast.enums.find((e) => e.name === 'Status');
+    expect(enumNode).toBeDefined();
+    const valueShapes = enumNode?.values.map((v) => ({ name: v.name, mapName: v.mapName }));
+    expect(valueShapes).toEqual([
+      { name: 'inProgress', mapName: 'in-progress' },
+      { name: '_enum', mapName: 'enum' },
+      { name: 'done', mapName: undefined },
+    ]);
+
+    // Printing the parsed AST again must produce identical output: the parser
+    // captured `mapName`, the printer re-emits it verbatim.
+    const printed2 = printPslFromAst(parsed.ast);
+    expect(printed2).toBe(printed1);
   });
 
   it('renders optional and list type modifiers, plus @map on field', () => {

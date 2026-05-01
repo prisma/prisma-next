@@ -94,7 +94,10 @@ function enumToPrinterEnum(en: PslEnum): PrinterEnum {
   return {
     name: en.name,
     mapName,
-    values: en.values.map((v) => v.name),
+    values: en.values.map((v) => ({
+      name: v.name,
+      ...(v.mapName !== undefined ? { mapName: v.mapName } : {}),
+    })),
   };
 }
 

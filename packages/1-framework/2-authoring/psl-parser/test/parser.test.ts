@@ -396,6 +396,52 @@ enum UserRole {
     });
   });
 
+  it('captures per-member @map storage labels', () => {
+    // The printer emits `@map("...")` on a member line whenever it had to
+    // normalise the storage label into a valid PSL identifier (e.g. Postgres
+    // enum labels with hyphens or PSL reserved words). The parser captures
+    // the original storage label as `mapName` on the corresponding
+    // `PslEnumValue`, so a parse → print → parse round-trip preserves it.
+    const schema = `
+enum Status {
+  inProgress @map("in-progress")
+  _enum @map("enum")
+  done
+}
+`;
+
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+    const status = result.ast.enums.find((e) => e.name === 'Status');
+    expect(status?.values.map((v) => ({ name: v.name, mapName: v.mapName }))).toEqual([
+      { name: 'inProgress', mapName: 'in-progress' },
+      { name: '_enum', mapName: 'enum' },
+      { name: 'done', mapName: undefined },
+    ]);
+  });
+
+  it('decodes PSL escape sequences in per-member @map storage labels', () => {
+    // The parser must apply the inverse of escapePslString so a label like
+    // `name with "quotes" and \\backslash` survives a parse → print → parse
+    // round-trip without doubling escapes.
+    const schema = `
+enum Quoted {
+  hasQuote @map("with \\"quote\\"")
+  hasBackslash @map("with \\\\back")
+  hasNewline @map("line1\\nline2")
+}
+`;
+
+    const result = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+    expect(result.ok).toBe(true);
+    const quoted = result.ast.enums.find((e) => e.name === 'Quoted');
+    expect(quoted?.values.map((v) => v.mapName)).toEqual([
+      'with "quote"',
+      'with \\back',
+      'line1\nline2',
+    ]);
+  });
+
   it('returns diagnostics for malformed attribute syntax', () => {
     const schema = `
 model User {
