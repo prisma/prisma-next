@@ -35,8 +35,8 @@ const BASE_IMPORTS: readonly ImportRequirement[] = [
  * `Migration` (i.e. `MongoMigration`) from `@prisma-next/family-mongo`, and
  * implements the abstract `operations` and `describe` members. `meta` is
  * always rendered — `describe()` is part of the `Migration` contract, so
- * even an empty stub must satisfy it; callers pass empty strings for a
- * migration-new scaffold.
+ * even an empty stub must satisfy it; callers pass `from: null` for a
+ * baseline `migration-new` scaffold (and a real `to` hash either way).
  *
  * The walk is polymorphic: each call node contributes its own
  * `renderTypeScript()` expression and declares its own

@@ -84,7 +84,8 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
     schema: schemaIR,
     policy,
     // `db init` does not produce a `migration.ts`, so the from-hash on the
-    // resulting plan is never surfaced to authoring — pass empty string.
+    // resulting plan is never surfaced to authoring — pass null (the
+    // baseline encoding for `MigrationPlanner.plan({ fromHash })`).
     fromHash: null,
     frameworkComponents,
   });
