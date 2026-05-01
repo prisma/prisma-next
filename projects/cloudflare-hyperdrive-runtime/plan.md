@@ -53,7 +53,7 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 | Section        | TC     | Test Case                                                                              | Type   | Milestone | Expected Outcome                                                                                       |
 | -------------- | ------ | -------------------------------------------------------------------------------------- | ------ | --------- | ------------------------------------------------------------------------------------------------------ |
 | Security       | TC-24  | Example `wrangler.jsonc` does not commit secrets; `localConnectionString` via env / `.dev.vars` only | Review | M3 | Reviewer confirms no plaintext credentials in committed files |
-| Observability  | TC-25  | Existing telemetry middleware emits expected events on the serverless facade's request lifecycle | Unit | M2 | Telemetry events fire with correct shape |
+| Observability  | TC-25  | ~~Telemetry-event-shape test on the serverless lifecycle~~ — **struck**. Symmetric with the Node `postgres()` factory, which has no telemetry test either; selective enforcement otherwise. Middleware pass-through is structurally covered by the existing `postgres-serverless.test.ts` lines 236-254. | — | — | — |
 | Architecture   | TC-26  | No driver-layer files modified; `architecture.config.json` updated only if a new package is created | Review | M2 | Diff confirms |
 
 ## Milestones
@@ -88,7 +88,7 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
   - Negative type test: `db.orm` / `db.runtime` / `db.transaction` access fails to compile.
   - Mocked-`pg` lifecycle test: `db.connect()` constructs `pg.Client` exactly once; `await using` calls `client.end()` exactly once; no `Pool` constructor invoked.
   - Two consecutive `connect()` calls return distinct runtimes.
-  - Telemetry middleware events fire with correct shape on the serverless lifecycle.
+  - ~~Telemetry middleware events fire with correct shape on the serverless lifecycle.~~ — struck per orchestrator decision in m2 R1 triage; symmetric with Node factory which has no telemetry test, structural pass-through coverage already present.
   - Symmetric-options structural type test (`postgresServerless` and `postgres` accept same option key shape where types align).
   - Existing `@prisma-next/postgres` tests pass unchanged.
   - (Satisfies: TC-1, TC-2, TC-7, TC-10, TC-12, TC-20, TC-25.)
@@ -190,3 +190,4 @@ Carried forward from the spec or surfaced during planning. Most resolve during e
 5. **PPg as the smoke-test origin** — currently aspirational. If PPg's preflight or networking story isn't ready, fall back to Neon or AWS RDS. Spec is generic to any Postgres origin; PPg-specific verification can be a follow-up.
 6. **Whether to backport `[Symbol.asyncDispose]` to the existing Node `postgres()` facade.** Additive, useful for Node CLIs that want `await using runtime = await db.connect({ url })`. Out of scope for this project; recommend opening a separate ticket.
 7. **Whether the Node wrapper's hardcoded `cursor: { disabled: true }` should be removed.** Decision §3 in spec applies to the serverless facade only. The Node default has its own history — out of scope here; flag as a follow-up if the team wants to revisit.
+8. **Re-export `PostgresCursorOptions` from `@prisma-next/driver-postgres/runtime`** (follow-up). The serverless facade currently uses `NonNullable<PostgresDriverCreateOptions['cursor']>` as a structural workaround because the type is internal to the driver package. Cleaner long-term to add the type to the driver's runtime export. Hygiene-only; doesn't affect correctness. Suggest filing as a separate ticket; out of scope for this project.
