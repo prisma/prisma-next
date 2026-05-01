@@ -32,9 +32,16 @@ The same `prisma-next.config.ts` supports both PSL and TypeScript contract autho
 # PSL (default) — watches prisma/contract.prisma
 pnpm dev
 
-# TypeScript — watches prisma/contract.ts
+# TypeScript — re-emits when prisma/contract.ts (or anything else imported by
+# prisma-next.config.ts) changes
 PRISMA_NEXT_CONTRACT_SOURCE=ts pnpm dev
 ```
+
+The TypeScript surface does not declare an explicit watch path. Instead,
+`prisma-next.config.ts` imports `./prisma/contract.ts`, which puts that file in
+the config's module graph; the Vite plugin walks that graph and adds every
+non-`node_modules` file to its watch set, so editing any of them triggers a
+re-emit.
 
 Re-toggling mid-session requires restarting the dev server; the config is read once at startup.
 
