@@ -100,6 +100,64 @@ function setupConfigMock(
   });
 }
 
+async function setupDivergentFixture(): Promise<InvariantFixture & { refHash: string }> {
+  const cwd = await mkdtemp(join(tmpdir(), 'cli-invariant-'));
+  const migrationsDir = join(cwd, 'migrations');
+  await mkdir(migrationsDir, { recursive: true });
+
+  const REF_HASH = `sha256:${'b'.repeat(64)}`;
+
+  // Branch A (will be the marker) — EMPTY → TO_HASH.
+  await writeAttestedPackage(
+    join(migrationsDir, '00001_branch_a'),
+    {
+      from: FROM_HASH,
+      to: TO_HASH,
+      fromContract: null,
+      toContract: createContract(),
+      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
+      labels: [],
+      providedInvariants: [],
+      createdAt: '2026-02-25T14:00:00.000Z',
+    },
+    ORIGINAL_OPS,
+  );
+
+  // Branch B (the ref target) — EMPTY → REF_HASH. No path from TO_HASH to
+  // REF_HASH, so a marker on TO_HASH cannot reach REF_HASH.
+  await writeAttestedPackage(
+    join(migrationsDir, '00002_branch_b'),
+    {
+      from: FROM_HASH,
+      to: REF_HASH,
+      fromContract: null,
+      toContract: createContract(),
+      hints: { used: [], applied: ['additive_only'], plannerVersion: '0.0.1' },
+      labels: [],
+      providedInvariants: [],
+      createdAt: '2026-02-25T14:01:00.000Z',
+    },
+    ORIGINAL_OPS,
+  );
+
+  const refsDir = join(migrationsDir, 'refs');
+  await writeRef(refsDir, 'prod', { hash: REF_HASH, invariants: [] });
+
+  const contractDir = join(cwd, 'src', 'prisma');
+  await mkdir(contractDir, { recursive: true });
+  await writeFile(
+    join(contractDir, 'contract.json'),
+    JSON.stringify({
+      storage: { storageHash: REF_HASH },
+      schemaVersion: SCHEMA_VERSION,
+      target: TARGET,
+      targetFamily: TARGET_FAMILY,
+    }),
+  );
+
+  return { cwd, refHash: REF_HASH };
+}
+
 async function setupFixture(opts: {
   refInvariants: readonly string[];
   edgeInvariants?: readonly string[];
@@ -295,6 +353,37 @@ describe(
         expect(envelope.meta?.code).not.toBe('MIGRATION.UNKNOWN_INVARIANT');
       }
       expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
+    });
+
+    it('migration status --ref does not emit MIGRATION.UP_TO_DATE when the marker cannot reach the ref', async () => {
+      // Marker is on a branch that has no forward path to the ref's branch.
+      // pendingCount and hasInvariantWork both report 0, but
+      // MIGRATION.UP_TO_DATE would mislead — the database simply cannot
+      // reach the ref from its current state. Suppress the diagnostic.
+      cleanupMocks();
+      const commandMocks = setupCommandMocks();
+      consoleOutput = commandMocks.consoleOutput;
+      consoleErrors = commandMocks.consoleErrors;
+      cleanupMocks = commandMocks.cleanup;
+      setupConfigMock({ markerHash: TO_HASH });
+
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const fixture = await setupDivergentFixture();
+      tempDirs.push(fixture.cwd);
+      process.chdir(fixture.cwd);
+
+      const exitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      );
+      expect(exitCode).toBe(0);
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      expect(jsonLine).toBeDefined();
+      const envelope = JSON.parse(jsonLine!) as {
+        diagnostics?: ReadonlyArray<{ code: string }>;
+      };
+      const codes = envelope.diagnostics?.map((d) => d.code) ?? [];
+      expect(codes).not.toContain('MIGRATION.UP_TO_DATE');
     });
 
     it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {

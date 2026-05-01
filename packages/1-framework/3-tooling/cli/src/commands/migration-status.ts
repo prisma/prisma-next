@@ -718,6 +718,37 @@ async function executeMigrationStatusCommand(
     summary = `${entries.length} migration(s) on disk`;
   }
 
+  let pathDecision: MigrationStatusResult['pathDecision'];
+  let routingUnreachable = false;
+  if (mode === 'online') {
+    const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
+    const outcome = findPathWithDecision(graph, originHash, targetHash, {
+      ...ifDefined('refName', activeRefName),
+      required: effectiveRequired,
+    });
+    if (outcome.kind === 'ok') {
+      pathDecision = toPathDecisionResult(outcome.decision);
+    } else if (outcome.kind === 'unsatisfiable') {
+      return notOk(
+        mapMigrationToolsError(
+          errorNoInvariantPath({
+            ...ifDefined('refName', activeRefName),
+            required: [...effectiveRequired].sort(),
+            missing: outcome.missing,
+            structuralPath: outcome.structuralPath.map(toStructuralEdge),
+          }),
+        ),
+      );
+    } else {
+      // outcome.kind === 'unreachable' — origin (marker) has no structural
+      // path to the active target. `pendingCount` and `hasInvariantWork`
+      // both report zero in this case, but emitting MIGRATION.UP_TO_DATE
+      // would be wrong: the database simply cannot reach the requested
+      // ref/contract from its current state. Suppress UP_TO_DATE below.
+      routingUnreachable = true;
+    }
+  }
+
   if (mode === 'online') {
     if (markerHash !== undefined && !graph.nodes.has(markerHash) && markerHash === contractHash) {
       diagnostics.push({
@@ -743,36 +774,13 @@ async function executeMigrationStatusCommand(
           `Run 'prisma-next migration apply --ref ${activeRefName ?? '<ref>'}' to apply a path that covers the required invariants`,
         ],
       });
-    } else {
+    } else if (!routingUnreachable) {
       diagnostics.push({
         code: 'MIGRATION.UP_TO_DATE',
         severity: 'info',
         message: 'Database is up to date',
         hints: [],
       });
-    }
-  }
-
-  let pathDecision: MigrationStatusResult['pathDecision'];
-  if (mode === 'online') {
-    const originHash = markerHash ?? EMPTY_CONTRACT_HASH;
-    const outcome = findPathWithDecision(graph, originHash, targetHash, {
-      ...ifDefined('refName', activeRefName),
-      required: effectiveRequired,
-    });
-    if (outcome.kind === 'ok') {
-      pathDecision = toPathDecisionResult(outcome.decision);
-    } else if (outcome.kind === 'unsatisfiable') {
-      return notOk(
-        mapMigrationToolsError(
-          errorNoInvariantPath({
-            ...ifDefined('refName', activeRefName),
-            required: [...effectiveRequired].sort(),
-            missing: outcome.missing,
-            structuralPath: outcome.structuralPath.map(toStructuralEdge),
-          }),
-        ),
-      );
     }
   }
 
