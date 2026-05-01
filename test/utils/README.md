@@ -143,7 +143,7 @@ type VectorOps = OperationsForTypeId<'pg/vector@1', CombinedTestOperations>;
 
 Centralized timeout values with environment variable support. All timeouts respect the `TEST_TIMEOUT_MULTIPLIER` environment variable (CI typically sets `2`; see `.github/workflows/ci.yml`).
 
-- `timeouts.spinUpPpgDev`: Timeout for hooks that spin up ppg-dev (PostgreSQL dev server). Base: 15000ms
+- `timeouts.spinUpPpgDev`: Timeout for hooks that spin up ppg-dev (PostgreSQL dev server). Base: 30000ms
 - `timeouts.typeScriptCompilation`: Timeout for tests that perform TypeScript compilation. Base: 8000ms
 - `timeouts.default`: Default timeout for general tests. Base: 100ms (per-test `it(..., timeouts.default)` stays intentionally tight — use semantic timeouts instead of raising this broadly)
 - `timeouts.vitestPackageDefault`: Base 500ms, meant for Vitest package-level `testTimeout` / `hookTimeout` after `timeouts.default × multiplier` proved too aggressive on CI (200ms failures)
