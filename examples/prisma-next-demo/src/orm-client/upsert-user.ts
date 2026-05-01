@@ -10,7 +10,7 @@ export interface OrmClientUpsertUserInput {
   readonly email: string;
   readonly displayName: string;
   readonly kind: 'admin' | 'user';
-  readonly createdAt?: Date | string;
+  readonly createdAt?: Date;
 }
 
 export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtime: Runtime) {
@@ -21,7 +21,7 @@ export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtim
       email: data.email,
       displayName: data.displayName,
       kind: data.kind,
-      createdAt: toUserCreatedAt(data.createdAt),
+      createdAt: (data.createdAt ?? new Date()) as UserRow['createdAt'],
     },
     update: {
       email: data.email,
@@ -33,9 +33,4 @@ export async function ormClientUpsertUser(data: OrmClientUpsertUserInput, runtim
 
 function toUserId(value: string): UserRow['id'] {
   return value as UserRow['id'];
-}
-
-function toUserCreatedAt(value: Date | string | undefined): UserRow['createdAt'] {
-  const resolved = value ?? new Date();
-  return (resolved instanceof Date ? resolved.toISOString() : resolved) as UserRow['createdAt'];
 }

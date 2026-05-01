@@ -339,22 +339,15 @@ const pgFloat8Codec = codec({
 const pgTimestampCodec = codec<
   typeof PG_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
-  string | Date,
-  string | Date
+  Date,
+  Date
 >({
   typeId: PG_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
   traits: ['equality', 'order'],
-  encode: (value: string | Date): string => {
-    if (value instanceof Date) return value.toISOString();
-    if (typeof value === 'string') return value;
-    return String(value);
-  },
-  decode: (wire: string | Date): string => {
-    if (wire instanceof Date) return wire.toISOString();
-    return wire;
-  },
-  encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+  encode: (value: Date): Date => value,
+  decode: (wire: Date): Date => wire,
+  encodeJson: (value: Date) => value.toISOString(),
   decodeJson: (json) => {
     if (typeof json !== 'string') {
       throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
@@ -381,22 +374,15 @@ const pgTimestampCodec = codec<
 const pgTimestamptzCodec = codec<
   typeof PG_TIMESTAMPTZ_CODEC_ID,
   readonly ['equality', 'order'],
-  string | Date,
-  string | Date
+  Date,
+  Date
 >({
   typeId: PG_TIMESTAMPTZ_CODEC_ID,
   targetTypes: ['timestamptz'],
   traits: ['equality', 'order'],
-  encode: (value: string | Date): string => {
-    if (value instanceof Date) return value.toISOString();
-    if (typeof value === 'string') return value;
-    return String(value);
-  },
-  decode: (wire: string | Date): string => {
-    if (wire instanceof Date) return wire.toISOString();
-    return wire;
-  },
-  encodeJson: (value: string | Date) => (value instanceof Date ? value.toISOString() : value),
+  encode: (value: Date): Date => value,
+  decode: (wire: Date): Date => wire,
+  encodeJson: (value: Date) => value.toISOString(),
   decodeJson: (json) => {
     if (typeof json !== 'string') {
       throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);

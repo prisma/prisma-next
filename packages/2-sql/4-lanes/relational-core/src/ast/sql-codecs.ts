@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import { type as arktype } from 'arktype';
 import { codec, defineCodecs } from './codec-types';
 
@@ -104,12 +105,28 @@ const sqlTextCodec = codec({
   decode: (wire: string): string => wire,
 });
 
-const sqlTimestampCodec = codec({
+const sqlTimestampCodec = codec<
+  typeof SQL_TIMESTAMP_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date,
+  Date
+>({
   typeId: SQL_TIMESTAMP_CODEC_ID,
   targetTypes: ['timestamp'],
   traits: ['equality', 'order'],
-  encode: (value: string | Date): string => (value instanceof Date ? value.toISOString() : value),
-  decode: (wire: string | Date): string => (wire instanceof Date ? wire.toISOString() : wire),
+  encode: (value: Date): Date => value,
+  decode: (wire: Date): Date => wire,
+  encodeJson: (value: Date): JsonValue => value.toISOString(),
+  decodeJson: (json: JsonValue): Date => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for sql/timestamp@1, got ${typeof json}`);
+    }
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for sql/timestamp@1: ${json}`);
+    }
+    return date;
+  },
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => {
     const precision = typeParams['precision'];

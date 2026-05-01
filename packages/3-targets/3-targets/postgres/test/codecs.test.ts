@@ -37,65 +37,44 @@ describe('adapter-postgres codecs', () => {
 
   describe('timestamp codec', () => {
     const timestampCodec = codecDefinitions.timestamp.codec as {
-      encode: (value: string | Date) => Promise<string>;
-      decode: (wire: string | Date) => Promise<string>;
+      encode: (value: Date) => Promise<Date>;
+      decode: (wire: Date) => Promise<Date>;
     };
 
-    it('encodes Date to ISO string', async () => {
+    it('encodes Date values as-is', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
+      expect(await timestampCodec.encode(date)).toBe(date);
     });
 
-    it('decodes Date to ISO string', async () => {
+    it('decodes Date values as-is', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.decode(date)).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('decodes string to string', async () => {
-      const result = await timestampCodec.decode('2024-01-15T10:30:00.000Z');
-      expect(result).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('encodes strings as-is', async () => {
-      expect(await timestampCodec.encode('2024-01-15T10:30:00.000Z')).toBe(
-        '2024-01-15T10:30:00.000Z',
-      );
+      expect(await timestampCodec.decode(date)).toBe(date);
     });
   });
 
   describe('sql-timestamp codec', () => {
     const timestampCodec = codecDefinitions['sql-timestamp'].codec as {
-      encode: (value: string | Date) => Promise<string>;
-      decode: (wire: string | Date) => Promise<string>;
+      encode: (value: Date) => Promise<Date>;
+      decode: (wire: Date) => Promise<Date>;
     };
 
-    it('encodes Date values to ISO strings', async () => {
+    it('round-trips Date values', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestampCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('keeps string values stable', async () => {
-      const wire = '2024-01-15T10:30:00.000Z';
-      expect(await timestampCodec.encode(wire)).toBe(wire);
-      expect(await timestampCodec.decode(wire)).toBe(wire);
+      expect(await timestampCodec.encode(date)).toBe(date);
+      expect(await timestampCodec.decode(date)).toBe(date);
     });
   });
 
   describe('timestamptz codec', () => {
     const timestamptzCodec = codecDefinitions.timestamptz.codec as {
-      encode: (value: string | Date) => Promise<string>;
-      decode: (wire: string | Date) => Promise<string>;
+      encode: (value: Date) => Promise<Date>;
+      decode: (wire: Date) => Promise<Date>;
     };
 
-    it('encodes Date values to ISO strings', async () => {
+    it('round-trips Date values', async () => {
       const date = new Date('2024-01-15T10:30:00Z');
-      expect(await timestamptzCodec.encode(date)).toBe('2024-01-15T10:30:00.000Z');
-    });
-
-    it('keeps strings and already-decoded values stable', async () => {
-      const wire = '2024-01-15T10:30:00.000Z';
-      expect(await timestamptzCodec.encode(wire)).toBe(wire);
-      expect(await timestamptzCodec.decode(wire)).toBe(wire);
+      expect(await timestamptzCodec.encode(date)).toBe(date);
+      expect(await timestamptzCodec.decode(date)).toBe(date);
     });
   });
 
@@ -425,10 +404,6 @@ describe('adapter-postgres codecs', () => {
         expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
           '2024-01-15T00:00:00.000Z',
         );
-      });
-
-      it('encodes string as-is', () => {
-        expect(codec.encodeJson('2024-01-15T00:00:00.000Z')).toBe('2024-01-15T00:00:00.000Z');
       });
 
       it('decodes ISO string to Date', () => {

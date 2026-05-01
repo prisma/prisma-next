@@ -142,12 +142,6 @@ describe('sql-codecs', () => {
       expectedEncoded: 'portable text',
       expectedDecoded: 'portable text',
     },
-    {
-      scalar: 'timestamp',
-      input: '2024-01-15T10:30:00.000Z',
-      expectedEncoded: '2024-01-15T10:30:00.000Z',
-      expectedDecoded: '2024-01-15T10:30:00.000Z',
-    },
   ];
 
   it.each(codecRoundTripCases)('encodes and decodes $scalar values', async ({
@@ -188,16 +182,32 @@ describe('sql-codecs', () => {
     });
   });
 
-  it('normalizes Date values for timestamp codecs', async () => {
+  it('round-trips Date values for timestamp codecs', async () => {
     const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
-      encode: (value: string | Date) => Promise<string>;
-      decode: (wire: string | Date) => Promise<string>;
+      encode: (value: Date) => Promise<Date>;
+      decode: (wire: Date) => Promise<Date>;
     };
 
     const instant = new Date('2024-01-15T10:30:00Z');
 
-    expect(await timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
-    expect(await timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(await timestampCodec.encode(instant)).toBe(instant);
+    expect(await timestampCodec.decode(instant)).toBe(instant);
+  });
+
+  it('serializes timestamps to ISO strings for the JSON contract', () => {
+    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+
+    const instant = new Date('2024-01-15T10:30:00Z');
+
+    expect(timestampCodec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(timestampCodec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+  });
+
+  it('throws on invalid JSON input for timestamp codecs', () => {
+    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+
+    expect(() => timestampCodec.decodeJson(42)).toThrow(/Expected ISO date string/);
+    expect(() => timestampCodec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
   });
 
   describe('renderOutputType', () => {

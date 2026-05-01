@@ -10,7 +10,7 @@ export interface OrmClientCreateUserWithAddressInput {
   readonly email: string;
   readonly displayName: string;
   readonly kind: 'admin' | 'user';
-  readonly createdAt: Date | string;
+  readonly createdAt: Date;
   readonly address: AddressInput;
 }
 
@@ -24,15 +24,11 @@ export async function ormClientCreateUserWithAddress(
     email: data.email,
     displayName: data.displayName,
     kind: data.kind,
-    createdAt: toUserCreatedAt(data.createdAt),
+    createdAt: data.createdAt as UserRow['createdAt'],
     address: data.address,
   });
 }
 
 function toUserId(value: string): UserRow['id'] {
   return value as UserRow['id'];
-}
-
-function toUserCreatedAt(value: Date | string): UserRow['createdAt'] {
-  return (value instanceof Date ? value.toISOString() : value) as UserRow['createdAt'];
 }
