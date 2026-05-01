@@ -71,8 +71,6 @@ Simplified `defineConfig` that pre-wires all Postgres internals (family, target,
 `@prisma-next/postgres/runtime` exposes a single `postgres(...)` helper that composes the Postgres execution stack and returns query/runtime roots:
 
 - `db.sql`
-- `db.kysely` (lane-owned build-only authoring surface: `build(query)` + `whereExpr(query)`)
-- `db.schema`
 - `db.orm`
 - `db.context`
 - `db.stack`
@@ -89,8 +87,6 @@ Simplified `defineConfig` that pre-wires all Postgres internals (family, target,
 
 Each `connect()` call constructs a fresh `pg.Client` and a fresh `Runtime`. No `pg.Pool` is allocated. `[Symbol.asyncDispose]` calls `runtime.close()`, which closes the underlying client. `pg-cursor` is enabled by default; opt out via `cursor: { disabled: true }`.
 
-`db.kysely` is produced by `@prisma-next/sql-kysely-lane` and intentionally exposes lane behavior, not raw Kysely execution APIs. `build(query)` infers plan row type from `query.compile()`, and `whereExpr(query)` produces `ToWhereExpr` payloads for ORM `.where(...)` interop.
-
 Runtime resources are deferred until `db.runtime()` or `db.connect(...)` is called.
 Connection binding can be provided up front (`url`, `pg`, `binding`) or deferred via `db.connect(...)`.
 
@@ -102,8 +98,8 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ## Responsibilities
 
 - Build a static Postgres execution stack from target, adapter, and driver descriptors
-- Build typed SQL and a build-only Kysely authoring surface from the same execution context
-- Build static schema and ORM roots from the execution context
+- Build a typed SQL authoring surface from the execution context
+- Build a static ORM root from the execution context
 - Normalize runtime binding input (`binding`, `url`, `pg`)
 - Lazily instantiate runtime resources on first `db.runtime()` or `db.connect(...)` call
 - Connect the internal Postgres driver through `db.connect(...)` or from initial binding options
@@ -128,7 +124,7 @@ When URL binding is used, pool timeouts are configurable via `poolOptions`:
 ```mermaid
 flowchart TD
     App[App Code] --> Client[postgres(...)]
-    Client --> Static[Roots: sql kysely(build-only) schema orm context stack]
+    Client --> Static[Roots: sql orm context stack]
     Client --> Lazy[runtime()]
 
     Lazy --> Instantiate[instantiateExecutionStack]
