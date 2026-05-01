@@ -1,10 +1,7 @@
 /**
- * `encryptedString({ equality, freeTextSearch })` TS contract factory
- * lands in M2.b alongside the PSL constructor; see
- * `projects/cipherstash-integration/project-1/specs/psl-encrypted-string-constructor.spec.md`.
- *
- * This subpath ships in M2.a so the package's surface area matches the
- * spec's § Subpath exports table — the implementation is intentionally
- * deferred to M2.b.
+ * Placeholder for the `encryptedString({ equality, freeTextSearch })` TS
+ * contract factory. The subpath ships today so the package's surface area
+ * stays stable across the in-progress milestones; see `DEVELOPING.md`
+ * § Forthcoming surface for the implementation timeline.
  */
 export {};
