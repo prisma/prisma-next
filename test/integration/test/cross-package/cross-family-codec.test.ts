@@ -34,8 +34,8 @@ describe('cross-family codec parity (T4.1)', () => {
       throw new Error('codec not registered in one of the family registries');
     }
 
-    const sqlWire = await sqlCodec.encode('abc-123');
-    const mongoWire = await mongoCodecLookup.encode('abc-123');
+    const sqlWire = await sqlCodec.encode('abc-123', {});
+    const mongoWire = await mongoCodecLookup.encode('abc-123', {});
 
     expect(sqlWire).toBe('wire:abc-123');
     expect(mongoWire).toBe('wire:abc-123');
@@ -51,7 +51,7 @@ describe('cross-family codec parity (T4.1)', () => {
     const sqlCodec = sqlRegistry.get('shared/object-id-like@1');
     if (!sqlCodec) throw new Error('SQL codec missing');
 
-    const sqlWire = await sqlCodec.encode('abc-123');
+    const sqlWire = await sqlCodec.encode('abc-123', {});
     const mongoWire = await resolveValue(
       new MongoParamRef('abc-123', { codecId: 'shared/object-id-like@1' }),
       mongoRegistry,
@@ -69,10 +69,10 @@ describe('cross-family codec parity (T4.1)', () => {
     const sqlCodec = sqlRegistry.get('shared/object-id-like@1');
     if (!sqlCodec) throw new Error('SQL codec missing');
 
-    const wire = await sqlCodec.encode('abc-123');
+    const wire = await sqlCodec.encode('abc-123', {});
     expect(wire).toBe('wire:abc-123');
 
-    const decoded = await sqlCodec.decode(wire);
+    const decoded = await sqlCodec.decode(wire, {});
     expect(decoded).toBe('abc-123');
   });
 });

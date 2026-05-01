@@ -17,7 +17,8 @@ const mongoCodecLookup: CodecLookup = {
     if (!entry) return undefined;
     return {
       ...entry,
-      decode: (w: unknown) => w,
+      encode: async (v: unknown) => v,
+      decode: async (w: unknown) => w,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
     } as ReturnType<CodecLookup['get']>;
