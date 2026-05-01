@@ -8,86 +8,38 @@ import {
   MongoMatchStage,
   RawAggregateCommand,
 } from '@prisma-next/mongo-query-ast/execution';
-import { contractModelToMongoResultShape } from '@prisma-next/mongo-query-builder';
-import type { MongoValue } from '@prisma-next/mongo-value';
+import { mongoQuery } from '@prisma-next/mongo-query-builder';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
+import {
+  decodeFixtureContractJson,
+  type TDecodeFixtureContract,
+} from './fixtures/decode-fixture-contract';
 import { withMongod } from './setup';
-
-const decodeFixtureContractJson = {
-  targetFamily: 'mongo' as const,
-  roots: { users: 'User' },
-  storage: {
-    collections: { users: {} },
-    storageHash: 'decode-integration-test',
-  },
-  models: {
-    User: {
-      storage: { collection: 'users' },
-      relations: {},
-      fields: {
-        _id: {
-          type: { kind: 'scalar' as const, codecId: 'mongo/objectId@1' },
-          nullable: false,
-        },
-        name: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        email: { type: { kind: 'scalar' as const, codecId: 'mongo/string@1' }, nullable: false },
-        createdAt: {
-          type: { kind: 'scalar' as const, codecId: 'mongo/date@1' },
-          nullable: false,
-        },
-        embeddings: {
-          type: { kind: 'scalar' as const, codecId: 'mongo/vector@1' },
-          nullable: false,
-          many: true,
-        },
-      },
-    },
-  },
-};
 
 describe('Mongo runtime decode integration', () => {
   it('typed read returns decoded _id, dates, and vector array', async () => {
     await withMongod(async (ctx) => {
-      const { contract } = validateMongoContract(decodeFixtureContractJson);
-      const model = contract.models['User'];
-      if (!model) {
-        throw new Error('fixture contract missing User model');
-      }
-      const collectionName = model.storage.collection ?? 'users';
+      const { contract } = validateMongoContract<TDecodeFixtureContract>(decodeFixtureContractJson);
       const createdAt = new Date('2024-01-15T12:00:00.000Z');
       const vec = [0.1, 0.2, 0.3];
-      const insert = await ctx.client.db(ctx.dbName).collection(collectionName).insertOne({
+      const insert = await ctx.client.db(ctx.dbName).collection('users').insertOne({
         name: 'Test',
         email: 't@example.com',
         createdAt,
         embeddings: vec,
       });
-      const command = new AggregateCommand(collectionName, [
-        new MongoMatchStage(
-          MongoFieldFilter.eq(
-            '_id',
-            MongoParamRef.of(insert.insertedId, {
-              codecId: 'mongo/objectId@1',
-            }) as unknown as MongoValue,
-          ),
-        ),
-      ]);
-      const resultShape = contractModelToMongoResultShape(model);
-      const rows = await ctx.runtime
-        .execute<{
-          _id: string;
-          name: string;
-          email: string;
-          createdAt: Date;
-          embeddings: number[];
-        }>({
-          collection: collectionName,
-          command,
-          meta: ctx.stubMeta,
-          resultShape,
-        })
-        .toArray();
+
+      // User-facing path: build the plan through the query-builder so the
+      // Row type is contract-derived (no explicit annotation on execute).
+      const plan = mongoQuery<TDecodeFixtureContract>({ contractJson: contract })
+        .from('users')
+        .match((f) =>
+          f._id.eq(MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' })),
+        )
+        .build();
+
+      const rows = await ctx.runtime.execute(plan).toArray();
       expect(rows).toHaveLength(1);
       const row = rows[0]!;
       expect(typeof row._id).toBe('string');
@@ -100,6 +52,13 @@ describe('Mongo runtime decode integration', () => {
 
   it('decode failure surfaces RUNTIME.DECODE_FAILED with details and cause', async () => {
     await withMongod(async (ctx) => {
+      // The synthetic codec id (`test/throws-on-decode@1`) is not a contract
+      // field codec, so this test legitimately needs a stub `resultShape` —
+      // the user-facing `mongoQuery(...)` path can't construct a shape
+      // referencing a codec the contract doesn't declare. The tradeoff is
+      // intentional: this test exercises the failure-envelope plumbing, not
+      // the lane-population path. The other two integration tests in this
+      // file go through the query-builder.
       const failing = mongoCodec({
         typeId: 'test/throws-on-decode@1',
         targetTypes: ['any'],
@@ -161,6 +120,13 @@ describe('Mongo runtime decode integration', () => {
 
   it('unknown shape slot leaves driver value for that field intact', async () => {
     await withMongod(async (ctx) => {
+      // No contract-modelled lane currently emits `kind: 'unknown'` for a
+      // sibling-of-leaf slot — lanes either emit a fully-described
+      // document shape or omit `resultShape` entirely. This test
+      // exercises the runtime's unknown-slot behavior with a hand-rolled
+      // shape; the match filter still goes through `MongoParamRef` for
+      // the encode-side codec round-trip (no `as unknown as MongoValue`
+      // cast — `MongoParamRef` is a member of `MongoValue`).
       const nested = { city: 'Paris' };
       const insert = await ctx.client
         .db(ctx.dbName)
@@ -177,9 +143,7 @@ describe('Mongo runtime decode integration', () => {
         new MongoMatchStage(
           MongoFieldFilter.eq(
             '_id',
-            MongoParamRef.of(insert.insertedId, {
-              codecId: 'mongo/objectId@1',
-            }) as unknown as MongoValue,
+            MongoParamRef.of(insert.insertedId, { codecId: 'mongo/objectId@1' }),
           ),
         ),
       ]);
@@ -191,6 +155,7 @@ describe('Mongo runtime decode integration', () => {
           resultShape: shape,
         })
         .toArray();
+      expect(rows).toHaveLength(1);
       expect(rows[0]!.addr).toEqual(nested);
     });
   });
