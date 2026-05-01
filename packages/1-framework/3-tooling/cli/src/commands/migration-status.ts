@@ -673,11 +673,15 @@ async function executeMigrationStatusCommand(
   let missingInvariants: readonly string[] | undefined;
   let effectiveRequired = new Set<string>();
   if (mode === 'online') {
-    const requiredSet = new Set(requiredInvariants);
-    appliedInvariants = markerInvariants.filter((id) => requiredSet.has(id)).sort();
-    const appliedSet = new Set(appliedInvariants);
-    missingInvariants = requiredInvariants.filter((id) => !appliedSet.has(id));
-    effectiveRequired = new Set(missingInvariants);
+    // Mirrors `migration-apply.ts`: compute `effectiveRequired = required −
+    // marker.invariants` directly, then derive the display fields from it.
+    // `appliedInvariants` is the intersection (`required ∩ marker`), which
+    // is what JSON consumers see for the active ref; the unfiltered set
+    // lives on `marker.invariants`.
+    const markerSet = new Set(markerInvariants);
+    effectiveRequired = new Set(requiredInvariants.filter((id) => !markerSet.has(id)));
+    appliedInvariants = requiredInvariants.filter((id) => markerSet.has(id));
+    missingInvariants = [...effectiveRequired].sort();
   }
 
   // The marker can match the structural target while still missing required
