@@ -1,7 +1,10 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createContract } from '@prisma-next/contract/testing';
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  DataTransformOperation,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -37,13 +40,17 @@ const ORIGINAL_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },
 ];
 
-function dataOp(invariantId: string): MigrationPlanOperation {
+function dataOp(invariantId: string): DataTransformOperation {
   return {
     id: `data.${invariantId}`,
     label: `data ${invariantId}`,
     operationClass: 'data',
+    name: `data ${invariantId}`,
     invariantId,
-  } as unknown as MigrationPlanOperation;
+    source: 'test://migration-invariants.test.ts',
+    check: false,
+    run: null,
+  };
 }
 
 interface InvariantFixture {
