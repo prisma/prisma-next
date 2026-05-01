@@ -615,6 +615,7 @@ describe('referential actions integration', () => {
             contract: validatedContract,
             schema: schemaIR,
             policy: INIT_ADDITIVE_POLICY,
+            fromContract: null,
             frameworkComponents,
           });
 

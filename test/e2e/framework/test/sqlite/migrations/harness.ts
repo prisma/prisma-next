@@ -126,6 +126,7 @@ export async function applyMigration(
         contract: options.origin,
         schema: emptySchema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: fw,
       });
       if (r.kind !== 'success') throw new Error('Origin planner failed');
@@ -146,6 +147,7 @@ export async function applyMigration(
       contract: options.destination,
       schema: currentSchema,
       policy,
+      fromContract: options.origin ?? null,
       frameworkComponents: fw,
     });
     if (planResult.kind !== 'success') {
