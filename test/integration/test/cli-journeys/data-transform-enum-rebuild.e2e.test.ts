@@ -156,8 +156,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(dataTransformOp, 'dataTransform op exists').toBeDefined();
         expect(dataTransformOp.operationClass).toBe('data');
-        expect(dataTransformOp.check).not.toBeNull();
-        expect(dataTransformOp.run).toHaveLength(1);
+        expect(dataTransformOp.precheck).toHaveLength(1);
+        expect(dataTransformOp.execute).toHaveLength(1);
+        expect(dataTransformOp.postcheck).toHaveLength(1);
 
         const apply1 = await runMigrationApply(ctx);
         expect(apply1.exitCode, `apply: ${apply1.stdout}\n${apply1.stderr}`).toBe(0);

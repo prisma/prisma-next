@@ -1,10 +1,7 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { createContract } from '@prisma-next/contract/testing';
-import type {
-  DataTransformOperation,
-  MigrationPlanOperation,
-} from '@prisma-next/framework-components/control';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { computeMigrationHash } from '@prisma-next/migration-tools/hash';
 import { writeMigrationPackage } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
@@ -40,16 +37,12 @@ const ORIGINAL_OPS: readonly MigrationPlanOperation[] = [
   { id: 'table.users', label: 'Create table users', operationClass: 'additive' },
 ];
 
-function dataOp(invariantId: string): DataTransformOperation {
+function dataOp(invariantId: string): MigrationPlanOperation {
   return {
-    id: `data.${invariantId}`,
-    label: `data ${invariantId}`,
+    id: `data_migration.${invariantId}`,
+    label: `Data transform: ${invariantId}`,
     operationClass: 'data',
-    name: `data ${invariantId}`,
     invariantId,
-    source: 'test://migration-invariants.test.ts',
-    check: false,
-    run: null,
   };
 }
 

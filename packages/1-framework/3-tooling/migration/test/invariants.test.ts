@@ -1,22 +1,15 @@
-import type {
-  DataTransformOperation,
-  MigrationPlanOperation,
-} from '@prisma-next/framework-components/control';
+import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import { MigrationToolsError } from '../src/errors';
 import { deriveProvidedInvariants, validateInvariantId } from '../src/invariants';
 
-function dataOp(name: string, invariantId?: string): DataTransformOperation {
+function dataOp(name: string, invariantId?: string): MigrationPlanOperation {
   return {
-    id: `data.${name}`,
-    label: `Data: ${name}`,
+    id: `data_migration.${name}`,
+    label: `Data transform: ${name}`,
     operationClass: 'data',
-    name,
     ...ifDefined('invariantId', invariantId),
-    source: 'migration.ts',
-    check: null,
-    run: null,
   };
 }
 

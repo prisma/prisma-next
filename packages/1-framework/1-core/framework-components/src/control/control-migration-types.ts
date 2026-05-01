@@ -28,60 +28,21 @@ import type { ControlDriverInstance, ControlFamilyInstance } from './control-ins
 export type MigrationOperationClass = 'additive' | 'widening' | 'destructive' | 'data';
 
 // ============================================================================
-// Data Transform Operation
+// Serialized Query Plan
 // ============================================================================
 
 /**
  * A lowered query statement as stored in ops.json.
  * Contains the SQL string and parameter values — ready for execution.
  * Lowering from query builder AST to SQL happens at verify time.
+ *
+ * The Postgres `dataTransform` factory uses this shape internally to
+ * carry the user's lowered `check`/`run` plans before wrapping them
+ * into precheck/execute/postcheck steps on the unified migration op.
  */
 export interface SerializedQueryPlan {
   readonly sql: string;
   readonly params: readonly unknown[];
-}
-
-/**
- * A data transform operation within a migration edge.
- *
- * Data transforms are authored in TypeScript using the query builder,
- * serialized to JSON ASTs at verification time, and rendered to SQL
- * by the target adapter at apply time.
- *
- * In draft state (before verification), `check` and `run` are null.
- * After verification, they contain the serialized query ASTs.
- */
-export interface DataTransformOperation extends MigrationPlanOperation {
-  readonly operationClass: 'data';
-  /**
-   * Human-readable label for this data transform.
-   */
-  readonly name: string;
-  /**
-   * Optional opt-in routing identity. Presence opts the transform into
-   * invariant-aware routing; absence means it is path-dependent and
-   * not referenceable from refs.
-   */
-  readonly invariantId?: string;
-  /**
-   * Path to the TypeScript source file that produced this operation.
-   * Not part of edgeId computation — for traceability only.
-   */
-  readonly source: string;
-  /**
-   * Serialized check query plan, or a boolean literal.
-   * - SerializedQueryPlan: describes violations; empty result = already applied.
-   * - false: always run (no check).
-   * - true: always skip.
-   * - null: not yet serialized (draft state).
-   */
-  readonly check: SerializedQueryPlan | boolean | null;
-  /**
-   * Serialized run query plans.
-   * - Array of serialized query plans to execute sequentially.
-   * - null: not yet serialized (draft state).
-   */
-  readonly run: readonly SerializedQueryPlan[] | null;
 }
 
 /**

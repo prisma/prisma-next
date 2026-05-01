@@ -81,14 +81,6 @@ export interface DataTransformOptions {
   readonly run: DataTransformClosure | readonly DataTransformClosure[];
 }
 
-/**
- * Concrete Postgres flavor of the lowered migration-op produced by
- * `dataTransform`, re-exported so the `PostgresMigration.dataTransform`
- * instance method can name its return type without leaking the
- * family-level symbol into call sites.
- */
-export type PostgresDataTransformOperation = SqlMigrationPlanOperation<PostgresPlanTargetDetails>;
-
 export function dataTransform<TContract extends Contract<SqlStorage>>(
   contract: TContract,
   name: string,
