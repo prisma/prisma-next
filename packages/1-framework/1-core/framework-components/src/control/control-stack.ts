@@ -291,10 +291,7 @@ export function extractCodecLookup(
   const byId = new Map<string, import('../shared/codec-types').Codec>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, import('../shared/codec-types').CodecMeta>();
-  const renderersById = new Map<
-    string,
-    (params: Record<string, unknown>) => string | undefined
-  >();
+  const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecInstances = descriptor.types?.codecTypes?.codecInstances;
@@ -310,14 +307,23 @@ export function extractCodecLookup(
       });
       owners.set(codec.id, descriptorId);
       byId.set(codec.id, codec);
-      // The runtime `Codec` interface no longer declares `targetTypes`
-      // or `renderOutputType`, but the SQL/Mongo factories still emit
-      // them physically on the runtime object. Read them through a
-      // structural narrow so the assembled `CodecLookup` continues to
-      // surface codec-id-keyed metadata to consumers (emit-path
-      // `renderOutputType` lookup, Mongo `derive-json-schema.ts`'s
-      // BSON-type resolution) while the descriptor migration progresses.
-      // Retires when every codec ships a native descriptor (TML-2357 M2).
+      // The framework `Codec` interface narrowed in TML-2357 M1 (it
+      // declares only `id` + the four conversion methods); the
+      // SQL/Mongo factories still emit `targetTypes` / `meta` /
+      // `renderOutputType` physically on the runtime object via the
+      // family-`Codec` extensions' optional transitional fields.
+      // Reading them here through a structural narrow keeps the
+      // assembled `CodecLookup` populated for descriptor-routed
+      // accessors (`targetTypesFor`, `metaFor`, `renderOutputTypeFor`)
+      // until every codec contributor ships a native `CodecDescriptor`.
+      //
+      // The `as unknown as LegacyCodecInstanceMeta` cast is intentional
+      // and documented as M2-bundled cleanup — it's the bridge between
+      // the narrowed framework type and the family extensions' wider
+      // shape, and it retires alongside `synthesizeNonParameterizedDescriptor`
+      // and the `traits` / `targetTypes` / `meta` / `renderOutputType`
+      // fields on family `Codec` interfaces in TML-2357 M2 (review F1
+      // for R1 explicitly accepted this site's cast as transitional).
       const legacyMeta = codec as unknown as LegacyCodecInstanceMeta;
       if (Array.isArray(legacyMeta.targetTypes)) {
         targetTypesById.set(codec.id, legacyMeta.targetTypes);

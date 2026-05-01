@@ -1,4 +1,4 @@
-import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import type { Codec as SqlCodec } from '@prisma-next/sql-relational-core/ast';
 import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 
@@ -19,10 +19,10 @@ import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
 export function createPostgresBuiltinCodecLookup(): CodecLookup {
   const byId = new Map<string, SqlCodec>();
   for (const definition of Object.values(codecDefinitions)) {
-    byId.set(definition.codec.id, definition.codec as unknown as SqlCodec);
+    byId.set(definition.codec.id, definition.codec);
   }
   return {
-    get: (id): Codec | undefined => byId.get(id) as Codec | undefined,
+    get: (id) => byId.get(id),
     targetTypesFor: (id) => byId.get(id)?.targetTypes,
     metaFor: (id) => byId.get(id)?.meta,
     renderOutputTypeFor: (id, params) => byId.get(id)?.renderOutputType?.(params),
