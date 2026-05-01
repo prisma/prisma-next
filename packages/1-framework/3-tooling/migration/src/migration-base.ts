@@ -21,8 +21,13 @@ export interface MigrationMeta {
   readonly labels?: readonly string[];
 }
 
+// `from` rejects empty strings to mirror `MigrationMetadataSchema` in
+// `./io.ts`. Without this match, an authored migration could `describe()` with
+// `from: ''` and pass `buildMigrationArtifacts`'s validation, only to have
+// `readMigrationPackage` reject the resulting `migration.json` later — the
+// two validators must agree on the legal value space.
 const MigrationMetaSchema = type({
-  from: 'string | null',
+  from: 'string > 0 | null',
   to: 'string',
   'labels?': type('string').array(),
 });

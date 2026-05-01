@@ -408,6 +408,22 @@ describe('buildMigrationArtifacts', () => {
     ).toThrow(/describe\(\).*invalid/);
   });
 
+  // The on-disk loader (`MigrationMetadataSchema` in `io.ts`) rejects
+  // `from: ''` so the `describe()` validator must reject the same value.
+  // Otherwise an authored migration could self-emit a package whose own
+  // loader would refuse to read it back.
+  it("rejects describe() returning from: '' (empty-string sentinel is not allowed)", () => {
+    expect(() =>
+      buildMigrationArtifacts(
+        makeMigration([{ id: 'op1', label: 'Op 1', operationClass: 'additive' }], {
+          from: '',
+          to: 'sha256:abc',
+        }),
+        null,
+      ),
+    ).toThrow(/describe\(\).*invalid/);
+  });
+
   it('derives providedInvariants from data ops with invariantId (sorted, deduped)', () => {
     const ops = [
       { id: 'add', label: 'Add', operationClass: 'additive' },
