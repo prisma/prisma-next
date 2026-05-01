@@ -174,19 +174,22 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         });
       }
 
-      // Self-edge no-op detection: a self-edge migration whose ops had no
-      // ops to begin with and brings no new invariants produced no observable
-      // change. Skip the marker + ledger writes so an idempotent re-apply of
-      // a self-edge data transform doesn't churn updatedAt or pile up empty
-      // ledger entries. db update no-ops still write a ledger entry as audit
-      // trail.
+      // Self-edge no-op detection: a self-edge migration with zero ops in
+      // the plan that brings no new invariants produced no observable
+      // change. Skip the marker + ledger writes so an idempotent re-apply
+      // of a self-edge data transform doesn't churn updatedAt or pile up
+      // empty ledger entries. db update no-ops still write a ledger entry
+      // as audit trail.
       //
-      // Note: `executeDataTransform` always counts ops it visited (even when
-      // it self-skipped), so `operationsExecuted === 0` here means "the plan
-      // had zero ops" rather than "every op self-skipped". The non-CLI path
-      // that re-applies a self-edge plan with skipping ops is tracked as
-      // future work; the CLI marker-subtraction in `migration-apply.ts`
-      // empties `effectiveRequired` first and short-circuits before we run.
+      // TODO(invariant-routing follow-up): `executeDataTransform` always
+      // counts every op it visits (including self-skips via `check === true`
+      // or empty idempotency probe), so `operationsExecuted === 0` here
+      // means "the plan had zero ops" rather than "every op self-skipped".
+      // The CLI is unaffected today because `migration-apply.ts` marker-
+      // subtraction empties `effectiveRequired` first and short-circuits
+      // before we run; the non-CLI re-apply path needs a per-op `executed`
+      // flag threaded through `executeDataTransform` to recover the
+      // intended check. See review thread A13 / future M5 ADR draft.
       const incomingInvariants = options.plan.providedInvariants ?? [];
       const existingInvariants = new Set(existingMarker?.invariants ?? []);
       const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>

@@ -195,6 +195,16 @@ export class MongoMigrationRunner {
     // Skip marker/ledger writes (and schema verification) only when the apply
     // is a true no-op: no operations executed, marker already at destination,
     // and every incoming invariant is already in the stored set.
+    //
+    // Divergence from the SQL runners (postgres/sqlite): those runners gate
+    // the no-op skip on `isSelfEdge` (origin === destination) only, so a
+    // non-self-edge `db update` that introspects-as-no-op still writes a
+    // ledger entry. Mongo skips even those because the runner has no
+    // structural distinction between self-edge and re-apply — invariant-
+    // aware routing here does not yet differentiate between the two
+    // ledger semantics. If the SQL audit-trail behavior should hold for
+    // Mongo too, gate this `isNoOp` on a self-edge check (or, conversely,
+    // align the SQL runners to skip non-self-edge no-ops uniformly).
     const isNoOp =
       operationsExecuted === 0 && markerAlreadyAtDestination && incomingIsSubsetOfExisting;
 
