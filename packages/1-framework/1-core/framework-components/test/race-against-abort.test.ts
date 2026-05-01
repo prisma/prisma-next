@@ -116,6 +116,18 @@ describe('raceAgainstAbort', () => {
     work.resolve(1);
   });
 
+  it('with undefined signal resolves with the work value and installs no listener', async () => {
+    const result = await raceAgainstAbort(Promise.resolve(1), undefined, 'encode');
+    expect(result).toBe(1);
+  });
+
+  it('with undefined signal propagates work rejections unchanged', async () => {
+    const codecError = new TypeError('boom');
+    await expect(raceAgainstAbort(Promise.reject(codecError), undefined, 'encode')).rejects.toBe(
+      codecError,
+    );
+  });
+
   it('handles undefined signal.reason (default abort) by carrying undefined through to RUNTIME.ABORTED.cause', async () => {
     const controller = new AbortController();
     const work = deferred<string>();

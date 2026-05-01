@@ -35,9 +35,12 @@ import { runtimeAborted } from './runtime-error';
  */
 export async function raceAgainstAbort<T>(
   work: Promise<T>,
-  signal: AbortSignal,
+  signal: AbortSignal | undefined,
   phase: RuntimeAbortedPhase,
 ): Promise<T> {
+  if (signal === undefined) {
+    return await work;
+  }
   const sentinel: { reason: unknown } = { reason: undefined };
   let onAbort: (() => void) | undefined;
 
