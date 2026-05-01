@@ -6,7 +6,7 @@ Ship `@prisma-next/extension-cipherstash`: a CipherStash/ZeroKMS-backed extensio
 
 CipherStash provides searchable application-layer encryption for Postgres: plaintext is encrypted client-side via ZeroKMS (network KMS), stored as `eql_v2_encrypted` JSONB, and queried via the EQL Postgres extension which exposes encrypted-aware operators (`eql_v2.eq`, `eql_v2.ilike`, etc.) backed by per-column index configuration. The CipherStash team built a first-attempt Prisma Next integration in their `cipherstash/stack` repo (`prisma-next` branch) and produced a [framework-gaps assessment](../../reference/framework-gaps.md) cataloguing the framework limitations that integration ran into.
 
-This project is the *production* integration — superseding the first attempt — built on the framework seams those gaps motivated. Project 1 (this spec) closes the gaps that allow a coherent searchable-encryption slice to ship: codec call context (already merged via [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / PR #400), mutable `beforeExecute` middleware ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)), the envelope-codec runtime pattern ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)), a PSL constructor surface, and migration factories that ride on PR #404's `DataTransformOperation` to let users hand-author per-column search-config DDL.
+This project is the *production* integration — superseding the first attempt — built on the framework seams those gaps motivated. Project 1 (this spec) closes the gaps that allow a coherent searchable-encryption slice to ship: codec call context (already merged via [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / PR #400), mutable `beforeExecute` middleware ([TML-2359](https://linear.app/prisma-company/issue/TML-2359)), the envelope-codec runtime pattern ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)), a PSL constructor surface, a `RawSqlExpr` AST node (extracted from cipherstash's migration-factory needs but generally useful), and migration factories that ride on PR #404's `DataTransformOperation` to let users hand-author per-column search-config DDL.
 
 A follow-on Project 2 (separate on-disk project, not in scope here) automates the per-column DDL via `planTypeOperations` integration ([TML-2338](https://linear.app/prisma-company/issue/TML-2338) / [TML-2339](https://linear.app/prisma-company/issue/TML-2339)) and extends the column-type and operator surface (`EncryptedNumber`, `EncryptedDate`, `EncryptedBoolean`, `EncryptedJson`, `orderAndRange`, `searchableJson`).
 
@@ -23,7 +23,8 @@ This is the umbrella spec for **Project 1**. Plans for individual task specs are
 | [envelope-codec-extension](specs/envelope-codec-extension.spec.md) — runtime pattern + codec + EQL bundle install + operator lowering | Drafted |
 | [middleware-param-transform](specs/middleware-param-transform.spec.md) — mutable `beforeExecute` seam | Drafted |
 | [psl-encrypted-string-constructor](specs/psl-encrypted-string-constructor.spec.md) — PSL `cipherstash.EncryptedString(...)` constructor + parity test | Drafted |
-| [migration-factories](specs/migration-factories.spec.md) — `addSearchConfig` / `activatePendingSearches` via `rawSql({...})` | Drafted |
+| [raw-sql-ast-node](specs/raw-sql-ast-node.spec.md) — `RawSqlExpr` AST node + Postgres lowerer arm + `planFromAst` envelope helper | Drafted |
+| [migration-factories](specs/migration-factories.spec.md) — `addSearchConfig` / `activatePendingSearches` as `DataTransformOperation`s carrying `invariantId`s | Drafted |
 
 # Requirements
 
@@ -65,10 +66,10 @@ This is the umbrella spec for **Project 1**. Plans for individual task specs are
 ### Migration factories: `addSearchConfig` / `activatePendingSearches`
 
 - Per-column search-mode configuration is **not** automatically planned by `dbInit` / `dbUpdate` in Project 1. Users hand-author `migration.ts` files that invoke extension-provided factories:
-  - `cipherstash.addSearchConfig({ table, column, equality?, freeTextSearch? })` — emits one `SELECT eql_v2.add_search_config(...)` call per enabled mode (one for `equality` mapped to EQL's `'unique'` index, one for `freeTextSearch` mapped to EQL's `'match'` index — the public flag names map to EQL's internal index names internally).
-  - `cipherstash.activatePendingSearches()` — flips pending EQL config rows to active state.
-- Both factories return migration ops with `operationClass: 'additive'`, wrapped via the existing Postgres `rawSql({...})` escape hatch (`packages/3-targets/3-targets/postgres/src/core/migrations/operations/raw.ts`). They carry `precheck` / `execute` / `postcheck` SQL — `precheck` skips re-installing already-active config; `postcheck` confirms the mode is active.
-- The factories are exported from `@prisma-next/extension-cipherstash/migration` and follow the precedent set by the first-attempt repo's `database-dependencies.ts` `buildAddSearchConfigOperation`.
+  - `cipherstash.addSearchConfig({ table, column, equality?, freeTextSearch? })` — produces one closure per enabled mode, each closure returning a `SqlQueryPlan` containing a `RawSqlExpr` AST that renders `SELECT eql_v2.add_search_config(...)` (one for `equality` mapped to EQL's `'unique'` index, one for `freeTextSearch` mapped to EQL's `'match'` index — the public flag names map to EQL's internal index names internally).
+  - `cipherstash.activatePendingSearches()` — produces a closure for the EQL pending-activation function.
+- The closures fit `dataTransform({ run: [...] })`'s `DataTransformClosure` signature, so the user invokes `this.dataTransform(endContract, name, { invariantId, run: [...] })` in their `migration.ts`. The resulting `DataTransformOperation` carries `operationClass: 'data'` and an `invariantId` for invariant-aware ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404).
+- The factories construct `RawSqlExpr` AST nodes directly via the package-internal API delivered by [raw-sql-ast-node task spec](specs/raw-sql-ast-node.spec.md), wrap them via `planFromAst(ast, contract)`, and hand the resulting `SqlQueryPlan` to `dataTransform`. There is no dependency on the (separate, parallel) [`projects/sql-raw-factory/`](../sql-raw-factory/spec.md) — that project ships the public user-facing `raw\`...\`` template-literal factory on top of the *same* AST node, but cipherstash's own migration factories don't need the public surface. The factories are exported from `@prisma-next/extension-cipherstash/migration`.
 
 ### `RuntimeMiddleware` SPI changes
 
@@ -158,13 +159,17 @@ No analytics events. The extension is a runtime / control-plane integration, not
 
 ## In-flight dependencies
 
-| PR | Linear | Subject | Project 1 dependency |
+| PR / Project | Linear | Subject | Project 1 dependency |
 |---|---|---|---|
 | [#400](https://github.com/prisma/prisma-next/pull/400) | [TML-2330](https://linear.app/prisma-company/issue/TML-2330) | Codec call context + per-query `AbortSignal` | **Direct** — codec consumes `SqlCodecCallContext.column` |
 | [#402](https://github.com/prisma/prisma-next/pull/402) | [TML-2229](https://linear.app/prisma-company/issue/TML-2229) | Unified `CodecDescriptor<P>` + per-library JSON extensions (ADR 208) | **Direct** — `paramsSchema` plumbing for `EncryptedString` config |
-| [#404](https://github.com/prisma/prisma-next/pull/404) | — | Invariant-aware ref routing (M4) + self-edge support | **Indirect** — Project 1 uses the pre-existing `rawSql({...})` escape hatch (`packages/3-targets/3-targets/postgres/src/core/migrations/operations/raw.ts`) for migration factories, which is independent of PR #404. PR #404 becomes a hard dependency in Project 2 when planner-driven cipherstash ops need invariant-aware composition with `DataTransformOperation`s. |
+| [#404](https://github.com/prisma/prisma-next/pull/404) | — | Invariant-aware ref routing (M4) + self-edge support | **Direct** — migration factories produce `DataTransformOperation`s with `invariantId`s for ref routing |
 | [#409](https://github.com/prisma/prisma-next/pull/409) | — | `intercept` hook on middleware + `contentHash` | **Coordinate** — same SPI surface; merge order determines who rebases |
 | [#411](https://github.com/prisma/prisma-next/pull/411) | — | Current draft holding initial spec drafts (this project's predecessor) | Replaced by this umbrella |
+
+## Downstream consumers (not dependencies)
+
+- [`projects/sql-raw-factory/`](../sql-raw-factory/spec.md) — separate, parallel project that ships the public user-facing `raw\`...\`` template-literal factory **on top of** the `RawSqlExpr` AST node defined by [raw-sql-ast-node task spec](specs/raw-sql-ast-node.spec.md). Cipherstash does not depend on `sql-raw-factory`; `sql-raw-factory` depends on cipherstash's AST node. If both projects land independently in either order, `sql-raw-factory`'s consumption of the AST node is straightforward.
 
 ## Internal references
 
