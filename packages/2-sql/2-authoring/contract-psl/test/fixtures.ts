@@ -178,10 +178,12 @@ const targetTypesByCodecId: Record<string, readonly string[]> = {
 
 export const postgresCodecLookup: CodecLookup = {
   get: (id: string) => {
-    const targetTypes = targetTypesByCodecId[id];
-    if (!targetTypes) return undefined;
-    return { id, targetTypes } as ReturnType<CodecLookup['get']>;
+    if (!targetTypesByCodecId[id]) return undefined;
+    return { id } as ReturnType<CodecLookup['get']>;
   },
+  targetTypesFor: (id: string) => targetTypesByCodecId[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 export function createPostgresTestContext(

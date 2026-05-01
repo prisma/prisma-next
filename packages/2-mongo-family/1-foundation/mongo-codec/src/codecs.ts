@@ -14,17 +14,38 @@ export type MongoCodecTrait = CodecTrait;
  * an application value and the JSON form stored in contract artifacts.
  *
  * Same shape as the framework codec base — see `Codec` in
- * `@prisma-next/framework-components/codec` for the contract. Static
- * codec-id-keyed metadata (`traits`, `targetTypes`) lives on the
- * unified `CodecDescriptor`; Mongo's full migration to descriptor-side
- * registration is tracked under TML-2324.
+ * `@prisma-next/framework-components/codec` for the contract.
+ *
+ * `traits`, `targetTypes`, and `renderOutputType` are redeclared here as
+ * transitional fields because the framework {@link BaseCodec} no longer
+ * carries them — codec-id-keyed static metadata lives on the unified
+ * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}.
+ * Mongo's full migration to descriptor-side registration is tracked
+ * under TML-2324; until that lands, the legacy fields keep production
+ * Mongo wire metadata (BSON-type derivation in
+ * `@prisma-next/mongo-contract-psl`, emit-path renderer for
+ * `Vector<N>`) reachable through the structural-narrow path in
+ * `extractCodecLookup`.
  */
-export type MongoCodec<
+export interface MongoCodec<
   Id extends string = string,
   TTraits extends readonly MongoCodecTrait[] = readonly MongoCodecTrait[],
   TWire = unknown,
   TInput = unknown,
-> = BaseCodec<Id, TTraits, TWire, TInput>;
+> extends BaseCodec<Id, TTraits, TWire, TInput> {
+  /** Transitional. See interface-level comment. */
+  readonly traits?: TTraits;
+  /**
+   * Transitional. See interface-level comment. Optional because a
+   * resolved codec returned by a {@link import('@prisma-next/framework-components/codec').CodecDescriptor}'s
+   * `factory` (framework {@link BaseCodec}) is structurally narrower;
+   * the `mongoCodec()` factory always populates the slot at the
+   * registration boundary.
+   */
+  readonly targetTypes?: readonly string[];
+  /** Transitional. See interface-level comment. */
+  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+}
 
 /**
  * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
@@ -88,6 +109,12 @@ export function mongoCodec<
   };
   return {
     id: config.typeId,
+    targetTypes: config.targetTypes,
+    ...ifDefined(
+      'traits',
+      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
+    ),
+    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: (value, ctx) => {
       try {
         return Promise.resolve(userEncode(value, ctx));

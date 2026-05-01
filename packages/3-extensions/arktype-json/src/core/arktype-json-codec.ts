@@ -30,12 +30,11 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type {
-  Codec,
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import { type Codec, codec } from '@prisma-next/sql-relational-core/ast';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -342,6 +341,8 @@ export const arktypeJsonEmitCodec: Codec<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
   string,
+  unknown,
+  Record<string, unknown>,
   unknown
 > = {
   id: ARKTYPE_JSON_CODEC_ID,

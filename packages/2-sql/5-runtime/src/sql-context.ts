@@ -331,7 +331,7 @@ function buildCodecDescriptorRegistry(
     // this plumbing retire alongside the synthesis bridge in TML-2357 M2.
     const descriptor = synthesizeNonParameterizedDescriptor(codec, {
       traits: codec.traits ?? [],
-      targetTypes: codec.targetTypes,
+      targetTypes: codec.targetTypes ?? [],
       ...(codec.meta !== undefined ? { meta: codec.meta } : {}),
     });
     registerInIndices(descriptor as unknown as AnyDescriptor);

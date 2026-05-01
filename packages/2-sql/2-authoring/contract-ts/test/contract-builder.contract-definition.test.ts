@@ -185,8 +185,6 @@ describe('shared contract definition lowering', () => {
 
         return {
           id,
-          targetTypes: ['timestamptz'],
-          traits: ['equality', 'order'] as const,
           encode: async (value: unknown) => value,
           decode: async (wire: unknown) => wire,
           encodeJson: (value: unknown) =>
@@ -194,6 +192,9 @@ describe('shared contract definition lowering', () => {
           decodeJson: (json: unknown) => new Date(json as string),
         };
       },
+      targetTypesFor: (id) => (id === 'pg/timestamptz@1' ? ['timestamptz'] : undefined),
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
     };
 
     const contract = buildSqlContractFromDefinition(

@@ -56,11 +56,12 @@ test('MongoCodecTraits is never for codec without traits', () => {
   expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
 });
 
-// MongoCodec is a structural alias of `BaseCodec` — same four generics in
-// the same order. Confirm the alias remains identical at the type level so
-// authors can hold a `BaseCodec` reference where a `MongoCodec` is expected.
-test('MongoCodec is structurally identical to BaseCodec (4 generics, same order)', () => {
-  expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string>>().toEqualTypeOf<
+// MongoCodec extends `BaseCodec` and carries the same four generics in the
+// same order, plus transitional metadata fields (`traits`, `targetTypes`,
+// `renderOutputType`) that retire alongside the synthesis bridge under
+// TML-2324. Confirm the extension is structurally assignable to the base.
+test('MongoCodec is assignable to BaseCodec (4 generics, same order)', () => {
+  expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string>>().toExtend<
     BaseCodec<'id/x@1', readonly ['equality'], number, string>
   >();
 });

@@ -765,18 +765,28 @@ describe('generateValueObjectTypeAliases', () => {
   });
 });
 
-function stubCodec(overrides: Partial<Codec> & { id: string }): Codec {
+type CodecStub = Codec & {
+  readonly targetTypes?: readonly string[];
+  readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
+};
+
+function stubCodec(overrides: Partial<CodecStub> & { id: string }): CodecStub {
   return {
     targetTypes: [],
     decode: (w: unknown) => w,
     encodeJson: (v: unknown) => v,
     decodeJson: (j: unknown) => j,
     ...overrides,
-  } as unknown as Codec;
+  } as unknown as CodecStub;
 }
 
-function stubCodecLookup(codecs: Record<string, Codec>): CodecLookup {
-  return { get: (id) => codecs[id] };
+function stubCodecLookup(codecs: Record<string, CodecStub>): CodecLookup {
+  return {
+    get: (id) => codecs[id],
+    targetTypesFor: (id) => codecs[id]?.targetTypes,
+    metaFor: () => undefined,
+    renderOutputTypeFor: (id, params) => codecs[id]?.renderOutputType?.(params),
+  };
 }
 
 describe('generateFieldResolvedType', () => {

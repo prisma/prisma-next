@@ -12,27 +12,30 @@ const mongoScalarTypeDescriptors: ReadonlyMap<string, string> = new Map([
   ['Float', 'mongo/double@1'],
 ]);
 
+const mongoTargetTypes: Record<string, readonly string[]> = {
+  'mongo/string@1': ['string'],
+  'mongo/int32@1': ['int'],
+  'mongo/bool@1': ['bool'],
+  'mongo/date@1': ['date'],
+  'mongo/objectId@1': ['objectId'],
+  'mongo/double@1': ['double'],
+};
+
 const mongoCodecLookup: CodecLookup = {
   get(id: string) {
-    const types: Record<string, readonly string[]> = {
-      'mongo/string@1': ['string'],
-      'mongo/int32@1': ['int'],
-      'mongo/bool@1': ['bool'],
-      'mongo/date@1': ['date'],
-      'mongo/objectId@1': ['objectId'],
-      'mongo/double@1': ['double'],
-    };
-    const targetTypes = types[id];
+    const targetTypes = mongoTargetTypes[id];
     if (!targetTypes) return undefined;
     return {
       id,
-      targetTypes,
       encode: async (v: unknown) => v,
       decode: async (w: unknown) => w,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
     } as ReturnType<CodecLookup['get']>;
   },
+  targetTypesFor: (id: string) => mongoTargetTypes[id],
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
 };
 
 function interpret(schema: string) {

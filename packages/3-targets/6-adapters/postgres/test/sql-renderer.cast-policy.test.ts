@@ -8,12 +8,29 @@ import {
   ParamRef,
   ProjectionItem,
   SelectAst,
+  type Codec as SqlCodec,
   TableSource,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { renderLoweredSql } from '../src/core/sql-renderer';
 import type { PostgresContract } from '../src/core/types';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
+
+const emptyLookup: CodecLookup = {
+  get: () => undefined,
+  targetTypesFor: () => undefined,
+  metaFor: () => undefined,
+  renderOutputTypeFor: () => undefined,
+};
+
+function lookupOf(byId: Record<string, SqlCodec>): CodecLookup {
+  return {
+    get: (id) => byId[id] as Codec | undefined,
+    targetTypesFor: (id) => byId[id]?.targetTypes,
+    metaFor: (id) => byId[id]?.meta,
+    renderOutputTypeFor: (id, params) => byId[id]?.renderOutputType?.(params),
+  };
+}
 
 const baseContract = validateContract<PostgresContract>(
   {
@@ -43,7 +60,7 @@ const baseContract = validateContract<PostgresContract>(
     },
     models: {},
   },
-  { get: () => undefined },
+  emptyLookup,
 );
 
 function selectWithParam(column: string, codecId: string | undefined, value: unknown) {
@@ -65,9 +82,7 @@ describe('renderLoweredSql cast policy', () => {
       decode: (wire: string): string => wire,
       meta: { db: { sql: { postgres: { nativeType: 'foo' } } } },
     });
-    const lookup: CodecLookup = {
-      get: (id) => (id === 'app/test-foo@1' ? fooCodec : undefined),
-    };
+    const lookup = lookupOf({ 'app/test-foo@1': fooCodec });
 
     const ast = selectWithParam('tag', 'app/test-foo@1', 'tagged');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -83,9 +98,7 @@ describe('renderLoweredSql cast policy', () => {
       decode: (wire: number): number => wire,
       meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
     });
-    const lookup: CodecLookup = {
-      get: (id) => (id === 'pg/int4@1' ? integerCodec : undefined),
-    };
+    const lookup = lookupOf({ 'pg/int4@1': integerCodec });
 
     const ast = selectWithParam('score', 'pg/int4@1', 1);
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -100,9 +113,7 @@ describe('renderLoweredSql cast policy', () => {
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
-    const lookup: CodecLookup = {
-      get: (id) => (id === 'pg/enum@1' ? enumCodec : undefined),
-    };
+    const lookup = lookupOf({ 'pg/enum@1': enumCodec });
 
     const ast = selectWithParam('note', 'pg/enum@1', 'urgent');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -117,7 +128,7 @@ describe('renderLoweredSql cast policy', () => {
     // stack. Surface it loudly at lower-time so callers fix the configuration
     // rather than silently emitting an uncast `$N` or guessing from contract
     // storage. (See ADR 205 § "Adapters built without a stack".)
-    const lookup: CodecLookup = { get: () => undefined };
+    const lookup = emptyLookup;
 
     const ast = selectWithParam('tag', 'app/test-foo@1', 'tagged');
 
@@ -125,7 +136,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('throws even when no contract column references the codecId', () => {
-    const lookup: CodecLookup = { get: () => undefined };
+    const lookup = emptyLookup;
 
     const ast = SelectAst.from(TableSource.named('user'))
       .withProjection([ProjectionItem.of('id', ColumnRef.of('user', 'id'))])
@@ -142,7 +153,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the param ref carries no codecId', () => {
-    const lookup: CodecLookup = { get: () => undefined };
+    const lookup = emptyLookup;
 
     const ast = selectWithParam('id', undefined, 1);
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -220,7 +231,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
         },
         models: {},
       },
-      { get: () => undefined },
+      emptyLookup,
     );
 
     const ast = selectWithParam('vec', 'pg/vector@1', [1, 2, 3]);

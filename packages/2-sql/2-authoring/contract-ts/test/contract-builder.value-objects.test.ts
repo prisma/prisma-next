@@ -30,8 +30,6 @@ describe('value objects in contract definition builder', () => {
 
         return {
           id,
-          targetTypes: ['jsonb'],
-          traits: ['equality'] as const,
           encode: async (value: unknown) => value,
           decode: async (wire: unknown) => wire,
           encodeJson: (value: unknown) => {
@@ -47,6 +45,9 @@ describe('value objects in contract definition builder', () => {
           decodeJson: (json: unknown) => json,
         };
       },
+      targetTypesFor: (id) => (id === 'pg/jsonb@1' ? ['jsonb'] : undefined),
+      metaFor: () => undefined,
+      renderOutputTypeFor: () => undefined,
     };
 
     const contract = buildSqlContractFromDefinition(

@@ -29,21 +29,19 @@ function createContract(overrides: Partial<Contract>): Contract {
 const testHashes = { storageHash: 'sha256:test', profileHash: 'sha256:test' };
 
 function vectorCodecLookup(): CodecLookup {
+  const vectorCodec = {
+    id: 'pg/vector@1',
+    encode: async (v: unknown) => v,
+    decode: async (w: unknown) => w,
+    encodeJson: (v: unknown) => v as never,
+    decodeJson: (j: unknown) => j as never,
+  } as ReturnType<CodecLookup['get']>;
   return {
-    get: (id) =>
-      id === 'pg/vector@1'
-        ? ({
-            id: 'pg/vector@1',
-            targetTypes: ['vector'],
-            renderOutputType: (params) => `Vector<${params['length']}>`,
-            encode: async (v: unknown) => v,
-            decode: async (w: unknown) => w,
-            encodeJson: (v: unknown) => v as never,
-            decodeJson: (j: unknown) => j as never,
-            // The framework `Codec` shape narrows `traits` etc.; the
-            // structural narrow here is enough for the emit-path test.
-          } as unknown as ReturnType<CodecLookup['get']>)
-        : undefined,
+    get: (id) => (id === 'pg/vector@1' ? vectorCodec : undefined),
+    targetTypesFor: (id) => (id === 'pg/vector@1' ? ['vector'] : undefined),
+    metaFor: () => undefined,
+    renderOutputTypeFor: (id, params) =>
+      id === 'pg/vector@1' ? `Vector<${params['length']}>` : undefined,
   };
 }
 

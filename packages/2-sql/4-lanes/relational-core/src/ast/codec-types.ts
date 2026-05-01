@@ -164,19 +164,27 @@ export interface Codec<
   TInput = unknown,
   TParams = Record<string, unknown>,
   THelper = unknown,
-> extends BaseCodec<Id, TWire, TInput> {
+> extends BaseCodec<Id, TTraits, TWire, TInput> {
   encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
   /** Transitional. See file-level comment. */
   readonly traits?: TTraits;
-  /** Transitional. See file-level comment. */
-  readonly targetTypes: readonly string[];
+  /**
+   * Transitional. See file-level comment. Optional because the resolved
+   * codec returned by a {@link import('@prisma-next/framework-components/codec').CodecDescriptor}'s
+   * `factory` (framework {@link BaseCodec}) is structurally narrower; the
+   * SQL `codec()` factory and `aliasCodec` always populate the slot at
+   * the registration boundary.
+   */
+  readonly targetTypes?: readonly string[];
   /** Transitional. See file-level comment. */
   readonly meta?: CodecMeta;
   /** Transitional. See file-level comment. */
   readonly paramsSchema?: Type<TParams>;
   /** Transitional. See file-level comment. */
   readonly init?: (params: TParams) => THelper;
+  /** Transitional. See file-level comment. */
+  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
 /**
@@ -304,8 +312,12 @@ class CodecRegistryImpl implements CodecRegistry {
 
     this._byId.set(codec.id, codec);
 
-    // Update byScalar mapping
-    for (const scalarType of codec.targetTypes) {
+    // Update byScalar mapping. The transitional `targetTypes` field is
+    // optional now — the SQL `codec()` factory always populates it, but
+    // the type-system narrow (a resolved descriptor codec is the framework
+    // {@link BaseCodec}) means we read defensively here. This branch retires
+    // alongside `CodecRegistryImpl` in TML-2357 M2.
+    for (const scalarType of codec.targetTypes ?? []) {
       const existing = this._byScalar.get(scalarType);
       if (existing) {
         existing.push(codec);

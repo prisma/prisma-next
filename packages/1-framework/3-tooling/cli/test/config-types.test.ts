@@ -201,7 +201,12 @@ describe('defineConfig', () => {
       composedExtensionPacks: [],
       scalarTypeDescriptors: new Map(),
       authoringContributions: { field: {}, type: {} },
-      codecLookup: { get: () => undefined },
+      codecLookup: {
+        get: () => undefined,
+        targetTypesFor: () => undefined,
+        metaFor: () => undefined,
+        renderOutputTypeFor: () => undefined,
+      },
       controlMutationDefaults: { defaultFunctionRegistry: new Map(), generatorDescriptors: [] },
       resolvedInputs: [],
     });
