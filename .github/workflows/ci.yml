@@ -88,6 +88,12 @@ jobs:
     runs-on: ubuntu-latest
     env:
       TEST_TIMEOUT_MULTIPLIER: 2
+      # Used by examples/prisma-next-cloudflare-worker's vitest-pool-workers
+      # integration test. Mirrors the .env.example pattern; the container is
+      # brought up by `pnpm db:up` below (docker-compose, not a service
+      # container, because GitHub Actions service containers can't override
+      # the postgres CMD to enable shared_preload_libraries=pg_stat_statements).
+      WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE: postgres://postgres:postgres@127.0.0.1:5433/prisma_next_cloudflare_worker
     services:
       postgres:
         image: postgres:15
@@ -114,6 +120,8 @@ jobs:
         run: pnpm build
       - name: Link bins
         run: pnpm install --frozen-lockfile
+      - name: Start cloudflare-worker Postgres (5433, pg_stat_statements)
+        run: pnpm --filter prisma-next-cloudflare-worker db:up
       - name: Test packages
         run: pnpm test:packages
       - name: Test examples
