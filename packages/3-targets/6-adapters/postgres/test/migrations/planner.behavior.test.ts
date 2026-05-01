@@ -40,6 +40,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -70,6 +71,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -109,6 +111,7 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -666,6 +669,7 @@ function planUserTableOperations(
     contract,
     schema,
     policy: INIT_ADDITIVE_POLICY,
+    fromContract: null,
     frameworkComponents: options?.frameworkComponents ?? [],
   });
   if (result.kind !== 'success') throw new Error('expected planner success');

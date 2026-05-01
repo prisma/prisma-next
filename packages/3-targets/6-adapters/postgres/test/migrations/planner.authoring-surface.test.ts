@@ -57,11 +57,15 @@ describe('PostgresMigrationPlanner authoring surface', () => {
         renderDefault: postgresRenderDefault,
       });
 
+      const fromContract: Contract<SqlStorage> = {
+        ...createEmptyContract(),
+        storage: { storageHash: coreHash('sha256:from'), tables: {} },
+      };
       const result = planner.plan({
         contract,
         schema: fromSchemaIR,
         policy: { allowedOperationClasses: ['additive'] },
-        fromHash: coreHash('sha256:from'),
+        fromContract,
         frameworkComponents: [],
       });
 

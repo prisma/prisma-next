@@ -66,6 +66,7 @@ function planAndGetFkSql(onDelete?: ReferentialAction, onUpdate?: ReferentialAct
     contract,
     schema: emptySchema,
     policy: INIT_ADDITIVE_POLICY,
+    fromContract: null,
     frameworkComponents: [],
   });
 

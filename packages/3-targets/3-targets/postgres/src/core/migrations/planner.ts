@@ -1,3 +1,4 @@
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
@@ -12,6 +13,7 @@ import type {
   MigrationScaffoldContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
@@ -83,20 +85,22 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     readonly contract: unknown;
     readonly schema: unknown;
     readonly policy: MigrationOperationPolicy;
-    readonly fromHash?: string | null;
     /**
      * The "from" contract (state the planner assumes the database starts
-     * at). Only `migration plan` supplies this; `db update` / `db init`
-     * reconcile against the live schema with no old contract. When present
-     * alongside the `'data'` operation class, strategies that need from/to
-     * column shape comparisons (unsafe type change, nullability tightening)
-     * activate.
+     * at), or `null` for reconciliation flows. Only `migration plan` ever
+     * supplies a non-null value; `db update` / `db init` reconcile against
+     * the live schema and pass `null`. When present alongside the
+     * `'data'` operation class, strategies that need from/to column-shape
+     * comparisons (unsafe type change, nullability tightening) activate.
+     *
+     * Used to populate `describe().from` on the produced plan as
+     * `fromContract?.storage.storageHash ?? null`.
      */
-    readonly fromContract?: unknown;
+    readonly fromContract: Contract<SqlStorage> | null;
     readonly schemaName?: string;
     readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
   }): PostgresPlanResult {
-    return this.planSql(options as SqlMigrationPlannerPlanOptions, options.fromHash ?? null);
+    return this.planSql(options as SqlMigrationPlannerPlanOptions);
   }
 
   emptyMigration(context: MigrationScaffoldContext): MigrationPlanWithAuthoringSurface {
@@ -106,10 +110,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     });
   }
 
-  private planSql(
-    options: SqlMigrationPlannerPlanOptions,
-    fromHash: string | null,
-  ): PostgresPlanResult {
+  private planSql(options: SqlMigrationPlannerPlanOptions): PostgresPlanResult {
     const schemaName = options.schemaName ?? this.config.defaultSchema;
     const policyResult = this.ensureAdditivePolicy(options.policy);
     if (policyResult) {
@@ -128,7 +129,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       // from/to comparisons (unsafe type change, nullable tightening) are
       // inapplicable there — reconciliation falls through to
       // `mapIssueToCall`'s direct destructive handlers.
-      fromContract: options.fromContract ?? null,
+      fromContract: options.fromContract,
       schemaName,
       codecHooks,
       storageTypes,
@@ -145,7 +146,7 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
     return Object.freeze({
       kind: 'success' as const,
       plan: new TypeScriptRenderablePostgresMigration(result.value.calls, {
-        from: fromHash,
+        from: options.fromContract?.storage.storageHash ?? null,
         to: options.contract.storage.storageHash,
       }),
     });

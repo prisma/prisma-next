@@ -55,6 +55,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
         expect(result.kind).toBe('success');
@@ -114,6 +115,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {
@@ -173,6 +175,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           contract,
           schema: emptySchema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
         if (initialPlan.kind !== 'success') {

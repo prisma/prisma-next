@@ -85,6 +85,7 @@ function planFromStorages(
     contract: toContract,
     schema: fromSchemaIR,
     policy: { allowedOperationClasses: ['additive'] },
+    fromContract: null,
     frameworkComponents: [],
   });
 }
@@ -119,6 +120,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       contract,
       schema: schemaIR,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -156,6 +158,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       contract,
       schema: emptySchemaIR,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -219,6 +222,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       contract,
       schema: fromSchemaIR,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -272,6 +276,7 @@ describe('contractToSchemaIR → planner round-trip', () => {
       contract,
       schema: schemaIR,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -841,6 +846,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       contract: toContract,
       schema: fromSchemaIR,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -869,6 +875,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       contract: toContract,
       schema: fromSchemaIR,
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -892,6 +899,7 @@ describe('incremental migration with full contract surface (extensions, enums, F
       contract: toContract,
       schema: fromSchemaIR,
       policy: { allowedOperationClasses: ['additive'] },
+      fromContract: null,
       frameworkComponents,
     });
 

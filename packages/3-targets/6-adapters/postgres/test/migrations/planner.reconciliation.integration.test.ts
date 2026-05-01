@@ -58,6 +58,7 @@ async function applyBaseline(
     contract,
     schema: emptySchema,
     policy: INIT_ADDITIVE_POLICY,
+    fromContract: null,
     frameworkComponents,
   });
   if (result.kind !== 'success') {
@@ -89,6 +90,7 @@ async function planAndExecute(
     contract,
     schema,
     policy: RECONCILIATION_POLICY,
+    fromContract: null,
     frameworkComponents,
   });
   if (planResult.kind !== 'success') {

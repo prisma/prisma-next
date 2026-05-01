@@ -49,6 +49,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
     if (initialPlan.kind !== 'success') {
@@ -73,6 +74,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
     expect(supersetResult).toMatchObject({
@@ -91,6 +93,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -122,6 +125,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
         contract,
         schema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents,
       });
 
@@ -157,6 +161,7 @@ describe.sequential('PostgresMigrationPlanner - integration (existing schemas)',
       contract,
       schema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 

@@ -69,6 +69,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -86,6 +87,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -104,6 +106,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -121,6 +124,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -144,6 +148,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -167,6 +172,7 @@ describe('PostgresMigrationPlanner - per-FK config combinations', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 

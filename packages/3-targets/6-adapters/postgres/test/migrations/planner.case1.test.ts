@@ -97,6 +97,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -164,6 +165,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       policy: {
         allowedOperationClasses: ['additive', 'widening', 'destructive', 'data'],
       },
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -205,6 +207,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -290,6 +293,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [postgresAdapterDescriptor],
     });
 
@@ -346,6 +350,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [pgvectorDescriptor],
     });
 
@@ -372,6 +377,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: schemaWithExtension,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -401,6 +407,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [extensionWithoutDeps],
     });
 
@@ -443,6 +450,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -504,6 +512,7 @@ describe('PostgresMigrationPlanner - when database is empty', () => {
       contract,
       schema: nonEmptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents,
     });
 
@@ -557,6 +566,7 @@ describe('PostgresMigrationPlanner - composite unique constraint DDL', () => {
       contract: compositeContract,
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
 
@@ -622,6 +632,7 @@ describe('PostgresMigrationPlanner - column defaults', () => {
       contract: contractWithTable(tableName, columns),
       schema: emptySchema,
       policy: INIT_ADDITIVE_POLICY,
+      fromContract: null,
       frameworkComponents: [],
     });
     expect(result.kind).toBe('success');

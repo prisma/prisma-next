@@ -84,6 +84,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
         contract: contractWithEnum,
         schema: emptySchema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents,
       });
 
@@ -156,6 +157,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
           contract: contractWithEnum,
           schema,
           policy: INIT_ADDITIVE_POLICY,
+          fromContract: null,
           frameworkComponents,
         });
 
@@ -185,6 +187,7 @@ describe.sequential('PostgresMigrationPlanner - Storage Types Integration', () =
           contract: contractWithEnum,
           schema,
           policy: { allowedOperationClasses: ['additive', 'widening'] },
+          fromContract: null,
           frameworkComponents,
         });
 

@@ -58,6 +58,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         contract,
         schema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -112,6 +113,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         contract,
         schema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -164,6 +166,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         contract,
         schema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: [],
       });
 
@@ -218,6 +221,7 @@ describe('PostgresMigrationPlanner - semantic satisfaction', () => {
         contract,
         schema,
         policy: INIT_ADDITIVE_POLICY,
+        fromContract: null,
         frameworkComponents: [],
       });
 
