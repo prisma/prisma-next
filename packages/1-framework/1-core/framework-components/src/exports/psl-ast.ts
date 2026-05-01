@@ -1,1 +1,1 @@
-export * from '../psl-ast';
+export * from '../control/psl-ast';

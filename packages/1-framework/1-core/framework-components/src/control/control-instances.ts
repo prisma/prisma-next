@@ -1,17 +1,17 @@
 import type { Contract, ContractMarkerRecord } from '@prisma-next/contract/types';
 import type {
-  SignDatabaseResult,
-  VerifyDatabaseResult,
-  VerifyDatabaseSchemaResult,
-} from './control-result-types';
-import type {
   AdapterInstance,
   DriverInstance,
   ExtensionInstance,
   FamilyInstance,
   TargetBoundComponentDescriptor,
   TargetInstance,
-} from './framework-components';
+} from '../shared/framework-components';
+import type {
+  SignDatabaseResult,
+  VerifyDatabaseResult,
+  VerifyDatabaseSchemaResult,
+} from './control-result-types';
 
 export interface ControlFamilyInstance<TFamilyId extends string, TSchemaIR>
   extends FamilyInstance<TFamilyId> {

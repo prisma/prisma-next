@@ -1,4 +1,18 @@
-import type { CodecLookup } from './codec-types';
+import type { CodecLookup } from '../shared/codec-types';
+import type {
+  AuthoringContributions,
+  AuthoringFieldNamespace,
+  AuthoringFieldPresetDescriptor,
+  AuthoringTypeConstructorDescriptor,
+  AuthoringTypeNamespace,
+} from '../shared/framework-authoring';
+import type { ComponentMetadata } from '../shared/framework-components';
+import type {
+  ControlMutationDefaultEntry,
+  ControlMutationDefaults,
+  MutationDefaultGeneratorDescriptor,
+} from '../shared/mutation-default-types';
+import type { TypesImportSpec } from '../shared/types-import-spec';
 import type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
@@ -6,20 +20,6 @@ import type {
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
 } from './control-descriptors';
-import type {
-  AuthoringContributions,
-  AuthoringFieldNamespace,
-  AuthoringFieldPresetDescriptor,
-  AuthoringTypeConstructorDescriptor,
-  AuthoringTypeNamespace,
-} from './framework-authoring';
-import type { ComponentMetadata } from './framework-components';
-import type {
-  ControlMutationDefaultEntry,
-  ControlMutationDefaults,
-  MutationDefaultGeneratorDescriptor,
-} from './mutation-default-types';
-import type { TypesImportSpec } from './types-import-spec';
 
 export interface AssembledAuthoringContributions {
   readonly field: AuthoringFieldNamespace;
@@ -328,7 +328,7 @@ export function assembleControlMutationDefaults(
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
-  const byId = new Map<string, import('./codec-types').Codec>();
+  const byId = new Map<string, import('../shared/codec-types').Codec>();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
     const codecInstances = descriptor.types?.codecTypes?.codecInstances;

@@ -3,27 +3,27 @@ export type {
   OperationPreviewCapable,
   PslContractInferCapable,
   SchemaViewCapable,
-} from '../control-capabilities';
+} from '../control/control-capabilities';
 export {
   hasMigrations,
   hasOperationPreview,
   hasPslContractInfer,
   hasSchemaView,
-} from '../control-capabilities';
+} from '../control/control-capabilities';
 export type {
   ControlAdapterDescriptor,
   ControlDriverDescriptor,
   ControlExtensionDescriptor,
   ControlFamilyDescriptor,
   ControlTargetDescriptor,
-} from '../control-descriptors';
+} from '../control/control-descriptors';
 export type {
   ControlAdapterInstance,
   ControlDriverInstance,
   ControlExtensionInstance,
   ControlFamilyInstance,
   ControlTargetInstance,
-} from '../control-instances';
+} from '../control/control-instances';
 export type {
   DataTransformOperation,
   MigrationOperationClass,
@@ -45,11 +45,11 @@ export type {
   OpFactoryCall,
   SerializedQueryPlan,
   TargetMigrationsCapability,
-} from '../control-migration-types';
+} from '../control/control-migration-types';
 export type {
   OperationPreview,
   OperationPreviewStatement,
-} from '../control-operation-preview';
+} from '../control/control-operation-preview';
 export type {
   BaseSchemaIssue,
   EmitContractResult,
@@ -61,25 +61,25 @@ export type {
   SignDatabaseResult,
   VerifyDatabaseResult,
   VerifyDatabaseSchemaResult,
-} from '../control-result-types';
+} from '../control/control-result-types';
 export {
   VERIFY_CODE_HASH_MISMATCH,
   VERIFY_CODE_MARKER_MISSING,
   VERIFY_CODE_SCHEMA_FAILURE,
   VERIFY_CODE_TARGET_MISMATCH,
-} from '../control-result-types';
+} from '../control/control-result-types';
 export type {
   CoreSchemaView,
   SchemaNodeKind,
   SchemaTreeNodeOptions,
   SchemaTreeVisitor,
-} from '../control-schema-view';
-export { SchemaTreeNode } from '../control-schema-view';
+} from '../control/control-schema-view';
+export { SchemaTreeNode } from '../control/control-schema-view';
 export type {
   AssembledAuthoringContributions,
   ControlStack,
   CreateControlStackInput,
-} from '../control-stack';
+} from '../control/control-stack';
 export {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
@@ -91,7 +91,7 @@ export {
   extractComponentIds,
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
-} from '../control-stack';
+} from '../control/control-stack';
 export type {
   ControlMutationDefaultEntry,
   ControlMutationDefaultRegistry,
@@ -106,4 +106,4 @@ export type {
   ParsedDefaultFunctionCall,
   SourceDiagnostic,
   SourceSpan,
-} from '../mutation-default-types';
+} from '../shared/mutation-default-types';

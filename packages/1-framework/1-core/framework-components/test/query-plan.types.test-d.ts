@@ -1,6 +1,6 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { assertType, expectTypeOf, test } from 'vitest';
-import type { ExecutionPlan, QueryPlan, ResultType } from '../src/query-plan';
+import type { ExecutionPlan, QueryPlan, ResultType } from '../src/execution/query-plan';
 
 const meta: PlanMeta = {
   target: 'mock',

@@ -3,10 +3,10 @@ import {
   hasOperationPreview,
   hasPslContractInfer,
   hasSchemaView,
-} from '../src/control-capabilities';
-import type { ControlFamilyInstance } from '../src/control-instances';
-import type { OperationPreview } from '../src/control-operation-preview';
-import type { PslDocumentAst } from '../src/psl-ast';
+} from '../src/control/control-capabilities';
+import type { ControlFamilyInstance } from '../src/control/control-instances';
+import type { OperationPreview } from '../src/control/control-operation-preview';
+import type { PslDocumentAst } from '../src/control/psl-ast';
 
 const SYNTHETIC_AST: PslDocumentAst = {
   kind: 'document',

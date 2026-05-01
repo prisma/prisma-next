@@ -1,10 +1,10 @@
+import { checkContractComponentRequirements } from '../shared/framework-components';
 import type {
   RuntimeAdapterDescriptor,
   RuntimeExtensionDescriptor,
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
 } from './execution-descriptors';
-import { checkContractComponentRequirements } from './framework-components';
 
 export function assertRuntimeContractRequirementsSatisfied<
   TFamilyId extends string,

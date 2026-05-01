@@ -3,8 +3,8 @@ import type {
   RuntimeAdapterDescriptor,
   RuntimeDriverDescriptor,
   RuntimeTargetDescriptor,
-} from '../src/execution-descriptors';
-import { createExecutionStack, instantiateExecutionStack } from '../src/execution-stack';
+} from '../src/execution/execution-descriptors';
+import { createExecutionStack, instantiateExecutionStack } from '../src/execution/execution-stack';
 
 type MockDriverInstance = { familyId: 'sql'; targetId: 'postgres' };
 

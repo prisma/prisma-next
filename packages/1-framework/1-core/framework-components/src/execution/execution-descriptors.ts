@@ -1,4 +1,11 @@
 import type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '../shared/framework-components';
+import type {
   RuntimeAdapterInstance,
   RuntimeDriverInstance,
   RuntimeExtensionInstance,
@@ -6,13 +13,6 @@ import type {
   RuntimeTargetInstance,
 } from './execution-instances';
 import type { ExecutionStack } from './execution-stack';
-import type {
-  AdapterDescriptor,
-  DriverDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from './framework-components';
 
 export interface RuntimeFamilyDescriptor<
   TFamilyId extends string,

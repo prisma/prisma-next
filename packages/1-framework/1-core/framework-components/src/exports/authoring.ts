@@ -10,7 +10,7 @@ export type {
   AuthoringTemplateValue,
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
-} from '../framework-authoring';
+} from '../shared/framework-authoring';
 export {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -19,4 +19,4 @@ export {
   isAuthoringTypeConstructorDescriptor,
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
-} from '../framework-authoring';
+} from '../shared/framework-authoring';

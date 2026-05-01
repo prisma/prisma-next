@@ -11,8 +11,8 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type { Result } from '@prisma-next/utils/result';
+import type { TargetBoundComponentDescriptor } from '../shared/framework-components';
 import type { ControlDriverInstance, ControlFamilyInstance } from './control-instances';
-import type { TargetBoundComponentDescriptor } from './framework-components';
 
 // ============================================================================
 // Operation Classes and Policy

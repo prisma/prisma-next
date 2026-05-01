@@ -1,7 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { CodecLookup } from '../src/codec-types';
-import type { CreateControlStackInput } from '../src/control-stack';
+import type { CreateControlStackInput } from '../src/control/control-stack';
 import {
   assembleAuthoringContributions,
   assembleControlMutationDefaults,
@@ -13,8 +12,9 @@ import {
   extractOperationTypeImports,
   extractQueryOperationTypeImports,
   validateScalarTypeCodecIds,
-} from '../src/control-stack';
-import type { ComponentDescriptor } from '../src/framework-components';
+} from '../src/control/control-stack';
+import type { CodecLookup } from '../src/shared/codec-types';
+import type { ComponentDescriptor } from '../src/shared/framework-components';
 
 function createDescriptor<K extends string = 'target'>(
   overrides: Partial<ComponentDescriptor<string>> & { kind?: K } = {} as Partial<
@@ -200,7 +200,7 @@ describe('extractCodecLookup', () => {
       decode: (w: unknown) => w,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
-    }) as unknown as import('../src/codec-types').Codec;
+    }) as unknown as import('../src/shared/codec-types').Codec;
 
   it('builds a lookup from codec instances across descriptors', () => {
     const codec1 = stubCodec('a@1');

@@ -1,5 +1,5 @@
 import type { Contract, ContractModel } from '@prisma-next/contract/types';
-import type { TypesImportSpec } from './types-import-spec';
+import type { TypesImportSpec } from '../shared/types-import-spec';
 
 export interface GenerateContractTypesOptions {
   readonly queryOperationTypeImports?: ReadonlyArray<TypesImportSpec>;

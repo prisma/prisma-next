@@ -1,8 +1,11 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
-import { RuntimeCore } from '../src/runtime-core';
-import type { RuntimeMiddleware, RuntimeMiddlewareContext } from '../src/runtime-middleware';
+import type { ExecutionPlan, QueryPlan } from '../src/execution/query-plan';
+import { RuntimeCore } from '../src/execution/runtime-core';
+import type {
+  RuntimeMiddleware,
+  RuntimeMiddlewareContext,
+} from '../src/execution/runtime-middleware';
 
 /**
  * Cross-family demonstration: a fictional "mock" family extends the

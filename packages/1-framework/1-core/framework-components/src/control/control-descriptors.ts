@@ -1,4 +1,11 @@
 import type {
+  AdapterDescriptor,
+  DriverDescriptor,
+  ExtensionDescriptor,
+  FamilyDescriptor,
+  TargetDescriptor,
+} from '../shared/framework-components';
+import type {
   ControlAdapterInstance,
   ControlDriverInstance,
   ControlExtensionInstance,
@@ -7,13 +14,6 @@ import type {
 } from './control-instances';
 import type { ControlStack } from './control-stack';
 import type { EmissionSpi } from './emission-types';
-import type {
-  AdapterDescriptor,
-  DriverDescriptor,
-  ExtensionDescriptor,
-  FamilyDescriptor,
-  TargetDescriptor,
-} from './framework-components';
 
 export interface ControlFamilyDescriptor<
   TFamilyId extends string,

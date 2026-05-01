@@ -4,7 +4,7 @@ import type {
   ExtensionInstance,
   FamilyInstance,
   TargetInstance,
-} from './framework-components';
+} from '../shared/framework-components';
 
 export interface RuntimeFamilyInstance<TFamilyId extends string>
   extends FamilyInstance<TFamilyId> {}
