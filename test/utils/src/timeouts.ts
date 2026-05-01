@@ -6,6 +6,13 @@ const BASE_TIMEOUTS = {
   coldTransformImport: 30000,
   databaseOperation: 5000,
   default: 100,
+  /**
+   * Vitest `testTimeout` / `hookTimeout` when a package uses mostly local I/O
+   * but CI sets `TEST_TIMEOUT_MULTIPLIER` (e.g. 2): 100ms × multiplier is a
+   * common false failure (Vitest reports 200ms). This baseline stays sub-second
+   * locally while giving cold workers headroom.
+   */
+  vitestPackageDefault: 500,
 } as const;
 
 function getMultiplier(): number {
@@ -108,5 +115,9 @@ export const timeouts = {
    */
   get default(): number {
     return Math.round(BASE_TIMEOUTS.default * getMultiplier());
+  },
+
+  get vitestPackageDefault(): number {
+    return Math.round(BASE_TIMEOUTS.vitestPackageDefault * getMultiplier());
   },
 } as const;

@@ -22,7 +22,8 @@ describe('result handler', () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
+    stderrSpy.mockRestore();
+    stdoutSpy.mockRestore();
   });
 
   it('returns 0 for successful result', () => {

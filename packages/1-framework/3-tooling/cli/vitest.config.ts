@@ -10,8 +10,8 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: 1,
     isolate: false,
-    testTimeout: timeouts.default,
-    hookTimeout: timeouts.default,
+    testTimeout: timeouts.vitestPackageDefault,
+    hookTimeout: timeouts.vitestPackageDefault,
     setupFiles: ['./test/setup.ts'],
     env: {
       CI: 'true',

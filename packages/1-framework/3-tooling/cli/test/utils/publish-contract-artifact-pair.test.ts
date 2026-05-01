@@ -52,7 +52,6 @@ describe('publishContractArtifactPair', () => {
   }
 
   beforeEach(async () => {
-    vi.restoreAllMocks();
     vi.resetModules();
 
     actualFs = await vi.importActual<typeof import('node:fs/promises')>('node:fs/promises');
@@ -75,7 +74,6 @@ describe('publishContractArtifactPair', () => {
     if (tmpDir.length > 0) {
       await actualFs.rm(tmpDir, { recursive: true, force: true });
     }
-    vi.restoreAllMocks();
   });
 
   it('publishes contract.d.ts before contract.json', async () => {

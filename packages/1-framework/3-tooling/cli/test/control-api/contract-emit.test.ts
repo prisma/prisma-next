@@ -127,7 +127,8 @@ describe('executeContractEmit', () => {
     if (tmpDir.length > 0) {
       await rm(tmpDir, { recursive: true, force: true });
     }
-    vi.restoreAllMocks();
+    // isolate: false — avoid vi.restoreAllMocks(); it restores hoisted vi.mock
+    // modules from other test files loaded in this worker (e.g. node:child_process).
   });
 
   async function withMockedConfig<T>(
