@@ -50,7 +50,7 @@ Internally this resolves to whatever `PostgresBinding` shape best fits the Worke
 The driver path used for Hyperdrive must:
 
 - Not allocate a long-lived client-side `pg.Pool` (Hyperdrive owns pooling; client-side pooling is wasteful and fights Hyperdrive's connection management).
-- Not depend on `pg-cursor` (cursors are not viable in the Workers runtime; buffered reads only).
+- Use `pg-cursor` if and only if it works under the Workers runtime (audit-determined; see Decisions §3). If cursors work, streaming is available; if not, fall back to buffered reads with a documented limitation around large result sets.
 - Open a per-request connection on demand, perform queries/transactions, and release/end cleanly when the request finishes — fitting the Workers isolate-per-request model.
 - Honor the existing `SqlDriver<TBinding>` SPI ([driver-types.ts](packages/2-sql/4-lanes/relational-core/src/ast/driver-types.ts)) so the runtime, ORM, and middleware stay unchanged.
 
@@ -82,7 +82,7 @@ A new doc (likely under `docs/products/` or `docs/onboarding/`) titled "Deployin
 - Setup steps (PPg/Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding).
 - Lifecycle expectations (per-request client, no shared global state).
 - Migration story (run from Node, not from the Worker).
-- Known limitations (no streaming/cursors, transaction affinity, etc.).
+- Known limitations (cursor support pending audit outcome, transaction affinity, isolate memory limits, etc.).
 
 ## Non-Functional Requirements
 
@@ -132,7 +132,7 @@ Worker cold-start (first request after deploy or after isolate eviction) target:
 ## Lifecycle
 
 - [ ] **AC3**: The Hyperdrive code path opens at most one underlying Postgres connection per Worker request and closes it cleanly on request end (verified by inspecting Hyperdrive metrics or instrumenting connection lifecycle).
-- [ ] **AC4**: No `pg-cursor` import is reachable on the Hyperdrive code path (verified by bundle analysis or import graph check).
+- [ ] **AC4**: Cursor behavior on the Hyperdrive path matches the Decisions §3 outcome — either `pg-cursor` is reachable and exercised by an integration test that consumes a large-result-set query incrementally, or it is intentionally absent and the limitation is documented.
 - [ ] **AC5**: No client-side `pg.Pool` is allocated on the Hyperdrive code path.
 
 ## Ergonomics
@@ -217,7 +217,7 @@ The shaping discussion resolved the following decisions. They are recorded here 
 
 1. **Driver topology**: gated on a Workers compatibility audit (first plan task). The leading choice is **a new binding kind on the existing `@prisma-next/driver-postgres`** (e.g. `{ kind: 'hyperdrive', binding }`) that internally runs a per-request `pg.Client` lifecycle. The audit may push us to a sibling package or to a wrapper-only solution; that re-decision happens within the plan, not the spec.
 2. **Underlying Postgres library**: stick with `pg`. Revisit only if the audit shows it's unworkable in Workers.
-3. **Streaming surface**: buffered execution on the Workers/Hyperdrive path. No `pg-cursor`. Matches the existing wrapper's `cursor: { disabled: true }` behavior.
+3. **Streaming surface**: cursor support on the Workers/Hyperdrive path is **desired** (Hyperdrive itself supports cursors via the standard Postgres wire protocol; the open question is whether `pg-cursor` works under `nodejs_compat` in Workers). The compat audit (plan M1) determines feasibility. If `pg-cursor` works in Workers, the Hyperdrive driver path keeps cursor support and the wrapper exposes it via the existing `cursor` option. If it does not, we fall back to buffered-only on the Workers path and document the limitation; large-result-set use cases would then need explicit `LIMIT`/`OFFSET` paging.
 4. **Local dev story**: both `wrangler dev` (ad-hoc) and `vitest-pool-workers` (CI integration tests).
 5. **Hyperdrive types**: dev-dependency on `@cloudflare/workers-types` in the wrapper package, plus a structural type so end-user packages without `@cloudflare/workers-types` are not forced to install it.
 6. **Example app**: mirror [`examples/prisma-next-demo`](examples/prisma-next-demo) — same schema and same operations — so users can compare Node vs. Workers side-by-side.
