@@ -1,7 +1,6 @@
 node_modules
 dist
 .wrangler
-.dev.vars
 .env
 .env.local
 *.tsbuildinfo

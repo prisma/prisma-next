@@ -1,4 +1,0 @@
-# Local Postgres URL exposed to the Hyperdrive binding's `localConnectionString`.
-# Bootstrap a local instance with `pnpm db:dev` (PGlite-backed `prisma dev`),
-# copy this file to `.dev.vars` (gitignored), and paste the printed TCP URL.
-LOCAL_DATABASE_URL="postgres://prisma:prisma@127.0.0.1:51214/template1"

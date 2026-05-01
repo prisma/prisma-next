@@ -8,8 +8,8 @@ import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { db } from '../src/prisma/db';
 
-function loadDevVars(): Record<string, string> {
-  const path = resolve(process.cwd(), '.dev.vars');
+function loadDotEnv(filename: string): Record<string, string> {
+  const path = resolve(process.cwd(), filename);
   if (!existsSync(path)) return {};
   const out: Record<string, string> = {};
   for (const line of readFileSync(path, 'utf8').split('\n')) {
@@ -24,17 +24,15 @@ function loadDevVars(): Record<string, string> {
   return out;
 }
 
+const HYPERDRIVE_VAR = 'WRANGLER_HYPERDRIVE_LOCAL_CONNECTION_STRING_HYPERDRIVE';
+
 async function main() {
-  const devVars = loadDevVars();
+  const fileVars = loadDotEnv('.env');
   const url =
-    devVars['LOCAL_DATABASE_URL'] ??
-    process.env['LOCAL_DATABASE_URL'] ??
-    process.env['DATABASE_URL'];
+    fileVars[HYPERDRIVE_VAR] ?? process.env[HYPERDRIVE_VAR] ?? process.env['DATABASE_URL'];
 
   if (!url) {
-    throw new Error(
-      'Set LOCAL_DATABASE_URL in .dev.vars (or DATABASE_URL) before running pnpm seed.',
-    );
+    throw new Error(`Set ${HYPERDRIVE_VAR} in .env (or DATABASE_URL) before running pnpm seed.`);
   }
 
   await using runtime = await db.connect({ url });
