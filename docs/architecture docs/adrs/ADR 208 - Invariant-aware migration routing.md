@@ -6,7 +6,7 @@ Graph-based migrations route between contract hashes as edges ([ADR 001 — Migr
 
 ## Problem
 
-We need durable decisions for: (1) how data-transform **identity** splits between display/retry and routing; (2) what the marker’s `invariants` field **means** relative to data-transform `check`; (3) how merges stay **atomic** per storage family; (4) how **ref-driven applies** stay idempotent; (5) how the pathfinder exposes **unreachable vs unsatisfiable** without CLI-side BFS duplication; (6) whether the runner accepts a parallel `invariants` option or **derives** from the plan.
+We need durable decisions for: (1) how data-transform **identity** splits between display/retry and routing; (2) what the marker’s `invariants` field **means** relative to data-transform `check`; (3) how merges stay **atomic** per storage family; (4) how **ref-driven applies** stay idempotent; (5) how the pathfinder exposes **unreachable vs unsatisfiable** without CLI-side BFS duplication; (6) how **`providedInvariants`** flows from attested manifests into runners (vs a parallel runner option channel).
 
 ## Decision
 
@@ -58,9 +58,9 @@ The pathfinder **owns** the structural fallback BFS for the unsatisfiable case; 
 
 (Source: `FindPathOutcome` in `packages/1-framework/3-tooling/migration/src/migration-graph.ts`.)
 
-### Runner derives `providedInvariants` from ops (spec F12 superseded)
+### Plan envelope carries `providedInvariants`; runners do not re-derive
 
-**Implemented decision:** the runner **`deriveProvidedInvariants(plan.operations)`** — never a parallel `SqlMigrationRunnerExecuteOptions.invariants?: readonly string[]` channel from callers. **Why:** single source of truth aligned with **`ops.json` / lowered plan**; `migration verify` re-derives `providedInvariants` from ops and rejects manifest mismatch — removes “forgot to thread the option” drift. Earlier spec text that proposed caller-supplied `invariants` on execute options is **obsolete-by-design**.
+**Implemented decision:** the canonical manifest value flows through the control-api boundary on `MigrationApplyStep.providedInvariants` and onward via `MigrationPlan.providedInvariants?`; each target runner reads `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. **Why:** single source of truth aligned with the manifest (`migration verify` re-derives `providedInvariants` from ops at load time and rejects manifest mismatch — `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`), removing both the spec's earlier `SqlMigrationRunnerExecuteOptions.invariants?` caller channel and the redundant runner-side `deriveProvidedInvariants(plan.operations)` call. Earlier spec text proposing either pattern is **obsolete-by-design**.
 
 ### Status diagnostic: `MIGRATION.INVARIANTS_PENDING`
 
@@ -83,7 +83,7 @@ Coverage audit for invariant-aware routing acceptance criteria (M1–M4). Projec
 | AC-A03 | `invariants.ts` / `packages/1-framework/3-tooling/migration/test/invariants.test.ts` — malformed id cases |
 | AC-A04 | `invariants.ts` / `packages/1-framework/3-tooling/migration/test/invariants.test.ts` / `packages/1-framework/3-tooling/migration/src/errors.ts` |
 | AC-A05 | `packages/1-framework/3-tooling/migration/src/io.ts` (`MigrationMetadataSchema`); `deriveProvidedInvariants` sort/dedupe |
-| AC-A06 | Emit uses `deriveProvidedInvariants` — `packages/1-framework/3-tooling/migration/test/migration-base.test.ts`, `packages/1-framework/3-tooling/migration/test/io.test.ts`; runners postgres/sqlite/mongo |
+| AC-A06 | Emit uses `deriveProvidedInvariants` — `packages/1-framework/3-tooling/migration/test/migration-base.test.ts`, `packages/1-framework/3-tooling/migration/test/io.test.ts`; runners consume `options.plan.providedInvariants ?? []` (postgres/sqlite/mongo) |
 | AC-A07 | `io.ts` re-derive + `packages/1-framework/3-tooling/migration/src/errors.ts`; tests `packages/1-framework/3-tooling/migration/test/io.test.ts` |
 | AC-A08 | `computeMigrationHash` / `packages/1-framework/3-tooling/migration/test/migration-graph.test.ts` |
 
@@ -121,7 +121,7 @@ Coverage audit for invariant-aware routing acceptance criteria (M1–M4). Projec
 | AC-M02 | Postgres marker DDL only; Arktype row parse — no probe |
 | AC-M03 | `packages/3-mongo-target/1-mongo-target/src/core/marker-ledger.ts` |
 | AC-M04 | `@prisma-next/contract` — `ContractMarkerRecord.invariants` |
-| AC-M05 | **PASS — superseded** — runner derives via `deriveProvidedInvariants`; this ADR records the deviation from legacy spec F12 |
+| AC-M05 | **PASS — superseded** — runner reads `options.plan.providedInvariants` (manifest-canonical via `MigrationApplyStep`); this ADR records the deviation from spec F12's `SqlMigrationRunnerExecuteOptions.invariants?` channel |
 | AC-M06 | Postgres UPDATE expression above; SQLite merge in txn (`runner.ts`); Mongo `$setUnion` pipeline |
 | AC-M07 | `packages/3-mongo-target/1-mongo-target/test/marker-ledger.test.ts` |
 | AC-M08 | `db update` / flows with empty derived set; mongo `omit-vs-empty` tests in marker-ledger |
@@ -153,4 +153,4 @@ Coverage audit for invariant-aware routing acceptance criteria (M1–M4). Projec
 
 ## Decision record
 
-We adopt **`invariantId`** as the opt-in routing key on data transforms; **monotonic marker union** via **family-specific atomic merge**; **`FindPathOutcome`** discrimination for unreachable vs unsatisfiable; **CLI subtraction** `ref.invariants − marker.invariants`; and **runner-side derivation** of provided invariants from **`plan.operations`** with verify as the integrity gate.
+We adopt **`invariantId`** as the opt-in routing key on data transforms; **monotonic marker union** via **family-specific atomic merge**; **`FindPathOutcome`** discrimination for unreachable vs unsatisfiable; **CLI subtraction** `ref.invariants − marker.invariants`; and **manifest-threaded `providedInvariants`** on the migration plan envelope (runners read `options.plan.providedInvariants ?? []`, with **`migration verify`** as the integrity gate against ops).

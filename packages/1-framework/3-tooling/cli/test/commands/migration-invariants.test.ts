@@ -319,11 +319,19 @@ describe(
         executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
       );
 
+      expect(exitCode).toBe(0);
       const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
-      if (jsonLine !== undefined && exitCode !== 0) {
-        const envelope = JSON.parse(jsonLine) as { meta?: { code?: string } };
-        expect(envelope.meta?.code).not.toBe('MIGRATION.UNKNOWN_INVARIANT');
-      }
+      expect(jsonLine).toBeDefined();
+      const envelope = JSON.parse(jsonLine!) as {
+        ok?: boolean;
+        summary?: string;
+        migrationsApplied?: number;
+        meta?: { code?: string };
+      };
+      expect(envelope.ok).toBe(true);
+      expect(envelope.summary).toBe('Already up to date');
+      expect(envelope.migrationsApplied).toBe(0);
+      expect(envelope.meta?.code).not.toBe('MIGRATION.UNKNOWN_INVARIANT');
       expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
     });
 
