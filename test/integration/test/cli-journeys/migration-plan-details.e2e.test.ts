@@ -60,7 +60,10 @@ withTempDir(({ createTempDir }) => {
         const result = parseJsonOutput<{
           ok: boolean;
           noOp: boolean;
-          from: string;
+          // Mirrors `MigrationPlanResult.from` (`string | null`); `null` is the
+          // baseline encoding produced by `migration plan` for an empty
+          // origin contract.
+          from: string | null;
           to: string;
           dir: string;
           operations: readonly { id: string; label: string; operationClass: string }[];
