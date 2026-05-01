@@ -452,6 +452,14 @@ export interface MigrationApplyStep {
   readonly to: string;
   readonly toContract: Contract;
   readonly operations: readonly MigrationPlanOperation[];
+  /**
+   * Sorted, deduplicated invariant ids from `migration.json.providedInvariants`.
+   * Verified at load time by `readMigrationPackage` (manifest copy must equal
+   * the value derived from `ops.json`). The control-api passes this through
+   * to the runner via `MigrationPlan.providedInvariants` so target runners
+   * read the canonical set instead of re-deriving from `operations`.
+   */
+  readonly providedInvariants: readonly string[];
 }
 
 /**

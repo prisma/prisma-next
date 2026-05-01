@@ -13,7 +13,6 @@ import type {
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { DataTransformOperation } from '@prisma-next/framework-components/control';
-import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -175,13 +174,20 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         });
       }
 
-      // Self-edge no-op detection: a self-edge migration whose ops all
-      // self-skipped (or had no ops to begin with) and brings no new invariants
-      // produced no observable change. Skip the marker + ledger writes so an
-      // idempotent re-apply of a self-edge data transform doesn't churn
-      // updatedAt or pile up empty ledger entries. db update no-ops still
-      // write a ledger entry as audit trail.
-      const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
+      // Self-edge no-op detection: a self-edge migration whose ops had no
+      // ops to begin with and brings no new invariants produced no observable
+      // change. Skip the marker + ledger writes so an idempotent re-apply of
+      // a self-edge data transform doesn't churn updatedAt or pile up empty
+      // ledger entries. db update no-ops still write a ledger entry as audit
+      // trail.
+      //
+      // Note: `executeDataTransform` always counts ops it visited (even when
+      // it self-skipped), so `operationsExecuted === 0` here means "the plan
+      // had zero ops" rather than "every op self-skipped". The non-CLI path
+      // that re-applies a self-edge plan with skipping ops is tracked as
+      // future work; the CLI marker-subtraction in `migration-apply.ts`
+      // empties `effectiveRequired` first and short-circuits before we run.
+      const incomingInvariants = options.plan.providedInvariants ?? [];
       const existingInvariants = new Set(existingMarker?.invariants ?? []);
       const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
         existingInvariants.has(id),
@@ -642,7 +648,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
+    const incomingInvariants = options.plan.providedInvariants ?? [];
     const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:

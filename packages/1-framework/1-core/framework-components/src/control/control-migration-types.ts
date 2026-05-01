@@ -152,6 +152,17 @@ export interface MigrationPlan {
   };
   /** Ordered list of operations to execute. */
   readonly operations: readonly MigrationPlanOperation[];
+  /**
+   * Sorted, deduplicated invariant ids declared by this plan's data-transform
+   * ops. Authored migrations carry the canonical value from
+   * `migration.json.providedInvariants`; planner-built plans (`db init`,
+   * `db update`) omit it (the runner treats it as `[]`). Runners read this
+   * field for marker writes and self-edge no-op detection rather than
+   * re-deriving from `operations`, since the manifest is the canonical
+   * source for the invariant set across all runners (postgres, sqlite,
+   * mongo).
+   */
+  readonly providedInvariants?: readonly string[];
 }
 
 /**

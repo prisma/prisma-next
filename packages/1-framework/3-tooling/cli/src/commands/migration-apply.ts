@@ -98,6 +98,7 @@ function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
     to: pkg.metadata.to,
     toContract: pkg.metadata.toContract,
     operations: pkg.ops,
+    providedInvariants: pkg.metadata.providedInvariants,
   };
 }
 

@@ -10,7 +10,6 @@ import type {
   MigrationRunnerResult,
   OperationContext,
 } from '@prisma-next/framework-components/control';
-import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type {
@@ -183,7 +182,7 @@ export class MongoMigrationRunner {
     const destination = options.plan.destination;
     const profileHash = options.destinationContract.profileHash ?? destination.storageHash;
 
-    const incomingInvariants = deriveProvidedInvariants(options.plan.operations);
+    const incomingInvariants = options.plan.providedInvariants ?? [];
     const existingInvariantSet = new Set(existingMarker?.invariants ?? []);
     const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
       existingInvariantSet.has(id),

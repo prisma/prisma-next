@@ -147,6 +147,7 @@ export async function executeMigrationApply<TFamilyId extends string, TTargetId 
       origin: migration.from === null ? null : { storageHash: migration.from },
       destination: { storageHash: migration.to },
       operations,
+      providedInvariants: migration.providedInvariants,
     };
 
     const destinationContract = familyInstance.validateContract(migration.toContract);

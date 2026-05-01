@@ -197,6 +197,11 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
    */
   readonly destination: SqlMigrationPlanContractInfo;
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  /**
+   * Sorted, deduplicated invariant ids declared by this plan's data-transform
+   * ops. See {@link MigrationPlan.providedInvariants}.
+   */
+  readonly providedInvariants?: readonly string[];
   readonly meta?: AnyRecord;
 }
 
