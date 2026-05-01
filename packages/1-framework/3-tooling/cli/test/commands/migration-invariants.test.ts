@@ -62,9 +62,21 @@ async function writeAttestedPackage(
   await writeMigrationPackage(packageDir, metadata, ops);
 }
 
-function setupConfigMock(): void {
+function setupConfigMock(
+  options: { markerInvariants?: readonly string[]; markerHash?: string } = {},
+): void {
+  const familyInstance = {
+    readMarker: vi.fn().mockResolvedValue(
+      options.markerHash !== undefined
+        ? {
+            storageHash: options.markerHash,
+            invariants: options.markerInvariants ?? [],
+          }
+        : null,
+    ),
+  };
   mocks.loadConfig.mockResolvedValue({
-    family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue({}) },
+    family: { familyId: TARGET_FAMILY, create: vi.fn().mockReturnValue(familyInstance) },
     target: {
       id: TARGET,
       familyId: TARGET_FAMILY,
@@ -73,7 +85,10 @@ function setupConfigMock(): void {
       migrations: {},
     },
     adapter: { kind: 'adapter', familyId: TARGET_FAMILY, targetId: TARGET },
-    driver: { kind: 'driver' },
+    driver: {
+      kind: 'driver',
+      create: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
+    },
     db: { connection: 'postgres://localhost/invariant-test' },
   });
 }
@@ -213,6 +228,66 @@ describe(
       expect(jsonLine).toBeDefined();
       const envelope = JSON.parse(jsonLine!) as { meta?: { code?: string } };
       expect(envelope.meta?.code).toBe('MIGRATION.UNKNOWN_INVARIANT');
+    });
+
+    it('migration apply --ref does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+      // Ref carries `retired-id`. No on-disk migration declares it any more
+      // (history was rewritten). The marker still records it as applied.
+      // Apply should treat the requirement as already satisfied — not
+      // surface MIGRATION.UNKNOWN_INVARIANT.
+      cleanupMocks();
+      const commandMocks = setupCommandMocks();
+      consoleOutput = commandMocks.consoleOutput;
+      consoleErrors = commandMocks.consoleErrors;
+      cleanupMocks = commandMocks.cleanup;
+      setupConfigMock({ markerHash: TO_HASH, markerInvariants: ['retired-id'] });
+
+      const { createMigrationApplyCommand } = await import('../../src/commands/migration-apply');
+      const fixture = await setupFixture({
+        refInvariants: ['retired-id'],
+        edgeInvariants: [],
+      });
+      tempDirs.push(fixture.cwd);
+      process.chdir(fixture.cwd);
+
+      const exitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationApplyCommand(), ['--ref', 'prod', '--json']),
+      );
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      if (jsonLine !== undefined && exitCode !== 0) {
+        const envelope = JSON.parse(jsonLine) as { meta?: { code?: string } };
+        expect(envelope.meta?.code).not.toBe('MIGRATION.UNKNOWN_INVARIANT');
+      }
+      expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
+    });
+
+    it('migration status --ref (online) does not fire UNKNOWN_INVARIANT when a retired invariant is already on the marker', async () => {
+      cleanupMocks();
+      const commandMocks = setupCommandMocks();
+      consoleOutput = commandMocks.consoleOutput;
+      consoleErrors = commandMocks.consoleErrors;
+      cleanupMocks = commandMocks.cleanup;
+      setupConfigMock({ markerHash: TO_HASH, markerInvariants: ['retired-id'] });
+
+      const { createMigrationStatusCommand } = await import('../../src/commands/migration-status');
+      const fixture = await setupFixture({
+        refInvariants: ['retired-id'],
+        edgeInvariants: [],
+      });
+      tempDirs.push(fixture.cwd);
+      process.chdir(fixture.cwd);
+
+      const exitCode = await runAndCaptureExit(() =>
+        executeCommand(createMigrationStatusCommand(), ['--ref', 'prod', '--json']),
+      );
+
+      const jsonLine = consoleOutput.find((line) => line.trimStart().startsWith('{'));
+      if (jsonLine !== undefined && exitCode !== 0) {
+        const envelope = JSON.parse(jsonLine) as { meta?: { code?: string } };
+        expect(envelope.meta?.code).not.toBe('MIGRATION.UNKNOWN_INVARIANT');
+      }
+      expect(consoleErrors.join('\n')).not.toContain('MIGRATION.UNKNOWN_INVARIANT');
     });
 
     it('migration apply --ref does not fire UNKNOWN_INVARIANT when the ref invariant list is empty', async () => {

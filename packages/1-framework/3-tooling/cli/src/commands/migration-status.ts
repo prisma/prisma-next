@@ -459,22 +459,6 @@ async function executeMigrationStatusCommand(
     );
   }
 
-  if (activeRefEntry && activeRefEntry.invariants.length > 0) {
-    const declared = collectDeclaredInvariants(graph);
-    const unknown = activeRefEntry.invariants.filter((id) => !declared.has(id));
-    if (unknown.length > 0) {
-      return notOk(
-        mapMigrationToolsError(
-          errorUnknownInvariant({
-            ...ifDefined('refName', activeRefName),
-            unknown,
-            declared: [...declared].sort(),
-          }),
-        ),
-      );
-    }
-  }
-
   if (bundles.length === 0) {
     if (contractHash !== EMPTY_CONTRACT_HASH) {
       diagnostics.push({
@@ -545,6 +529,32 @@ async function executeMigrationStatusCommand(
       }
     } finally {
       await client.close();
+    }
+  }
+
+  // Pre-check unknown invariants. Online: union the graph's declared
+  // invariants with the marker's recorded set so a retired-but-applied
+  // invariant doesn't surface as MIGRATION.UNKNOWN_INVARIANT — apply would
+  // route fine because marker subtraction empties `effectiveRequired`.
+  // Offline: keep the check graph-strict (the marker is unknown, and a
+  // missing declarer is the dominant signal we can offer).
+  if (activeRefEntry && activeRefEntry.invariants.length > 0) {
+    const declared = collectDeclaredInvariants(graph);
+    const known = new Set<string>(declared);
+    if (mode === 'online') {
+      for (const id of markerInvariants) known.add(id);
+    }
+    const unknown = activeRefEntry.invariants.filter((id) => !known.has(id));
+    if (unknown.length > 0) {
+      return notOk(
+        mapMigrationToolsError(
+          errorUnknownInvariant({
+            ...ifDefined('refName', activeRefName),
+            unknown,
+            declared: [...declared].sort(),
+          }),
+        ),
+      );
     }
   }
 

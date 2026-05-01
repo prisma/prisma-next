@@ -205,22 +205,6 @@ async function executeMigrationApplyCommand(
     throw error;
   }
 
-  if (refEntry && refEntry.invariants.length > 0) {
-    const declared = collectDeclaredInvariants(migrations.graph);
-    const unknown = refEntry.invariants.filter((id) => !declared.has(id));
-    if (unknown.length > 0) {
-      return notOk(
-        mapMigrationToolsError(
-          errorUnknownInvariant({
-            ...ifDefined('refName', refName),
-            unknown,
-            declared: [...declared].sort(),
-          }),
-        ),
-      );
-    }
-  }
-
   const client = createControlClient({
     family: config.family,
     target: config.target,
@@ -232,6 +216,32 @@ async function executeMigrationApplyCommand(
   try {
     await client.connect(dbConnection);
     const marker = await client.readMarker();
+
+    // Pre-check unknown invariants against `(declared by graph) ∪
+    // (already on the marker)`. The union catches the edge case where the
+    // ref carries an invariant whose declaring migration was retired (e.g.
+    // history rewritten) but whose id is recorded on the marker —
+    // surfacing that as MIGRATION.UNKNOWN_INVARIANT would be misleading
+    // because the database has already satisfied the requirement, so the
+    // marker-subtraction below empties `effectiveRequired` and apply
+    // short-circuits to "Already up to date".
+    if (refEntry && refEntry.invariants.length > 0) {
+      const declared = collectDeclaredInvariants(migrations.graph);
+      const known = new Set<string>(declared);
+      for (const id of marker?.invariants ?? []) known.add(id);
+      const unknown = refEntry.invariants.filter((id) => !known.has(id));
+      if (unknown.length > 0) {
+        return notOk(
+          mapMigrationToolsError(
+            errorUnknownInvariant({
+              ...ifDefined('refName', refName),
+              unknown,
+              declared: [...declared].sort(),
+            }),
+          ),
+        );
+      }
+    }
 
     // --- No migrations on disk ---
     if (migrations.bundles.length === 0) {
