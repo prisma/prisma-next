@@ -18,6 +18,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "arktype": "catalog:"
   },
   "devDependencies": {
@@ -44,8 +45,5 @@
     "type": "git",
     "url": "https://github.com/prisma/prisma-next.git",
     "directory": "packages/3-extensions/cipherstash"
-  },
-  "main": "./dist/index.mjs",
-  "module": "./dist/index.mjs",
-  "types": "./dist/index.d.mts"
+  }
 }

@@ -1,3 +1,4 @@
+import { ifDefined } from '@prisma-next/utils/defined';
 import type { CipherstashSdk } from './sdk';
 
 /**
@@ -137,7 +138,7 @@ export class EncryptedString {
       ciphertext: handle.ciphertext,
       table: handle.table,
       column: handle.column,
-      ...(opts?.signal ? { signal: opts.signal } : {}),
+      ...ifDefined('signal', opts?.signal),
     });
     handle.plaintext = plaintext;
     return plaintext;

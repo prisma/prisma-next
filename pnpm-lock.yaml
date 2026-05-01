@@ -2324,6 +2324,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../1-framework/0-foundation/utils
       arktype:
         specifier: 'catalog:'
         version: 2.1.29
