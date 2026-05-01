@@ -91,6 +91,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
               ],
             },
           ],
+          providedInvariants: [],
         });
 
         const postcheckPreSatisfiedResult = await runner.execute({
@@ -179,6 +180,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [mutableOperation],
+          providedInvariants: [],
         });
 
         const postcheckPreSatisfiedResult = await runner.execute({
@@ -271,6 +273,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           origin: toPlanContractInfo(contract),
           destination: toPlanContractInfo(contract),
           operations: [],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -362,6 +365,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
               postcheck: [],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({

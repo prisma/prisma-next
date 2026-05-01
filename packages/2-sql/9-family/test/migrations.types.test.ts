@@ -34,6 +34,7 @@ describe('createMigrationPlan', () => {
       destination: { storageHash: 'core', profileHash: 'profile' },
       operations: sourceOperations as readonly SqlMigrationPlanOperation<TestTargetDetails>[],
       meta: { marker: 'none' },
+      providedInvariants: [],
     });
 
     expect(plan).toMatchObject({
@@ -74,6 +75,7 @@ describe('createMigrationPlan', () => {
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     // Mutate original
@@ -106,6 +108,7 @@ describe('createMigrationPlan', () => {
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     // Primitive should remain as-is (no cloning needed)
@@ -129,6 +132,7 @@ describe('createMigrationPlan', () => {
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     // Mutate original array
@@ -147,6 +151,7 @@ describe('planner helpers', () => {
       targetId: 'postgres',
       destination: { storageHash: 'abc', profileHash: 'def' },
       operations: [],
+      providedInvariants: [],
     });
     const success = plannerSuccess(plan);
     expect(success).toEqual({ kind: 'success', plan });

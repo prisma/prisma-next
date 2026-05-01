@@ -106,6 +106,7 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
 
     const emptyPlanResult = await runner.execute({

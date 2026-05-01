@@ -1,3 +1,4 @@
+import { deriveProvidedInvariants } from '@prisma-next/migration-tools/invariants';
 import { Migration } from '@prisma-next/migration-tools/migration';
 import type { AnySqlMigrationOperation, SqlPlanTargetDetails } from './migrations/types';
 
@@ -31,4 +32,18 @@ import type { AnySqlMigrationOperation, SqlPlanTargetDetails } from './migration
 export abstract class SqlMigration<
   TDetails extends SqlPlanTargetDetails,
   TTargetId extends string = string,
-> extends Migration<AnySqlMigrationOperation<TDetails>, 'sql', TTargetId> {}
+> extends Migration<AnySqlMigrationOperation<TDetails>, 'sql', TTargetId> {
+  /**
+   * Sorted, deduplicated invariant ids declared by this migration's
+   * data-transform ops. Derived from `this.operations` so the field remains
+   * consistent with the operation list — planner-built plans (`db init`,
+   * `db update`) yield `[]` because they emit no data-transform ops.
+   *
+   * Required by `SqlMigrationPlan.providedInvariants` (tightened from
+   * optional at the SQL-family layer); the framework-level
+   * `MigrationPlan.providedInvariants?` stays optional.
+   */
+  get providedInvariants(): readonly string[] {
+    return deriveProvidedInvariants(this.operations);
+  }
+}

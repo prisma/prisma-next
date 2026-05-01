@@ -38,6 +38,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -102,6 +103,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       },
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -161,6 +163,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
           postcheck: [{ description: 'always returns false', sql: 'SELECT 0' }],
         },
       ],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -211,6 +214,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -243,6 +247,7 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
       origin: null,
       destination: { storageHash: 'sha256:plan-hash', profileHash: 'sha256:plan-profile' },
       operations: [],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -290,6 +295,7 @@ describe('SqliteMigrationRunner - Policy Violations', () => {
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({

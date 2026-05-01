@@ -77,6 +77,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
               postcheck: [],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -142,6 +143,7 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
               ],
             },
           ],
+          providedInvariants: [],
         });
 
         // Policy that allows destructive operations

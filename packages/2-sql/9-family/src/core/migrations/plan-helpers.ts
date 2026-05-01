@@ -101,6 +101,7 @@ export function createMigrationPlan<TTargetDetails>(
       : {}),
     destination: Object.freeze({ ...options.destination }),
     operations: freezeOperations(options.operations),
+    providedInvariants: Object.freeze([...options.providedInvariants]),
     ...(options.meta ? { meta: cloneRecord(options.meta) } : {}),
   });
 }

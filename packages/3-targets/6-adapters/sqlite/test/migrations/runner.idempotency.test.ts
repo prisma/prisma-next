@@ -63,6 +63,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
           ],
         },
       ],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({
@@ -111,6 +112,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
     const initResult = await runner.execute({
       plan: initPlan,
@@ -136,6 +138,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       origin: toPlanContractInfo(contract),
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
     const result = await runner.execute({
       plan: noOpPlan,
@@ -179,6 +182,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       origin: null,
       destination: toPlanContractInfo(contract),
       operations: [],
+      providedInvariants: [],
     });
     const initResult = await runner.execute({
       plan: initPlan,
@@ -217,6 +221,7 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
           postcheck: [],
         },
       ],
+      providedInvariants: [],
     });
 
     const result = await runner.execute({

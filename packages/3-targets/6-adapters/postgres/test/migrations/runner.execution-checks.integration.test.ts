@@ -93,6 +93,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
               ],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -169,6 +170,7 @@ describe.sequential('PostgresMigrationRunner - Execution Checks', () => {
               ],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({

@@ -199,9 +199,13 @@ export interface SqlMigrationPlan<TTargetDetails> extends MigrationPlan {
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
   /**
    * Sorted, deduplicated invariant ids declared by this plan's data-transform
-   * ops. See {@link MigrationPlan.providedInvariants}.
+   * ops. Required at the SQL-family layer (the SQL runners consume this as
+   * the source of truth for marker writes and self-edge no-op checks); the
+   * framework-level {@link MigrationPlan.providedInvariants} stays optional
+   * because `db init` / `db update` plans don't have a corresponding
+   * migration manifest.
    */
-  readonly providedInvariants?: readonly string[];
+  readonly providedInvariants: readonly string[];
   readonly meta?: AnyRecord;
 }
 
@@ -350,5 +354,11 @@ export interface CreateSqlMigrationPlanOptions<TTargetDetails> {
   readonly origin?: SqlMigrationPlanContractInfo | null;
   readonly destination: SqlMigrationPlanContractInfo;
   readonly operations: readonly SqlMigrationPlanOperation<TTargetDetails>[];
+  /**
+   * Sorted, deduplicated invariant ids for this plan; mirrors the required
+   * field on {@link SqlMigrationPlan}. Callers without a migration manifest
+   * (`db init`, `db update`, planner-built plans) pass `[]`.
+   */
+  readonly providedInvariants: readonly string[];
   readonly meta?: AnyRecord;
 }

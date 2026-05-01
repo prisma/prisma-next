@@ -62,6 +62,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -135,6 +136,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
           },
           destination: toPlanContractInfo(contract),
           operations: [],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -207,6 +209,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
               postcheck: [],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -272,6 +275,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
               ],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -336,6 +340,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
               postcheck: [],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({
@@ -419,6 +424,7 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
               postcheck: [],
             },
           ],
+          providedInvariants: [],
         });
 
         const result = await runner.execute({

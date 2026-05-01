@@ -127,7 +127,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
         // re-apply of a self-edge data transform doesn't churn updatedAt or
         // pile up empty ledger entries. db update no-ops still write a
         // ledger entry as audit trail.
-        const incomingInvariants = options.plan.providedInvariants ?? [];
+        const incomingInvariants = options.plan.providedInvariants;
         const existingInvariants = new Set(existingMarker?.invariants ?? []);
         const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
           existingInvariants.has(id),
@@ -524,7 +524,7 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     // the way Postgres does. Merge client-side under the runner's
     // BEGIN EXCLUSIVE — sort + dedupe so the JSON-encoded value is stable.
     const merged = new Set<string>(existingMarker?.invariants ?? []);
-    for (const inv of options.plan.providedInvariants ?? []) merged.add(inv);
+    for (const inv of options.plan.providedInvariants) merged.add(inv);
     const invariants = Array.from(merged).sort();
     const writeStatements = buildWriteMarkerStatements({
       storageHash: options.plan.destination.storageHash,

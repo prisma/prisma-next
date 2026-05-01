@@ -99,6 +99,7 @@ export function createFailingPlan() {
         postcheck: [],
       },
     ],
+    providedInvariants: [],
   });
 }
 

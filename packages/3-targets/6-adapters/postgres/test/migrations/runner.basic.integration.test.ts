@@ -132,6 +132,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
           origin: null,
           destination: toPlanContractInfo(contract),
           operations: [],
+          providedInvariants: [],
         });
 
         const emptyPlanResult = await runner.execute({

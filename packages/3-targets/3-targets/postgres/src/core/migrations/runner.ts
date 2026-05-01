@@ -190,7 +190,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       // before we run; the non-CLI re-apply path needs a per-op `executed`
       // flag threaded through `executeDataTransform` to recover the
       // intended check. See review thread A13 / future M5 ADR draft.
-      const incomingInvariants = options.plan.providedInvariants ?? [];
+      const incomingInvariants = options.plan.providedInvariants;
       const existingInvariants = new Set(existingMarker?.invariants ?? []);
       const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
         existingInvariants.has(id),
@@ -651,7 +651,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    const incomingInvariants = options.plan.providedInvariants ?? [];
+    const incomingInvariants = options.plan.providedInvariants;
     const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:
