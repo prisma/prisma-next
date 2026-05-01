@@ -9,13 +9,19 @@ let cached: { db: Db; pool: Pool } | undefined;
 
 export function getDb(): Db {
   if (!cached) {
+    const connectionString = process.env['DATABASE_URL'];
+    if (!connectionString) {
+      throw new Error(
+        'DATABASE_URL is required to construct the Prisma Next runtime. Set it in your environment (see .env.example) before invoking a loader or action.',
+      );
+    }
     // REACT_ROUTER_DEMO_PG_POOL_MAX, when set, caps the pool size. The smoke
     // test sets it to '1' so the example cohabits with @prisma/dev (PGlite),
     // which rejects concurrent connections. In production the pg default
     // applies and the framework's own pool sizing wins.
     const poolMaxRaw = process.env['REACT_ROUTER_DEMO_PG_POOL_MAX'];
     const pool = new Pool({
-      connectionString: process.env['DATABASE_URL'],
+      connectionString,
       ...(poolMaxRaw === undefined ? {} : { max: Number(poolMaxRaw) }),
     });
     // pg emits 'error' on idle-client disconnects (e.g., the test harness
@@ -35,11 +41,14 @@ export function getDb(): Db {
 // Drop the cached client whenever Vite re-executes this module so HMR after a
 // contract re-emit rebuilds the runtime against the fresh contractJson instead
 // of reusing the stale one.
+// TODO(APR-VP3-07): replace this example-local cache with a hash-keyed dev
+// helper shared across frameworks.
 if (import.meta.hot) {
-  import.meta.hot.dispose(() => {
+  import.meta.hot.dispose(async () => {
     if (cached) {
-      void cached.pool.end();
+      const { pool } = cached;
       cached = undefined;
+      await pool.end();
     }
   });
 }
