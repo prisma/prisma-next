@@ -269,10 +269,10 @@ export function codec<
     targetTypes: readonly string[];
     encode:
       | ((value: TInput) => TWire | Promise<TWire>)
-      | ((value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>);
+      | ((value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>);
     decode:
       | ((wire: TWire) => TInput | Promise<TInput>)
-      | ((wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>);
+      | ((wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>);
     meta?: CodecMeta;
     paramsSchema?: Type<TParams>;
     init?: (params: TParams) => THelper;
@@ -281,9 +281,12 @@ export function codec<
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
-  // The union typing on `config.encode` / `config.decode` (single- or two-
-  // arg authors) preserves TInput inference at call sites; widen to the
-  // two-arg shape inside the factory body so the lift can forward ctx.
+  // `ctx?` matches the runtime contract: `runtime.execute(plan)` (no
+  // signal) constructs `codecCtx = undefined`, so two-arg authors must
+  // accept undefined. The union typing on `config.encode` /
+  // `config.decode` (single- or two-arg authors) preserves TInput
+  // inference at call sites; widen to the two-arg shape inside the
+  // factory body so the lift can forward ctx.
   type CtxEncode = (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
   type CtxDecode = (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
   const userEncode = config.encode as CtxEncode;
