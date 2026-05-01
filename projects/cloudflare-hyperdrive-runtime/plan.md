@@ -2,132 +2,147 @@
 
 ## Summary
 
-Make Prisma Next deployable on Cloudflare Workers with a Postgres origin (initially Prisma Postgres) fronted by Cloudflare Hyperdrive. The work is structured around a short Workers-compatibility audit that gates the driver topology decision, followed by additive driver/wrapper changes, an example Worker app that mirrors `prisma-next-demo`, and documentation. Success means a Worker can call `postgres({ contract, hyperdrive: env.HYPERDRIVE })` and execute SQL DSL, ORM, and transaction workloads end-to-end against a real Hyperdrive-fronted Postgres.
+Ship a sibling `postgresServerless` facade alongside the existing `postgres()` factory, with a deployable Cloudflare Worker example using it against a Hyperdrive-fronted Postgres, plus a deployment guide. The facade is generic across per-request runtimes; Cloudflare + Hyperdrive is the primary tested + documented path. M1 audit (complete) confirmed the existing `PostgresDirectDriverImpl` already implements the lifecycle we need — no driver-layer changes required, the work is concentrated in a new wrapper-package facade.
 
 **Spec:** [`spec.md`](./spec.md)
+**M1 audit:** [`assets/workers-compat-audit.md`](./assets/workers-compat-audit.md)
 
 ## Shipping Strategy
 
-Every milestone is **additive and immediately deployable**. No feature flags. The implicit gate that separates old behavior from new is **call-site opt-in**: the new Hyperdrive code path is only reached when a user calls `postgres({ hyperdrive: ... })` (M2) or runs the new example Worker (M3). Existing `postgres({ url })` / `postgres({ pg })` / `postgres({ binding })` callers see no change.
+Every milestone is **additive and immediately deployable**. No feature flags. The implicit gate that separates old behavior from new is **import-time opt-in**: the new code path is only reached when a user imports `postgresServerless` (M2) or runs the new example Worker (M3). Existing `postgres({ url|pg|binding })` callers see no change. No driver-layer code is modified.
 
 Per-milestone safety:
 
-- **M1 (audit)** — read-only investigation; produces a decision doc as a project asset. No production code touched. Always safe to merge.
-- **M2 (driver/wrapper)** — adds a new binding kind and/or a new wrapper input variant. Existing input variants and the existing driver code paths are untouched. Safe because nothing reaches the new code without explicit opt-in.
-- **M3 (example + integration tests)** — adds `examples/prisma-next-cloudflare-worker/` and a `vitest-pool-workers` integration test. No impact on existing packages or examples. Safe.
-- **M4 (docs + close-out)** — docs migration + repo-wide reference cleanup + `projects/cloudflare-hyperdrive-runtime/` deletion. No runtime impact. Safe.
-
-If the M1 audit reveals a blocker that requires a non-additive change to the existing Postgres driver (e.g. a refactor of how `pg-cursor` is imported), that change must be split into a separate, behavior-preserving prep commit/PR within M2 with its own tests, before the additive Hyperdrive path lands on top.
+- **M1 (audit) — complete.** Read-only investigation; produced [`assets/workers-compat-audit.md`](./assets/workers-compat-audit.md). No production code touched.
+- **M2 (serverless facade)** — adds a new wrapper package (or new entrypoint within the existing wrapper — decided in M2 task 2.1) that exports `postgresServerless`. No driver-layer changes; no changes to the existing `postgres()` Node facade. Safe because nothing reaches the new code without explicit import.
+- **M3 (example + integration tests)** — adds `examples/prisma-next-cloudflare-worker/` and a `vitest-pool-workers` integration test. No impact on existing packages or examples.
+- **M4 (docs + close-out)** — docs migration + repo-wide reference cleanup + `projects/cloudflare-hyperdrive-runtime/` deletion. No runtime impact.
 
 ## Test Design
 
-Test cases derived from the spec's acceptance criteria. Every AC has at least one mapped test case; tasks in subsequent milestones reference the test case IDs they satisfy.
+Test cases derived from the spec's acceptance criteria. Every AC has at least one mapped test case; tasks reference the test case IDs they satisfy.
 
 | AC    | TC     | Test Case                                                                                              | Type        | Milestone | Expected Outcome                                                                                              |
 | ----- | ------ | ------------------------------------------------------------------------------------------------------ | ----------- | --------- | ------------------------------------------------------------------------------------------------------------- |
-| AC-1  | TC-1   | Worker bundle imports `@prisma-next/postgres/runtime` under `compatibility_flags = ["nodejs_compat"]`  | Integration | M3        | Worker boots without import error in `vitest-pool-workers`                                                    |
-| AC-2  | TC-2   | `db.sql` SELECT against Hyperdrive in Workers runtime returns rows                                     | Integration | M3        | Rows returned matching expected projection                                                                    |
-| AC-2  | TC-3   | `db.orm.user.findMany({ take: 10 })` against Hyperdrive in Workers runtime returns rows                | Integration | M3        | Rows returned                                                                                                 |
-| AC-2  | TC-4   | `db.transaction(...)` mixed INSERT + UPDATE against Hyperdrive commits atomically                      | Integration | M3        | Final state reflects both writes                                                                              |
-| AC-2  | TC-5   | `db.runtime().connection()` acquires + releases a connection against Hyperdrive                        | Integration | M3        | Acquire/release cycle completes without leaks                                                                 |
-| AC-3  | TC-6   | Hyperdrive code path opens at most one underlying Postgres connection per request                      | Unit        | M2        | Mocked `pg.Client` is constructed once per request lifecycle; `connect()` and `end()` called exactly once     |
-| AC-3  | TC-7   | Connection is closed cleanly when the `fetch` handler returns                                          | Integration | M3        | Hyperdrive lifecycle metrics or instrumented hook observes proper teardown                                    |
-| AC-4  | TC-8a  | If the M1 audit confirms `pg-cursor` works in Workers: large-result-set (e.g. 10k rows) `execute()` over Hyperdrive yields rows incrementally and an early `break` closes the cursor without materializing remaining rows | Integration | M3        | Cursor is opened, closed on `break`; memory footprint stays bounded                                          |
-| AC-4  | TC-8b  | If the M1 audit shows `pg-cursor` does not work in Workers: the Hyperdrive path is intentionally buffered, no `pg-cursor` is reachable from it, and the limitation is documented in the example README + deployment guide | Unit + Review | M2 + M4 | Either path satisfies AC-4; chosen path matches the audit outcome                                            |
-| AC-5  | TC-9   | `pg.Pool` is not constructed on the Hyperdrive code path                                               | Unit        | M2        | Mock-based test confirms only `pg.Client` is constructed, never `pg.Pool`                                     |
-| AC-6  | TC-10  | `postgres({ contract, hyperdrive: env.HYPERDRIVE })` returns a working `PostgresClient<TContract>`     | Unit        | M2        | Returned object exposes `sql`, `orm`, `context`, `runtime()`, `transaction()`, `connect()` per existing shape |
-| AC-7  | TC-11  | All existing wrapper input variants (`url`, `pg`, `binding`) continue to work                          | Unit        | M2        | Existing wrapper unit tests pass unchanged                                                                    |
-| AC-8  | TC-12  | Transaction body that throws triggers ROLLBACK                                                         | Integration | M3        | Database state unchanged after thrown error                                                                   |
-| AC-9  | TC-13  | Transaction body that throws AND simulated rollback failure: connection is destroyed (not released)    | Integration | M3        | Connection is `destroy()`ed; no leaked open transaction                                                       |
-| AC-10 | TC-14  | `wrangler deploy` of `examples/prisma-next-cloudflare-worker` serves a real `findMany` request         | Manual      | M4        | HTTP 200 with expected JSON                                                                                   |
-| AC-11 | TC-15  | Example README documents PPg/Postgres origin setup, `wrangler hyperdrive create`, `localConnectionString` | Manual    | M3        | Reviewer confirms README is sufficient to bootstrap the example from scratch                                  |
-| AC-12 | TC-16  | New "Deploying to Cloudflare Workers with Hyperdrive" doc exists under `docs/` with required sections  | Manual      | M4        | Reviewer confirms architecture, setup, lifecycle, migrations, limitations sections are present and accurate   |
-| AC-13 | TC-17  | `pnpm lint:deps` passes                                                                                | CI          | M2/M3/M4  | Exit code 0                                                                                                   |
-| AC-14 | TC-18  | `pnpm test:packages` passes                                                                            | CI          | M2/M3/M4  | Exit code 0                                                                                                   |
-| AC-15 | TC-19  | New driver/wrapper code paths have unit tests                                                          | Review      | M2        | Coverage report + reviewer sign-off                                                                           |
-| AC-16 | TC-20  | `vitest-pool-workers` integration test is wired into CI and runs                                       | CI          | M3        | CI job invokes the integration test and it passes                                                             |
-| AC-17 | TC-21  | Worker bundle for the example app is < 1 MB compressed                                                 | Manual      | M3        | `wrangler deploy --dry-run` reports compressed size; baseline recorded in plan/spec                           |
-| AC-18 | TC-22  | Cold-start `findMany({ take: 10 })` p50 latency < 200 ms in `wrangler dev`                             | Manual      | M3 or M4  | Best-effort benchmark recorded; revised target if measurement disagrees                                       |
+| AC-1  | TC-1   | `postgresServerless<Contract>(...)` returns a client whose type exposes `sql`/`context`/`stack`/`contract`/`connect` and **rejects** access to `orm`/`runtime`/`transaction` at the type level | Unit (negative type test) | M2 | TS compile error on attempted access to absent fields |
+| AC-2  | TC-2   | Two consecutive `db.connect({ url })` calls return distinct `Runtime` instances; `await using` disposes each independently | Unit | M2 | Distinct identities, `[Symbol.asyncDispose]` invoked exactly once per scope exit |
+| AC-3  | TC-3   | Worker bundle imports `@prisma-next/postgres-serverless/runtime` (or chosen export path) under `compatibility_flags = ["nodejs_compat"]` | Integration | M3 | Worker boots without import error in `vitest-pool-workers` |
+| AC-4  | TC-4   | `db.sql.from(table).select(...)` plan + `runtime.execute(plan)` against Hyperdrive returns rows | Integration | M3 | Rows returned matching projection |
+| AC-4  | TC-5   | `createOrmClient(runtime).user.findMany({ take: 10 })` returns rows | Integration | M3 | Rows returned |
+| AC-4  | TC-6   | `withTransaction(runtime, ...)` mixed INSERT + UPDATE commits atomically | Integration | M3 | Final state reflects both writes |
+| AC-5  | TC-7   | `db.connect({ url })` constructs `pg.Client` exactly once; `[Symbol.asyncDispose]` calls `client.end()` exactly once | Unit (mocked `pg`) | M2 | Construct/connect/end counts: 1/1/1 |
+| AC-5  | TC-8   | Connection is closed cleanly when the `fetch` handler returns (the integration variant of TC-7) | Integration | M3 | Hyperdrive-side / instrumented hook observes proper teardown |
+| AC-6  | TC-9   | Large-result-set query (10k rows in a TEMP table) yielded incrementally via cursor; early `break` closes cursor without materializing remaining rows | Integration | M3 | Memory footprint stays bounded; cursor close observed |
+| AC-7  | TC-10  | `pg.Pool` is **not** constructed on the serverless path | Unit (mocked `pg`) | M2 | Mock confirms `Pool` constructor never invoked |
+| AC-8  | TC-11  | All existing `postgres()` Node-facade input variants (`url`, `pg`, `binding`) continue to work and existing tests pass unchanged | Unit + workspace test sweep | M2 | Existing wrapper unit tests + `pnpm test:packages` green |
+| AC-9  | TC-12  | `postgresServerless({ contractJson, extensions, middleware })` accepts the same option keys as `postgres({...})` (verified by structural type test) | Unit (type test) | M2 | Type test asserts symmetric option keys |
+| AC-10 | TC-13  | Transaction body that throws triggers ROLLBACK | Integration | M3 | Database state unchanged after thrown error |
+| AC-11 | TC-14  | Failed transaction body + simulated rollback failure: underlying `pg.Client` is `client.end()`-able without leaks | Integration | M3 | No leaked open transaction; teardown completes |
+| AC-12 | TC-15  | `wrangler deploy` of `examples/prisma-next-cloudflare-worker` serves SQL DSL, ORM, transaction routes against a real Hyperdrive | Manual | M4 | HTTP 200 with expected JSON for each route |
+| AC-13 | TC-16  | Example README sufficient to bootstrap from scratch (PPg/Postgres origin, `wrangler hyperdrive create`, `localConnectionString`) | Review | M3 | Reviewer confirms |
+| AC-14 | TC-17  | New deployment guide present under `docs/` covering all FR7 sections | Review | M4 | Reviewer confirms |
+| AC-15 | TC-18  | `pnpm lint:deps` passes | CI | M2/M3/M4 | Exit code 0 |
+| AC-16 | TC-19  | `pnpm test:packages` passes | CI | M2/M3/M4 | Exit code 0 |
+| AC-17 | TC-20  | New code has unit tests covering `postgresServerless` facade + lifecycle + ORM/transaction threading | Review | M2 | Coverage report + reviewer sign-off |
+| AC-18 | TC-21  | `vitest-pool-workers` integration test wired into CI and runs | CI | M3 | CI job invokes integration test and it passes |
+| AC-19 | TC-22  | Worker bundle for the example app is < 1 MB compressed | Manual | M3 | `wrangler deploy --dry-run` reports compressed size; recorded |
+| AC-20 | TC-23  | Cold-start ORM `findMany({ take: 10 })` p50 latency < 200 ms in `wrangler dev` | Manual | M3 or M4 | Best-effort benchmark recorded |
 
 ### Test cases derived from non-requirement spec sections
 
 | Section        | TC     | Test Case                                                                              | Type   | Milestone | Expected Outcome                                                                                       |
 | -------------- | ------ | -------------------------------------------------------------------------------------- | ------ | --------- | ------------------------------------------------------------------------------------------------------ |
-| Security       | TC-23  | Example `wrangler.jsonc` does not commit secrets; `localConnectionString` via env/dev.vars only | Review | M3 | Reviewer confirms no plaintext credentials in the committed example                                  |
-| Observability  | TC-24  | Existing telemetry middleware emits expected events on the Workers code path           | Unit   | M2        | Telemetry events fire with correct shape on the new binding's lifecycle                                |
-| Architecture   | TC-25  | Driver-layer changes respect ADR 159 (driver lifecycle) and ADR 155 (driver/codec boundary) | Review | M2   | Reviewer confirms no responsibility leaks; binding-determined options stay at create/connect boundary  |
+| Security       | TC-24  | Example `wrangler.jsonc` does not commit secrets; `localConnectionString` via env / `.dev.vars` only | Review | M3 | Reviewer confirms no plaintext credentials in committed files |
+| Observability  | TC-25  | Existing telemetry middleware emits expected events on the serverless facade's request lifecycle | Unit | M2 | Telemetry events fire with correct shape |
+| Architecture   | TC-26  | No driver-layer files modified; `architecture.config.json` updated only if a new package is created | Review | M2 | Diff confirms |
 
 ## Milestones
 
-### Milestone 1: Workers compatibility audit & driver-topology decision
+### Milestone 1: Workers compatibility audit & topology decision — complete
 
-**Goal:** Determine empirically what does and doesn't work when the existing PN Postgres runtime is loaded under `nodejs_compat` in Cloudflare Workers, and produce a written decision on the driver topology (a/b/c from spec Decision §1) with supporting evidence.
+**Goal:** Determine empirically what runs in Cloudflare Workers under `nodejs_compat`, and pick the wrapper topology.
 
-**Deliverable:** `projects/cloudflare-hyperdrive-runtime/assets/workers-compat-audit.md` documenting:
+**Outcome:** [`assets/workers-compat-audit.md`](./assets/workers-compat-audit.md) — topology = sibling facade (`postgresServerless`), no driver-layer changes. `pg` + `pg-cursor` work in workerd. Bundle baseline (pg-only spike): 53 KiB gzipped.
 
-1. Which transitive imports of `@prisma-next/postgres/runtime` (if any) fail to load under `nodejs_compat` and why.
-2. What happens end-to-end if you wire `postgres({ pg: new Client({ connectionString: env.HYPERDRIVE.connectionString }) })` today (does it work, partially work, or fail?).
-3. Whether `pg-cursor` actually works in Workers under `nodejs_compat` (open a cursor, read in batches, close it). The wrapper's existing `cursor: { disabled: true }` is a separate concern; the audit needs an empirical answer for the Workers/Hyperdrive path.
-4. The chosen topology (a/b/c) with rationale.
-5. Bundle-size baseline if we can produce one (no budget enforcement, just a reading).
+**Validation gate (already passed):** audit doc exists with all five sections; spike artifacts under `wip/` (gitignored).
+
+### Milestone 2: `postgresServerless` facade
+
+**Goal:** Ship the new `postgresServerless` facade with full unit-test coverage. Construction shape mirrors the existing `postgres()` factory; runtime surface is intentionally narrowed (no `orm`, no `runtime()`, no `transaction()`). Per-`connect()` lifecycle, `[Symbol.asyncDispose]` on returned `Runtime`. No driver-layer changes.
 
 **Tasks:**
 
-- [ ] **1.1 — Spike: minimal Worker that imports `@prisma-next/postgres/runtime`** — scaffold throwaway Worker (under `wip/` or in the audit notes), enable `nodejs_compat`, `wrangler dev` it, observe import errors. Record findings. (Decision input; unblocks: TC-8, TC-9, TC-10.)
-- [ ] **1.2 — Spike: end-to-end query through Hyperdrive with `pgClient` binding** — run a `postgres({ pg: new Client({ connectionString: env.HYPERDRIVE.connectionString }) })` flow against a local Postgres in `wrangler dev` (using `localConnectionString` so we don't need a real Hyperdrive). Try a simple SELECT, an ORM call, and a transaction. Note what works and what doesn't. (Decision input.)
-- [ ] **1.3 — `pg-cursor` Workers compatibility check** — empirically run a cursor-based query through the spike worker (open cursor, read 100 rows, read another 100, close). Confirm whether `pg-cursor` works under `nodejs_compat`, and whether it's statically imported regardless of `cursor: { disabled: true }` (informs bundle-size). Record outcome. (Unblocks: TC-8a or TC-8b.)
-- [ ] **1.4 — Bundle size baseline** — `wrangler deploy --dry-run` (or `--outdir`) on the spike worker; record compressed bundle size and largest contributors. (Informs AC-17.)
-- [ ] **1.5 — Decision: driver topology** — synthesize 1.1–1.4 into the audit doc. Pick (a) new binding kind on existing driver, (b) sibling driver package, or (c) wrapper-only. Record rationale and update spec Decision §1 if needed. (Unblocks all M2 tasks.)
-
-**Validation gate:**
-
-- `pnpm lint:deps` (no code touched in production packages, but cheap to run)
-- Audit doc exists at `projects/cloudflare-hyperdrive-runtime/assets/workers-compat-audit.md` with all five sections filled in
-- Spike code lives under `wip/` (per the WIP rule) and is not committed to the project's deliverable surface
-
-### Milestone 2: Driver / wrapper changes
-
-**Goal:** Implement whichever option (a/b/c) the M1 audit selected, with full unit-test coverage. The Hyperdrive code path is reachable via `postgres({ hyperdrive: env.HYPERDRIVE })`. Existing input variants are untouched.
-
-**Tasks (assuming the audit picks option (a) — adjust task list if (b) or (c) is chosen):**
-
-- [ ] **2.1 — Add Hyperdrive `PostgresBinding` kind** — extend `PostgresBinding` in [`packages/3-targets/7-drivers/postgres/src/postgres-driver.ts`](packages/3-targets/7-drivers/postgres/src/postgres-driver.ts) with `{ kind: 'hyperdrive', binding: HyperdriveLike }`. Add a structural `HyperdriveLike` type so we don't force `@cloudflare/workers-types` on consumers. (Satisfies: TC-10.)
-- [ ] **2.2 — Implement per-request driver path** — new `PostgresHyperdriveDriverImpl` (or factory) inside the postgres driver package: per-`acquireConnection` `pg.Client`, `connect()` on use, `end()` on release/destroy. No `Pool`, no `Cursor`. Wire into `createBoundDriverFromBinding`. (Satisfies: TC-6, TC-9.)
-- [ ] **2.3 — Cursor vs. buffered wiring on the Hyperdrive path** — implement whichever the M1 audit selected:
-  - If cursors work: keep `pg-cursor` reachable on the Hyperdrive driver path; let the wrapper expose `cursor` config the same way it does today. (Satisfies: TC-8a.)
-  - If cursors don't work: ensure the Hyperdrive driver path never reaches `executeWithCursor`, with a guard + unit test, and document the limitation. (Satisfies: TC-8b.)
-- [ ] **2.4 — Wrapper input variant** — extend [`packages/3-extensions/postgres/src/runtime/binding.ts`](packages/3-extensions/postgres/src/runtime/binding.ts) and `postgres.ts` to accept `hyperdrive: env.HYPERDRIVE` and translate to the new `PostgresBinding` kind. Update `PostgresBindingInput` discriminated union. (Satisfies: TC-10, TC-11.)
-- [ ] **2.5 — Unit tests** — for the new binding kind, the per-request driver lifecycle (mocked `pg.Client`), the wrapper input variant, and assertions that no `Pool`/`Cursor` is constructed. Existing wrapper unit tests must pass unchanged. (Satisfies: TC-6, TC-8, TC-9, TC-10, TC-11, TC-19, TC-24, TC-25.)
-- [ ] **2.6 — Type plumbing** — `@cloudflare/workers-types` as `devDependency` of the wrapper package; structural `HyperdriveLike` exported as the public type. Update README of both touched packages per the doc-maintenance rule.
-- [ ] **2.7 — Architecture/ADR review touch** — confirm no `architecture.config.json` updates are needed (the new binding lives in the same package); if any cross-package import was added, update `architecture.config.json` and verify `pnpm lint:deps`. (Satisfies: TC-17, TC-25.)
+- [ ] **2.1 — Decide package shape: new package vs. new entrypoint within `@prisma-next/postgres`.**
+  - Option A: new package `@prisma-next/postgres-serverless` (cleanest separation; new entry under `packages/3-extensions/postgres-serverless/`; needs an `architecture.config.json` glob entry).
+  - Option B: new entrypoint within `@prisma-next/postgres` (e.g. `@prisma-next/postgres/serverless`); shares the existing package's deps and tsdown config; one less package to maintain but two facades exported from one package.
+  - Decision criteria: layering integrity (the serverless facade must not pull anything new the Node one doesn't already), discoverability (separate import path is clearer), and example/example-doc clarity. Maker decides at task start; record in commit message and this plan as an amendment.
+- [ ] **2.2 — Implement `postgresServerless<TContract>({ contractJson, extensions, middleware })` factory.**
+  - Construction shape mirrors `postgres()`: validate contract via `validateContract`, build the SQL execution stack via `createSqlExecutionStack`, build the execution context via `createExecutionContext`, build `db.sql` via `sqlBuilder({ context })`. Exposes `sql`, `context`, `stack`, `contract`. Does not expose `orm`, `runtime()`, `transaction()`.
+  - (Satisfies: TC-1, TC-12.)
+- [ ] **2.3 — Implement `db.connect({ url }) → Promise<Runtime & AsyncDisposable>`.**
+  - Each call: `instantiateExecutionStack(stack)` → `driverDescriptor.create({ cursor: undefined })` → driver `connect({ kind: 'pgClient', client: new Client({ connectionString: url }) })` → `createRuntime({...})`. No closure cache. The returned object is a `Runtime` augmented with `[Symbol.asyncDispose]` that calls `runtime.close()` (which transitively closes the underlying `pg.Client`).
+  - (Satisfies: TC-2, TC-7, TC-10, TC-25.)
+- [ ] **2.4 — Cursor wiring on the serverless facade.**
+  - The audit confirmed `pg-cursor` works in Workers. Default: cursor enabled (no `cursor: { disabled: true }`). Expose the same `cursor` option the existing wrapper accepts so users can opt out (`cursor: { disabled: true }`) if they want buffered. The Node facade's hardcoded `cursor: { disabled: true }` is a separate concern — do not touch it in this PR.
+  - (Satisfies: TC-9.)
+- [ ] **2.5 — Unit tests.**
+  - Negative type test: `db.orm` / `db.runtime` / `db.transaction` access fails to compile.
+  - Mocked-`pg` lifecycle test: `db.connect()` constructs `pg.Client` exactly once; `await using` calls `client.end()` exactly once; no `Pool` constructor invoked.
+  - Two consecutive `connect()` calls return distinct runtimes.
+  - Telemetry middleware events fire with correct shape on the serverless lifecycle.
+  - Symmetric-options structural type test (`postgresServerless` and `postgres` accept same option key shape where types align).
+  - Existing `@prisma-next/postgres` tests pass unchanged.
+  - (Satisfies: TC-1, TC-2, TC-7, TC-10, TC-12, TC-20, TC-25.)
+- [ ] **2.6 — Package layering.**
+  - If 2.1 picks Option A (new package): add `architecture.config.json` glob entry mirroring the existing `@prisma-next/postgres` plane/layer/domain assignment. `pnpm lint:deps` must pass.
+  - If 2.1 picks Option B (new entrypoint in existing package): no architecture.config.json change.
+  - Either way: no new cross-domain imports. Driver-layer files untouched.
+  - (Satisfies: TC-26, TC-18.)
+- [ ] **2.7 — README updates per doc-maintenance rule.**
+  - Update `packages/3-extensions/postgres/README.md` (or the new package's README) to mention both facades and link to the deployment guide once it exists.
 
 **Validation gate:**
 
 - `pnpm typecheck`
-- `pnpm test --filter @prisma-next/driver-postgres --filter @prisma-next/postgres`
-- `pnpm test:packages` (workspace-wide; ensures no consumer regression)
+- `pnpm test --filter @prisma-next/postgres` (and the new package if Option A)
+- `pnpm test:packages` (workspace-wide; ensures no consumer regression — existing `db.orm` / `db.runtime` / `db.transaction` Node usages still work)
 - `pnpm lint:deps`
-- `pnpm build --filter @prisma-next/driver-postgres --filter @prisma-next/postgres` (refreshes `dist/*.d.mts` per CLAUDE.md guidance)
+- `pnpm build` for any package whose exports/types changed (refreshes `dist/*.d.mts` per AGENTS.md)
 
-### Milestone 3: Example Worker app + integration tests
+### Milestone 3: Example Cloudflare Worker app + integration tests
 
-**Goal:** A deployable Cloudflare Worker example mirroring `examples/prisma-next-demo`, with `wrangler dev` for ad-hoc development and a `vitest-pool-workers` integration test in CI exercising the full surface.
+**Goal:** A deployable Cloudflare Worker example mirroring `examples/prisma-next-demo` (same schema, adapted to per-request runtime threading per spec Decision §8), with `wrangler dev` for ad-hoc development and a `vitest-pool-workers` integration test in CI.
 
 **Tasks:**
 
-- [ ] **3.1 — Scaffold `examples/prisma-next-cloudflare-worker`** — `package.json`, `wrangler.jsonc` with `nodejs_compat`, `tsconfig.json`, `prisma-next.config.ts`. Schema and operations mirror `examples/prisma-next-demo` per spec Decision §6. Use `wrangler hyperdrive create` (driven by the maker, not committed) to provision the binding ID; document the steps in the README.
-- [ ] **3.2 — Implement Worker `fetch` handler** — at minimum: a route that runs a SQL DSL `SELECT`, a route that runs an ORM `findMany`, and a route that runs a multi-statement transaction. Use the new `postgres({ contract, hyperdrive: env.HYPERDRIVE })` ergonomics. (Satisfies: TC-2, TC-3, TC-4, TC-5.)
-- [ ] **3.3 — Local dev wiring** — `wrangler.jsonc` references `localConnectionString` from `.dev.vars` (gitignored). Add a `docker-compose` or a script that brings up a local Postgres pre-seeded with the demo data. Document in the example README. (Satisfies: TC-15, TC-23.)
-- [ ] **3.4 — `vitest-pool-workers` integration test** — new test file (likely in the example or in `test/integration/`) that boots the Worker under `workerd` via `vitest-pool-workers`, points at a local Postgres, and exercises TC-1 through TC-5, TC-7, TC-12, TC-13. Wire into CI via the existing test runner (likely as part of `test:examples` or a new filter). (Satisfies: TC-1, TC-2, TC-3, TC-4, TC-5, TC-7, TC-12, TC-13, TC-16, TC-20.)
-- [ ] **3.5 — Example README** — setup steps (Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding, `.dev.vars`, `wrangler dev`, `wrangler deploy`), known limitations (no streaming, transaction affinity), troubleshooting. (Satisfies: TC-15.)
-- [ ] **3.6 — Bundle size measurement** — `wrangler deploy --dry-run` in the example; record compressed size in the README and in the audit doc / spec. (Satisfies: TC-21.)
-- [ ] **3.7 — Cold-start best-effort benchmark** — run `findMany({ take: 10 })` against `wrangler dev` cold-start; record p50; if > 200 ms, document in spec/plan rather than blocking. (Satisfies: TC-22.)
-- [ ] **3.8 — `fixtures:check` parity** — if the example has emitted contract artifacts, ensure `pnpm fixtures:check` passes (per AGENTS.md guidance to use `fixtures:check` not ad-hoc emit-and-diff).
+- [ ] **3.1 — Scaffold `examples/prisma-next-cloudflare-worker`.**
+  - `package.json`, `wrangler.jsonc` with `nodejs_compat`, `tsconfig.json`, `prisma-next.config.ts`. Schema mirrors `examples/prisma-next-demo`. Use `wrangler hyperdrive create` to provision the binding ID; the ID goes in `wrangler.jsonc`, the connection string goes in `.dev.vars` (gitignored).
+- [ ] **3.2 — Implement Worker `fetch` handler.**
+  - Module-scope: `const db = postgresServerless<Contract>({ contractJson, extensions, middleware })`.
+  - Inside `fetch`: `await using runtime = await db.connect({ url: env.HYPERDRIVE.connectionString })`; route to one of: SQL DSL `select` via `runtime.execute(db.sql.user.select(...).build())`, ORM `findMany` via `createOrmClient(runtime).user.findMany(...)`, transaction via `withTransaction(runtime, ...)`.
+  - (Satisfies: TC-3, TC-4, TC-5, TC-6, TC-8, TC-13, TC-14.)
+- [ ] **3.3 — Local dev wiring.**
+  - `wrangler.jsonc` references `localConnectionString` from `.dev.vars`. Add a script that brings up a local Postgres pre-seeded with the demo data (Docker Compose if available, or a `psql`-driven setup script — match what `examples/prisma-next-demo` uses for parity).
+  - (Satisfies: TC-16, TC-24.)
+- [ ] **3.4 — `vitest-pool-workers` integration test.**
+  - Test file boots the Worker under `workerd` via `vitest-pool-workers`, points at a local Postgres, and exercises TC-3 through TC-6, TC-8, TC-9, TC-13, TC-14. Wire into CI via the existing test runner. Decide example-local vs. root devDependency for `vitest-pool-workers` — probably example-local to keep the root install slim.
+  - (Satisfies: TC-3 through TC-6, TC-8, TC-9, TC-13, TC-14, TC-19, TC-21.)
+- [ ] **3.5 — Example README.**
+  - Setup steps (Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding, `.dev.vars`, `wrangler dev`, `wrangler deploy`), known limitations (transaction affinity, isolate memory limits), troubleshooting.
+  - (Satisfies: TC-16.)
+- [ ] **3.6 — Bundle size measurement.**
+  - `wrangler deploy --dry-run` against the example; record compressed size in the README.
+  - (Satisfies: TC-22.)
+- [ ] **3.7 — Cold-start best-effort benchmark.**
+  - Run ORM `findMany({ take: 10 })` against `wrangler dev` cold-start; record p50; if > 200 ms, document in spec/plan rather than blocking.
+  - (Satisfies: TC-23.)
+- [ ] **3.8 — `fixtures:check` parity.**
+  - Ensure `pnpm fixtures:check` passes if the example has emitted contract artifacts.
 
 **Validation gate:**
 
 - `pnpm typecheck:all`
-- `pnpm test:examples --filter prisma-next-cloudflare-worker` (or whatever filter the new package needs)
+- `pnpm test:examples --filter prisma-next-cloudflare-worker`
 - `pnpm test:packages` (no regressions)
 - `pnpm lint:deps`
 - `pnpm fixtures:check`
@@ -135,16 +150,25 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 
 ### Milestone 4: Docs, real-world smoke verification, and close-out
 
-**Goal:** Ship the deployment guide, prove the example works against a real Cloudflare account + real Hyperdrive, verify all acceptance criteria, and close out the project (migrate long-lived docs into `docs/`, delete `projects/cloudflare-hyperdrive-runtime/`).
+**Goal:** Ship the deployment guide, prove the example works against a real Cloudflare account + real Hyperdrive, verify all acceptance criteria, and close out the project.
 
 **Tasks:**
 
-- [ ] **4.1 — Write `docs/products/Deploying to Cloudflare Workers with Hyperdrive.md`** (exact path TBD with docs team) — architecture diagram, setup steps, lifecycle expectations, migrations story, known limitations. Cross-link from `docs/README.md` and `docs/onboarding/Getting-Started.md` if appropriate. (Satisfies: TC-16.)
-- [ ] **4.2 — `wrangler deploy` smoke test** — deploy the example to a real Cloudflare account against a real Hyperdrive config (PPg or similar origin). Run `findMany`, ORM call, and transaction via real HTTPS request. Record outcomes in the audit doc. (Satisfies: TC-14.)
-- [ ] **4.3 — AC verification pass** — walk every AC in the spec, confirm the corresponding TC has passed, link the evidence (test file + line, doc anchor, deploy URL). Record in `projects/cloudflare-hyperdrive-runtime/assets/ac-verification.md` (will be deleted at close-out, but useful for the close-out PR description).
-- [ ] **4.4 — Migrate long-lived docs into `docs/`** — the new deployment guide stays in `docs/`. The audit + AC-verification stay under `projects/` (transient). If a new ADR is warranted (e.g. "Workers-aware driver lifecycle"), draft it under `docs/architecture docs/adrs/`.
-- [ ] **4.5 — Strip repo-wide references to `projects/cloudflare-hyperdrive-runtime/**`** — search for any links from `docs/`, READMEs, scripts; replace with canonical `docs/` links or remove. (Per drive-project-workflow.mdc.)
-- [ ] **4.6 — Delete `projects/cloudflare-hyperdrive-runtime/`** — final commit on the close-out PR removes the project directory. PR title or body must reference `(TML-2369)` so Linear's GitHub integration auto-completes the issue.
+- [ ] **4.1 — Write the deployment guide under `docs/`** (path TBD with docs team — likely `docs/products/Deploying-to-Serverless-Runtimes.md` or similar). Sections per FR7: facade-asymmetry rationale, Cloudflare + Hyperdrive worked example, lifecycle expectations, generality across other per-request runtimes, migration story, known limitations. Cross-link from `docs/README.md` and `docs/onboarding/Getting-Started.md` if appropriate.
+  - (Satisfies: TC-17.)
+- [ ] **4.2 — `wrangler deploy` smoke test.**
+  - Deploy `examples/prisma-next-cloudflare-worker` to a real Cloudflare account against a real Hyperdrive config (PPg if available, otherwise Neon/RDS). Run all routes via real HTTPS request. Record outcomes in the audit doc / a temporary `assets/smoke-test-results.md`.
+  - (Satisfies: TC-15.)
+- [ ] **4.3 — AC verification pass.**
+  - Walk every AC in `spec.md`, confirm corresponding TC has passed, link evidence (test file + line, doc anchor, deploy URL). Record in `projects/cloudflare-hyperdrive-runtime/assets/ac-verification.md` (transient; useful for the close-out PR description).
+- [ ] **4.4 — Decide on a new ADR.**
+  - The serverless facade asymmetry (drop `orm`/`runtime()`/`transaction` for per-request lifecycle) is a design decision worth recording as an ADR if the team agrees it's load-bearing. Draft under `docs/architecture docs/adrs/` if so. If not, the deployment guide carries the rationale.
+- [ ] **4.5 — Migrate long-lived docs into `docs/`.**
+  - Deployment guide stays in `docs/`. ADR (if drafted) lives under `docs/architecture docs/adrs/`. Audit + AC-verification stay under `projects/` (transient).
+- [ ] **4.6 — Strip repo-wide references to `projects/cloudflare-hyperdrive-runtime/**`.**
+  - Search for any links from `docs/`, READMEs, scripts; replace with canonical `docs/` links or remove.
+- [ ] **4.7 — Delete `projects/cloudflare-hyperdrive-runtime/`.**
+  - Final commit of the close-out PR. PR title or body must reference `(TML-2369)` so Linear's GitHub integration auto-completes the issue.
 
 **Validation gate:**
 
@@ -154,17 +178,17 @@ Test cases derived from the spec's acceptance criteria. Every AC has at least on
 - `pnpm lint:docs`
 - `pnpm fixtures:check`
 - `pnpm build`
-- Manual: real `wrangler deploy` succeeds and serves expected response (TC-14)
-- Manual: AC-verification doc is complete; every AC has linked evidence
+- Manual: real `wrangler deploy` succeeds and serves expected response (TC-15)
+- Manual: AC-verification doc complete; every AC has linked evidence
 
 ## Open Items
 
 Carried forward from the spec or surfaced during planning. Most resolve during execution.
 
-1. **Driver topology (a/b/c)** — decided in M1 task 1.5. Plan tasks in M2 are written assuming option (a); if (b) or (c) is chosen, M2 task list is rewritten before M2 starts.
-2. **`pg.Client` lifecycle when `acquireConnection` is called multiple times within one Worker request** — for the ORM client + a separate `connection()` call in the same `fetch`, do we open one `pg.Client` per `acquireConnection`, or do we reuse one per request via a request-scoped cache? Decide in M2 task 2.2 with a unit test pinning the behavior.
-3. **Where to install `vitest-pool-workers`** — root devDependency vs. example-local. Decide in M3 task 3.4. Probably example-local.
-4. **Cloudflare account for the smoke test (M4 task 4.2)** — needs a Cloudflare account with a Hyperdrive entitlement and a Postgres origin. The maker provisions or borrows; not blocking M1–M3.
-5. **Whether to draft a new ADR** for "Workers-aware driver lifecycle" — depends on what the M1 audit + M2 changes look like. Decide in M4 task 4.4.
-6. **PPg as the smoke-test origin** — currently aspirational. If PPg's preflight or networking story isn't ready, fall back to Neon or AWS RDS for the smoke test. The spec is generic to any Postgres origin; PPg-specific verification can be a follow-up.
-7. **`AsyncIterable<Row>` semantics if we end up buffered** — only relevant if the M1 audit decides cursor support is not viable on the Workers path. With buffered execution, the iterable yields all rows after the query completes (not while it streams), and `break`-mid-iteration cancels nothing. If we land on buffered, confirm no consumer in the SQL/ORM lanes assumes streaming-as-it-arrives semantics, and document the limitation in the deployment guide. If cursors work, this open item closes.
+1. **Package shape (Option A vs. B)** — decided in M2 task 2.1. Affects the import path users write (`@prisma-next/postgres-serverless/runtime` vs. `@prisma-next/postgres/serverless`) and `architecture.config.json` whether a new package glob is needed.
+2. **Where to install `vitest-pool-workers`** — root devDependency vs. example-local. Decide in M3 task 3.4. Probably example-local.
+3. **Cloudflare account for the smoke test (M4 task 4.2)** — needs a Cloudflare account with a Hyperdrive entitlement and a Postgres origin. The maker provisions or borrows; not blocking M2-M3.
+4. **Whether to draft a new ADR** for the facade asymmetry. Decide in M4 task 4.4.
+5. **PPg as the smoke-test origin** — currently aspirational. If PPg's preflight or networking story isn't ready, fall back to Neon or AWS RDS. Spec is generic to any Postgres origin; PPg-specific verification can be a follow-up.
+6. **Whether to backport `[Symbol.asyncDispose]` to the existing Node `postgres()` facade.** Additive, useful for Node CLIs that want `await using runtime = await db.connect({ url })`. Out of scope for this project; recommend opening a separate ticket.
+7. **Whether the Node wrapper's hardcoded `cursor: { disabled: true }` should be removed.** Decision §3 in spec applies to the serverless facade only. The Node default has its own history — out of scope here; flag as a follow-up if the team wants to revisit.
