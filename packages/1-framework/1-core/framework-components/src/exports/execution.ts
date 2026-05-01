@@ -4,14 +4,14 @@ export type {
   RuntimeExtensionDescriptor,
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
-} from '../execution-descriptors';
+} from '../execution/execution-descriptors';
 export type {
   RuntimeAdapterInstance,
   RuntimeDriverInstance,
   RuntimeExtensionInstance,
   RuntimeFamilyInstance,
   RuntimeTargetInstance,
-} from '../execution-instances';
-export { assertRuntimeContractRequirementsSatisfied } from '../execution-requirements';
-export type { ExecutionStack, ExecutionStackInstance } from '../execution-stack';
-export { createExecutionStack, instantiateExecutionStack } from '../execution-stack';
+} from '../execution/execution-instances';
+export { assertRuntimeContractRequirementsSatisfied } from '../execution/execution-requirements';
+export type { ExecutionStack, ExecutionStackInstance } from '../execution/execution-stack';
+export { createExecutionStack, instantiateExecutionStack } from '../execution/execution-stack';

@@ -93,7 +93,7 @@ flowchart TD
 
 ### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
 
-- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. `encode` may be omitted (identity default); `decode` is required.
+- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
 - Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
 - This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
 
@@ -119,7 +119,43 @@ const secretCodec = codec({
 });
 ```
 
-See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
+#### Codec call context (`ctx`)
+
+Codecs receive a second `ctx` options argument; you may ignore it. The runtime allocates one `SqlCodecCallContext` per `runtime.execute(plan, { signal })` call and threads the same reference to every codec dispatch site as a non-optional argument — when no `signal` is supplied the runtime still threads an empty `{}`, never `undefined`. The internal `Codec` interface declares the parameter as required (`encode(value, ctx: SqlCodecCallContext)` / `decode(wire, ctx: SqlCodecCallContext)`); single-arg author functions `(value) => …` continue to compile via TypeScript's bivariance for trailing parameters, so codec ergonomics are unchanged.
+
+- **`ctx.signal`** — the same `AbortSignal` reference at every codec call in one execute. Forward it to network SDKs so aborted queries stop talking to the underlying service.
+- **`ctx.column`** (decode-side only) — `{ table, name }` for cells the runtime can resolve to a single column ref; `undefined` for aggregate aliases, computed projections, and other unresolvable cells. Encode-side `ctx.column` is always `undefined` (encode-time column enrichment is the middleware's domain).
+
+```ts
+// Forward ctx.signal to a network call so aborted queries stop the SDK.
+const kmsSecretCodec = codec({
+  typeId: 'pg/kms-secret@1',
+  targetTypes: ['text'],
+  encode: async (v: string, ctx) =>
+    kms.encrypt({ plaintext: v }, { signal: ctx?.signal }),
+  decode: async (w: string, ctx) =>
+    kms.decrypt({ ciphertext: w }, { signal: ctx?.signal }),
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+
+// Use ctx.column on decode to construct an envelope value carrying (table, name).
+const envelopeCodec = codec({
+  typeId: 'pg/envelope@1',
+  targetTypes: ['text'],
+  encode: async (v: string) => v,
+  decode: async (w: string, ctx) => ({
+    value: w,
+    column: ctx?.column,
+  }),
+  encodeJson: (v: string) => v,
+  decodeJson: (j: string) => j as string,
+});
+```
+
+Codec bodies that ignore `ctx.signal` complete in the background (cooperative cancellation); aborts still surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`.
+
+See [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) and [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
 
 ### AST Surface (`ast/*` via `exports/ast.ts`)
 - Query roots: `SelectAst`, `InsertAst`, `UpdateAst`, `DeleteAst`

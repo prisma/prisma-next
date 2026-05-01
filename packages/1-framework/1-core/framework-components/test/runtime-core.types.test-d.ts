@@ -1,9 +1,9 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
-import type { AsyncIterableResult } from '../src/async-iterable-result';
-import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
-import { RuntimeCore } from '../src/runtime-core';
-import type { RuntimeExecutor, RuntimeMiddleware } from '../src/runtime-middleware';
+import type { AsyncIterableResult } from '../src/execution/async-iterable-result';
+import type { ExecutionPlan, QueryPlan } from '../src/execution/query-plan';
+import { RuntimeCore } from '../src/execution/runtime-core';
+import type { RuntimeExecutor, RuntimeMiddleware } from '../src/execution/runtime-middleware';
 
 interface FixturePlan extends QueryPlan {
   readonly draftId: string;

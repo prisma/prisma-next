@@ -6,6 +6,9 @@ import type {
   ControlFamilyInstance,
   ControlStack,
   CoreSchemaView,
+  MigrationPlanOperation,
+  OperationPreview,
+  OperationPreviewCapable,
   SchemaViewCapable,
   SignDatabaseResult,
   VerifyDatabaseResult,
@@ -19,7 +22,12 @@ import {
 import type { MongoContract } from '@prisma-next/mongo-contract';
 import { validateMongoContract } from '@prisma-next/mongo-contract';
 import type { MongoSchemaIR } from '@prisma-next/mongo-schema-ir';
-import { initMarker, readMarker, updateMarker } from '@prisma-next/target-mongo/control';
+import {
+  formatMongoOperations,
+  initMarker,
+  readMarker,
+  updateMarker,
+} from '@prisma-next/target-mongo/control';
 import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Db } from 'mongodb';
@@ -27,7 +35,8 @@ import { mongoSchemaToView } from './schema-to-view';
 
 export interface MongoControlFamilyInstance
   extends ControlFamilyInstance<'mongo', MongoSchemaIR>,
-    SchemaViewCapable<MongoSchemaIR> {
+    SchemaViewCapable<MongoSchemaIR>,
+    OperationPreviewCapable {
   validateContract(contractJson: unknown): Contract;
 }
 
@@ -261,6 +270,15 @@ class MongoFamilyInstance implements MongoControlFamilyInstance {
 
   toSchemaView(schema: MongoSchemaIR): CoreSchemaView {
     return mongoSchemaToView(schema);
+  }
+
+  toOperationPreview(operations: readonly MigrationPlanOperation[]): OperationPreview {
+    return {
+      statements: formatMongoOperations(operations).map((text) => ({
+        text,
+        language: 'mongodb-shell',
+      })),
+    };
   }
 }
 

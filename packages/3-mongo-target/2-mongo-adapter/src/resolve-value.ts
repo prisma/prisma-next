@@ -1,4 +1,9 @@
-import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
+import {
+  checkAborted,
+  raceAgainstAbort,
+  runtimeError,
+} from '@prisma-next/framework-components/runtime';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoValue } from '@prisma-next/mongo-value';
 import { MongoParamRef } from '@prisma-next/mongo-value';
@@ -16,17 +21,45 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
  * (mirroring SQL's `wrapEncodeFailure` shape) with `{ label, codec }` details
  * and the original error attached on `cause`. An already-wrapped envelope is
  * re-thrown verbatim so nested resolvers don't double-wrap.
+ *
+ * `ctx: CodecCallContext` is forwarded verbatim to every
+ * `codec.encode(value, ctx)` call. The same `ctx` reference is also passed
+ * to nested `resolveValue` invocations so codec authors observe **signal
+ * identity** across the entire recursive walk for one `runtime.execute()`.
+ *
+ * Abort observation (only when `ctx.signal` is provided):
+ *
+ * - **Already-aborted at entry** — every recursive call pre-checks
+ *   `ctx.signal.aborted` and short-circuits with
+ *   `RUNTIME.ABORTED { phase: 'encode' }` before any codec is invoked.
+ * - **Mid-flight abort** — each per-level `Promise.all` races against the
+ *   signal via `raceAgainstAbort`. The runtime returns
+ *   `RUNTIME.ABORTED { phase: 'encode' }` promptly even if codec bodies
+ *   ignore the signal; in-flight bodies run to completion in the background
+ *   (cooperative cancellation, see ADR 204).
+ * - `RUNTIME.ENCODE_FAILED` envelopes thrown by a codec body before the
+ *   runtime sees the abort pass through unchanged (AC-ERR4).
  */
 export async function resolveValue(
   value: MongoValue,
-  codecs?: MongoCodecRegistry,
+  codecs: MongoCodecRegistry,
+  ctx: CodecCallContext,
 ): Promise<unknown> {
+  checkAborted(ctx, 'encode');
+  const signal = ctx.signal;
+
   if (value instanceof MongoParamRef) {
-    if (value.codecId && codecs) {
+    if (value.codecId) {
       const codec = codecs.get(value.codecId);
       if (codec?.encode) {
         try {
-          return await codec.encode(value.value);
+          // Race even leaf scalar encodes against the signal so a leaf
+          // `MongoParamRef` (e.g. a simple field filter, or any leaf reached
+          // from `MongoAdapterImpl.#resolveDocument()` outside an enclosing
+          // `Promise.all`) surfaces `RUNTIME.ABORTED` promptly instead of
+          // blocking on a slow codec body.
+          const encoded = codec.encode(value.value, ctx);
+          return await raceAgainstAbort(encoded, signal, 'encode');
         } catch (error) {
           wrapEncodeFailure(error, value, codec.id);
         }
@@ -41,10 +74,12 @@ export async function resolveValue(
     return value;
   }
   if (Array.isArray(value)) {
-    return Promise.all(value.map((v) => resolveValue(v, codecs)));
+    const tasks = Promise.all(value.map((v) => resolveValue(v, codecs, ctx)));
+    return raceAgainstAbort(tasks, signal, 'encode');
   }
   const entries = Object.entries(value);
-  const resolved = await Promise.all(entries.map(([, val]) => resolveValue(val, codecs)));
+  const all = Promise.all(entries.map(([, val]) => resolveValue(val, codecs, ctx)));
+  const resolved = await raceAgainstAbort(all, signal, 'encode');
   const result: Record<string, unknown> = {};
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];

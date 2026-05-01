@@ -300,3 +300,87 @@ describe('formatMigrationJson', () => {
     expect(lines[1]).toMatch(/^ {2}"/);
   });
 });
+
+describe('formatMigrationPlanOutput — preview block rendering', () => {
+  // Byte-identity bar from spec § A9 / OQ-4: SQL output must be unchanged from
+  // the pre-M3 `sql: string[]` rendering. The legacy renderer trimmed each
+  // statement and appended `;` if missing, one statement per line under the
+  // `DDL preview` header. SQL-only previews continue to use that header label;
+  // any non-SQL preview switches to a family-agnostic `Operation preview`.
+  it('renders SQL statements identically to the legacy `sql[]` rendering', () => {
+    const result = createPlanResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
+        preview: {
+          statements: [
+            { text: 'CREATE TABLE "user" (id int4 NOT NULL)', language: 'sql' },
+            { text: 'ALTER TABLE "post" ADD COLUMN name text;', language: 'sql' },
+          ],
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('DDL preview');
+    // Byte-identity bar: assert exact ordered DDL line shape, not just
+    // substring presence. `toContain` would silently accept format drifts (e.g.
+    // missing trailing `;`, doubled `;`, reordered statements, additional
+    // injected lines).
+    const ddlLines = stripped
+      .split('\n')
+      .map((line) => line.trim())
+      .filter((line) => line.startsWith('CREATE ') || line.startsWith('ALTER '));
+    expect(ddlLines).toEqual([
+      'CREATE TABLE "user" (id int4 NOT NULL);',
+      'ALTER TABLE "post" ADD COLUMN name text;',
+    ]);
+  });
+
+  it('uses an `Operation preview` header and renders `mongodb-shell` statements verbatim without trailing `;`', () => {
+    const result = createPlanResult({
+      plan: {
+        targetId: 'mongo',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [{ id: 'op1', label: 'op1', operationClass: 'additive' }],
+        preview: {
+          statements: [
+            {
+              text: 'db.users.createIndex({ "email": 1 }, { unique: true })',
+              language: 'mongodb-shell',
+            },
+            { text: 'db.users.dropIndex("email_1")', language: 'mongodb-shell' },
+          ],
+        },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('Operation preview');
+    expect(stripped).not.toContain('DDL preview');
+    expect(stripped).toContain('db.users.createIndex({ "email": 1 }, { unique: true })');
+    expect(stripped).toContain('db.users.dropIndex("email_1")');
+    // Mongo shell lines must not be suffixed with `;`.
+    expect(stripped).not.toContain('createIndex({ "email": 1 }, { unique: true });');
+  });
+
+  it('uses an `Operation preview` header for an empty preview, not `DDL preview`', () => {
+    // `Array.prototype.every` is vacuously true on empty arrays. Without
+    // explicitly guarding on length, an empty preview would be misclassified
+    // as SQL-only and rendered with the SQL-specific `DDL preview` header.
+    // Default the empty case to the family-agnostic label.
+    const result = createPlanResult({
+      plan: {
+        targetId: 'postgres',
+        destination: { storageHash: 'sha256:dest-hash' },
+        operations: [],
+        preview: { statements: [] },
+      },
+    });
+    const flags = parseGlobalFlags({ 'no-color': true });
+    const stripped = stripAnsi(formatMigrationPlanOutput(result, flags));
+    expect(stripped).toContain('Operation preview');
+    expect(stripped).not.toContain('DDL preview');
+  });
+});

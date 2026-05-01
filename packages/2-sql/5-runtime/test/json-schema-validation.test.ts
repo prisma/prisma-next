@@ -330,12 +330,12 @@ describe('JSON Schema encoding validation', () => {
       ),
     });
 
-    const result = await encodeParams(plan, codecRegistry);
+    const result = await encodeParams(plan, codecRegistry, {});
     expect(result[0]).toBe('{"name":"Alice"}');
   });
 
   it('returns null for null values', async () => {
-    const result = await encodeParam(null, { codecId: 'pg/jsonb@1' }, 0, codecRegistry);
+    const result = await encodeParam(null, { codecId: 'pg/jsonb@1' }, 0, codecRegistry, {});
     expect(result).toBeNull();
   });
 
@@ -345,6 +345,7 @@ describe('JSON Schema encoding validation', () => {
       { name: 'metadata', codecId: 'pg/jsonb@1' },
       0,
       codecRegistry,
+      {},
     );
     expect(result).toBe('{"age":30}');
   });
@@ -365,7 +366,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: '{"name":"Alice"}' };
-    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {});
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });
 
@@ -378,7 +379,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { metadata: '{"age":30}' };
     await expect(
-      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry()),
+      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       category: 'RUNTIME',
@@ -401,7 +402,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { userMeta: '{"age":30}' };
     await expect(
-      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry()),
+      decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       details: {
@@ -425,7 +426,7 @@ describe('JSON Schema decoding validation', () => {
       postMeta: '{"userName":"Alice"}',
     };
     await expect(
-      decodeRow(row, plan, codecRegistry, createJoinMetadataValidatorRegistry()),
+      decodeRow(row, plan, codecRegistry, createJoinMetadataValidatorRegistry(), {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       details: {
@@ -444,7 +445,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { data: '{"bad":"data"}' };
-    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {});
     expect(result['data']).toEqual({ bad: 'data' });
   });
 
@@ -456,7 +457,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: null };
-    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {});
     expect(result['metadata']).toBeNull();
   });
 
@@ -468,7 +469,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { metadata: '{"bad":"data"}' };
-    const result = await decodeRow(row, plan, codecRegistry);
+    const result = await decodeRow(row, plan, codecRegistry, undefined, {});
     expect(result['metadata']).toEqual({ bad: 'data' });
   });
 
@@ -481,7 +482,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { id: 42, metadata: '{"name":"Alice"}' };
-    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry());
+    const result = await decodeRow(row, plan, codecRegistry, createMetadataValidatorRegistry(), {});
     expect(result['id']).toBe(42);
     expect(result['metadata']).toEqual({ name: 'Alice' });
   });
@@ -505,7 +506,7 @@ describe('JSON Schema decoding validation', () => {
 
     const row = { metadata: '{"age":30}' };
     await expect(
-      decodeRow(row, plan, asyncRegistry, createMetadataValidatorRegistry()),
+      decodeRow(row, plan, asyncRegistry, createMetadataValidatorRegistry(), {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       category: 'RUNTIME',
@@ -553,7 +554,7 @@ describe('JSON Schema decoding validation', () => {
     });
 
     const row = { secret: 'wire-bytes' };
-    const rejection = await decodeRow(row, plan, registry).catch((e: unknown) => e);
+    const rejection = await decodeRow(row, plan, registry, undefined, {}).catch((e: unknown) => e);
 
     const err = rejection as Error & {
       code?: string;

@@ -1,5 +1,6 @@
 import { INIT_ADDITIVE_POLICY } from '@prisma-next/family-sql/control';
 import type { SqlitePlanTargetDetails } from '@prisma-next/target-sqlite/planner-target-details';
+import { timeouts } from '@prisma-next/test-utils';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   contract,
@@ -14,7 +15,7 @@ import {
   toPlanContractInfo,
 } from './fixtures/runner-fixtures';
 
-describe('SqliteMigrationRunner - Idempotency', () => {
+describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOperation }, () => {
   let testDb: TestDatabase;
 
   afterEach(() => {

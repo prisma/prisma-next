@@ -4,29 +4,25 @@
 > and is published only to support its runtime. Its API is unstable and may change
 > without notice. Do not depend on this package directly; install `prisma-next` instead.
 
-Prints Prisma Schema Language (PSL) from introspected SQL schema IR.
+Prints Prisma Schema Language (PSL) from `PslDocumentAst` (`@prisma-next/framework-components/psl-ast`).
 
 ## Overview
 
-`@prisma-next/psl-printer` converts `SqlSchemaIR` into deterministic PSL text for brownfield authoring and database introspection flows. It is intentionally printer-only: database inspection, semantic verification, and contract emission stay in adjacent packages.
+`@prisma-next/psl-printer` renders deterministic PSL text from a `PslDocumentAst` (defined in `@prisma-next/framework-components/psl-ast`). The package is target-agnostic: SQL → AST construction lives in the SQL family (`@prisma-next/family-sql`'s `inferPslContract` capability).
 
 ## Responsibilities
 
-- Convert `SqlSchemaIR` tables, relations, enums, defaults, and indexes into valid PSL output.
-- Normalize database names into stable PSL identifiers while preserving original names with `@map` and `@@map`.
-- Preserve storage-level defaults when PSL client-side defaults would change semantics.
-- Generate deterministic output so round-tripping and snapshot-based tests remain stable.
-- Surface unsupported types and raw defaults in a way that keeps the emitted PSL readable.
+- Convert structured AST (`model`, `field`, `enum`, `types`) into valid PSL output.
+- Preserve `@map` / `@@map` and relation attributes from AST nodes.
+- Generate deterministic output so snapshot-based tests remain stable.
 
 ## Dependencies
 
 - **Depends on**
-  - `@prisma-next/contract`
-  - `@prisma-next/sql-schema-ir`
-  - `@prisma-next/utils`
+  - `@prisma-next/framework-components`
 - **Used by**
-  - `@prisma-next/cli` for `db introspect`
-  - future authoring and emit flows that need PSL output from SQL schema IR
+  - `@prisma-next/cli` (consumes `printPsl(ast)` after the SQL family produces the AST)
+  - `@prisma-next/family-sql` (tests; consumes the printer to verify AST construction)
 
 ## Related Docs
 

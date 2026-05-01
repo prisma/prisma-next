@@ -7,10 +7,10 @@ import type {
   MigrationRunnerResult,
   TargetMigrationsCapability,
 } from '@prisma-next/framework-components/control';
+import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
-import { extractOperationStatements } from './extract-operation-statements';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 // F12: db update allows additive, widening, and destructive operations.
@@ -114,12 +114,14 @@ export async function executeDbUpdate<TFamilyId extends string, TTargetId extend
   const migrationPlan = plannerResult.plan;
 
   if (mode === 'plan') {
-    const planSql = extractOperationStatements(familyInstance.familyId, migrationPlan.operations);
+    const preview = hasOperationPreview(familyInstance)
+      ? familyInstance.toOperationPreview(migrationPlan.operations)
+      : undefined;
     const result: DbUpdateSuccess = {
       mode: 'plan',
       plan: {
         operations: stripOperations(migrationPlan.operations),
-        ...(planSql !== undefined ? { sql: planSql } : {}),
+        ...ifDefined('preview', preview),
       },
       destination: {
         storageHash: migrationPlan.destination.storageHash,

@@ -5,8 +5,10 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import {
   AsyncIterableResult,
+  checkAborted,
   checkMiddlewareCompatibility,
   RuntimeCore,
+  type RuntimeExecuteOptions,
   type RuntimeLog,
   runtimeError,
   runWithMiddleware,
@@ -17,6 +19,7 @@ import type {
   AnyQueryAst,
   CodecRegistry,
   LoweredStatement,
+  SqlCodecCallContext,
   SqlDriver,
   SqlQueryable,
   SqlTransaction,
@@ -187,12 +190,21 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
    * Lower a `SqlQueryPlan` (AST + meta) into a `SqlExecutionPlan` with
    * encoded parameters ready for the driver. This is the single point at
    * which params transition from app-layer values to driver wire-format.
+   *
+   * `ctx: SqlCodecCallContext` is forwarded to `encodeParams` so per-query
+   * cancellation reaches every codec body during parameter encoding. The
+   * framework abstract typed this as `CodecCallContext`; the SQL family
+   * narrows it to the SQL-specific extension. SQL params do not populate
+   * `ctx.column` — encode-side column metadata is the middleware's domain.
    */
-  protected override async lower(plan: SqlQueryPlan): Promise<SqlExecutionPlan> {
+  protected override async lower(
+    plan: SqlQueryPlan,
+    ctx: SqlCodecCallContext,
+  ): Promise<SqlExecutionPlan> {
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
-      params: await encodeParams(lowered, this.codecRegistry),
+      params: await encodeParams(lowered, this.codecRegistry, ctx),
     });
   }
 
@@ -231,24 +243,37 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
 
   override execute<Row>(
     plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
   ): AsyncIterableResult<Row> {
-    return this.executeAgainstQueryable<Row>(plan, this.driver);
+    return this.executeAgainstQueryable<Row>(plan, this.driver, options);
   }
 
   private executeAgainstQueryable<Row>(
     plan: SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>,
     queryable: SqlQueryable,
+    options?: RuntimeExecuteOptions,
   ): AsyncIterableResult<Row> {
     this.ensureCodecRegistryValidated();
 
     const self = this;
+    const signal = options?.signal;
+    // One ctx per execute() call — the same reference is shared by
+    // encodeParams (lower), decodeRow (per-row), and the stream loop's
+    // between-row checks. Per-cell ctx allocations inside decodeField add
+    // `column` for resolvable cells without re-wrapping the signal. The
+    // ctx object is always allocated; the `signal` field is only included
+    // when a signal was supplied (exactOptionalPropertyTypes).
+    const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
+      checkAborted(codecCtx, 'stream');
+
       const exec: SqlExecutionPlan = isExecutionPlan(plan)
         ? Object.freeze({
             ...plan,
-            params: await encodeParams(plan, self.codecRegistry),
+            params: await encodeParams(plan, self.codecRegistry, codecCtx),
           })
-        : await self.lower(await self.runBeforeCompile(plan));
+        : await self.lower(await self.runBeforeCompile(plan), codecCtx);
 
       self.familyAdapter.validatePlan(exec, self.contract);
       self._telemetry = null;
@@ -280,14 +305,33 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             }),
         );
 
-        for await (const rawRow of stream) {
-          const decodedRow = await decodeRow(
-            rawRow,
-            exec,
-            self.codecRegistry,
-            self.jsonSchemaValidators,
-          );
-          yield decodedRow as Row;
+        // Manually drive the driver's async iterator so the between-row
+        // abort check fires *before* requesting the next row. With a
+        // `for await...of` loop the runtime would await `iterator.next()`
+        // first, leaving a window where one extra row is pulled through
+        // the driver after the signal aborted.
+        const iterator = stream[Symbol.asyncIterator]();
+        try {
+          while (true) {
+            checkAborted(codecCtx, 'stream');
+            const next = await iterator.next();
+            if (next.done) {
+              break;
+            }
+            const decodedRow = await decodeRow(
+              next.value,
+              exec,
+              self.codecRegistry,
+              self.jsonSchemaValidators,
+              codecCtx,
+            );
+            yield decodedRow as Row;
+          }
+        } finally {
+          // Best-effort iterator cleanup so the driver can release its
+          // resources whether the stream finished normally, threw, or was
+          // abandoned by the consumer.
+          await iterator.return?.();
         }
 
         outcome = 'success';
@@ -321,8 +365,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       },
       execute<Row>(
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+        options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverConn);
+        return self.executeAgainstQueryable<Row>(plan, driverConn, options);
       },
     };
 
@@ -340,8 +385,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       },
       execute<Row>(
         plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+        options?: RuntimeExecuteOptions,
       ): AsyncIterableResult<Row> {
-        return self.executeAgainstQueryable<Row>(plan, driverTx);
+        return self.executeAgainstQueryable<Row>(plan, driverTx, options);
       },
     };
   }
@@ -455,11 +501,12 @@ export async function withTransaction<R>(
     },
     execute<Row>(
       plan: (SqlExecutionPlan<unknown> | SqlQueryPlan<unknown>) & { readonly _row?: Row },
+      options?: RuntimeExecuteOptions,
     ): AsyncIterableResult<Row> {
       if (invalidated) {
         throw transactionClosedError();
       }
-      const inner = transaction.execute(plan);
+      const inner = transaction.execute(plan, options);
       const guarded = async function* (): AsyncGenerator<Row, void, unknown> {
         for await (const row of inner) {
           if (invalidated) {

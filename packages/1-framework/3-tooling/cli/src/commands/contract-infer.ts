@@ -1,12 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { errorRuntime } from '@prisma-next/errors/execution';
-import { printPsl, validatePrintableSqlSchemaIR } from '@prisma-next/psl-printer';
-import {
-  createPostgresDefaultMapping,
-  createPostgresTypeMap,
-  extractEnumInfo,
-  parseRawDefault,
-} from '@prisma-next/psl-printer/postgres';
+import { printPsl } from '@prisma-next/psl-printer';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { dirname, relative } from 'pathe';
@@ -59,26 +53,19 @@ async function executeContractInferCommand(
     return inspectResult;
   }
 
-  const { config, target, meta } = inspectResult.value;
+  const { config, target, meta, pslContractAst } = inspectResult.value;
 
-  if (target.familyId !== 'sql') {
+  if (!pslContractAst) {
     return notOk(
-      errorRuntime(`contract infer is not supported for family "${target.familyId}"`, {
-        why: 'contract infer currently supports SQL targets only',
-        fix: 'Use an SQL target (e.g. Postgres) with this command',
+      errorRuntime('contract infer is not supported for this family', {
+        why: 'The configured family does not implement the PslContractInferCapable capability, so an inferred PSL contract cannot be produced from the live database schema.',
+        fix: 'Use a family that supports contract inference (e.g. SQL/Postgres).',
       }),
     );
   }
 
-  const schema = validatePrintableSqlSchemaIR(inspectResult.value.schema);
   const outputPath = resolveContractInferOutputPath(options, config.contract?.output);
-  const enumInfo = extractEnumInfo(schema.annotations);
-  const pslContent = printPsl(schema, {
-    defaultMapping: createPostgresDefaultMapping(),
-    typeMap: createPostgresTypeMap(enumInfo.typeNames),
-    enumInfo,
-    parseRawDefault,
-  });
+  const pslContent = printPsl(pslContractAst);
 
   if (existsSync(outputPath) && !flags.json && !flags.quiet) {
     ui.stderr(`\u26A0 Overwriting existing file: ${relative(process.cwd(), outputPath)}`);

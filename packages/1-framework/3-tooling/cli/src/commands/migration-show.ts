@@ -1,4 +1,7 @@
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
+import type {
+  MigrationPlanOperation,
+  OperationPreview,
+} from '@prisma-next/framework-components/control';
 import { MigrationToolsError } from '@prisma-next/migration-tools/errors';
 import { readMigrationPackage, readMigrationsDir } from '@prisma-next/migration-tools/io';
 import {
@@ -10,7 +13,7 @@ import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
 import { loadConfig } from '../config-loader';
-import { extractOperationStatements } from '../control-api/operations/extract-operation-statements';
+import { createControlClient } from '../control-api/client';
 import {
   type CliStructuredError,
   errorRuntime,
@@ -46,7 +49,13 @@ export interface MigrationShowResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql: readonly string[];
+  /**
+   * Family-agnostic textual preview of the migration's operations. Replaces
+   * the previous string-array DDL field. Always defined; statements is empty
+   * for a no-op migration or a family that does not implement the
+   * `OperationPreviewCapable` capability.
+   */
+  readonly preview: OperationPreview;
   readonly summary: string;
 }
 
@@ -174,7 +183,18 @@ async function executeMigrationShowCommand(
   }
 
   const ops = pkg.ops as readonly MigrationPlanOperation[];
-  const sql = extractOperationStatements(config.family.familyId, ops) ?? [];
+
+  // `migration show` is an offline command; the control client is constructed
+  // purely to dispatch the family-specific `toOperationPreview` capability and
+  // is not connected to a database.
+  const client = createControlClient({
+    family: config.family,
+    target: config.target,
+    adapter: config.adapter,
+    ...(config.driver ? { driver: config.driver } : {}),
+    extensionPacks: config.extensionPacks ?? [],
+  });
+  const preview: OperationPreview = client.toOperationPreview(ops) ?? { statements: [] };
 
   const result: MigrationShowResult = {
     ok: true,
@@ -189,7 +209,7 @@ async function executeMigrationShowCommand(
       label: op.label,
       operationClass: op.operationClass,
     })),
-    sql,
+    preview,
     summary: `${ops.length} operation(s)`,
   };
   return ok(result);
@@ -200,7 +220,7 @@ export function createMigrationShowCommand(): Command {
   setCommandDescriptions(
     command,
     'Display migration package contents',
-    'Shows the operations, DDL preview, and metadata for a migration package.\n' +
+    'Shows the operations, statement preview, and metadata for a migration package.\n' +
       'Accepts a directory path, a hash prefix (git-style), or defaults to the\n' +
       'latest migration.',
   );

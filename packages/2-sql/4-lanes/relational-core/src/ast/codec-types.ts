@@ -1,10 +1,47 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
+import type {
+  Codec as BaseCodec,
+  CodecCallContext,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
 
-export type { CodecTrait } from '@prisma-next/framework-components/codec';
+export type { CodecCallContext, CodecTrait } from '@prisma-next/framework-components/codec';
+
+/**
+ * SQL-family addressing of a single column. The decode site populates a
+ * `SqlColumnRef` whenever it can resolve the cell to a single underlying
+ * `(table, column)` (the typical case for projected columns from a
+ * single-table source); cells the runtime cannot resolve (aggregate
+ * aliases, include aggregate fields, computed projections without a
+ * simple ref) get `column = undefined`.
+ *
+ * The shape is a structural projection of the runtime's `ColumnRef` so
+ * the SQL decode site can reuse the resolution it already performs for
+ * `RUNTIME.DECODE_FAILED` envelope construction without allocating
+ * twice per cell.
+ */
+export interface SqlColumnRef {
+  readonly table: string;
+  readonly name: string;
+}
+
+/**
+ * SQL-family per-call context. Extends the framework {@link CodecCallContext}
+ * (which carries `signal` only) with `column?: SqlColumnRef`, populated
+ * on **decode** call sites that can resolve a single underlying column
+ * ref. Encode call sites currently leave `column` undefined (encode-time
+ * column context is the middleware's domain).
+ *
+ * SQL codec authors writing a `(value, ctx)` author function for the SQL
+ * `codec()` factory observe this type. The framework codec dispatch
+ * surface (and Mongo) sees only the base `CodecCallContext`.
+ */
+export interface SqlCodecCallContext extends CodecCallContext {
+  readonly column?: SqlColumnRef;
+}
 
 /**
  * Descriptor for parameterized codecs that require type parameter validation.
@@ -51,6 +88,12 @@ export interface CodecMeta {
  * optional parameterized-codec descriptor (`paramsSchema` + `init`) for
  * codecs that require type-parameter validation (e.g. `pg/vector@1`).
  *
+ * `encode` and `decode` are redeclared here to narrow the per-call
+ * context to the SQL-family {@link SqlCodecCallContext} (adds
+ * `column?: SqlColumnRef`). TypeScript treats method-syntax declarations
+ * bivariantly, so the SQL narrowing is structurally compatible with the
+ * framework {@link BaseCodec} super-interface.
+ *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
  */
@@ -62,6 +105,8 @@ export interface Codec<
   TParams = Record<string, unknown>,
   THelper = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
+  encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
+  decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
   readonly meta?: CodecMeta;
   readonly paramsSchema?: Type<TParams>;
   readonly init?: (params: TParams) => THelper;
@@ -203,14 +248,15 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  *
  * Author `encode` and `decode` as sync or async functions; the factory
  * produces a {@link Codec} whose query-time methods follow the boundary
- * contract documented on `Codec`.
+ * contract documented on `Codec`. Authors receive a second `ctx` options
+ * argument carrying the SQL-family per-call context; ignore it if you
+ * don't need it.
  *
- * `encode` is optional — when omitted, an identity default is installed
- * (declaring "the input value already is the wire value", so `TInput` and
- * `TWire` are interchangeable for that codec). `decode` is always
- * required. `encodeJson` and `decodeJson` default to identity **only when
- * `TInput` is assignable to `JsonValue`**; otherwise both are required
- * so the contract artifact stays JSON-safe.
+ * Both `encode` and `decode` are required so `TInput` and `TWire` are
+ * always covered by an explicit author function — the factory installs
+ * no identity fallback. `encodeJson` and `decodeJson` default to identity
+ * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
+ * required so the contract artifact stays JSON-safe.
  */
 export function codec<
   Id extends string,
@@ -223,8 +269,8 @@ export function codec<
   config: {
     typeId: Id;
     targetTypes: readonly string[];
-    encode?: (value: TInput) => TWire | Promise<TWire>;
-    decode: (wire: TWire) => TInput | Promise<TInput>;
+    encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
     meta?: CodecMeta;
     paramsSchema?: Type<TParams>;
     init?: (params: TParams) => THelper;
@@ -233,10 +279,13 @@ export function codec<
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
-  // The synchronous identity default is only safe when the author has
-  // declared "the input is already the wire value" (i.e. TInput == TWire);
-  // it returns the value directly, never a Promise.
-  const userEncode = config.encode ?? ((value: TInput) => value as unknown as TWire);
+  // The runtime allocates one `SqlCodecCallContext` per `runtime.execute()`
+  // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
+  // and threads it as a non-optional reference to every codec call. The
+  // author surface keeps the second parameter optional so single-arg
+  // `(value) => …` authors continue to satisfy the signature via
+  // TypeScript's bivariance for trailing parameters.
+  const userEncode = config.encode;
   const userDecode = config.decode;
   // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the
   // boundary; widen back to the generic shape inside the factory body.
@@ -255,16 +304,16 @@ export function codec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: (value) => {
+    encode: (value, ctx) => {
       try {
-        return Promise.resolve(userEncode(value));
+        return Promise.resolve(userEncode(value, ctx));
       } catch (error) {
         return Promise.reject(error);
       }
     },
-    decode: (wire) => {
+    decode: (wire, ctx) => {
       try {
-        return Promise.resolve(userDecode(wire));
+        return Promise.resolve(userDecode(wire, ctx));
       } catch (error) {
         return Promise.reject(error);
       }

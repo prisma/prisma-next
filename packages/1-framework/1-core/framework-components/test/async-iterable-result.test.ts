@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { AsyncIterableResult } from '../src/async-iterable-result';
+import { AsyncIterableResult } from '../src/execution/async-iterable-result';
 
 describe('AsyncIterableResult', () => {
   it('works with for await loop', async () => {

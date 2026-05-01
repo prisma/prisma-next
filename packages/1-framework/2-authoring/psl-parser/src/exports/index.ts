@@ -1,5 +1,3 @@
-export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
-export { parsePslDocument } from '../parser';
 export type {
   ParsePslDocumentInput,
   ParsePslDocumentResult,
@@ -26,4 +24,6 @@ export type {
   PslSpan,
   PslTypeConstructorCall,
   PslTypesBlock,
-} from '../types';
+} from '@prisma-next/framework-components/psl-ast';
+export { getPositionalArgument, parseQuotedStringLiteral } from '../attribute-helpers';
+export { parsePslDocument } from '../parser';

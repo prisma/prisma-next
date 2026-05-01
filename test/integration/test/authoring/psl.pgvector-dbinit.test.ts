@@ -108,7 +108,11 @@ model Document {
               throw new Error(`dbInit plan failed: ${plan.failure.summary}`);
             }
 
-            const ddl = plan.value.plan.sql?.join(';\n\n') ?? '';
+            const ddl =
+              plan.value.plan.preview?.statements
+                .filter((s) => s.language === 'sql')
+                .map((s) => s.text)
+                .join(';\n\n') ?? '';
             expect(ddl).toContain('vector(1536)');
             expect(ddl).not.toContain('"vector(1536)"');
 

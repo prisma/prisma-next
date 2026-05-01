@@ -142,6 +142,7 @@ async function executeDbInitCommand(
           label: op.label,
           operationClass: op.operationClass,
         })),
+        ...ifDefined('preview', result.value.plan.preview),
       },
       ...(result.value.execution
         ? {

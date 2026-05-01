@@ -8,6 +8,7 @@ export default defineConfig({
     'src/exports/control.ts',
     'src/exports/emission.ts',
     'src/exports/execution.ts',
+    'src/exports/psl-ast.ts',
     'src/exports/runtime.ts',
   ],
 });

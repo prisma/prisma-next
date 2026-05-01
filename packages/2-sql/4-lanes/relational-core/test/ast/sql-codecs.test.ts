@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { SqlCodecCallContext } from '../../src/ast/codec-types';
 import {
   SQL_CHAR_CODEC_ID,
   SQL_FLOAT_CODEC_ID,
@@ -142,12 +143,6 @@ describe('sql-codecs', () => {
       expectedEncoded: 'portable text',
       expectedDecoded: 'portable text',
     },
-    {
-      scalar: 'timestamp',
-      input: '2024-01-15T10:30:00.000Z',
-      expectedEncoded: '2024-01-15T10:30:00.000Z',
-      expectedDecoded: '2024-01-15T10:30:00.000Z',
-    },
   ];
 
   it.each(codecRoundTripCases)('encodes and decodes $scalar values', async ({
@@ -157,21 +152,21 @@ describe('sql-codecs', () => {
     expectedDecoded,
   }) => {
     const codec = sqlCodecDefinitions[scalar].codec as {
-      encode: (value: unknown) => Promise<unknown>;
-      decode: (wire: unknown) => Promise<unknown>;
+      encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
+      decode: (wire: unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
     };
 
-    expect(await codec.encode(input)).toBe(expectedEncoded);
-    expect(await codec.decode(input)).toBe(expectedDecoded);
+    expect(await codec.encode(input, {})).toBe(expectedEncoded);
+    expect(await codec.decode(input, {})).toBe(expectedDecoded);
   });
 
   it('trims trailing spaces when decoding char values', async () => {
     const charCodec = sqlCodecDefinitions.char.codec as {
-      decode: (wire: string) => Promise<string>;
+      decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
-    expect(await charCodec.decode('user_001                            ')).toBe('user_001');
-    expect(await charCodec.decode('user_001')).toBe('user_001');
+    expect(await charCodec.decode('user_001                            ', {})).toBe('user_001');
+    expect(await charCodec.decode('user_001', {})).toBe('user_001');
   });
 
   it('initializes helpers for length-parameterized codecs', () => {
@@ -188,16 +183,32 @@ describe('sql-codecs', () => {
     });
   });
 
-  it('normalizes Date values for timestamp codecs', async () => {
+  it('round-trips Date values for timestamp codecs', async () => {
     const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
-      encode: (value: string | Date) => Promise<string>;
-      decode: (wire: string | Date) => Promise<string>;
+      encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
+      decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
 
     const instant = new Date('2024-01-15T10:30:00Z');
 
-    expect(await timestampCodec.encode(instant)).toBe('2024-01-15T10:30:00.000Z');
-    expect(await timestampCodec.decode(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(await timestampCodec.encode(instant, {})).toBe(instant);
+    expect(await timestampCodec.decode(instant, {})).toBe(instant);
+  });
+
+  it('serializes timestamps to ISO strings for the JSON contract', () => {
+    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+
+    const instant = new Date('2024-01-15T10:30:00Z');
+
+    expect(timestampCodec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
+    expect(timestampCodec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
+  });
+
+  it('throws on invalid JSON input for timestamp codecs', () => {
+    const timestampCodec = sqlCodecDefinitions.timestamp.codec;
+
+    expect(() => timestampCodec.decodeJson(42)).toThrow(/Expected ISO date string/);
+    expect(() => timestampCodec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
   });
 
   describe('renderOutputType', () => {

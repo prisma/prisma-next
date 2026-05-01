@@ -4,8 +4,8 @@ import type {
   RuntimeExtensionDescriptor,
   RuntimeFamilyDescriptor,
   RuntimeTargetDescriptor,
-} from '../src/execution-descriptors';
-import { assertRuntimeContractRequirementsSatisfied } from '../src/execution-requirements';
+} from '../src/execution/execution-descriptors';
+import { assertRuntimeContractRequirementsSatisfied } from '../src/execution/execution-requirements';
 
 describe('assertRuntimeContractRequirementsSatisfied', () => {
   const family: RuntimeFamilyDescriptor<'sql'> = {

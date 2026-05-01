@@ -1,3 +1,4 @@
+import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
 import {
   MongoAddFieldsStage,
@@ -50,25 +51,34 @@ import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { lowerAggExpr, lowerFilter, lowerPipeline, lowerStage } from '../src/lowering';
 
+// Default fixtures: tests that don't exercise codecs use an empty registry
+// and an empty ctx. Tests that need codec encoding shadow `registry` locally.
+const registry = createMongoCodecRegistry();
+const ctx: CodecCallContext = {};
+
 describe('lowerFilter', () => {
   it('lowers MongoFieldFilter with $eq', async () => {
     const filter = MongoFieldFilter.eq('email', 'alice@example.com');
-    expect(await lowerFilter(filter)).toEqual({ email: { $eq: 'alice@example.com' } });
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
+      email: { $eq: 'alice@example.com' },
+    });
   });
 
   it('lowers MongoFieldFilter with $gt', async () => {
-    expect(await lowerFilter(MongoFieldFilter.gt('age', 18))).toEqual({ age: { $gt: 18 } });
+    expect(await lowerFilter(MongoFieldFilter.gt('age', 18), registry, ctx)).toEqual({
+      age: { $gt: 18 },
+    });
   });
 
   it('lowers MongoFieldFilter with arbitrary operator', async () => {
-    expect(await lowerFilter(MongoFieldFilter.of('loc', '$near', [1, 2]))).toEqual({
+    expect(await lowerFilter(MongoFieldFilter.of('loc', '$near', [1, 2]), registry, ctx)).toEqual({
       loc: { $near: [1, 2] },
     });
   });
 
   it('lowers MongoAndExpr', async () => {
     const and = MongoAndExpr.of([MongoFieldFilter.eq('x', 1), MongoFieldFilter.gt('y', 2)]);
-    expect(await lowerFilter(and)).toEqual({
+    expect(await lowerFilter(and, registry, ctx)).toEqual({
       $and: [{ x: { $eq: 1 } }, { y: { $gt: 2 } }],
     });
   });
@@ -78,22 +88,24 @@ describe('lowerFilter', () => {
       MongoFieldFilter.eq('status', 'active'),
       MongoFieldFilter.eq('status', 'pending'),
     ]);
-    expect(await lowerFilter(or)).toEqual({
+    expect(await lowerFilter(or, registry, ctx)).toEqual({
       $or: [{ status: { $eq: 'active' } }, { status: { $eq: 'pending' } }],
     });
   });
 
   it('lowers MongoNotExpr to $nor', async () => {
     const not = new MongoNotExpr(MongoFieldFilter.eq('x', 1));
-    expect(await lowerFilter(not)).toEqual({ $nor: [{ x: { $eq: 1 } }] });
+    expect(await lowerFilter(not, registry, ctx)).toEqual({ $nor: [{ x: { $eq: 1 } }] });
   });
 
   it('lowers MongoExistsExpr (true)', async () => {
-    expect(await lowerFilter(MongoExistsExpr.exists('name'))).toEqual({ name: { $exists: true } });
+    expect(await lowerFilter(MongoExistsExpr.exists('name'), registry, ctx)).toEqual({
+      name: { $exists: true },
+    });
   });
 
   it('lowers MongoExistsExpr (false)', async () => {
-    expect(await lowerFilter(MongoExistsExpr.notExists('name'))).toEqual({
+    expect(await lowerFilter(MongoExistsExpr.notExists('name'), registry, ctx)).toEqual({
       name: { $exists: false },
     });
   });
@@ -103,7 +115,7 @@ describe('lowerFilter', () => {
       MongoOrExpr.of([MongoFieldFilter.eq('x', 1), MongoFieldFilter.eq('x', 2)]),
       new MongoNotExpr(MongoFieldFilter.gt('y', 10)),
     ]);
-    expect(await lowerFilter(filter)).toEqual({
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
       $and: [{ $or: [{ x: { $eq: 1 } }, { x: { $eq: 2 } }] }, { $nor: [{ y: { $gt: 10 } }] }],
     });
   });
@@ -111,21 +123,29 @@ describe('lowerFilter', () => {
   it('resolves MongoParamRef values during lowering', async () => {
     const param = MongoParamRef.of('alice@example.com', { name: 'email' });
     const filter = MongoFieldFilter.eq('email', param);
-    expect(await lowerFilter(filter)).toEqual({ email: { $eq: 'alice@example.com' } });
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
+      email: { $eq: 'alice@example.com' },
+    });
   });
 
   it('lowers MongoFieldFilter.isNull', async () => {
-    expect(await lowerFilter(MongoFieldFilter.isNull('bio'))).toEqual({ bio: { $eq: null } });
+    expect(await lowerFilter(MongoFieldFilter.isNull('bio'), registry, ctx)).toEqual({
+      bio: { $eq: null },
+    });
   });
 
   it('lowers MongoFieldFilter.isNotNull', async () => {
-    expect(await lowerFilter(MongoFieldFilter.isNotNull('bio'))).toEqual({ bio: { $ne: null } });
+    expect(await lowerFilter(MongoFieldFilter.isNotNull('bio'), registry, ctx)).toEqual({
+      bio: { $ne: null },
+    });
   });
 
   it('resolves nested MongoParamRef in document values', async () => {
     const param = MongoParamRef.of(42);
     const filter = MongoFieldFilter.of('data', '$elemMatch', { value: param });
-    expect(await lowerFilter(filter)).toEqual({ data: { $elemMatch: { value: 42 } } });
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
+      data: { $elemMatch: { value: 42 } },
+    });
   });
 
   it('encodes MongoParamRef field-filter values via the codec registry when provided', async () => {
@@ -142,7 +162,7 @@ describe('lowerFilter', () => {
     const param = MongoParamRef.of('alice', { codecId: 'test/uppercase@1' });
     const filter = MongoFieldFilter.eq('email', param);
 
-    expect(await lowerFilter(filter, registry)).toEqual({ email: { $eq: 'ALICE' } });
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({ email: { $eq: 'ALICE' } });
   });
 
   it('forwards the codec registry through composite filters', async () => {
@@ -166,7 +186,7 @@ describe('lowerFilter', () => {
       ]),
     ]);
 
-    expect(await lowerFilter(filter, registry)).toEqual({
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
       $and: [{ a: { $eq: 'A' } }, { $or: [{ b: { $eq: 'B' } }, { $nor: [{ c: { $eq: 'C' } }] }] }],
     });
   });
@@ -186,10 +206,10 @@ describe('lowerFilter', () => {
       MongoFieldFilter.eq('email', MongoParamRef.of('alice', { codecId: 'test/uppercase@1' })),
     );
 
-    expect(await lowerStage(matchStage, registry)).toEqual({
+    expect(await lowerStage(matchStage, registry, ctx)).toEqual({
       $match: { email: { $eq: 'ALICE' } },
     });
-    expect(await lowerPipeline([matchStage], registry)).toEqual([
+    expect(await lowerPipeline([matchStage], registry, ctx)).toEqual([
       { $match: { email: { $eq: 'ALICE' } } },
     ]);
   });
@@ -198,7 +218,7 @@ describe('lowerFilter', () => {
     const filter = MongoExprFilter.of(
       MongoAggOperator.of('$gt', [MongoAggFieldRef.of('qty'), MongoAggFieldRef.of('minQty')]),
     );
-    expect(await lowerFilter(filter)).toEqual({
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
       $expr: { $gt: ['$qty', '$minQty'] },
     });
   });
@@ -210,7 +230,7 @@ describe('lowerFilter', () => {
         MongoAggOperator.multiply(MongoAggFieldRef.of('discount'), MongoAggLiteral.of(2)),
       ]),
     );
-    expect(await lowerFilter(filter)).toEqual({
+    expect(await lowerFilter(filter, registry, ctx)).toEqual({
       $expr: { $gt: ['$price', { $multiply: ['$discount', 2] }] },
     });
   });
@@ -219,25 +239,27 @@ describe('lowerFilter', () => {
 describe('lowerStage', () => {
   it('lowers $match stage', async () => {
     const stage = new MongoMatchStage(MongoFieldFilter.eq('x', 1));
-    expect(await lowerStage(stage)).toEqual({ $match: { x: { $eq: 1 } } });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({ $match: { x: { $eq: 1 } } });
   });
 
   it('lowers $project stage', async () => {
     const stage = new MongoProjectStage({ name: 1, email: 1, _id: 0 });
-    expect(await lowerStage(stage)).toEqual({ $project: { name: 1, email: 1, _id: 0 } });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
+      $project: { name: 1, email: 1, _id: 0 },
+    });
   });
 
   it('lowers $sort stage', async () => {
     const stage = new MongoSortStage({ age: -1, name: 1 });
-    expect(await lowerStage(stage)).toEqual({ $sort: { age: -1, name: 1 } });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({ $sort: { age: -1, name: 1 } });
   });
 
   it('lowers $limit stage', async () => {
-    expect(await lowerStage(new MongoLimitStage(10))).toEqual({ $limit: 10 });
+    expect(await lowerStage(new MongoLimitStage(10), registry, ctx)).toEqual({ $limit: 10 });
   });
 
   it('lowers $skip stage', async () => {
-    expect(await lowerStage(new MongoSkipStage(5))).toEqual({ $skip: 5 });
+    expect(await lowerStage(new MongoSkipStage(5), registry, ctx)).toEqual({ $skip: 5 });
   });
 
   it('lowers $lookup stage without pipeline', async () => {
@@ -247,7 +269,7 @@ describe('lowerStage', () => {
       foreignField: 'authorId',
       as: 'userPosts',
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $lookup: {
         from: 'posts',
         localField: '_id',
@@ -265,7 +287,7 @@ describe('lowerStage', () => {
       as: 'userPosts',
       pipeline: [new MongoMatchStage(MongoFieldFilter.eq('published', true))],
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $lookup: {
         from: 'posts',
         localField: '_id',
@@ -278,14 +300,14 @@ describe('lowerStage', () => {
 
   it('lowers $unwind stage', async () => {
     const stage = new MongoUnwindStage('$posts', true);
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $unwind: { path: '$posts', preserveNullAndEmptyArrays: true },
     });
   });
 
   it('lowers $unwind stage with includeArrayIndex', async () => {
     const stage = new MongoUnwindStage('$items', false, 'itemIndex');
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $unwind: {
         path: '$items',
         preserveNullAndEmptyArrays: false,
@@ -299,7 +321,7 @@ describe('lowerStage', () => {
       total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
       count: MongoAggAccumulator.count(),
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $group: {
         _id: '$department',
         total: { $sum: '$amount' },
@@ -312,7 +334,7 @@ describe('lowerStage', () => {
     const stage = new MongoGroupStage(null, {
       total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')),
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $group: { _id: null, total: { $sum: '$amount' } },
     });
   });
@@ -325,7 +347,7 @@ describe('lowerStage', () => {
       },
       { total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')) },
     );
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $group: {
         _id: { dept: '$department', year: '$year' },
         total: { $sum: '$amount' },
@@ -341,7 +363,7 @@ describe('lowerStage', () => {
       },
       { total: MongoAggAccumulator.sum(MongoAggFieldRef.of('amount')) },
     );
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $group: {
         _id: { kind: '$type', dept: '$department' },
         total: { $sum: '$amount' },
@@ -357,7 +379,7 @@ describe('lowerStage', () => {
         MongoAggFieldRef.of('last'),
       ]),
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $addFields: {
         fullName: { $concat: ['$first', ' ', '$last'] },
       },
@@ -366,24 +388,24 @@ describe('lowerStage', () => {
 
   it('lowers $replaceRoot stage', async () => {
     const stage = new MongoReplaceRootStage(MongoAggFieldRef.of('address'));
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $replaceRoot: { newRoot: '$address' },
     });
   });
 
   it('lowers $count stage', async () => {
     const stage = new MongoCountStage('totalDocs');
-    expect(await lowerStage(stage)).toEqual({ $count: 'totalDocs' });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({ $count: 'totalDocs' });
   });
 
   it('lowers $sortByCount stage', async () => {
     const stage = new MongoSortByCountStage(MongoAggFieldRef.of('status'));
-    expect(await lowerStage(stage)).toEqual({ $sortByCount: '$status' });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({ $sortByCount: '$status' });
   });
 
   it('lowers $sample stage', async () => {
     const stage = new MongoSampleStage(10);
-    expect(await lowerStage(stage)).toEqual({ $sample: { size: 10 } });
+    expect(await lowerStage(stage, registry, ctx)).toEqual({ $sample: { size: 10 } });
   });
 
   it('lowers $redact stage', async () => {
@@ -395,7 +417,7 @@ describe('lowerStage', () => {
       ),
     );
     const thenKey = 'then';
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $redact: {
         $cond: Object.fromEntries([
           ['if', { $eq: ['$level', 5] }],
@@ -416,7 +438,7 @@ describe('lowerStage', () => {
       email: 1,
       _id: 0,
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $project: {
         fullName: { $concat: ['$first', ' ', '$last'] },
         email: 1,
@@ -432,7 +454,7 @@ describe('lowerStage', () => {
       let_: { userId: MongoAggFieldRef.of('_id') },
       pipeline: [new MongoMatchStage(MongoFieldFilter.eq('status', 'active'))],
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $lookup: {
         from: 'orders',
         as: 'matchingOrders',
@@ -691,17 +713,19 @@ describe('lowerAggExpr', () => {
 
 describe('lowerStage — new stages', () => {
   it('lowers $out with collection only', async () => {
-    expect(await lowerStage(new MongoOutStage('results'))).toEqual({ $out: 'results' });
+    expect(await lowerStage(new MongoOutStage('results'), registry, ctx)).toEqual({
+      $out: 'results',
+    });
   });
 
   it('lowers $out with db and collection', async () => {
-    expect(await lowerStage(new MongoOutStage('results', 'archive'))).toEqual({
+    expect(await lowerStage(new MongoOutStage('results', 'archive'), registry, ctx)).toEqual({
       $out: { db: 'archive', coll: 'results' },
     });
   });
 
   it('lowers $unionWith without pipeline', async () => {
-    expect(await lowerStage(new MongoUnionWithStage('other'))).toEqual({
+    expect(await lowerStage(new MongoUnionWithStage('other'), registry, ctx)).toEqual({
       $unionWith: { coll: 'other' },
     });
   });
@@ -710,7 +734,7 @@ describe('lowerStage — new stages', () => {
     const stage = new MongoUnionWithStage('other', [
       new MongoMatchStage(MongoFieldFilter.eq('status', 'active')),
     ]);
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $unionWith: {
         coll: 'other',
         pipeline: [{ $match: { status: { $eq: 'active' } } }],
@@ -725,7 +749,7 @@ describe('lowerStage — new stages', () => {
       default_: 'Other',
       output: { count: MongoAggAccumulator.sum(MongoAggLiteral.of(1)) },
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $bucket: {
         groupBy: '$price',
         boundaries: [0, 100, 500],
@@ -741,7 +765,7 @@ describe('lowerStage — new stages', () => {
       buckets: 5,
       granularity: 'R10',
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $bucketAuto: { groupBy: '$price', buckets: 5, granularity: 'R10' },
     });
   });
@@ -753,7 +777,7 @@ describe('lowerStage — new stages', () => {
       spherical: true,
       maxDistance: 5000,
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $geoNear: {
         near: { type: 'Point', coordinates: [-73.99, 40.73] },
         distanceField: 'dist.calculated',
@@ -769,7 +793,7 @@ describe('lowerStage — new stages', () => {
       distanceField: 'dist',
       query: MongoFieldFilter.eq('active', true),
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $geoNear: {
         near: [0, 0],
         distanceField: 'dist',
@@ -787,7 +811,7 @@ describe('lowerStage — new stages', () => {
       distanceMultiplier: 0.001,
       includeLocs: 'loc',
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $geoNear: {
         near: { type: 'Point', coordinates: [0, 0] },
         distanceField: 'dist',
@@ -806,7 +830,7 @@ describe('lowerStage — new stages', () => {
       ],
       countByStatus: [new MongoSortByCountStage(MongoAggFieldRef.of('status'))],
     });
-    const lowered = await lowerStage(stage);
+    const lowered = await lowerStage(stage, registry, ctx);
     expect(lowered).toEqual({
       $facet: {
         priceStats: [{ $group: { _id: null, avg: { $avg: '$price' } } }],
@@ -825,7 +849,7 @@ describe('lowerStage — new stages', () => {
       maxDepth: 3,
       depthField: 'depth',
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $graphLookup: {
         from: 'employees',
         startWith: '$reportsTo',
@@ -847,7 +871,7 @@ describe('lowerStage — new stages', () => {
       as: 'h',
       restrictSearchWithMatch: MongoFieldFilter.eq('active', true),
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $graphLookup: {
         from: 'e',
         startWith: '$mgr',
@@ -860,7 +884,7 @@ describe('lowerStage — new stages', () => {
   });
 
   it('lowers $merge with string into', async () => {
-    expect(await lowerStage(new MongoMergeStage({ into: 'output' }))).toEqual({
+    expect(await lowerStage(new MongoMergeStage({ into: 'output' }), registry, ctx)).toEqual({
       $merge: { into: 'output' },
     });
   });
@@ -872,7 +896,7 @@ describe('lowerStage — new stages', () => {
       whenMatched: [new MongoAddFieldsStage({ updated: MongoAggLiteral.of(true) })],
       whenNotMatched: 'insert',
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $merge: {
         into: { db: 'archive', coll: 'results' },
         on: '_id',
@@ -884,7 +908,7 @@ describe('lowerStage — new stages', () => {
 
   it('lowers $merge with string whenMatched', async () => {
     const stage = new MongoMergeStage({ into: 'output', whenMatched: 'replace' });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $merge: { into: 'output', whenMatched: 'replace' },
     });
   });
@@ -900,7 +924,7 @@ describe('lowerStage — new stages', () => {
         },
       },
     });
-    const lowered = await lowerStage(stage);
+    const lowered = await lowerStage(stage, registry, ctx);
     expect(lowered).toEqual({
       $setWindowFields: {
         partitionBy: '$state',
@@ -922,7 +946,7 @@ describe('lowerStage — new stages', () => {
         bad: { operator: MongoAggFieldRef.of('x') },
       },
     });
-    await expect(lowerStage(stage)).rejects.toThrow(
+    await expect(lowerStage(stage, registry, ctx)).rejects.toThrow(
       'Window field operator must lower to an object',
     );
   });
@@ -933,7 +957,7 @@ describe('lowerStage — new stages', () => {
       partitionByFields: ['sensorId'],
       range: { step: 1, unit: 'hour', bounds: 'full' },
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $densify: {
         field: 'timestamp',
         partitionByFields: ['sensorId'],
@@ -947,7 +971,7 @@ describe('lowerStage — new stages', () => {
       sortBy: { ts: 1 },
       output: { qty: { method: 'linear' } },
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $fill: {
         sortBy: { ts: 1 },
         output: { qty: { method: 'linear' } },
@@ -960,7 +984,7 @@ describe('lowerStage — new stages', () => {
       partitionBy: MongoAggFieldRef.of('region'),
       output: { price: { value: MongoAggLiteral.of(0) } },
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $fill: {
         partitionBy: '$region',
         output: { price: { value: 0 } },
@@ -970,14 +994,14 @@ describe('lowerStage — new stages', () => {
 
   it('lowers $search', async () => {
     const stage = new MongoSearchStage({ text: { query: 'hello', path: 'body' } }, 'myIndex');
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $search: { index: 'myIndex', text: { query: 'hello', path: 'body' } },
     });
   });
 
   it('lowers $searchMeta', async () => {
     const stage = new MongoSearchMetaStage({ facet: { operator: {} } });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $searchMeta: { facet: { operator: {} } },
     });
   });
@@ -991,7 +1015,7 @@ describe('lowerStage — new stages', () => {
       limit: 10,
       filter: { genre: 'drama' },
     });
-    expect(await lowerStage(stage)).toEqual({
+    expect(await lowerStage(stage, registry, ctx)).toEqual({
       $vectorSearch: {
         index: 'vec_idx',
         path: 'embedding',
@@ -1023,7 +1047,7 @@ describe('lowerPipeline', () => {
       new MongoProjectStage({ name: 1, email: 1, posts: 1 }),
     ];
 
-    const lowered = await lowerPipeline(stages);
+    const lowered = await lowerPipeline(stages, registry, ctx);
     expect(lowered).toEqual([
       {
         $match: {

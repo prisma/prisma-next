@@ -20,5 +20,5 @@ export type {
   TargetDescriptor,
   TargetInstance,
   TargetPackRef,
-} from '../framework-components';
-export { checkContractComponentRequirements } from '../framework-components';
+} from '../shared/framework-components';
+export { checkContractComponentRequirements } from '../shared/framework-components';

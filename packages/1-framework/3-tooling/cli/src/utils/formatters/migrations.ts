@@ -1,7 +1,40 @@
+import type { OperationPreview } from '@prisma-next/framework-components/control';
 import { green, yellow } from 'colorette';
 
 import type { GlobalFlags } from '../global-flags';
 import { createColorFormatter, formatDim, isVerbose } from './helpers';
+
+/**
+ * Render a single statement of an `OperationPreview` for the human-readable
+ * preview block. SQL statements get a trailing `;` if missing — matches the
+ * legacy `string[]`-based renderer byte-for-byte (per spec OQ-4). Other
+ * languages (`'mongodb-shell'`) render verbatim.
+ */
+function renderPreviewStatement(text: string, language: string): string | undefined {
+  const trimmed = text.trim();
+  if (!trimmed) return undefined;
+  if (language === 'sql') {
+    return trimmed.endsWith(';') ? trimmed : `${trimmed};`;
+  }
+  return trimmed;
+}
+
+/**
+ * Choose the header label for a preview block. SQL-only previews keep the
+ * legacy `DDL preview` label (preserves CLI byte-identity for SQL targets per
+ * spec OQ-4); previews from any other family — or a mix that includes any
+ * non-SQL language — use the family-agnostic `Operation preview` label.
+ *
+ * An empty `statements` array deliberately renders as `Operation preview`
+ * rather than `DDL preview`: `Array.prototype.every` is vacuously true for
+ * empty arrays, but we have no evidence the preview is SQL-only when no
+ * statements are present, so the family-agnostic label is the safer default.
+ */
+export function previewBlockHeader(preview: OperationPreview): string {
+  const allSql =
+    preview.statements.length > 0 && preview.statements.every((s) => s.language === 'sql');
+  return allSql ? 'DDL preview' : 'Operation preview';
+}
 
 // ============================================================================
 // Migration Command Output Formatters (shared by db init and db update)
@@ -24,7 +57,12 @@ export interface MigrationCommandResult {
       readonly label: string;
       readonly operationClass: string;
     }[];
-    readonly sql?: readonly string[];
+    /**
+     * Family-agnostic textual preview of the planned operations. Replaces the
+     * previous `sql?: readonly string[]`. Consumers should read
+     * `plan.preview?.statements`.
+     */
+    readonly preview?: OperationPreview;
   };
   readonly execution?: {
     readonly operationsPlanned: number;
@@ -92,20 +130,20 @@ export function formatMigrationPlanOutput(
     lines.push(`${formatDimText(`Destination hash: ${result.plan.destination.storageHash}`)}`);
   }
 
-  // SQL DDL preview (SQL family only)
-  const planSql = result.plan?.sql;
-  if (planSql) {
+  // Statement preview (any family that implements OperationPreviewCapable)
+  const preview = result.plan?.preview;
+  if (preview) {
     lines.push('');
-    lines.push(`${formatDimText('DDL preview')}`);
-    if (planSql.length === 0) {
-      lines.push(`${formatDimText('No DDL operations.')}`);
+    lines.push(`${formatDimText(previewBlockHeader(preview))}`);
+    if (preview.statements.length === 0) {
+      lines.push(`${formatDimText('No operations.')}`);
     } else {
       lines.push('');
-      for (const statement of planSql) {
-        const trimmed = statement.trim();
-        if (!trimmed) continue;
-        const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
-        lines.push(`${line}`);
+      for (const statement of preview.statements) {
+        const rendered = renderPreviewStatement(statement.text, statement.language);
+        if (rendered) {
+          lines.push(rendered);
+        }
       }
     }
   }
@@ -190,7 +228,7 @@ interface MigrationShowResult {
     readonly label: string;
     readonly operationClass: string;
   }[];
-  readonly sql: readonly string[];
+  readonly preview: OperationPreview;
   readonly summary: string;
 }
 
@@ -237,15 +275,15 @@ export function formatMigrationShowOutput(result: MigrationShowResult, flags: Gl
     }
   }
 
-  if (result.sql.length > 0) {
+  if (result.preview.statements.length > 0) {
     lines.push('');
-    lines.push(`${formatDimText('DDL preview')}`);
+    lines.push(`${formatDimText(previewBlockHeader(result.preview))}`);
     lines.push('');
-    for (const statement of result.sql) {
-      const trimmed = statement.trim();
-      if (!trimmed) continue;
-      const line = trimmed.endsWith(';') ? trimmed : `${trimmed};`;
-      lines.push(`${line}`);
+    for (const statement of result.preview.statements) {
+      const rendered = renderPreviewStatement(statement.text, statement.language);
+      if (rendered) {
+        lines.push(rendered);
+      }
     }
   }
 

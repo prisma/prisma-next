@@ -36,6 +36,37 @@ The base `Codec` interface lands on the seam between **query-time** methods (per
 
 There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
 
+### Codec call context (`ctx`)
+
+Codecs receive a second `ctx` options argument; you may ignore it. The runtime allocates one `CodecCallContext` per `execute()` call and threads the same reference to every codec dispatch site as a non-optional argument — when no `signal` is supplied the runtime still threads an empty `{}`, never `undefined`. The framework `CodecCallContext` is signal-only:
+
+```ts
+export interface CodecCallContext {
+  readonly signal?: AbortSignal;
+}
+```
+
+The internal `Codec` interface declares the parameter as required:
+
+```ts
+encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
+decode(wire: TWire, ctx: CodecCallContext): Promise<TInput>;
+```
+
+Codec authors who write `(value) => …` continue to compile via TypeScript's bivariance for trailing parameters; nothing at the author surface changes.
+
+Family layers extend the context where they have a per-call concept that doesn't generalise. SQL declares `SqlCodecCallContext extends CodecCallContext { column?: SqlColumnRef }` (see `@prisma-next/sql-relational-core`); Mongo continues to use the framework type directly. Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to network SDKs:
+
+```ts
+// Sketch — actual factory lives in a family package (codec() / mongoCodec()).
+encode: async (v: string, ctx) =>
+  kms.encrypt({ plaintext: v }, { signal: ctx?.signal });
+```
+
+Aborts surface to the caller as `RUNTIME.ABORTED` with `details.phase ∈ { 'encode', 'decode', 'stream' }`. Codec bodies that ignore the signal complete in the background (cooperative cancellation). The `runtimeAborted(phase, cause?)` envelope helper and the `raceAgainstAbort(work, signal, phase)` race helper are exported from `@prisma-next/framework-components/runtime`.
+
+See [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) for the full design.
+
 ## Why SPI types live here (dependency inversion)
 
 This package sits in the **core** layer — below the tooling layer where family-specific emitters and control implementations live. SPI interfaces like `EmissionSpi` define the contract between framework orchestration code (control-plane emission, CLI) and family-specific implementations (SQL emitter, Mongo emitter).

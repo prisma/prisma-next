@@ -1,12 +1,12 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import type { ExecutionPlan } from '../src/query-plan';
-import { runWithMiddleware } from '../src/run-with-middleware';
+import type { ExecutionPlan } from '../src/execution/query-plan';
+import { runWithMiddleware } from '../src/execution/run-with-middleware';
 import type {
   AfterExecuteResult,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
-} from '../src/runtime-middleware';
+} from '../src/execution/runtime-middleware';
 
 const meta: PlanMeta = {
   target: 'mock',

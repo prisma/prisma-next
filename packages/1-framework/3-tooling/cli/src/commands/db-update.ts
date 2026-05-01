@@ -112,7 +112,7 @@ async function executeDbUpdateCommand(
           label: op.label,
           operationClass: op.operationClass,
         })),
-        ...ifDefined('sql', result.value.plan.sql),
+        ...ifDefined('preview', result.value.plan.preview),
       },
       ...ifDefined(
         'execution',

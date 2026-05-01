@@ -4,8 +4,8 @@ import type {
   RuntimeDriverDescriptor,
   RuntimeExtensionDescriptor,
   RuntimeTargetDescriptor,
-} from '../src/execution-descriptors';
-import { createExecutionStack, instantiateExecutionStack } from '../src/execution-stack';
+} from '../src/execution/execution-descriptors';
+import { createExecutionStack, instantiateExecutionStack } from '../src/execution/execution-stack';
 
 describe('createExecutionStack', () => {
   const target: RuntimeTargetDescriptor<'sql', 'postgres'> = {

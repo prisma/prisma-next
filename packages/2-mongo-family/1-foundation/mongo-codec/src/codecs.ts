@@ -1,5 +1,9 @@
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { Codec as BaseCodec, CodecTrait } from '@prisma-next/framework-components/codec';
+import type {
+  Codec as BaseCodec,
+  CodecCallContext,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type MongoCodecTrait = CodecTrait;
@@ -44,13 +48,14 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  * Author `encode` and `decode` as sync or async functions; the factory
  * produces a {@link MongoCodec} whose query-time methods follow the
  * boundary contract documented on the framework {@link BaseCodec}.
+ * Authors receive a second `ctx` options argument carrying the per-call
+ * context; ignore it if you don't need it.
  *
- * `encode` is optional — when omitted, an identity default is installed
- * (declaring "the input value already is the wire value", so `TInput` and
- * `TWire` are interchangeable for that codec). `decode` is always
- * required. `encodeJson` and `decodeJson` default to identity **only when
- * `TInput` is assignable to `JsonValue`**; otherwise both are required so
- * the contract artifact stays JSON-safe.
+ * Both `encode` and `decode` are required so `TInput` and `TWire` are
+ * always covered by an explicit author function — the factory installs
+ * no identity fallback. `encodeJson` and `decodeJson` default to identity
+ * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
+ * required so the contract artifact stays JSON-safe.
  */
 export function mongoCodec<
   Id extends string,
@@ -62,16 +67,19 @@ export function mongoCodec<
     typeId: Id;
     targetTypes: readonly string[];
     traits?: TTraits;
-    encode?: (value: TInput) => TWire | Promise<TWire>;
-    decode: (wire: TWire) => TInput | Promise<TInput>;
+    encode: (value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>;
+    decode: (wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>;
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
-  // The synchronous identity default is only safe when the author has
-  // declared "the input is already the wire value" (i.e. TInput == TWire);
-  // it returns the value directly, never a Promise.
-  const userEncode = config.encode ?? ((value: TInput) => value as unknown as TWire);
+  // The runtime allocates one `CodecCallContext` per `runtime.execute()`
+  // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
+  // and threads it as a non-optional reference to every codec call. The
+  // author surface keeps the second parameter optional so single-arg
+  // `(value) => …` authors continue to satisfy the signature via
+  // TypeScript's bivariance for trailing parameters.
+  const userEncode = config.encode;
   const userDecode = config.decode;
   const widenedConfig = config as {
     encodeJson?: (value: TInput) => JsonValue;
@@ -85,16 +93,16 @@ export function mongoCodec<
       config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
     ),
     ...ifDefined('renderOutputType', config.renderOutputType),
-    encode: (value) => {
+    encode: (value, ctx) => {
       try {
-        return Promise.resolve(userEncode(value));
+        return Promise.resolve(userEncode(value, ctx));
       } catch (error) {
         return Promise.reject(error);
       }
     },
-    decode: (wire) => {
+    decode: (wire, ctx) => {
       try {
-        return Promise.resolve(userDecode(wire));
+        return Promise.resolve(userDecode(wire, ctx));
       } catch (error) {
         return Promise.reject(error);
       }

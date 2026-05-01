@@ -1,11 +1,11 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { assertType, expectTypeOf, test } from 'vitest';
-import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
+import type { ExecutionPlan, QueryPlan } from '../src/execution/query-plan';
 import type {
   RuntimeExecutor,
   RuntimeMiddleware,
   RuntimeMiddlewareContext,
-} from '../src/runtime-middleware';
+} from '../src/execution/runtime-middleware';
 
 test('framework ExecutionPlan satisfies RuntimeExecutor plan constraint', () => {
   type Executor = RuntimeExecutor<ExecutionPlan>;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { AuthoringTypeConstructorDescriptor } from '../src/framework-authoring';
+import type { AuthoringTypeConstructorDescriptor } from '../src/shared/framework-authoring';
 import {
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
@@ -8,7 +8,7 @@ import {
   isAuthoringTypeConstructorDescriptor,
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
-} from '../src/framework-authoring';
+} from '../src/shared/framework-authoring';
 
 describe('authoring template resolution', () => {
   it('detects authoring descriptor kinds', () => {

@@ -19,7 +19,73 @@
       "plane": "shared"
     },
     {
-      "glob": "packages/1-framework/1-core/framework-components/**",
+      "glob": "packages/1-framework/1-core/framework-components/src/shared/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/control/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/execution/**",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/authoring.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/codec.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/components.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "shared"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/control.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/emission.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/execution.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/psl-ast.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "migration"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/src/exports/runtime.ts",
+      "domain": "framework",
+      "layer": "core",
+      "plane": "runtime"
+    },
+    {
+      "glob": "packages/1-framework/1-core/framework-components/test/**",
       "domain": "framework",
       "layer": "core",
       "plane": "shared"

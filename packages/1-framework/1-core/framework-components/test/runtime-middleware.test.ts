@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { checkMiddlewareCompatibility, type RuntimeMiddleware } from '../src/runtime-middleware';
+import {
+  checkMiddlewareCompatibility,
+  type RuntimeMiddleware,
+} from '../src/execution/runtime-middleware';
 
 describe('checkMiddlewareCompatibility', () => {
   it('accepts a generic middleware (no familyId) for any runtime', () => {

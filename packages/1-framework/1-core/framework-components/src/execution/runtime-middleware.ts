@@ -1,0 +1,103 @@
+import type { AsyncIterableResult } from './async-iterable-result';
+import type { QueryPlan } from './query-plan';
+import { runtimeError } from './runtime-error';
+
+export interface RuntimeLog {
+  info(event: unknown): void;
+  warn(event: unknown): void;
+  error(event: unknown): void;
+  debug?(event: unknown): void;
+}
+
+export interface RuntimeMiddlewareContext {
+  readonly contract: unknown;
+  readonly mode: 'strict' | 'permissive';
+  readonly now: () => number;
+  readonly log: RuntimeLog;
+}
+
+export interface AfterExecuteResult {
+  readonly rowCount: number;
+  readonly latencyMs: number;
+  readonly completed: boolean;
+}
+
+/**
+ * Family-agnostic middleware SPI parameterized over the plan marker.
+ *
+ * `TPlan` defaults to the framework `QueryPlan` marker so a generic
+ * middleware (e.g. cross-family telemetry) can be authored without
+ * naming a family. Family-specific middleware (`SqlMiddleware`,
+ * `MongoMiddleware`) narrow `TPlan` to their concrete plan type.
+ */
+export interface RuntimeMiddleware<TPlan extends QueryPlan = QueryPlan> {
+  readonly name: string;
+  readonly familyId?: string;
+  readonly targetId?: string;
+  beforeExecute?(plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
+  onRow?(row: Record<string, unknown>, plan: TPlan, ctx: RuntimeMiddlewareContext): Promise<void>;
+  afterExecute?(
+    plan: TPlan,
+    result: AfterExecuteResult,
+    ctx: RuntimeMiddlewareContext,
+  ): Promise<void>;
+}
+
+/**
+ * Optional per-`execute` options accepted by every family runtime.
+ *
+ * `signal` is the per-query cancellation signal. The runtime threads the
+ * signal through to every codec call for the query and uses it to short-
+ * circuit the row stream with `RUNTIME.ABORTED` when the caller aborts.
+ * Omitting the option (or passing `undefined`) preserves today's behavior
+ * bit-for-bit.
+ */
+export interface RuntimeExecuteOptions {
+  readonly signal?: AbortSignal;
+}
+
+/**
+ * Cross-family SPI for any runtime that can execute plans and be shut down.
+ * Each family runtime (SQL, Mongo) satisfies this interface — SQL nominally,
+ * Mongo structurally (due to its phantom Row parameter using a unique symbol).
+ *
+ * The `_row` intersection on `execute` connects the `Row` type parameter to the
+ * plan, mirroring how `QueryPlan<Row>` carries a phantom `_row?: Row`.
+ */
+export interface RuntimeExecutor<TPlan extends QueryPlan> {
+  execute<Row>(
+    plan: TPlan & { readonly _row?: Row },
+    options?: RuntimeExecuteOptions,
+  ): AsyncIterableResult<Row>;
+  close(): Promise<void>;
+}
+
+export function checkMiddlewareCompatibility(
+  middleware: RuntimeMiddleware,
+  runtimeFamilyId: string,
+  runtimeTargetId: string,
+): void {
+  if (middleware.targetId !== undefined && middleware.familyId === undefined) {
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_INCOMPATIBLE',
+      `Middleware '${middleware.name}' specifies targetId '${middleware.targetId}' without familyId`,
+      { middleware: middleware.name, targetId: middleware.targetId },
+    );
+  }
+
+  if (middleware.familyId !== undefined && middleware.familyId !== runtimeFamilyId) {
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_FAMILY_MISMATCH',
+      `Middleware '${middleware.name}' requires family '${middleware.familyId}' but the runtime is configured for family '${runtimeFamilyId}'`,
+      { middleware: middleware.name, middlewareFamilyId: middleware.familyId, runtimeFamilyId },
+    );
+  }
+
+  if (middleware.targetId !== undefined && middleware.targetId !== runtimeTargetId) {
+    throw runtimeError(
+      'RUNTIME.MIDDLEWARE_TARGET_MISMATCH',
+      `Middleware '${middleware.name}' requires target '${middleware.targetId}' but the runtime is configured for target '${runtimeTargetId}'`,
+      { middleware: middleware.name, middlewareTargetId: middleware.targetId, runtimeTargetId },
+    );
+  }
+}

@@ -61,6 +61,7 @@ describe('renderLoweredSql cast policy', () => {
     const fooCodec: Codec = codec({
       typeId: 'app/test-foo@1',
       targetTypes: ['foo'],
+      encode: (value: string): string => value,
       decode: (wire: string): string => wire,
       meta: { db: { sql: { postgres: { nativeType: 'foo' } } } },
     });
@@ -78,6 +79,7 @@ describe('renderLoweredSql cast policy', () => {
     const integerCodec: Codec = codec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
+      encode: (value: number): number => value,
       decode: (wire: number): number => wire,
       meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
     });
@@ -95,6 +97,7 @@ describe('renderLoweredSql cast policy', () => {
     const enumCodec: Codec = codec({
       typeId: 'pg/enum@1',
       targetTypes: ['enum'],
+      encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
     const lookup: CodecLookup = {
@@ -153,6 +156,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     const geographyCodec: Codec = codec({
       typeId: 'app/geography@1',
       targetTypes: ['geography'],
+      encode: (value: string): string => value,
       decode: (wire: string): string => wire,
       meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
     });
