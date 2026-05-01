@@ -25,6 +25,10 @@ import type {
   SqlQueryable,
   SqlTransaction,
 } from '@prisma-next/sql-relational-core/ast';
+import {
+  createSqlParamRefMutator,
+  type SqlParamRefMutator,
+} from '@prisma-next/sql-relational-core/middleware';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import type {
   CodecDescriptorRegistry,
@@ -208,6 +212,12 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
    * framework abstract typed this as `CodecCallContext`; the SQL family
    * narrows it to the SQL-specific extension. SQL params do not populate
    * `ctx.column` — encode-side column metadata is the middleware's domain.
+   *
+   * Retained for the inherited `RuntimeCore.execute` path; the SQL runtime
+   * itself overrides `execute` to defer encoding until after the
+   * `beforeExecute` middleware chain runs (so middleware can mutate
+   * `ParamRef.value` slots before encode), so `executeAgainstQueryable`
+   * never calls this method.
    */
   protected override async lower(
     plan: SqlQueryPlan,
@@ -276,18 +286,34 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     // ctx object is always allocated; the `signal` field is only included
     // when a signal was supplied (exactOptionalPropertyTypes).
     const codecCtx: SqlCodecCallContext = signal === undefined ? {} : { signal };
+    // Per-execute view of the middleware ctx that carries the per-query
+    // signal. `self.ctx` is allocated once at construction (no signal); we
+    // shallow-clone it here so middleware sees the same `AbortSignal`
+    // reference threaded into `codecCtx.signal` (ADR 207 identity).
+    const execMiddlewareCtx = signal === undefined ? self.ctx : { ...self.ctx, signal };
 
     const generator = async function* (): AsyncGenerator<Row, void, unknown> {
       checkAborted(codecCtx, 'stream');
 
-      const exec: SqlExecutionPlan = isExecutionPlan(plan)
-        ? Object.freeze({
-            ...plan,
-            params: await encodeParams(plan, self.codecRegistry, codecCtx, self.contractCodecs),
-          })
-        : await self.lower(await self.runBeforeCompile(plan), codecCtx);
+      // Lower without encoding so `beforeExecute` middleware can mutate
+      // `ParamRef.value` slots before any `codec.encode` call runs.
+      // `lowered.params` carries the AST's raw values for both branches
+      // (`SqlExecutionPlan` callers pass in already-lowered SQL + raw
+      // params; `SqlQueryPlan` callers go through the lane → adapter
+      // lowering, which extracts params from `collectOrderedParamRefs`).
+      const lowered: SqlExecutionPlan = isExecutionPlan(plan)
+        ? plan
+        : Object.freeze(
+            lowerSqlPlan(self.adapter, self.contract, await self.runBeforeCompile(plan)),
+          );
 
-      self.familyAdapter.validatePlan(exec, self.contract);
+      // `mutator` is built once per execute() and exposes the plan's
+      // outbound `ParamRef` slots to `beforeExecute`. If no middleware
+      // mutates, `mutator.currentParams()` returns `lowered.params` by
+      // reference identity (AC-MUT5).
+      const mutator = createSqlParamRefMutator(lowered);
+
+      self.familyAdapter.validatePlan(lowered, self.contract);
       self._telemetry = null;
 
       if (!self.startupVerified && self.verify.mode === 'startup') {
@@ -306,15 +332,40 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
           await self.verifyMarker();
         }
 
-        const stream = runWithMiddleware<SqlExecutionPlan, Record<string, unknown>>(
-          exec,
+        // The runDriver thunk is invoked by `runWithMiddleware` AFTER
+        // every `beforeExecute` body has settled. At that point the
+        // mutator carries any mutations the chain made; we read them,
+        // run `encodeParams` once, and hand the encoded params to the
+        // driver. Encoding therefore runs exactly once per execute()
+        // and middleware sees pre-encode (raw) values throughout.
+        const stream = runWithMiddleware<
+          SqlExecutionPlan,
+          Record<string, unknown>,
+          SqlParamRefMutator
+        >(
+          lowered,
           self.middleware,
-          self.ctx,
-          () =>
-            queryable.execute<Record<string, unknown>>({
-              sql: exec.sql,
-              params: exec.params,
-            }),
+          execMiddlewareCtx,
+          (): AsyncIterable<Record<string, unknown>> => ({
+            async *[Symbol.asyncIterator]() {
+              const finalParams = mutator.currentParams();
+              const planForEncode: SqlExecutionPlan =
+                finalParams === lowered.params ? lowered : { ...lowered, params: finalParams };
+              const encoded = await encodeParams(
+                planForEncode,
+                self.codecRegistry,
+                codecCtx,
+                self.contractCodecs,
+              );
+              for await (const row of queryable.execute<Record<string, unknown>>({
+                sql: lowered.sql,
+                params: encoded,
+              })) {
+                yield row;
+              }
+            },
+          }),
+          mutator,
         );
 
         // Manually drive the driver's async iterator so the between-row
@@ -332,7 +383,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
             }
             const decodedRow = await decodeRow(
               next.value,
-              exec,
+              lowered,
               self.codecRegistry,
               self.jsonSchemaValidators,
               codecCtx,
@@ -353,7 +404,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         throw error;
       } finally {
         if (outcome !== null) {
-          self.recordTelemetry(exec, outcome, Date.now() - startedAt);
+          self.recordTelemetry(lowered, outcome, Date.now() - startedAt);
         }
       }
     };

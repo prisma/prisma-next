@@ -42,6 +42,7 @@
     "./ast": "./dist/exports/ast.mjs",
     "./errors": "./dist/exports/errors.mjs",
     "./expression": "./dist/exports/expression.mjs",
+    "./middleware": "./dist/exports/middleware.mjs",
     "./plan": "./dist/exports/plan.mjs",
     "./query-lane-context": "./dist/exports/query-lane-context.mjs",
     "./types": "./dist/exports/types.mjs",
