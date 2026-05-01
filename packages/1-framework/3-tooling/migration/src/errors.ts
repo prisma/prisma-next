@@ -152,7 +152,7 @@ export function errorSameSourceAndTarget(dir: string, hash: string): MigrationTo
   const dirName = basename(dir);
   return new MigrationToolsError(
     'MIGRATION.SAME_SOURCE_AND_TARGET',
-    'Migration with no operations has same source and target',
+    'Migration without data-transform operations has same source and target',
     {
       why: `Migration "${dirName}" has from === to === "${hash}" and declares no data-transform operations. Self-edges are only allowed when the migration runs at least one dataTransform — otherwise the migration is a no-op.`,
       fix: reemitHint(
