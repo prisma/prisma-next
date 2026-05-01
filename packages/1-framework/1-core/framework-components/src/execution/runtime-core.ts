@@ -1,8 +1,8 @@
 import type { CodecCallContext } from '../shared/codec-types';
 import { AsyncIterableResult } from './async-iterable-result';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
+import { checkAborted } from './race-against-abort';
 import { runWithMiddleware } from './run-with-middleware';
-import { runtimeAborted } from './runtime-error';
 import type {
   RuntimeExecuteOptions,
   RuntimeExecutor,
@@ -114,9 +114,7 @@ export abstract class RuntimeCore<
     async function* generator(): AsyncGenerator<Row, void, unknown> {
       // Pre-check the signal at entry so an already-aborted caller observes
       // RUNTIME.ABORTED on the first `next()` without any work being done.
-      if (signal?.aborted) {
-        throw runtimeAborted('stream', signal.reason);
-      }
+      checkAborted(codecCtx, 'stream');
 
       const compiled = await self.runBeforeCompile(plan);
       const exec = await self.lower(compiled, codecCtx);
