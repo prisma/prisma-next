@@ -1,6 +1,6 @@
 # Summary
 
-Data migrations are data transformation operations that execute as part of a migration edge in the graph. All migrations — structural and data — are authored in TypeScript as target-agnostic operation chains. At verification time the target adapter lowers the chain into a serialized target-native operation form and stores it in `ops.json` (for SQL targets this takes a `{ sql, params }` shape; document targets serialize their operations with a comparable shape appropriate to that target). At apply time the runner hands the serialized operations to the target adapter for execution — no TypeScript is loaded. Data transforms are first-class operations in the chain, positioned by the planner at the correct point between structural ops. Data transforms can opt into being routing-visible via `invariantId`; the routing layer (path selection on refs, marker-side applied-invariant storage, structured errors) is specced separately in `invariant-aware-routing.spec.md`.
+Data migrations are data transformation operations that execute as part of a migration edge in the graph. All migrations — structural and data — are authored in TypeScript as target-agnostic operation chains. At verification time the target adapter lowers the chain into a serialized target-native operation form and stores it in `ops.json` (for SQL targets this takes a `{ sql, params }` shape; document targets serialize their operations with a comparable shape appropriate to that target). At apply time the runner hands the serialized operations to the target adapter for execution — no TypeScript is loaded. Data transforms are first-class operations in the chain, positioned by the planner at the correct point between structural ops. Data transforms can opt into being routing-visible via `invariantId`; the routing layer (path selection on refs, marker-side applied-invariant storage, structured errors) is recorded in [ADR 208 — Invariant-aware migration routing](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 
 # Description
 
@@ -256,7 +256,7 @@ The transaction model is composable — the user annotates individual operations
 
 ## Graph integration (R7, R8)
 
-Graph integration and invariant-aware routing are specced in `invariant-aware-routing.spec.md`. In brief: data transforms opt into routing visibility via `invariantId?: string`; `migration.json` carries the attestation-covered aggregate `providedInvariants`; the marker table stores the applied-invariants set; and `migration apply --ref` / `migration status --ref` route through the shortest path covering the ref's required invariants minus what's already applied. Per-invariant ledger provenance is deferred (see that spec's Deferred section).
+Graph integration and invariant-aware routing are documented in [ADR 208 — Invariant-aware migration routing](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md). In brief: data transforms opt into routing visibility via `invariantId?: string`; `migration.json` carries the attestation-covered aggregate `providedInvariants`; the marker table stores the applied-invariants set; and `migration apply --ref` / `migration status --ref` route through the shortest path covering the ref's required invariants minus what's already applied. Per-invariant ledger provenance is deferred (see ADR 208 §Verification / umbrella deferred items).
 
 ## Operation builder API
 
@@ -338,7 +338,7 @@ dataTransform(name, {
 // name is the retry/ledger identity — used by the runner's check to decide whether a
 // transform has already run against a database. invariantId, when set, is the opt-in
 // routing key — the identity refs reference and the routing layer reads. See
-// invariant-aware-routing.spec.md §D4.
+// ADR 208 — Invariant-aware routing (D4 identity split).
 ```
 
 ### Type operations
@@ -407,7 +407,7 @@ These document the major design choices, the alternatives considered, and why we
 
 ## D2. Name over semantic postconditions; honest about what invariants are
 
-> **Refined by `invariant-aware-routing.spec.md` §D4.** `name` retains its retry/ledger-identity role described below. The routing-visible invariant identity is now a separate, opt-in `invariantId?: string` field on `DataTransformOperation`. The discussion here remains a valid design note on identity-by-name vs. semantic postconditions.
+> **Refined by [ADR 208 — Invariant-aware migration routing](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md) (D4).** `name` retains its retry/ledger-identity role described below. The routing-visible invariant identity is now a separate, opt-in `invariantId?: string` field on `DataTransformOperation`. The discussion here remains a valid design note on identity-by-name vs. semantic postconditions.
 
 **Decision**: The system tracks data migrations by **name** (identity, human-readable). The invariant is "named data migration X was applied."
 
@@ -486,7 +486,7 @@ These document the major design choices, the alternatives considered, and why we
 
 - [ ] Migration application is recorded in the ledger on edge completion (retry/apply history — ledger semantics not owned by this spec)
 
-See `invariant-aware-routing.spec.md` for acceptance criteria covering ref-declared required invariants, path selection, and marker-side applied-invariants storage.
+See [ADR 208 — Invariant-aware migration routing](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md) §Verification for acceptance-style coverage and architecture decisions covering ref-declared required invariants, path selection, and marker-side applied-invariants storage.
 
 ## Rollback
 
@@ -502,7 +502,7 @@ See `invariant-aware-routing.spec.md` for acceptance criteria covering ref-decla
 - **Runtime no-op detection**: Mock-style verification that transforms actually modified data. Future safety layer.
 - **Content hash drift detection**: Descoped — the `migration.ts` is not part of `edgeId`, serialized ASTs have integrity via `edgeId`, and cross-environment comparison requires shared state.
 - **Question-tree UX**: Interactive diff-driven authoring. Future layer.
-- **Invariant routing**: Specced and scoped in `invariant-aware-routing.spec.md`. Ref management (`migration ref set/list/rm`) already landed; CLI surface for editing a ref's `invariants` array remains deferred in that spec.
+- **Invariant routing**: Documented in [ADR 208](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md). Ref management (`migration ref set/list/rm`) already landed; CLI surface for editing a ref's `invariants` array remains deferred.
 
 # Open Questions
 
@@ -549,7 +549,7 @@ See `invariant-aware-routing.spec.md` for acceptance criteria covering ref-decla
 ## Observability
 
 - The runner logs data migration start/completion/failure with the migration name and transaction mode.
-- The ledger records migration applications (retry/apply history). The applied-invariants set (what `invariantId`s the database has seen) lives on the marker; see `invariant-aware-routing.spec.md`.
+- The ledger records migration applications (retry/apply history). The applied-invariants set (what `invariantId`s the database has seen) lives on the marker; see [ADR 208](../../docs/architecture%20docs/adrs/ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 
 # References
 
