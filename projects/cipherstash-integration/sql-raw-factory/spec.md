@@ -6,7 +6,7 @@ Implement the user-facing `raw\`...\`` SQL factory the framework's type declarat
 
 `packages/2-sql/4-lanes/relational-core/src/types.ts:259` declares `RawFactory` and `RawTemplateFactory` as TypeScript interfaces. The `SqlExecutionPlan` docstring refers to "lane-level utilities (`RawTemplateFactory`, `RawFactory`, `SqlPlan`)." But there is no implementation: searching `packages/` finds zero modules that export a `raw` symbol satisfying the interface. The only places `lane: 'raw'` appears in production code are *test fixtures* that hand-construct `SqlExecutionPlan` object literals. Users who need raw SQL today have no public path.
 
-This project ships the public factory. It does **not** ship the underlying `RawSqlExpr` AST node — that lands separately in [`projects/cipherstash-integration/specs/raw-sql-ast-node.spec.md`](../cipherstash-integration/specs/raw-sql-ast-node.spec.md), driven by cipherstash's migration-factories needs and timed independently. This project is the *consumer* of that AST node, adding the user-facing typed-template-literal surface and the SQL-injection-defense affordances.
+This project ships the public factory. It does **not** ship the underlying `RawSqlExpr` AST node — that lands separately in the [raw-sql-ast-node task spec](../project-1/specs/raw-sql-ast-node.spec.md) under [Project 1](../project-1/spec.md) of the umbrella, driven by cipherstash's migration-factories needs and timed independently. This project is the *consumer* of that AST node, adding the user-facing typed-template-literal surface and the SQL-injection-defense affordances.
 
 The cleavage:
 
@@ -143,7 +143,7 @@ Default: ship Level 0 first; gather feedback; polish to Level 1 if user reports 
 
 ## Non-goals
 
-- **`RawSqlExpr` AST node and its lowerer arm for `'param-ref'` and inlined Expressions.** Those live in [`projects/cipherstash-integration/specs/raw-sql-ast-node.spec.md`](../cipherstash-integration/specs/raw-sql-ast-node.spec.md). This project consumes that work.
+- **`RawSqlExpr` AST node and its lowerer arm for `'param-ref'` and inlined Expressions.** Those live in the [raw-sql-ast-node task spec](../project-1/specs/raw-sql-ast-node.spec.md) under Project 1. This project consumes that work.
 - **Inlined-string raw SQL** (i.e. `raw('SELECT * FROM users')` with no params). The user can write `raw\`SELECT * FROM users\`` (an empty template literal); explicit-string-form `raw('...')` is unnecessary surface area. The dropped second call signature reflects this.
 - **Raw SQL fragments as sub-expressions.** A `rawExpr\`...\`` that produces an `AnyExpression` (for use as a `WHERE` clause fragment, etc.) is a related but separate concern — defer to a follow-up if there's demand.
 - **Type-level row inference from the SQL string.** Tools that parse SQL at compile-time to recover row types (à la Slonik / pg-typed) are out of scope; users supply row types explicitly via a generic on `raw\`...\`` if they want type narrowing.
@@ -180,7 +180,7 @@ Default: ship Level 0 first; gather feedback; polish to Level 1 if user reports 
 ## Composition with existing surfaces
 
 - [ ] **AC-COMP1**: A raw plan executes against a real Postgres database and returns the expected rows.
-- [ ] **AC-COMP2**: A raw plan's `ParamRef`s are visible to `RuntimeMiddleware.beforeExecute`'s `params.entries()` walk (post-[middleware-param-transform task spec](../cipherstash-integration/specs/middleware-param-transform.spec.md)).
+- [ ] **AC-COMP2**: A raw plan's `ParamRef`s are visible to `RuntimeMiddleware.beforeExecute`'s `params.entries()` walk (post-[middleware-param-transform task spec](../project-1/specs/middleware-param-transform.spec.md)).
 - [ ] **AC-COMP3**: Cipherstash's bulk-encrypt middleware runs against a raw plan that includes a `param(value, { codecId: 'cipherstash/string@1' })` — the param's value is bulk-encrypted before the SQL executes.
 
 # Other Considerations
@@ -205,11 +205,12 @@ No new data-protection surface. Codec encoding runs identically against raw-plan
 
 # References
 
-- [`projects/cipherstash-integration/specs/raw-sql-ast-node.spec.md`](../cipherstash-integration/specs/raw-sql-ast-node.spec.md) — upstream sequencing dependency. Ships `RawSqlExpr`, the lowerer arm for `'param-ref'` and inlined Expressions, `planFromAst`.
-- [`packages/2-sql/4-lanes/relational-core/src/types.ts:246-262`](../../packages/2-sql/4-lanes/relational-core/src/types.ts) — current type-only `RawTemplateFactory` / `RawFactory` declarations (modified by this project).
-- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:395-436`](../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — existing `ParamRef` class.
-- [`packages/2-sql/4-lanes/relational-core/src/expression.ts`](../../packages/2-sql/4-lanes/relational-core/src/expression.ts) — `toExpr` shape this factory's discriminator mirrors.
-- [`packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts`](../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — `dataTransform` factory that consumes raw plans unchanged once this factory exists.
+- [Umbrella spec](../spec.md) — sql-raw-factory's parent project.
+- [raw-sql-ast-node task spec](../project-1/specs/raw-sql-ast-node.spec.md) — upstream sequencing dependency. Ships `RawSqlExpr`, the lowerer arm for `'param-ref'` and inlined Expressions, `planFromAst`.
+- [`packages/2-sql/4-lanes/relational-core/src/types.ts:246-262`](../../../packages/2-sql/4-lanes/relational-core/src/types.ts) — current type-only `RawTemplateFactory` / `RawFactory` declarations (modified by this project).
+- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:395-436`](../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — existing `ParamRef` class.
+- [`packages/2-sql/4-lanes/relational-core/src/expression.ts`](../../../packages/2-sql/4-lanes/relational-core/src/expression.ts) — `toExpr` shape this factory's discriminator mirrors.
+- [`packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — `dataTransform` factory that consumes raw plans unchanged once this factory exists.
 
 # Open Questions
 

@@ -1,6 +1,6 @@
 # Summary
 
-Ship `cipherstash.addSearchConfig({ ... })` and `cipherstash.activatePendingSearches()` migration factories that users invoke from hand-authored `migration.ts` files to install per-column EQL search-mode configuration. Both factories produce `DataTransformOperation`s — not `rawSql({...})` `'additive'`-class ops — so they can carry `invariantId`s for invariant-aware ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404). Each factory builds a `SqlQueryPlan` containing a `RawSqlExpr` AST node (delivered by [raw-sql-ast-node task spec](raw-sql-ast-node.spec.md)) directly via the package-internal API — no dependency on the (separate, parallel) public `raw\`...\`` template-literal factory at [`projects/sql-raw-factory/`](../../sql-raw-factory/spec.md).
+Ship `cipherstash.addSearchConfig({ ... })` and `cipherstash.activatePendingSearches()` migration factories that users invoke from hand-authored `migration.ts` files to install per-column EQL search-mode configuration. Both factories produce `DataTransformOperation`s — not `rawSql({...})` `'additive'`-class ops — so they can carry `invariantId`s for invariant-aware ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404). Each factory builds a `SqlQueryPlan` containing a `RawSqlExpr` AST node (delivered by [raw-sql-ast-node task spec](raw-sql-ast-node.spec.md)) directly via the package-internal API — no dependency on the (separate, parallel) public `raw\`...\`` template-literal factory at [`sql-raw-factory`](../../sql-raw-factory/spec.md).
 
 # Description
 
@@ -173,7 +173,7 @@ This was a previous-design reversal worth recording: an earlier draft of this sp
 
 ### Why `RawSqlExpr` directly, not the public `raw\`...\`` factory
 
-The public `raw\`...\`` factory ships in [`projects/sql-raw-factory/`](../../sql-raw-factory/spec.md), an independent project that is not on this project's critical path. Cipherstash needs the raw-SQL capability *now* (for Project 1), and the AST node + lowerer arm in [raw-sql-ast-node task spec](raw-sql-ast-node.spec.md) is sufficient. Constructing `RawSqlExpr.of(...)` directly is a small amount of factory-internal boilerplate; the user-facing `cipherstash.addSearchConfig({...})` API hides it entirely. When `sql-raw-factory` lands, this factory could be refactored to use `raw\`...\`` internally for cosmetic clarity, but there's no functional reason to gate Project 1 on that refactor.
+The public `raw\`...\`` factory ships in [`sql-raw-factory`](../../sql-raw-factory/spec.md), a sibling component of the cipherstash-integration umbrella that is not on Project 1's critical path. Cipherstash needs the raw-SQL capability *now* (for Project 1), and the AST node + lowerer arm in [raw-sql-ast-node task spec](raw-sql-ast-node.spec.md) is sufficient. Constructing `RawSqlExpr.of(...)` directly is a small amount of factory-internal boilerplate; the user-facing `cipherstash.addSearchConfig({...})` API hides it entirely. When `sql-raw-factory` lands, this factory could be refactored to use `raw\`...\`` internally for cosmetic clarity, but there's no functional reason to gate Project 1 on that refactor.
 
 ## Non-Functional Requirements
 
@@ -248,15 +248,16 @@ Not applicable — these factories install search configuration only; data encry
 
 # References
 
-- [Umbrella spec](../spec.md)
+- [Project 1 spec](../spec.md)
+- [Umbrella spec](../../spec.md)
 - [raw-sql-ast-node task spec](raw-sql-ast-node.spec.md) — the AST node + lowerer arm + `planFromAst` envelope helper this factory consumes.
 - [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — defines the codec these search modes apply to.
 - [psl-encrypted-string-constructor task spec](psl-encrypted-string-constructor.spec.md) — defines the authoring surface that produces `typeParams` matching the modes this factory installs.
-- [First-attempt `database-dependencies.ts`](../../../reference/cipherstash/stack/packages/stack/src/prisma/core/database-dependencies.ts) — the canonical EQL operation SQL shapes are lifted from this file.
-- [Postgres `dataTransform` factory](../../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — the `Buildable`-consuming factory that produces `DataTransformOperation`s.
-- [`invariants.ts:deriveProvidedInvariants`](../../../packages/1-framework/3-tooling/migration/src/invariants.ts) — confirms that only `operationClass: 'data'` ops contribute invariants to the index.
+- [First-attempt `database-dependencies.ts`](../../../../reference/cipherstash/stack/packages/stack/src/prisma/core/database-dependencies.ts) — the canonical EQL operation SQL shapes are lifted from this file.
+- [Postgres `dataTransform` factory](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — the `Buildable`-consuming factory that produces `DataTransformOperation`s.
+- [`invariants.ts:deriveProvidedInvariants`](../../../../packages/1-framework/3-tooling/migration/src/invariants.ts) — confirms that only `operationClass: 'data'` ops contribute invariants to the index.
 - [PR #404](https://github.com/prisma/prisma-next/pull/404) — invariant-aware ref routing.
-- [`projects/sql-raw-factory/`](../../sql-raw-factory/spec.md) — separate, parallel project that ships the user-facing `raw\`...\`` template-literal factory (not a dependency of this spec).
+- [`sql-raw-factory`](../../sql-raw-factory/spec.md) — sibling component of the cipherstash-integration umbrella that ships the user-facing `raw\`...\`` template-literal factory (not a dependency of this spec).
 
 # Open Questions
 
