@@ -38,10 +38,11 @@ Interpretation/validation (for example `@prisma-next/sql-contract-psl`) is respo
 ## Public API
 
 - `parsePslDocument(input)` in `src/parser.ts`
-- Exported AST/diagnostic/span types in `src/types.ts`
+- AST/diagnostic/span types live in `@prisma-next/framework-components/psl-ast`
+  and are re-exported from this package's root entry for convenience.
 - Subpath exports:
   - `@prisma-next/psl-parser/parser`
-  - `@prisma-next/psl-parser/types`
+  - `@prisma-next/psl-parser/tokenizer`
 
 ## Dependencies
 
