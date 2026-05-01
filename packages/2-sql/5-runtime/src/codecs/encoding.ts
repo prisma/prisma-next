@@ -146,8 +146,6 @@ export async function encodeParams(
     tasks[i] = encodeParamValue(plan.params[i], metadata[i] ?? NO_METADATA, i, registry, ctx);
   }
 
-  const settled = signal
-    ? await raceAgainstAbort(Promise.all(tasks), signal, 'encode')
-    : await Promise.all(tasks);
+  const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'encode');
   return Object.freeze(settled);
 }

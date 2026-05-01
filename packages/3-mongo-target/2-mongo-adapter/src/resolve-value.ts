@@ -61,7 +61,7 @@ export async function resolveValue(
           // `Promise.all`) surfaces `RUNTIME.ABORTED` promptly instead of
           // blocking on a slow codec body.
           const encoded = codec.encode(value.value, ctx);
-          return signal ? await raceAgainstAbort(encoded, signal, 'encode') : await encoded;
+          return await raceAgainstAbort(encoded, signal, 'encode');
         } catch (error) {
           wrapEncodeFailure(error, value, codec.id);
         }
@@ -77,11 +77,11 @@ export async function resolveValue(
   }
   if (Array.isArray(value)) {
     const tasks = Promise.all(value.map((v) => resolveValue(v, codecs, ctx)));
-    return signal ? raceAgainstAbort(tasks, signal, 'encode') : tasks;
+    return raceAgainstAbort(tasks, signal, 'encode');
   }
   const entries = Object.entries(value);
   const all = Promise.all(entries.map(([, val]) => resolveValue(val, codecs, ctx)));
-  const resolved = signal ? await raceAgainstAbort(all, signal, 'encode') : await all;
+  const resolved = await raceAgainstAbort(all, signal, 'encode');
   const result: Record<string, unknown> = {};
   for (let i = 0; i < entries.length; i++) {
     const entry = entries[i];

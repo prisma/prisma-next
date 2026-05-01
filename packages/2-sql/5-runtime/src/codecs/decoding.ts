@@ -293,9 +293,7 @@ export async function decodeRow(
     tasks.push(decodeField(alias, wireValue, decodeCtx, jsonValidators, rowCtx));
   }
 
-  const settled = signal
-    ? await raceAgainstAbort(Promise.all(tasks), signal, 'decode')
-    : await Promise.all(tasks);
+  const settled = await raceAgainstAbort(Promise.all(tasks), signal, 'decode');
 
   // Include aggregates are decoded synchronously after concurrent codec
   // dispatch settles, so any decode failures upstream propagate first.
