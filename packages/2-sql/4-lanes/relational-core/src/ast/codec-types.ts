@@ -250,12 +250,11 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  * produces a {@link Codec} whose query-time methods follow the boundary
  * contract documented on `Codec`.
  *
- * `encode` is optional — when omitted, an identity default is installed
- * (declaring "the input value already is the wire value", so `TInput` and
- * `TWire` are interchangeable for that codec). `decode` is always
- * required. `encodeJson` and `decodeJson` default to identity **only when
- * `TInput` is assignable to `JsonValue`**; otherwise both are required
- * so the contract artifact stays JSON-safe.
+ * Both `encode` and `decode` are required so `TInput` and `TWire` are
+ * always covered by an explicit author function — the factory installs
+ * no identity fallback. `encodeJson` and `decodeJson` default to identity
+ * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
+ * required so the contract artifact stays JSON-safe.
  */
 export function codec<
   Id extends string,
@@ -268,7 +267,7 @@ export function codec<
   config: {
     typeId: Id;
     targetTypes: readonly string[];
-    encode?:
+    encode:
       | ((value: TInput) => TWire | Promise<TWire>)
       | ((value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>);
     decode:
@@ -282,18 +281,13 @@ export function codec<
   } & JsonRoundTripConfig<TInput>,
 ): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
   const identity = (v: unknown) => v;
-  // The synchronous identity default is only safe when the author has
-  // declared "the input is already the wire value" (i.e. TInput == TWire);
-  // it returns the value directly, never a Promise. Authors who want the
-  // identity default never observe `ctx`, so the parameter is omitted here.
   // The union typing on `config.encode` / `config.decode` (single- or two-
   // arg authors) preserves TInput inference at call sites; widen to the
   // two-arg shape inside the factory body so the lift can forward ctx.
   type CtxEncode = (value: TInput, ctx?: SqlCodecCallContext) => TWire | Promise<TWire>;
   type CtxDecode = (wire: TWire, ctx?: SqlCodecCallContext) => TInput | Promise<TInput>;
-  const userEncode: CtxEncode =
-    (config.encode as CtxEncode | undefined) ?? ((value: TInput) => value as unknown as TWire);
-  const userDecode: CtxDecode = config.decode as CtxDecode;
+  const userEncode = config.encode as CtxEncode;
+  const userDecode = config.decode as CtxDecode;
   // The conditional JsonRoundTripConfig narrows TInput|JsonValue at the
   // boundary; widen back to the generic shape inside the factory body.
   const widenedConfig = config as {

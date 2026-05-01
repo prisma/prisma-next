@@ -93,7 +93,7 @@ flowchart TD
 
 ### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
 
-- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. `encode` may be omitted (identity default); `decode` is required.
+- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
 - Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
 - This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
 

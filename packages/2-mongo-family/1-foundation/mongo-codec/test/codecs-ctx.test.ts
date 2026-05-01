@@ -89,14 +89,4 @@ describe('mongoCodec() factory — CodecCallContext arity', () => {
     });
     expect(await c.encode('x', { signal: new AbortController().signal })).toBe('enc:x');
   });
-
-  it('identity default for omitted encode still works (single-arg call site)', async () => {
-    const c = mongoCodec({
-      typeId: 'demo/identity-default-ctx@1',
-      targetTypes: ['string'],
-      decode: (wire: string) => wire,
-    });
-    expect(await c.encode('hi')).toBe('hi');
-    expect(await c.encode('hi', { signal: new AbortController().signal })).toBe('hi');
-  });
 });

@@ -51,15 +51,9 @@ test('factory accepts mixed async encode + sync decode', () => {
   expectTypeOf<ReturnType<typeof c.decode>>().toExtend<Promise<string>>();
 });
 
-test('factory installs identity encode default when encode is omitted', () => {
-  const c = codec({
-    typeId: 'demo/no-encode@1',
-    targetTypes: ['text'],
-    decode: (wire: string) => wire,
-  });
-
-  expectTypeOf(c.encode).toBeFunction();
-  expectTypeOf<ReturnType<NonNullable<typeof c.encode>>>().toExtend<Promise<unknown>>();
+test('factory rejects an omitted encode — the property is required', () => {
+  // @ts-expect-error encode is required at the codec() factory call site; the factory installs no identity fallback.
+  codec({ typeId: 'demo/no-encode@1', targetTypes: ['text'], decode: (wire: string) => wire });
 });
 
 test('factory passes encodeJson and decodeJson through as synchronous', () => {

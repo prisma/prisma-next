@@ -98,16 +98,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     expect(await c.encode('x', { signal: new AbortController().signal })).toBe('enc:x');
   });
 
-  it('identity default for omitted encode still works (single-arg call site)', async () => {
-    const c = codec({
-      typeId: 'demo/identity-default-ctx@1',
-      targetTypes: ['text'],
-      decode: (wire: string) => wire,
-    });
-    expect(await c.encode('hi')).toBe('hi');
-    expect(await c.encode('hi', { signal: new AbortController().signal })).toBe('hi');
-  });
-
   it('a column-aware decode author observes ctx.column shape `{ table, name }`', async () => {
     let observedColumn: SqlCodecCallContext['column'];
     const c = codec({
