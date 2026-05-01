@@ -106,6 +106,17 @@ export interface MigrationPlanOperation {
   readonly label: string;
   /** The class of operation (additive, widening, destructive). */
   readonly operationClass: MigrationOperationClass;
+  /**
+   * Optional opt-in routing identity for data-transform operations.
+   * Presence opts the transform into invariant-aware routing; absence
+   * means it is path-dependent and not referenceable from refs.
+   *
+   * Lives on the base op so the manifest emitter and
+   * `deriveProvidedInvariants` can read it without depending on a
+   * target-specific shape. Schema-DDL ops (additive / widening /
+   * destructive) leave it undefined.
+   */
+  readonly invariantId?: string;
 }
 
 // ============================================================================

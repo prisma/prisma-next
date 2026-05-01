@@ -35,6 +35,7 @@ function freezeSteps(
       Object.freeze({
         description: step.description,
         sql: step.sql,
+        ...(step.params ? { params: Object.freeze([...step.params]) } : {}),
         ...(step.meta ? { meta: cloneRecord(step.meta) } : {}),
       }),
     ),
@@ -74,6 +75,7 @@ function freezeOperation<TTargetDetails>(
     label: operation.label,
     ...(operation.summary ? { summary: operation.summary } : {}),
     operationClass: operation.operationClass,
+    ...(operation.invariantId ? { invariantId: operation.invariantId } : {}),
     target: freezeTargetDetails(operation.target),
     precheck: freezeSteps(operation.precheck),
     execute: freezeSteps(operation.execute),
