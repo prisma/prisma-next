@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { isRuntimeError, RUNTIME_ABORTED, runtimeAborted } from '../src/runtime-error';
+import { isRuntimeError, RUNTIME_ABORTED, runtimeAborted } from '../src/execution/runtime-error';
 
 describe('runtimeAborted()', () => {
   it('exposes the canonical code constant', () => {

@@ -1,10 +1,10 @@
 import type { PlanMeta } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
 import type { CodecCallContext } from '../src/codec-types';
-import type { ExecutionPlan, QueryPlan } from '../src/query-plan';
-import { RuntimeCore } from '../src/runtime-core';
-import { isRuntimeError } from '../src/runtime-error';
-import type { RuntimeMiddleware, RuntimeMiddlewareContext } from '../src/runtime-middleware';
+import type { ExecutionPlan, QueryPlan } from '../src/execution/query-plan';
+import { RuntimeCore } from '../src/execution/runtime-core';
+import { isRuntimeError } from '../src/execution/runtime-error';
+import type { RuntimeMiddleware, RuntimeMiddlewareContext } from '../src/execution/runtime-middleware';
 
 const meta: PlanMeta = {
   target: 'mock',

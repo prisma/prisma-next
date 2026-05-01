@@ -1,4 +1,4 @@
-import type { CodecCallContext } from './codec-types';
+import type { CodecCallContext } from '../shared/codec-types';
 import type { RuntimeAbortedPhase } from './runtime-error';
 import { runtimeAborted } from './runtime-error';
 

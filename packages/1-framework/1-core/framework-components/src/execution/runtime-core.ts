@@ -1,5 +1,5 @@
 import { AsyncIterableResult } from './async-iterable-result';
-import type { CodecCallContext } from './codec-types';
+import type { CodecCallContext } from '../shared/codec-types';
 import type { ExecutionPlan, QueryPlan } from './query-plan';
 import { runWithMiddleware } from './run-with-middleware';
 import { runtimeAborted } from './runtime-error';
