@@ -74,9 +74,20 @@ describe('react-router-demo smoke (e2e)', () => {
   let dev: DevDatabase | null = null;
   let server: ViteDevServer | null = null;
   let originalSchema: string | null = null;
+  let schemaBaseline: string | null = null;
+  let contractJsonBaseline: Buffer | null = null;
 
   beforeEach(async () => {
-    originalSchema = await readFile(schemaPath, 'utf-8');
+    // Capture byte-equal baselines for both checked-in artifacts so afterEach
+    // can assert that the test's mutations were fully reverted. AC10 requires
+    // the working tree to stay clean after teardown; sequencing alone is not
+    // enough — a future regression in the wait-for-re-emit step, or any new
+    // mid-test file write that forgets to revert, would leave the tree dirty
+    // without detection unless this invariant is checked at the end of each
+    // test.
+    schemaBaseline = await readFile(schemaPath, 'utf-8');
+    contractJsonBaseline = await readFile(contractJsonPath);
+    originalSchema = schemaBaseline;
     dev = await createDevDatabase();
     await withClient(dev.connectionString, async (client) => {
       await client.query(TEST_SCHEMA_SQL);
@@ -114,6 +125,18 @@ describe('react-router-demo smoke (e2e)', () => {
       dev = null;
     }
     vi.unstubAllEnvs();
+
+    // Assert AC10's working-tree-clean invariant after teardown completes.
+    // Read fresh from disk (not the closure-captured baselines) so we observe
+    // the actual on-disk state the next test (or `git status`) would see.
+    if (schemaBaseline !== null && contractJsonBaseline !== null) {
+      const finalSchema = await readFile(schemaPath, 'utf-8');
+      const finalContractJson = await readFile(contractJsonPath);
+      expect(finalSchema).toBe(schemaBaseline);
+      expect(finalContractJson.equals(contractJsonBaseline)).toBe(true);
+      schemaBaseline = null;
+      contractJsonBaseline = null;
+    }
   });
 
   it(
