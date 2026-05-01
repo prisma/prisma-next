@@ -94,8 +94,8 @@ PRs and Linear tickets affecting more than one component:
 |---|---|---|---|---|
 | [#400](https://github.com/prisma/prisma-next/pull/400) | [TML-2330](https://linear.app/prisma-company/issue/TML-2330) | Codec call context + per-query `AbortSignal` (ADR 207) | Merged 2026-05-01 | Project 1 codec & middleware; Project 2 inherits |
 | [#402](https://github.com/prisma/prisma-next/pull/402) | [TML-2229](https://linear.app/prisma-company/issue/TML-2229) | Unified `CodecDescriptor<P>` (ADR 208) | Merged 2026-05-01 | Project 1 codec; Project 2 inherits |
-| [#404](https://github.com/prisma/prisma-next/pull/404) | — | Invariant-aware ref routing (M4) + self-edge support | Open | Project 1 migration factories; Project 2 planner-driven ops |
-| [#409](https://github.com/prisma/prisma-next/pull/409) | — | `intercept` hook + `contentHash` on middleware | Open | Project 1 middleware-param-transform spec; SPI co-edit |
+| [#404](https://github.com/prisma/prisma-next/pull/404) | — | Invariant-aware ref routing (M4) + self-edge support | Open | Project 1 migration factories carry `invariantId`; routing benefit is retroactive when #404 lands. Not a Project 1 dependency. |
+| [#409](https://github.com/prisma/prisma-next/pull/409) | — | `intercept` hook + `contentHash` on middleware | Open | Edits the same `RuntimeMiddleware` types as Project 1's middleware-param-transform task; whichever lands first, the other rebases. Not a Project 1 dependency. |
 | — | [TML-2338](https://linear.app/prisma-company/issue/TML-2338) | `(table, column)` to `planTypeOperations` | Not started | Project 2 only |
 | — | [TML-2339](https://linear.app/prisma-company/issue/TML-2339) | Prior-state contract for destructive `planTypeOperations` | Not started | Project 2 only |
 | — | [TML-2360](https://linear.app/prisma-company/issue/TML-2360) | Envelope-codec runtime pattern | Not started | Project 1 (consumer of param-transform seam) |
