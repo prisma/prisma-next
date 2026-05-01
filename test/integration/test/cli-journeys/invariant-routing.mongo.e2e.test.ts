@@ -450,8 +450,7 @@ describe(
       const users = await client
         .db(dbName)
         .collection('users')
-        .find({}, { projection: { _id: 0, email: 1, name: 1 } })
-        .sort({ email: 1 })
+        .aggregate([{ $project: { _id: 0, email: 1, name: 1 } }, { $sort: { email: 1 } }])
         .toArray();
       expect(users, 'Mongo-O.08: names lowercased').toEqual([
         { email: 'alice@example.com', name: 'alice' },
