@@ -362,6 +362,35 @@ describe('decodeMongoRow', () => {
     expect((out as { sub: object }).sub).toBe(row.sub);
   });
 
+  it('passes through subdocument keys the nested document shape does not describe', async () => {
+    // The pass-through invariant is structurally additive at every depth, not
+    // just the top level. A nested `kind: 'document'` slot decodes the keys
+    // its `fields` enumerates and round-trips the rest. ADR 207 promises
+    // future lane work threading concrete value-object subtrees is purely
+    // additive, which requires this.
+    const registry = registryWithDefaults();
+    const shape: MongoResultShape = {
+      kind: 'document',
+      fields: {
+        address: {
+          kind: 'document',
+          nullable: false,
+          fields: {
+            city: { kind: 'leaf', codecId: 'mongo/string@1', nullable: false },
+          },
+        },
+      },
+    };
+    const row = {
+      address: { city: 'Paris', zip: '75001', country: 'FR' },
+    };
+    const out = await decodeMongoRow(row, shape, registry, 'users');
+    const addr = (out as { address: { city: string; zip: string; country: string } }).address;
+    expect(addr.city).toBe('Paris');
+    expect(addr.zip).toBe('75001');
+    expect(addr.country).toBe('FR');
+  });
+
   it('passes values through for kind unknown anywhere in the tree', async () => {
     const registry = registryWithDefaults();
     const shape: MongoResultShape = {

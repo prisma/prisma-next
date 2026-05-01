@@ -105,7 +105,12 @@ export async function decodeMongoRow(
           return;
         }
         const vObj = value as Record<string, unknown>;
-        const nested: Record<string, unknown> = {};
+        // Pre-seed with a shallow copy so unshaped subdocument keys
+        // round-trip verbatim. Subsequent walkField assignments overwrite
+        // shaped keys with their decoded values. Mirrors the top-level
+        // pass-through invariant — the decode path is structurally
+        // additive at every nesting depth, not just the root.
+        const nested: Record<string, unknown> = { ...vObj };
         assign(nested);
         for (const [fk, fShape] of Object.entries(fieldShape.fields)) {
           walkField(vObj[fk], fShape, `${path}.${fk}`, (v) => {
