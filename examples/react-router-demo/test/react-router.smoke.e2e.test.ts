@@ -155,6 +155,23 @@ describe('react-router-demo smoke (e2e)', () => {
   it(
     're-emits contract on PSL edit and serves requests through the framework runtime',
     async () => {
+      // Capture `contract.json`'s mtime *before* `createServer()` so the
+      // startup re-emit assertion can't be silently satisfied by the stale
+      // committed artifact. The Vite plugin's `configureServer` hook (which
+      // runs the initial emit via `requestEmit({ refreshWatchedFiles: false })`)
+      // is awaited inside `createServer()` itself, so any read after the
+      // `await createServer()` already reflects the post-emit mtime. Treat
+      // ENOENT as a pre-boot null baseline so a future change that stops
+      // committing the artifact still works.
+      let preBootMtime: number | null = null;
+      try {
+        preBootMtime = (await stat(contractJsonPath)).mtimeMs;
+      } catch (error) {
+        if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT') {
+          throw error;
+        }
+      }
+
       server = await createServer({
         root: exampleDir,
         mode: 'development',
@@ -171,7 +188,7 @@ describe('react-router-demo smoke (e2e)', () => {
 
       const initialEmit = await waitForFileMtimeChange(
         contractJsonPath,
-        null,
+        preBootMtime,
         timeouts.typeScriptCompilation,
       );
       expect(initialEmit).toBe(true);
