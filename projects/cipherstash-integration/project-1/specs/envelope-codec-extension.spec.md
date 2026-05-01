@@ -4,7 +4,7 @@ Build the runtime side of `@prisma-next/extension-cipherstash`: the `EncryptedSt
 
 # Description
 
-This task spec covers the *runtime* portion of Project 1's scope (see [umbrella spec](../spec.md)). It assumes the [middleware-param-transform](middleware-param-transform.spec.md) seam is in place and consumes it.
+This task spec covers the *runtime* portion of Project 1's scope (see [Project 1 spec](../spec.md) and the [umbrella spec](../../spec.md)). It assumes the [middleware-param-transform](middleware-param-transform.spec.md) seam is in place and consumes it.
 
 The shape is the **envelope-codec pattern**: an `EncryptedString` envelope class that crosses both directions of the codec boundary. Users construct envelopes for writes (`EncryptedString.from(plaintext)`) and receive envelopes from reads. Network I/O is amortized — the write side runs `bulkEncrypt` once per query (via middleware), the read side runs `bulkDecrypt` once per `decryptAll(rows)` call. Decryption is always explicit; the framework never silently materializes plaintext.
 
@@ -332,14 +332,15 @@ See umbrella spec.
 
 # References
 
-- [Umbrella spec](../spec.md)
+- [Project 1 spec](../spec.md)
+- [Umbrella spec](../../spec.md)
 - [middleware-param-transform task spec](middleware-param-transform.spec.md) — direct dependency for the bulk-encrypt middleware
-- [ADR 207 — codec call context](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) (forthcoming with [PR #400](https://github.com/prisma/prisma-next/pull/400))
-- [ADR 208 — unified `CodecDescriptor<P>`](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) (forthcoming with [PR #402](https://github.com/prisma/prisma-next/pull/402))
-- [pgvector extension](../../../packages/3-extensions/pgvector/) — direct precedent for codec + parameterized descriptor + `databaseDependencies.init` shape
-- [First-attempt EQL bundle](../../../reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts) — vendored install SQL
-- [First-attempt operation templates](../../../reference/cipherstash/stack/packages/stack/src/prisma/core/operation-templates.ts) — canonical EQL operator lowering reference
-- [First-attempt database dependencies](../../../reference/cipherstash/stack/packages/stack/src/prisma/core/database-dependencies.ts) — precedent for the install entry shape
+- [ADR 207 — codec call context](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md) (forthcoming with [PR #400](https://github.com/prisma/prisma-next/pull/400))
+- [ADR 208 — unified `CodecDescriptor<P>`](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md) (forthcoming with [PR #402](https://github.com/prisma/prisma-next/pull/402))
+- [pgvector extension](../../../../packages/3-extensions/pgvector/) — direct precedent for codec + parameterized descriptor + `databaseDependencies.init` shape
+- [First-attempt EQL bundle](../../../../reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts) — vendored install SQL
+- [First-attempt operation templates](../../../../reference/cipherstash/stack/packages/stack/src/prisma/core/operation-templates.ts) — canonical EQL operator lowering reference
+- [First-attempt database dependencies](../../../../reference/cipherstash/stack/packages/stack/src/prisma/core/database-dependencies.ts) — precedent for the install entry shape
 
 # Open Questions
 
@@ -380,7 +381,7 @@ Define a generic `KmsProvider` interface; `@prisma-next/extension-kms` implement
 
 Implement `EncryptedString` with a `Proxy` or getter that triggers decryption on first property access (`user.email + ''` triggers `decrypt()`).
 
-**Rejected** because it makes decryption implicit — users can't tell when an `await` is happening, can't reason about when the SDK is being called, can't bulk-amortize. Explicit `await envelope.decrypt()` is the clearer mental model and matches the framework's "always-await codec methods" boundary established by [ADR 204](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
+**Rejected** because it makes decryption implicit — users can't tell when an `await` is happening, can't reason about when the SDK is being called, can't bulk-amortize. Explicit `await envelope.decrypt()` is the clearer mental model and matches the framework's "always-await codec methods" boundary established by [ADR 204](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md).
 
 ## Public handle type
 

@@ -1,8 +1,8 @@
 # Summary
 
-Promote `beforeExecute` middleware to a **mutable param-transformation seam** — middleware can rewrite the values carried in the plan's outbound `ParamRef`s before encode runs, with access to the per-query `AbortSignal` from [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / [ADR 207](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). Unlocks bulk-everything patterns at the framework layer (bulk-encrypt for KMS-backed columns, bulk-sign for audit columns, bulk-validate for cross-column constraints) without each extension growing its own plan-walker or the codec interface growing a new trait.
+Promote `beforeExecute` middleware to a **mutable param-transformation seam** — middleware can rewrite the values carried in the plan's outbound `ParamRef`s before encode runs, with access to the per-query `AbortSignal` from [TML-2330](https://linear.app/prisma-company/issue/TML-2330) / [ADR 207](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). Unlocks bulk-everything patterns at the framework layer (bulk-encrypt for KMS-backed columns, bulk-sign for audit columns, bulk-validate for cross-column constraints) without each extension growing its own plan-walker or the codec interface growing a new trait.
 
-CipherStash bulk-encrypt — see the [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — is the **first concrete consumer** ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)), not the owner. This task spec belongs to the [Cipherstash Integration umbrella project](../spec.md).
+CipherStash bulk-encrypt — see the [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — is the **first concrete consumer** ([TML-2360](https://linear.app/prisma-company/issue/TML-2360)), not the owner. This task spec belongs to [Project 1](../spec.md) of the [cipherstash-integration umbrella project](../../spec.md).
 
 ## Grounding example
 
@@ -54,7 +54,7 @@ Everything else falls out: the runtime allocates a `MiddlewareContext` once per 
 
 ## Why
 
-[ADR 204](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) made codec query-time methods uniformly Promise-returning at the per-cell `codec.encode` / `codec.decode` boundary. That works for codecs whose work fits the per-cell shape (a single value transformation) but has no answer for codecs whose work is **inherently bulk** — KMS-backed encryption being the canonical case. Network-backed services are efficient only when amortized across many ciphertexts in one round-trip; per-cell `codec.encode` calls fan out to N independent HTTPS requests, which the runtime races concurrently but does not coalesce.
+[ADR 204](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) made codec query-time methods uniformly Promise-returning at the per-cell `codec.encode` / `codec.decode` boundary. That works for codecs whose work fits the per-cell shape (a single value transformation) but has no answer for codecs whose work is **inherently bulk** — KMS-backed encryption being the canonical case. Network-backed services are efficient only when amortized across many ciphertexts in one round-trip; per-cell `codec.encode` calls fan out to N independent HTTPS requests, which the runtime races concurrently but does not coalesce.
 
 The first attempt at solving this (the CipherStash team's `cipherstash/stack` repo, `prisma-next` branch) used a **microtask-coalescing batcher** inside the codec body: every `codec.encode` call enqueues into a shared queue, a microtask flushes the queue with one bulk SDK call, the codec resolves each per-cell promise. This works but pushes concurrency control, batch sizing, abort handling, and SDK-specific error attribution into the codec body — squeezed into a per-cell shape that doesn't fit any of them.
 
@@ -156,7 +156,7 @@ The mutator is constructed lazily. If no middleware in the chain calls `replaceV
 
 ### Cooperative cancellation
 
-Same contract as the codec dispatch sites established by [ADR 207](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md):
+Same contract as the codec dispatch sites established by [ADR 207](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md):
 
 - **Already-aborted at entry** to any middleware phase short-circuits via `checkAborted(ctx, 'beforeExecute' | 'afterExecute' | 'onRow')`.
 - **Mid-flight aborts** during a middleware body race against the signal; the runtime returns `RUNTIME.ABORTED` promptly while in-flight middleware bodies that ignore the signal complete in the background.
@@ -222,7 +222,7 @@ Validation hooks on the design above. Implementation is complete when each is me
 1. **Should `replaceValues` accept a Promise of updates?** Default: no — middleware awaits, calls synchronously. Async mutator would interleave with the runtime's encode dispatch and complicate ordering reasoning. Confirm before implementation.
 2. **Mongo's flat `entries()` iterator over a tree-shaped `MongoParamRef` walk.** Confirmed flat; specifically whether parent-path metadata (which object key / array index a `MongoParamRef` came from) is exposed to middleware is open. Default: no — middleware identifies refs by codec id, not path. Confirm.
 3. **Mutator reuse across chained middleware.** Each middleware sees a fresh mutator reflecting all prior mutations. Multiple middlewares mutating the same column allocate the param array once per mutating middleware. Acceptable cost; a multi-middleware single-allocation optimization is a phase-2 concern if it ever becomes a hot path.
-4. **`MiddlewareContext` family extension story.** Today shared, no SQL/Mongo extension needed. If a real consumer needs family-shaped middleware ctx (e.g. SQL middleware wanting `executionPlan` as an additional ctx field), follow the `SqlCodecCallContext extends CodecCallContext` precedent established in [ADR 207](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
+4. **`MiddlewareContext` family extension story.** Today shared, no SQL/Mongo extension needed. If a real consumer needs family-shaped middleware ctx (e.g. SQL middleware wanting `executionPlan` as an additional ctx field), follow the `SqlCodecCallContext extends CodecCallContext` precedent established in [ADR 207](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
 
 ## Alternatives considered
 
@@ -258,8 +258,8 @@ Don't carry the signal through to `afterExecute` or `onRow`.
 
 ## References
 
-- [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). The codec-side context this seam complements; the `signal` plumbed by this project is the same reference. **Forthcoming** with [PR #400](https://github.com/prisma/prisma-next/pull/400) — the ADR file does not yet exist on `main` or this branch.
-- [ADR 204 — Single-Path Async Codec Runtime](../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). The per-cell codec model this seam composes with (rather than replacing).
+- [ADR 207 — Codec call context: per-query `AbortSignal` and column metadata](../../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md). The codec-side context this seam complements; the `signal` plumbed by this project is the same reference. **Forthcoming** with [PR #400](https://github.com/prisma/prisma-next/pull/400) — the ADR file does not yet exist on `main` or this branch.
+- [ADR 204 — Single-Path Async Codec Runtime](../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md). The per-cell codec model this seam composes with (rather than replacing).
 - [TML-2330 / PR #400](https://github.com/prisma/prisma-next/pull/400) — the `CodecCallContext` plumbing prerequisite. The `signal` reference originates there.
 - [TML-2359](https://linear.app/prisma-company/issue/TML-2359) — this project's tracking ticket.
 - [TML-2360](https://linear.app/prisma-company/issue/TML-2360) — first concrete consumer; `projects/cipherstash-integration/specs/envelope-codec-extension.spec.md`.

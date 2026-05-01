@@ -141,11 +141,12 @@ Same as the underlying codec — see envelope-codec-extension spec.
 
 # References
 
-- [Umbrella spec](../spec.md) — design rationale for constructor-vs-attribute decision is locked there.
+- [Project 1 spec](../spec.md) — design rationale for constructor-vs-attribute decision is locked there.
+- [Umbrella spec](../../spec.md)
 - [envelope-codec-extension task spec](envelope-codec-extension.spec.md) — registers the underlying `RuntimeParameterizedCodecDescriptor` whose `paramsSchema` this constructor's `typeParams` must satisfy.
-- [pgvector authoring](../../../packages/3-extensions/pgvector/src/core/authoring.ts) — the precedent for namespaced-constructor registration.
-- [pgvector parity test](../../../test/integration/test/authoring/parity/pgvector-named-type/) — the parity test shape this spec mirrors.
-- [PSL parser README](../../../packages/2-sql/2-authoring/contract-psl/README.md) — confirms namespaced-constructor inline + alias support.
+- [pgvector authoring](../../../../packages/3-extensions/pgvector/src/core/authoring.ts) — the precedent for namespaced-constructor registration.
+- [pgvector parity test](../../../../test/integration/test/authoring/parity/pgvector-named-type/) — the parity test shape this spec mirrors.
+- [PSL parser README](../../../../packages/2-sql/2-authoring/contract-psl/README.md) — confirms namespaced-constructor inline + alias support.
 
 # Open Questions
 

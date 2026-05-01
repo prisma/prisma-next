@@ -6,7 +6,7 @@ Add `RawSqlExpr` to the SQL `AnyQueryAst` union as a first-class AST node carryi
 
 `packages/2-sql/4-lanes/relational-core/src/ast/types.ts:1629` declares `AnyQueryAst = SelectAst | InsertAst | UpdateAst | DeleteAst`. There's no AST kind for "already-rendered SQL with embedded `ParamRef`s." Today's only path to raw SQL is hand-constructing a `SqlExecutionPlan` literal (test fixtures only — no production callers; the user-facing `raw\`...\`` factory promised in `types.ts:259` is type-only, not implemented). That hand-constructed-plan path is structurally wrong: it bypasses codec resolution at the `ParamRef` layer, bypasses middleware that walks `params.entries()` looking for codec ids, bypasses any AST-level analyzer.
 
-Adding `RawSqlExpr` as a real AST node fixes the structural problem and lets cipherstash's migration factories produce `DataTransformOperation`s carrying `invariantId`s — *without* coupling cipherstash to the (separate, parallel) effort to ship a public `raw\`...\`` template-literal factory at [`projects/sql-raw-factory/`](../../sql-raw-factory/spec.md).
+Adding `RawSqlExpr` as a real AST node fixes the structural problem and lets cipherstash's migration factories produce `DataTransformOperation`s carrying `invariantId`s — *without* coupling cipherstash to the (separate, parallel) effort to ship a public `raw\`...\`` template-literal factory at [`sql-raw-factory`](../../sql-raw-factory/spec.md).
 
 The cleavage is deliberate: this task spec ships the **AST node + lowerer arm + minimum package-internal construction surface**. The public user-facing `raw\`...\`` factory, the `RawArg` type union (Expression | ParamRef | Identifier), bare-value type rejection, and the `identifier(...)` escape hatch all live in `projects/sql-raw-factory/`. Cipherstash needs none of those — it constructs `RawSqlExpr` directly from validated `ParamRef`s built inside the migration-factories module.
 
@@ -219,14 +219,15 @@ No new data-protection surface. Codec encoding (which is the layer responsible f
 
 # References
 
-- [Umbrella spec](../spec.md)
+- [Project 1 spec](../spec.md)
+- [Umbrella spec](../../spec.md)
 - [migration-factories task spec](migration-factories.spec.md) — the immediate consumer.
-- [`projects/sql-raw-factory/spec.md`](../../sql-raw-factory/spec.md) — the parallel project that ships the user-facing `raw\`...\`` factory on top of the AST node this spec adds.
-- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:1629`](../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — `AnyQueryAst` union (extended by this project).
-- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:395-436`](../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — existing `ParamRef` class.
-- [`packages/2-sql/4-lanes/relational-core/src/plan.ts`](../../../packages/2-sql/4-lanes/relational-core/src/plan.ts) — `SqlQueryPlan` shape.
-- [`packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts:72`](../../../packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts) — `PostgresControlAdapter.lower` (the lowerer entry point).
-- [`packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts`](../../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — `dataTransform` factory and `Buildable` (composes with this AST unchanged).
+- [`sql-raw-factory`](../../sql-raw-factory/spec.md) — sibling component of the umbrella that ships the user-facing `raw\`...\`` factory on top of the AST node this spec adds.
+- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:1629`](../../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — `AnyQueryAst` union (extended by this project).
+- [`packages/2-sql/4-lanes/relational-core/src/ast/types.ts:395-436`](../../../../packages/2-sql/4-lanes/relational-core/src/ast/types.ts) — existing `ParamRef` class.
+- [`packages/2-sql/4-lanes/relational-core/src/plan.ts`](../../../../packages/2-sql/4-lanes/relational-core/src/plan.ts) — `SqlQueryPlan` shape.
+- [`packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts:72`](../../../../packages/3-targets/6-adapters/postgres/src/core/control-adapter.ts) — `PostgresControlAdapter.lower` (the lowerer entry point).
+- [`packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts`](../../../../packages/3-targets/3-targets/postgres/src/core/migrations/operations/data-transform.ts) — `dataTransform` factory and `Buildable` (composes with this AST unchanged).
 
 # Open Questions
 
