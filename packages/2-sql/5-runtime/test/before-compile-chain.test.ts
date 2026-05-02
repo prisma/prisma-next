@@ -5,8 +5,8 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
   LiteralExpr,
+  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -342,7 +342,7 @@ describe('runBeforeCompileChain', () => {
   it(
     'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
     async () => {
-      const decoderRegistry = createCodecRegistry();
+      const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
         codec({
           typeId: 'pg/int4@1',
@@ -395,7 +395,7 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const { InsertAst } = await import('@prisma-next/sql-relational-core/ast');
 
-      const decoderRegistry = createCodecRegistry();
+      const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
         codec({
           typeId: 'pg/int4@1',

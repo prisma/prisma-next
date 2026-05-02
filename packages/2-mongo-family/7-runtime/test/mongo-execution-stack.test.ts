@@ -1,6 +1,6 @@
 import mongoRuntimeAdapter from '@prisma-next/adapter-mongo/runtime';
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import mongoRuntimeTarget from '@prisma-next/target-mongo/runtime';
 import { describe, expect, it } from 'vitest';
 import {
@@ -38,7 +38,7 @@ describe('createMongoExecutionStack', () => {
       familyId: 'mongo',
       targetId: 'mongo',
       version: '0.0.1',
-      codecs: () => createMongoCodecRegistry(),
+      codecs: () => newMongoCodecRegistry(),
       create: () => ({ familyId: 'mongo', targetId: 'mongo' }),
     };
     const stack = createMongoExecutionStack({
@@ -75,7 +75,7 @@ describe('createMongoExecutionContext', () => {
       targetId: 'mongo',
       version: '0.0.1',
       codecs: () => {
-        const registry = createMongoCodecRegistry();
+        const registry = newMongoCodecRegistry();
         registry.register(customCodec);
         return registry;
       },
@@ -104,7 +104,7 @@ describe('createMongoExecutionContext', () => {
       targetId: 'mongo',
       version: '0.0.1',
       codecs: () => {
-        const registry = createMongoCodecRegistry();
+        const registry = newMongoCodecRegistry();
         registry.register(conflictingCodec);
         return registry;
       },

@@ -1,7 +1,7 @@
 import { type Contract, coreHash, executionHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec, newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
   createExecutionContext,
@@ -36,7 +36,7 @@ function createTestExtensionDescriptor(options?: {
 
   const codecRegistry = hasCodecs
     ? (() => {
-        const registry = createCodecRegistry();
+        const registry = newCodecRegistry();
         registry.register(
           codec({
             typeId: 'test/ext@1',
@@ -47,7 +47,7 @@ function createTestExtensionDescriptor(options?: {
         );
         return registry;
       })()
-    : createCodecRegistry();
+    : newCodecRegistry();
 
   const operationsArray: ReadonlyArray<SqlOperationDescriptor> = hasOperations
     ? [
@@ -147,7 +147,7 @@ describe('createExecutionContext', () => {
 
 describe('comprehensive descriptor-based derivation', () => {
   it('includes all expected codec IDs and operations from target, adapter, and extensions', () => {
-    const targetCodecRegistry = createCodecRegistry();
+    const targetCodecRegistry = newCodecRegistry();
     targetCodecRegistry.register(
       codec({
         typeId: 'target/special@1',

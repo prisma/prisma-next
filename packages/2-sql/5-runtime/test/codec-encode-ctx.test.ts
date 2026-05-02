@@ -5,7 +5,7 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
+  newCodecRegistry,
   ParamRef,
   SelectAst,
   type SqlCodecCallContext,
@@ -69,7 +69,7 @@ function deferred<T>(): {
 describe('encodeParams — SqlCodecCallContext threading', () => {
   it('forwards the same ctx instance to every per-param codec.encode', async () => {
     const observed: (SqlCodecCallContext | undefined)[] = [];
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe@1',
@@ -100,7 +100,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('leaves ctx.column undefined on encode call sites (encode-time column-context is the middleware domain)', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe-column@1',
@@ -120,7 +120,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
   });
 
   it('regression — omitting ctx is bit-for-bit identical to today (no-ctx case)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/passthrough@1',
@@ -140,7 +140,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('already-aborted signal at entry short-circuits before any codec call', async () => {
     let callCount = 0;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/counter@1',
@@ -171,7 +171,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
   });
 
   it('already-aborted signal short-circuits even for empty param lists', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     const controller = new AbortController();
     const reason = new Error('encode short-circuit');
     controller.abort(reason);
@@ -187,7 +187,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('mid-encode abort surfaces RUNTIME.ABORTED { phase: encode } via abortable race', async () => {
     const release = deferred<string>();
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/blocking@1',
@@ -219,7 +219,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 
   it('passes through RUNTIME.ENCODE_FAILED when the codec body throws before the runtime sees the abort (no double-wrap)', async () => {
     const cause = new Error('codec specific failure');
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/explody@1',
@@ -245,7 +245,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
 describe('encodeParam — ctx forwarded to codec.encode', () => {
   it('forwards ctx (signal) to a codec body that accepts (value, ctx)', async () => {
     let observedSignal: AbortSignal | undefined;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/single-cell@1',
@@ -267,7 +267,7 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
   });
 
   it('null/undefined values still bypass the codec when ctx is provided', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/never@1',

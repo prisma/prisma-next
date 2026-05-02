@@ -1,30 +1,31 @@
-import {
-  type Adapter,
-  type AdapterProfile,
-  type AggregateExpr,
-  type AnyExpression,
-  type AnyFromSource,
-  type AnyQueryAst,
-  type BinaryExpr,
-  type ColumnRef,
-  createCodecRegistry,
-  type DeleteAst,
-  type InsertAst,
-  type InsertValue,
-  type JoinAst,
-  type JoinOnExpr,
-  type JsonArrayAggExpr,
-  type JsonObjectExpr,
-  type ListExpression,
-  type LiteralExpr,
-  type LowererContext,
-  type NullCheckExpr,
-  type OperationExpr,
-  type OrderByItem,
-  type ProjectionItem,
-  type SelectAst,
-  type SubqueryExpr,
-  type UpdateAst,
+import type {
+  Adapter,
+  AdapterProfile,
+  AggregateExpr,
+  AnyExpression,
+  AnyFromSource,
+  AnyQueryAst,
+  BinaryExpr,
+  Codec,
+  CodecRegistry,
+  ColumnRef,
+  DeleteAst,
+  InsertAst,
+  InsertValue,
+  JoinAst,
+  JoinOnExpr,
+  JsonArrayAggExpr,
+  JsonObjectExpr,
+  ListExpression,
+  LiteralExpr,
+  LowererContext,
+  NullCheckExpr,
+  OperationExpr,
+  OrderByItem,
+  ProjectionItem,
+  SelectAst,
+  SubqueryExpr,
+  UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
@@ -47,12 +48,23 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly targetId = 'sqlite' as const;
 
   readonly profile: AdapterProfile<'sqlite'>;
-  private readonly codecRegistry = (() => {
-    const registry = createCodecRegistry();
+  private readonly codecRegistry: CodecRegistry = (() => {
+    const byId = new Map<string, Codec<string>>();
     for (const definition of Object.values(codecDefinitions)) {
-      registry.register(definition.codec);
+      byId.set(definition.codec.id, definition.codec);
     }
-    return registry;
+    return {
+      get: (id) => byId.get(id),
+      has: (id) => byId.has(id),
+      register: (c) => {
+        if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
+        byId.set(c.id, c);
+      },
+      values: () => byId.values(),
+      [Symbol.iterator]: function* () {
+        yield* byId.values();
+      },
+    };
   })();
 
   constructor(options?: SqliteAdapterOptions) {

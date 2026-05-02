@@ -1,10 +1,11 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import {
-  type Adapter,
-  type AdapterProfile,
-  type AnyQueryAst,
-  createCodecRegistry,
-  type LowererContext,
+import type {
+  Adapter,
+  AdapterProfile,
+  AnyQueryAst,
+  Codec,
+  CodecRegistry,
+  LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
@@ -36,12 +37,23 @@ class PostgresAdapterImpl
   readonly targetId = 'postgres' as const;
 
   readonly profile: AdapterProfile<'postgres'>;
-  private readonly codecRegistry = (() => {
-    const registry = createCodecRegistry();
+  private readonly codecRegistry: CodecRegistry = (() => {
+    const byId = new Map<string, Codec<string>>();
     for (const definition of Object.values(codecDefinitions)) {
-      registry.register(definition.codec);
+      byId.set(definition.codec.id, definition.codec);
     }
-    return registry;
+    return {
+      get: (id) => byId.get(id),
+      has: (id) => byId.has(id),
+      register: (c) => {
+        if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
+        byId.set(c.id, c);
+      },
+      values: () => byId.values(),
+      [Symbol.iterator]: function* () {
+        yield* byId.values();
+      },
+    };
   })();
   private readonly codecLookup: CodecLookup;
 

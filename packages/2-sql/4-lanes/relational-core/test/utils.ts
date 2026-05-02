@@ -1,9 +1,30 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import type { Adapter, LoweredStatement, SelectAst } from '../src/exports/ast';
-import { createCodecRegistry } from '../src/exports/ast';
+import type {
+  Adapter,
+  Codec,
+  CodecRegistry,
+  LoweredStatement,
+  SelectAst,
+} from '../src/exports/ast';
 import type { ExecutionContext } from '../src/exports/query-lane-context';
+
+function emptyCodecRegistry(): CodecRegistry {
+  const byId = new Map<string, Codec<string>>();
+  return {
+    get: (id) => byId.get(id),
+    has: (id) => byId.has(id),
+    register: (c) => {
+      if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
+      byId.set(c.id, c);
+    },
+    values: () => byId.values(),
+    [Symbol.iterator]: function* () {
+      yield* byId.values();
+    },
+  };
+}
 
 /**
  * Creates a stub adapter for testing.
@@ -16,7 +37,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
       target: 'postgres',
       capabilities: {},
       codecs() {
-        return createCodecRegistry();
+        return emptyCodecRegistry();
       },
       readMarkerStatement: () => ({ sql: '', params: [] }),
       parseMarkerRow: () => {
@@ -40,7 +61,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
 ): ExecutionContext<TContract> {
-  const codecRegistry = createCodecRegistry();
+  const codecRegistry = emptyCodecRegistry();
 
   return {
     contract,

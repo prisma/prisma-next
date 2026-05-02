@@ -1,6 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { describe, expect, it } from 'vitest';
-import { createMongoCodecRegistry } from '../src/codec-registry';
+import { newMongoCodecRegistry } from '../src/codec-registry';
 import { type MongoCodec, mongoCodec } from '../src/codecs';
 
 describe('mongoCodec()', () => {
@@ -62,7 +62,7 @@ describe('MongoCodecRegistry', () => {
   }
 
   it('registers and retrieves a codec by id', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/a@1');
     registry.register(codec);
 
@@ -70,12 +70,12 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('returns undefined for unregistered id', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     expect(registry.get('nonexistent')).toBeUndefined();
   });
 
   it('has() returns true for registered, false for unregistered', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/b@1');
     registry.register(codec);
 
@@ -84,7 +84,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('throws on duplicate registration', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const codec = makeCodec('test/dup@1');
     registry.register(codec);
 
@@ -94,7 +94,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('iterates over registered codecs', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const a = makeCodec('test/x@1');
     const b = makeCodec('test/y@1');
     registry.register(a);
@@ -107,7 +107,7 @@ describe('MongoCodecRegistry', () => {
   });
 
   it('values() returns an iterable of codecs', () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const a = makeCodec('test/v@1');
     registry.register(a);
 

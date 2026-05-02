@@ -3,8 +3,8 @@ import {
   AggregateExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
   LiteralExpr,
+  newCodecRegistry,
   ProjectionItem,
   SelectAst,
   type SqlCodecCallContext,
@@ -56,7 +56,7 @@ function deferred<T>(): {
 describe('decodeRow — SqlCodecCallContext threading', () => {
   it('forwards a per-cell ctx whose signal is the same instance as the row-level ctx (signal identity preserved)', async () => {
     const observed: AbortSignal[] = [];
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe@1',
@@ -85,7 +85,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('populates ctx.column = { table, name } for cells whose ColumnRef resolves', async () => {
     const observed: { alias: string; column: SqlCodecCallContext['column'] }[] = [];
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe-col@1',
@@ -115,7 +115,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('populates ctx.column when the projection points at a different table.column than the alias', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe-projection@1',
@@ -141,7 +141,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('leaves ctx.column undefined for cells the runtime cannot resolve to a single (table, name) — aggregate projection', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe-undef@1',
@@ -176,7 +176,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('leaves ctx.column undefined for non-column-ref projections (computed expression)', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/observe-no-ref@1',
@@ -207,7 +207,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
   it('1-arg codec authors observe no behavioral change when ctx is the default empty ctx', async () => {
     let invoked = 0;
     let receivedWire: unknown;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/single-arg-author@1',
@@ -231,7 +231,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('already-aborted signal at entry short-circuits before any codec call', async () => {
     let callCount = 0;
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/counter@1',
@@ -265,7 +265,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('mid-decode abort surfaces RUNTIME.ABORTED { phase: decode } via abortable race', async () => {
     const release = deferred<string>();
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/blocking@1',
@@ -296,7 +296,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
 
   it('passes through RUNTIME.DECODE_FAILED unchanged when the codec body throws (no double-wrap, AC-ERR4)', async () => {
     const cause = new Error('decode boom');
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/explody@1',
@@ -325,7 +325,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     // `{ table, column }` shape the runtime would have constructed for
     // the error envelope (proving the resolution is shared, not duplicated).
     const observedColumns: SqlCodecCallContext['column'][] = [];
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/recorder@1',

@@ -7,7 +7,7 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
+  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -120,7 +120,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     const dB = deferred<string>();
     const callOrder: string[] = [];
 
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/async-a@1',
@@ -175,7 +175,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('always awaits codec.encode (no Promise leaks into the driver)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/async@1',
@@ -197,7 +197,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
 
   it('wraps encode failures in RUNTIME.ENCODE_FAILED with { label, codec, paramIndex } and cause', async () => {
     const cause = new Error('boom');
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/explody@1',
@@ -227,7 +227,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('uses param[<i>] label when ParamRef has no name', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/explody@1',
@@ -250,7 +250,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('returns null for null/undefined parameter values without invoking the codec', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/sync@1',
@@ -274,7 +274,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('passes through values when no codec is registered for the ParamRef.codecId', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     const plan = buildAstPlan({
       params: [{ value: 'raw', codecId: 'test/missing@1' }],
     });
@@ -283,7 +283,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/should-not-run@1',
@@ -301,7 +301,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   });
 
   it('encodes a fully-typed AST-backed plan without throwing', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/passthrough@1',
@@ -329,7 +329,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
 
 describe('decodeRow — async, concurrent per-cell dispatch', () => {
   function buildJsonbRegistry(): CodecRegistry {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec<'pg/jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/jsonb@1',
@@ -359,7 +359,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const dB = deferred<string>();
     const callOrder: string[] = [];
 
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/slow-a@1',
@@ -415,7 +415,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('always awaits codec.decode and yields plain values (no Promise leaks)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/async@1',
@@ -481,7 +481,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
   it('wraps decode failures in RUNTIME.DECODE_FAILED with { table, column, codec } and cause', async () => {
     const cause = new Error('boom');
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/explody@1',
@@ -519,7 +519,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('passes wire values through for raw plans (no AST, no codec decoding)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(
       codec({
         typeId: 'test/should-not-run@1',
@@ -537,7 +537,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('throws RUNTIME.DECODE_FAILED for AST-backed plan when row is missing a projection alias', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     const plan = buildAstPlan({
       projections: [{ alias: 'id' }, { alias: 'email' }],
     });
@@ -553,7 +553,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('preserves wire null for AST-backed plans (distinct from missing alias)', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     const plan = buildAstPlan({
       projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
     });
@@ -573,7 +573,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   });
 
   it('decodeField is single-armed: same path for sync and async codec authors', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     const buildCodec = (
       id: string,
       encode: (value: string) => string,
@@ -624,7 +624,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
     'encodeParams encrypts plaintext via async codec.encode (no Promise leaks)',
     { timeout: timeouts.databaseOperation },
     async () => {
-      const registry = createCodecRegistry();
+      const registry = newCodecRegistry();
       registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
       const plan = buildAstPlan({
@@ -643,7 +643,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
     'decodeRow decrypts ciphertext via async codec.decode and yields plain values',
     { timeout: timeouts.databaseOperation },
     async () => {
-      const registry = createCodecRegistry();
+      const registry = newCodecRegistry();
       registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
       const wire = await encryptSecret('top-secret', seed);
@@ -663,7 +663,7 @@ describe('seeded-secret-codec — realistic crypto path against the runtime', ()
   );
 
   it('decode failures from async crypto are wrapped in RUNTIME.DECODE_FAILED with cause', async () => {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(createAsyncSecretCodec({ typeId: 'pg/secret@1', seed }));
 
     const plan = buildAstPlan({

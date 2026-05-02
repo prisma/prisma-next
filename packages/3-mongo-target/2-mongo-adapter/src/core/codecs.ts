@@ -1,10 +1,10 @@
 import type { CodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
-  createMongoCodecRegistry,
   type MongoCodec,
   type MongoCodecRegistry,
   mongoCodec,
+  newMongoCodecRegistry,
 } from '@prisma-next/mongo-codec';
 import { ObjectId } from 'mongodb';
 import {
@@ -171,7 +171,7 @@ export function mongoDescriptorById(codecId: string): CodecDescriptor | undefine
  * `createMongoExecutionContext`) instead of calling this directly.
  */
 export function buildStandardCodecRegistry(): MongoCodecRegistry {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   for (const codec of mongoStandardCodecs) {
     registry.register(codec);
   }

@@ -313,7 +313,7 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
  * Per Phase B of codec-registry-unification, `descriptorFor('arktype/json@1')`
  * returns this descriptor and its `traits`/`targetTypes` are the codec-id-
  * keyed source of truth — no parallel placeholder on the legacy `codecs:`
- * slot is needed (the runtime descriptor ships `codecs: () => createCodecRegistry()`
+ * slot is needed (the runtime descriptor ships `codecs: () => newCodecRegistry()`
  * — empty).
  */
 export const arktypeJsonCodec: CodecDescriptor<ArktypeJsonTypeParams> = {

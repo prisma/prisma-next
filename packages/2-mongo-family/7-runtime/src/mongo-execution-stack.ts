@@ -12,7 +12,7 @@ import {
 } from '@prisma-next/framework-components/execution';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { MongoCodec } from '@prisma-next/mongo-codec';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 
 /**
@@ -134,7 +134,7 @@ export function createMongoExecutionContext<TTargetId extends string = 'mongo'>(
   readonly contract: unknown;
   readonly stack: MongoExecutionStack<TTargetId>;
 }): MongoExecutionContext<TTargetId> {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   const owners = new Map<string, string>();
 
   const contributors: ReadonlyArray<MongoStaticContributions & { readonly id: string }> = [

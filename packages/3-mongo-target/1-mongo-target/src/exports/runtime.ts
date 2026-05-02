@@ -2,7 +2,7 @@ import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { createMongoCodecRegistry, type MongoCodecRegistry } from '@prisma-next/mongo-codec';
+import { type MongoCodecRegistry, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { mongoTargetDescriptorMeta } from '../core/descriptor-meta';
 
 export interface MongoRuntimeTargetInstance extends RuntimeTargetInstance<'mongo', 'mongo'> {}
@@ -26,7 +26,7 @@ const mongoRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   ...mongoTargetDescriptorMeta,
   // The target descriptor itself contributes no codecs — the standard set
   // lives on the adapter descriptor (see `@prisma-next/adapter-mongo/runtime`).
-  codecs: () => createMongoCodecRegistry(),
+  codecs: () => newMongoCodecRegistry(),
   create(): MongoRuntimeTargetInstance {
     return {
       familyId: 'mongo',

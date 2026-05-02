@@ -1,4 +1,4 @@
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../src/resolve-value';
@@ -16,13 +16,13 @@ const uppercaseCodec = mongoCodec({
 });
 
 function testRegistry() {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   registry.register(uppercaseCodec);
   return registry;
 }
 
 function emptyRegistry() {
-  return createMongoCodecRegistry();
+  return newMongoCodecRegistry();
 }
 
 const noCtx = {} as const;
@@ -117,7 +117,7 @@ describe('resolveValue', () => {
         },
       });
 
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(asyncACodec);
       registry.register(asyncBCodec);
 
@@ -156,7 +156,7 @@ describe('resolveValue', () => {
         },
       });
 
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(codec);
 
       const arr = [
@@ -193,7 +193,7 @@ describe('resolveValue', () => {
           throw new Error('kms-key-resolution-failed');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
@@ -217,7 +217,7 @@ describe('resolveValue', () => {
           throw new Error('boom');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', {
@@ -240,7 +240,7 @@ describe('resolveValue', () => {
           throw new Error('boom');
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(failingCodec);
 
       const ref = new MongoParamRef('plaintext', { codecId: 'test/failing@1' });
@@ -261,7 +261,7 @@ describe('resolveValue', () => {
           throw err;
         },
       });
-      const registry = createMongoCodecRegistry();
+      const registry = newMongoCodecRegistry();
       registry.register(innerCodec);
 
       const ref = new MongoParamRef('x', { codecId: 'test/already-wrapped@1' });

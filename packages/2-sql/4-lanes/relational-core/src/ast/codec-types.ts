@@ -182,38 +182,6 @@ export interface CodecRegistry {
 }
 
 /**
- * Implementation of CodecRegistry.
- */
-class CodecRegistryImpl implements CodecRegistry {
-  private readonly _byId = new Map<string, Codec<string>>();
-
-  get(id: string): Codec<string> | undefined {
-    return this._byId.get(id);
-  }
-
-  has(id: string): boolean {
-    return this._byId.has(id);
-  }
-
-  register(codec: Codec<string>): void {
-    if (this._byId.has(codec.id)) {
-      throw new Error(`Codec with ID '${codec.id}' is already registered`);
-    }
-    this._byId.set(codec.id, codec);
-  }
-
-  *[Symbol.iterator](): Iterator<Codec<string>> {
-    for (const codec of this._byId.values()) {
-      yield codec;
-    }
-  }
-
-  values(): IterableIterator<Codec<string>> {
-    return this._byId.values();
-  }
-}
-
-/**
  * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
  * structurally assignable to `JsonValue` the identity defaults are
  * sound and both fields are optional; otherwise both fields are
@@ -494,10 +462,26 @@ class CodecDefBuilderImpl<
 }
 
 /**
- * Create a new codec registry.
+ * Create a new codec registry. Inline object literal — no class
+ * implementation; the registry is just a private `Map<string, Codec>`
+ * with the documented surface methods.
  */
-export function createCodecRegistry(): CodecRegistry {
-  return new CodecRegistryImpl();
+export function newCodecRegistry(): CodecRegistry {
+  const byId = new Map<string, Codec<string>>();
+  return {
+    get: (id) => byId.get(id),
+    has: (id) => byId.has(id),
+    register: (codec) => {
+      if (byId.has(codec.id)) {
+        throw new Error(`Codec with ID '${codec.id}' is already registered`);
+      }
+      byId.set(codec.id, codec);
+    },
+    values: () => byId.values(),
+    [Symbol.iterator]: function* () {
+      yield* byId.values();
+    },
+  };
 }
 
 /**

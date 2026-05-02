@@ -6,11 +6,11 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
   ExistsExpr,
   ListExpression,
   NotExpr,
   NullCheckExpr,
+  newCodecRegistry,
   OperationExpr,
   OrderByItem,
   ParamRef,
@@ -47,7 +47,7 @@ describe('createModelAccessor', () => {
   }
 
   function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     for (const [id, traits] of Object.entries(entries)) {
       registry.register(
         codec({

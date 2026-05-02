@@ -17,8 +17,8 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
   LiteralExpr,
+  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -67,7 +67,7 @@ interface DriverMockSpies {
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
 function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = createCodecRegistry();
+  const registry = newCodecRegistry();
   registry.register(
     codec({
       typeId: 'pg/int4@1',

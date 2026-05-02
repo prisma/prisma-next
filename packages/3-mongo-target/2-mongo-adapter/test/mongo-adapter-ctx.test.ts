@@ -1,5 +1,5 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import {
   AggregateCommand,
   DeleteOneCommand,
@@ -22,7 +22,7 @@ const baseMeta = {
 };
 
 function recordingRegistry(observed: (CodecCallContext | undefined)[]) {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   registry.register(
     mongoCodec({
       typeId: 'test/recorder@1',
@@ -192,7 +192,7 @@ describe('MongoAdapter — CodecCallContext threading', () => {
     let callCount = 0;
     const adapter = _unstable_createMongoAdapterWithCodecs(
       (() => {
-        const reg = createMongoCodecRegistry();
+        const reg = newMongoCodecRegistry();
         reg.register(
           mongoCodec({
             typeId: 'test/counter@1',

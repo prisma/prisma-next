@@ -7,7 +7,7 @@ import {
   BinaryExpr,
   ColumnRef,
   codec,
-  createCodecRegistry,
+  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -105,7 +105,7 @@ function jsonbCodec<Id extends string>(typeId: Id, targetType: string) {
 }
 
 function createTestCodecRegistry(): CodecRegistry {
-  const registry = createCodecRegistry();
+  const registry = newCodecRegistry();
   registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
   registry.register(jsonbCodec('pg/json@1', 'json'));
   registry.register(
@@ -512,7 +512,7 @@ describe('JSON Schema decoding validation', () => {
   });
 
   it('runs JSON schema validation against the resolved value of an async decoder', async () => {
-    const asyncRegistry = createCodecRegistry();
+    const asyncRegistry = newCodecRegistry();
     asyncRegistry.register(
       codec<'pg/async-jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/async-jsonb@1',
@@ -568,7 +568,7 @@ describe('JSON Schema decoding validation', () => {
         throw new Error(`decrypt failed for value=${leakyPlaintext}`);
       },
     });
-    const registry = createCodecRegistry();
+    const registry = newCodecRegistry();
     registry.register(leakyCodec);
 
     const plan = createTestPlan({

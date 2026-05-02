@@ -1,5 +1,5 @@
 import { createExecutionStack } from '@prisma-next/framework-components/execution';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec, newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { createExecutionContext, createSqlExecutionStack } from '../src/exports';
 import type {
@@ -11,7 +11,7 @@ import type {
 import { createTestContract, descriptorsFromCodecRegistry } from './utils';
 
 function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
+  const registry = newCodecRegistry();
   registry.register(
     codec({
       typeId: 'pg/text@1',
@@ -66,7 +66,7 @@ function createStubTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
 }
 
 function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
+  const registry = newCodecRegistry();
   registry.register(
     codec({
       typeId: 'pg/uuid@1',

@@ -16,11 +16,29 @@ import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
+  Codec,
   CodecRegistry,
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec } from '@prisma-next/sql-relational-core/ast';
+
+function emptyCodecRegistry(): CodecRegistry {
+  const byId = new Map<string, Codec<string>>();
+  return {
+    get: (id) => byId.get(id),
+    has: (id) => byId.has(id),
+    register: (c) => {
+      if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
+      byId.set(c.id, c);
+    },
+    values: () => byId.values(),
+    [Symbol.iterator]: function* () {
+      yield* byId.values();
+    },
+  };
+}
+
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -253,7 +271,7 @@ export function createTestStackInstance(options?: {
  * to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
-  const codecRegistry = createCodecRegistry();
+  const codecRegistry = emptyCodecRegistry();
 
   // Register stub codecs for common test types
   // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)

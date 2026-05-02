@@ -31,7 +31,6 @@ import type {
   SqlCodecInstanceContext,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type {
   AppliedMutationDefault,
   CodecDescriptorRegistry,
@@ -825,20 +824,32 @@ export function createExecutionContext<
   const { all: allCodecDescriptors, parameterized: parameterizedCodecDescriptors } =
     collectCodecDescriptors(contributors);
 
-  // Materialize the legacy `CodecRegistry` view by calling
+  // Materialize the runtime codec view by calling
   // `descriptor.factory(undefined)(ctx)` once per descriptor. For non-
   // parameterized descriptors the factory is constant — every call
   // yields the same shared codec. For parameterized descriptors whose
   // factory tolerates `undefined` (pgvector's factory ignores its
   // params and returns the same shared codec), the materialization
-  // produces a representative codec instance the legacy `forCodecId`
-  // fallback can hand out for refs-less call sites (the AC-5 carve-out
-  // path for parameter encoding); descriptors whose factory needs real
-  // params (arktype-json) raise — skip them and let the per-column
-  // dispatch path handle materialization lazily. The registry stops
-  // serving as a contributor protocol return type under TML-2357 M2
-  // Phase A; only its runtime context role remains.
-  const codecRegistry = createCodecRegistry();
+  // produces a representative codec instance the `forCodecId` fallback
+  // can hand out for refs-less call sites (the AC-5 carve-out path for
+  // parameter encoding); descriptors whose factory needs real params
+  // (arktype-json) raise — skip them and let the per-column dispatch
+  // path handle materialization lazily.
+  const codecMap = new Map<string, Codec<string>>();
+  const codecRegistry: CodecRegistry = {
+    get: (id) => codecMap.get(id),
+    has: (id) => codecMap.has(id),
+    register: (c) => {
+      if (codecMap.has(c.id)) {
+        throw new Error(`Codec with ID '${c.id}' is already registered`);
+      }
+      codecMap.set(c.id, c);
+    },
+    values: () => codecMap.values(),
+    [Symbol.iterator]: function* () {
+      yield* codecMap.values();
+    },
+  };
   for (const descriptor of allCodecDescriptors) {
     const ctx: SqlCodecInstanceContext = {
       name: `<shared:${descriptor.codecId}>`,

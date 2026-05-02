@@ -1,4 +1,4 @@
-import { createMongoCodecRegistry, mongoCodec } from '@prisma-next/mongo-codec';
+import { mongoCodec, newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
 import type { AnyMongoCommand } from '@prisma-next/mongo-query-ast/execution';
 import {
@@ -384,7 +384,7 @@ describe('MongoAdapter with codec registry', () => {
   });
 
   function registryWithUppercase() {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(uppercaseCodec);
     return registry;
   }

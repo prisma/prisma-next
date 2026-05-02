@@ -17,7 +17,7 @@ import type {
 import {
   ColumnRef,
   codec,
-  createCodecRegistry,
+  newCodecRegistry,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -61,7 +61,7 @@ function deferred<T>(): {
 }
 
 function createStubCodecs(extras: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = createCodecRegistry();
+  const registry = newCodecRegistry();
   for (const c of extras) registry.register(c);
   return registry;
 }

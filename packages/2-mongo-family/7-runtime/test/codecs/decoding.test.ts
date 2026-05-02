@@ -1,8 +1,8 @@
 import { isRuntimeError } from '@prisma-next/framework-components/runtime';
 import {
-  createMongoCodecRegistry,
   type MongoCodecRegistry,
   mongoCodec,
+  newMongoCodecRegistry,
 } from '@prisma-next/mongo-codec';
 import type { MongoFieldShape, MongoResultShape } from '@prisma-next/mongo-query-ast/execution';
 import { ObjectId } from 'mongodb';
@@ -24,7 +24,7 @@ function deferred<T>(): {
 }
 
 function registryWithDefaults(): MongoCodecRegistry {
-  const registry = createMongoCodecRegistry();
+  const registry = newMongoCodecRegistry();
   registry.register(
     mongoCodec({
       typeId: 'mongo/string@1',
@@ -246,7 +246,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('coerces non-Error throw values into the wrapper message', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws-string@1',
@@ -277,7 +277,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('serialises non-string wire values for wirePreview when decode throws', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
@@ -305,7 +305,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('truncates long string wirePreviews to 100 chars with an ellipsis', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
@@ -400,7 +400,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('passes through when registry has no entry for codecId', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     const shape: MongoResultShape = {
       kind: 'document',
       fields: {
@@ -413,7 +413,7 @@ describe('decodeMongoRow', () => {
   });
 
   it('wraps codec errors in RUNTIME.DECODE_FAILED with details and cause', async () => {
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'throws@1',
@@ -453,7 +453,7 @@ describe('decodeMongoRow', () => {
     const dA = deferred<string>();
     const dB = deferred<string>();
     const callOrder: string[] = [];
-    const registry = createMongoCodecRegistry();
+    const registry = newMongoCodecRegistry();
     registry.register(
       mongoCodec({
         typeId: 'slow-a@1',
