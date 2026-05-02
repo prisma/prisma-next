@@ -191,19 +191,20 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     paramsSchema: jsonTypeParamsSchema,
     factory: (params: Record<string, unknown>) => {
       const validate = createStubValidator(params['schema'] as Record<string, unknown>);
-      const baseTraits: ReadonlyArray<string> = base.traits ?? [];
-      const traitsArr = Array.from(new Set([...baseTraits, 'json-validator']));
-      const traits = Object.freeze(traitsArr) as NonNullable<Codec['traits']>;
+      // Trait metadata lives on the descriptor (set above); the resolved
+      // codec instance is conversion-only (TML-2357 M2 Phase B). The
+      // factory still attaches a per-instance `validate` because that's
+      // how the JSON-schema validator registry pulls the per-column
+      // validator off the resolved codec.
       const resolved: Codec & { readonly validate: typeof validate } = {
         ...base,
-        traits,
         validate,
       };
       return () => resolved;
     },
   });
 
-  const descriptors: RuntimeParameterizedCodecDescriptor<Record<string, unknown>>[] = [
+  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<Record<string, unknown>>[] = [
     buildJsonDescriptor('pg/json@1', baseJson, 'json'),
     buildJsonDescriptor('pg/jsonb@1', baseJsonb, 'jsonb'),
   ];
@@ -214,7 +215,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
+    codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },

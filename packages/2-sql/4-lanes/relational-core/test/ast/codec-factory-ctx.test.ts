@@ -6,7 +6,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
   it('lifts a single-arg `(value)` author unchanged (back-compat)', async () => {
     const c = codec({
       typeId: 'demo/single-arg-encode@1',
-      targetTypes: ['text'],
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
     });
@@ -17,7 +16,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     let observed: SqlCodecCallContext | undefined;
     const c = codec({
       typeId: 'demo/ctx-encode@1',
-      targetTypes: ['text'],
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
         return value;
@@ -39,7 +37,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     let observed: SqlCodecCallContext | undefined;
     const c = codec({
       typeId: 'demo/ctx-decode@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
@@ -61,7 +58,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     let observedSignal: AbortSignal | undefined;
     const c = codec({
       typeId: 'demo/identity@1',
-      targetTypes: ['text'],
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observedSignal = ctx?.signal;
         return value;
@@ -77,7 +73,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     let observed: unknown = 'sentinel';
     const c = codec({
       typeId: 'demo/empty-ctx@1',
-      targetTypes: ['text'],
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
         return value;
@@ -92,7 +87,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
   it('async ctx-bearing encode resolves with the produced value', async () => {
     const c = codec({
       typeId: 'demo/async-ctx@1',
-      targetTypes: ['text'],
       encode: async (value: string, _ctx?: SqlCodecCallContext) => `enc:${value}`,
       decode: (wire: string) => wire,
     });
@@ -103,7 +97,6 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
     let observedColumn: SqlCodecCallContext['column'];
     const c = codec({
       typeId: 'demo/column-aware@1',
-      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string, ctx?: SqlCodecCallContext) => {
         observedColumn = ctx?.column;

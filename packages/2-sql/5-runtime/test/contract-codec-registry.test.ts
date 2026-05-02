@@ -33,14 +33,14 @@ import { createStubAdapter, createTestContext } from './utils';
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
   const baseCodec = codec({
     typeId: 'pg/vector@1',
-    targetTypes: ['vector'],
     encode: (v: number[]) => v,
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // SQL-side `Codec` declares `meta?: CodecMeta`; cast to the
-  // non-undefined branch under `exactOptionalPropertyTypes`.
-  return { ...baseCodec, meta: meta as NonNullable<Codec['meta']> };
+  // The narrow `Codec` shape is conversion-only (TML-2357 M2 Phase B);
+  // the `meta` sentinel here is test-side bookkeeping that downstream
+  // assertions read off the exact instance handed back by the factory.
+  return { ...baseCodec, meta } as unknown as Codec;
 }
 
 function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {

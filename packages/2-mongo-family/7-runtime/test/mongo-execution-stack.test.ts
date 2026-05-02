@@ -149,9 +149,9 @@ describe('createMongoExecutionContext', () => {
 });
 
 describe('runtime adapter descriptor', () => {
-  it('declares the seven standard Mongo codec instances on codecInstances', () => {
-    const codecInstances = mongoRuntimeAdapter.types?.codecTypes?.codecInstances ?? [];
-    expect(codecInstances.map((c) => c.id).sort()).toEqual([...STANDARD_CODEC_IDS].sort());
+  it('declares the seven standard Mongo codec descriptors on codecDescriptors', () => {
+    const codecDescriptors = mongoRuntimeAdapter.types?.codecTypes?.codecDescriptors ?? [];
+    expect(codecDescriptors.map((d) => d.codecId).sort()).toEqual([...STANDARD_CODEC_IDS].sort());
   });
 
   it('create(stack) returns an instance whose lower() delegates to the standard adapter', async () => {

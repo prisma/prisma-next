@@ -1,6 +1,6 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { Codec as SqlCodec } from '@prisma-next/sql-relational-core/ast';
-import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
+import { codecDescriptorList } from '@prisma-next/target-postgres/codecs';
 
 /**
  * Build a {@link CodecLookup} populated with the Postgres-builtin codec
@@ -17,14 +17,10 @@ import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
  * extension-inclusive lookup at construction time.
  */
 export function createPostgresBuiltinCodecLookup(): CodecLookup {
-  const byId = new Map<string, SqlCodec>();
-  for (const definition of Object.values(codecDefinitions)) {
-    byId.set(definition.codec.id, definition.codec);
-  }
-  return {
-    get: (id) => byId.get(id),
-    targetTypesFor: (id) => byId.get(id)?.targetTypes,
-    metaFor: (id) => byId.get(id)?.meta,
-    renderOutputTypeFor: (id, params) => byId.get(id)?.renderOutputType?.(params),
-  };
+  return extractCodecLookup([
+    {
+      id: 'postgres-builtin-codecs',
+      types: { codecTypes: { codecDescriptors: codecDescriptorList } },
+    },
+  ]);
 }

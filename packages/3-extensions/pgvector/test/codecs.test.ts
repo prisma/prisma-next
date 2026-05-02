@@ -1,6 +1,6 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { codecDefinitions, codecDescriptorDefinitions } from '../src/core/codecs';
 
 // The pgvector codec authors `encode`/`decode` synchronously, but the
 // `codec()` factory in `relational-core` lifts both methods to
@@ -24,7 +24,7 @@ describe('pgvector codecs', () => {
       const vectorDef = codecDefinitions.vector;
       expect(vectorDef).toBeDefined();
       expect(vectorDef.typeId).toBe('pg/vector@1');
-      expect(vectorDef.codec.targetTypes).toEqual(['vector']);
+      expect(codecDescriptorDefinitions.vector.descriptor.targetTypes).toEqual(['vector']);
     },
     timeouts.default,
   );

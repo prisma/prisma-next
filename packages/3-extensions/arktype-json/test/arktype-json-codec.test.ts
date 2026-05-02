@@ -46,9 +46,10 @@ describe('arktypeJson(schema)', () => {
   it('exposes a curried (ctx) => Codec factory in the type slot', () => {
     const descriptor = arktypeJson(productSchema);
     const codec = descriptor.type(SYNTH_CTX);
+    // Static metadata (`traits`, `targetTypes`) lives on the
+    // `CodecDescriptor`, exercised below in the "arktypeJsonCodec
+    // descriptor" suite.
     expect(codec.id).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(codec.targetTypes).toEqual(['jsonb']);
-    expect(codec.traits).toEqual(['equality']);
   });
 
   it('rejects non-callable schema lookalikes at the call site', () => {

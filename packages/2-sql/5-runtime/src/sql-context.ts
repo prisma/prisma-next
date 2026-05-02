@@ -433,29 +433,22 @@ function validateColumnTypeParams(
   }
 }
 
-/**
- * View of a codec that exposes a per-instance JSON-schema `validate`
- * function. Codecs declare this contract by including the
- * `'json-validator'` `CodecTrait` in their `traits` array; the trait is
- * the gate that lets `extractValidator` resolve from structurally-typed
- * `unknown` to this typed view.
- */
 type JsonValidatorCodec = {
-  readonly traits?: ReadonlyArray<unknown>;
   readonly validate: JsonSchemaValidateFn;
 };
 
-function hasJsonValidatorTrait(candidate: unknown): candidate is JsonValidatorCodec {
+function hasValidateFunction(candidate: unknown): candidate is JsonValidatorCodec {
   if (candidate === null || typeof candidate !== 'object') return false;
-  const traits = (candidate as { readonly traits?: unknown }).traits;
-  if (!Array.isArray(traits)) return false;
-  if (!traits.includes('json-validator')) return false;
   const validate = (candidate as { readonly validate?: unknown }).validate;
   return typeof validate === 'function';
 }
 
-function extractValidator(candidate: unknown): JsonSchemaValidateFn | undefined {
-  return hasJsonValidatorTrait(candidate) ? candidate.validate : undefined;
+function extractValidator(
+  candidate: unknown,
+  descriptor: CodecDescriptor<unknown> | undefined,
+): JsonSchemaValidateFn | undefined {
+  if (!descriptor?.traits?.includes('json-validator')) return undefined;
+  return hasValidateFunction(candidate) ? candidate.validate : undefined;
 }
 
 function isResolvedCodec(candidate: unknown): candidate is Codec {
@@ -586,7 +579,7 @@ function buildContractCodecRegistry(
 
       if (resolvedCodec) {
         byColumn.set(columnKey, resolvedCodec);
-        const validate = extractValidator(resolvedCodec);
+        const validate = extractValidator(resolvedCodec, descriptor);
         if (validate) {
           validators.set(columnKey, validate);
         }

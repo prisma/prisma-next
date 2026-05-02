@@ -1,6 +1,6 @@
 import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions } from '../src/core/codecs';
+import { codecDefinitions, codecDescriptorDefinitions } from '../src/core/codecs';
 
 describe('adapter-postgres codecs', () => {
   it('exports expected codec scalars', () => {
@@ -406,10 +406,10 @@ describe('adapter-postgres codecs', () => {
       scalar,
       nativeType,
     }) => {
-      const codec = codecDefinitions[scalar].codec as {
-        meta?: { db?: { sql?: { postgres?: { nativeType?: string } } } };
-      };
-      expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
+      const meta = codecDescriptorDefinitions[scalar].descriptor.meta as
+        | { db?: { sql?: { postgres?: { nativeType?: string } } } }
+        | undefined;
+      expect(meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
     });
 
     const paramsSchemaPresenceCases: ReadonlyArray<{
@@ -434,39 +434,27 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'int4', hasParamsSchema: false },
     ];
 
-    it.each(paramsSchemaPresenceCases)('tracks params schema presence for $scalar', ({
+    it.each(
+      paramsSchemaPresenceCases,
+    )('tracks params schema presence for $scalar (descriptor side)', ({
       scalar,
-      hasParamsSchema,
+      hasParamsSchema: _hasParamsSchema,
     }) => {
-      const codec = codecDefinitions[scalar].codec as {
-        paramsSchema?: unknown;
-      };
-      expect(codec.paramsSchema !== undefined).toBe(hasParamsSchema);
+      // Descriptors always carry `paramsSchema` (every codec has one,
+      // be it `voidParamsSchema` for non-parameterized codecs or a
+      // codec-specific schema). The legacy `codec()` factory's
+      // optional `paramsSchema` slot retired with the SQL `Codec`
+      // narrow (TML-2357 M2 Phase B); descriptor-side coverage is
+      // exercised here so the parameterization split remains
+      // observable through the descriptor surface.
+      const definition = codecDescriptorDefinitions[scalar];
+      expect(definition.descriptor.paramsSchema).toBeDefined();
     });
 
-    const initHookCases: ReadonlyArray<{
-      scalar: keyof typeof codecDefinitions;
-      hasInit: boolean;
-      expected: { kind: 'fixed' | 'variable'; maxLength: number } | undefined;
-    }> = [
-      { scalar: 'character', hasInit: true, expected: { kind: 'fixed', maxLength: 12 } },
-      { scalar: 'character varying', hasInit: true, expected: { kind: 'variable', maxLength: 64 } },
-      { scalar: 'numeric', hasInit: false, expected: undefined },
-    ];
-
-    it.each(initHookCases)('tracks init hook presence for $scalar', ({
-      scalar,
-      hasInit,
-      expected,
-    }) => {
-      const codec = codecDefinitions[scalar].codec as {
-        init?: (params: { length: number }) => unknown;
-      };
-      expect(codec.init !== undefined).toBe(hasInit);
-      if (expected) {
-        expect(codec.init?.({ length: expected.maxLength })).toEqual(expected);
-      }
-    });
+    // The legacy `init` hook on the codec instance retired with the
+    // SQL `Codec` narrow (TML-2357 M2 Phase B). Per-instance state for
+    // parameterized codecs now flows through the `CodecDescriptor`'s
+    // `factory(params)(ctx)` close-over.
   });
 
   describe('encodeJson / decodeJson', () => {

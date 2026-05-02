@@ -7,7 +7,6 @@ import type {
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
 import { voidParamsSchema } from '@prisma-next/framework-components/codec';
-import { ifDefined } from '@prisma-next/utils/defined';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Type } from 'arktype';
 import type { O } from 'ts-toolbelt';
@@ -92,32 +91,17 @@ export interface CodecMeta {
 }
 
 /**
- * SQL codec — extends the framework codec base with SQL-specific metadata:
- * driver-native type info (`meta.db.sql.<dialect>.nativeType`) and an
- * optional parameterized-codec descriptor (`paramsSchema` + `init`) for
- * codecs that require type-parameter validation (e.g. `pg/vector@1`).
+ * SQL codec — extends the framework codec base by narrowing the per-
+ * call context to the SQL-family {@link SqlCodecCallContext} (adds
+ * `column?: SqlColumnRef`). TypeScript treats method-syntax
+ * declarations bivariantly, so the SQL narrowing is structurally
+ * compatible with the framework {@link BaseCodec} super-interface.
  *
- * `encode` and `decode` are redeclared here to narrow the per-call
- * context to the SQL-family {@link SqlCodecCallContext} (adds
- * `column?: SqlColumnRef`). TypeScript treats method-syntax declarations
- * bivariantly, so the SQL narrowing is structurally compatible with the
- * framework {@link BaseCodec} super-interface.
- *
- * `traits` and `targetTypes` are redeclared here because the framework
- * {@link BaseCodec} no longer carries them — they live on the unified
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`,
+ * `paramsSchema`, `renderOutputType`) lives on the unified
  * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}
- * as the codec-id-keyed source of truth. The instance-side fields stay
- * as a transitional surface that the legacy `codec()` factory still
- * emits on resolved instances; consumers of those fields (e.g.
- * `CodecLookup` assembly in `framework-components/control-stack`) read
- * them through a structural narrow until the family-extension narrow
- * lands in TML-2357 M2 Phase B.
- *
- * Note: `meta`, `paramsSchema`, and `init` are legacy adapter-level
- * slots retained transitionally on the codec instance. The runtime
- * materialization path uses `RuntimeParameterizedCodecDescriptor` (in
- * `@prisma-next/sql-runtime`) via the unified `CodecDescriptor<P>` shape;
- * codec-self-carried `meta`/`paramsSchema`/`init` retire under TML-2357.
+ * — the codec instance itself only carries `id` plus the four
+ * conversion methods (TML-2357 M2 Phase B).
  *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
@@ -127,29 +111,9 @@ export interface Codec<
   TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
   TWire = unknown,
   TInput = unknown,
-  TParams = Record<string, unknown>,
-  THelper = unknown,
 > extends BaseCodec<Id, TTraits, TWire, TInput> {
   encode(value: TInput, ctx: SqlCodecCallContext): Promise<TWire>;
   decode(wire: TWire, ctx: SqlCodecCallContext): Promise<TInput>;
-  /** Transitional. See file-level comment. */
-  readonly traits?: TTraits;
-  /**
-   * Transitional. See file-level comment. Optional because the resolved
-   * codec returned by a {@link import('@prisma-next/framework-components/codec').CodecDescriptor}'s
-   * `factory` (framework {@link BaseCodec}) is structurally narrower; the
-   * SQL `codec()` factory always populates the slot at the
-   * registration boundary.
-   */
-  readonly targetTypes?: readonly string[];
-  /** Transitional. See file-level comment. */
-  readonly meta?: CodecMeta;
-  /** Transitional. See file-level comment. */
-  readonly paramsSchema?: Type<TParams>;
-  /** Transitional. See file-level comment. */
-  readonly init?: (params: TParams) => THelper;
-  /** Transitional. See file-level comment. */
-  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
 }
 
 /**
@@ -212,13 +176,7 @@ export interface ContractCodecRegistry {
 export interface CodecRegistry {
   get(id: string): Codec<string> | undefined;
   has(id: string): boolean;
-  getByScalar(scalar: string): readonly Codec<string>[];
-  getDefaultCodec(scalar: string): Codec<string> | undefined;
   register(codec: Codec<string>): void;
-  /** Returns true if the codec with this ID has the given trait. */
-  hasTrait(codecId: string, trait: CodecTrait): boolean;
-  /** Returns all traits for a codec, or an empty array if not found. */
-  traitsOf(codecId: string): readonly CodecTrait[];
   [Symbol.iterator](): Iterator<Codec<string>>;
   values(): IterableIterator<Codec<string>>;
 }
@@ -228,92 +186,28 @@ export interface CodecRegistry {
  */
 class CodecRegistryImpl implements CodecRegistry {
   private readonly _byId = new Map<string, Codec<string>>();
-  private readonly _byScalar = new Map<string, Codec<string>[]>();
 
-  /**
-   * Map-like interface for codec lookup by ID.
-   * Example: registry.get('pg/text@1')
-   */
   get(id: string): Codec<string> | undefined {
     return this._byId.get(id);
   }
 
-  /**
-   * Check if a codec with the given ID is registered.
-   */
   has(id: string): boolean {
     return this._byId.has(id);
   }
 
-  /**
-   * Get all codecs that handle a given scalar type.
-   * Returns an empty frozen array if no codecs are found.
-   * Example: registry.getByScalar('text') → [codec1, codec2, ...]
-   */
-  getByScalar(scalar: string): readonly Codec<string>[] {
-    return this._byScalar.get(scalar) ?? Object.freeze([]);
-  }
-
-  /**
-   * Get the default codec for a scalar type (first registered codec).
-   * Returns undefined if no codec handles this scalar type.
-   */
-  getDefaultCodec(scalar: string): Codec<string> | undefined {
-    const _codecs = this._byScalar.get(scalar);
-    return _codecs?.[0];
-  }
-
-  /**
-   * Register a codec in the registry.
-   * Throws an error if a codec with the same ID is already registered.
-   *
-   * @param codec - The codec to register
-   * @throws Error if a codec with the same ID already exists
-   */
   register(codec: Codec<string>): void {
     if (this._byId.has(codec.id)) {
       throw new Error(`Codec with ID '${codec.id}' is already registered`);
     }
-
     this._byId.set(codec.id, codec);
-
-    // Update byScalar mapping. The transitional `targetTypes` field is
-    // optional now — the SQL `codec()` factory always populates it, but
-    // the type-system narrow (a resolved descriptor codec is the framework
-    // {@link BaseCodec}) means we read defensively here. This branch retires
-    // alongside `CodecRegistryImpl` in TML-2357 M2.
-    for (const scalarType of codec.targetTypes ?? []) {
-      const existing = this._byScalar.get(scalarType);
-      if (existing) {
-        existing.push(codec);
-      } else {
-        this._byScalar.set(scalarType, [codec]);
-      }
-    }
   }
 
-  hasTrait(codecId: string, trait: CodecTrait): boolean {
-    const codec = this._byId.get(codecId);
-    return codec?.traits?.includes(trait) ?? false;
-  }
-
-  traitsOf(codecId: string): readonly CodecTrait[] {
-    return this._byId.get(codecId)?.traits ?? [];
-  }
-
-  /**
-   * Returns an iterator over all registered codecs.
-   * Useful for iterating through codecs from another registry.
-   */
   *[Symbol.iterator](): Iterator<Codec<string>> {
     for (const codec of this._byId.values()) {
       yield codec;
     }
   }
 
-  /**
-   * Returns an iterable of all registered codecs.
-   */
   values(): IterableIterator<Codec<string>> {
     return this._byId.values();
   }
@@ -359,9 +253,16 @@ export function codec<
   TParams = Record<string, unknown>,
   THelper = unknown,
 >(
+  // The legacy author surface still accepts `targetTypes` / `traits` /
+  // `meta` / `paramsSchema` / `init` / `renderOutputType` so existing
+  // call sites compile against this factory while it's still in use.
+  // The factory drops every transitional field on the way out — the
+  // narrowed `Codec` instance only carries `id` plus the four
+  // conversion methods. The legacy factory itself retires alongside
+  // the parallel `codecDescriptor()` API in TML-2357 M2.
   config: {
     typeId: Id;
-    targetTypes: readonly string[];
+    targetTypes?: readonly string[];
     encode: (value: TInput, ctx: SqlCodecCallContext) => TWire | Promise<TWire>;
     decode: (wire: TWire, ctx: SqlCodecCallContext) => TInput | Promise<TInput>;
     meta?: CodecMeta;
@@ -370,7 +271,7 @@ export function codec<
     traits?: TTraits;
     renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
-): Codec<Id, TTraits, TWire, TInput, TParams, THelper> {
+): Codec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
   // The runtime allocates one `SqlCodecCallContext` per `runtime.execute()`
   // call (no caller-supplied `signal` produces `{}` instead of `undefined`)
@@ -388,15 +289,6 @@ export function codec<
   };
   return {
     id: config.typeId,
-    targetTypes: config.targetTypes,
-    ...ifDefined('meta', config.meta),
-    ...ifDefined('paramsSchema', config.paramsSchema),
-    ...ifDefined('init', config.init),
-    ...ifDefined(
-      'traits',
-      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
-    ),
-    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: (value, ctx) => {
       try {
         return Promise.resolve(userEncode(value, ctx));
@@ -413,7 +305,7 @@ export function codec<
     },
     encodeJson: (widenedConfig.encodeJson ?? identity) as (value: TInput) => JsonValue,
     decodeJson: (widenedConfig.decodeJson ?? identity) as (json: JsonValue) => TInput,
-  };
+  } as Codec<Id, TTraits, TWire, TInput>;
 }
 
 /**

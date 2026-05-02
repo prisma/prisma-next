@@ -1,4 +1,5 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -23,12 +24,26 @@ const emptyLookup: CodecLookup = {
   renderOutputTypeFor: () => undefined,
 };
 
-function lookupOf(byId: Record<string, SqlCodec>): CodecLookup {
+// `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`)
+// retired with the SQL `Codec` narrow (TML-2357 M2 Phase B); these tests
+// supply the metadata side-by-side with the codec instance to build the
+// `CodecLookup` directly.
+interface CodecMetadata {
+  readonly targetTypes?: readonly string[];
+  readonly meta?: {
+    readonly db?: { readonly sql?: { readonly postgres?: { readonly nativeType?: string } } };
+  };
+  readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
+}
+
+function lookupOf(
+  byId: Record<string, { codec: SqlCodec; metadata?: CodecMetadata }>,
+): CodecLookup {
   return {
-    get: (id) => byId[id] as Codec | undefined,
-    targetTypesFor: (id) => byId[id]?.targetTypes,
-    metaFor: (id) => byId[id]?.meta,
-    renderOutputTypeFor: (id, params) => byId[id]?.renderOutputType?.(params),
+    get: (id) => byId[id]?.codec as Codec | undefined,
+    targetTypesFor: (id) => byId[id]?.metadata?.targetTypes,
+    metaFor: (id) => byId[id]?.metadata?.meta,
+    renderOutputTypeFor: (id, params) => byId[id]?.metadata?.renderOutputType?.(params),
   };
 }
 
@@ -77,12 +92,18 @@ describe('renderLoweredSql cast policy', () => {
   it('emits $N::<nativeType> when the codec nativeType is outside the inferrable set', () => {
     const fooCodec: Codec = codec({
       typeId: 'app/test-foo@1',
-      targetTypes: ['foo'],
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
-      meta: { db: { sql: { postgres: { nativeType: 'foo' } } } },
     });
-    const lookup = lookupOf({ 'app/test-foo@1': fooCodec });
+    const lookup = lookupOf({
+      'app/test-foo@1': {
+        codec: fooCodec,
+        metadata: {
+          targetTypes: ['foo'],
+          meta: { db: { sql: { postgres: { nativeType: 'foo' } } } },
+        },
+      },
+    });
 
     const ast = selectWithParam('tag', 'app/test-foo@1', 'tagged');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -93,12 +114,18 @@ describe('renderLoweredSql cast policy', () => {
   it('emits plain $N when the codec nativeType is inferrable', () => {
     const integerCodec: Codec = codec({
       typeId: 'pg/int4@1',
-      targetTypes: ['int4'],
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
-      meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
     });
-    const lookup = lookupOf({ 'pg/int4@1': integerCodec });
+    const lookup = lookupOf({
+      'pg/int4@1': {
+        codec: integerCodec,
+        metadata: {
+          targetTypes: ['int4'],
+          meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
+        },
+      },
+    });
 
     const ast = selectWithParam('score', 'pg/int4@1', 1);
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -109,11 +136,15 @@ describe('renderLoweredSql cast policy', () => {
   it('emits plain $N when the codec carries no nativeType metadata', () => {
     const enumCodec: Codec = codec({
       typeId: 'pg/enum@1',
-      targetTypes: ['enum'],
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
-    const lookup = lookupOf({ 'pg/enum@1': enumCodec });
+    const lookup = lookupOf({
+      'pg/enum@1': {
+        codec: enumCodec,
+        metadata: { targetTypes: ['enum'] },
+      },
+    });
 
     const ast = selectWithParam('note', 'pg/enum@1', 'urgent');
     const lowered = renderLoweredSql(ast, baseContract, lookup);
@@ -166,11 +197,21 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
     const geographyCodec: Codec = codec({
       typeId: 'app/geography@1',
-      targetTypes: ['geography'],
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
-      meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
     });
+
+    // Codec-side static metadata (`targetTypes` / `meta`) lives on
+    // the codec descriptor (TML-2357 M2 Phase B); contributors expose
+    // it via `types.codecTypes.codecDescriptors`.
+    const geographyDescriptor = {
+      codecId: 'app/geography@1',
+      traits: [],
+      targetTypes: ['geography'],
+      meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
+      paramsSchema: voidParamsSchema,
+      factory: () => () => geographyCodec,
+    } as const;
 
     const geographyExtension: RuntimeExtensionDescriptor<'sql', 'postgres'> = {
       kind: 'extension',
@@ -180,7 +221,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       targetId: 'postgres',
       types: {
         codecTypes: {
-          codecInstances: [geographyCodec],
+          codecDescriptors: [geographyDescriptor],
         },
       },
       create() {

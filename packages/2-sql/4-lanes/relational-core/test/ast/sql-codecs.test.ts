@@ -8,6 +8,7 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
   sqlCodecDefinitions,
+  sqlCodecDescriptorDefinitions,
   sqlDataTypes,
 } from '../../src/ast/sql-codecs';
 
@@ -31,53 +32,46 @@ describe('sql-codecs', () => {
   });
 
   const codecDefinitionCases: ReadonlyArray<{
-    scalar: keyof typeof sqlCodecDefinitions;
+    scalar: keyof typeof sqlCodecDescriptorDefinitions;
     id: string;
     targetTypes: readonly string[];
     hasParamsSchema: boolean;
-    hasInit: boolean;
   }> = [
     {
       scalar: 'char',
       id: SQL_CHAR_CODEC_ID,
       targetTypes: ['char'],
       hasParamsSchema: true,
-      hasInit: true,
     },
     {
       scalar: 'varchar',
       id: SQL_VARCHAR_CODEC_ID,
       targetTypes: ['varchar'],
       hasParamsSchema: true,
-      hasInit: true,
     },
     {
       scalar: 'int',
       id: SQL_INT_CODEC_ID,
       targetTypes: ['int'],
-      hasParamsSchema: false,
-      hasInit: false,
+      hasParamsSchema: true,
     },
     {
       scalar: 'float',
       id: SQL_FLOAT_CODEC_ID,
       targetTypes: ['float'],
-      hasParamsSchema: false,
-      hasInit: false,
+      hasParamsSchema: true,
     },
     {
       scalar: 'text',
       id: SQL_TEXT_CODEC_ID,
       targetTypes: ['text'],
-      hasParamsSchema: false,
-      hasInit: false,
+      hasParamsSchema: true,
     },
     {
       scalar: 'timestamp',
       id: SQL_TIMESTAMP_CODEC_ID,
       targetTypes: ['timestamp'],
       hasParamsSchema: true,
-      hasInit: false,
     },
   ];
 
@@ -86,14 +80,12 @@ describe('sql-codecs', () => {
     id,
     targetTypes,
     hasParamsSchema,
-    hasInit,
   }) => {
-    const definition = sqlCodecDefinitions[scalar];
-    expect(definition.typeId).toBe(id);
+    const definition = sqlCodecDescriptorDefinitions[scalar];
+    expect(definition.codecId).toBe(id);
     expect(definition.scalar).toBe(scalar);
-    expect(definition.codec.targetTypes).toEqual(targetTypes);
-    expect(definition.codec.paramsSchema !== undefined).toBe(hasParamsSchema);
-    expect(definition.codec.init !== undefined).toBe(hasInit);
+    expect(definition.descriptor.targetTypes).toEqual(targetTypes);
+    expect(definition.descriptor.paramsSchema !== undefined).toBe(hasParamsSchema);
   });
 
   it('exports data types mapped to codec IDs', () => {
@@ -169,20 +161,6 @@ describe('sql-codecs', () => {
     expect(await charCodec.decode('user_001', {})).toBe('user_001');
   });
 
-  it('initializes helpers for length-parameterized codecs', () => {
-    const charCodec = sqlCodecDefinitions.char.codec;
-    const varcharCodec = sqlCodecDefinitions.varchar.codec;
-
-    expect(charCodec.init?.({ length: 5 })).toEqual({
-      kind: 'fixed',
-      maxLength: 5,
-    });
-    expect(varcharCodec.init?.({ length: 255 })).toEqual({
-      kind: 'variable',
-      maxLength: 255,
-    });
-  });
-
   it('round-trips Date values for timestamp codecs', async () => {
     const timestampCodec = sqlCodecDefinitions.timestamp.codec as {
       encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
@@ -213,61 +191,99 @@ describe('sql-codecs', () => {
 
   describe('renderOutputType', () => {
     it('sql/char@1 renders Char<length>', () => {
-      expect(sqlCodecDefinitions.char.codec.renderOutputType!({ length: 36 })).toBe('Char<36>');
+      expect(
+        (sqlCodecDescriptorDefinitions.char.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ length: 36 }),
+      ).toBe('Char<36>');
     });
 
     it('sql/char@1 returns undefined when length absent', () => {
-      expect(sqlCodecDefinitions.char.codec.renderOutputType!({})).toBeUndefined();
+      expect(
+        (sqlCodecDescriptorDefinitions.char.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({}),
+      ).toBeUndefined();
     });
 
     it('sql/char@1 throws on invalid length type', () => {
-      expect(() => sqlCodecDefinitions.char.codec.renderOutputType!({ length: 'bad' })).toThrow(
-        /expected integer "length"/,
-      );
+      expect(() =>
+        (sqlCodecDescriptorDefinitions.char.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ length: 'bad' }),
+      ).toThrow(/expected integer "length"/);
     });
 
     it('sql/varchar@1 renders Varchar<length>', () => {
-      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 255 })).toBe(
-        'Varchar<255>',
-      );
+      expect(
+        (sqlCodecDescriptorDefinitions.varchar.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ length: 255 }),
+      ).toBe('Varchar<255>');
     });
 
     it('sql/varchar@1 returns undefined when length absent', () => {
-      expect(sqlCodecDefinitions.varchar.codec.renderOutputType!({})).toBeUndefined();
+      expect(
+        (sqlCodecDescriptorDefinitions.varchar.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({}),
+      ).toBeUndefined();
     });
 
     it('sql/varchar@1 throws on invalid length type', () => {
-      expect(() => sqlCodecDefinitions.varchar.codec.renderOutputType!({ length: 'bad' })).toThrow(
-        /expected integer "length"/,
-      );
+      expect(() =>
+        (sqlCodecDescriptorDefinitions.varchar.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ length: 'bad' }),
+      ).toThrow(/expected integer "length"/);
     });
 
     it('sql/timestamp@1 renders Timestamp<P> with precision', () => {
-      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 3 })).toBe(
-        'Timestamp<3>',
-      );
+      expect(
+        (sqlCodecDescriptorDefinitions.timestamp.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ precision: 3 }),
+      ).toBe('Timestamp<3>');
     });
 
     it('sql/timestamp@1 renders bare Timestamp when precision absent', () => {
-      expect(sqlCodecDefinitions.timestamp.codec.renderOutputType!({})).toBe('Timestamp');
+      expect(
+        (sqlCodecDescriptorDefinitions.timestamp.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({}),
+      ).toBe('Timestamp');
     });
 
     it('sql/timestamp@1 throws on invalid precision type', () => {
       expect(() =>
-        sqlCodecDefinitions.timestamp.codec.renderOutputType!({ precision: 'bad' }),
+        (sqlCodecDescriptorDefinitions.timestamp.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined)!({ precision: 'bad' }),
       ).toThrow(/expected integer "precision"/);
     });
 
     it('sql/int@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.int.codec.renderOutputType).toBeUndefined();
+      expect(
+        sqlCodecDescriptorDefinitions.int.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined,
+      ).toBeUndefined();
     });
 
     it('sql/float@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.float.codec.renderOutputType).toBeUndefined();
+      expect(
+        sqlCodecDescriptorDefinitions.float.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined,
+      ).toBeUndefined();
     });
 
     it('sql/text@1 has no renderOutputType', () => {
-      expect(sqlCodecDefinitions.text.codec.renderOutputType).toBeUndefined();
+      expect(
+        sqlCodecDescriptorDefinitions.text.descriptor.renderOutputType as
+          | ((p: Record<string, unknown>) => string | undefined)
+          | undefined,
+      ).toBeUndefined();
     });
   });
 });

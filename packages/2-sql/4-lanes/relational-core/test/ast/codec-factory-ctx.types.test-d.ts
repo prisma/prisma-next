@@ -32,7 +32,6 @@ test('SQL Codec.encode/decode narrow ctx to SqlCodecCallContext (non-optional at
 test('factory accepts a `(value, ctx: SqlCodecCallContext)` encode author', () => {
   const c = codec({
     typeId: 'demo/ctx-encode@1',
-    targetTypes: ['text'],
     encode: (value: string, _ctx?: SqlCodecCallContext) => value,
     decode: (wire: string) => wire,
   });
@@ -43,7 +42,6 @@ test('factory accepts a `(value, ctx: SqlCodecCallContext)` encode author', () =
 test('factory accepts a `(value, ctx: SqlCodecCallContext)` decode author', () => {
   const c = codec({
     typeId: 'demo/ctx-decode@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: (wire: string, _ctx?: SqlCodecCallContext) => wire,
   });
@@ -54,7 +52,6 @@ test('factory accepts a `(value, ctx: SqlCodecCallContext)` decode author', () =
 test('factory accepts a single-arg `(value)` encode author and exposes a Promise method', () => {
   const c = codec({
     typeId: 'demo/single-encode@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });
@@ -64,7 +61,6 @@ test('factory accepts a single-arg `(value)` encode author and exposes a Promise
 test('factory lifts an async ctx-bearing encode into a Promise method', () => {
   const c = codec({
     typeId: 'demo/async-ctx-encode@1',
-    targetTypes: ['text'],
     encode: async (value: string, _ctx?: SqlCodecCallContext) => value,
     decode: (wire: string) => wire,
   });
@@ -74,7 +70,6 @@ test('factory lifts an async ctx-bearing encode into a Promise method', () => {
 test('Codec.encode and Codec.decode require a ctx argument', () => {
   const c = codec({
     typeId: 'demo/require-ctx@1',
-    targetTypes: ['text'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });
