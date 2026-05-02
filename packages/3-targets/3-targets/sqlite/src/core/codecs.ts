@@ -3,7 +3,6 @@ import {
   type Codec,
   type DescriptorCodecInput,
   type DescriptorCodecTraits,
-  type DescriptorResolvedCodec,
   defineCodec,
   type ExtractDescriptorCodecTypes,
   sqlCharDescriptor,
@@ -183,7 +182,7 @@ type SqliteByScalar = {
   readonly [K in keyof SqliteDescriptors]: {
     readonly typeId: SqliteDescriptors[K]['codecId'];
     readonly scalar: K;
-    readonly codec: DescriptorResolvedCodec<SqliteDescriptors[K]> & Codec;
+    readonly codec: Codec;
     readonly input: DescriptorCodecInput<SqliteDescriptors[K]>;
     readonly output: DescriptorCodecInput<SqliteDescriptors[K]>;
     readonly jsType: DescriptorCodecInput<SqliteDescriptors[K]>;

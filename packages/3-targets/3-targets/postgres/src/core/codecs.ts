@@ -18,7 +18,6 @@ import {
   type Codec,
   type DescriptorCodecInput,
   type DescriptorCodecTraits,
-  type DescriptorResolvedCodec,
   defineCodec,
   type ExtractDescriptorCodecTypes,
   sqlCharDescriptor,
@@ -551,7 +550,7 @@ type PgByScalar = {
   readonly [K in keyof PgDescriptors]: {
     readonly typeId: PgDescriptors[K]['codecId'];
     readonly scalar: K;
-    readonly codec: DescriptorResolvedCodec<PgDescriptors[K]> & Codec;
+    readonly codec: Codec;
     readonly input: DescriptorCodecInput<PgDescriptors[K]>;
     readonly output: DescriptorCodecInput<PgDescriptors[K]>;
     readonly jsType: DescriptorCodecInput<PgDescriptors[K]>;
