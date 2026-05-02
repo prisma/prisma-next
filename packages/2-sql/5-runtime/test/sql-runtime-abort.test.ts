@@ -16,7 +16,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
-  codec,
+  mkCodec,
   newCodecRegistry,
   ProjectionItem,
   SelectAst,
@@ -307,7 +307,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const blockingDecodeStarted = deferred<void>();
     const codecAbortObserved = deferred<void>();
 
-    const observingCodec = codec({
+    const observingCodec = mkCodec({
       typeId: 'test/observe-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,
@@ -361,7 +361,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
   it('codec ignoring ctx.signal does not block runtime — RUNTIME.ABORTED still surfaces (cooperative cancellation)', async () => {
     const decodeStarted = deferred<void>();
     const release = deferred<string>();
-    const ignoringCodec = codec({
+    const ignoringCodec = mkCodec({
       typeId: 'test/ignore-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,

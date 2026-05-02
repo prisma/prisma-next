@@ -16,8 +16,8 @@ import type {
 import {
   BinaryExpr,
   ColumnRef,
-  codec,
   LiteralExpr,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -69,7 +69,7 @@ type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
   const registry = newCodecRegistry();
   registry.register(
-    codec({
+    mkCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
@@ -616,7 +616,7 @@ describe('createRuntime', () => {
   );
 
   it('wraps async parameter encoding failures before the driver runs', async () => {
-    const failingCodec = codec({
+    const failingCodec = mkCodec({
       typeId: 'test/failing-secret@1',
       targetTypes: ['text'],
       encode: async (_value: string) => {

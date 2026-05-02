@@ -28,7 +28,7 @@ import type {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
+import { byScalar } from '@prisma-next/target-sqlite/codecs';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
@@ -50,7 +50,7 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly profile: AdapterProfile<'sqlite'>;
   private readonly codecRegistry: CodecRegistry = (() => {
     const byId = new Map<string, Codec<string>>();
-    for (const definition of Object.values(codecDefinitions)) {
+    for (const definition of Object.values(byScalar)) {
       byId.set(definition.codec.id, definition.codec);
     }
     return {

@@ -1,9 +1,9 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { codecDefinitions, codecDescriptorDefinitions } from '../src/core/codecs';
+import { byScalar, codecDescriptorDefinitions } from '../src/core/codecs';
 
 // The pgvector codec authors `encode`/`decode` synchronously, but the
-// `codec()` factory in `relational-core` lifts both methods to
+// `mkCodec()` factory in `relational-core` lifts both methods to
 // `Promise`-returning at the boundary. The tests below cast through the
 // Promise-returning shape and `await` every call so unit-level coverage
 // stays aligned with the codec contract:
@@ -14,14 +14,14 @@ type AsyncVectorCodec = {
 };
 
 function asAsyncCodec(): AsyncVectorCodec {
-  return codecDefinitions.vector.codec as unknown as AsyncVectorCodec;
+  return byScalar.vector.codec as unknown as AsyncVectorCodec;
 }
 
 describe('pgvector codecs', () => {
   it(
     'has vector codec registered',
     () => {
-      const vectorDef = codecDefinitions.vector;
+      const vectorDef = byScalar.vector;
       expect(vectorDef).toBeDefined();
       expect(vectorDef.typeId).toBe('pg/vector@1');
       expect(codecDescriptorDefinitions.vector.descriptor.targetTypes).toEqual(['vector']);

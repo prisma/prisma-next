@@ -235,15 +235,15 @@ export function assertExecutionStackContractRequirements(
 
 function validateTypeParams(
   typeParams: Record<string, unknown>,
-  codecDescriptor: RuntimeParameterizedCodecDescriptor,
+  defineCodec: RuntimeParameterizedCodecDescriptor,
   context: { typeName?: string; tableName?: string; columnName?: string },
 ): Record<string, unknown> {
-  const result = codecDescriptor.paramsSchema['~standard'].validate(typeParams);
+  const result = defineCodec.paramsSchema['~standard'].validate(typeParams);
   if (result instanceof Promise) {
     throw runtimeError(
       'RUNTIME.TYPE_PARAMS_INVALID',
-      `paramsSchema for codec '${codecDescriptor.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
-      { ...context, codecId: codecDescriptor.codecId, typeParams },
+      `paramsSchema for codec '${defineCodec.codecId}' returned a Promise; runtime validation requires a synchronous Standard Schema validator.`,
+      { ...context, codecId: defineCodec.codecId, typeParams },
     );
   }
   if (result.issues) {
@@ -253,8 +253,8 @@ function validateTypeParams(
       : `column '${context.tableName}.${context.columnName}'`;
     throw runtimeError(
       'RUNTIME.TYPE_PARAMS_INVALID',
-      `Invalid typeParams for ${locationInfo} (codecId: ${codecDescriptor.codecId}): ${messages}`,
-      { ...context, codecId: codecDescriptor.codecId, typeParams },
+      `Invalid typeParams for ${locationInfo} (codecId: ${defineCodec.codecId}): ${messages}`,
+      { ...context, codecId: defineCodec.codecId, typeParams },
     );
   }
   return result.value as Record<string, unknown>;
@@ -264,7 +264,7 @@ function validateTypeParams(
  * Collect every {@link CodecDescriptor} contributed by the SQL stack and
  * partition into "parameterized" vs "non-parameterized" by reference-
  * equality with the framework-supplied {@link voidParamsSchema}. Every
- * non-parameterized descriptor flows through `codecDescriptor()` with
+ * non-parameterized descriptor flows through `defineCodec()` with
  * no `paramsSchema` argument, which falls back to the singleton
  * `voidParamsSchema`; parameterized descriptors author their own
  * `paramsSchema`, so the singleton check classifies them as

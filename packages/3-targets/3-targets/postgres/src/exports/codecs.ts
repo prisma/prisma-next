@@ -1,6 +1,6 @@
 export type { CodecTypes } from '../core/codecs';
 export {
-  codecDefinitions,
+  byScalar,
   codecDescriptorDefinitions,
   codecDescriptorList,
   dataTypes,

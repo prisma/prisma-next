@@ -1,6 +1,6 @@
 export {
+  byScalar,
   type CodecTypes,
-  codecDefinitions,
   codecDescriptorDefinitions,
   codecDescriptorList,
   dataTypes,

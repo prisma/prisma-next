@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { SqlCodecCallContext } from '../../src/ast/codec-types';
-import { codec } from '../../src/ast/codec-types';
+import { mkCodec } from '../../src/ast/codec-types';
 
-describe('codec() factory — SqlCodecCallContext arity', () => {
+describe('mkCodec() factory — SqlCodecCallContext arity', () => {
   it('lifts a single-arg `(value)` author unchanged (back-compat)', async () => {
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/single-arg-encode@1',
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
@@ -14,7 +14,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
 
   it('forwards ctx (signal + column) to a `(value, ctx)` encode author', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/ctx-encode@1',
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
@@ -35,7 +35,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
 
   it('forwards ctx (signal + column) to a `(value, ctx)` decode author', async () => {
     let observed: SqlCodecCallContext | undefined;
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/ctx-decode@1',
       encode: (value: string) => value,
       decode: (wire: string, ctx?: SqlCodecCallContext) => {
@@ -56,7 +56,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
 
   it('preserves AbortSignal identity through the lifted method', async () => {
     let observedSignal: AbortSignal | undefined;
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/identity@1',
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observedSignal = ctx?.signal;
@@ -71,7 +71,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
 
   it('forwards an empty ctx (no signal, no column) as-is to a ctx-bearing author', async () => {
     let observed: unknown = 'sentinel';
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/empty-ctx@1',
       encode: (value: string, ctx?: SqlCodecCallContext) => {
         observed = ctx;
@@ -85,7 +85,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
   });
 
   it('async ctx-bearing encode resolves with the produced value', async () => {
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/async-ctx@1',
       encode: async (value: string, _ctx?: SqlCodecCallContext) => `enc:${value}`,
       decode: (wire: string) => wire,
@@ -95,7 +95,7 @@ describe('codec() factory — SqlCodecCallContext arity', () => {
 
   it('a column-aware decode author observes ctx.column shape `{ table, name }`', async () => {
     let observedColumn: SqlCodecCallContext['column'];
-    const c = codec({
+    const c = mkCodec({
       typeId: 'demo/column-aware@1',
       encode: (value: string) => value,
       decode: (wire: string, ctx?: SqlCodecCallContext) => {

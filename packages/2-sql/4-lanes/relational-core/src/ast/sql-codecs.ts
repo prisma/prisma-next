@@ -1,6 +1,6 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { type as arktype } from 'arktype';
-import { codec, codecDescriptor, defineCodecDescriptors, defineCodecs } from './codec-types';
+import { defineCodec, defineCodecBundle, defineCodecGroup, mkCodec } from './codec-types';
 
 export const SQL_CHAR_CODEC_ID = 'sql/char@1' as const;
 export const SQL_VARCHAR_CODEC_ID = 'sql/varchar@1' as const;
@@ -33,7 +33,7 @@ function createLengthTypeHelper(
 
 // ---------------------------------------------------------------------------
 // Author surface: encode/decode/render extracted to module-level constants so
-// the legacy `codec()` form and the `codecDescriptor()` sibling form share a
+// the legacy `mkCodec()` form and the `defineCodec()` sibling form share a
 // single source of truth for runtime behaviour. The legacy codec form is
 // retained transitionally for consumers that still read codec instances out
 // of `sqlCodecDefinitions[k].codec`; the descriptor sibling is the M2 target
@@ -110,10 +110,10 @@ const sqlTimestampRenderOutputType = (typeParams: { readonly precision?: number 
 // Legacy codec instances. Retained transitionally for consumers that still
 // read `sqlCodecDefinitions[k].codec` (postgres + sqlite target codecs.ts,
 // sql-codecs.test.ts). Deleted in the M2 cleanup commit alongside the
-// `codec()` factory and `defineCodecs()` builder.
+// `mkCodec()` factory and `defineCodecGroup()` builder.
 // ---------------------------------------------------------------------------
 
-const sqlCharCodec = codec<
+const sqlCharCodec = mkCodec<
   typeof SQL_CHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -129,7 +129,7 @@ const sqlCharCodec = codec<
   renderOutputType: (typeParams) => sqlCharRenderOutputType(typeParams as { length?: number }),
 });
 
-const sqlVarcharCodec = codec<
+const sqlVarcharCodec = mkCodec<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -145,7 +145,7 @@ const sqlVarcharCodec = codec<
   renderOutputType: (typeParams) => sqlVarcharRenderOutputType(typeParams as { length?: number }),
 });
 
-const sqlIntCodec = codec({
+const sqlIntCodec = mkCodec({
   typeId: SQL_INT_CODEC_ID,
   targetTypes: ['int'],
   traits: ['equality', 'order', 'numeric'],
@@ -153,7 +153,7 @@ const sqlIntCodec = codec({
   decode: sqlIntDecode,
 });
 
-const sqlFloatCodec = codec({
+const sqlFloatCodec = mkCodec({
   typeId: SQL_FLOAT_CODEC_ID,
   targetTypes: ['float'],
   traits: ['equality', 'order', 'numeric'],
@@ -161,7 +161,7 @@ const sqlFloatCodec = codec({
   decode: sqlFloatDecode,
 });
 
-const sqlTextCodec = codec({
+const sqlTextCodec = mkCodec({
   typeId: SQL_TEXT_CODEC_ID,
   targetTypes: ['text'],
   traits: ['equality', 'order', 'textual'],
@@ -169,7 +169,7 @@ const sqlTextCodec = codec({
   decode: sqlTextDecode,
 });
 
-const sqlTimestampCodec = codec<
+const sqlTimestampCodec = mkCodec<
   typeof SQL_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -187,7 +187,7 @@ const sqlTimestampCodec = codec<
     sqlTimestampRenderOutputType(typeParams as { precision?: number }),
 });
 
-const codecs = defineCodecs()
+const codecs = defineCodecGroup()
   .add('char', sqlCharCodec)
   .add('varchar', sqlVarcharCodec)
   .add('int', sqlIntCodec)
@@ -195,7 +195,7 @@ const codecs = defineCodecs()
   .add('text', sqlTextCodec)
   .add('timestamp', sqlTimestampCodec);
 
-export const sqlCodecDefinitions = codecs.codecDefinitions;
+export const sqlCodecDefinitions = codecs.byScalar;
 export const sqlDataTypes = codecs.dataTypes;
 export type SqlCodecTypes = typeof codecs.CodecTypes;
 
@@ -207,7 +207,7 @@ export type SqlCodecTypes = typeof codecs.CodecTypes;
 // commit once every consumer has migrated.
 // ---------------------------------------------------------------------------
 
-export const sqlCharDescriptor = codecDescriptor<
+export const sqlCharDescriptor = defineCodec<
   typeof SQL_CHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -223,7 +223,7 @@ export const sqlCharDescriptor = codecDescriptor<
   renderOutputType: sqlCharRenderOutputType,
 });
 
-export const sqlVarcharDescriptor = codecDescriptor<
+export const sqlVarcharDescriptor = defineCodec<
   typeof SQL_VARCHAR_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -239,7 +239,7 @@ export const sqlVarcharDescriptor = codecDescriptor<
   renderOutputType: sqlVarcharRenderOutputType,
 });
 
-export const sqlIntDescriptor = codecDescriptor<
+export const sqlIntDescriptor = defineCodec<
   typeof SQL_INT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -252,7 +252,7 @@ export const sqlIntDescriptor = codecDescriptor<
   decode: sqlIntDecode,
 });
 
-export const sqlFloatDescriptor = codecDescriptor<
+export const sqlFloatDescriptor = defineCodec<
   typeof SQL_FLOAT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -265,7 +265,7 @@ export const sqlFloatDescriptor = codecDescriptor<
   decode: sqlFloatDecode,
 });
 
-export const sqlTextDescriptor = codecDescriptor<
+export const sqlTextDescriptor = defineCodec<
   typeof SQL_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -278,7 +278,7 @@ export const sqlTextDescriptor = codecDescriptor<
   decode: sqlTextDecode,
 });
 
-export const sqlTimestampDescriptor = codecDescriptor<
+export const sqlTimestampDescriptor = defineCodec<
   typeof SQL_TIMESTAMP_CODEC_ID,
   readonly ['equality', 'order'],
   Date,
@@ -296,7 +296,7 @@ export const sqlTimestampDescriptor = codecDescriptor<
   renderOutputType: sqlTimestampRenderOutputType,
 });
 
-const sqlDescriptors = defineCodecDescriptors()
+const sqlDescriptors = defineCodecBundle()
   .add('char', sqlCharDescriptor)
   .add('varchar', sqlVarcharDescriptor)
   .add('int', sqlIntDescriptor)
@@ -308,7 +308,7 @@ const sqlDescriptors = defineCodecDescriptors()
  * Descriptor view of the SQL base codecs, keyed by scalar name. Mirrors
  * {@link sqlCodecDefinitions} for the descriptor shape (TML-2357 M2).
  */
-export const sqlCodecDescriptorDefinitions = sqlDescriptors.codecDefinitions;
+export const sqlCodecDescriptorDefinitions = sqlDescriptors.byScalar;
 
 /**
  * Flat array of every SQL base codec descriptor — ready to feed into a

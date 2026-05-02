@@ -5,9 +5,9 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  codec,
   ExistsExpr,
   ListExpression,
+  mkCodec,
   NotExpr,
   NullCheckExpr,
   newCodecRegistry,
@@ -50,7 +50,7 @@ describe('createModelAccessor', () => {
     const registry = newCodecRegistry();
     for (const [id, traits] of Object.entries(entries)) {
       registry.register(
-        codec({
+        mkCodec({
           typeId: id,
           targetTypes: [],
           traits,

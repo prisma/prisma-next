@@ -34,7 +34,7 @@ import type {
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { type Codec, codec } from '@prisma-next/sql-relational-core/ast';
+import { type Codec, mkCodec } from '@prisma-next/sql-relational-core/ast';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -120,7 +120,7 @@ function isArktypeSchemaLike(value: unknown): value is ArktypeSchemaLike {
  * previous version of the schema, a manual SQL `INSERT`); validate when
  * reading, not when writing.
  *
- * Author bodies are sync; main's `codec({...})` factory promise-lifts
+ * Author bodies are sync; main's `mkCodec({...})` factory promise-lifts
  * `encode`/`decode` into the framework-required `Promise<…>` boundary
  * shape (per ADR 204).
  */
@@ -182,7 +182,7 @@ function arktypeJsonCodecForSchema<TInferred>(
   }
 
   return (_ctx) =>
-    codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
+    mkCodec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
       typeId: ARKTYPE_JSON_CODEC_ID,
       targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
       traits: ['equality'] as const,

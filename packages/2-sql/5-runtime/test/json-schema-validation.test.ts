@@ -6,7 +6,7 @@ import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast'
 import {
   BinaryExpr,
   ColumnRef,
-  codec,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -96,7 +96,7 @@ function createJoinMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
 }
 
 function jsonbCodec<Id extends string>(typeId: Id, targetType: string) {
-  return codec<Id, readonly [], string, JsonValue>({
+  return mkCodec<Id, readonly [], string, JsonValue>({
     typeId,
     targetTypes: [targetType],
     encode: (v: JsonValue) => JSON.stringify(v),
@@ -109,7 +109,7 @@ function createTestCodecRegistry(): CodecRegistry {
   registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
   registry.register(jsonbCodec('pg/json@1', 'json'));
   registry.register(
-    codec({
+    mkCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
@@ -514,7 +514,7 @@ describe('JSON Schema decoding validation', () => {
   it('runs JSON schema validation against the resolved value of an async decoder', async () => {
     const asyncRegistry = newCodecRegistry();
     asyncRegistry.register(
-      codec<'pg/async-jsonb@1', readonly [], string, JsonValue>({
+      mkCodec<'pg/async-jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/async-jsonb@1',
         targetTypes: ['jsonb'],
         encode: async (v: JsonValue) => JSON.stringify(v),
@@ -560,7 +560,7 @@ describe('JSON Schema decoding validation', () => {
   // ---------------------------------------------------------------------------
   it.skip('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
     const leakyPlaintext = 'super-secret-plaintext-value';
-    const leakyCodec = codec({
+    const leakyCodec = mkCodec({
       typeId: 'pg/leaky@1',
       targetTypes: ['text'],
       encode: (v: string) => v,

@@ -7,12 +7,12 @@ import {
   SQLITE_REAL_CODEC_ID,
   SQLITE_TEXT_CODEC_ID,
 } from '@prisma-next/target-sqlite/codec-ids';
-import { codecDefinitions } from '@prisma-next/target-sqlite/codecs';
+import { byScalar } from '@prisma-next/target-sqlite/codecs';
 import { describe, expect, it } from 'vitest';
 
 describe('SQLite codecs', () => {
   describe('text codec', () => {
-    const codec = codecDefinitions.text.codec;
+    const codec = byScalar.text.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_TEXT_CODEC_ID);
@@ -28,7 +28,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('integer codec', () => {
-    const codec = codecDefinitions.integer.codec;
+    const codec = byScalar.integer.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_INTEGER_CODEC_ID);
@@ -42,7 +42,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('real codec', () => {
-    const codec = codecDefinitions.real.codec;
+    const codec = byScalar.real.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_REAL_CODEC_ID);
@@ -55,7 +55,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('blob codec', () => {
-    const codec = codecDefinitions.blob.codec;
+    const codec = byScalar.blob.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_BLOB_CODEC_ID);
@@ -73,7 +73,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('datetime codec', () => {
-    const codec = codecDefinitions.datetime.codec;
+    const codec = byScalar.datetime.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_DATETIME_CODEC_ID);
@@ -104,7 +104,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('json codec', () => {
-    const codec = codecDefinitions.json.codec;
+    const codec = byScalar.json.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_JSON_CODEC_ID);
@@ -141,7 +141,7 @@ describe('SQLite codecs', () => {
   });
 
   describe('bigint codec', () => {
-    const codec = codecDefinitions.bigint.codec;
+    const codec = byScalar.bigint.codec;
 
     it('has correct id', () => {
       expect(codec.id).toBe(SQLITE_BIGINT_CODEC_ID);
@@ -167,7 +167,7 @@ describe('SQLite codecs', () => {
 
   describe('codec definitions structure', () => {
     it('has all expected codecs', () => {
-      const keys = Object.keys(codecDefinitions);
+      const keys = Object.keys(byScalar);
       expect(keys).toContain('text');
       expect(keys).toContain('integer');
       expect(keys).toContain('real');

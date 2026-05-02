@@ -4,8 +4,8 @@ import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
-  codec,
   LiteralExpr,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -344,7 +344,7 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        codec({
+        mkCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
@@ -397,7 +397,7 @@ describe('runBeforeCompileChain', () => {
 
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        codec({
+        mkCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,

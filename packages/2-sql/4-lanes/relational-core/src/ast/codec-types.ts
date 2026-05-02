@@ -43,7 +43,7 @@ export interface SqlColumnRef {
  * column context is the middleware's domain).
  *
  * SQL codec authors writing a `(value, ctx)` author function for the SQL
- * `codec()` factory observe this type. The framework codec dispatch
+ * `mkCodec()` factory observe this type. The framework codec dispatch
  * surface (and Mongo) sees only the base `CodecCallContext`.
  */
 export interface SqlCodecCallContext extends CodecCallContext {
@@ -213,7 +213,7 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
  * required so the contract artifact stays JSON-safe.
  */
-export function codec<
+export function mkCodec<
   Id extends string,
   const TTraits extends readonly CodecTrait[] = readonly [],
   TWire = unknown,
@@ -227,7 +227,7 @@ export function codec<
   // The factory drops every transitional field on the way out — the
   // narrowed `Codec` instance only carries `id` plus the four
   // conversion methods. The legacy factory itself retires alongside
-  // the parallel `codecDescriptor()` API in TML-2357 M2.
+  // the parallel `defineCodec()` API in TML-2357 M2.
   config: {
     typeId: Id;
     targetTypes?: readonly string[];
@@ -329,7 +329,7 @@ export interface CodecDefBuilder<
     O.Overwrite<ScalarNames, Record<ScalarName, CodecImpl>> & Record<ScalarName, CodecImpl>
   >;
 
-  readonly codecDefinitions: {
+  readonly byScalar: {
     readonly [K in keyof ScalarNames]: {
       readonly typeId: ScalarNames[K] extends Codec<infer Id extends string> ? Id : never;
       readonly scalar: K;
@@ -412,9 +412,9 @@ class CodecDefBuilderImpl<
   }
 
   /**
-   * Derive codecDefinitions structure.
+   * Derive byScalar structure.
    */
-  get codecDefinitions(): {
+  get byScalar(): {
     readonly [K in keyof ScalarNames]: {
       readonly typeId: ScalarNames[K] extends Codec<infer Id> ? Id : never;
       readonly scalar: K;
@@ -487,12 +487,12 @@ export function newCodecRegistry(): CodecRegistry {
 /**
  * Create a new codec definition builder.
  */
-export function defineCodecs(): CodecDefBuilder<Record<never, never>> {
+export function defineCodecGroup(): CodecDefBuilder<Record<never, never>> {
   return new CodecDefBuilderImpl({});
 }
 
 /**
- * Spec accepted by the SQL `codecDescriptor()` factory. Mirrors the
+ * Spec accepted by the SQL `defineCodec()` factory. Mirrors the
  * fields on the framework {@link CodecDescriptor} plus author-side
  * `encode`/`decode` (and, when `TInput` is not JSON-safe,
  * `encodeJson`/`decodeJson`).
@@ -507,7 +507,7 @@ export function defineCodecs(): CodecDefBuilder<Record<never, never>> {
  * emit-path hook the framework consults to produce the TypeScript
  * output type expression for `contract.d.ts`.
  *
- * Replaces the legacy `codec()` factory's spec, which produced a
+ * Replaces the legacy `mkCodec()` factory's spec, which produced a
  * `Codec` with codec-id-keyed metadata fields on the instance. Per
  * TML-2357 M2, contributors ship `CodecDescriptor`s through the unified
  * `codecs:` slot; the descriptor's `factory` materializes the resolved
@@ -529,7 +529,7 @@ type CodecDescriptorSpecBase<
 
 /**
  * Conditional bundle for `encodeJson`/`decodeJson` on the descriptor
- * spec — same JSON-safety conditional as the legacy `codec()` factory.
+ * spec — same JSON-safety conditional as the legacy `mkCodec()` factory.
  */
 type DescriptorJsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
   ? {
@@ -574,17 +574,17 @@ export type CodecDescriptorSpec<
  * over the same shared instance regardless of `params` — sufficient for
  * today's parameterized codecs (e.g. pgvector) where `params` is a
  * metadata bag rather than a per-call closure dependency. Codec authors
- * who need per-instance state can wrap `codecDescriptor()` with their
+ * who need per-instance state can wrap `defineCodec()` with their
  * own factory closure.
  *
  * `encodeJson` and `decodeJson` default to identity **only when
  * `TInput` is assignable to `JsonValue`**; otherwise both are required
  * so the contract artifact stays JSON-safe.
  *
- * Replaces the legacy `codec()` factory under TML-2357 M2; the legacy
+ * Replaces the legacy `mkCodec()` factory under TML-2357 M2; the legacy
  * factory deletes once every consumer migrates.
  */
-export function codecDescriptor<
+export function defineCodec<
   Id extends string,
   const TTraits extends readonly CodecTrait[] = readonly [],
   TWire = unknown,
@@ -700,7 +700,7 @@ export type ExtractDescriptorCodecTypes<
 /**
  * Builder interface for declaring codec descriptors keyed by an
  * authoring-time scalar name. Produces the structural artifacts
- * (`codecDefinitions`, `dataTypes`, `CodecTypes`) consumed by
+ * (`byScalar`, `dataTypes`, `CodecTypes`) consumed by
  * contributors and the contract authoring surface.
  *
  * Replaces {@link CodecDefBuilder} under TML-2357 M2; the legacy builder
@@ -726,7 +726,7 @@ export interface CodecDescriptorBuilder<
    */
   readonly descriptors: ReadonlyArray<AnyCodecDescriptor>;
 
-  readonly codecDefinitions: {
+  readonly byScalar: {
     readonly [K in keyof ScalarNames]: {
       readonly codecId: DescriptorCodecId<ScalarNames[K]>;
       readonly scalar: K;
@@ -807,7 +807,7 @@ class CodecDescriptorBuilderImpl<
     return Object.values(this._descriptors as Record<string, AnyCodecDescriptor>);
   }
 
-  get codecDefinitions(): {
+  get byScalar(): {
     readonly [K in keyof ScalarNames]: {
       readonly codecId: DescriptorCodecId<ScalarNames[K]>;
       readonly scalar: K;
@@ -855,10 +855,10 @@ class CodecDescriptorBuilderImpl<
 }
 
 /**
- * Create a new codec descriptor builder. Replaces {@link defineCodecs}
+ * Create a new codec descriptor builder. Replaces {@link defineCodecGroup}
  * under TML-2357 M2; the legacy builder deletes once every consumer
  * migrates.
  */
-export function defineCodecDescriptors(): CodecDescriptorBuilder<Record<never, never>> {
+export function defineCodecBundle(): CodecDescriptorBuilder<Record<never, never>> {
   return new CodecDescriptorBuilderImpl({});
 }

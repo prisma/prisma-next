@@ -272,7 +272,7 @@ export function assembleControlMutationDefaults(
 /**
  * Structural narrow of the legacy fields the codec instance still
  * physically carries while the runtime `Codec` interface narrowed to
- * id + behavior. SQL `codec()` / Mongo `mongoCodec()` factories still
+ * id + behavior. SQL `mkCodec()` / Mongo `mongoCodec()` factories still
  * emit `targetTypes` (and SQL emits `renderOutputType`) on the runtime
  * object — the narrow reads what's there to populate
  * {@link CodecLookup.targetTypesFor} and
@@ -303,36 +303,36 @@ export function extractCodecLookup(
     // `Codec` extensions' transitional fields once every contributor
     // exposes `codecDescriptors`.
     const seenIds = new Set<string>();
-    for (const codecDescriptor of codecTypes?.codecDescriptors ?? []) {
+    for (const defineCodec of codecTypes?.codecDescriptors ?? []) {
       assertUniqueCodecOwner({
-        codecId: codecDescriptor.codecId,
+        codecId: defineCodec.codecId,
         owners,
         descriptorId,
         entityLabel: 'codec descriptor',
         entityOwnershipLabel: 'codec descriptor provider',
       });
-      owners.set(codecDescriptor.codecId, descriptorId);
-      seenIds.add(codecDescriptor.codecId);
-      if (Array.isArray(codecDescriptor.targetTypes)) {
-        targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
+      owners.set(defineCodec.codecId, descriptorId);
+      seenIds.add(defineCodec.codecId);
+      if (Array.isArray(defineCodec.targetTypes)) {
+        targetTypesById.set(defineCodec.codecId, defineCodec.targetTypes);
       }
-      if (codecDescriptor.meta !== undefined) {
-        metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
+      if (defineCodec.meta !== undefined) {
+        metaById.set(defineCodec.codecId, defineCodec.meta);
       }
-      if (typeof codecDescriptor.renderOutputType === 'function') {
-        renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
+      if (typeof defineCodec.renderOutputType === 'function') {
+        renderersById.set(defineCodec.codecId, defineCodec.renderOutputType);
       }
       // Materialize a representative `Codec` instance for `byId.get()`
       // so consumers reading the lookup's instance side (e.g. SQL
       // renderer's cast-policy lookup) keep finding the codec.
       // Descriptors whose factory needs concrete params raise — those
       // are populated lazily by `buildContractCodecRegistry` at runtime.
-      if (!byId.has(codecDescriptor.codecId)) {
+      if (!byId.has(defineCodec.codecId)) {
         try {
-          const representative = codecDescriptor.factory(undefined as never)({
-            name: `<lookup:${codecDescriptor.codecId}>`,
-          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
-          byId.set(codecDescriptor.codecId, representative);
+          const representative = defineCodec.factory(undefined as never)({
+            name: `<lookup:${defineCodec.codecId}>`,
+          } as Parameters<ReturnType<typeof defineCodec.factory>>[0]);
+          byId.set(defineCodec.codecId, representative);
         } catch {
           // Parameterized factory needs real params; leave `byId.get()`
           // returning `undefined` for this codec id.

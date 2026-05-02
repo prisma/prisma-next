@@ -8,7 +8,7 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
+import { byScalar } from '@prisma-next/target-postgres/codecs';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -39,7 +39,7 @@ class PostgresAdapterImpl
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry: CodecRegistry = (() => {
     const byId = new Map<string, Codec<string>>();
-    for (const definition of Object.values(codecDefinitions)) {
+    for (const definition of Object.values(byScalar)) {
       byId.set(definition.codec.id, definition.codec);
     }
     return {

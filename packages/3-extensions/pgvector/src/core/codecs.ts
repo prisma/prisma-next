@@ -5,9 +5,9 @@
  * Wire format is a string like `[1,2,3]` (PostgreSQL vector text format).
  */
 
-import { codec, defineCodecs } from '@prisma-next/sql-relational-core/ast';
+import { defineCodecGroup, mkCodec } from '@prisma-next/sql-relational-core/ast';
 
-const pgVectorCodec = codec({
+const pgVectorCodec = mkCodec({
   typeId: 'pg/vector@1',
   targetTypes: ['vector'],
   traits: ['equality'],
@@ -67,10 +67,10 @@ const pgVectorCodec = codec({
 });
 
 // Build codec definitions using the builder DSL
-const codecs = defineCodecs().add('vector', pgVectorCodec);
+const codecs = defineCodecGroup().add('vector', pgVectorCodec);
 
 // Export derived structures directly from codecs builder
-export const codecDefinitions = codecs.codecDefinitions;
+export const byScalar = codecs.byScalar;
 export const dataTypes = codecs.dataTypes;
 
 // Export types derived from codecs builder
@@ -82,7 +82,7 @@ export type CodecTypes = typeof codecs.CodecTypes;
 // slot retired in M2 Phase A.
 // ---------------------------------------------------------------------------
 
-import { codecDescriptor, defineCodecDescriptors } from '@prisma-next/sql-relational-core/ast';
+import { defineCodec, defineCodecBundle } from '@prisma-next/sql-relational-core/ast';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
 
@@ -99,7 +99,7 @@ const vectorParamsSchema = arktype({
   return true;
 });
 
-export const pgVectorDescriptor = codecDescriptor<
+export const pgVectorDescriptor = defineCodec<
   typeof VECTOR_CODEC_ID,
   readonly ['equality'],
   string,
@@ -142,15 +142,15 @@ export const pgVectorDescriptor = codecDescriptor<
   meta: { db: { sql: { postgres: { nativeType: 'vector' } } } },
 });
 
-const pgvectorDescriptorsBuilder = defineCodecDescriptors().add('vector', pgVectorDescriptor);
+const pgvectorDescriptorsBuilder = defineCodecBundle().add('vector', pgVectorDescriptor);
 
 /**
  * Descriptor view of the pgvector codecs, keyed by scalar name. Mirrors
- * {@link codecDefinitions} for the descriptor shape (TML-2357 T2.5);
+ * {@link byScalar} for the descriptor shape (TML-2357 T2.5);
  * the runtime extension switches to consume this descriptor list once
  * the unified `codecs:` slot lands later in M2.
  */
-export const codecDescriptorDefinitions = pgvectorDescriptorsBuilder.codecDefinitions;
+export const codecDescriptorDefinitions = pgvectorDescriptorsBuilder.byScalar;
 
 /**
  * Flat array of every pgvector codec descriptor — ready to feed into a

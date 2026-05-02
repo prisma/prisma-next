@@ -2,8 +2,8 @@ import { coreHash } from '@prisma-next/contract/types';
 import {
   AggregateExpr,
   ColumnRef,
-  codec,
   LiteralExpr,
+  mkCodec,
   newCodecRegistry,
   ProjectionItem,
   SelectAst,
@@ -58,7 +58,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const observed: AbortSignal[] = [];
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/observe@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -87,7 +87,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const observed: { alias: string; column: SqlCodecCallContext['column'] }[] = [];
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/observe-col@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -117,7 +117,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     let observed: SqlCodecCallContext | undefined;
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/observe-projection@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -143,7 +143,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     let observed: SqlCodecCallContext | undefined;
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/observe-undef@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -178,7 +178,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     let observed: SqlCodecCallContext | undefined;
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/observe-no-ref@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -209,7 +209,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     let receivedWire: unknown;
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/single-arg-author@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -233,7 +233,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     let callCount = 0;
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/counter@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -267,7 +267,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const release = deferred<string>();
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/blocking@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -298,7 +298,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const cause = new Error('decode boom');
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -327,7 +327,7 @@ describe('decodeRow — SqlCodecCallContext threading', () => {
     const observedColumns: SqlCodecCallContext['column'][] = [];
     const registry = newCodecRegistry();
     registry.register(
-      codec({
+      mkCodec({
         typeId: 'test/recorder@1',
         targetTypes: ['text'],
         encode: (v: string) => v,

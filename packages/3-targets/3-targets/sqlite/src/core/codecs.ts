@@ -1,4 +1,8 @@
-import { codec, defineCodecs, sqlCodecDefinitions } from '@prisma-next/sql-relational-core/ast';
+import {
+  defineCodecGroup,
+  mkCodec,
+  sqlCodecDefinitions,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
@@ -22,7 +26,7 @@ export type JsonValue =
   | { readonly [key: string]: JsonValue }
   | readonly JsonValue[];
 
-const sqliteTextCodec = codec({
+const sqliteTextCodec = mkCodec({
   typeId: SQLITE_TEXT_CODEC_ID,
   targetTypes: ['text'],
   traits: ['equality', 'order', 'textual'],
@@ -30,7 +34,7 @@ const sqliteTextCodec = codec({
   decode: (wire: string): string => wire,
 });
 
-const sqliteIntegerCodec = codec({
+const sqliteIntegerCodec = mkCodec({
   typeId: SQLITE_INTEGER_CODEC_ID,
   targetTypes: ['integer'],
   traits: ['equality', 'order', 'numeric'],
@@ -38,7 +42,7 @@ const sqliteIntegerCodec = codec({
   decode: (wire: number): number => wire,
 });
 
-const sqliteRealCodec = codec({
+const sqliteRealCodec = mkCodec({
   typeId: SQLITE_REAL_CODEC_ID,
   targetTypes: ['real'],
   traits: ['equality', 'order', 'numeric'],
@@ -46,7 +50,7 @@ const sqliteRealCodec = codec({
   decode: (wire: number): number => wire,
 });
 
-const sqliteBlobCodec = codec({
+const sqliteBlobCodec = mkCodec({
   typeId: SQLITE_BLOB_CODEC_ID,
   targetTypes: ['blob'],
   traits: ['equality'],
@@ -61,7 +65,7 @@ const sqliteBlobCodec = codec({
   },
 });
 
-const sqliteDatetimeCodec = codec({
+const sqliteDatetimeCodec = mkCodec({
   typeId: SQLITE_DATETIME_CODEC_ID,
   targetTypes: ['text'],
   traits: ['equality', 'order'],
@@ -76,7 +80,7 @@ const sqliteDatetimeCodec = codec({
   },
 });
 
-const sqliteJsonCodec = codec({
+const sqliteJsonCodec = mkCodec({
   typeId: SQLITE_JSON_CODEC_ID,
   targetTypes: ['text'],
   traits: ['equality'],
@@ -85,7 +89,7 @@ const sqliteJsonCodec = codec({
     typeof wire === 'string' ? (JSON.parse(wire) as JsonValue) : wire,
 });
 
-const sqliteBigintCodec = codec({
+const sqliteBigintCodec = mkCodec({
   typeId: SQLITE_BIGINT_CODEC_ID,
   targetTypes: ['integer'],
   traits: ['equality', 'order', 'numeric'],
@@ -100,7 +104,7 @@ const sqliteBigintCodec = codec({
   },
 });
 
-const codecs = defineCodecs()
+const codecs = defineCodecGroup()
   .add('char', sqlCharCodec)
   .add('varchar', sqlVarcharCodec)
   .add('int', sqlIntCodec)
@@ -113,32 +117,32 @@ const codecs = defineCodecs()
   .add('json', sqliteJsonCodec)
   .add('bigint', sqliteBigintCodec);
 
-export const codecDefinitions = codecs.codecDefinitions;
+export const byScalar = codecs.byScalar;
 export const dataTypes = codecs.dataTypes;
 
 export type CodecTypes = typeof codecs.CodecTypes;
 
 // ---------------------------------------------------------------------------
 // Native CodecDescriptor exports (TML-2357 T2.4). Each sqlite target codec
-// gains a sibling `*Descriptor` authored via `codecDescriptor()`. The
+// gains a sibling `*Descriptor` authored via `defineCodec()`. The
 // descriptor builder is exposed as `codecDescriptorDefinitions` /
 // `codecDescriptorList`. The legacy codec exports above stay so the
 // sqlite adapter and tests keep reading codec instances out of
-// `codecDefinitions[k].codec` until the unified `codecs:` slot reshape
+// `byScalar[k].codec` until the unified `codecs:` slot reshape
 // (later in M2). Both shapes retire to descriptor-only in the M2 cleanup
 // commit.
 // ---------------------------------------------------------------------------
 
 import {
-  codecDescriptor,
-  defineCodecDescriptors,
+  defineCodec,
+  defineCodecBundle,
   sqlCharDescriptor,
   sqlFloatDescriptor,
   sqlIntDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
 
-const sqliteTextDescriptor = codecDescriptor<
+const sqliteTextDescriptor = defineCodec<
   typeof SQLITE_TEXT_CODEC_ID,
   readonly ['equality', 'order', 'textual'],
   string,
@@ -151,7 +155,7 @@ const sqliteTextDescriptor = codecDescriptor<
   decode: (wire) => wire,
 });
 
-const sqliteIntegerDescriptor = codecDescriptor<
+const sqliteIntegerDescriptor = defineCodec<
   typeof SQLITE_INTEGER_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -164,7 +168,7 @@ const sqliteIntegerDescriptor = codecDescriptor<
   decode: (wire) => wire,
 });
 
-const sqliteRealDescriptor = codecDescriptor<
+const sqliteRealDescriptor = defineCodec<
   typeof SQLITE_REAL_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number,
@@ -177,7 +181,7 @@ const sqliteRealDescriptor = codecDescriptor<
   decode: (wire) => wire,
 });
 
-const sqliteBlobDescriptor = codecDescriptor<
+const sqliteBlobDescriptor = defineCodec<
   typeof SQLITE_BLOB_CODEC_ID,
   readonly ['equality'],
   Uint8Array,
@@ -197,7 +201,7 @@ const sqliteBlobDescriptor = codecDescriptor<
   },
 });
 
-const sqliteDatetimeDescriptor = codecDescriptor<
+const sqliteDatetimeDescriptor = defineCodec<
   typeof SQLITE_DATETIME_CODEC_ID,
   readonly ['equality', 'order'],
   string,
@@ -217,7 +221,7 @@ const sqliteDatetimeDescriptor = codecDescriptor<
   },
 });
 
-const sqliteJsonDescriptor = codecDescriptor<
+const sqliteJsonDescriptor = defineCodec<
   typeof SQLITE_JSON_CODEC_ID,
   readonly ['equality'],
   string | JsonValue,
@@ -230,7 +234,7 @@ const sqliteJsonDescriptor = codecDescriptor<
   decode: (wire) => (typeof wire === 'string' ? (JSON.parse(wire) as JsonValue) : wire),
 });
 
-const sqliteBigintDescriptor = codecDescriptor<
+const sqliteBigintDescriptor = defineCodec<
   typeof SQLITE_BIGINT_CODEC_ID,
   readonly ['equality', 'order', 'numeric'],
   number | bigint,
@@ -250,7 +254,7 @@ const sqliteBigintDescriptor = codecDescriptor<
   },
 });
 
-const sqliteDescriptorsBuilder = defineCodecDescriptors()
+const sqliteDescriptorsBuilder = defineCodecBundle()
   .add('char', sqlCharDescriptor)
   .add('varchar', sqlVarcharDescriptor)
   .add('int', sqlIntDescriptor)
@@ -265,11 +269,11 @@ const sqliteDescriptorsBuilder = defineCodecDescriptors()
 
 /**
  * Descriptor view of the sqlite target codecs, keyed by scalar name.
- * Mirrors {@link codecDefinitions} for the descriptor shape (TML-2357
+ * Mirrors {@link byScalar} for the descriptor shape (TML-2357
  * T2.4); the runtime contributor protocol switches to consume this map
  * once the unified `codecs:` slot lands later in M2.
  */
-export const codecDescriptorDefinitions = sqliteDescriptorsBuilder.codecDefinitions;
+export const codecDescriptorDefinitions = sqliteDescriptorsBuilder.byScalar;
 
 /**
  * Flat array of every sqlite target codec descriptor — ready to feed

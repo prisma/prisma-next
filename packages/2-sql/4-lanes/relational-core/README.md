@@ -93,13 +93,13 @@ flowchart TD
 
 ### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
 
-- `codec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
+- `mkCodec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
 - Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
 - This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
 
 ```ts
 // Sync authoring:
-const textCodec = codec({
+const textCodec = mkCodec({
   typeId: 'pg/text@1',
   targetTypes: ['text'],
   encode: (v: string) => v,
@@ -109,7 +109,7 @@ const textCodec = codec({
 });
 
 // Async authoring (e.g. KMS-backed encryption): same factory, same shape.
-const secretCodec = codec({
+const secretCodec = mkCodec({
   typeId: 'pg/secret@1',
   targetTypes: ['text'],
   encode: async (v: string) => encrypt(v, await getKey()),
@@ -128,7 +128,7 @@ Codecs receive a second `ctx` options argument; you may ignore it. The runtime a
 
 ```ts
 // Forward ctx.signal to a network call so aborted queries stop the SDK.
-const kmsSecretCodec = codec({
+const kmsSecretCodec = mkCodec({
   typeId: 'pg/kms-secret@1',
   targetTypes: ['text'],
   encode: async (v: string, ctx) =>
@@ -140,7 +140,7 @@ const kmsSecretCodec = codec({
 });
 
 // Use ctx.column on decode to construct an envelope value carrying (table, name).
-const envelopeCodec = codec({
+const envelopeCodec = mkCodec({
   typeId: 'pg/envelope@1',
   targetTypes: ['text'],
   encode: async (v: string) => v,
