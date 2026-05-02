@@ -65,7 +65,6 @@ describe('createMongoExecutionContext', () => {
   it('folds extension-pack codec contributions into the same registry', () => {
     const customCodec = mongoCodec({
       typeId: 'test/custom@1',
-      targetTypes: ['custom'],
       decode: (wire: string) => `decoded:${wire}`,
       encode: (value: string) => value,
     });
@@ -95,7 +94,6 @@ describe('createMongoExecutionContext', () => {
   it('throws RUNTIME.DUPLICATE_CODEC when two contributors declare the same codec id', () => {
     const conflictingCodec = mongoCodec({
       typeId: 'mongo/string@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });

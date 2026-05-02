@@ -379,7 +379,6 @@ describe('MongoAdapter', () => {
 describe('MongoAdapter with codec registry', () => {
   const uppercaseCodec = mongoCodec({
     typeId: 'test/uppercase@1',
-    targetTypes: ['string'],
     decode: (wire: string) => wire.toLowerCase(),
     encode: (value: string) => value.toUpperCase(),
   });

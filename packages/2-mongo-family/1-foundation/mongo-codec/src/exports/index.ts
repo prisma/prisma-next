@@ -1,9 +1,4 @@
 export type { MongoCodecRegistry } from '../codec-registry';
 export { createMongoCodecRegistry } from '../codec-registry';
-export type {
-  MongoCodec,
-  MongoCodecInput,
-  MongoCodecTrait,
-  MongoCodecTraits,
-} from '../codecs';
+export type { MongoCodec, MongoCodecInput, MongoCodecTrait } from '../codecs';
 export { mongoCodec } from '../codecs';

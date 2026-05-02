@@ -153,7 +153,6 @@ describe('lowerFilter', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),
@@ -170,7 +169,6 @@ describe('lowerFilter', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),
@@ -196,7 +194,6 @@ describe('lowerFilter', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/uppercase@1',
-        targetTypes: ['string'],
         decode: (wire: string) => wire,
         encode: (value: string) => value.toUpperCase(),
       }),

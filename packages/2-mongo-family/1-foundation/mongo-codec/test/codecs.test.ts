@@ -7,7 +7,6 @@ describe('mongoCodec()', () => {
   it('creates a codec with the given config', async () => {
     const codec = mongoCodec({
       typeId: 'test/string@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });
@@ -20,7 +19,6 @@ describe('mongoCodec()', () => {
   it('creates a codec with encode and decode', async () => {
     const codec = mongoCodec({
       typeId: 'test/upper@1',
-      targetTypes: ['text'],
       decode: (wire: string) => wire.toUpperCase(),
       encode: (value: string) => value.toLowerCase(),
     });
@@ -32,7 +30,6 @@ describe('mongoCodec()', () => {
   it('lifts sync author functions to Promise-returning methods', () => {
     const codec = mongoCodec({
       typeId: 'test/sync@1',
-      targetTypes: ['string'],
       decode: (wire: string) => wire,
       encode: (value: string) => value,
     });
@@ -46,7 +43,6 @@ describe('mongoCodec()', () => {
   it('accepts async author functions and uses them directly', async () => {
     const codec = mongoCodec({
       typeId: 'test/async@1',
-      targetTypes: ['string'],
       decode: async (wire: string) => `decoded:${wire}`,
       encode: async (value: string) => `encoded:${value}`,
     });
@@ -60,7 +56,6 @@ describe('MongoCodecRegistry', () => {
   function makeCodec(id: string): MongoCodec<string> {
     return mongoCodec<string, readonly [], JsonValue, JsonValue>({
       typeId: id,
-      targetTypes: ['test'],
       decode: (wire: JsonValue) => wire,
       encode: (value: JsonValue) => value,
     });

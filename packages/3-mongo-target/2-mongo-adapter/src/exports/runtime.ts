@@ -5,7 +5,7 @@ import type {
 } from '@prisma-next/framework-components/execution';
 import type { MongoCodecRegistry } from '@prisma-next/mongo-codec';
 import type { MongoAdapter } from '@prisma-next/mongo-lowering';
-import { buildStandardCodecRegistry, mongoStandardCodecs } from '../core/codecs';
+import { buildStandardCodecRegistry, mongoCodecDescriptors } from '../core/codecs';
 import { createMongoAdapter } from '../mongo-adapter';
 
 /**
@@ -40,7 +40,7 @@ const mongoRuntimeAdapterDescriptor: RuntimeAdapterDescriptor<
   version: '0.0.1',
   types: {
     codecTypes: {
-      codecInstances: [...mongoStandardCodecs],
+      codecDescriptors: mongoCodecDescriptors,
     },
   },
   codecs: buildStandardCodecRegistry,

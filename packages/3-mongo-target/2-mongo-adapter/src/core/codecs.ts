@@ -1,5 +1,8 @@
+import type { CodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
   createMongoCodecRegistry,
+  type MongoCodec,
   type MongoCodecRegistry,
   mongoCodec,
 } from '@prisma-next/mongo-codec';
@@ -16,48 +19,36 @@ import {
 
 export const mongoObjectIdCodec = mongoCodec({
   typeId: MONGO_OBJECTID_CODEC_ID,
-  targetTypes: ['objectId'],
-  traits: ['equality'],
   decode: (wire: ObjectId) => wire.toHexString(),
   encode: (value: string) => new ObjectId(value),
 });
 
 export const mongoStringCodec = mongoCodec({
   typeId: MONGO_STRING_CODEC_ID,
-  targetTypes: ['string'],
-  traits: ['equality', 'order', 'textual'],
   decode: (wire: string) => wire,
   encode: (value: string) => value,
 });
 
 export const mongoDoubleCodec = mongoCodec({
   typeId: MONGO_DOUBLE_CODEC_ID,
-  targetTypes: ['double'],
-  traits: ['equality', 'order', 'numeric'],
   decode: (wire: number) => wire,
   encode: (value: number) => value,
 });
 
 export const mongoInt32Codec = mongoCodec({
   typeId: MONGO_INT32_CODEC_ID,
-  targetTypes: ['int'],
-  traits: ['equality', 'order', 'numeric'],
   decode: (wire: number) => wire,
   encode: (value: number) => value,
 });
 
 export const mongoBooleanCodec = mongoCodec({
   typeId: MONGO_BOOLEAN_CODEC_ID,
-  targetTypes: ['bool'],
-  traits: ['equality', 'boolean'],
   decode: (wire: boolean) => wire,
   encode: (value: boolean) => value,
 });
 
 export const mongoDateCodec = mongoCodec({
   typeId: MONGO_DATE_CODEC_ID,
-  targetTypes: ['date'],
-  traits: ['equality', 'order'],
   decode: (wire: Date) => wire,
   encode: (value: Date) => value,
   encodeJson: (value: Date) => value.toISOString(),
@@ -69,18 +60,8 @@ export const mongoDateCodec = mongoCodec({
 
 export const mongoVectorCodec = mongoCodec({
   typeId: MONGO_VECTOR_CODEC_ID,
-  targetTypes: ['vector'],
-  traits: ['equality'],
   decode: (wire: readonly number[]) => wire,
   encode: (value: readonly number[]) => value,
-  renderOutputType: (typeParams) => {
-    const length = typeParams['length'];
-    if (length === undefined) return undefined;
-    if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
-      throw new Error('renderOutputType: expected positive integer "length" for Vector');
-    }
-    return `Vector<${length}>`;
-  },
 });
 
 /**
@@ -98,6 +79,86 @@ export const mongoStandardCodecs = [
   mongoDateCodec,
   mongoVectorCodec,
 ] as const;
+
+/**
+ * Build a {@link CodecDescriptor} for a Mongo wire-type codec.
+ *
+ * Wraps an existing {@link MongoCodec} instance into a descriptor whose
+ * factory hands out the same shared codec. Mongo's full migration to
+ * descriptor-first authoring is tracked under TML-2324; for now the
+ * descriptor view is composed from the existing `mongoCodec()` outputs.
+ */
+function descriptorFor<Id extends string>(
+  codec: MongoCodec<Id, readonly CodecTrait[]>,
+  metadata: {
+    readonly traits: readonly CodecTrait[];
+    readonly targetTypes: readonly string[];
+    readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
+  },
+): CodecDescriptor {
+  // The descriptor's `P` is structurally `Record<string, unknown>` for
+  // codecs that take params (Mongo `vector`); non-parameterized codecs
+  // ignore the slot. Cast through `unknown` to fit the
+  // `CodecDescriptor` slot's `(params: P) => …` typing without leaking
+  // a per-codec `P` into the heterogeneous descriptor list.
+  const renderOutputType = metadata.renderOutputType as
+    | CodecDescriptor['renderOutputType']
+    | undefined;
+  return {
+    codecId: codec.id,
+    traits: metadata.traits,
+    targetTypes: metadata.targetTypes,
+    paramsSchema: voidParamsSchema as CodecDescriptor['paramsSchema'],
+    factory: (() => () => codec) as CodecDescriptor['factory'],
+    ...(renderOutputType !== undefined ? { renderOutputType } : {}),
+  };
+}
+
+const renderVectorOutputType = (typeParams: Record<string, unknown>): string | undefined => {
+  const length = typeParams['length'];
+  if (length === undefined) return undefined;
+  if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
+    throw new Error('renderOutputType: expected positive integer "length" for Vector');
+  }
+  return `Vector<${length}>`;
+};
+
+/**
+ * Mongo wire-type codec descriptors. Static metadata for `traits`,
+ * `targetTypes`, and `renderOutputType` lives here (the descriptor
+ * shape) — `MongoCodec` itself is narrow and only carries the four
+ * conversion methods (TML-2357 M2 Phase B).
+ */
+export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
+  descriptorFor(mongoObjectIdCodec, { traits: ['equality'], targetTypes: ['objectId'] }),
+  descriptorFor(mongoStringCodec, {
+    traits: ['equality', 'order', 'textual'],
+    targetTypes: ['string'],
+  }),
+  descriptorFor(mongoDoubleCodec, {
+    traits: ['equality', 'order', 'numeric'],
+    targetTypes: ['double'],
+  }),
+  descriptorFor(mongoInt32Codec, {
+    traits: ['equality', 'order', 'numeric'],
+    targetTypes: ['int'],
+  }),
+  descriptorFor(mongoBooleanCodec, { traits: ['equality', 'boolean'], targetTypes: ['bool'] }),
+  descriptorFor(mongoDateCodec, { traits: ['equality', 'order'], targetTypes: ['date'] }),
+  descriptorFor(mongoVectorCodec, {
+    traits: ['equality'],
+    targetTypes: ['vector'],
+    renderOutputType: renderVectorOutputType,
+  }),
+];
+
+/**
+ * Lookup descriptor metadata by codec id — used by tests and for
+ * descriptor-side reads of static metadata.
+ */
+export function mongoDescriptorById(codecId: string): CodecDescriptor | undefined {
+  return mongoCodecDescriptors.find((d) => d.codecId === codecId);
+}
 
 /**
  * Build a {@link MongoCodecRegistry} preloaded with the standard Mongo

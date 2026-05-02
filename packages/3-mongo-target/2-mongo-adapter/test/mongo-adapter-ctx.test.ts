@@ -26,7 +26,6 @@ function recordingRegistry(observed: (CodecCallContext | undefined)[]) {
   registry.register(
     mongoCodec({
       typeId: 'test/recorder@1',
-      targetTypes: ['string'],
       decode: (w: string) => w,
       encode: (v: string, ctx?: CodecCallContext) => {
         observed.push(ctx);
@@ -197,7 +196,6 @@ describe('MongoAdapter — CodecCallContext threading', () => {
         reg.register(
           mongoCodec({
             typeId: 'test/counter@1',
-            targetTypes: ['string'],
             decode: (w: string) => w,
             encode: (v: string) => {
               callCount += 1;

@@ -61,7 +61,6 @@ describe('Mongo runtime decode integration', () => {
       // file go through the query-builder.
       const failing = mongoCodec({
         typeId: 'test/throws-on-decode@1',
-        targetTypes: ['any'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('decode explosion');

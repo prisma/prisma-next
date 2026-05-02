@@ -1,65 +1,12 @@
 import type { Codec as BaseCodec } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
-import type { MongoCodec, MongoCodecInput, MongoCodecTraits } from '../src/codecs';
+import type { MongoCodec, MongoCodecInput } from '../src/codecs';
 import { mongoCodec } from '../src/codecs';
 
-const equalityOnlyCodec = mongoCodec({
-  typeId: 'test/equality@1',
-  targetTypes: ['string'],
-  traits: ['equality'],
-  decode: (w: string) => w,
-  encode: (v: string) => v,
-});
-
-const multiTraitCodec = mongoCodec({
-  typeId: 'test/multi@1',
-  targetTypes: ['string'],
-  traits: ['equality', 'order', 'textual'],
-  decode: (w: string) => w,
-  encode: (v: string) => v,
-});
-
-const vectorCodec = mongoCodec({
-  typeId: 'test/vector@1',
-  targetTypes: ['vector'],
-  traits: ['equality', 'numeric'],
-  decode: (w: readonly number[]) => w,
-  encode: (v: readonly number[]) => v,
-});
-
-test('MongoCodecTraits extracts single trait', () => {
-  expectTypeOf<MongoCodecTraits<typeof equalityOnlyCodec>>().toEqualTypeOf<'equality'>();
-});
-
-test('MongoCodecTraits extracts multiple traits as union', () => {
-  expectTypeOf<MongoCodecTraits<typeof multiTraitCodec>>().toEqualTypeOf<
-    'equality' | 'order' | 'textual'
-  >();
-});
-
-test('MongoCodecTraits extracts multiple traits from vector codec', () => {
-  expectTypeOf<MongoCodecTraits<typeof vectorCodec>>().toEqualTypeOf<'equality' | 'numeric'>();
-});
-
-const traitlessCodec = mongoCodec({
-  typeId: 'test/traitless@1',
-  targetTypes: ['blob'],
-  decode: (w: Buffer) => w,
-  encode: (v: Buffer) => v,
-  // Buffer is not assignable to JsonValue, so encodeJson/decodeJson are
-  // required (the conditional default identity is unsafe here).
-  encodeJson: (v: Buffer) => v.toString('base64'),
-  decodeJson: (j) => Buffer.from(j as string, 'base64'),
-});
-
-test('MongoCodecTraits is never for codec without traits', () => {
-  expectTypeOf<MongoCodecTraits<typeof traitlessCodec>>().toEqualTypeOf<never>();
-});
-
-// MongoCodec extends `BaseCodec` and carries the same four generics in the
-// same order, plus transitional metadata fields (`traits`, `targetTypes`,
-// `renderOutputType`) that retire alongside the synthesis bridge under
-// TML-2324. Confirm the extension is structurally assignable to the base.
+// MongoCodec extends `BaseCodec` and carries the same four generics in
+// the same order. Trait/targetType/renderOutputType metadata moved to
+// the unified `CodecDescriptor` (TML-2357 M2 Phase B); the codec
+// instance is now a pure conversion record.
 test('MongoCodec is assignable to BaseCodec (4 generics, same order)', () => {
   expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string>>().toExtend<
     BaseCodec<'id/x@1', readonly ['equality'], number, string>
@@ -72,7 +19,6 @@ test('MongoCodec is assignable to BaseCodec (4 generics, same order)', () => {
 test('MongoCodecInput extracts the JS application type used for both write input and read output', () => {
   const text = mongoCodec({
     typeId: 'demo/text@1',
-    targetTypes: ['string'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });

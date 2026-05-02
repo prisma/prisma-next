@@ -25,7 +25,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/observe@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string, ctx?: CodecCallContext) => {
           observed.push(ctx);
@@ -46,7 +45,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/observe-recursive@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string, ctx?: CodecCallContext) => {
           observed.push(ctx);
@@ -82,7 +80,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/single-arg-author@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => {
           invoked += 1;
@@ -108,7 +105,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/counter@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => {
           callCount += 1;
@@ -140,7 +136,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/blocking@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => release.promise.then((suffix) => `${v}:${suffix}`),
       }),
@@ -171,7 +166,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/explody@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: () => {
           throw cause;
@@ -195,7 +189,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/level-blocker@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => blockingLeaf.promise.then((s) => `${v}:${s}`),
       }),
@@ -229,7 +222,6 @@ describe('resolveValue — CodecCallContext threading', () => {
     registry.register(
       mongoCodec({
         typeId: 'test/array-blocker@1',
-        targetTypes: ['string'],
         decode: (w: string) => w,
         encode: (v: string) => blockingLeaf.promise.then((s) => `${v}:${s}`),
       }),

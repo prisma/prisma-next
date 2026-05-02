@@ -11,7 +11,6 @@ test('Mongo uses the framework CodecCallContext directly (signal-only, no `colum
 test('mongoCodec() accepts a `(value, ctx)` encode author', () => {
   const c = mongoCodec({
     typeId: 'demo/ctx-encode@1',
-    targetTypes: ['string'],
     encode: (value: string, _ctx?: CodecCallContext) => value,
     decode: (wire: string) => wire,
   });
@@ -22,7 +21,6 @@ test('mongoCodec() accepts a `(value, ctx)` encode author', () => {
 test('mongoCodec() accepts a `(value, ctx)` decode author', () => {
   const c = mongoCodec({
     typeId: 'demo/ctx-decode@1',
-    targetTypes: ['string'],
     encode: (value: string) => value,
     decode: (wire: string, _ctx?: CodecCallContext) => wire,
   });
@@ -32,7 +30,6 @@ test('mongoCodec() accepts a `(value, ctx)` decode author', () => {
 test('mongoCodec() accepts a single-arg `(value)` encode author and exposes a Promise method', () => {
   const c = mongoCodec({
     typeId: 'demo/single-encode@1',
-    targetTypes: ['string'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });
@@ -42,7 +39,6 @@ test('mongoCodec() accepts a single-arg `(value)` encode author and exposes a Pr
 test('MongoCodec.encode and MongoCodec.decode require a ctx argument', () => {
   const c = mongoCodec({
     typeId: 'demo/require-ctx@1',
-    targetTypes: ['string'],
     encode: (value: string) => value,
     decode: (wire: string) => wire,
   });

@@ -4,7 +4,6 @@ import type {
   CodecCallContext,
   CodecTrait,
 } from '@prisma-next/framework-components/codec';
-import { ifDefined } from '@prisma-next/utils/defined';
 
 export type MongoCodecTrait = CodecTrait;
 
@@ -14,38 +13,18 @@ export type MongoCodecTrait = CodecTrait;
  * an application value and the JSON form stored in contract artifacts.
  *
  * Same shape as the framework codec base — see `Codec` in
- * `@prisma-next/framework-components/codec` for the contract.
- *
- * `traits`, `targetTypes`, and `renderOutputType` are redeclared here as
- * transitional fields because the framework {@link BaseCodec} no longer
- * carries them — codec-id-keyed static metadata lives on the unified
- * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}.
+ * `@prisma-next/framework-components/codec` for the contract. Codec-id-
+ * keyed static metadata (`traits`, `targetTypes`, `renderOutputType`)
+ * lives on the unified {@link import('@prisma-next/framework-components/codec').CodecDescriptor};
  * Mongo's full migration to descriptor-side registration is tracked
- * under TML-2324; until that lands, the legacy fields keep production
- * Mongo wire metadata (BSON-type derivation in
- * `@prisma-next/mongo-contract-psl`, emit-path renderer for
- * `Vector<N>`) reachable through the structural-narrow path in
- * `extractCodecLookup`.
+ * under TML-2324.
  */
 export interface MongoCodec<
   Id extends string = string,
   TTraits extends readonly MongoCodecTrait[] = readonly MongoCodecTrait[],
   TWire = unknown,
   TInput = unknown,
-> extends BaseCodec<Id, TTraits, TWire, TInput> {
-  /** Transitional. See interface-level comment. */
-  readonly traits?: TTraits;
-  /**
-   * Transitional. See interface-level comment. Optional because a
-   * resolved codec returned by a {@link import('@prisma-next/framework-components/codec').CodecDescriptor}'s
-   * `factory` (framework {@link BaseCodec}) is structurally narrower;
-   * the `mongoCodec()` factory always populates the slot at the
-   * registration boundary.
-   */
-  readonly targetTypes?: readonly string[];
-  /** Transitional. See interface-level comment. */
-  readonly renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
-}
+> extends BaseCodec<Id, TTraits, TWire, TInput> {}
 
 /**
  * Conditional bundle for `encodeJson`/`decodeJson`: when `TInput` is
@@ -78,6 +57,10 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  * no identity fallback. `encodeJson` and `decodeJson` default to identity
  * **only when `TInput` is assignable to `JsonValue`**; otherwise both are
  * required so the contract artifact stays JSON-safe.
+ *
+ * Codec-id-keyed static metadata (`traits`, `targetTypes`,
+ * `renderOutputType`) lives on the unified `CodecDescriptor` rather
+ * than on the codec instance itself (TML-2357 M2 Phase B).
  */
 export function mongoCodec<
   Id extends string,
@@ -87,11 +70,8 @@ export function mongoCodec<
 >(
   config: {
     typeId: Id;
-    targetTypes: readonly string[];
-    traits?: TTraits;
     encode: (value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>;
     decode: (wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>;
-    renderOutputType?: (typeParams: Record<string, unknown>) => string | undefined;
   } & JsonRoundTripConfig<TInput>,
 ): MongoCodec<Id, TTraits, TWire, TInput> {
   const identity = (v: unknown) => v;
@@ -109,12 +89,6 @@ export function mongoCodec<
   };
   return {
     id: config.typeId,
-    targetTypes: config.targetTypes,
-    ...ifDefined(
-      'traits',
-      config.traits ? (Object.freeze([...config.traits]) as TTraits) : undefined,
-    ),
-    ...ifDefined('renderOutputType', config.renderOutputType),
     encode: (value, ctx) => {
       try {
         return Promise.resolve(userEncode(value, ctx));
@@ -137,6 +111,3 @@ export function mongoCodec<
 /** Extract the JS application type carried by a Mongo codec — used both as `encode` input and as `decode` output. */
 export type MongoCodecInput<T> =
   T extends MongoCodec<string, readonly MongoCodecTrait[], unknown, infer TInput> ? TInput : never;
-
-export type MongoCodecTraits<T> =
-  T extends MongoCodec<string, infer TTraits> ? TTraits[number] & MongoCodecTrait : never;
