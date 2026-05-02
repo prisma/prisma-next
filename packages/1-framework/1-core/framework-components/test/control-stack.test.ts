@@ -253,26 +253,38 @@ describe('extractCodecLookup', () => {
   const stubCodec = (id: string) =>
     ({
       id,
-      targetTypes: [],
-      decode: (w: unknown) => w,
+      encode: async (v: unknown) => v,
+      decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
     }) as unknown as import('../src/shared/codec-types').Codec;
 
-  it('builds a lookup from codec instances across descriptors', () => {
-    const codec1 = stubCodec('a@1');
-    const codec2 = stubCodec('b@1');
+  const stubDescriptor = (id: string): import('../src/shared/codec-types').AnyCodecDescriptor => ({
+    codecId: id,
+    traits: [],
+    targetTypes: [],
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: () => ({ value: undefined }),
+      },
+    } as unknown as import('@standard-schema/spec').StandardSchemaV1<void>,
+    factory: () => () => stubCodec(id),
+  });
+
+  it('builds a lookup from codec descriptors across components', () => {
     const lookup = extractCodecLookup([
-      { id: 'desc-1', types: { codecTypes: { codecInstances: [codec1] } } },
-      { id: 'desc-2', types: { codecTypes: { codecInstances: [codec2] } } },
+      { id: 'desc-1', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+      { id: 'desc-2', types: { codecTypes: { codecDescriptors: [stubDescriptor('b@1')] } } },
     ]);
-    expect(lookup.get('a@1')).toBe(codec1);
-    expect(lookup.get('b@1')).toBe(codec2);
+    expect(lookup.get('a@1')?.id).toBe('a@1');
+    expect(lookup.get('b@1')?.id).toBe('b@1');
   });
 
   it('returns undefined for unknown codec ids', () => {
     const lookup = extractCodecLookup([
-      { id: 'desc', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+      { id: 'desc', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
     ]);
     expect(lookup.get('z@1')).toBeUndefined();
   });
@@ -280,10 +292,10 @@ describe('extractCodecLookup', () => {
   it('throws on duplicate codec ids from different descriptors', () => {
     expect(() =>
       extractCodecLookup([
-        { id: 'desc-1', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
-        { id: 'desc-2', types: { codecTypes: { codecInstances: [stubCodec('a@1')] } } },
+        { id: 'desc-1', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
+        { id: 'desc-2', types: { codecTypes: { codecDescriptors: [stubDescriptor('a@1')] } } },
       ]),
-    ).toThrow(/Duplicate codec instance for codecId "a@1"/);
+    ).toThrow(/Duplicate codec descriptor for codecId "a@1"/);
   });
 });
 

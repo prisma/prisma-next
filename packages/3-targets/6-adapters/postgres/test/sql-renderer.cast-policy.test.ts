@@ -240,9 +240,9 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
 
   it('emits $1::vector when pgvector is installed via stack.extensionPacks', async () => {
     // Smoke test for the M2 wiring fix: `pgvectorRuntimeDescriptor` exposes
-    // its codec instances via `types.codecTypes.codecInstances`, so the
-    // adapter's runtime-plane lookup picks up `pg/vector@1` and the renderer
-    // emits the cast. Without the wiring fix this regresses to `$1`.
+    // its codecs via `types.codecTypes.codecDescriptors`, so the adapter's
+    // runtime-plane lookup picks up `pg/vector@1` and the renderer emits
+    // the cast. Without the wiring fix this regresses to `$1`.
     const pgvectorRuntime = (await import('@prisma-next/extension-pgvector/runtime')).default;
 
     const adapter = createComposedPostgresAdapter({ extensionPacks: [pgvectorRuntime] });

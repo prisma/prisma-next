@@ -127,7 +127,7 @@ describe('parameterized types', () => {
       paramsSchema?: Type<{ length: number }>;
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -146,7 +146,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return {
             familyId: 'sql' as const,
@@ -253,7 +253,7 @@ describe('parameterized types', () => {
           length: 'number',
         });
       const factory = opts?.factory ?? ((_params: { length: number }) => () => sharedCodec);
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -270,7 +270,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -386,7 +386,7 @@ describe('parameterized types', () => {
   describe('column typeParams validation', () => {
     function createBasicVectorExt(): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -403,7 +403,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -473,15 +473,16 @@ describe('parameterized types', () => {
 
       function createVectorExtension(id: string): SqlRuntimeExtensionDescriptor<'postgres'> {
         const sharedCodec = vectorCodecInstance();
-        const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
-          {
-            codecId: 'pg/vector@1',
-            traits: [],
-            targetTypes: ['vector'],
-            paramsSchema: vectorParamsSchema,
-            factory: (_params) => () => sharedCodec,
-          },
-        ];
+        const parameterizedDescriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] =
+          [
+            {
+              codecId: 'pg/vector@1',
+              traits: [],
+              targetTypes: ['vector'],
+              paramsSchema: vectorParamsSchema,
+              factory: (_params) => () => sharedCodec,
+            },
+          ];
 
         return {
           kind: 'extension' as const,
@@ -489,7 +490,7 @@ describe('parameterized types', () => {
           version: '0.0.1',
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
-          codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+          codecs: () => parameterizedDescriptors as unknown as ReadonlyArray<CodecDescriptor>,
           create() {
             return {
               familyId: 'sql' as const,

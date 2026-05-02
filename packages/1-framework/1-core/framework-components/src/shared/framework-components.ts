@@ -1,4 +1,4 @@
-import type { AnyCodecDescriptor, Codec } from './codec-types';
+import type { AnyCodecDescriptor } from './codec-types';
 import type { AuthoringContributions } from './framework-authoring';
 import type { ControlMutationDefaults } from './mutation-default-types';
 import type { TypesImportSpec } from './types-import-spec';
@@ -43,17 +43,11 @@ export interface ComponentMetadata {
        */
       readonly controlPlaneHooks?: Record<string, unknown>;
       /**
-       * Codec instances contributed by this component.
-       * Used to build a CodecLookup for codec-dispatched type rendering during emission.
-       *
-       * Transitional alongside `codecDescriptors` until every contributor
-       * exposes the descriptor list (TML-2357 M2 Phase B).
-       */
-      readonly codecInstances?: ReadonlyArray<Codec>;
-      /**
        * Codec descriptors contributed by this component. Source of truth
        * for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`,
-       * `renderOutputType`) consumed by `extractCodecLookup`.
+       * `renderOutputType`) consumed by `extractCodecLookup`, and used to
+       * materialize representative `Codec` instances for codec-dispatched
+       * type rendering during emission.
        */
       readonly codecDescriptors?: ReadonlyArray<AnyCodecDescriptor>;
     };

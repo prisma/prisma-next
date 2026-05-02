@@ -9,11 +9,11 @@
  * Per TML-2357 M2, runtime materialization flows through the unified
  * descriptor map (`arktypeJsonCodec` parameterized descriptor) and the
  * emit path consults `descriptorFor('arktype/json@1').renderOutputType`
- * directly — no per-library "emit-only Codec" stub on `codecInstances`.
+ * directly — no per-library "emit-only Codec" stub.
  */
 
 import type { CodecTypes } from '../types/codec-types';
-import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonCodec } from './arktype-json-codec';
 
 const arktypeJsonPackMetaBase = {
   kind: 'extension',
@@ -24,6 +24,7 @@ const arktypeJsonPackMetaBase = {
   capabilities: {},
   types: {
     codecTypes: {
+      codecDescriptors: [arktypeJsonCodec],
       import: {
         package: '@prisma-next/extension-arktype-json/codec-types',
         named: 'CodecTypes',

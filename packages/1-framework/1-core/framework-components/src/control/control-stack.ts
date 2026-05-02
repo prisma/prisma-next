@@ -269,22 +269,6 @@ export function assembleControlMutationDefaults(
   };
 }
 
-/**
- * Structural narrow of the legacy fields the codec instance still
- * physically carries while the runtime `Codec` interface narrowed to
- * id + behavior. SQL `mkCodec()` / Mongo `mongoCodec()` factories still
- * emit `targetTypes` (and SQL emits `renderOutputType`) on the runtime
- * object — the narrow reads what's there to populate
- * {@link CodecLookup.targetTypesFor} and
- * {@link CodecLookup.renderOutputTypeFor}. Replaced when every codec
- * ships a native descriptor (TML-2357 M2).
- */
-type LegacyCodecInstanceMeta = {
-  readonly targetTypes?: readonly string[];
-  readonly meta?: import('../shared/codec-types').CodecMeta;
-  readonly renderOutputType?: (params: Record<string, unknown>) => string | undefined;
-};
-
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
@@ -296,73 +280,42 @@ export function extractCodecLookup(
   for (const descriptor of descriptors) {
     const codecTypes = descriptor.types?.codecTypes;
     const descriptorId = descriptor.id ?? '<unknown>';
-    // Descriptor-side metadata is the source of truth for `targetTypes`
-    // / `meta` / `renderOutputType` (TML-2357 M2 Phase B). The codec-
-    // instance fallback below stays for contributors that still
-    // populate only `codecInstances`; it retires alongside the family-
-    // `Codec` extensions' transitional fields once every contributor
-    // exposes `codecDescriptors`.
-    const seenIds = new Set<string>();
-    for (const defineCodec of codecTypes?.codecDescriptors ?? []) {
+    // Descriptor-side metadata is the single source of truth for
+    // `targetTypes` / `meta` / `renderOutputType`. Every contributor
+    // ships a `codecDescriptors` list on `types.codecTypes`.
+    for (const codecDescriptor of codecTypes?.codecDescriptors ?? []) {
       assertUniqueCodecOwner({
-        codecId: defineCodec.codecId,
+        codecId: codecDescriptor.codecId,
         owners,
         descriptorId,
         entityLabel: 'codec descriptor',
         entityOwnershipLabel: 'codec descriptor provider',
       });
-      owners.set(defineCodec.codecId, descriptorId);
-      seenIds.add(defineCodec.codecId);
-      if (Array.isArray(defineCodec.targetTypes)) {
-        targetTypesById.set(defineCodec.codecId, defineCodec.targetTypes);
+      owners.set(codecDescriptor.codecId, descriptorId);
+      if (Array.isArray(codecDescriptor.targetTypes)) {
+        targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
       }
-      if (defineCodec.meta !== undefined) {
-        metaById.set(defineCodec.codecId, defineCodec.meta);
+      if (codecDescriptor.meta !== undefined) {
+        metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
       }
-      if (typeof defineCodec.renderOutputType === 'function') {
-        renderersById.set(defineCodec.codecId, defineCodec.renderOutputType);
+      if (typeof codecDescriptor.renderOutputType === 'function') {
+        renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
       }
       // Materialize a representative `Codec` instance for `byId.get()`
       // so consumers reading the lookup's instance side (e.g. SQL
       // renderer's cast-policy lookup) keep finding the codec.
       // Descriptors whose factory needs concrete params raise — those
       // are populated lazily by `buildContractCodecRegistry` at runtime.
-      if (!byId.has(defineCodec.codecId)) {
+      if (!byId.has(codecDescriptor.codecId)) {
         try {
-          const representative = defineCodec.factory(undefined as never)({
-            name: `<lookup:${defineCodec.codecId}>`,
-          } as Parameters<ReturnType<typeof defineCodec.factory>>[0]);
-          byId.set(defineCodec.codecId, representative);
+          const representative = codecDescriptor.factory(undefined as never)({
+            name: `<lookup:${codecDescriptor.codecId}>`,
+          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+          byId.set(codecDescriptor.codecId, representative);
         } catch {
           // Parameterized factory needs real params; leave `byId.get()`
           // returning `undefined` for this codec id.
         }
-      }
-    }
-    for (const codec of codecTypes?.codecInstances ?? []) {
-      if (!seenIds.has(codec.id)) {
-        assertUniqueCodecOwner({
-          codecId: codec.id,
-          owners,
-          descriptorId,
-          entityLabel: 'codec instance',
-          entityOwnershipLabel: 'codec instance provider',
-        });
-        owners.set(codec.id, descriptorId);
-      }
-      byId.set(codec.id, codec);
-      // Legacy bolt-on read for contributors that haven't migrated to
-      // `codecDescriptors`. Retires once every consumer ships the
-      // descriptor list on `types.codecTypes.codecDescriptors`.
-      const legacyMeta = codec as unknown as LegacyCodecInstanceMeta;
-      if (!targetTypesById.has(codec.id) && Array.isArray(legacyMeta.targetTypes)) {
-        targetTypesById.set(codec.id, legacyMeta.targetTypes);
-      }
-      if (!metaById.has(codec.id) && legacyMeta.meta !== undefined) {
-        metaById.set(codec.id, legacyMeta.meta);
-      }
-      if (!renderersById.has(codec.id) && typeof legacyMeta.renderOutputType === 'function') {
-        renderersById.set(codec.id, legacyMeta.renderOutputType);
       }
     }
   }
