@@ -7,8 +7,8 @@
  * (with the runtime `Codec` instance materialized through the
  * descriptor's `factory(undefined)(ctx)`), the `dataTypes` map, and the
  * compile-time `CodecTypes` map are all derived from the descriptor
- * map. There is no parallel `mkCodec(...)` / `defineCodecGroup()` /
- * `defineCodecBundle()` chain (TML-2357 M2 R4).
+ * map. The legacy factory + builder chain (renamed transiently in M2 R3)
+ * was removed in TML-2357 M2 R4.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
