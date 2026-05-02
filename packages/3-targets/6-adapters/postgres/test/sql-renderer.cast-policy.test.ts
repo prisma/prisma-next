@@ -1,11 +1,10 @@
 import type { Codec, CodecLookup } from '@prisma-next/framework-components/codec';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { buildCodec, voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { RuntimeExtensionDescriptor } from '@prisma-next/framework-components/execution';
 import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
   ColumnRef,
-  mkCodec,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -90,8 +89,8 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
 
 describe('renderLoweredSql cast policy', () => {
   it('emits $N::<nativeType> when the codec nativeType is outside the inferrable set', () => {
-    const fooCodec: Codec = mkCodec({
-      typeId: 'app/test-foo@1',
+    const fooCodec: Codec = buildCodec({
+      id: 'app/test-foo@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
@@ -112,8 +111,8 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec nativeType is inferrable', () => {
-    const integerCodec: Codec = mkCodec({
-      typeId: 'pg/int4@1',
+    const integerCodec: Codec = buildCodec({
+      id: 'pg/int4@1',
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
     });
@@ -134,8 +133,8 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
-    const enumCodec: Codec = mkCodec({
-      typeId: 'pg/enum@1',
+    const enumCodec: Codec = buildCodec({
+      id: 'pg/enum@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });
@@ -195,8 +194,8 @@ describe('renderLoweredSql cast policy', () => {
 
 describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
-    const geographyCodec: Codec = mkCodec({
-      typeId: 'app/geography@1',
+    const geographyCodec: Codec = buildCodec({
+      id: 'app/geography@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
     });

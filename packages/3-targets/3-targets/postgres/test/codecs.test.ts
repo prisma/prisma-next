@@ -442,7 +442,7 @@ describe('adapter-postgres codecs', () => {
     }) => {
       // Descriptors always carry `paramsSchema` (every codec has one,
       // be it `voidParamsSchema` for non-parameterized codecs or a
-      // codec-specific schema). The legacy `mkCodec()` factory's
+      // codec-specific schema). The legacy `buildCodec()` factory's
       // optional `paramsSchema` slot retired with the SQL `Codec`
       // narrow (TML-2357 M2 Phase B); descriptor-side coverage is
       // exercised here so the parameterization split remains

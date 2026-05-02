@@ -1,4 +1,5 @@
 import type { JsonValue } from '@prisma-next/contract/types';
+import { buildCodec } from '@prisma-next/framework-components/codec';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
 import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -7,7 +8,6 @@ import {
   ColumnRef,
   ExistsExpr,
   ListExpression,
-  mkCodec,
   NotExpr,
   NullCheckExpr,
   newCodecRegistry,
@@ -48,12 +48,10 @@ describe('createModelAccessor', () => {
 
   function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
     const registry = newCodecRegistry();
-    for (const [id, traits] of Object.entries(entries)) {
+    for (const [id, _traits] of Object.entries(entries)) {
       registry.register(
-        mkCodec({
-          typeId: id,
-          targetTypes: [],
-          traits,
+        buildCodec({
+          id,
           encode: (v: JsonValue) => v,
           decode: (v: JsonValue) => v,
         }),

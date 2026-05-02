@@ -4,10 +4,9 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
+import { buildCodec, voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
-import { mkCodec } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -31,8 +30,8 @@ import { createStubAdapter, createTestContext } from './utils';
 // See spec § Decision and AC-3, AC-4.
 
 function makeVectorCodec(meta?: Record<string, unknown>): Codec {
-  const baseCodec = mkCodec({
-    typeId: 'pg/vector@1',
+  const baseCodec = buildCodec({
+    id: 'pg/vector@1',
     encode: (v: number[]) => v,
     decode: (w: number[]) => w,
   });
@@ -84,9 +83,8 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
 function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
   // Custom codec id avoids colliding with the default test target
   // descriptor's pre-registered codecs (`pg/text@1`, etc.).
-  const scalarCodec = mkCodec({
-    typeId: 'test/scalar@1',
-    targetTypes: ['scalar'],
+  const scalarCodec = buildCodec({
+    id: 'test/scalar@1',
     encode: (v: string) => v,
     decode: (w: string) => w,
   });

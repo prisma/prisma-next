@@ -1,12 +1,13 @@
+import { buildCodec } from '@prisma-next/framework-components/codec';
 import { newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { mkCodec, newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../../../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value';
 
 // T4.1 — cross-family codec parity proof
 //
-// A single `mkCodec({...})` value (the unified factory entry point in
+// A single `buildCodec({...})` value (the unified factory entry point in
 // relational-core, mirrored by `mongoCodec` post-m4) is registered in both a
 // SQL `CodecRegistry` and a Mongo `MongoCodecRegistry`. Encoding the same
 // input value through each registry must produce identical wire output. For
@@ -15,9 +16,8 @@ import { resolveValue } from '../../../../packages/3-mongo-target/2-mongo-adapte
 
 describe('cross-family codec parity (T4.1)', () => {
   // A single codec instance — registered in both SQL and Mongo registries.
-  const objectIdLikeCodec = mkCodec({
-    typeId: 'shared/object-id-like@1',
-    targetTypes: ['objectIdLike'],
+  const objectIdLikeCodec = buildCodec({
+    id: 'shared/object-id-like@1',
     encode: (value: string) => `wire:${value}`,
     decode: (wire: string) => wire.replace(/^wire:/, ''),
   });
