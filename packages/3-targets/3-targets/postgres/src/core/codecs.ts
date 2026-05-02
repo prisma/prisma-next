@@ -130,65 +130,25 @@ const pgTextCodec = codec({
   },
 });
 
-const pgCharCodec = {
+const pgCharCodec: Codec<typeof PG_CHAR_CODEC_ID> = {
   ...sqlCharCodec,
   id: PG_CHAR_CODEC_ID,
-  targetTypes: ['character'],
-  meta: {
-    db: {
-      sql: {
-        postgres: {
-          nativeType: 'character',
-        },
-      },
-    },
-  },
-} as unknown as Codec<typeof PG_CHAR_CODEC_ID>;
+};
 
-const pgVarcharCodec = {
+const pgVarcharCodec: Codec<typeof PG_VARCHAR_CODEC_ID> = {
   ...sqlVarcharCodec,
   id: PG_VARCHAR_CODEC_ID,
-  targetTypes: ['character varying'],
-  meta: {
-    db: {
-      sql: {
-        postgres: {
-          nativeType: 'character varying',
-        },
-      },
-    },
-  },
-} as unknown as Codec<typeof PG_VARCHAR_CODEC_ID>;
+};
 
-const pgIntCodec = {
+const pgIntCodec: Codec<typeof PG_INT_CODEC_ID> = {
   ...sqlIntCodec,
   id: PG_INT_CODEC_ID,
-  targetTypes: ['int4'],
-  meta: {
-    db: {
-      sql: {
-        postgres: {
-          nativeType: 'integer',
-        },
-      },
-    },
-  },
-} as unknown as Codec<typeof PG_INT_CODEC_ID>;
+};
 
-const pgFloatCodec = {
+const pgFloatCodec: Codec<typeof PG_FLOAT_CODEC_ID> = {
   ...sqlFloatCodec,
   id: PG_FLOAT_CODEC_ID,
-  targetTypes: ['float8'],
-  meta: {
-    db: {
-      sql: {
-        postgres: {
-          nativeType: 'double precision',
-        },
-      },
-    },
-  },
-} as unknown as Codec<typeof PG_FLOAT_CODEC_ID>;
+};
 
 const pgInt4Codec = codec({
   typeId: PG_INT4_CODEC_ID,
