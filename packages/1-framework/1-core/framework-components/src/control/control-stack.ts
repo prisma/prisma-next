@@ -320,10 +320,12 @@ export function extractCodecLookup(
       // The `as unknown as LegacyCodecInstanceMeta` cast is intentional
       // and documented as M2-bundled cleanup — it's the bridge between
       // the narrowed framework type and the family extensions' wider
-      // shape, and it retires alongside `synthesizeNonParameterizedDescriptor`
-      // and the `traits` / `targetTypes` / `meta` / `renderOutputType`
-      // fields on family `Codec` interfaces in TML-2357 M2 (review F1
-      // for R1 explicitly accepted this site's cast as transitional).
+      // shape, and it retires alongside the `traits` / `targetTypes` /
+      // `meta` / `renderOutputType` fields on family `Codec` interfaces
+      // in TML-2357 M2 Phase B (the family-extension narrow). M2 Phase
+      // A already retired the synthesis bridge at the contributor
+      // protocol layer; review F1 for R1 explicitly accepted this
+      // site's cast as transitional.
       const legacyMeta = codec as unknown as LegacyCodecInstanceMeta;
       if (Array.isArray(legacyMeta.targetTypes)) {
         targetTypesById.set(codec.id, legacyMeta.targetTypes);

@@ -1,5 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type {
+  CodecDescriptor,
+  CodecMeta,
+  CodecTrait,
+} from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import {
   instantiateExecutionStack,
   type RuntimeDriverDescriptor,
@@ -8,7 +14,12 @@ import type { ResultType } from '@prisma-next/framework-components/runtime';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Adapter, LoweredStatement, SelectAst } from '@prisma-next/sql-relational-core/ast';
+import type {
+  Adapter,
+  CodecRegistry,
+  LoweredStatement,
+  SelectAst,
+} from '@prisma-next/sql-relational-core/ast';
 import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
@@ -122,18 +133,51 @@ export async function writeTestContractMarker(
  * Wraps the adapter in an SqlRuntimeAdapterDescriptor with static contributions
  * derived from the adapter's codec registry.
  */
+/**
+ * Synthesize `CodecDescriptor`s from a legacy {@link CodecRegistry} of
+ * non-parameterized codec instances. M2 Phase A retired the production
+ * synthesis bridge; this test-only equivalent lets the existing
+ * `createTestAdapterDescriptor` pattern keep wrapping a raw `Adapter`
+ * (whose `profile.codecs()` still returns a `CodecRegistry`) into the
+ * descriptor-list shape that `SqlStaticContributions.codecs:` now
+ * expects. The legacy `Codec` instances carry `traits`/`targetTypes`/
+ * `meta` via the SQL family extension; the structural narrow reads
+ * those fields directly. Retires alongside the family-extension narrow
+ * in M2 Phase B.
+ */
+export function descriptorsFromCodecRegistry(
+  registry: CodecRegistry,
+): ReadonlyArray<CodecDescriptor> {
+  const descriptors: CodecDescriptor[] = [];
+  for (const instance of registry.values()) {
+    const legacy = instance as {
+      readonly traits?: readonly CodecTrait[];
+      readonly targetTypes?: readonly string[];
+      readonly meta?: CodecMeta;
+    };
+    descriptors.push({
+      codecId: instance.id,
+      traits: legacy.traits ?? [],
+      targetTypes: legacy.targetTypes ?? [],
+      paramsSchema: voidParamsSchema,
+      factory: () => () => instance,
+      ...(legacy.meta !== undefined ? { meta: legacy.meta } : {}),
+    });
+  }
+  return descriptors;
+}
+
 export function createTestAdapterDescriptor(
   adapter: Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement>,
 ): SqlRuntimeAdapterDescriptor<'postgres'> {
-  const codecRegistry = adapter.profile.codecs();
+  const descriptors = descriptorsFromCodecRegistry(adapter.profile.codecs());
   return {
     kind: 'adapter' as const,
     id: 'test-adapter',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptors,
     mutationDefaultGenerators: createTestMutationDefaultGenerators,
     create(_stack): SqlRuntimeAdapterInstance<'postgres'> {
       return Object.assign({ familyId: 'sql' as const, targetId: 'postgres' as const }, adapter);
@@ -151,8 +195,7 @@ export function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgr
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },

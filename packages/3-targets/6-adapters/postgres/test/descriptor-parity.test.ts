@@ -5,7 +5,7 @@ import postgresRuntimeAdapterDescriptor from '../src/exports/runtime';
 describe('adapter descriptor / instance codec parity', () => {
   it('descriptor codecs() matches adapter instance profile.codecs() codec IDs', () => {
     const descriptorCodecIds = new Set(
-      [...postgresRuntimeAdapterDescriptor.codecs().values()].map((c) => c.id),
+      postgresRuntimeAdapterDescriptor.codecs().map((d) => d.codecId),
     );
 
     // The adapter reads stack metadata to derive a `codecLookup` for the

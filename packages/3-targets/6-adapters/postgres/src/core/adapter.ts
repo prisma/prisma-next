@@ -3,13 +3,11 @@ import {
   type Adapter,
   type AdapterProfile,
   type AnyQueryAst,
-  type CodecParamsDescriptor,
   createCodecRegistry,
   type LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { codecDefinitions } from '@prisma-next/target-postgres/codecs';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -28,22 +26,6 @@ const defaultCapabilities = Object.freeze({
     defaultInInsert: true,
   },
 });
-
-type AdapterCodec = (typeof codecDefinitions)[keyof typeof codecDefinitions]['codec'];
-type ParameterizedCodec = AdapterCodec & {
-  readonly paramsSchema: NonNullable<AdapterCodec['paramsSchema']>;
-};
-
-const parameterizedCodecs: ReadonlyArray<CodecParamsDescriptor> = Object.values(codecDefinitions)
-  .map((definition) => definition.codec)
-  .filter((codec): codec is ParameterizedCodec => codec.paramsSchema !== undefined)
-  .map((codec) =>
-    Object.freeze({
-      codecId: codec.id,
-      paramsSchema: codec.paramsSchema,
-      ...ifDefined('init', codec.init),
-    }),
-  );
 
 class PostgresAdapterImpl
   implements Adapter<AnyQueryAst, PostgresContract, PostgresLoweredStatement>
@@ -78,10 +60,6 @@ class PostgresAdapterImpl
       // the row is already in the shape the shared parser expects.
       parseMarkerRow: (row: unknown) => parseContractMarkerRow(row),
     });
-  }
-
-  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
-    return parameterizedCodecs;
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<PostgresContract>): PostgresLoweredStatement {

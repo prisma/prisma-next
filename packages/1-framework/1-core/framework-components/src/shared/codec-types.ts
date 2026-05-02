@@ -241,6 +241,21 @@ export interface CodecDescriptor<P = void> {
 }
 
 /**
+ * Variance-erased {@link CodecDescriptor} alias. `CodecDescriptor<P>` is
+ * invariant in `P` (the `factory` and `renderOutputType` slots use `P`
+ * contravariantly), so `CodecDescriptor<P>` does not extend
+ * `CodecDescriptor<unknown>` for specific `P`. Heterogeneous descriptor
+ * collections — e.g. `SqlStaticContributions.codecs:` returning a list
+ * that mixes parameterized and non-parameterized descriptors — type
+ * against this alias and narrow per codec id at the consumer.
+ *
+ * Codec-registry-unification spec § Decision: every codec resolves
+ * through one descriptor map; reads are non-branching.
+ */
+// biome-ignore lint/suspicious/noExplicitAny: variance erasure for heterogeneous descriptor collections
+export type AnyCodecDescriptor = CodecDescriptor<any>;
+
+/**
  * Standard Schema validator for `void` params. Accepts only `undefined`
  * (or absent input); rejects any other value so a contract that tries to
  * thread `typeParams` through a non-parameterized codec id fails fast at
@@ -263,57 +278,6 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
           },
   },
 };
-
-/**
- * Static descriptor metadata threaded into {@link synthesizeNonParameterizedDescriptor}.
- *
- * The runtime {@link Codec} instance no longer carries codec-id-keyed
- * static metadata (`traits`, `targetTypes`, `meta`); the synthesis bridge
- * receives them explicitly from the call site that has the contributor
- * context. The bridge itself retires under TML-2357 once every codec
- * contributor ships a {@link CodecDescriptor} natively.
- */
-export interface NonParameterizedDescriptorMeta {
-  readonly traits: readonly CodecTrait[];
-  readonly targetTypes: readonly string[];
-  readonly meta?: CodecMeta;
-}
-
-/**
- * Synthesize a `CodecDescriptor<void>` for a non-parameterized codec
- * runtime instance. The factory is constant — every call returns the same
- * shared codec instance — so columns sharing this codec id share one
- * resolved codec.
- *
- * Codec-registry-unification spec § Decision (Case T — non-parameterized
- * text codec). This is the bridge while non-parameterized codec
- * contributors still register through the legacy `codecs:` slot; once they
- * migrate to ship descriptors directly (TML-2357 T2.7), this synthesis
- * steps aside.
- *
- * The runtime instance no longer carries `traits`/`targetTypes`/`meta`;
- * the call site supplies them via {@link NonParameterizedDescriptorMeta}.
- */
-export function synthesizeNonParameterizedDescriptor(
-  codec: Codec,
-  meta: NonParameterizedDescriptorMeta,
-): CodecDescriptor<void> {
-  // The descriptor's `factory: (params: void) => (ctx: CodecInstanceContext)
-  // => Codec` is a constant for non-parameterized codecs — `params` is
-  // never read and the returned ctx-applier always yields the same shared
-  // codec. We rely on the descriptor's typed `factory` slot to infer the
-  // signatures rather than naming `void` locally (biome's
-  // `noConfusingVoidType` flags `void` outside return positions).
-  const sharedFactory = () => () => codec;
-  return {
-    codecId: codec.id,
-    traits: meta.traits,
-    targetTypes: meta.targetTypes,
-    paramsSchema: voidParamsSchema,
-    factory: sharedFactory,
-    ...(meta.meta !== undefined ? { meta: meta.meta } : {}),
-  };
-}
 
 /**
  * Compose a derived {@link CodecDescriptor} from an existing base

@@ -32,6 +32,7 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
+import { descriptorsFromCodecRegistry } from './utils';
 
 const testContract: Contract<SqlStorage> = {
   targetFamily: 'sql',
@@ -133,8 +134,7 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -147,8 +147,7 @@ function createTestSetup(extras: readonly Codec<string>[] = [], driverOptions?: 
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecRegistry(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },

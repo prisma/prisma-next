@@ -8,7 +8,7 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
-import { createTestContract } from './utils';
+import { createTestContract, descriptorsFromCodecRegistry } from './utils';
 
 function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> {
   const registry = createCodecRegistry();
@@ -27,8 +27,7 @@ function createStubAdapterDescriptor(): SqlRuntimeAdapterDescriptor<'postgres'> 
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecRegistry(registry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },
@@ -59,8 +58,7 @@ function createStubTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -91,9 +89,8 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
+    codecs: () => descriptorsFromCodecRegistry(registry),
     queryOperations: () => operations,
-    parameterizedCodecs: () => [],
     create() {
       return {
         familyId: 'sql' as const,

@@ -5,10 +5,10 @@ import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
 describe('arktypeJsonRuntimeDescriptor', () => {
   // The runtime descriptor is the SQL runtime's entry point for
-  // arktype-json. It registers `arktypeJsonCodec` through the
-  // `parameterizedCodecs:` slot and ships an empty legacy `codecs:`
-  // registry — Phase B of codec-registry-unification: arktype-json's
-  // codec metadata flows through the unified descriptor map only.
+  // arktype-json. M2 Phase A unified the contributor protocol: every
+  // codec — parameterized or not — flows through the single `codecs:`
+  // slot returning a `CodecDescriptor` list. arktype-json contributes
+  // exactly one descriptor: `arktypeJsonCodec`.
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonRuntimeDescriptor.familyId).toBe('sql');
     expect(arktypeJsonRuntimeDescriptor.targetId).toBe('postgres');
@@ -16,14 +16,10 @@ describe('arktypeJsonRuntimeDescriptor', () => {
     expect(arktypeJsonRuntimeDescriptor.id).toBe('arktype-json');
   });
 
-  it('exposes the parameterized codec descriptor through parameterizedCodecs()', () => {
-    expect(arktypeJsonRuntimeDescriptor.parameterizedCodecs()).toEqual([arktypeJsonCodec]);
-  });
-
-  it('returns an empty legacy codec registry from codecs()', () => {
-    const registry = arktypeJsonRuntimeDescriptor.codecs();
-    expect(registry.has(ARKTYPE_JSON_CODEC_ID)).toBe(false);
-    expect([...registry]).toEqual([]);
+  it('contributes the arktype-json descriptor through the unified codecs slot', () => {
+    const descriptors = arktypeJsonRuntimeDescriptor.codecs();
+    expect(descriptors).toEqual([arktypeJsonCodec]);
+    expect(descriptors[0]?.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
   });
 
   it('create() returns an instance tagged with the family/target', () => {

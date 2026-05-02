@@ -37,6 +37,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
+import { descriptorsFromCodecRegistry } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
 
@@ -171,8 +172,7 @@ function createTestTargetDescriptor(): SqlRuntimeTargetDescriptor<'postgres'> {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => createCodecRegistry(),
-    parameterizedCodecs: () => [],
+    codecs: () => [],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -189,8 +189,7 @@ function createTestAdapterDescriptor(
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
-    parameterizedCodecs: () => [],
+    codecs: () => descriptorsFromCodecRegistry(codecRegistry),
     create() {
       return Object.assign(
         { familyId: 'sql' as const, targetId: 'postgres' as const },

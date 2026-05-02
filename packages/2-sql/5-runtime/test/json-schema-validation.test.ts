@@ -1,5 +1,6 @@
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import {
@@ -207,18 +208,13 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     buildJsonDescriptor('pg/jsonb@1', baseJsonb, 'jsonb'),
   ];
 
-  const registry = createCodecRegistry();
-  registry.register(baseJson);
-  registry.register(baseJsonb);
-
   return {
     kind: 'extension' as const,
     id: 'json-validation',
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => parameterizedCodecs,
+    codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -307,29 +303,25 @@ describe('JSON Schema validator registry', () => {
 
     it('omits validator registry when no descriptor declares the json-validator trait', () => {
       const baseJsonb = jsonbCodec('pg/jsonb@1', 'jsonb');
-      const registry = createCodecRegistry();
-      registry.register(baseJsonb);
 
       // The factory returns the legacy codec without attaching `validate`
       // and without declaring the `'json-validator'` trait — so the
       // framework's validator registry builder finds no per-column
       // validators to extract.
+      const jsonbDescriptor: RuntimeParameterizedCodecDescriptor<Record<string, unknown>> = {
+        codecId: 'pg/jsonb@1',
+        traits: [],
+        targetTypes: ['jsonb'],
+        paramsSchema: jsonTypeParamsSchema,
+        factory: (_params: Record<string, unknown>) => () => baseJsonb,
+      };
       const noValidatorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
         kind: 'extension' as const,
         id: 'json-no-validator',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => [
-          {
-            codecId: 'pg/jsonb@1',
-            traits: [],
-            targetTypes: ['jsonb'],
-            paramsSchema: jsonTypeParamsSchema,
-            factory: (_params) => () => baseJsonb,
-          },
-        ],
+        codecs: () => [jsonbDescriptor as unknown as CodecDescriptor],
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },

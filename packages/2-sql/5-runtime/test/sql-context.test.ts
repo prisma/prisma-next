@@ -13,6 +13,7 @@ import {
   createStubAdapter,
   createTestAdapterDescriptor,
   createTestTargetDescriptor,
+  descriptorsFromCodecRegistry,
 } from './utils';
 
 const testContract: Contract<SqlStorage> = {
@@ -64,9 +65,8 @@ function createTestExtensionDescriptor(options?: {
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => codecRegistry,
+    codecs: () => descriptorsFromCodecRegistry(codecRegistry),
     queryOperations: () => operationsArray,
-    parameterizedCodecs: () => [],
     create() {
       return {
         familyId: 'sql' as const,
@@ -171,9 +171,8 @@ describe('comprehensive descriptor-based derivation', () => {
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
-      codecs: () => targetCodecRegistry,
+      codecs: () => descriptorsFromCodecRegistry(targetCodecRegistry),
       queryOperations: () => targetOps,
-      parameterizedCodecs: () => [],
       create() {
         return { familyId: 'sql' as const, targetId: 'postgres' as const };
       },

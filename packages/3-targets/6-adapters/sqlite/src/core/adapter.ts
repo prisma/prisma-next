@@ -6,7 +6,6 @@ import {
   type AnyFromSource,
   type AnyQueryAst,
   type BinaryExpr,
-  type CodecParamsDescriptor,
   type ColumnRef,
   createCodecRegistry,
   type DeleteAst,
@@ -78,10 +77,6 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
         return parseContractMarkerRow({ ...raw, invariants });
       },
     });
-  }
-
-  parameterizedCodecs(): ReadonlyArray<CodecParamsDescriptor> {
-    return [];
   }
 
   lower(ast: AnyQueryAst, context: LowererContext<SqliteContract>): SqliteLoweredStatement {

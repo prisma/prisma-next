@@ -1,6 +1,6 @@
 import type { Contract, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
-import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { synthesizeNonParameterizedDescriptor } from '@prisma-next/framework-components/codec';
+import type { AnyCodecDescriptor, CodecDescriptor } from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { ComponentDescriptor } from '@prisma-next/framework-components/components';
 import { checkContractComponentRequirements } from '@prisma-next/framework-components/components';
 import {
@@ -55,10 +55,16 @@ import type {
  */
 export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> = CodecDescriptor<P>;
 
+/**
+ * Contributor protocol for SQL components (target, adapter, extension
+ * pack). Per TML-2357 M2 Phase A, the unified `codecs:` slot returns the
+ * full {@link CodecDescriptor} list — non-parameterized and parameterized
+ * descriptors live side-by-side in the same array. The framework
+ * dispatches every codec id through the unified descriptor map without
+ * branching on parameterization.
+ */
 export interface SqlStaticContributions {
-  readonly codecs: () => CodecRegistry;
-  // biome-ignore lint/suspicious/noExplicitAny: needed for covariance with concrete descriptor types
-  readonly parameterizedCodecs: () => ReadonlyArray<RuntimeParameterizedCodecDescriptor<any>>;
+  readonly codecs: () => ReadonlyArray<AnyCodecDescriptor>;
   readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
@@ -255,86 +261,93 @@ function validateTypeParams(
   return result.value as Record<string, unknown>;
 }
 
-function collectParameterizedCodecDescriptors(
-  contributors: ReadonlyArray<SqlStaticContributions>,
-): Map<string, RuntimeParameterizedCodecDescriptor> {
-  const descriptors = new Map<string, RuntimeParameterizedCodecDescriptor>();
+/**
+ * Collect every {@link CodecDescriptor} contributed by the SQL stack and
+ * partition into "parameterized" vs "non-parameterized" by reference-
+ * equality with the framework-supplied {@link voidParamsSchema}. Every
+ * non-parameterized descriptor flows through `codecDescriptor()` with
+ * no `paramsSchema` argument, which falls back to the singleton
+ * `voidParamsSchema`; parameterized descriptors author their own
+ * `paramsSchema`, so the singleton check classifies them as
+ * parameterized regardless of how permissive the validator is. The
+ * heuristic survives "validators that accept everything" (test stubs).
+ *
+ * The unified descriptor list collapses the legacy `codecs:` /
+ * `parameterizedCodecs:` split — every codec id resolves through the
+ * same map (codec-registry-unification spec § Decision).
+ */
+function collectCodecDescriptors(contributors: ReadonlyArray<SqlStaticContributions>): {
+  readonly all: ReadonlyArray<AnyCodecDescriptor>;
+  readonly parameterized: Map<string, RuntimeParameterizedCodecDescriptor>;
+} {
+  const all: AnyCodecDescriptor[] = [];
+  const parameterized = new Map<string, RuntimeParameterizedCodecDescriptor>();
+  const seen = new Set<string>();
 
   for (const contributor of contributors) {
-    for (const descriptor of contributor.parameterizedCodecs()) {
-      if (descriptors.has(descriptor.codecId)) {
+    for (const descriptor of contributor.codecs()) {
+      if (seen.has(descriptor.codecId)) {
         throw runtimeError(
-          'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
-          `Duplicate parameterized codec descriptor for codecId '${descriptor.codecId}'.`,
+          'RUNTIME.DUPLICATE_CODEC',
+          `Duplicate codec descriptor for codecId '${descriptor.codecId}'.`,
           { codecId: descriptor.codecId },
         );
       }
-      descriptors.set(descriptor.codecId, descriptor);
+      seen.add(descriptor.codecId);
+      all.push(descriptor);
+
+      if (descriptor.paramsSchema !== voidParamsSchema) {
+        // The descriptor authored its own params schema → parameterized.
+        // Cast widens the descriptor's heterogeneous `P` to the runtime
+        // alias surface; consumers narrow per codec id at the dispatch
+        // site, where the descriptor's own `paramsSchema` validates
+        // JSON-sourced params before the factory ever sees them.
+        parameterized.set(
+          descriptor.codecId,
+          descriptor as unknown as RuntimeParameterizedCodecDescriptor,
+        );
+      }
     }
   }
 
-  return descriptors;
+  return { all, parameterized };
 }
 
 /**
- * Build the unified descriptor map. Combines parameterized descriptors
- * (which already ship as `CodecDescriptor`s) with synthesized descriptors
- * for non-parameterized codecs registered through the legacy `codecs:`
- * slot. Codec ids that ship a parameterized descriptor take precedence —
- * even when the legacy registry registers a representative codec under
- * the same id, the parameterized descriptor is the authoritative source.
+ * Build the unified descriptor map. Every codec contributor ships
+ * native {@link CodecDescriptor}s through the unified `codecs:` slot
+ * (TML-2357 M2 Phase A), so the registry construction is now a pure
+ * indexing pass — no synthesis, no parameterized-vs-not branching.
  *
  * Codec-registry-unification spec § Decision: every codec resolves
  * through one descriptor map; reads are non-branching.
  */
 function buildCodecDescriptorRegistry(
-  codecRegistry: CodecRegistry,
-  parameterizedDescriptors: Map<string, RuntimeParameterizedCodecDescriptor>,
+  allDescriptors: ReadonlyArray<AnyCodecDescriptor>,
 ): CodecDescriptorRegistry {
   type AnyDescriptor = CodecDescriptor<unknown>;
   const byId = new Map<string, AnyDescriptor>();
   const byTargetType = new Map<string, Array<AnyDescriptor>>();
 
-  function registerInIndices(descriptor: AnyDescriptor): void {
-    byId.set(descriptor.codecId, descriptor);
+  // The descriptor map is heterogeneous in `P` — each codec id has its
+  // own params shape. The public `CodecDescriptorRegistry` interface
+  // widens to `CodecDescriptor<unknown>` and consumers narrow per codec
+  // id at the call site (the descriptor's `paramsSchema` validates
+  // JSON-sourced params before the factory ever sees them, so the
+  // runtime narrow is safe). The cast at registration goes through
+  // `unknown` because `CodecDescriptor<P>` is invariant in `P` (the
+  // `factory` and `renderOutputType` slots use `P` contravariantly).
+  for (const descriptor of allDescriptors) {
+    const widened = descriptor as unknown as AnyDescriptor;
+    byId.set(descriptor.codecId, widened);
     for (const targetType of descriptor.targetTypes) {
       const list = byTargetType.get(targetType);
       if (list) {
-        list.push(descriptor);
+        list.push(widened);
       } else {
-        byTargetType.set(targetType, [descriptor]);
+        byTargetType.set(targetType, [widened]);
       }
     }
-  }
-
-  // The descriptor map is heterogeneous in `P` — each codec id has its own
-  // params shape. The public `CodecDescriptorRegistry` interface widens to
-  // `CodecDescriptor<unknown>` and consumers narrow per codec id at the
-  // call site (the descriptor's `paramsSchema` validates JSON-sourced
-  // params before the factory ever sees them, so the runtime narrow is
-  // safe). The cast at registration goes through `unknown` because
-  // `CodecDescriptor<P>` is invariant in `P` (the `factory` and
-  // `renderOutputType` slots use `P` contravariantly).
-  for (const descriptor of parameterizedDescriptors.values()) {
-    registerInIndices(descriptor as unknown as AnyDescriptor);
-  }
-
-  for (const codec of codecRegistry.values()) {
-    if (byId.has(codec.id)) continue;
-    // The framework `Codec` instance no longer carries codec-id-keyed
-    // static metadata (`traits`, `targetTypes`, `meta`); the SQL `Codec`
-    // extension still surfaces them as a transitional compatibility
-    // shape (see `@prisma-next/sql-relational-core/ast` § Codec). Thread
-    // the SQL-side values explicitly into the synthesis bridge so the
-    // resulting descriptor exposes the same metadata it did when the
-    // bridge read them off the codec instance directly. Both ends of
-    // this plumbing retire alongside the synthesis bridge in TML-2357 M2.
-    const descriptor = synthesizeNonParameterizedDescriptor(codec, {
-      traits: codec.traits ?? [],
-      targetTypes: codec.targetTypes ?? [],
-      ...(codec.meta !== undefined ? { meta: codec.meta } : {}),
-    });
-    registerInIndices(descriptor as unknown as AnyDescriptor);
   }
 
   return {
@@ -536,27 +549,21 @@ function buildContractCodecRegistry(
           }
         } else if (!isParameterized) {
           // Non-parameterized column. Cache the resolved codec by codec
-          // id — the synthesized descriptor's factory is constant for
-          // non-parameterized codecs, so columns sharing this codec id
-          // share one resolved instance.
+          // id — non-parameterized descriptors' factories are constant
+          // (every call returns the same shared codec instance), so
+          // columns sharing this codec id share one resolved instance.
           let cached = byCodecId.get(column.codecId);
           if (!cached) {
             const ctx: SqlCodecInstanceContext = {
               name: `<shared:${column.codecId}>`,
               usedAt: [{ table: tableName, column: columnName }],
             };
-            // `synthesizeNonParameterizedDescriptor` produces a
-            // `CodecDescriptor<void>` whose factory ignores its params
-            // and ctx; the runtime's `void` value is `undefined`. The
-            // structural cast goes through `unknown` to satisfy the
-            // heterogeneous-`P` registry boundary (the factory's
-            // declared `P` is `any` here; the consumer narrows per
-            // codec id). The cast narrows the descriptor's
-            // family-agnostic `CodecInstanceContext` slot to the SQL
+            // The descriptor's `P` is `void` for non-parameterized
+            // codecs; the runtime's `void` value is `undefined`. The
+            // cast narrows the descriptor's family-agnostic
+            // `CodecInstanceContext` slot to the SQL
             // `SqlCodecInstanceContext` we pass at this call site —
-            // function-argument contravariance makes the narrow safe
-            // (a callee that accepts the base will also accept the
-            // SQL extension). Per spec § Non-functional constraints.
+            // function-argument contravariance makes the narrow safe.
             const voidFactory = descriptor.factory as unknown as (
               params: undefined,
             ) => (ctx: SqlCodecInstanceContext) => Codec;
@@ -816,17 +823,48 @@ export function createExecutionContext<
 
   assertExecutionStackContractRequirements(contract, stack);
 
-  const codecRegistry = createCodecRegistry();
-
   const contributors: Array<SqlStaticContributions & ComponentDescriptor<string>> = [
     stack.target,
     stack.adapter,
     ...stack.extensionPacks,
   ];
 
-  for (const contributor of contributors) {
-    for (const c of contributor.codecs().values()) {
-      codecRegistry.register(c);
+  const { all: allCodecDescriptors, parameterized: parameterizedCodecDescriptors } =
+    collectCodecDescriptors(contributors);
+
+  // Materialize the legacy `CodecRegistry` view by calling
+  // `descriptor.factory(undefined)(ctx)` once per descriptor. For non-
+  // parameterized descriptors the factory is constant — every call
+  // yields the same shared codec. For parameterized descriptors whose
+  // factory tolerates `undefined` (pgvector's factory ignores its
+  // params and returns the same shared codec), the materialization
+  // produces a representative codec instance the legacy `forCodecId`
+  // fallback can hand out for refs-less call sites (the AC-5 carve-out
+  // path for parameter encoding); descriptors whose factory needs real
+  // params (arktype-json) raise — skip them and let the per-column
+  // dispatch path handle materialization lazily. The registry stops
+  // serving as a contributor protocol return type under TML-2357 M2
+  // Phase A; only its runtime context role remains.
+  const codecRegistry = createCodecRegistry();
+  for (const descriptor of allCodecDescriptors) {
+    const ctx: SqlCodecInstanceContext = {
+      name: `<shared:${descriptor.codecId}>`,
+      usedAt: [],
+    };
+    // The descriptor's `P` is heterogeneous; for non-parameterized
+    // descriptors it's `void` and runtime value is `undefined`, for
+    // parameterized descriptors `undefined` may be tolerated (pgvector)
+    // or raise (arktype-json — needs `jsonIr`). The cast narrows the
+    // family-agnostic `CodecInstanceContext` to the SQL extension
+    // supplied at this call site (contravariant input narrow is safe).
+    const factory = descriptor.factory as unknown as (
+      params: unknown,
+    ) => (ctx: SqlCodecInstanceContext) => Codec;
+    try {
+      codecRegistry.register(factory(undefined)(ctx));
+    } catch {
+      // Parameterized descriptor whose factory needs real params; skip
+      // here and let the per-column dispatch path materialize lazily.
     }
   }
 
@@ -837,11 +875,7 @@ export function createExecutionContext<
     }
   }
 
-  const parameterizedCodecDescriptors = collectParameterizedCodecDescriptors(contributors);
-  const codecDescriptors = buildCodecDescriptorRegistry(
-    codecRegistry,
-    parameterizedCodecDescriptors,
-  );
+  const codecDescriptors = buildCodecDescriptorRegistry(allCodecDescriptors);
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
   assertMutationDefaultGeneratorsAvailable(contract, mutationDefaultGeneratorRegistry);
 

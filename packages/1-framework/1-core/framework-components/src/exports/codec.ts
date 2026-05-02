@@ -1,4 +1,5 @@
 export type {
+  AnyCodecDescriptor,
   Codec,
   CodecCallContext,
   CodecDescriptor,
@@ -6,11 +7,5 @@ export type {
   CodecLookup,
   CodecMeta,
   CodecTrait,
-  NonParameterizedDescriptorMeta,
 } from '../shared/codec-types';
-export {
-  aliasDescriptor,
-  emptyCodecLookup,
-  synthesizeNonParameterizedDescriptor,
-  voidParamsSchema,
-} from '../shared/codec-types';
+export { aliasDescriptor, emptyCodecLookup, voidParamsSchema } from '../shared/codec-types';

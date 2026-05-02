@@ -150,10 +150,11 @@ export interface CodecMeta {
  * {@link BaseCodec} no longer carries them — they live on the unified
  * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}
  * as the codec-id-keyed source of truth. The instance-side fields stay
- * here in M1 so the legacy `CodecRegistry` registration slot keeps
- * working and `synthesizeNonParameterizedDescriptor` can thread them
- * into descriptors at context-construction. Deletes alongside the
- * synthesis bridge in TML-2357 M2.
+ * as a transitional surface that the legacy `codec()` factory still
+ * emits on resolved instances; consumers of those fields (e.g.
+ * `CodecLookup` assembly in `framework-components/control-stack`) read
+ * them through a structural narrow until the family-extension narrow
+ * lands in TML-2357 M2 Phase B.
  *
  * Note: `meta`, `paramsSchema`, and `init` are the legacy adapter-level
  * slots mirrored from {@link CodecParamsDescriptor}. The runtime
@@ -771,6 +772,17 @@ export function codecDescriptor<
   const buildSqlCodec = (): Codec<Id, TTraits, TWire, TInput> =>
     ({
       id: spec.codecId,
+      // SQL family extension still surfaces these legacy fields on the
+      // codec instance until M2 Phase B narrows the SQL `Codec`. Attach
+      // them so consumers like `extractCodecLookup` (which reads
+      // `targetTypes` / `meta` / `renderOutputType` off codec instances)
+      // see the same shape they get from the legacy `codec()` factory.
+      // Phase B retires this attachment alongside the family-extension
+      // narrow.
+      traits,
+      targetTypes: spec.targetTypes,
+      ...(spec.meta !== undefined ? { meta: spec.meta } : {}),
+      ...(spec.renderOutputType !== undefined ? { renderOutputType: spec.renderOutputType } : {}),
       encode: (value, ctx) => {
         try {
           return Promise.resolve(userEncode(value, ctx));

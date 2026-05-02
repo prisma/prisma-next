@@ -3,7 +3,6 @@ import {
   extractCodecTypeImports,
   extractOperationTypeImports,
 } from '@prisma-next/family-sql/test-utils';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 
@@ -52,14 +51,14 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('descriptor provides codecs', () => {
-    const codecs = pgvector.codecs();
-    expect(codecs).toBeDefined();
+  it('descriptor contributes the pg/vector@1 codec descriptor', () => {
+    const descriptors = pgvector.codecs();
+    expect(descriptors).toBeDefined();
 
-    const vectorCodec = codecs.get('pg/vector@1');
-    expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.id).toBe('pg/vector@1');
-    expect(vectorCodec?.targetTypes).toEqual(['vector']);
+    const vectorDescriptor = descriptors.find((d) => d.codecId === 'pg/vector@1');
+    expect(vectorDescriptor).toBeDefined();
+    expect(vectorDescriptor?.codecId).toBe('pg/vector@1');
+    expect(vectorDescriptor?.targetTypes).toEqual(['vector']);
   });
 
   it('descriptor provides query operations', () => {
@@ -74,17 +73,12 @@ describe('pgvector extension pack integration', () => {
     expect(cosineSimilarityOp).toBeDefined();
   });
 
-  it('codecs can be registered in registry', { timeout: 1_000 }, () => {
-    const codecs = pgvector.codecs();
-    expect(codecs).toBeDefined();
+  it('descriptor materializes a runtime codec when factory is called', { timeout: 1_000 }, () => {
+    const descriptors = pgvector.codecs();
+    const vectorDescriptor = descriptors.find((d) => d.codecId === 'pg/vector@1');
+    expect(vectorDescriptor).toBeDefined();
 
-    const registry = createCodecRegistry();
-    for (const codec of codecs.values()) {
-      registry.register(codec);
-    }
-
-    const vectorCodec = registry.get('pg/vector@1');
-    expect(vectorCodec).toBeDefined();
-    expect(vectorCodec?.id).toBe('pg/vector@1');
+    const codec = vectorDescriptor!.factory({ length: 3 })({ name: '<test>' });
+    expect(codec.id).toBe('pg/vector@1');
   });
 });

@@ -1,9 +1,13 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { describe, expect, it } from 'vitest';
 import type {
@@ -46,27 +50,23 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
     (params) => (_ctx) =>
       makeVectorCodec({ length: params.length });
 
-  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
-    {
-      codecId: 'pg/vector@1',
-      traits: ['equality'],
-      targetTypes: ['vector'],
-      paramsSchema: {
-        '~standard': {
-          version: 1,
-          vendor: 'test',
-          validate: (value) => ({ value: value as { length: number } }),
-        },
+  const vectorDescriptor: RuntimeParameterizedCodecDescriptor<{ length: number }> = {
+    codecId: 'pg/vector@1',
+    traits: ['equality'],
+    targetTypes: ['vector'],
+    paramsSchema: {
+      '~standard': {
+        version: 1,
+        vendor: 'test',
+        validate: (value) => ({ value: value as { length: number } }),
       },
-      factory,
     },
-  ];
+    factory,
+  };
 
-  // The legacy `codecs:` registration carries a representative codec used
-  // as the codec-id fallback. Production parameterized descriptors ship
-  // the same shape today.
-  const registry = createCodecRegistry();
-  registry.register(makeVectorCodec());
+  const descriptors: ReadonlyArray<CodecDescriptor> = [
+    vectorDescriptor as unknown as CodecDescriptor,
+  ];
 
   return {
     kind: 'extension' as const,
@@ -74,8 +74,7 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => parameterizedCodecs,
+    codecs: () => descriptors,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },
@@ -83,17 +82,22 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
 }
 
 function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgres'> {
-  const registry = createCodecRegistry();
   // Custom codec id avoids colliding with the default test target
   // descriptor's pre-registered codecs (`pg/text@1`, etc.).
-  registry.register(
-    codec({
-      typeId: 'test/scalar@1',
-      targetTypes: ['scalar'],
-      encode: (v: string) => v,
-      decode: (w: string) => w,
-    }),
-  );
+  const scalarCodec = codec({
+    typeId: 'test/scalar@1',
+    targetTypes: ['scalar'],
+    encode: (v: string) => v,
+    decode: (w: string) => w,
+  });
+
+  const scalarDescriptor: CodecDescriptor = {
+    codecId: 'test/scalar@1',
+    traits: [],
+    targetTypes: ['scalar'],
+    paramsSchema: voidParamsSchema,
+    factory: () => () => scalarCodec,
+  };
 
   return {
     kind: 'extension' as const,
@@ -101,8 +105,7 @@ function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescrip
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => registry,
-    parameterizedCodecs: () => [],
+    codecs: () => [scalarDescriptor],
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },

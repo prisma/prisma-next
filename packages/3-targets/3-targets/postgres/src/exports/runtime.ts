@@ -1,8 +1,8 @@
+import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   RuntimeTargetDescriptor,
   RuntimeTargetInstance,
 } from '@prisma-next/framework-components/execution';
-import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { postgresTargetDescriptorMeta } from '../core/descriptor-meta';
 
 export interface PostgresRuntimeTargetInstance extends RuntimeTargetInstance<'sql', 'postgres'> {}
@@ -13,20 +13,22 @@ export interface PostgresRuntimeTargetInstance extends RuntimeTargetInstance<'sq
  * residence and must not pull the SQL execution-plane package into its
  * dependency closure. The runtime descriptor here is shaped to satisfy the
  * framework's `RuntimeTargetDescriptor` plus the structural
- * `SqlStaticContributions` (`codecs`, `parameterizedCodecs`) that
+ * `SqlStaticContributions` (`codecs:` returning a descriptor list) that
  * `@prisma-next/sql-runtime` consumers narrow to at composition time.
+ *
+ * The target itself contributes no codecs — postgres-specific codecs ship
+ * from the postgres adapter and from extension packs (pgvector,
+ * arktype-json, etc.).
  */
 const postgresRuntimeTargetDescriptor: RuntimeTargetDescriptor<
   'sql',
   'postgres',
   PostgresRuntimeTargetInstance
 > & {
-  readonly codecs: () => ReturnType<typeof createCodecRegistry>;
-  readonly parameterizedCodecs: () => readonly never[];
+  readonly codecs: () => readonly AnyCodecDescriptor[];
 } = {
   ...postgresTargetDescriptorMeta,
-  codecs: () => createCodecRegistry(),
-  parameterizedCodecs: () => [],
+  codecs: () => [],
   create(): PostgresRuntimeTargetInstance {
     return {
       familyId: 'sql',

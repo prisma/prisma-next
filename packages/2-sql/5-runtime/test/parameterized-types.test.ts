@@ -1,9 +1,12 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
+import type {
+  CodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
-import { codec, createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { codec } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
@@ -130,18 +133,13 @@ describe('parameterized types', () => {
           factory: (_params) => (_ctx) => sharedCodec,
         },
       ];
-
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
-
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return {
             familyId: 'sql' as const,
@@ -257,16 +255,13 @@ describe('parameterized types', () => {
           factory,
         },
       ];
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -378,16 +373,13 @@ describe('parameterized types', () => {
           factory: (_params) => () => sharedCodec,
         },
       ];
-      const registry = createCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => registry,
-        parameterizedCodecs: () => parameterizedCodecs,
+        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -450,7 +442,7 @@ describe('parameterized types', () => {
   });
 
   describe('duplicate codec descriptor detection', () => {
-    it('throws RUNTIME.DUPLICATE_PARAMETERIZED_CODEC when multiple extensions provide same codecId', () => {
+    it('throws RUNTIME.DUPLICATE_CODEC when multiple extensions provide same codecId', () => {
       const vectorParamsSchema = arktype({
         length: 'number',
       });
@@ -473,8 +465,7 @@ describe('parameterized types', () => {
           version: '0.0.1',
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
-          codecs: () => createCodecRegistry(),
-          parameterizedCodecs: () => parameterizedCodecs,
+          codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
           create() {
             return {
               familyId: 'sql' as const,
@@ -492,7 +483,7 @@ describe('parameterized types', () => {
         }),
       ).toThrow(
         expect.objectContaining({
-          code: 'RUNTIME.DUPLICATE_PARAMETERIZED_CODEC',
+          code: 'RUNTIME.DUPLICATE_CODEC',
           category: 'RUNTIME',
           severity: 'error',
           details: {
