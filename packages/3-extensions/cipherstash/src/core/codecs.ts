@@ -26,9 +26,57 @@ import type { CipherstashSdk } from './sdk';
 
 export const CIPHERSTASH_STRING_CODEC_ID = 'cipherstash/string@1' as const;
 
-const CIPHERSTASH_STRING_TARGET_TYPE = 'eql_v2_encrypted' as const;
+export const CIPHERSTASH_STRING_TARGET_TYPE = 'eql_v2_encrypted' as const;
 
 const CIPHERSTASH_STRING_TRAITS = ['equality'] as const;
+
+/**
+ * SDK-free codec used in pack-meta (`cipherstashPackMeta.types.codecTypes
+ * .codecInstances`). The framework's lookup machinery only reads codec
+ * *metadata* (`typeId`, `targetTypes`, `traits`, `renderOutputType`) from
+ * pack-meta codec instances; encode/decode never fire on a pack-meta
+ * codec because the SQL runtime always resolves codecs through the
+ * SDK-bound runtime descriptor instead.
+ *
+ * Encode/decode throw with a clear message in the misuse case so it's
+ * obvious the runtime descriptor wasn't wired up.
+ */
+export const cipherstashStringCodecMetadata = codec({
+  typeId: CIPHERSTASH_STRING_CODEC_ID,
+  targetTypes: [CIPHERSTASH_STRING_TARGET_TYPE],
+  traits: CIPHERSTASH_STRING_TRAITS,
+  renderOutputType: () => 'EncryptedString',
+  encode: () => {
+    throw new Error(
+      'cipherstash codec: encode called on the pack-meta metadata codec. ' +
+        'Construct a runtime descriptor with `createCipherstashRuntimeDescriptor({ sdk })` and use that instead.',
+    );
+  },
+  decode: () => {
+    throw new Error(
+      'cipherstash codec: decode called on the pack-meta metadata codec. ' +
+        'Construct a runtime descriptor with `createCipherstashRuntimeDescriptor({ sdk })` and use that instead.',
+    );
+  },
+  encodeJson: (value) => {
+    void value;
+    return { $encryptedString: '<opaque>' };
+  },
+  decodeJson: () => {
+    throw new Error(
+      'cipherstash codec: decodeJson is not supported; envelopes do not round-trip through JSON.',
+    );
+  },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: CIPHERSTASH_STRING_TARGET_TYPE,
+        },
+      },
+    },
+  },
+});
 
 /**
  * Construct the cipherstash storage codec, capturing the `sdk`

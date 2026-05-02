@@ -2331,6 +2331,12 @@ importers:
         specifier: 'catalog:'
         version: 2.1.29
     devDependencies:
+      '@prisma-next/psl-parser':
+        specifier: workspace:*
+        version: link:../../1-framework/2-authoring/psl-parser
+      '@prisma-next/sql-contract-psl':
+        specifier: workspace:*
+        version: link:../../2-sql/2-authoring/contract-psl
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils

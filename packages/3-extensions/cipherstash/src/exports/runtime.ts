@@ -14,11 +14,11 @@
 import { createCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
 import { createCipherstashStringCodec } from '../core/codecs';
+import { CIPHERSTASH_EXTENSION_ID, CIPHERSTASH_EXTENSION_VERSION } from '../core/descriptor-meta';
 import { createParameterizedCodecDescriptors } from '../core/parameterized';
 import type { CipherstashSdk } from '../core/sdk';
 
-export const CIPHERSTASH_EXTENSION_ID = 'cipherstash' as const;
-export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
+export { CIPHERSTASH_EXTENSION_ID, CIPHERSTASH_EXTENSION_VERSION };
 
 export interface CreateCipherstashRuntimeDescriptorOptions {
   readonly sdk: CipherstashSdk;

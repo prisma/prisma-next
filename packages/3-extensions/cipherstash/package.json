@@ -22,6 +22,8 @@
     "arktype": "catalog:"
   },
   "devDependencies": {
+    "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/test-utils": "workspace:*",
     "@prisma-next/tsconfig": "workspace:*",
     "@prisma-next/tsdown": "workspace:*",
@@ -38,6 +40,7 @@
     "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./middleware": "./dist/middleware.mjs",
+    "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },

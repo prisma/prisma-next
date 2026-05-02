@@ -1,15 +1,15 @@
 /**
  * SQL control extension descriptor for cipherstash.
  *
- * Mirrors `packages/3-extensions/pgvector/src/exports/control.ts` —
- * `databaseDependencies.init` declares the EQL extension install so
- * the framework's `dbInit` runs the bundle (idempotent via the
- * precheck) before any cipherstash-bound migration executes.
+ * Spreads `cipherstashPackMeta` (authoring contributions, capabilities,
+ * storage type registration, codec metadata) and adds the
+ * `databaseDependencies.init` block that installs the EQL Postgres
+ * extension before any cipherstash-bound migration executes.
  *
  * **AC-INSTALL1** is satisfied at the *shape* level in M2.a; the
  * placeholder install SQL points at the M2.c bundle vendor task.
  * **AC-INSTALL2** (live-Postgres `dbInit` succeeds) and
- * **AC-INSTALL3** (idempotency) require the real bundle and live a
+ * **AC-INSTALL3** (idempotency) require the real bundle and a live
  * Postgres harness — both deferred to M2.c.
  */
 
@@ -17,10 +17,8 @@ import type {
   ComponentDatabaseDependencies,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
+import { cipherstashPackMeta } from '../core/descriptor-meta';
 import { EQL_INSTALL_SQL } from '../core/eql-bundle';
-
-export const CIPHERSTASH_EXTENSION_ID = 'cipherstash' as const;
-export const CIPHERSTASH_EXTENSION_VERSION = '0.0.1' as const;
 
 const cipherstashDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   init: [
@@ -60,11 +58,7 @@ const cipherstashDatabaseDependencies: ComponentDatabaseDependencies<unknown> = 
 };
 
 export const cipherstashControlDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
-  kind: 'extension' as const,
-  id: CIPHERSTASH_EXTENSION_ID,
-  version: CIPHERSTASH_EXTENSION_VERSION,
-  familyId: 'sql' as const,
-  targetId: 'postgres' as const,
+  ...cipherstashPackMeta,
   databaseDependencies: cipherstashDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
