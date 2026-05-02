@@ -1,4 +1,3 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { parsePslDocument } from '@prisma-next/psl-parser';
 import { interpretPslDocumentToSqlContract } from '@prisma-next/sql-contract-psl';
 import { describe, expect, it } from 'vitest';
@@ -20,20 +19,10 @@ const postgresScalarTypeDescriptors = new Map([
   ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
 ]);
 
-const targetTypesByCodecId: Record<string, readonly string[]> = {
-  'pg/text@1': ['text'],
-  'pg/bool@1': ['bool'],
-  'pg/int4@1': ['int4'],
-  'cipherstash/string@1': ['eql_v2_encrypted'],
-};
-
-const codecLookup: CodecLookup = {
-  get: (id: string) => {
-    const targetTypes = targetTypesByCodecId[id];
-    if (!targetTypes) return undefined;
-    return { id, targetTypes } as ReturnType<CodecLookup['get']>;
-  },
-};
+interface NarrowedStorage {
+  readonly tables: Record<string, { readonly columns: Record<string, Record<string, unknown>> }>;
+  readonly types?: Record<string, Record<string, unknown>>;
+}
 
 function interpret(schema: string) {
   return interpretPslDocumentToSqlContract({
@@ -42,8 +31,20 @@ function interpret(schema: string) {
     scalarTypeDescriptors: postgresScalarTypeDescriptors,
     composedExtensionPacks: [cipherstashControl.id],
     authoringContributions: { type: cipherstashPack.authoring.type, field: {} },
-    codecLookup,
   });
+}
+
+function narrowStorage(value: { storage: unknown }): NarrowedStorage {
+  // Test-only narrowing: the IR's StorageBase is intentionally weak so
+  // family adapters can specialise it; for these tests we know we're
+  // working with the SQL family's tables/types projection.
+  return value.storage as unknown as NarrowedStorage;
+}
+
+function userColumns(value: { storage: unknown }, name: string): Record<string, unknown> {
+  const col = narrowStorage(value).tables['user']?.columns[name];
+  if (!col) throw new Error(`expected user.${name} column`);
+  return col;
 }
 
 describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
@@ -55,7 +56,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.tables['user']?.columns['email']).toMatchObject({
+    expect(userColumns(result.value, 'email')).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, freeTextSearch: true },
@@ -71,7 +72,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.tables['user']?.columns['notes']).toMatchObject({
+    expect(userColumns(result.value, 'notes')).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: false, freeTextSearch: false },
@@ -87,7 +88,7 @@ describe('PSL interpretation: cipherstash.EncryptedString constructor', () => {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.tables['user']?.columns['username']).toMatchObject({
+    expect(userColumns(result.value, 'username')).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, freeTextSearch: false },
@@ -143,12 +144,13 @@ model User {
 `);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.value.storage.types?.SearchableEmail).toMatchObject({
+    const storage = narrowStorage(result.value);
+    expect(storage.types?.['SearchableEmail']).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       typeParams: { equality: true, freeTextSearch: false },
     });
-    expect(result.value.storage.tables['user']?.columns['email']).toMatchObject({
+    expect(userColumns(result.value, 'email')).toMatchObject({
       codecId: 'cipherstash/string@1',
       nativeType: 'eql_v2_encrypted',
       nullable: false,
@@ -175,11 +177,9 @@ model User {
     expect(inlineResult.ok).toBe(true);
     if (!aliasResult.ok || !inlineResult.ok) return;
 
-    const aliasNamedType = aliasResult.value.storage.types?.SearchableEmail;
-    const inlineCol = inlineResult.value.storage.tables['user']?.columns['email'] as Record<
-      string,
-      unknown
-    >;
+    const aliasStorage = narrowStorage(aliasResult.value);
+    const aliasNamedType = aliasStorage.types?.['SearchableEmail'];
+    const inlineCol = userColumns(inlineResult.value, 'email');
 
     // The named type's storage descriptor and the inline column's
     // codec/nativeType/typeParams must agree byte-for-byte; the inline
