@@ -11,11 +11,11 @@ Codec query-time methods (`encode`, `decode`) gain an optional second argument: 
 A codec author shipping an encrypted-JSON column type with cancellation and column-aware envelopes:
 
 ```ts
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import { defineCodec } from '@prisma-next/sql-relational-core/ast';
 import { encryptClient } from './encrypt-client';
 
 const encryptedJson = defineCodec({
-  typeId: 'encrypted/json@1',
+  codecId: 'encrypted/json@1',
   targetTypes: ['jsonb'],
 
   // Single-arg authors continue to compile and run unchanged.

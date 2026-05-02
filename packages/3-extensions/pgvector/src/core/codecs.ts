@@ -73,7 +73,7 @@ export const pgVectorDescriptor = defineCodec<
 
 // ---------------------------------------------------------------------------
 // Scalar-keyed views derived from the descriptor source-of-truth.
-// `codecDefinitions[k].codec` materializes the runtime `Codec` instance via
+// `byScalar[k].codec` materializes the runtime `Codec` instance via
 // the descriptor's `factory`; encode/decode do not depend on params, so a
 // shared (no-params) materialization is sufficient for the registry-style
 // runtime path.

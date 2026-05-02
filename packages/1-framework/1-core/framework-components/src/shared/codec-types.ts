@@ -286,7 +286,7 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
  * factory, then rewrites `id` on the resolved codec so per-instance
  * decode-error envelopes report the alias id.
  *
- * Replaces the legacy `aliasCodec` helper (TML-2357 T2.1) — composes at
+ * Composes at
  * the descriptor level rather than the codec-instance level so a single
  * registration slot ships the alias.
  *

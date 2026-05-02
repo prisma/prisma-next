@@ -31,7 +31,7 @@ import { RuntimeCore, runWithMiddleware, type RuntimeMiddleware } from '@prisma-
 
 The base `Codec` interface lands on the seam between **query-time** methods (per-row, IO-relevant) and **build-time** methods (per-contract-load):
 
-- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`mkCodec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
+- Query-time: `encode(value): Promise<TWire>` and `decode(wire): Promise<TInput>` are required and **Promise-returning at the public boundary**, regardless of whether the codec body is synchronous or asynchronous. Family factories (`defineCodec()` for SQL, `mongoCodec()` for Mongo) accept either sync or async author functions and lift sync ones to Promise-shaped methods, so authors write whichever shape is natural per method without annotations.
 - Build-time: `encodeJson`, `decodeJson`, and the optional `renderOutputType` are **synchronous** so `validateContract` and client construction stay synchronous.
 
 There is no `runtime` / `kind` / equivalent async marker on the interface and no `TRuntime` generic. The runtime always awaits the query-time methods. See [ADR 204 — Single-Path Async Codec Runtime](../../../../../docs/architecture%20docs/adrs/ADR%20204%20-%20Single-Path%20Async%20Codec%20Runtime.md) for the full design.
@@ -58,7 +58,7 @@ Codec authors who write `(value) => …` continue to compile via TypeScript's bi
 Family layers extend the context where they have a per-call concept that doesn't generalise. SQL declares `SqlCodecCallContext extends CodecCallContext { column?: SqlColumnRef }` (see `@prisma-next/sql-relational-core`); Mongo continues to use the framework type directly. Codec authors that take a `(value, ctx)` author signature can forward `ctx.signal` to network SDKs:
 
 ```ts
-// Sketch — actual factory lives in a family package (mkCodec() / mongoCodec()).
+// Sketch — actual factory lives in a family package (defineCodec() / mongoCodec()).
 encode: async (v: string, ctx) =>
   kms.encrypt({ plaintext: v }, { signal: ctx?.signal });
 ```

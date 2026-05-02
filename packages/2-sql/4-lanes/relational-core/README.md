@@ -93,14 +93,16 @@ flowchart TD
 
 ### Codec Factory (`ast/codec-types.ts` via `exports/ast.ts`)
 
-- `mkCodec({...})` is the SQL-side factory for constructing `Codec` values. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the constructed codec exposes Promise-returning query-time methods regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
-- Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) are synchronous and pass through unchanged.
-- This is the only public entry point for SQL codecs. There is no separate `codecSync` / `codecAsync` factory and no per-codec async marker on the resulting value.
+- `defineCodec({...})` is the SQL-side factory for constructing `CodecDescriptor`s — the canonical SQL codec authoring surface. It accepts `encode` and `decode` author functions in **either sync or async form** with no annotations; the descriptor's `factory(typeParams)(ctx)` produces a `Codec` whose query-time methods are Promise-returning regardless of which form was used. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback.
+- Build-time methods (`encodeJson`, `decodeJson`, `renderOutputType?`) live on the descriptor, are synchronous, and pass through unchanged.
+- For ad-hoc test fixtures and closure-bound codecs, the framework `buildCodec({...})` helper from `@prisma-next/framework-components/codec` produces a narrow `Codec` instance directly from `id`/`encode`/`decode`/`encodeJson?`/`decodeJson?`.
 
 ```ts
+import { defineCodec } from '@prisma-next/sql-relational-core/ast';
+
 // Sync authoring:
-const textCodec = mkCodec({
-  typeId: 'pg/text@1',
+const textDescriptor = defineCodec({
+  codecId: 'pg/text@1',
   targetTypes: ['text'],
   encode: (v: string) => v,
   decode: (w: string) => w,
@@ -109,8 +111,8 @@ const textCodec = mkCodec({
 });
 
 // Async authoring (e.g. KMS-backed encryption): same factory, same shape.
-const secretCodec = mkCodec({
-  typeId: 'pg/secret@1',
+const secretDescriptor = defineCodec({
+  codecId: 'pg/secret@1',
   targetTypes: ['text'],
   encode: async (v: string) => encrypt(v, await getKey()),
   decode: async (w: string) => decrypt(w, await getKey()),
@@ -128,8 +130,8 @@ Codecs receive a second `ctx` options argument; you may ignore it. The runtime a
 
 ```ts
 // Forward ctx.signal to a network call so aborted queries stop the SDK.
-const kmsSecretCodec = mkCodec({
-  typeId: 'pg/kms-secret@1',
+const kmsSecretDescriptor = defineCodec({
+  codecId: 'pg/kms-secret@1',
   targetTypes: ['text'],
   encode: async (v: string, ctx) =>
     kms.encrypt({ plaintext: v }, { signal: ctx?.signal }),
@@ -140,8 +142,8 @@ const kmsSecretCodec = mkCodec({
 });
 
 // Use ctx.column on decode to construct an envelope value carrying (table, name).
-const envelopeCodec = mkCodec({
-  typeId: 'pg/envelope@1',
+const envelopeDescriptor = defineCodec({
+  codecId: 'pg/envelope@1',
   targetTypes: ['text'],
   encode: async (v: string) => v,
   decode: async (w: string, ctx) => ({

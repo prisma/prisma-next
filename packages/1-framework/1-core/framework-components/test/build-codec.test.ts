@@ -71,7 +71,7 @@ describe('buildCodec', () => {
     // Type-level pin: `buildCodec` accepts only the narrow runtime shape.
     // Adding `targetTypes`, `traits`, `meta`, `paramsSchema`, `init`, or
     // `renderOutputType` must be a compile error so this helper cannot be
-    // used as a back-door for the retired `mkCodec` contributor surface.
+    // used as a back-door for a wide-spec contributor surface.
     // @ts-expect-error - targetTypes is not part of the narrow runtime shape
     buildCodec({ id: 'x@1', encode: (v) => v, decode: (w) => w, targetTypes: ['x'] });
     // @ts-expect-error - traits is not part of the narrow runtime shape
