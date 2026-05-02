@@ -338,13 +338,7 @@ export function defineCodec<
   TWire = unknown,
   TInput = unknown,
   TParams = void,
->(
-  spec: CodecDescriptorSpec<Id, TTraits, TWire, TInput, TParams>,
-): Omit<CodecDescriptor<TParams>, 'factory'> & {
-  readonly factory: (
-    params: TParams,
-  ) => (ctx: CodecInstanceContext) => Codec<Id, TTraits, TWire, TInput>;
-} {
+>(spec: CodecDescriptorSpec<Id, TTraits, TWire, TInput, TParams>): CodecDescriptor<TParams> {
   const identity = (v: unknown) => v;
   const userEncode = spec.encode;
   const userDecode = spec.decode;
@@ -378,9 +372,7 @@ export function defineCodec<
     }) as Codec<Id, TTraits, TWire, TInput>;
 
   const sharedCodec = buildSqlCodec();
-  const factory: (
-    params: TParams,
-  ) => (ctx: CodecInstanceContext) => Codec<Id, TTraits, TWire, TInput> = () => () => sharedCodec;
+  const factory: CodecDescriptor<TParams>['factory'] = () => () => sharedCodec;
 
   // `voidParamsSchema` validates `void`/`undefined` params; widen
   // through `unknown` to populate the descriptor's
