@@ -124,7 +124,7 @@ describe('parameterized types', () => {
       paramsSchema?: Type<{ length: number }>;
     }): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const descriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -139,7 +139,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return {
             familyId: 'sql' as const,
@@ -246,7 +246,7 @@ describe('parameterized types', () => {
           length: 'number',
         });
       const factory = opts?.factory ?? ((_params: { length: number }) => () => sharedCodec);
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const descriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -261,7 +261,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -332,8 +332,14 @@ describe('parameterized types', () => {
         extensionPacks: [extensionDescriptor],
       });
 
-      expect(observedCtxs[0]?.name).toBe('Vector1536');
-      expect(observedCtxs[0]?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
+      // Skip the representative-materialization call sql-context.ts
+      // makes per descriptor for the legacy `forCodecId` fallback (named
+      // `<shared:pg/vector@1>` with empty `usedAt`); locate the per-
+      // column factory call by the type-instance ctx the test contract
+      // declares.
+      const perColumnCtx = observedCtxs.find((ctx) => ctx.name === 'Vector1536');
+      expect(perColumnCtx?.name).toBe('Vector1536');
+      expect(perColumnCtx?.usedAt).toEqual([{ table: 'test', column: 'embedding' }]);
     });
 
     it('stores full type instance for codec ids without a parameterized descriptor', () => {
@@ -364,7 +370,7 @@ describe('parameterized types', () => {
   describe('column typeParams validation', () => {
     function createBasicVectorExt(): SqlRuntimeExtensionDescriptor<'postgres'> {
       const sharedCodec = vectorCodecInstance();
-      const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+      const descriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
         {
           codecId: 'pg/vector@1',
           traits: [],
@@ -379,7 +385,7 @@ describe('parameterized types', () => {
         version: '0.0.1',
         familyId: 'sql' as const,
         targetId: 'postgres' as const,
-        codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+        codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
         create() {
           return { familyId: 'sql' as const, targetId: 'postgres' as const };
         },
@@ -449,7 +455,7 @@ describe('parameterized types', () => {
 
       function createVectorExtension(id: string): SqlRuntimeExtensionDescriptor<'postgres'> {
         const sharedCodec = vectorCodecInstance();
-        const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
+        const descriptors: RuntimeParameterizedCodecDescriptor<{ length: number }>[] = [
           {
             codecId: 'pg/vector@1',
             traits: [],
@@ -465,7 +471,7 @@ describe('parameterized types', () => {
           version: '0.0.1',
           familyId: 'sql' as const,
           targetId: 'postgres' as const,
-          codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+          codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
           create() {
             return {
               familyId: 'sql' as const,

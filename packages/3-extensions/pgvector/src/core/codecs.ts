@@ -77,10 +77,9 @@ export const dataTypes = codecs.dataTypes;
 export type CodecTypes = typeof codecs.CodecTypes;
 
 // ---------------------------------------------------------------------------
-// Native CodecDescriptor for pgvector (TML-2357 T2.5). The runtime
-// extension protocol still ships the legacy `parameterizedCodecs:` slot
-// alongside; the M2 cleanup commit collapses both into a single
-// `codecs:` slot returning descriptors.
+// Native CodecDescriptor for pgvector (TML-2357 T2.5). Registered
+// through the unified `codecs:` slot — the dedicated parameterized-codec
+// slot retired in M2 Phase A.
 // ---------------------------------------------------------------------------
 
 import { codecDescriptor, defineCodecDescriptors } from '@prisma-next/sql-relational-core/ast';

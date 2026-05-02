@@ -303,7 +303,7 @@ function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {
 
 /**
  * Framework-registration descriptor for the arktype-json codec. Registered
- * through the SQL runtime's `parameterizedCodecs:` slot. `sql-runtime`'s
+ * through the SQL runtime's unified `codecs:` slot. `sql-runtime`'s
  * `initializeTypeHelpers` (and per-column walk in
  * `buildContractCodecRegistry`) calls `arktypeJsonCodec.factory(typeParams)
  * (ctx)` once per `storage.types` instance (or once per inline-typeParams

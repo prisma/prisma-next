@@ -203,7 +203,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     },
   });
 
-  const parameterizedCodecs: RuntimeParameterizedCodecDescriptor<Record<string, unknown>>[] = [
+  const descriptors: RuntimeParameterizedCodecDescriptor<Record<string, unknown>>[] = [
     buildJsonDescriptor('pg/json@1', baseJson, 'json'),
     buildJsonDescriptor('pg/jsonb@1', baseJsonb, 'jsonb'),
   ];
@@ -214,7 +214,7 @@ function createJsonbExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgr
     version: '0.0.1',
     familyId: 'sql' as const,
     targetId: 'postgres' as const,
-    codecs: () => parameterizedCodecs as unknown as ReadonlyArray<CodecDescriptor>,
+    codecs: () => descriptors as unknown as ReadonlyArray<CodecDescriptor>,
     create() {
       return { familyId: 'sql' as const, targetId: 'postgres' as const };
     },

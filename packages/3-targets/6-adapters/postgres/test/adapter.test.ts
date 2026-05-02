@@ -310,8 +310,8 @@ describe('Postgres adapter', () => {
     // M2 Phase A unified the contributor protocol: every codec descriptor
     // (parameterized or not) flows through the runtime descriptor's
     // `codecs:` slot. The adapter class itself no longer carries a
-    // `parameterizedCodecs()` accessor — descriptor metadata lives on
-    // the runtime descriptor exported by the package.
+    // dedicated parameterized-codec accessor — descriptor metadata lives
+    // on the runtime descriptor exported by the package.
     const runtimeMod = await import('../src/exports/runtime');
     const descriptors = runtimeMod.default.codecs();
     expect(descriptors.length).toBeGreaterThan(0);

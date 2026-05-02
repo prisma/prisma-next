@@ -13,7 +13,7 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import { aliasDescriptor } from '@prisma-next/framework-components/codec';
-import type { Codec, CodecMeta, CodecTrait } from '@prisma-next/sql-relational-core/ast';
+import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import {
   codec,
   codecDescriptor,
@@ -27,7 +27,6 @@ import {
   sqlTimestampDescriptor,
   sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
-import { ifDefined } from '@prisma-next/utils/defined';
 import { type as arktype } from 'arktype';
 import {
   PG_BIT_CODEC_ID,
@@ -106,36 +105,6 @@ function renderPrecision(typeName: string, typeParams: Record<string, unknown>):
 // through to the generic `CodecTypes['pg/jsonb@1']['output']` accessor
 // (which resolves to `JsonValue` via the codec-types map).
 
-function aliasCodec<
-  Id extends string,
-  TTraits extends readonly CodecTrait[],
-  TWire,
-  TJs,
-  TParams,
-  THelper,
->(
-  base: Codec<string, TTraits, TWire, TJs, TParams, THelper>,
-  options: {
-    readonly typeId: Id;
-    readonly targetTypes: readonly string[];
-    readonly meta?: CodecMeta;
-  },
-): Codec<Id, TTraits, TWire, TJs, TParams, THelper> {
-  return {
-    id: options.typeId,
-    targetTypes: options.targetTypes,
-    ...ifDefined('meta', options.meta),
-    ...ifDefined('paramsSchema', base.paramsSchema),
-    ...ifDefined('init', base.init),
-    ...ifDefined('encode', base.encode),
-    ...ifDefined('traits', base.traits),
-    ...ifDefined('renderOutputType', base.renderOutputType),
-    decode: base.decode,
-    encodeJson: base.encodeJson,
-    decodeJson: base.decodeJson,
-  } as Codec<Id, TTraits, TWire, TJs, TParams, THelper>;
-}
-
 const sqlCharCodec = sqlCodecDefinitions.char.codec;
 const sqlVarcharCodec = sqlCodecDefinitions.varchar.codec;
 const sqlIntCodec = sqlCodecDefinitions.int.codec;
@@ -161,8 +130,9 @@ const pgTextCodec = codec({
   },
 });
 
-const pgCharCodec = aliasCodec(sqlCharCodec, {
-  typeId: PG_CHAR_CODEC_ID,
+const pgCharCodec = {
+  ...sqlCharCodec,
+  id: PG_CHAR_CODEC_ID,
   targetTypes: ['character'],
   meta: {
     db: {
@@ -173,10 +143,11 @@ const pgCharCodec = aliasCodec(sqlCharCodec, {
       },
     },
   },
-});
+} as unknown as Codec<typeof PG_CHAR_CODEC_ID>;
 
-const pgVarcharCodec = aliasCodec(sqlVarcharCodec, {
-  typeId: PG_VARCHAR_CODEC_ID,
+const pgVarcharCodec = {
+  ...sqlVarcharCodec,
+  id: PG_VARCHAR_CODEC_ID,
   targetTypes: ['character varying'],
   meta: {
     db: {
@@ -187,10 +158,11 @@ const pgVarcharCodec = aliasCodec(sqlVarcharCodec, {
       },
     },
   },
-});
+} as unknown as Codec<typeof PG_VARCHAR_CODEC_ID>;
 
-const pgIntCodec = aliasCodec(sqlIntCodec, {
-  typeId: PG_INT_CODEC_ID,
+const pgIntCodec = {
+  ...sqlIntCodec,
+  id: PG_INT_CODEC_ID,
   targetTypes: ['int4'],
   meta: {
     db: {
@@ -201,10 +173,11 @@ const pgIntCodec = aliasCodec(sqlIntCodec, {
       },
     },
   },
-});
+} as unknown as Codec<typeof PG_INT_CODEC_ID>;
 
-const pgFloatCodec = aliasCodec(sqlFloatCodec, {
-  typeId: PG_FLOAT_CODEC_ID,
+const pgFloatCodec = {
+  ...sqlFloatCodec,
+  id: PG_FLOAT_CODEC_ID,
   targetTypes: ['float8'],
   meta: {
     db: {
@@ -215,7 +188,7 @@ const pgFloatCodec = aliasCodec(sqlFloatCodec, {
       },
     },
   },
-});
+} as unknown as Codec<typeof PG_FLOAT_CODEC_ID>;
 
 const pgInt4Codec = codec({
   typeId: PG_INT4_CODEC_ID,

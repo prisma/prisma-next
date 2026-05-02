@@ -272,9 +272,9 @@ function validateTypeParams(
  * parameterized regardless of how permissive the validator is. The
  * heuristic survives "validators that accept everything" (test stubs).
  *
- * The unified descriptor list collapses the legacy `codecs:` /
- * `parameterizedCodecs:` split — every codec id resolves through the
- * same map (codec-registry-unification spec § Decision).
+ * The unified descriptor list collapses the legacy split (a separate
+ * slot used to register parameterized codecs) — every codec id resolves
+ * through the same map (codec-registry-unification spec § Decision).
  */
 function collectCodecDescriptors(contributors: ReadonlyArray<SqlStaticContributions>): {
   readonly all: ReadonlyArray<AnyCodecDescriptor>;
