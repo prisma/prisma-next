@@ -414,7 +414,7 @@ export function defineCodec<
 // biome-ignore lint/suspicious/noExplicitAny: descriptor variance erasure — `P` is contravariant on the factory and renderOutputType slots, so heterogeneous descriptor storage cannot use `unknown`.
 export type AnyCodecDescriptor = CodecDescriptor<any>;
 
-type DescriptorResolvedCodec<D> =
+export type DescriptorResolvedCodec<D> =
   D extends CodecDescriptor<infer _P> ? ReturnType<ReturnType<D['factory']>> : never;
 
 export type DescriptorCodecId<D> = D extends AnyCodecDescriptor ? D['codecId'] : never;

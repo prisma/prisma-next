@@ -9,6 +9,7 @@ import {
   type AnyCodecDescriptor,
   type Codec,
   type DescriptorCodecInput,
+  type DescriptorResolvedCodec,
   defineCodec,
   type ExtractDescriptorCodecTypes,
 } from '@prisma-next/sql-relational-core/ast';
@@ -95,7 +96,7 @@ type PgVectorByScalar = {
   readonly [K in keyof PgVectorDescriptors]: {
     readonly typeId: PgVectorDescriptors[K]['codecId'];
     readonly scalar: K;
-    readonly codec: Codec;
+    readonly codec: DescriptorResolvedCodec<PgVectorDescriptors[K]> & Codec;
     readonly input: DescriptorCodecInput<PgVectorDescriptors[K]>;
     readonly output: DescriptorCodecInput<PgVectorDescriptors[K]>;
     readonly jsType: DescriptorCodecInput<PgVectorDescriptors[K]>;
