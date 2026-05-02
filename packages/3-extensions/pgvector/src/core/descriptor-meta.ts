@@ -7,7 +7,7 @@ import {
 } from '@prisma-next/sql-relational-core/expression';
 import type { CodecTypes } from '../types/codec-types';
 import { pgvectorAuthoringTypes } from './authoring';
-import { codecDefinitions } from './codecs';
+import { codecDescriptorList } from './codecs';
 
 const pgvectorTypeId = 'pg/vector@1' as const;
 
@@ -72,7 +72,7 @@ const pgvectorPackMetaBase = {
   },
   types: {
     codecTypes: {
-      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      codecDescriptors: codecDescriptorList,
       import: {
         package: '@prisma-next/extension-pgvector/codec-types',
         named: 'CodecTypes',

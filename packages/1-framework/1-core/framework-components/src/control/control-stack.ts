@@ -294,46 +294,74 @@ export function extractCodecLookup(
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();
   const owners = new Map<string, string>();
   for (const descriptor of descriptors) {
-    const codecInstances = descriptor.types?.codecTypes?.codecInstances;
-    if (!codecInstances) continue;
+    const codecTypes = descriptor.types?.codecTypes;
     const descriptorId = descriptor.id ?? '<unknown>';
-    for (const codec of codecInstances) {
+    // Descriptor-side metadata is the source of truth for `targetTypes`
+    // / `meta` / `renderOutputType` (TML-2357 M2 Phase B). The codec-
+    // instance fallback below stays for contributors that still
+    // populate only `codecInstances`; it retires alongside the family-
+    // `Codec` extensions' transitional fields once every contributor
+    // exposes `codecDescriptors`.
+    const seenIds = new Set<string>();
+    for (const codecDescriptor of codecTypes?.codecDescriptors ?? []) {
       assertUniqueCodecOwner({
-        codecId: codec.id,
+        codecId: codecDescriptor.codecId,
         owners,
         descriptorId,
-        entityLabel: 'codec instance',
-        entityOwnershipLabel: 'codec instance provider',
+        entityLabel: 'codec descriptor',
+        entityOwnershipLabel: 'codec descriptor provider',
       });
-      owners.set(codec.id, descriptorId);
+      owners.set(codecDescriptor.codecId, descriptorId);
+      seenIds.add(codecDescriptor.codecId);
+      if (Array.isArray(codecDescriptor.targetTypes)) {
+        targetTypesById.set(codecDescriptor.codecId, codecDescriptor.targetTypes);
+      }
+      if (codecDescriptor.meta !== undefined) {
+        metaById.set(codecDescriptor.codecId, codecDescriptor.meta);
+      }
+      if (typeof codecDescriptor.renderOutputType === 'function') {
+        renderersById.set(codecDescriptor.codecId, codecDescriptor.renderOutputType);
+      }
+      // Materialize a representative `Codec` instance for `byId.get()`
+      // so consumers reading the lookup's instance side (e.g. SQL
+      // renderer's cast-policy lookup) keep finding the codec.
+      // Descriptors whose factory needs concrete params raise — those
+      // are populated lazily by `buildContractCodecRegistry` at runtime.
+      if (!byId.has(codecDescriptor.codecId)) {
+        try {
+          const representative = codecDescriptor.factory(undefined as never)({
+            name: `<lookup:${codecDescriptor.codecId}>`,
+          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+          byId.set(codecDescriptor.codecId, representative);
+        } catch {
+          // Parameterized factory needs real params; leave `byId.get()`
+          // returning `undefined` for this codec id.
+        }
+      }
+    }
+    for (const codec of codecTypes?.codecInstances ?? []) {
+      if (!seenIds.has(codec.id)) {
+        assertUniqueCodecOwner({
+          codecId: codec.id,
+          owners,
+          descriptorId,
+          entityLabel: 'codec instance',
+          entityOwnershipLabel: 'codec instance provider',
+        });
+        owners.set(codec.id, descriptorId);
+      }
       byId.set(codec.id, codec);
-      // The framework `Codec` interface narrowed in TML-2357 M1 (it
-      // declares only `id` + the four conversion methods); the
-      // SQL/Mongo factories still emit `targetTypes` / `meta` /
-      // `renderOutputType` physically on the runtime object via the
-      // family-`Codec` extensions' optional transitional fields.
-      // Reading them here through a structural narrow keeps the
-      // assembled `CodecLookup` populated for descriptor-routed
-      // accessors (`targetTypesFor`, `metaFor`, `renderOutputTypeFor`)
-      // until every codec contributor ships a native `CodecDescriptor`.
-      //
-      // The `as unknown as LegacyCodecInstanceMeta` cast is intentional
-      // and documented as M2-bundled cleanup — it's the bridge between
-      // the narrowed framework type and the family extensions' wider
-      // shape, and it retires alongside the `traits` / `targetTypes` /
-      // `meta` / `renderOutputType` fields on family `Codec` interfaces
-      // in TML-2357 M2 Phase B (the family-extension narrow). M2 Phase
-      // A already retired the synthesis bridge at the contributor
-      // protocol layer; review F1 for R1 explicitly accepted this
-      // site's cast as transitional.
+      // Legacy bolt-on read for contributors that haven't migrated to
+      // `codecDescriptors`. Retires once every consumer ships the
+      // descriptor list on `types.codecTypes.codecDescriptors`.
       const legacyMeta = codec as unknown as LegacyCodecInstanceMeta;
-      if (Array.isArray(legacyMeta.targetTypes)) {
+      if (!targetTypesById.has(codec.id) && Array.isArray(legacyMeta.targetTypes)) {
         targetTypesById.set(codec.id, legacyMeta.targetTypes);
       }
-      if (legacyMeta.meta !== undefined) {
+      if (!metaById.has(codec.id) && legacyMeta.meta !== undefined) {
         metaById.set(codec.id, legacyMeta.meta);
       }
-      if (typeof legacyMeta.renderOutputType === 'function') {
+      if (!renderersById.has(codec.id) && typeof legacyMeta.renderOutputType === 'function') {
         renderersById.set(codec.id, legacyMeta.renderOutputType);
       }
     }
