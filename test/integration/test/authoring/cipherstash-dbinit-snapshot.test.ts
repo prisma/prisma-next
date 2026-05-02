@@ -24,9 +24,11 @@ import { describe, expect, it } from 'vitest';
 // "search-mode typeParams do not affect DDL" decision in
 // `exports/control.ts` — i.e. the column's SQL signature is always
 // `eql_v2_encrypted`, regardless of `equality` / `freeTextSearch`.
-const codecHooks = new Map<string, CodecControlHooks>(
-  Object.entries(cipherstashControl.types?.codecTypes?.controlPlaneHooks ?? {}),
-);
+const controlPlaneHooks = (cipherstashControl.types?.codecTypes?.controlPlaneHooks ?? {}) as Record<
+  string,
+  CodecControlHooks
+>;
+const codecHooks = new Map<string, CodecControlHooks>(Object.entries(controlPlaneHooks));
 
 function cipherstashColumn(typeParams: Record<string, unknown>, nullable: boolean) {
   return {
