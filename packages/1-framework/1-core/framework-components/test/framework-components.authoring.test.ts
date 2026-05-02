@@ -76,13 +76,47 @@ describe('authoring template resolution', () => {
             properties: {
               label: { kind: 'string' },
               length: { kind: 'number', integer: true, minimum: 1, maximum: 3 },
+              enabled: { kind: 'boolean', optional: true },
             },
           },
           { kind: 'number', optional: true, minimum: 0 },
         ],
-        ['vector', ['a', 'b'], { label: 'embedding', length: 2 }, 0],
+        ['vector', ['a', 'b'], { label: 'embedding', length: 2, enabled: true }, 0],
       ),
     ).not.toThrow();
+  });
+
+  it('accepts boolean leaf arguments at the top level', () => {
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'type.flag',
+        [{ kind: 'boolean' }, { kind: 'boolean', optional: true }],
+        [true, false],
+      ),
+    ).not.toThrow();
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'type.flag',
+        [{ kind: 'boolean' }, { kind: 'boolean', optional: true }],
+        [false],
+      ),
+    ).not.toThrow();
+  });
+
+  it('rejects non-boolean values where boolean is expected', () => {
+    expect(() =>
+      validateAuthoringHelperArguments('type.flag', [{ kind: 'boolean' }], ['yes']),
+    ).toThrow(/must be a boolean/);
+    expect(() => validateAuthoringHelperArguments('type.flag', [{ kind: 'boolean' }], [1])).toThrow(
+      /must be a boolean/,
+    );
+    expect(() =>
+      validateAuthoringHelperArguments(
+        'type.flag',
+        [{ kind: 'object', properties: { equality: { kind: 'boolean' } } }],
+        [{ equality: 'yes' }],
+      ),
+    ).toThrow(/type\.flag\[0\]\.equality must be a boolean/);
   });
 
   it('allows omitted optional helper arguments', () => {

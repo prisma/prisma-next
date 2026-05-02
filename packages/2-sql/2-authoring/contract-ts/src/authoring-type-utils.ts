@@ -38,19 +38,21 @@ export type ArgTypeFromDescriptor<Arg extends AuthoringArgumentDescriptor> = Arg
   readonly kind: 'string';
 }
   ? string
-  : Arg extends { readonly kind: 'number' }
-    ? number
-    : Arg extends { readonly kind: 'stringArray' }
-      ? readonly string[]
-      : Arg extends {
-            readonly kind: 'object';
-            readonly properties: infer Properties extends Record<
-              string,
-              AuthoringArgumentDescriptor
-            >;
-          }
-        ? ObjectArgumentType<Properties>
-        : never;
+  : Arg extends { readonly kind: 'boolean' }
+    ? boolean
+    : Arg extends { readonly kind: 'number' }
+      ? number
+      : Arg extends { readonly kind: 'stringArray' }
+        ? readonly string[]
+        : Arg extends {
+              readonly kind: 'object';
+              readonly properties: infer Properties extends Record<
+                string,
+                AuthoringArgumentDescriptor
+              >;
+            }
+          ? ObjectArgumentType<Properties>
+          : never;
 
 export type TupleFromArgumentDescriptors<Args extends readonly AuthoringArgumentDescriptor[]> = {
   readonly [K in keyof Args]: Args[K] extends AuthoringArgumentDescriptor
