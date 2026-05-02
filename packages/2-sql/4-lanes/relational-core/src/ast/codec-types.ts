@@ -729,17 +729,6 @@ export function codecDescriptor<
   const buildSqlCodec = (): Codec<Id, TTraits, TWire, TInput> =>
     ({
       id: spec.codecId,
-      // SQL family extension still surfaces these legacy fields on the
-      // codec instance until M2 Phase B narrows the SQL `Codec`. Attach
-      // them so consumers like `extractCodecLookup` (which reads
-      // `targetTypes` / `meta` / `renderOutputType` off codec instances)
-      // see the same shape they get from the legacy `codec()` factory.
-      // Phase B retires this attachment alongside the family-extension
-      // narrow.
-      traits,
-      targetTypes: spec.targetTypes,
-      ...(spec.meta !== undefined ? { meta: spec.meta } : {}),
-      ...(spec.renderOutputType !== undefined ? { renderOutputType: spec.renderOutputType } : {}),
       encode: (value, ctx) => {
         try {
           return Promise.resolve(userEncode(value, ctx));
