@@ -8,4 +8,9 @@ export type {
   CodecMeta,
   CodecTrait,
 } from '../shared/codec-types';
-export { aliasDescriptor, emptyCodecLookup, voidParamsSchema } from '../shared/codec-types';
+export {
+  aliasDescriptor,
+  buildCodec,
+  emptyCodecLookup,
+  voidParamsSchema,
+} from '../shared/codec-types';
