@@ -286,9 +286,8 @@ export const voidParamsSchema: StandardSchemaV1<void> = {
  * factory, then rewrites `id` on the resolved codec so per-instance
  * decode-error envelopes report the alias id.
  *
- * Composes at
- * the descriptor level rather than the codec-instance level so a single
- * registration slot ships the alias.
+ * Composes at the descriptor level rather than the codec-instance
+ * level so a single registration slot ships the alias (TML-2357 T2.1).
  *
  * Per-instance state on the base codec (closure-captured params,
  * derived helpers) is shared by the alias because the alias's factory
@@ -316,59 +315,4 @@ export function aliasDescriptor<P>(
     ...(overrides.meta !== undefined ? { meta: overrides.meta } : {}),
     ...(base.renderOutputType !== undefined ? { renderOutputType: base.renderOutputType } : {}),
   };
-}
-
-/**
- * Construct a runtime {@link Codec} instance from the narrow runtime
- * shape — `id` plus the four conversion methods. Author `encode` /
- * `decode` as sync or async; `buildCodec` promise-lifts both onto the
- * framework-required `Promise<…>` boundary (per ADR 204) so authors
- * don't have to wrap return values themselves. `encodeJson` /
- * `decodeJson` default to identity when omitted; supply explicit
- * functions when `TInput` is not JSON-safe.
- *
- * Strictly the runtime instance shape: `buildCodec` does **not** accept
- * `targetTypes`, `traits`, `meta`, `paramsSchema`, or
- * `renderOutputType`. Codec-id-keyed metadata (and the build-time
- * renderer) belong on the {@link CodecDescriptor}; build the descriptor
- * via the family factory (`defineCodec` in SQL) when registering a
- * codec. `buildCodec` is for sites that need a raw `Codec` instance
- * — descriptor `factory` bodies that materialize a per-call codec from
- * closure-captured state, and tests that exercise the codec dispatch
- * surface against ad-hoc codecs.
- */
-export function buildCodec<
-  Id extends string,
-  TWire = unknown,
-  TInput = unknown,
-  TTraits extends readonly CodecTrait[] = readonly CodecTrait[],
->(spec: {
-  readonly id: Id;
-  readonly encode: (value: TInput, ctx: CodecCallContext) => TWire | Promise<TWire>;
-  readonly decode: (wire: TWire, ctx: CodecCallContext) => TInput | Promise<TInput>;
-  readonly encodeJson?: (value: TInput) => JsonValue;
-  readonly decodeJson?: (json: JsonValue) => TInput;
-}): Codec<Id, TTraits, TWire, TInput> {
-  const userEncode = spec.encode;
-  const userDecode = spec.decode;
-  const identity = (v: unknown) => v;
-  return {
-    id: spec.id,
-    encode: (value, ctx) => {
-      try {
-        return Promise.resolve(userEncode(value, ctx));
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    },
-    decode: (wire, ctx) => {
-      try {
-        return Promise.resolve(userDecode(wire, ctx));
-      } catch (error) {
-        return Promise.reject(error);
-      }
-    },
-    encodeJson: (spec.encodeJson ?? identity) as (value: TInput) => JsonValue,
-    decodeJson: (spec.decodeJson ?? identity) as (json: JsonValue) => TInput,
-  } as Codec<Id, TTraits, TWire, TInput>;
 }

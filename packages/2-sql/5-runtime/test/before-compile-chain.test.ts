@@ -1,11 +1,11 @@
 import type { Contract, PlanMeta } from '@prisma-next/contract/types';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -344,8 +344,9 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        buildCodec({
-          id: 'pg/int4@1',
+        mkCodec({
+          typeId: 'pg/int4@1',
+          targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),
@@ -396,8 +397,9 @@ describe('runBeforeCompileChain', () => {
 
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        buildCodec({
-          id: 'pg/int4@1',
+        mkCodec({
+          typeId: 'pg/int4@1',
+          targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),

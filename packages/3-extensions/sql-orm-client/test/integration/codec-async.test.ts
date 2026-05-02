@@ -3,7 +3,7 @@
  *
  * `Post.embedding` flows through the `pg/vector@1` codec from
  * `@prisma-next/extension-pgvector`. The pgvector codec's `encode` and
- * `decode` are authored synchronously, but the `buildCodec()` factory in
+ * `decode` are authored synchronously, but the `mkCodec()` factory in
  * `relational-core` lifts them to Promise-returning at the boundary, so this
  * column exercises the runtime's async dispatch path on every read and write.
  *

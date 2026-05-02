@@ -1,12 +1,12 @@
 import type { Contract, JsonValue } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
 import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
   ColumnRef,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -95,9 +95,10 @@ function createJoinMetadataValidatorRegistry(): JsonSchemaValidatorRegistry {
   return { get: (key) => validators.get(key), size: validators.size };
 }
 
-function jsonbCodec<Id extends string>(typeId: Id, _targetType: string) {
-  return buildCodec({
-    id: typeId,
+function jsonbCodec<Id extends string>(typeId: Id, targetType: string) {
+  return mkCodec<Id, readonly [], string, JsonValue>({
+    typeId,
+    targetTypes: [targetType],
     encode: (v: JsonValue) => JSON.stringify(v),
     decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
   });
@@ -108,8 +109,9 @@ function createTestCodecRegistry(): CodecRegistry {
   registry.register(jsonbCodec('pg/jsonb@1', 'jsonb'));
   registry.register(jsonbCodec('pg/json@1', 'json'));
   registry.register(
-    buildCodec({
-      id: 'pg/int4@1',
+    mkCodec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
@@ -512,8 +514,9 @@ describe('JSON Schema decoding validation', () => {
   it('runs JSON schema validation against the resolved value of an async decoder', async () => {
     const asyncRegistry = newCodecRegistry();
     asyncRegistry.register(
-      buildCodec({
-        id: 'pg/async-jsonb@1',
+      mkCodec<'pg/async-jsonb@1', readonly [], string, JsonValue>({
+        typeId: 'pg/async-jsonb@1',
+        targetTypes: ['jsonb'],
         encode: async (v: JsonValue) => JSON.stringify(v),
         decode: async (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
       }),
@@ -557,8 +560,9 @@ describe('JSON Schema decoding validation', () => {
   // ---------------------------------------------------------------------------
   it.skip('does not leak codec-authored error.message into the DECODE_FAILED envelope', async () => {
     const leakyPlaintext = 'super-secret-plaintext-value';
-    const leakyCodec = buildCodec({
-      id: 'pg/leaky@1',
+    const leakyCodec = mkCodec({
+      typeId: 'pg/leaky@1',
+      targetTypes: ['text'],
       encode: (v: string) => v,
       decode: async (_w: string) => {
         throw new Error(`decrypt failed for value=${leakyPlaintext}`);

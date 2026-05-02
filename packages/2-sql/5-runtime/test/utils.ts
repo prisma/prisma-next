@@ -21,6 +21,7 @@ import type {
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { mkCodec } from '@prisma-next/sql-relational-core/ast';
 
 function emptyCodecRegistry(): CodecRegistry {
   const byId = new Map<string, Codec<string>>();
@@ -38,7 +39,6 @@ function emptyCodecRegistry(): CodecRegistry {
   };
 }
 
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -277,24 +277,27 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
   // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)
   // but don't require importing from the postgres adapter package
   codecRegistry.register(
-    buildCodec({
-      id: 'pg/int4@1',
+    mkCodec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
       encode: (value: number) => value,
       decode: (wire: number) => wire,
     }),
   );
 
   codecRegistry.register(
-    buildCodec({
-      id: 'pg/text@1',
+    mkCodec({
+      typeId: 'pg/text@1',
+      targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
     }),
   );
 
   codecRegistry.register(
-    buildCodec({
-      id: 'pg/timestamptz@1',
+    mkCodec({
+      typeId: 'pg/timestamptz@1',
+      targetTypes: ['timestamptz'],
       encode: (value: Date) => value,
       decode: (wire: Date) => wire,
       // Date is not assignable to JsonValue, so the JSON round-trip pair

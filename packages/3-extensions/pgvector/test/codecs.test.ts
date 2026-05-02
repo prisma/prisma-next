@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { byScalar, codecDescriptorDefinitions } from '../src/core/codecs';
 
 // The pgvector codec authors `encode`/`decode` synchronously, but the
-// `buildCodec()` factory in `relational-core` lifts both methods to
+// `mkCodec()` factory in `relational-core` lifts both methods to
 // `Promise`-returning at the boundary. The tests below cast through the
 // Promise-returning shape and `await` every call so unit-level coverage
 // stays aligned with the codec contract:

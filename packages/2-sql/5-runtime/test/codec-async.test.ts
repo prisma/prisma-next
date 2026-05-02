@@ -1,12 +1,12 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { coreHash } from '@prisma-next/contract/types';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import type { Codec, CodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import {
   AndExpr,
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -122,8 +122,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
 
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/async-a@1',
+      mkCodec({
+        typeId: 'test/async-a@1',
+        targetTypes: ['text'],
         encode: (value: string) => {
           callOrder.push('encode-a-start');
           return dA.promise.then((wire) => `${value}:${wire}`);
@@ -132,8 +133,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
     registry.register(
-      buildCodec({
-        id: 'test/async-b@1',
+      mkCodec({
+        typeId: 'test/async-b@1',
+        targetTypes: ['text'],
         encode: (value: string) => {
           callOrder.push('encode-b-start');
           return dB.promise.then((wire) => `${value}:${wire}`);
@@ -142,8 +144,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
     registry.register(
-      buildCodec({
-        id: 'test/sync@1',
+      mkCodec({
+        typeId: 'test/sync@1',
+        targetTypes: ['int4'],
         encode: (value: number) => {
           callOrder.push('encode-sync');
           return value + 1;
@@ -174,8 +177,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('always awaits codec.encode (no Promise leaks into the driver)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/async@1',
+      mkCodec({
+        typeId: 'test/async@1',
+        targetTypes: ['text'],
         encode: async (value: string) => `wire:${value}`,
         decode: async (wire: string) => wire,
       }),
@@ -195,8 +199,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
     const cause = new Error('boom');
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/explody@1',
+      mkCodec({
+        typeId: 'test/explody@1',
+        targetTypes: ['text'],
         encode: () => {
           throw cause;
         },
@@ -224,8 +229,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('uses param[<i>] label when ParamRef has no name', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/explody@1',
+      mkCodec({
+        typeId: 'test/explody@1',
+        targetTypes: ['text'],
         encode: () => {
           throw new Error('boom');
         },
@@ -246,8 +252,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('returns null for null/undefined parameter values without invoking the codec', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/sync@1',
+      mkCodec({
+        typeId: 'test/sync@1',
+        targetTypes: ['text'],
         encode: () => {
           throw new Error('codec must not be invoked for null/undefined');
         },
@@ -278,8 +285,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/should-not-run@1',
+      mkCodec({
+        typeId: 'test/should-not-run@1',
+        targetTypes: ['text'],
         encode: () => {
           throw new Error('raw plans must skip codec encoding');
         },
@@ -295,8 +303,9 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('encodes a fully-typed AST-backed plan without throwing', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/passthrough@1',
+      mkCodec({
+        typeId: 'test/passthrough@1',
+        targetTypes: ['text'],
         encode: (value: string) => `wire:${value}`,
         decode: (wire: string) => wire,
       }),
@@ -322,8 +331,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   function buildJsonbRegistry(): CodecRegistry {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'pg/jsonb@1',
+      mkCodec<'pg/jsonb@1', readonly [], string, JsonValue>({
+        typeId: 'pg/jsonb@1',
+        targetTypes: ['jsonb'],
         encode: (v: JsonValue) => JSON.stringify(v),
         decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
       }),
@@ -351,8 +361,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/slow-a@1',
+      mkCodec({
+        typeId: 'test/slow-a@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: (w: string) => {
           callOrder.push('decode-a-start');
@@ -361,8 +372,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
     registry.register(
-      buildCodec({
-        id: 'test/slow-b@1',
+      mkCodec({
+        typeId: 'test/slow-b@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: (w: string) => {
           callOrder.push('decode-b-start');
@@ -371,8 +383,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
     registry.register(
-      buildCodec({
-        id: 'test/sync@1',
+      mkCodec({
+        typeId: 'test/sync@1',
+        targetTypes: ['int4'],
         encode: (v: number) => v,
         decode: (w: number) => {
           callOrder.push('decode-sync');
@@ -404,8 +417,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   it('always awaits codec.decode and yields plain values (no Promise leaks)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/async@1',
+      mkCodec({
+        typeId: 'test/async@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: async (w: string) => `decoded:${w}`,
       }),
@@ -469,8 +483,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const cause = new Error('boom');
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/explody@1',
+      mkCodec({
+        typeId: 'test/explody@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: () => {
           throw cause;
@@ -506,8 +521,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   it('passes wire values through for raw plans (no AST, no codec decoding)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      buildCodec({
-        id: 'test/should-not-run@1',
+      mkCodec({
+        typeId: 'test/should-not-run@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('raw plans must skip codec decoding');
@@ -542,8 +558,9 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
     });
     registry.register(
-      buildCodec({
-        id: 'test/should-not-run@1',
+      mkCodec({
+        typeId: 'test/should-not-run@1',
+        targetTypes: ['text'],
         encode: (v: string) => v,
         decode: () => {
           throw new Error('codec must not be invoked for null wire values');
@@ -557,26 +574,27 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
   it('decodeField is single-armed: same path for sync and async codec authors', async () => {
     const registry = newCodecRegistry();
-    const makeCodec = (
+    const buildCodec = (
       id: string,
       encode: (value: string) => string,
       decode: (wire: string) => string | Promise<string>,
     ): Codec<string> =>
-      buildCodec({
-        id,
+      mkCodec<string, readonly [], string, string>({
+        typeId: id,
+        targetTypes: ['text'],
         encode,
         decode,
       });
 
     registry.register(
-      makeCodec(
+      buildCodec(
         'sync@1',
         (v) => v,
         (w) => `sync:${String(w)}`,
       ),
     );
     registry.register(
-      makeCodec(
+      buildCodec(
         'async@1',
         (v) => v,
         async (w) => `async:${String(w)}`,

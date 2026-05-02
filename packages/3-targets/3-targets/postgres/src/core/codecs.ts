@@ -1,27 +1,26 @@
 /**
- * Unified codec definitions for the Postgres target.
+ * Unified codec definitions for Postgres adapter.
  *
- * Single source of truth: every postgres codec is authored as a
- * `CodecDescriptor` via `defineCodec()` (or composed from a SQL base
- * descriptor via `aliasDescriptor`). The scalar-keyed `byScalar` map
- * (with the runtime `Codec` instance materialized through the
- * descriptor's `factory(undefined)(ctx)`), the `dataTypes` map, and the
- * compile-time `CodecTypes` map are all derived from the descriptor
- * map. The legacy factory + builder chain (renamed transiently in M2 R3)
- * was removed in TML-2357 M2 R4.
+ * This file contains a single source of truth for all codec information:
+ * - Scalar names
+ * - Type IDs
+ * - Codec implementations (runtime)
+ * - Type information (compile-time)
+ *
+ * This structure is used both at runtime (to populate the registry) and
+ * at compile time (to derive CodecTypes).
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import { aliasDescriptor } from '@prisma-next/framework-components/codec';
+import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import {
-  type AnyCodecDescriptor,
-  type Codec,
-  type DescriptorCodecInput,
-  type DescriptorCodecTraits,
   defineCodec,
-  type ExtractDescriptorCodecTypes,
+  defineCodecBundle,
+  defineCodecGroup,
+  mkCodec,
   sqlCharDescriptor,
-  sqlCodecDescriptorDefinitions,
+  sqlCodecDefinitions,
   sqlFloatDescriptor,
   sqlIntDescriptor,
   sqlTextDescriptor,
@@ -106,12 +105,481 @@ function renderPrecision(typeName: string, typeParams: Record<string, unknown>):
 // through to the generic `CodecTypes['pg/jsonb@1']['output']` accessor
 // (which resolves to `JsonValue` via the codec-types map).
 
+const sqlCharCodec = sqlCodecDefinitions.char.codec;
+const sqlVarcharCodec = sqlCodecDefinitions.varchar.codec;
+const sqlIntCodec = sqlCodecDefinitions.int.codec;
+const sqlFloatCodec = sqlCodecDefinitions.float.codec;
+const sqlTextCodec = sqlCodecDefinitions.text.codec;
+const sqlTimestampCodec = sqlCodecDefinitions.timestamp.codec;
+
+// Create individual codec instances
+const pgTextCodec = mkCodec({
+  typeId: PG_TEXT_CODEC_ID,
+  targetTypes: ['text'],
+  traits: ['equality', 'order', 'textual'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'text',
+        },
+      },
+    },
+  },
+});
+
+const pgCharCodec: Codec<typeof PG_CHAR_CODEC_ID> = {
+  ...sqlCharCodec,
+  id: PG_CHAR_CODEC_ID,
+};
+
+const pgVarcharCodec: Codec<typeof PG_VARCHAR_CODEC_ID> = {
+  ...sqlVarcharCodec,
+  id: PG_VARCHAR_CODEC_ID,
+};
+
+const pgIntCodec: Codec<typeof PG_INT_CODEC_ID> = {
+  ...sqlIntCodec,
+  id: PG_INT_CODEC_ID,
+};
+
+const pgFloatCodec: Codec<typeof PG_FLOAT_CODEC_ID> = {
+  ...sqlFloatCodec,
+  id: PG_FLOAT_CODEC_ID,
+};
+
+const pgInt4Codec = mkCodec({
+  typeId: PG_INT4_CODEC_ID,
+  targetTypes: ['int4'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'integer',
+        },
+      },
+    },
+  },
+});
+
+const pgNumericCodec = mkCodec<
+  typeof PG_NUMERIC_CODEC_ID,
+  readonly ['equality', 'order', 'numeric'],
+  string,
+  string
+>({
+  typeId: PG_NUMERIC_CODEC_ID,
+  targetTypes: ['numeric', 'decimal'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: string): string => value,
+  decode: (wire: string | number): string => {
+    if (typeof wire === 'number') return String(wire);
+    return wire;
+  },
+  paramsSchema: numericParamsSchema,
+  renderOutputType: (typeParams) => {
+    const precision = typeParams['precision'];
+    if (precision === undefined) return undefined;
+    if (
+      typeof precision !== 'number' ||
+      !Number.isFinite(precision) ||
+      !Number.isInteger(precision)
+    ) {
+      throw new Error(
+        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
+      );
+    }
+    const scale = typeParams['scale'];
+    return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
+  },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'numeric',
+        },
+      },
+    },
+  },
+});
+
+const pgInt2Codec = mkCodec({
+  typeId: PG_INT2_CODEC_ID,
+  targetTypes: ['int2'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'smallint',
+        },
+      },
+    },
+  },
+});
+
+const pgInt8Codec = mkCodec({
+  typeId: PG_INT8_CODEC_ID,
+  targetTypes: ['int8'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bigint',
+        },
+      },
+    },
+  },
+});
+
+const pgFloat4Codec = mkCodec({
+  typeId: PG_FLOAT4_CODEC_ID,
+  targetTypes: ['float4'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'real',
+        },
+      },
+    },
+  },
+});
+
+const pgFloat8Codec = mkCodec({
+  typeId: PG_FLOAT8_CODEC_ID,
+  targetTypes: ['float8'],
+  traits: ['equality', 'order', 'numeric'],
+  encode: (value: number): number => value,
+  decode: (wire: number): number => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'double precision',
+        },
+      },
+    },
+  },
+});
+
+const pgTimestampCodec = mkCodec<
+  typeof PG_TIMESTAMP_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date,
+  Date
+>({
+  typeId: PG_TIMESTAMP_CODEC_ID,
+  targetTypes: ['timestamp'],
+  traits: ['equality', 'order'],
+  encode: (value: Date): Date => value,
+  decode: (wire: Date): Date => wire,
+  encodeJson: (value: Date) => value.toISOString(),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+    }
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+    }
+    return date;
+  },
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timestamp', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timestamp without time zone',
+        },
+      },
+    },
+  },
+});
+
+const pgTimestamptzCodec = mkCodec<
+  typeof PG_TIMESTAMPTZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  Date,
+  Date
+>({
+  typeId: PG_TIMESTAMPTZ_CODEC_ID,
+  targetTypes: ['timestamptz'],
+  traits: ['equality', 'order'],
+  encode: (value: Date): Date => value,
+  decode: (wire: Date): Date => wire,
+  encodeJson: (value: Date) => value.toISOString(),
+  decodeJson: (json) => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+    }
+    const date = new Date(json);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+    }
+    return date;
+  },
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timestamptz', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timestamp with time zone',
+        },
+      },
+    },
+  },
+});
+
+const pgTimeCodec = mkCodec<
+  typeof PG_TIME_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+>({
+  typeId: PG_TIME_CODEC_ID,
+  targetTypes: ['time'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Time', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'time',
+        },
+      },
+    },
+  },
+});
+
+const pgTimetzCodec = mkCodec<
+  typeof PG_TIMETZ_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+>({
+  typeId: PG_TIMETZ_CODEC_ID,
+  targetTypes: ['timetz'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Timetz', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'timetz',
+        },
+      },
+    },
+  },
+});
+
+const pgBoolCodec = mkCodec({
+  typeId: PG_BOOL_CODEC_ID,
+  targetTypes: ['bool'],
+  traits: ['equality', 'boolean'],
+  encode: (value: boolean): boolean => value,
+  decode: (wire: boolean): boolean => wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'boolean',
+        },
+      },
+    },
+  },
+});
+
+const pgBitCodec = mkCodec<typeof PG_BIT_CODEC_ID, readonly ['equality', 'order'], string, string>({
+  typeId: PG_BIT_CODEC_ID,
+  targetTypes: ['bit'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('Bit', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bit',
+        },
+      },
+    },
+  },
+});
+
+const pgVarbitCodec = mkCodec<
+  typeof PG_VARBIT_CODEC_ID,
+  readonly ['equality', 'order'],
+  string,
+  string
+>({
+  typeId: PG_VARBIT_CODEC_ID,
+  targetTypes: ['bit varying'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  paramsSchema: lengthParamsSchema,
+  renderOutputType: (typeParams) => renderLength('VarBit', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bit varying',
+        },
+      },
+    },
+  },
+});
+
+const pgEnumCodec = mkCodec({
+  typeId: PG_ENUM_CODEC_ID,
+  targetTypes: ['enum'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string): string => wire,
+  renderOutputType: (typeParams) => {
+    const values = typeParams['values'];
+    if (!Array.isArray(values)) {
+      throw new Error(
+        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
+      );
+    }
+    return values
+      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+      .join(' | ');
+  },
+});
+
+const pgIntervalCodec = mkCodec<
+  typeof PG_INTERVAL_CODEC_ID,
+  readonly ['equality', 'order'],
+  string | Record<string, unknown>,
+  string
+>({
+  typeId: PG_INTERVAL_CODEC_ID,
+  targetTypes: ['interval'],
+  traits: ['equality', 'order'],
+  encode: (value: string): string => value,
+  decode: (wire: string | Record<string, unknown>): string => {
+    if (typeof wire === 'string') return wire;
+    return JSON.stringify(wire);
+  },
+  paramsSchema: precisionParamsSchema,
+  renderOutputType: (typeParams) => renderPrecision('Interval', typeParams),
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'interval',
+        },
+      },
+    },
+  },
+});
+
+const pgJsonCodec = mkCodec({
+  typeId: PG_JSON_CODEC_ID,
+  targetTypes: ['json'],
+  traits: [],
+  encode: (value: string | JsonValue): string => JSON.stringify(value),
+  decode: (wire: string | JsonValue): JsonValue =>
+    typeof wire === 'string' ? JSON.parse(wire) : wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'json',
+        },
+      },
+    },
+  },
+});
+
+const pgJsonbCodec = mkCodec({
+  typeId: PG_JSONB_CODEC_ID,
+  targetTypes: ['jsonb'],
+  traits: ['equality'],
+  encode: (value: string | JsonValue): string => JSON.stringify(value),
+  decode: (wire: string | JsonValue): JsonValue =>
+    typeof wire === 'string' ? JSON.parse(wire) : wire,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'jsonb',
+        },
+      },
+    },
+  },
+});
+
+// Build codec definitions using the builder DSL
+const codecs = defineCodecGroup()
+  .add('char', sqlCharCodec)
+  .add('varchar', sqlVarcharCodec)
+  .add('int', sqlIntCodec)
+  .add('float', sqlFloatCodec)
+  .add('sql-text', sqlTextCodec)
+  .add('sql-timestamp', sqlTimestampCodec)
+  .add('text', pgTextCodec)
+  .add('character', pgCharCodec)
+  .add('character varying', pgVarcharCodec)
+  .add('integer', pgIntCodec)
+  .add('double precision', pgFloatCodec)
+  .add('int4', pgInt4Codec)
+  .add('int2', pgInt2Codec)
+  .add('int8', pgInt8Codec)
+  .add('float4', pgFloat4Codec)
+  .add('float8', pgFloat8Codec)
+  .add('numeric', pgNumericCodec)
+  .add('timestamp', pgTimestampCodec)
+  .add('timestamptz', pgTimestamptzCodec)
+  .add('time', pgTimeCodec)
+  .add('timetz', pgTimetzCodec)
+  .add('bool', pgBoolCodec)
+  .add('bit', pgBitCodec)
+  .add('bit varying', pgVarbitCodec)
+  .add('interval', pgIntervalCodec)
+  .add('enum', pgEnumCodec)
+  .add('json', pgJsonCodec)
+  .add('jsonb', pgJsonbCodec);
+
+// Export derived structures directly from codecs builder
+export const byScalar = codecs.byScalar;
+export const dataTypes = codecs.dataTypes;
+
+export type CodecTypes = typeof codecs.CodecTypes;
+
 // ---------------------------------------------------------------------------
-// CodecDescriptor source of truth. Each postgres target codec is authored
-// via `defineCodec()` or composed from a SQL base descriptor via
-// `aliasDescriptor`. Scalar-keyed `byScalar` / `dataTypes` /
-// `codecDescriptorDefinitions` views are derived from the descriptor map
-// at the bottom of the file.
+// Native CodecDescriptor exports (TML-2357 T2.3). Each postgres target codec
+// gains a sibling `*Descriptor` authored via `defineCodec()` (or composed
+// from a SQL base descriptor via `aliasDescriptor`). The legacy codec
+// exports above still flow through the `byScalar[k].codec` surface
+// the postgres adapter + extension consumers read; both shapes ship until
+// the M2 cleanup commit collapses to descriptor-only.
 // ---------------------------------------------------------------------------
 
 const pgTextDescriptor = defineCodec<
@@ -496,183 +964,47 @@ const pgJsonbDescriptor = defineCodec<
   meta: { db: { sql: { postgres: { nativeType: 'jsonb' } } } },
 });
 
-// ---------------------------------------------------------------------------
-// Scalar-keyed view derived from the descriptor map. The four SQL-base
-// scalars (`char`, `varchar`, `int`, `float`) inherit the SQL family
-// descriptor; the two `sql-text` / `sql-timestamp` scalars carry the SQL
-// family text/timestamp descriptors directly. The runtime `Codec`
-// instance in each `byScalar[k].codec` slot is materialized from the
-// descriptor's `factory(undefined)(ctx)` so the runtime instance carries
-// only the narrow shape (`id` plus four conversion methods).
-// ---------------------------------------------------------------------------
-
-const pgDescriptors = {
-  char: sqlCharDescriptor,
-  varchar: sqlVarcharDescriptor,
-  int: sqlIntDescriptor,
-  float: sqlFloatDescriptor,
-  'sql-text': sqlTextDescriptor,
-  'sql-timestamp': sqlTimestampDescriptor,
-  text: pgTextDescriptor,
-  character: pgCharDescriptor,
-  'character varying': pgVarcharDescriptor,
-  integer: pgIntDescriptor,
-  'double precision': pgFloatDescriptor,
-  int4: pgInt4Descriptor,
-  int2: pgInt2Descriptor,
-  int8: pgInt8Descriptor,
-  float4: pgFloat4Descriptor,
-  float8: pgFloat8Descriptor,
-  numeric: pgNumericDescriptor,
-  timestamp: pgTimestampDescriptor,
-  timestamptz: pgTimestamptzDescriptor,
-  time: pgTimeDescriptor,
-  timetz: pgTimetzDescriptor,
-  bool: pgBoolDescriptor,
-  bit: pgBitDescriptor,
-  'bit varying': pgVarbitDescriptor,
-  bytea: pgByteaDescriptor,
-  interval: pgIntervalDescriptor,
-  enum: pgEnumDescriptor,
-  json: pgJsonDescriptor,
-  jsonb: pgJsonbDescriptor,
-} as const;
-
-type PgDescriptors = typeof pgDescriptors;
-
-function materializeDescriptorCodec(d: AnyCodecDescriptor): Codec {
-  return d.factory(undefined as never)({
-    name: `<shared:${d.codecId}>`,
-  }) as Codec;
-}
-
-type PgByScalar = {
-  readonly [K in keyof PgDescriptors]: {
-    readonly typeId: PgDescriptors[K]['codecId'];
-    readonly scalar: K;
-    readonly codec: Codec;
-    readonly input: DescriptorCodecInput<PgDescriptors[K]>;
-    readonly output: DescriptorCodecInput<PgDescriptors[K]>;
-    readonly jsType: DescriptorCodecInput<PgDescriptors[K]>;
-    readonly traits: DescriptorCodecTraits<PgDescriptors[K]>;
-  };
-};
-
-type PgCodecDescriptorDefinitions = {
-  readonly [K in keyof PgDescriptors]: {
-    readonly codecId: PgDescriptors[K]['codecId'];
-    readonly scalar: K;
-    readonly descriptor: PgDescriptors[K];
-    readonly input: DescriptorCodecInput<PgDescriptors[K]>;
-    readonly output: DescriptorCodecInput<PgDescriptors[K]>;
-    readonly jsType: DescriptorCodecInput<PgDescriptors[K]>;
-  };
-};
-
-type PgDataTypes = {
-  readonly [K in keyof PgDescriptors]: PgDescriptors[K]['codecId'];
-};
-
-function buildPgCodecMaps(): {
-  readonly byScalar: PgByScalar;
-  readonly descriptorDefinitions: PgCodecDescriptorDefinitions;
-  readonly dataTypes: PgDataTypes;
-  readonly descriptorList: ReadonlyArray<AnyCodecDescriptor>;
-} {
-  // Seed the SQL-base scalar codec slots from the SQL-base descriptor
-  // definitions so `byScalar.{char,varchar,int,float,sql-text,sql-timestamp}.codec`
-  // shares the SQL family materialization (preserves identity across
-  // postgres + sqlite consumers reading from these slots).
-  const sqlSeeded: Record<string, Codec> = {
-    char: sqlCodecDescriptorDefinitions.char.descriptor.factory(undefined as never)({
-      name: `<shared:${sqlCharDescriptor.codecId}>`,
-    }) as Codec,
-    varchar: sqlCodecDescriptorDefinitions.varchar.descriptor.factory(undefined as never)({
-      name: `<shared:${sqlVarcharDescriptor.codecId}>`,
-    }) as Codec,
-    int: sqlCodecDescriptorDefinitions.int.descriptor.factory(undefined as never)({
-      name: `<shared:${sqlIntDescriptor.codecId}>`,
-    }) as Codec,
-    float: sqlCodecDescriptorDefinitions.float.descriptor.factory(undefined as never)({
-      name: `<shared:${sqlFloatDescriptor.codecId}>`,
-    }) as Codec,
-    'sql-text': sqlCodecDescriptorDefinitions.text.descriptor.factory(undefined as never)({
-      name: `<shared:${sqlTextDescriptor.codecId}>`,
-    }) as Codec,
-    'sql-timestamp': sqlCodecDescriptorDefinitions.timestamp.descriptor.factory(undefined as never)(
-      {
-        name: `<shared:${sqlTimestampDescriptor.codecId}>`,
-      },
-    ) as Codec,
-  };
-
-  const byScalar: Record<string, unknown> = {};
-  const descriptorDefinitions: Record<string, unknown> = {};
-  const dataTypes: Record<string, string> = {};
-  const descriptorList: AnyCodecDescriptor[] = [];
-
-  for (const [scalar, descriptor] of Object.entries(pgDescriptors)) {
-    const d = descriptor as AnyCodecDescriptor;
-    const codec = sqlSeeded[scalar] ?? materializeDescriptorCodec(d);
-    byScalar[scalar] = {
-      typeId: d.codecId,
-      scalar,
-      codec,
-      input: undefined,
-      output: undefined,
-      jsType: undefined,
-      traits: undefined,
-    };
-    descriptorDefinitions[scalar] = {
-      codecId: d.codecId,
-      scalar,
-      descriptor: d,
-      input: undefined,
-      output: undefined,
-      jsType: undefined,
-    };
-    dataTypes[scalar] = d.codecId;
-    descriptorList.push(d);
-  }
-
-  return {
-    byScalar: byScalar as unknown as PgByScalar,
-    descriptorDefinitions: descriptorDefinitions as unknown as PgCodecDescriptorDefinitions,
-    dataTypes: dataTypes as unknown as PgDataTypes,
-    descriptorList,
-  };
-}
-
-const pgCodecMaps = buildPgCodecMaps();
-
-/**
- * Scalar-keyed map of postgres codec definitions. Each entry exposes
- * `typeId`, the materialized runtime `codec` instance (via the
- * descriptor's `factory(undefined)(ctx)`), and type-only `input` /
- * `output` / `jsType` / `traits` carriers.
- */
-export const byScalar: PgByScalar = pgCodecMaps.byScalar;
-
-/**
- * Scalar-keyed map mapping each scalar name to its codec id.
- */
-export const dataTypes: PgDataTypes = pgCodecMaps.dataTypes;
-
-/**
- * Type-level codec id → `{input, output, traits}` map for builder
- * consumers that key by codec id rather than scalar name.
- */
-export type CodecTypes = ExtractDescriptorCodecTypes<PgDescriptors>;
+const codecDescriptorsBuilder = defineCodecBundle()
+  .add('char', sqlCharDescriptor)
+  .add('varchar', sqlVarcharDescriptor)
+  .add('int', sqlIntDescriptor)
+  .add('float', sqlFloatDescriptor)
+  .add('sql-text', sqlTextDescriptor)
+  .add('sql-timestamp', sqlTimestampDescriptor)
+  .add('text', pgTextDescriptor)
+  .add('character', pgCharDescriptor)
+  .add('character varying', pgVarcharDescriptor)
+  .add('integer', pgIntDescriptor)
+  .add('double precision', pgFloatDescriptor)
+  .add('int4', pgInt4Descriptor)
+  .add('int2', pgInt2Descriptor)
+  .add('int8', pgInt8Descriptor)
+  .add('float4', pgFloat4Descriptor)
+  .add('float8', pgFloat8Descriptor)
+  .add('numeric', pgNumericDescriptor)
+  .add('timestamp', pgTimestampDescriptor)
+  .add('timestamptz', pgTimestamptzDescriptor)
+  .add('time', pgTimeDescriptor)
+  .add('timetz', pgTimetzDescriptor)
+  .add('bool', pgBoolDescriptor)
+  .add('bit', pgBitDescriptor)
+  .add('bit varying', pgVarbitDescriptor)
+  .add('bytea', pgByteaDescriptor)
+  .add('interval', pgIntervalDescriptor)
+  .add('enum', pgEnumDescriptor)
+  .add('json', pgJsonDescriptor)
+  .add('jsonb', pgJsonbDescriptor);
 
 /**
  * Descriptor view of the postgres target codecs, keyed by scalar name.
- * Mirrors {@link byScalar} on the descriptor side (TML-2357 T2.3).
+ * Mirrors {@link byScalar} for the descriptor shape (TML-2357
+ * T2.3); the runtime contributor protocol switches to consume this map
+ * once the unified `codecs:` slot lands later in M2.
  */
-export const codecDescriptorDefinitions: PgCodecDescriptorDefinitions =
-  pgCodecMaps.descriptorDefinitions;
+export const codecDescriptorDefinitions = codecDescriptorsBuilder.byScalar;
 
 /**
  * Flat array of every postgres target codec descriptor — ready to feed
  * into a contributor's unified `codecs:` slot.
  */
-export const codecDescriptorList: ReadonlyArray<AnyCodecDescriptor> = pgCodecMaps.descriptorList;
+export const codecDescriptorList = codecDescriptorsBuilder.descriptors;

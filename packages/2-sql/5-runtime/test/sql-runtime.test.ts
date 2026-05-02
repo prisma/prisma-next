@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -18,6 +17,7 @@ import {
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
+  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -69,8 +69,9 @@ type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
   const registry = newCodecRegistry();
   registry.register(
-    buildCodec({
-      id: 'pg/int4@1',
+    mkCodec({
+      typeId: 'pg/int4@1',
+      targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
@@ -615,8 +616,9 @@ describe('createRuntime', () => {
   );
 
   it('wraps async parameter encoding failures before the driver runs', async () => {
-    const failingCodec = buildCodec({
-      id: 'test/failing-secret@1',
+    const failingCodec = mkCodec({
+      typeId: 'test/failing-secret@1',
+      targetTypes: ['text'],
       encode: async (_value: string) => {
         throw new Error('encrypt failed');
       },

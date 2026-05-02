@@ -85,12 +85,7 @@ describe('SQLite codecs', () => {
     });
 
     it('decodes ISO8601 string to Date', async () => {
-      // The byScalar slot exposes a bare runtime `Codec`, so `decode`
-      // returns `Promise<unknown>` at the type level. The
-      // `toBeInstanceOf(Date)` assertion runtime-validates the shape;
-      // narrow with `as Date` so the field reads below typecheck without
-      // re-exposing a typed-codec slot from the descriptor.
-      const result = (await codec.decode('2024-01-15T10:30:00.000Z', {})) as Date;
+      const result = await codec.decode('2024-01-15T10:30:00.000Z', {});
       expect(result).toBeInstanceOf(Date);
       expect(result.toISOString()).toBe('2024-01-15T10:30:00.000Z');
     });
@@ -98,8 +93,7 @@ describe('SQLite codecs', () => {
     it('round-trips dates', async () => {
       const date = new Date('2024-06-15T23:59:59.999Z');
       const wire = await codec.encode!(date, {});
-      // See note on `decode` return narrowing above.
-      const decoded = (await codec.decode(wire, {})) as Date;
+      const decoded = await codec.decode(wire, {});
       expect(decoded.getTime()).toBe(date.getTime());
     });
 

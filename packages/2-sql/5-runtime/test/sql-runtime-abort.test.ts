@@ -1,6 +1,5 @@
 import type { Contract } from '@prisma-next/contract/types';
 import { coreHash, profileHash } from '@prisma-next/contract/types';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import {
   type ExecutionStackInstance,
   instantiateExecutionStack,
@@ -17,6 +16,7 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
+  mkCodec,
   newCodecRegistry,
   ProjectionItem,
   SelectAst,
@@ -307,8 +307,9 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const blockingDecodeStarted = deferred<void>();
     const codecAbortObserved = deferred<void>();
 
-    const observingCodec = buildCodec({
-      id: 'test/observe-signal@1',
+    const observingCodec = mkCodec({
+      typeId: 'test/observe-signal@1',
+      targetTypes: ['text'],
       encode: (v: string) => v,
       decode: async (w: string, ctx?: SqlCodecCallContext) => {
         // Mimic an SDK that registers an abort listener on the supplied
@@ -360,8 +361,9 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
   it('codec ignoring ctx.signal does not block runtime — RUNTIME.ABORTED still surfaces (cooperative cancellation)', async () => {
     const decodeStarted = deferred<void>();
     const release = deferred<string>();
-    const ignoringCodec = buildCodec({
-      id: 'test/ignore-signal@1',
+    const ignoringCodec = mkCodec({
+      typeId: 'test/ignore-signal@1',
+      targetTypes: ['text'],
       encode: (v: string) => v,
       decode: async (w: string) => {
         // Signal we're inside the decode body and deliberately ignore ctx.signal.

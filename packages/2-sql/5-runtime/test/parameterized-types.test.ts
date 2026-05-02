@@ -4,10 +4,9 @@ import type {
   CodecDescriptor,
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
-import { buildCodec } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
-import { newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { mkCodec, newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
@@ -19,8 +18,8 @@ import type {
 import { createStubAdapter, createTestContext } from './utils';
 
 function vectorCodecInstance(meta?: Record<string, unknown>): Codec {
-  const baseCodec = buildCodec({
-    id: 'pg/vector@1',
+  const baseCodec = mkCodec({
+    typeId: 'pg/vector@1',
     encode: (v: number[]) => v,
     decode: (w: number[]) => w,
   });
