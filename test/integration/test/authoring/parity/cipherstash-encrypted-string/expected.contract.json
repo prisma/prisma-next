@@ -1,0 +1,216 @@
+{
+  "schemaVersion": "1",
+  "targetFamily": "sql",
+  "target": "postgres",
+  "profileHash": "sha256:1a8dbe044289f30a1de958fe800cc5a8378b285d2e126a8c44b58864bac2c18e",
+  "roots": {
+    "encrypted_doc": "EncryptedDoc"
+  },
+  "models": {
+    "EncryptedDoc": {
+      "fields": {
+        "equalityOnly": {
+          "nullable": false,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {
+              "equality": true
+            }
+          }
+        },
+        "equalityOnlyOpt": {
+          "nullable": true,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {
+              "equality": true
+            }
+          }
+        },
+        "id": {
+          "nullable": false,
+          "type": {
+            "codecId": "pg/int4@1",
+            "kind": "scalar"
+          }
+        },
+        "searchable": {
+          "nullable": false,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {
+              "equality": true,
+              "freeTextSearch": true
+            }
+          }
+        },
+        "searchableOpt": {
+          "nullable": true,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {
+              "equality": true,
+              "freeTextSearch": true
+            }
+          }
+        },
+        "storageOnly": {
+          "nullable": false,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {}
+          }
+        },
+        "storageOnlyOpt": {
+          "nullable": true,
+          "type": {
+            "codecId": "cipherstash/string@1",
+            "kind": "scalar",
+            "typeParams": {}
+          }
+        }
+      },
+      "relations": {},
+      "storage": {
+        "fields": {
+          "equalityOnly": {
+            "column": "equalityOnly"
+          },
+          "equalityOnlyOpt": {
+            "column": "equalityOnlyOpt"
+          },
+          "id": {
+            "column": "id"
+          },
+          "searchable": {
+            "column": "searchable"
+          },
+          "searchableOpt": {
+            "column": "searchableOpt"
+          },
+          "storageOnly": {
+            "column": "storageOnly"
+          },
+          "storageOnlyOpt": {
+            "column": "storageOnlyOpt"
+          }
+        },
+        "table": "encrypted_doc"
+      }
+    }
+  },
+  "storage": {
+    "storageHash": "sha256:889f3bdc8ed6ba3a28669324ae16fd3986a65400d098ff5155bc436abd81c2d9",
+    "tables": {
+      "encrypted_doc": {
+        "columns": {
+          "equalityOnly": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": false,
+            "typeParams": {
+              "equality": true
+            }
+          },
+          "equalityOnlyOpt": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": true,
+            "typeParams": {
+              "equality": true
+            }
+          },
+          "id": {
+            "codecId": "pg/int4@1",
+            "default": {
+              "expression": "autoincrement()",
+              "kind": "function"
+            },
+            "nativeType": "int4",
+            "nullable": false
+          },
+          "searchable": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": false,
+            "typeParams": {
+              "equality": true,
+              "freeTextSearch": true
+            }
+          },
+          "searchableOpt": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": true,
+            "typeParams": {
+              "equality": true,
+              "freeTextSearch": true
+            }
+          },
+          "storageOnly": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": false,
+            "typeParams": {}
+          },
+          "storageOnlyOpt": {
+            "codecId": "cipherstash/string@1",
+            "nativeType": "eql_v2_encrypted",
+            "nullable": true,
+            "typeParams": {}
+          }
+        },
+        "foreignKeys": [],
+        "indexes": [],
+        "primaryKey": {
+          "columns": ["id"]
+        },
+        "uniques": []
+      }
+    }
+  },
+  "capabilities": {
+    "postgres": {
+      "jsonAgg": true,
+      "lateral": true,
+      "limit": true,
+      "orderBy": true,
+      "returning": true
+    },
+    "sql": {
+      "defaultInInsert": true,
+      "enums": true,
+      "returning": true
+    }
+  },
+  "extensionPacks": {
+    "cipherstash": {
+      "familyId": "sql",
+      "id": "cipherstash",
+      "kind": "extension",
+      "targetId": "postgres",
+      "types": {
+        "storage": [
+          {
+            "familyId": "sql",
+            "nativeType": "eql_v2_encrypted",
+            "targetId": "postgres",
+            "typeId": "cipherstash/string@1"
+          }
+        ]
+      },
+      "version": "0.0.1"
+    }
+  },
+  "meta": {},
+  "_generated": {
+    "warning": "⚠️  GENERATED FILE - DO NOT EDIT",
+    "message": "This file is automatically generated by \"prisma-next contract emit\".",
+    "regenerate": "To regenerate, run: prisma-next contract emit"
+  }
+}

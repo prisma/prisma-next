@@ -1,0 +1,13 @@
+model EncryptedDoc {
+  id Int @id @default(autoincrement())
+
+  storageOnly       cipherstash.EncryptedString({})
+  equalityOnly      cipherstash.EncryptedString({ equality: true })
+  searchable        cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
+
+  storageOnlyOpt    cipherstash.EncryptedString({})?
+  equalityOnlyOpt   cipherstash.EncryptedString({ equality: true })?
+  searchableOpt     cipherstash.EncryptedString({ equality: true, freeTextSearch: true })?
+
+  @@map("encrypted_doc")
+}
