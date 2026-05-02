@@ -297,7 +297,7 @@ function createStubAdapter(): Adapter<SelectAst, SqlContract<SqlStorage>, Lowere
       target: 'postgres',
       targetFamily: 'sql',
       capabilities: {},
-      codecs: createCodecRegistry(),
+      codecs: emptyCodecRegistry(),
     },
     lower: () => ({ sql: '', params: [] }),
   };

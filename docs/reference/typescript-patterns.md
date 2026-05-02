@@ -92,32 +92,26 @@ This aligns with the "Types-Only Emission" principle and allows for better abstr
 **✅ CORRECT: Export interface and factory function**
 
 ```typescript
-export interface CodecRegistry {
-  register(codec: Codec<string>): void;
-  get(id: string): Codec<string> | undefined;
+export interface ColumnRegistry {
+  register(column: Column): void;
+  get(id: string): Column | undefined;
   has(id: string): boolean;
   // ... other methods
 }
 
-export function createCodecRegistry(): CodecRegistry {
-  return new CodecRegistryImpl();  // Private implementation class
-}
-
-// Private implementation - not exported
-class CodecRegistryImpl implements CodecRegistry {
-  private codecs = new Map<string, Codec<string>>();
-
-  register(codec: Codec<string>): void {
-    this.codecs.set(codec.id, codec);
-  }
-
-  get(id: string): Codec<string> | undefined {
-    return this.codecs.get(id);
-  }
-
-  has(id: string): boolean {
-    return this.codecs.has(id);
-  }
+export function createColumnRegistry(): ColumnRegistry {
+  const columns = new Map<string, Column>();
+  return {
+    register(column) {
+      columns.set(column.id, column);
+    },
+    get(id) {
+      return columns.get(id);
+    },
+    has(id) {
+      return columns.has(id);
+    },
+  };
 }
 ```
 
@@ -125,16 +119,14 @@ class CodecRegistryImpl implements CodecRegistry {
 
 ```typescript
 // Don't do this - exposes implementation details
-export class CodecRegistry {
-  private codecs = new Map<string, Codec<string>>();
+export class ColumnRegistry {
+  private columns = new Map<string, Column>();
   // ...
 }
 ```
 
 ### Examples in Codebase
 
-- `CodecRegistry` → `createCodecRegistry()`
-- `CodecDefBuilder` → `defineCodecs()`
 - `Runtime` → `createRuntime()`
 - `PostgresDriver` → `postgresRuntimeDriverDescriptor.create()` + `connect(binding)`
 - `PostgresAdapter` → `createPostgresAdapter()`
@@ -606,16 +598,16 @@ It's easy to add unnecessary type casts (`as unknown as T`) or optional chaining
 
 ```typescript
 // Codec accepts string | Date, but we cast Date to string
-const codec = codecDefinitions['timestamp']?.codec;
-const encoded = codec.encode!(date as unknown as string);  // Unnecessary cast!
+const c = codecLookup.get('pg/timestamptz@1');
+const encoded = c.encode(date as unknown as string);  // Unnecessary cast!
 ```
 
 **✅ CORRECT: Check the actual type signature first**
 
 ```typescript
-// Codec interface: encode?(value: string | Date): string
-const codec = codecDefinitions['timestamp'].codec;
-const encoded = codec.encode!(date);  // Date is already accepted!
+// Codec interface: encode(value: string | Date): Promise<string>
+const c = codecLookup.get('pg/timestamptz@1');
+const encoded = await c.encode(date);  // Date is already accepted!
 ```
 
 **When to use type casts:**
@@ -628,23 +620,20 @@ const encoded = codec.encode!(date);  // Date is already accepted!
 **❌ WRONG: Using optional chaining when values are guaranteed to exist**
 
 ```typescript
-// codecDefinitions['timestamp'] is guaranteed to exist in tests
-const codec = codecDefinitions['timestamp']?.codec as
-  | { encode: (value: string | Date) => string }
+// codecLookup.get('pg/timestamptz@1') is guaranteed to return a codec in tests
+const c = codecLookup.get('pg/timestamptz@1') as
+  | { encode: (value: string | Date) => Promise<string> }
   | undefined;
-if (!codec) {
+if (!c) {
   throw new Error('codec not found');
 }
 ```
 
-**✅ CORRECT: Use dot notation when values are guaranteed**
+**✅ CORRECT: Use a non-null assertion (or assert) when values are guaranteed**
 
 ```typescript
-// In test context, codecDefinitions['timestamp'] is guaranteed to exist
-const codec = codecDefinitions['timestamp'].codec as {
-  encode: (value: string | Date) => string;
-  decode: (wire: string | Date) => string;
-};
+// In test context, the codec lookup always has the timestamp codec registered
+const c = codecLookup.get('pg/timestamptz@1')!;
 ```
 
 **When to use optional chaining:**
@@ -657,18 +646,15 @@ const codec = codecDefinitions['timestamp'].codec as {
 **❌ WRONG: Adding `| undefined` to type assertions when values are guaranteed**
 
 ```typescript
-const codec = codecDefinitions['timestamp']?.codec as
-  | { encode: (value: string | Date) => string }
+const c = codecLookup.get('pg/timestamptz@1') as
+  | { encode: (value: string | Date) => Promise<string> }
   | undefined;  // Unnecessary - value is guaranteed to exist
 ```
 
 **✅ CORRECT: Only include `| undefined` if the value might actually be undefined**
 
 ```typescript
-const codec = codecDefinitions['timestamp'].codec as {
-  encode: (value: string | Date) => string;
-  decode: (wire: string | Date) => string;
-};
+const c = codecLookup.get('pg/timestamptz@1')!;
 ```
 
 ### Best Practices

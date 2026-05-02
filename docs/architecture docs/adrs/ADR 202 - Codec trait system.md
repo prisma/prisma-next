@@ -63,7 +63,7 @@ Traits are declared at codec registration time. Core SQL codecs and adapter code
 
 ```ts
 // sql-codecs.ts
-const sqlIntCodec = codec({
+const sqlIntCodec = defineCodec({
   typeId: SQL_INT_CODEC_ID,
   targetTypes: ['int'],
   traits: ['equality', 'order', 'numeric'],
@@ -74,7 +74,7 @@ const sqlIntCodec = codec({
 
 ```ts
 // postgres adapter codecs
-const pgTextCodec = codec({
+const pgTextCodec = defineCodec({
   typeId: 'pg/text@1',
   targetTypes: ['text'],
   traits: ['equality', 'order', 'textual'],
@@ -82,7 +82,7 @@ const pgTextCodec = codec({
   decode: (wire) => wire,
 });
 
-const pgBoolCodec = codec({
+const pgBoolCodec = defineCodec({
   typeId: 'pg/bool@1',
   targetTypes: ['bool'],
   traits: ['equality', 'boolean'],
@@ -90,7 +90,7 @@ const pgBoolCodec = codec({
   decode: (wire) => wire,
 });
 
-const pgJsonbCodec = codec({
+const pgJsonbCodec = defineCodec({
   typeId: 'pg/jsonb@1',
   targetTypes: ['jsonb'],
   traits: ['equality'],  // equality only; not order-comparable
@@ -103,7 +103,7 @@ Extension codecs declare traits the same way:
 
 ```ts
 // pgvector codec — vectors have equality but are not order-comparable or numeric
-const pgVectorCodec = codec({
+const pgVectorCodec = defineCodec({
   typeId: 'pg/vector@1',
   targetTypes: ['vector'],
   traits: ['equality'],

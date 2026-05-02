@@ -124,7 +124,7 @@ Non-parameterized codecs don't need to implement it. The common case is zero cod
 Here's what the JSONB codec looks like with `renderOutputType`:
 
 ```ts
-const pgJsonbCodec = codec({
+const pgJsonbCodec = defineCodec({
   typeId: 'pg/jsonb@1',
   targetTypes: ['jsonb'],
   encode: (value): string => JSON.stringify(value),
@@ -210,7 +210,7 @@ Rejected because phantom types are gross, and mixing type-only metadata into the
 
 ### Make `renderOutputType` required with a default
 
-Like `encodeJson`/`decodeJson` on [ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), make it required with a default provided by the `codec()` factory.
+Like `encodeJson`/`decodeJson` on [ADR 184](ADR%20184%20-%20Codec-owned%20value%20serialization.md), make it required with a default provided by the `defineCodec()` factory.
 
 Deferred. Most codecs don't parameterize their output type — the default (`CodecTypes[codecId]['output']`) handles them. Optional with a well-defined fallback is cleaner for now.
 

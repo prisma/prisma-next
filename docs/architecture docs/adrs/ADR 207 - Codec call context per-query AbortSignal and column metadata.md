@@ -14,7 +14,7 @@ A codec author shipping an encrypted-JSON column type with cancellation and colu
 import { codec } from '@prisma-next/sql-relational-core/ast';
 import { encryptClient } from './encrypt-client';
 
-const encryptedJson = codec({
+const encryptedJson = defineCodec({
   typeId: 'encrypted/json@1',
   targetTypes: ['jsonb'],
 

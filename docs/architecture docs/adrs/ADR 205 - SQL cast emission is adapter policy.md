@@ -90,7 +90,7 @@ Anything outside the set — including `json`, `jsonb`, all extension types, all
 The pgvector extension declares its codec the same way it does today, with no new fields:
 
 ```ts
-const pgVectorCodec = codec({
+const pgVectorCodec = defineCodec({
   typeId: 'pg/vector@1',
   meta: { db: { sql: { postgres: { nativeType: 'vector' } } } },
   // … encode/decode …
@@ -113,7 +113,7 @@ function renderTypedParam(index, codecId, codecLookup) {
 A user who registers a PostGIS codec gets correct emission with zero adapter change:
 
 ```ts
-const geographyCodec = codec({
+const geographyCodec = defineCodec({
   typeId: 'app/geography@1',
   meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
   // …

@@ -18,13 +18,13 @@ That direction was rejected during architectural review. The salient critique:
 - **The cost lived in the wrong place.** A property of two codec methods became a property of the whole interface, the ORM type system, and every codec author's mental model.
 - **There was nowhere to walk back to.** Once `runtime: 'async'` and conditional return types are public, removing them is a breaking change. The optimization (sync fast-path) and the public surface were tangled.
 - **The sync/async split was the wrong seam.** The actual structural seam is between **query-time methods** (per-row, IO-relevant: `encode`, `decode`) and **build-time methods** (per-contract-load, sync: `encodeJson`, `decodeJson`, `renderOutputType`).
-- **Cross-family portability was harder, not easier.** Mongo and SQL would each need to interpret the marker; a single `codec({...})` value couldn't be reused without re-typing.
+- **Cross-family portability was harder, not easier.** Mongo and SQL would each need to interpret the marker; a single `defineCodec({...})` value couldn't be reused without re-typing.
 
 This ADR replaces that direction with a **single-path** design that localizes the cost of supporting both sync and async authoring to one place — the runtime's two codec invocation loops — and leaves the public interface uniform, the ORM type surfaces single-ended, and the build-time path synchronous.
 
 ## Decision
 
-The runtime treats codec query-time methods as **uniformly Promise-returning** at the public interface and **always awaits** them. Codec authors may write either sync or async functions; the `codec()` factory transparently lifts sync ones to Promise-returning methods. Build-time methods stay synchronous.
+The runtime treats codec query-time methods as **uniformly Promise-returning** at the public interface and **always awaits** them. Codec authors may write either sync or async functions; the `defineCodec()` factory transparently lifts sync ones to Promise-returning methods. Build-time methods stay synchronous.
 
 Concretely:
 
@@ -36,7 +36,7 @@ Concretely:
    - `renderOutputType?(typeParams): string | undefined` — build-time, optional, synchronous.
    - **No** `runtime` / `kind` / equivalent marker. **No** `TRuntime` generic. **No** conditional return types.
 
-2. **Single factory.** `codec()` (in `relational-core`) and its cross-family analog `mongoCodec()` (in `mongo-codec`) accept `encode` and `decode` in either sync or async form. Sync functions are wrapped to return `Promise.resolve(...)`; async functions pass through unchanged. The constructed `Codec` value always exposes Promise-returning query-time methods, regardless of how it was authored. `encode` may be omitted (identity default); `decode` is required.
+2. **Single factory.** `defineCodec()` (in `relational-core`) and its cross-family analog `mongoCodec()` (in `mongo-codec`) accept `encode` and `decode` in either sync or async form. Sync functions are wrapped to return `Promise.resolve(...)`; async functions pass through unchanged. The constructed `Codec` value always exposes Promise-returning query-time methods, regardless of how it was authored. `encode` may be omitted (identity default); `decode` is required.
 
 3. **Runtime always awaits.**
    - `encodeParams` is `async` and dispatches all parameter codec calls concurrently via `Promise.all`.
@@ -48,7 +48,7 @@ Concretely:
 
 5. **ORM client type surfaces are uniform.** `DefaultModelRow` / `InferRootRow` field types are plain `T`. Write surfaces (`MutationUpdateInput`, `CreateInput`, `UniqueConstraintCriterion`, `ShorthandWhereFilter`, `DefaultModelInputRow`) accept plain `T`. Read and write share **one** field type-map.
 
-6. **Cross-family portability.** The `Codec` interface in SQL (`framework-components` / `relational-core`) and Mongo (`mongo-codec`) is structurally identical: same generics, same Promise-returning query-time methods, same synchronous build-time methods. A single `codec({...})` value is structurally usable in both runtimes.
+6. **Cross-family portability.** The `Codec` interface in SQL (`framework-components` / `relational-core`) and Mongo (`mongo-codec`) is structurally identical: same generics, same Promise-returning query-time methods, same synchronous build-time methods. A single `defineCodec({...})` value is structurally usable in both runtimes.
 
 ## Architecture
 
@@ -78,13 +78,13 @@ interface Codec<
 
 The interface uses the same four generics across SQL and Mongo (`Id`, `TTraits`, `TWire`, `TInput`). `decode` returns `Promise<TInput>`: a codec's decoded value is the same JS-side type its `encode` accepts, so a single round-trip type variable `TInput` is sufficient. There is no `TOutput`. There is no `TRuntime`. There is no `kind` discriminant. There is no conditional return type.
 
-### `codec()` / `mongoCodec()` factories
+### `defineCodec()` / `mongoCodec()` factories
 
 The factory is the **only** place where author-side sync/async authoring is observable. It accepts each query-time method in either form and constructs a `Codec` whose query-time methods always return Promises:
 
 ```ts
 // Sync authoring — works exactly the same end-to-end.
-const textCodec = codec({
+const textCodec = defineCodec({
   typeId: 'pg/text@1',
   targetTypes: ['text'],
   encode: (v: string) => v,
@@ -94,7 +94,7 @@ const textCodec = codec({
 });
 
 // Async authoring — same factory, same shape.
-const secretCodec = codec({
+const secretCodec = defineCodec({
   typeId: 'pg/secret@1',
   targetTypes: ['text'],
   encode: async (v: string) => encrypt(v, await getKey()),
@@ -141,12 +141,12 @@ async function decodeField(wire, codec, schema) {
 Mongo gets the same `Codec` shape and the same encode-side always-await pattern:
 
 - `MongoCodec` is structurally identical to the SQL `Codec` (same four generics, same Promise-returning query-time methods, same synchronous build-time methods).
-- `mongoCodec()` is the cross-family analog of `codec()` and lifts sync authoring identically.
+- `mongoCodec()` is the cross-family analog of `defineCodec()` and lifts sync authoring identically.
 - `resolveValue` is `async` and dispatches codec-encoded leaves concurrently via `Promise.all` when a value tree carries multiple of them.
 - `MongoAdapter.lower()` is `async`; `MongoAdapter` in `mongo-lowering` reflects this.
 - `MongoRuntime.execute()` awaits `adapter.lower(plan)` before issuing the wire command.
 
-A single `codec({...})` module is structurally usable in both SQL and Mongo runtimes; a portability test exercises this.
+A single `defineCodec({...})` module is structurally usable in both SQL and Mongo runtimes; a portability test exercises this.
 
 ### Error envelopes (unchanged)
 
@@ -160,14 +160,14 @@ Encode and decode failures continue to be wrapped in the standard envelope shape
 
 A synchronous fast-path for sustained-throughput workloads is a future, **additive**, opt-in change — not a constraint on the public interface today. The walk-back path is:
 
-- A new `codecSync()` factory (in addition to, not replacing, `codec()`) that constructs a codec whose query-time methods are typed as synchronous returns at the public boundary.
+- A new `codecSync()` factory (in addition to, not replacing, `defineCodec()`) that constructs a codec whose query-time methods are typed as synchronous returns at the public boundary.
 - Predicates `isSyncEncoder(codec)` / `isSyncDecoder(codec)` that the runtime can call to take a faster, fully-sync encode/decode path that skips the `Promise.all` allocation and microtask hop.
 - The runtime gains a sync fast-path arm; the existing async path remains, unchanged, for codecs that opt in to async or that don't opt in to sync.
 
 For this opt-in to land cleanly, the design today must **not** introduce any of the following walk-back constraints:
 
 1. A sync/async marker on the public `Codec` interface (no `runtime`, `kind`, or equivalent field).
-2. Multiple factory variants (`codecSync` / `codecAsync`) — there is **one** factory, `codec()`, today; `codecSync()` is the future additive opt-in.
+2. Multiple factory variants (`codecSync` / `codecAsync`) — there is **one** factory, `defineCodec()`, today; `codecSync()` is the future additive opt-in.
 3. Exported sync-vs-async predicates.
 4. Conditional return types tied to async-ness on the public interface.
 5. A `TRuntime` generic on `Codec`.
@@ -218,7 +218,7 @@ The single-path always-await design does not preclude either mitigation; both ca
 
 Mongo decode is **in place** as of TML-2324: the Mongo runtime walks a structural `MongoResultShape` attached to `MongoQueryPlan` / `MongoExecutionPlan` (see `packages/2-mongo-family/4-query/query-ast/src/result-shape.ts`), dispatches leaf decodes via `Promise.all` per row, and maps failures to `RUNTIME.DECODE_FAILED` with `{ collection, path, codec, wirePreview }`. Lanes populate `resultShape` for flat typed reads; raw commands omit it so rows pass through unchanged. SQL continues to use `meta.annotations` / `meta.projectionTypes`; Mongo does not use those fields for decode.
 
-Mongo's codec registry is now aggregated by the framework's execution-stack composition machinery (matching the SQL pattern that has been in place since ADR 152): component descriptors declare codecs on `ComponentMetadata.types.codecTypes.codecInstances`, and `createMongoExecutionContext({ contract, stack })` walks the stack to fold them into a single `MongoCodecRegistry` exposed on `context.codecs`. `MongoRuntimeOptions` no longer accepts a `codecs` field — users do not construct or thread a registry. See `packages/2-mongo-family/7-runtime/src/mongo-execution-stack.ts` for the Mongo-side implementation and `packages/2-sql/5-runtime/src/sql-context.ts` for the SQL counterpart.
+Mongo's codec registry is now aggregated by the framework's execution-stack composition machinery (matching the SQL pattern that has been in place since ADR 152): component descriptors declare codecs on `ComponentMetadata.types.codecTypes.codecDescriptors`, and `createMongoExecutionContext({ contract, stack })` walks the stack to fold them into a single `MongoCodecRegistry` exposed on `context.codecs`. `MongoRuntimeOptions` no longer accepts a `codecs` field — users do not construct or thread a registry. See `packages/2-mongo-family/7-runtime/src/mongo-execution-stack.ts` for the Mongo-side implementation and `packages/2-sql/5-runtime/src/sql-context.ts` for the SQL counterpart.
 
 The earlier "Mongo decode out of scope" note below is **historical** — it described the state before this work landed.
 
@@ -233,7 +233,7 @@ Concretely, in this ADR’s original encode-focused slice:
 
 - **In scope (Mongo):** the encode-side runtime invocation pattern. `resolveValue`, `MongoAdapter.lower()`, and `MongoRuntime.execute()` are reshaped to async + `Promise.all` for consistency with SQL.
 - **Decode (Mongo), follow-up to this ADR:** row decoding now uses structural `MongoResultShape` and `decodeMongoRow` in `@prisma-next/mongo-runtime` (TML-2324); JSON-Schema validation on decoded cells remains SQL-only for now.
-- **In scope (cross-family):** the structural identity of `Codec` and `MongoCodec`, and the structural reusability of a single `codec({...})` module across both runtimes' encode paths.
+- **In scope (cross-family):** the structural identity of `Codec` and `MongoCodec`, and the structural reusability of a single `defineCodec({...})` module across both runtimes' encode paths.
 
 ## References
 

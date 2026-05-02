@@ -5,7 +5,7 @@
 A column with `codecId: "pg/timestamptz@1"` has a default value of `new Date('2024-01-15')` — a JavaScript `Date`. This value has to survive a round-trip through `contract.json`, but `Date` has no JSON representation. The codec handles it:
 
 ```ts
-const pgTimestamptzCodec = codec({
+const pgTimestamptzCodec = defineCodec({
   typeId: 'pg/timestamptz@1',
   targetTypes: ['timestamptz'],
   traits: ['equality', 'order'],
@@ -42,7 +42,7 @@ The resulting contract JSON is plain — no tags, no wrappers:
 
 The consumer reads `"2024-01-15T00:00:00.000Z"`, looks up `pg/timestamptz@1`, calls `decodeJson(...)`, gets a `Date` object.
 
-Every codec has `encodeJson` and `decodeJson`. For JSON-safe types (strings, numbers, booleans, null), they are identity functions — the `codec()` factory provides these defaults. Only codecs for types that JSON can't represent (`Date`, binary data, etc.) override them.
+Every codec has `encodeJson` and `decodeJson`. For JSON-safe types (strings, numbers, booleans, null), they are identity functions — the `defineCodec()` factory provides these defaults. Only codecs for types that JSON can't represent (`Date`, binary data, etc.) override them.
 
 The same typed value crosses other boundaries too. The migration planner renders it into DDL (`DEFAULT '2024-01-15T00:00:00.000Z'`). The PSL printer renders it into schema source (`@default("2024-01-15T00:00:00.000Z")`). Migration operations carry it in `ops.json`. These are the same problem for different media, but they live at different layers:
 
@@ -119,7 +119,7 @@ Both SQL and Mongo families define structurally identical codec interfaces (`Cod
 
 `encodeJson` and `decodeJson` are required on the `Codec` interface, not optional. Any type that can appear in the contract may need a literal value serialized for it (column defaults, discriminator values, type parameters, migration temporary defaults). Making the methods required eliminates null checks at every dispatch site.
 
-For JSON-safe types (strings, numbers, booleans, null), the methods are identity functions. The `codec()` factory provides these defaults when not explicitly supplied, so codecs for JSON-safe types need no additional boilerplate.
+For JSON-safe types (strings, numbers, booleans, null), the methods are identity functions. The `defineCodec()` factory provides these defaults when not explicitly supplied, so codecs for JSON-safe types need no additional boilerplate.
 
 ### Contract loading integrates decoding
 

@@ -42,7 +42,7 @@ const runtime = createMongoRuntime({
 });
 ```
 
-Custom or third-party codecs (encryption, vendor scalars) are contributed via an extension-pack descriptor whose `codecInstances` list includes them; `createMongoExecutionContext` folds them into the same registry. Duplicate codec ids across contributors throw `RUNTIME.DUPLICATE_CODEC` at composition time.
+Custom or third-party codecs (encryption, vendor scalars) are contributed via an extension-pack descriptor whose `codecs` slot returns the codec descriptors; `createMongoExecutionContext` folds them into the same registry. Duplicate codec ids across contributors throw `RUNTIME.DUPLICATE_CODEC` at composition time.
 
 ## Responsibilities
 
