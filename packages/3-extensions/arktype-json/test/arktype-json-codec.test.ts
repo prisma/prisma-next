@@ -277,16 +277,38 @@ describe('arktypeJsonCodec descriptor', () => {
       })(SYNTH_CTX),
     ).toThrow(/Failed to rehydrate arktype schema/);
   });
+
+  // The factory rehydrates the schema from `jsonIr` and asserts that
+  // the schema's `expression` round-trips. A divergence means either
+  // the contract was hand-edited or an arktype version mismatch caused
+  // the rendering to drift — in both cases the emitted `contract.d.ts`
+  // is no longer faithful to the runtime schema, and the previous
+  // `console.warn` was too quiet (the bad types had already shipped
+  // by the time the warning fired).
+  it('factory throws RUNTIME.TYPE_PARAMS_INVALID when typeParams.expression diverges from rehydrated schema', () => {
+    const descriptor = arktypeJson(productSchema);
+    expect(() =>
+      arktypeJsonCodec.factory({
+        ...descriptor.typeParams,
+        expression: 'an obviously stale expression',
+      })(SYNTH_CTX),
+    ).toThrow(/typeParams\.expression .* does not match/);
+  });
+
+  it('factory accepts matching typeParams.expression without complaint', () => {
+    const descriptor = arktypeJson(productSchema);
+    expect(() => arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX)).not.toThrow();
+  });
 });
 
 describe('serialize/rehydrate roundtrip', () => {
   it("rehydrated schema's behavior matches the source", async () => {
     // The rehydration round-trip is the load-bearing guarantee for the
     // emit-vs-runtime parity check: the rehydrated schema validates the
-    // same payloads as the source (semantic identity, even if the
-    // expression diverges across arktype versions). The descriptor's
-    // factory carries a defensive console.warn for expression
-    // divergence; we only assert on the validation side here.
+    // same payloads as the source. The factory enforces expression
+    // round-trip stability by throwing if `expression` diverges; this
+    // test exercises the happy path where serialized and rehydrated
+    // expressions match.
     const descriptor = arktypeJson(productSchema);
     const reCodec = arktypeJsonCodec.factory(descriptor.typeParams)(SYNTH_CTX);
     const sourceCodec = descriptor.type(SYNTH_CTX);

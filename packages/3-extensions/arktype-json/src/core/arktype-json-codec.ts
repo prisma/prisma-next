@@ -404,22 +404,27 @@ export const arktypeJsonCodec: CodecDescriptor<ArktypeJsonTypeParams> = {
   renderOutputType: renderArktypeJsonOutputType,
   factory: (params) => {
     const schema = rehydrateSchema(params.jsonIr);
-    /* c8 ignore start — defensive parity check; not exercised by typical contracts */
-    // The rehydrated schema's `expression` should match the serialized
-    // one; diverging means contract.json was hand-edited out from under
-    // the emit-path renderer. Surface as a soft warning at materialization
-    // time so the caller knows their emit output may not match the
-    // runtime schema. The runtime keeps using the schema rehydrated from
-    // `jsonIr` — that's the lossless source — so the worst case is an
-    // emit-vs-runtime divergence at a single column, not a runtime
-    // failure.
+    // The rehydrated schema's `expression` must match the serialized one.
+    // A mismatch means either contract.json was hand-edited or the
+    // installed arktype version's IR-to-expression rendering diverged from
+    // the version that produced contract.json — in both cases the emitted
+    // `contract.d.ts` is no longer faithful to the runtime schema. Fail at
+    // contract-load rather than warn: a runtime warning fires after the
+    // wrong types have already shipped to consumers, and silent drift is
+    // exactly what the round-trip-stability invariant is supposed to
+    // prevent. See § Compatibility in the package README.
     const rehydratedExpression = (schema as { readonly expression?: unknown }).expression;
     if (typeof rehydratedExpression === 'string' && rehydratedExpression !== params.expression) {
-      console.warn(
-        `[arktype-json] typeParams.expression (${params.expression}) does not match rehydrated schema expression (${rehydratedExpression}); contract.json may be stale relative to the runtime schema.`,
+      throw runtimeError(
+        'RUNTIME.TYPE_PARAMS_INVALID',
+        `arktype-json: typeParams.expression (${params.expression}) does not match the rehydrated schema's expression (${rehydratedExpression}). The contract was likely emitted against a different arktype version or hand-edited; re-run \`pnpm emit\` to regenerate.`,
+        {
+          codecId: ARKTYPE_JSON_CODEC_ID,
+          serializedExpression: params.expression,
+          rehydratedExpression,
+        },
       );
     }
-    /* c8 ignore stop */
     return arktypeJsonCodecForSchema<unknown>(schema);
   },
 };
