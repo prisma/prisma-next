@@ -60,6 +60,10 @@ The developer's workflow is: scaffold the package with `migration plan` (which w
 
 Because `migrationId` is computed from the manifest and `ops.json`, two `migration.ts` files with different source code that emit identical ops produce the same `migrationId`. Refactoring the authoring file — extracting helpers, changing variable names, upgrading builder APIs — doesn't invalidate an already-attested migration as long as the emitted ops are unchanged.
 
+### Op schema includes routing-layer fields
+
+`MigrationOpSchema` (Arktype) admits an optional `invariantId: string` on data-transform ops so the field round-trips through `ops.json` validation. The schema stays shallow on operation-specific payload — `invariantId` is the routing-layer carve-out, not a generic op-level extension point. Authoring + emit derives the migration's `providedInvariants` aggregate from the data ops' `invariantId`s; the manifest field is then re-derived from `ops.json` at verify time and compared against the stored copy via `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
+
 ## Alternatives considered
 
 ### Execute migration.ts directly at apply time
@@ -86,3 +90,4 @@ Rejected because MongoDB commands have richer structure than SQL DDL strings. Ch
 - [ADR 169 — On-disk migration persistence](ADR%20169%20-%20On-disk%20migration%20persistence.md)
 - [ADR 188 — MongoDB migration operation model](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)
 - [ADR 199 — Storage-only migration identity](ADR%20199%20-%20Storage-only%20migration%20identity.md)
+- [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md)

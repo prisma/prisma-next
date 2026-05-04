@@ -69,8 +69,8 @@ Not a conflict with reconstruction:
 
 ### Integrity checks on load
 
-- **Same source and target check**: reject `from == to` with `MIGRATION.SAME_SOURCE_AND_TARGET`
-- **Cycle detection**: DFS with color marking, reported as `WARN_MIG_GRAPH_CYCLE` for diagnostics. Cycles are tolerated at runtime — BFS pathfinding uses visited-node tracking to avoid infinite loops. See ADR 169 §3.
+- **Same source and target check**: reject `from == to` with `MIGRATION.SAME_SOURCE_AND_TARGET` **unless** the migration package carries at least one `data`-class operation. Self-edges with data ops are first-class (pure data migrations on the current contract hash); the rejection is narrowed to ops-free self-edges. See [ADR 001 §Self-edges](ADR%20001%20-%20Migrations%20as%20Edges.md) and [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
+- **Cycle detection**: DFS with color marking, reported as `WARN_MIG_GRAPH_CYCLE` for diagnostics. Cycles are tolerated at runtime — BFS pathfinding uses visited-state tracking to avoid infinite loops (see §Path computation below). See ADR 169 §3.
 - **Parallel edge policy**: two edges with same `(from, to)` but different `opsHash` require label `parallel-ok`, else `ERR_MIG_GRAPH_PARALLEL_EDGE`
 - **Orphan edge detection**: edges unreachable from any genesis or that lead to no declared target are flagged as `WARN_MIG_ORPHAN_EDGE` (excludes edges marked `archived: true`)
 - **Dangling target detection**: `to` with no inbound edges and not a genesis is `ERR_MIG_GRAPH_DANGLING_TARGET`
@@ -79,8 +79,9 @@ Not a conflict with reconstruction:
 ### Path computation
 
 - **Default**: reconstruct graph from edge file manifests in-memory
-- Use BFS to compute minimal-hop paths over adjacency list
-- Complexity O(V+E)
+- `findPath(graph, from, to)` uses BFS to compute minimal-hop paths over adjacency list. Complexity O(V+E).
+- `findPathWithInvariants(graph, from, to, required)` extends the BFS to invariant-aware routing — returns the shortest path whose edges' `invariants` sets collectively cover `required`, or `null`. State-level dedup over `(node, coveredSubset)` is required for correctness; node-only dedup misses paths whose first arrival covered the wrong subset. The covered subset is encoded as an int32 bitmask over a sorted enumeration of `required`, capped at `k = 30` for encoding correctness (not a perf threshold). When `required = ∅` the result is byte-identical to `findPath`. See [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the full algorithm and rationale.
+- Neighbour ordering is owned by neighbour generation, not by a separate sort step — invariant-aware ordering depends on the source state's still-needed set, and that dependency can't be separated from where neighbours are produced. When `required ≠ ∅`, edges that cover at least one still-needed invariant are explored before edges that don't, with the deterministic tie-break below as the secondary key. When `required = ∅`, ordering matches `findPath` exactly.
 - With squash-first policy (ADR 102), typical V+E < 50, making this trivial
 - Optional index pre-materializes adjacency for performance at scale
 
@@ -89,18 +90,21 @@ Not a conflict with reconstruction:
 Neighbor ordering is deterministic whether using reconstruction or index. Metadata comes from migration file headers (`migration.json`), not the index. The index merely caches this for faster access.
 
 Neighbor processing order is stable by a sort key tuple:
-1. Label priority: `main < default < feature`
-2. `createdAt` ascending
-3. `to` lexicographic
-4. `edgeId` lexicographic
+1. (Invariant-aware BFS only, when `required ≠ ∅`) edge's `invariants` overlap the still-needed set: covering edges first
+2. Label priority: `main < default < feature`
+3. `createdAt` ascending
+4. `to` lexicographic
+5. `migrationHash` lexicographic
 
-If labels are absent the order falls back to the remaining keys.
+If labels are absent the order falls back to the remaining keys. Key (1) applies only inside `findPathWithInvariants`; structural `findPath` ignores it (preserving byte-for-byte routing parity for callers that don't thread invariants).
 
 ### Graph version and caching
 
-- `graphVersion = sha256(sorted(edgeId, from, to, opsHash))`
+- `graphVersion = sha256(sorted(migrationHash, from, to, opsHash))`
 - The runner uses `(currentHash, desiredHash, graphVersion)` in cache keys
 - Any index change invalidates cached paths deterministically
+
+> **Terminology note.** This ADR's body uses `edgeId` in places where the code uses `migrationHash` — the same content-addressed hash. `migrationHash` covers `providedInvariants` as well (see [ADR 169 §3](ADR%20169%20-%20On-disk%20migration%20persistence.md), [ADR 199](ADR%20199%20-%20Storage-only%20migration%20identity.md)).
 
 ### Orphans and parallel edges policy
 
@@ -153,9 +157,11 @@ If labels are absent the order falls back to the remaining keys.
 
 ## References
 
+- ADR 001 — Migrations as Edges (self-edge rule)
 - ADR 028 — Migration structure & operations
 - ADR 037 — Transactional DDL fallback & compensation
 - ADR 038 — Operation idempotency classification & enforcement
 - ADR 021 — Contract marker storage & verification modes
 - ADR 101 — Advisors framework
 - ADR 102 — Squash-first policy & squash advisor
+- [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — `findPathWithInvariants`, the discriminated `FindPathOutcome`, and the `(hash, requiredInvariants)` routing target tuple

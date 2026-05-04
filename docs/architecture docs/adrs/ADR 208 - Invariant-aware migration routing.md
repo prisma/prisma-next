@@ -20,6 +20,19 @@ We need durable decisions for: (1) how data-transform **identity** splits betwee
 
 `ContractMarkerRecord.invariants` is **set-semantic** and **monotonic**: on every successful apply that updates the marker, the storage layer **unions** newly provided ids into the existing set; it **never shrinks** on rollback or re-run. **Two authorities:** the data transform’s **`check`** answers “does the data satisfy X *right now*?”; **`marker.invariants`** answers “has a migration that provides X been **successfully applied at least once** (history)?” — not the same claim.
 
+#### Why marker, not ledger or graph-derived
+
+The marker and the ledger answer different categories of question. The marker is **what Prisma Next has signed the database with** — a framework-issued *guarantee record*. `storageHash` and `profileHash` already record "this database is at contract C with capability profile P." `invariants` extends that record to "…and these named data-transform guarantees have been applied." The runner is the only writer; the framework reads it to decide whether plans are applicable, whether a ref is satisfied, whether routing is needed. The ledger is an **audit artifact** — an append-only log of what happened, when, and (in the future) by whom; intended for compliance / debugging / observability and on a user-owned lifecycle (truncatable for retention, log compaction, or an ops accident).
+
+Structural framework behaviour must never depend on the audit log. "Successfully applied invariants" is a structural guarantee about the database's contract state, so it belongs on the guarantee record. Asking the audit log to answer structural questions is a category error: it ties routing correctness to whether anyone vacuumed the ledger lately.
+
+Two alternatives were considered against that frame and rejected:
+
+- **Ledger-side storage** — record `(migrationId, invariants)` per applied row, derive the applied set by reading the ledger. Per-migration provenance is a real benefit, but: (a) it makes routing depend on a writable, user-owned audit log; (b) it requires a new `readLedger` SPI on `ControlFamilyInstance`; (c) it drags Mongo ledger parity (TML-2283) into the critical path; (d) it pays for a capability v1 doesn't consume. The principled objection (a) stands even if the SPI cost (b–d) is paid.
+- **Graph-derived snapshot** — walk `root → marker` in the graph and union declared `providedInvariants` from each edge. Rejected as correctness-breaking: assumes the DB traversed every edge on that structural path, which `db update` violates.
+
+Costs accepted in v1: no per-migration provenance ("X was first applied by M1 on Tuesday"); rollbacks don't subtract (compensating migrations *add* their own `providedInvariants` and the data transform's `check` is what verifies the data); no explicit revoke story. If product needs surface, the *ledger* can grow per-invariant provenance later — as an audit feature, not as the source of truth for routing.
+
 ### Server-side merge for invariants
 
 - **Postgres** — marker UPDATE sets `invariants` with a **single self-referential** expression (reads current row under the update lock, unions, dedupes, sorts):

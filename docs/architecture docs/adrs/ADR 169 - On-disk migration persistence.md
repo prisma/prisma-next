@@ -48,17 +48,17 @@ Migrations are directed edges in a graph where nodes are contract hashes and edg
 
 **Branch detection**: Two migrations sharing the same `from` hash that target different `to` hashes create divergent branches, detected as `AMBIGUOUS_TARGET`. This is a hard error requiring explicit resolution — the system never silently picks a winner.
 
-**Ref-based targeting**: Named refs (`migrations/refs.json`) map environment names (e.g., `staging`, `production`) to contract hashes. When a ref is provided via `--ref`, `migration status` and `migration apply` use the ref hash as the target, bypassing target resolution entirely. This allows commands to work on divergent graphs by selecting a specific branch.
+**Ref-based targeting**: Named refs map environment names (e.g., `staging`, `production`) to a `(hash, invariants)` tuple. Storage is per-file: `migrations/refs/<name>.json`, each file carrying `{ hash, invariants: string[] }`. When a ref is provided via `--ref`, `migration status` and `migration apply` use the ref hash as the structural target *and* compute `effectiveRequired = ref.invariants − marker.invariants` to drive invariant-aware routing through `findPathWithInvariants`. This allows commands to work on divergent graphs by selecting a specific branch and additionally requires the selected path to apply the named data invariants. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 
 ### 3. Content-addressed migration identity
 
-`migrationId` is a content-addressed hash computed from:
-- The manifest (minus `migrationId` and `signature`)
-- The operations (`ops.json`)
+`migrationId` (in code: `migrationHash`) is a content-addressed hash computed from:
+- The manifest (minus `migrationId` and `signature`) — including `providedInvariants`
+- The operations (`ops.json`) — including any `invariantId` on data ops
 - The canonicalized `fromContract`
 - The canonicalized `toContract`
 
-The `from` and `to` hashes are included in the manifest and therefore in the `migrationId`. Changing either endpoint changes the identity.
+The `from` and `to` hashes are included in the manifest and therefore in the `migrationId`. Changing either endpoint changes the identity. Adding, removing, or renaming an `invariantId` on a data op also changes the identity (it ripples through `providedInvariants` and `ops.json`); see [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md). The migration `verify` step independently re-derives `providedInvariants` from `ops.json` and surfaces a dedicated `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` error if the manifest disagrees — independent integrity layer alongside the hash check.
 
 ### 4. Direct SQL on disk
 
@@ -133,8 +133,9 @@ Rejected because: sequence numbers require coordination (who assigns the next nu
 - [ADR 010 — Canonicalization Rules](ADR%20010%20-%20Canonicalization%20Rules.md)
 - [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
 - [ADR 039 — Migration graph path resolution & integrity](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md)
-- [ADR 028 — Migration Structure & Operations](ADR%20028%20-%20Migration%20Structure%20&%20Operations.md)
 - [ADR 188 — MongoDB migration operation model](ADR%20188%20-%20MongoDB%20migration%20operation%20model.md)
 - [ADR 122 — Database Initialization & Adoption](ADR%20122%20-%20Database%20Initialization%20&%20Adoption.md)
+- [ADR 199 — Storage-only migration identity](ADR%20199%20-%20Storage-only%20migration%20identity.md)
+- [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — refs carry `{hash, invariants}`; `migrationHash` covers `providedInvariants`
 - PR #184: feat(migrations): on-disk migration planning, serialization, and apply
 - Linear: TML-1938 — [PN] On-disk migration system
