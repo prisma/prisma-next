@@ -7,6 +7,33 @@
 - Upgrade path from Prisma 7
 - Complete feature parity with Prisma 7
 - Production-readiness certification
+- A general "deployment recipes" story for every host (Workers is in scope because the MAP forces it; other hosts are not)
+
+---
+
+## What April delivered (and what carries over)
+
+April was architectural validation. May builds on what landed and finishes the items that didn't reach their stop condition. Source-of-truth status:
+
+- **WS1 Migration system** 🟡 — Data-migration graph & invariant-aware routing ✅. Manual authoring and graph-scale measurement: ❓ (verify with Saevar).
+- **WS2 Contract authoring** ❓ — PSL/TS symmetric authoring, terseness, invisible emit: status unconfirmed (verify with Alberto).
+- **WS3 Runtime pipeline** 🟡 — Transactions ✅, RSC concurrency ✅, extension ops 🟡 (real-contract regression coverage missing; TML-2163, TML-2299 open), caching middleware 🟡 (intercept plumbing landed; user story not end-to-end), streaming subscriptions 🔴 (unstarted). Detailed status: [april-ws3-status.md](./april-ws3-status.md).
+- **WS4 MongoDB** 🟡 — Contract extraction ✅, ORM consolidation ✅, polymorphism ✅, data migrations ✅, query builder ✅. Schema migrations ⚠️.
+- **WS5 SQLite** 🔴 — Not started.
+- **WS6 Contributor readiness** 🔴 — Not started.
+
+### April carry-overs that need explicit homes in May
+
+| Item | Source | New home |
+|---|---|---|
+| TML-2143 — caching middleware end-to-end | WS3 VP4 | WS2 M0 (highest carry-over) |
+| TML-2163 — shared operator-trait mapping | WS3 VP2 | WS2 M2 |
+| TML-2299 — `sql.lateral` capability bug | WS3 VP2 | WS2 M2 |
+| TML-2303 — RSC H2 marker-read dedupe | WS3 VP3 | WS2 M0 |
+| TML-2218 — extension op nullability | WS3 backlog | WS2 M3 (design done) |
+| TML-2197 — error consolidation | WS3 backlog | WS6 M1 |
+| TML-2165, TML-2183 — benchmarks | WS3 side quest | Side quest under WS2 (parallel content track) |
+| VP5 streaming subscriptions | WS3 VP5 | **Open question — explicit go/no-go required, see §Open questions** |
 
 ---
 
@@ -14,43 +41,101 @@
 
 April proved the architecture. May proves the product. The primary forcing function is porting real applications to Prisma Next — each port exercises the full stack (authoring, emit, migrate, query, debug) and surfaces the gaps that unit tests and architectural PoCs miss.
 
-The team has four people and 4–5 weeks. One person acts as a **full-stack scout** — porting real apps, defining the public API surface, and fixing gaps autonomously. The remaining people work parallel workstreams addressing known gaps and incoming discoveries. Workstreams beyond the team size are queued and picked up as earlier ones complete or as people become available.
+The team has four people and 4–5 weeks. One person acts as a **full-stack scout** — porting real apps, defining the public API surface, and fixing gaps autonomously within tight bounds (see [Scout working method](#scout-working-method)). The remaining people work parallel workstreams addressing known gaps and incoming discoveries. Workstreams beyond the team size are queued and picked up as earlier ones complete or as people become available.
 
-The full-stack scout is not a passive reporter. They have autonomy to address issues they find directly, collaborating with workstream owners to avoid conflicts when the fix touches workstream-owned territory. They are the closest thing to a real user the team has — their friction is the team's signal.
+The full-stack scout is not a passive reporter. They have autonomy to address issues they find directly within the triage rule, collaborating with workstream owners to avoid conflicts when the fix touches workstream-owned territory. They are the closest thing to a real user the team has — their friction is the team's signal.
 
 Building the apps is not the hard part. Addressing the limitations they uncover is. The apps are the discovery mechanism; the workstreams are where the real work happens.
+
+### Scout working method
+
+The scout's instinct under time pressure is to work around framework gaps. That instinct destroys the milestone's central forcing function — if the scout papers over gaps, nothing in WS2/WS3/WS5 changes, and EA ships with the same gaps. The working method is therefore:
+
+1. **Log every gap.** Maintain a shared **gaps & findings log** as the discovery artifact. Every framework friction point — bug, missing feature, confusing error, weird workaround — is logged immediately, with concrete reproduction context.
+2. **Don't paper over.** When the scout hits a real framework gap, the default is **stop and document**, not work-around-and-keep-moving.
+3. **Triage rule.** The scout fixes a gap themselves only if **both** are true:
+   - It is on the **critical path** of the port currently in progress.
+   - It is **small** (rule of thumb: ≤ ~½ day of work).
+   Otherwise, the gap is handed to the owning workstream.
+4. **Daily standup is the triage venue.** Each morning, the team raises new findings, agrees priorities, and assigns gaps that aren't scout-fixable. Hand-offs happen there.
+5. **The gaps log is the queue between scout and workstreams.** It's not a personal notebook. WS2/WS3/WS5 owners read it and pull from it.
+
+This rule is what prevents the two failure modes: scout becomes a one-person framework engineer and never finishes a port; or scout drifts back to workarounds and the milestone forcing function dies silently.
+
+---
+
+## Cross-cutting: Cloudflare Workers as a first-party EA target
+
+The MAP port (WS1 M1) runs on Cloudflare Workers, which forces PN to support Workers as a first-party EA target. This is grounded in real validation, not aspiration.
+
+**Decisions made:**
+- **First-party module**: a Workers-Postgres facade (Workers-shaped connection lifecycle, identical transport to ordinary Postgres) ships as part of `@prisma-next/postgres` (final placement TBD — module export, sibling package, or recipe). This is not throwaway scaffolding.
+- **EA claim**: the EA story includes "PN runs on Cloudflare Workers" with the MAP as the validating workload.
+
+**Implications per workstream (open decisions):**
+- **WS1**: MAP runs on Workers. The Workers facade is a WS1 M0 deliverable.
+- **WS2 M1 (transactions)**: does "transactions work on Postgres" cover Workers as a tested dimension, or is Workers-tx an explicit later commitment? Workers' connection lifecycle (no long-lived TCP, often fronted by transaction-mode poolers) makes Node-tx and Workers-tx two distinct claims. **Open.**
+- **WS4 (test harness)**: does the harness add Workers as a fourth dimension, or is the MAP the sole Workers validation? **Open.**
+
+**Out of scope**: a generic "PN deployment recipes for every host" story. PN already works with every standard pooler (PgBouncer, Hyperdrive, Supabase pooler, Neon pooler, RDS Proxy) out of the box; only Accelerate is incompatible (it accepts Prisma 7 query payloads, which PN doesn't speak). No general pooling workstream is required.
+
+---
+
+## Open questions (gating decisions before/early in May)
+
+These items must be decided in the planning session or its immediate follow-ups; they affect scope, sequencing, and team allocation.
+
+1. **VP5 streaming subscriptions go/no-go.** April left this entirely unstarted. Two options:
+   - **In**: re-scope into May as a runtime-interface validation (Supabase adapter + `subscribe()` op + AbortSignal cleanup + one event through the plugin pipeline). Keeps the architectural door open before stabilising runtime/middleware/plugin interfaces for external contributors. Mongo workstream tracks change streams as `FL-14 → "Future (WS3 VP5)"` assuming this option.
+   - **Out**: defer past May; accept potential breaking changes when streaming lands. Higher risk to the contributor-stability promise.
+2. **Cal.com → Dub.co rationale.** Cal.com was originally chosen as "an external, large-scale Next.js application with a large Prisma 7 schema" — *those properties* made it a useful test of EA adoption. Confirm Dub.co still tests the same shape (or document what it tests instead). "More amenable to PN" is a yellow flag if it means "easier", not "still representative".
+3. **WS2 M1 Workers-tx coverage.** See cross-cutting Workers section.
+4. **WS4 Workers test dimension.** See cross-cutting Workers section.
+5. **TML-2137 / TML-2138 disposition.** Extension ops in `aggregate` / `groupBy` / `having` — pull into WS2 M2 or defer past May.
 
 ---
 
 ## WS1: App porting + public API
 
-**People**: 1
+**People**: 1 (the scout)
 
-The scout. Ports real applications to Prisma Next, defines the public API surface (facade packages), and fixes issues autonomously.
+The scout. Ports real applications to Prisma Next, defines the public API surface (facade packages), maintains the gaps log, and fixes issues within the triage rule.
 
 **Context**: Today, `@prisma-next/postgres` and `@prisma-next/sqlite` exist as facade packages with a single `./runtime` export. `@prisma-next/mongo` doesn't exist yet. The ~30 internal packages are not something we want to expose to users. The facade packages are the natural place to express the public API — what users import, what's stable, what's documented.
 
 **Key risks**:
 
-- The import surface is too complex or requires too many packages for a simple app
-- Real-world schemas expose ORM, query builder, or migration gaps that block adoption
-- The side-by-side story with Prisma 7 doesn't work in practice
+- The import surface is too complex or requires too many packages for a simple app.
+- Real-world schemas expose ORM, query builder, or migration gaps that block adoption.
+- The side-by-side story with Prisma 7 doesn't work in practice.
+- The Workers facade is more invasive to land cleanly than expected, blocking the MAP port.
 
-#### Prerequisite: `init` command and Mongo facade
+#### Milestone 0: Onboarding prerequisites
 
-Before porting apps, verify the onboarding path works. The `init` command (scaffolding config, contract, and scripts for a new project) is the first thing a new user runs. If it doesn't exist or is incomplete, implement it. Additionally, create `@prisma-next/mongo` facade package with the same structure as `@prisma-next/postgres` and `@prisma-next/sqlite`.
+Before porting apps, verify the onboarding path works.
+
+Tasks:
+
+1. **`init` command** — scaffolding config, contract, and scripts for a new project. The first thing a new user runs. Implement or complete it.
+2. **`@prisma-next/mongo` facade** — same structure as `@prisma-next/postgres` and `@prisma-next/sqlite`.
+3. **Workers-Postgres facade as a first-party module** — Workers-shaped lifecycle, ordinary Postgres transport. Ship as part of `@prisma-next/postgres` (placement TBD: e.g. `@prisma-next/postgres/workers` export). Includes a recipe doc and at least a smoke-test against Miniflare/Wrangler.
+
+Checkpoint: A new user can run `init`, get a working scaffold, and the scout can deploy `@prisma-next/postgres` on Cloudflare Workers without bespoke glue. `@prisma-next/mongo` is importable.
 
 #### Milestone 1: Management API — reads
 
 Port the Prisma Data Platform Management API's read endpoints to Prisma Next, running side by side with the existing Prisma 7 implementation. This is the gentlest forcing function — read queries against an existing database, no migrations, no writes.
 
+**Note on connection layer**: the MAP currently routes through Accelerate, which PN can't speak (Prisma-7-protocol-specific). The port must replace Accelerate with a normal pooler (Hyperdrive, since the MAP runs on Workers). This is a port-local concern, not a general PN pooling story (see cross-cutting Workers section).
+
 Tasks:
 
 1. **Author the PDP contract in PSL** — model the Management API's schema in Prisma Next PSL, emit the contract, and verify the output is correct against the live database. Produce a PSL parity audit as a side-effect, classifying each gap encountered as `greenfield-blocker`, `defer-to-june`, or `worked-around-for-EA`. The audit is the input to WS5.
-2. **Port read API endpoints** — replace Prisma 7 queries with Prisma Next ORM queries for all `get` and `list` operations. Use the SQL DSL as an escape hatch where the ORM can't express the query.
-3. **Define the facade surface** — based on what you actually needed to import, define the public API for `@prisma-next/postgres`. Document what's exposed and what's internal.
+2. **Replace Accelerate with Workers-friendly pooling** — use the WS1 M0 Workers facade against Hyperdrive (or equivalent). Verify connectivity and pooling behaviour.
+3. **Port read API endpoints** — replace Prisma 7 queries with Prisma Next ORM queries for all `get` and `list` operations. Use the SQL DSL as an escape hatch where the ORM can't express the query.
+4. **Define the facade surface** — based on what you actually needed to import, define the public API for `@prisma-next/postgres`. Document what's exposed and what's internal.
 
-Checkpoint: All `get` and `list` operations in the Management API use Prisma Next exclusively. Prisma 7 is not used for any read operation. The `@prisma-next/postgres` facade surface is defined and documented.
+Checkpoint: All `get` and `list` operations in the Management API use Prisma Next exclusively, running on Workers, without Accelerate. Prisma 7 is not used for any read operation. The `@prisma-next/postgres` facade surface is defined and documented.
 
 #### Milestone 2: Management API — writes
 
@@ -59,9 +144,9 @@ Extend the port to include write operations and transactions.
 Tasks:
 
 1. **Port write endpoints** — replace Prisma 7 mutations with Prisma Next ORM mutations for all write operations (creates, updates, deletes).
-2. **Transaction usage** — use transactions (built by WS2) in at least one multi-step business logic unit. Exercise ORM + SQL DSL interop within a transaction.
+2. **Transaction usage** — use transactions (built by WS2) in at least one multi-step business logic unit. Exercise ORM + SQL DSL interop within a transaction. **Note**: this is the first real test of transactions on Workers; coordinate with WS2 M1 on whether Workers-tx is in scope or a known carve-out.
 
-Checkpoint: All write operations in the Management API use Prisma Next exclusively. At least one transactional workflow is ported and running. ORM and SQL DSL gaps discovered during the port are filed for WS2.
+Checkpoint: All write operations in the Management API use Prisma Next exclusively. At least one transactional workflow is ported and running on Workers (or the Workers-tx carve-out is documented). ORM and SQL DSL gaps discovered during the port are filed in the gaps log for WS2.
 
 #### Milestone 3: PDP schema management via PN migrations
 
@@ -72,22 +157,22 @@ Tasks:
 1. **Initial migration** — create the initial migration that represents the current PDP schema. Verify `migration apply` produces the correct tables against a fresh database.
 2. **Schema evolution** — make a schema change (add a model, add a field, add a relation), plan and apply the migration. Exercise the planner on common scenarios.
 3. **Escape hatch** — hit a case the planner can't handle (or simulate one). Author a manual migration. Verify it integrates cleanly into the graph.
-4. **Feedback to WS3** — file detailed UX feedback on every rough edge: confusing output, unclear errors, missing information, workflow friction.
+4. **Feedback to WS3** — file detailed UX feedback in the gaps log on every rough edge: confusing output, unclear errors, missing information, workflow friction.
 
-Checkpoint: The PDP database schema is managed exclusively by Prisma Next migrations. At least one planned migration and one manual migration have been applied. Detailed migration UX feedback is filed for WS3.
+Checkpoint: The PDP database schema is managed exclusively by Prisma Next migrations. At least one planned migration and one manual migration have been applied. Detailed migration UX feedback is in the gaps log for WS3.
 
-#### Milestone 4: Cal.com adoption path
+#### Milestone 4: Dub.co adoption path
 
-Validate that an external, large-scale Next.js application can adopt Prisma Next. Cal.com is open source, has a large Prisma 7 schema, and runs on Next.js — it's a representative target for the EA audience.
+Validate that an external, open-source Next.js application can adopt Prisma Next. Dub.co replaces Cal.com as the external target — confirm the rationale in planning (see [Open questions](#open-questions-gating-decisions-beforeearly-in-may)).
 
 Tasks:
 
-1. **Contract authoring** — author a contract for Cal.com's schema (or a representative subset). Note any schema features that can't be expressed; greenfield-shaped gaps feed WS5, brownfield-shaped gaps (P7→PN syntax) feed the June milestone draft.
-2. **Side-by-side setup** — configure PN alongside P7 in the Cal.com codebase. Verify the two can coexist without conflicts.
+1. **Contract authoring** — author a contract for Dub.co's schema (or a representative subset). Note any schema features that can't be expressed; greenfield-shaped gaps feed WS5, brownfield-shaped gaps (P7→PN syntax) feed the June milestone draft.
+2. **Side-by-side setup** — configure PN alongside P7 in the Dub.co codebase. Verify the two can coexist without conflicts.
 3. **Basic query port** — port a small number of queries to PN. Exercise both ORM and SQL DSL.
-4. **Document the adoption path** — write up what worked, what didn't, and what a Cal.com developer would need to know. Hand off to DevRel.
+4. **Document the adoption path** — write up what worked, what didn't, and what a Dub.co developer would need to know. Hand off to DevRel.
 
-Checkpoint: A written assessment of the Cal.com adoption path exists, with concrete evidence (working queries or documented blockers). A Cal.com developer could follow the documented path without our help. This is an evaluation, not a full port.
+Checkpoint: A written assessment of the Dub.co adoption path exists, with concrete evidence (working queries or documented blockers). A Dub.co developer could follow the documented path without our help. This is an evaluation, not a full port.
 
 ---
 
@@ -95,45 +180,70 @@ Checkpoint: A written assessment of the Cal.com adoption path exists, with concr
 
 **People**: 1
 
-The query surface is how users interact with their data. Transactions don't exist today. The SQL query builder is PoC-level. The ORM has gaps that will be discovered by WS1 and WS4. This workstream makes the query surface real.
+The query surface is how users interact with their data. Transactions exist on Postgres only (April VP1). The SQL query builder is PoC-level. The ORM has gaps that will be discovered by WS1 and WS4. This workstream makes the query surface real and finishes the April runtime carry-overs.
 
 **Key risks**:
 
-- Transaction semantics are complex and interact with connection pooling, error handling, and the adapter abstraction
-- The SQL query builder needs to graduate from PoC to something users can rely on as an ORM escape hatch
-- ORM gaps may require structural changes, not just additive features
-- The MongoDB ORM may have feature parity gaps compared to the SQL ORM that surface during WS1 or WS4 — monitor and address if they arise
+- Transaction semantics are complex and interact with connection pooling, error handling, and the adapter abstraction. Mongo transactions and Workers transactions are each a separate claim from Postgres-on-Node.
+- The SQL query builder needs to graduate from PoC to something users can rely on as an ORM escape hatch.
+- ORM gaps may require structural changes, not just additive features.
+- The MongoDB ORM may have feature parity gaps compared to the SQL ORM that surface during WS1 or WS4 — monitor and address if they arise.
+- April carry-overs (caching middleware, op-trait mapping, sql.lateral, RSC H2) are critical-path commitments from prior contracts; under-scoping them risks shipping EA with known issues.
 
-#### Milestone 1: Transactions end-to-end
+#### Milestone 0: April runtime carry-overs
 
-April validated that transactions are architecturally feasible. May makes them work.
+Land the April work that didn't reach its stop condition. **Highest priority** — these are pre-existing commitments and the caching middleware is the proof point that PN's middleware interface supports the full short-circuit story.
 
 Tasks:
 
-1. **ORM transaction support** — `db.$transaction(async (tx) => { ... })` with commit on success, rollback on error.
-2. **SQL DSL within transactions** — the SQL DSL can execute queries within an ORM-opened transaction, sharing the same connection.
-3. **Error handling** — errors inside a transaction trigger rollback and propagate to the caller with a clear error envelope.
-4. **Multi-target** — transactions work on Postgres, SQLite, and MongoDB (where supported by the database).
+1. **Caching middleware end-to-end** ([TML-2143](https://linear.app/prisma-company/issue/TML-2143)) — pull the `cache-middleware-intercept` / `cache-middleware-impl` branches over the line. Prove a repeated query is served from cache without hitting the database, against a real database.
+2. **RSC H2 fix** ([TML-2303](https://linear.app/prisma-company/issue/TML-2303)) — dedupe in-flight contract verification (~10-line behaviour fix in `RuntimeCoreImpl.verifyPlanIfNeeded()`); tighten the existing PoC integration test from `markerReads ∈ [1, K]` to `markerReads === 1`.
 
-Checkpoint: A transaction opens, executes two ORM mutations and a SQL DSL query sharing the same connection, and commits. An error inside a transaction triggers rollback and propagates cleanly. Works on Postgres and SQLite at minimum.
+Checkpoint: A repeated query is served from cache without DB roundtrip. The RSC marker-read storm is gone. Both have regression tests pinning the new behaviour.
+
+#### Milestone 1: Transactions end-to-end
+
+April validated that transactions are architecturally feasible on Postgres. May makes them work on every supported target.
+
+Tasks:
+
+1. **ORM transaction support** — `db.$transaction(async (tx) => { ... })` with commit on success, rollback on error. Already shipped on Postgres-on-Node; must extend to other targets/runtimes per below.
+2. **SQL DSL within transactions** — the SQL DSL can execute queries within an ORM-opened transaction, sharing the same connection. (Already shipped on Postgres-on-Node.)
+3. **Error handling** — errors inside a transaction trigger rollback and propagate to the caller with a clear error envelope (coordinate with WS6 M1).
+4. **SQLite transactions** — extend ORM tx + SQL DSL interop to SQLite.
+5. **MongoDB transactions** — extend to MongoDB where it supports transactions (replica sets / Atlas). Mongo's transaction semantics differ; treat as a separate claim from SQL.
+6. **Workers transactions decision** — decide whether Workers-Postgres transactions are in scope for May or an explicit carve-out for June. (See [Open questions](#open-questions-gating-decisions-beforeearly-in-may).)
+
+Checkpoint: A transaction opens, executes two ORM mutations and a SQL DSL query sharing the same connection, and commits, on Postgres-on-Node, SQLite, and MongoDB. An error inside a transaction triggers rollback and propagates cleanly. Workers-tx is either covered by an additional checkpoint or explicitly listed as a deferred claim.
 
 #### Milestone 2: SQL query builder maturity
 
-The SQL DSL is the escape hatch for the ORM. It needs to cover the queries that real applications need but the ORM can't express.
+The SQL DSL is the escape hatch for the ORM. It needs to cover the queries that real applications need but the ORM can't express. This milestone also closes April's VP2 architectural debt.
 
 Tasks:
 
 1. **Audit against real-world query patterns** — review the Management API's queries (from WS1) and common SQL patterns. Identify what the builder can't express today.
 2. **Implement missing query operations** — prioritized by what WS1 actually needs, then by common SQL patterns.
 3. **Multi-target SQL generation** — verify that the builder produces correct SQL for both Postgres and SQLite (different quoting, function names, type handling).
+4. **Shared operator-trait mapping** ([TML-2163](https://linear.app/prisma-company/issue/TML-2163)) — move the operator-to-trait mapping from `sql-orm-client` to `relational-core` so trait gating is consistent across both query surfaces. This is the April VP2 follow-up that was deliberately bounded by the stop condition.
+5. **`sql.lateral` capability bug** ([TML-2299](https://linear.app/prisma-company/issue/TML-2299)) — `lateral` capability not emitted, making `lateralJoin` `never` on real contracts. Without this fix, the SQL DSL escape-hatch promise fails on real (non-fixture) contracts.
 
-Checkpoint: The SQL DSL can express every query the Management API port (WS1) needs. Common patterns — joins, aggregations, subqueries — produce correct, parameterized SQL on both Postgres and SQLite.
+Checkpoint: The SQL DSL can express every query the Management API port (WS1) needs. Common patterns — joins, aggregations, subqueries, lateral joins — produce correct, parameterized SQL on both Postgres and SQLite. Trait gating works identically on ORM and SQL DSL surfaces. A real-contract regression test for trait-gated extension ops on the SQL DSL exists.
 
 #### Milestone 3: ORM gap fixes
 
-Address ORM gaps discovered by WS1 (app porting) and WS4 (test harness). The specific gaps aren't known yet — this is reactive work driven by incoming discoveries.
+Address ORM gaps discovered by WS1 (app porting) and WS4 (test harness). The specific gaps are pulled from the gaps log; this is reactive work driven by incoming discoveries.
 
-Checkpoint: No ORM gaps are blocking WS1's progress. The test harness (WS4) exercises ORM scenarios across all three targets without failures caused by ORM bugs.
+Tasks:
+
+1. **Pull from the gaps log** — work the WS2-tagged gaps in priority order set at daily standup.
+2. **Extension op nullability** ([TML-2218](https://linear.app/prisma-company/issue/TML-2218)) — design is complete in the ticket (Approach 2 — overloads — recommended). Implementation only. Unblocks ergonomic pgvector-style ops.
+
+Checkpoint: No ORM gaps in the gaps log are blocking WS1's progress at end of milestone. The test harness (WS4) exercises ORM scenarios across all three targets without failures caused by ORM bugs. Extension op nullability ships.
+
+#### Side quest: Comparative benchmarks
+
+[TML-2165](https://linear.app/prisma-company/issue/TML-2165) and [TML-2183](https://linear.app/prisma-company/issue/TML-2183). Precondition (enough ORM/SQL DSL coverage to run a representative suite) is now met. High-visibility content piece — runs in parallel with the main WS2 milestones, owned alongside but not blocking the milestone path.
 
 ---
 
@@ -141,7 +251,7 @@ Checkpoint: No ORM gaps are blocking WS1's progress. The test harness (WS4) exer
 
 **People**: 1
 
-The migration system's architecture is validated (April). The workflow is not. Nobody has used `migration plan → apply → status` to manage a real database. The planner covers limited scenarios. The escape hatch (manual migration authoring) is a PoC. CI/CD integration is untested. If the migration workflow isn't intuitive, it will destroy trust at EA — migrations are the highest-stakes developer workflow.
+The migration system's architecture is validated (April VP1). The workflow is not. Nobody has used `migration plan → apply → status` to manage a real database. The planner covers limited scenarios. The escape hatch (manual migration authoring) is a PoC. CI/CD integration is untested. If the migration workflow isn't intuitive, it will destroy trust at EA — migrations are the highest-stakes developer workflow.
 
 **Key risks**:
 
@@ -205,12 +315,13 @@ Checkpoint: The planner handles the common 80% of schema changes that Prisma 7 h
 
 **People**: 1
 
-Confidence in correctness across Postgres, SQLite, and MongoDB. Today's tests are per-target and ad hoc. A shared test suite exercising the same scenarios across all three targets catches family-specific bugs, ensures behavioral consistency, and prevents regressions.
+Confidence in correctness across Postgres, SQLite, and MongoDB. Today's tests are per-target and ad hoc. A shared test suite exercising the same scenarios across all three targets catches family-specific bugs, ensures behavioural consistency, and prevents regressions.
 
 **Key risks**:
 
-- Behavioral differences between targets may be larger than expected (e.g. type coercion, NULL handling, transaction semantics)
-- The test harness infrastructure itself is non-trivial — parameterizing tests across three different databases with different setup/teardown requirements
+- Behavioural differences between targets may be larger than expected (e.g. type coercion, NULL handling, transaction semantics).
+- The test harness infrastructure itself is non-trivial — parameterizing tests across three different databases with different setup/teardown requirements.
+- Workers-as-a-test-dimension is unresolved. If the harness doesn't pick it up, the MAP port becomes the sole validation of Workers support — fine if intended, fragile if accidental.
 
 #### Milestone 1: Shared test suite infrastructure
 
@@ -219,8 +330,9 @@ Tasks:
 1. **Test harness design** — parameterized test runner that takes a target configuration (connection, adapter, contract) and runs the same test suite against each target.
 2. **Database lifecycle** — automated setup, migration, seeding, and teardown for each target's test database.
 3. **Target configurations** — working configurations for Postgres, SQLite, and MongoDB.
+4. **Workers dimension decision** — decide whether the harness adds a Workers (Miniflare) target, or whether the MAP port is the sole Workers validation.
 
-Checkpoint: A single test file runs the same scenario against Postgres, SQLite, and MongoDB. Each target uses its own database instance and adapter. Failures are clearly attributed to a specific target. Database setup and teardown are fully automated.
+Checkpoint: A single test file runs the same scenario against Postgres, SQLite, and MongoDB. Each target uses its own database instance and adapter. Failures are clearly attributed to a specific target. Database setup and teardown are fully automated. The Workers dimension decision is documented.
 
 #### Milestone 2: ORM scenario coverage
 
@@ -234,7 +346,7 @@ Tasks:
 4. **Aggregations** — count, sum, avg, min, max, group by.
 5. **Edge cases** — NULL handling, empty results, type coercion, large result sets.
 
-Checkpoint: A comprehensive ORM scenario suite runs green on all three targets. Any failures are filed as bugs for WS2 with clear target attribution.
+Checkpoint: A comprehensive ORM scenario suite runs green on all three targets. Any failures are filed in the gaps log for WS2 with clear target attribution.
 
 #### Milestone 3: Migration scenario coverage
 
@@ -329,8 +441,9 @@ The CLI is the primary interface for authoring, migration, and database manageme
 
 **Key risks**:
 
-- Error messages today may be stack traces or raw exceptions rather than user-facing diagnostics
-- Different commands may use different output formats, making the CLI feel like a collection of scripts rather than a cohesive tool
+- Error messages today may be stack traces or raw exceptions rather than user-facing diagnostics.
+- Different commands may use different output formats, making the CLI feel like a collection of scripts rather than a cohesive tool.
+- Five inconsistent error sites today, none matching ADR 027 ([TML-2197](https://linear.app/prisma-company/issue/TML-2197)) — this is the prerequisite for opening the framework to external contributors per ADR 027.
 
 #### Milestone 1: Error envelope consistency
 
@@ -340,9 +453,10 @@ Tasks:
 
 1. **Audit existing error paths** — catalog every CLI command and runtime operation's error output, including query engine and adapter errors. Identify inconsistencies.
 2. **Define the error envelope** — stable error codes, human-readable messages, suggested remediation. Consistent across CLI and runtime (query errors, connection errors, constraint violations).
-3. **Implement consistently** — update all commands and runtime error paths to use the standard envelope.
+3. **Consolidate `RuntimeError` creation** ([TML-2197](https://linear.app/prisma-company/issue/TML-2197)) — collapse the five inconsistent error sites into a canonical foundation package, aligned with ADR 027. Prerequisite for external-contributor framework stability.
+4. **Implement consistently** — update all commands and runtime error paths to use the standard envelope.
 
-Checkpoint: All CLI commands and runtime operations produce errors in a consistent envelope: stable error code, human-readable message, suggested next step. No raw stack traces appear in user-facing output. Runtime query and adapter errors use the same envelope structure.
+Checkpoint: All CLI commands and runtime operations produce errors in a consistent envelope: stable error code, human-readable message, suggested next step. No raw stack traces appear in user-facing output. Runtime query and adapter errors use the same envelope structure. `RuntimeError` is consolidated per ADR 027.
 
 #### Milestone 2: CLI output consistency
 
@@ -381,8 +495,8 @@ Not everyone uses migrations, especially during early development. `db update` (
 
 **Key risks**:
 
-- `db update` may fail on schema changes that the migration planner handles, confusing users about which tool to use when
-- `db init` correctness is critical: a wrong fresh-database setup destroys trust before the user runs a single query
+- `db update` may fail on schema changes that the migration planner handles, confusing users about which tool to use when.
+- `db init` correctness is critical: a wrong fresh-database setup destroys trust before the user runs a single query.
 
 #### Milestone 1: `db update` and `db init` reliability
 
@@ -400,9 +514,10 @@ Checkpoint: `db update` handles common development-cycle schema changes without 
 
 ## Release
 
-Publicly announce Early Access status of Prisma Next for Postgres, SQLite, and MongoDB. DevRel writes user-facing documentation with team assistance (getting-started guides, API reference, key concepts, migration guides from P7). The team provides:
+Publicly announce Early Access status of Prisma Next for Postgres, SQLite, and MongoDB, with first-party Cloudflare Workers support. DevRel writes user-facing documentation with team assistance (getting-started guides, API reference, key concepts, migration guides from P7). The team provides:
 
-- Defined public API surface (facade packages with documented exports)
-- Working example applications (Management API port, demo apps)
-- Documented adoption path for existing codebases (Cal.com assessment)
+- Defined public API surface (facade packages with documented exports, including the Workers module)
+- Working example applications (Management API port, demo apps, Workers deployment recipe)
+- Documented adoption path for existing codebases (Dub.co assessment)
 - Internal assessment of known gaps and limitations for the EA release notes
+- The gaps log, curated and triaged, as input to the June milestone draft

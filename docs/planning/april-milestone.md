@@ -6,6 +6,17 @@
 
 ---
 
+## Status legend
+
+- ✅ Done — stop condition met
+- 🟡 Partial — work landed but stop condition not yet met, or done with material caveats
+- 🔴 Not started
+- ❓ Status unconfirmed — verify with the workstream owner before relying on this in May planning
+
+For WS3, the source of truth is [april-ws3-status.md](./april-ws3-status.md). For WS4, status is annotated inline (✅/⚠️) — ⚠️ is treated as 🟡 in the rollup.
+
+---
+
 ## Approach: architectural validation, not polish
 
 We have five weeks (Mar 31 – May 2, with an offsite in Week 3). The goal for each workstream is to **validate the architecture** — prove that the design decisions hold under real conditions. It is not to polish the experience for users. That's May.
@@ -18,7 +29,7 @@ The team's instinct is to perfect. The constraint is: prove the architecture wor
 
 ## Workstreams
 
-### 1. Migration system
+### 1. Migration system 🟡
 
 **People**: Saevar
 
@@ -33,7 +44,7 @@ The migration system uses a graph-based data structure for migration history. Th
 
 #### Priority queue
 
-**VP1: Data migrations work in the graph model** *(highest risk)*
+**VP1: Data migrations work in the graph model** 🟡 *(highest risk)*
 
 The entire migration graph is built on the assumption that any migration from contract state A to contract state B is functionally equivalent to any other A→B migration. Data migrations break this assumption — two databases at the same contract hash can have meaningfully different data. The routing model must be extended to define "done" as "contract hash H reached **and** required data invariants satisfied."
 
@@ -47,7 +58,7 @@ Tasks:
 
 Stop condition: A graph with two paths to the same contract hash. One path includes a data migration (split `name` → `firstName` + `lastName`) with a postcondition invariant. `plan` selects the invariant-satisfying path for an environment that requires it. `apply` executes it. `status` reports "done" only when both the contract hash and the invariant are satisfied. Then stop — routing optimizations, invariant composition, and ref UX are May.
 
-**VP2: Users can author migrations by hand** *(table-stakes)*
+**VP2: Users can author migrations by hand** ✅ *(table-stakes)*
 
 Manual SQL and data migrations both require this. Every migration system has an escape hatch where the user writes the migration themselves.
 
@@ -61,7 +72,7 @@ Tasks:
 
 Stop condition: A user runs `migration new`, gets a scaffolded `.ts` file, writes raw SQL in it, and the runner executes it as a first-class graph node. Then stop — polish of the authoring API, documentation, and support for exotic migration shapes are May.
 
-**VP3: The graph scales with large contracts** *(quick pass/fail)*
+**VP3: The graph scales with large contracts** ✅ *(quick pass/fail)*
 
 Every migration node encodes the full contract content. For projects with large contracts, this could cause performance and storage problems.
 
@@ -81,7 +92,7 @@ Stop condition: Numbers in hand. If acceptable, move on. If not, file an issue w
 
 ---
 
-### 2. Contract authoring (PSL + TypeScript)
+### 2. Contract authoring (PSL + TypeScript) ✅
 
 **People:** Alberto
 
@@ -94,7 +105,7 @@ Users describe their domain model — which becomes the contract — in one of t
 
 #### Priority queue
 
-**VP1: Symmetric authoring surfaces from shared composition**
+**VP1: Symmetric authoring surfaces from shared composition** ✅
 
 Both PSL and TypeScript must present authoring surfaces that are derived from the same framework composition data sources — families, targets, and extension packs contribute type constructors and field presets via the [ADR 170](../../architecture%20docs/adrs/ADR%20170%20-%20Pack-provided%20type%20constructors%20and%20field%20presets.md) registry (ADR 170 defines how extensions contribute authoring helpers like `pgvector.Vector(1536)` to both surfaces through a shared definition), and both surfaces lower through these shared definitions. The two surfaces should be symmetrical in capability — what's expressible in one is broadly expressible in the other — but idiomatically different in each language.
 
@@ -109,7 +120,7 @@ Tasks:
 
 Stop condition: A contract authored in both PSL and TS, using at least one family-provided type constructor (e.g. `sql.String(length: 35)`) and at least one extension-provided namespaced type constructor (e.g. `pgvector.Vector(1536)`), emitting identical contracts. Then stop — full vocabulary of helpers, preset coverage, and parameterized type polish are May.
 
-**VP2: TypeScript authoring achieves comparable terseness to PSL**
+**VP2: TypeScript authoring achieves comparable terseness to PSL** ✅
 
 The current TypeScript authoring surface mirrors the contract JSON structure — extremely verbose, repetitive, and roughly 3–5x longer than the equivalent PSL. The new authoring surface must close this gap substantially. This is a concrete, measurable proof that the surface design works, not a UX polish question.
 
@@ -122,7 +133,7 @@ Tasks:
 
 Stop condition: The TypeScript version of a representative contract is in the same ballpark of length as the PSL version. Then stop — authoring ergonomics, API naming, and syntactic sugar are May.
 
-**VP3: Invisible contract emission in at least one major framework**
+**VP3: Invisible contract emission in at least one major framework** ✅
 
 The contract emit step — producing `contract.json` and `contract.d.ts` — must be triggered automatically by the dev server and build tool. The developer never runs a manual command. This was a massive pain point for Prisma ORM (`prisma generate`), and Prisma Next's pure TypeScript architecture makes transparent build tool plugins feasible. A Vite plugin PoC already exists in this repo.
 
@@ -147,7 +158,9 @@ Stop condition: Modify a contract definition in a running dev server, see the co
 
 ---
 
-### 3. Runtime pipeline (ORM, query builders, middleware, framework integration)
+### 3. Runtime pipeline (ORM, query builders, middleware, framework integration) 🟡
+
+> Detailed status: [april-ws3-status.md](./april-ws3-status.md). VP1/VP2/VP3 stop conditions met; VP2 has an architectural-cleanup caveat (TML-2163); VP4 plumbing landed but the caching-middleware user story is not yet end-to-end; VP5 unstarted.
 
 **People**: Alexey
 
@@ -160,7 +173,7 @@ The ORM client, SQL DSL, middleware pipeline, and runtime together form the exec
 
 #### Priority queue
 
-**VP1: Transactions and SQL DSL as escape hatch**
+**VP1: Transactions and SQL DSL as escape hatch** ✅
 
 The ORM must support transactions, and the SQL DSL must interoperate with the ORM within a transaction. The SQL DSL is the escape hatch for the ORM — users will drop into it mid-transaction when they hit something the ORM can't express. If the two query surfaces can't share a transaction, the escape hatch is broken.
 
@@ -174,7 +187,7 @@ Tasks:
 
 Stop condition: A script that opens a transaction, does two ORM mutations, executes a SQL DSL query within the same transaction, and commits. Plus a standalone SQL DSL query. Then stop — transaction isolation levels, savepoints, and nested transactions are May.
 
-**VP2: Extension-contributed operations flow through both query surfaces**
+**VP2: Extension-contributed operations flow through both query surfaces** 🟡
 
 When an extension pack like pgvector is added, its operations must surface in both the ORM client and the SQL DSL. This is the query-side counterpart of ADR 170 — extensions must flow from contract authoring through to the query surface. The codec trait system ([PR #247](https://github.com/prisma/prisma-next/pull/247)) gates operators by codec-declared semantic traits (`equality`, `order`, `numeric`, `textual`, `boolean`); this gating must apply equally to both query surfaces, not just the ORM. Currently the operator-to-trait mapping lives in `sql-orm-client` and needs to be shared.
 
@@ -188,7 +201,7 @@ Tasks:
 
 Stop condition: An extension-contributed operation (e.g. pgvector similarity search) is usable via both the ORM and SQL DSL. Trait gating works on both surfaces — a `bool` field rejects `gt()` on both. Then stop — full extension operation API design and discovery ergonomics are May.
 
-**VP3: RSC concurrency safety**
+**VP3: RSC concurrency safety** ✅
 
 The runtime has mutable state (`verified`, `startupVerified`), the ORM has a lazily-populated Collection cache — both are exposed by React Server Components' concurrent rendering model, where multiple components query in parallel through a shared instance. (See [framework integration analysis, Hard problem 2](../reference/framework-integration-analysis.md#hard-problem-2-concurrent-statefulness-under-rsc).)
 
@@ -201,7 +214,7 @@ Tasks:
 
 Stop condition: The PoC either works or we've identified the specific concurrency issues and know what to fix. Then stop — pool sizing guidance, edge runtime validation, and production-ready concurrency guarantees are May.
 
-**VP4: Middleware supports request rewriting**
+**VP4: Middleware supports request rewriting** 🟡
 
 Currently middleware are observers only. A caching middleware forces the architecture to support interception, short-circuiting, and result injection — validating that the middleware interface can support the full range of use cases (rate limiting, access control, query rewriting), not just observability.
 
@@ -213,7 +226,7 @@ Tasks:
 
 Stop condition: A repeated query is served from cache without hitting the database. The middleware interface supports short-circuiting and result injection. Then stop — cache invalidation strategies, TTL, and middleware composition are May.
 
-**VP5: Runtime interfaces accommodate streaming subscriptions**
+**VP5: Runtime interfaces accommodate streaming subscriptions** 🔴
 
 The runtime, middleware, and plugin interfaces assume request-response queries — `execute()` runs a query, returns a finite `AsyncIterableResult`, and the plugin lifecycle (`beforeExecute → onRow → afterExecute`) completes. Streaming subscriptions (Supabase Realtime, MongoDB change streams, future Prisma Postgres streaming) have a fundamentally different lifecycle: they don't complete until closed. If we stabilize these interfaces for contributors without validating streaming, we risk closing a door that's strategically important to keep open.
 
@@ -229,9 +242,9 @@ Tasks:
 
 Stop condition: A script that opens a Supabase Realtime subscription through the PN runtime, receives at least one change event through the plugin pipeline, and cancels cleanly. The runtime handles both `execute()` and `subscribe()` on the same instance. Then stop — subscription filtering, reconnection, backpressure, and production-quality error handling are all later. The point is proving the runtime interfaces can accommodate streaming, not shipping a streaming feature.
 
-**Side quest: Benchmarks**
+**Side quest: Benchmarks** 🟡
 
-Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility content piece — publish as soon as the ORM has enough query support to run the suite. In progress.
+Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visibility content piece — publish as soon as the ORM has enough query support to run the suite. Precondition (enough ORM/SQL DSL coverage) is now met but the suite hasn't been started; carries over to May.
 
 **Deferred (May)**:
 
@@ -243,9 +256,9 @@ Comparative benchmark suite (Prisma Next vs Prisma ORM vs raw driver). High-visi
 
 ---
 
-### 4. MongoDB — land the learnings
+### 4. MongoDB — land the learnings ✅
 
-**People**: Will, Serhii (after SQLite)
+**People**: Will
 
 **Status**: PoC complete. Architecture validated. Remaining work is integration.
 
@@ -276,7 +289,7 @@ Proof: Mongo `Collection` class with the same method vocabulary as SQL, compilin
 
 Proof: querying a polymorphic root returns a discriminated union type that narrows correctly on the discriminator field in both SQL and Mongo ORM clients, using emitter-produced contracts (not hand-crafted fixtures).
 
-**4. ⚠️ Schema migrations for MongoDB.** MongoDB has DDL-equivalent server-side configuration that the migration system must manage: indexes (unique, compound, text, geospatial, TTL, partial, wildcard), JSON Schema validators, and collection options (capped, time series, collation). The contract's `storage.collections` section describes these, and the migration planner diffs contract states to generate `createIndex`/`dropIndex`/`createCollection` operations — the same graph-based system used for SQL DDL. Polymorphic collections require partial indexes with `partialFilterExpression` scoped to the discriminator value. See [mongo-schema-migrations.md](mongo-target/1-design-docs/mongo-schema-migrations.md).
+**4. ✅ Schema migrations for MongoDB.** MongoDB has DDL-equivalent server-side configuration that the migration system must manage: indexes (unique, compound, text, geospatial, TTL, partial, wildcard), JSON Schema validators, and collection options (capped, time series, collation). The contract's `storage.collections` section describes these, and the migration planner diffs contract states to generate `createIndex`/`dropIndex`/`createCollection` operations — the same graph-based system used for SQL DDL. Polymorphic collections require partial indexes with `partialFilterExpression` scoped to the discriminator value. See [mongo-schema-migrations.md](mongo-target/1-design-docs/mongo-schema-migrations.md).
 
 Proof: a contract diff between two Mongo contract states produces the correct index creation/deletion operations. The migration runner applies them against a real MongoDB instance. Partial indexes for polymorphic collections are generated correctly.
 
@@ -300,7 +313,7 @@ Not applicable in April: streaming subscriptions (validated in the SQL runtime w
 
 ---
 
-### 5. Second SQL database (SQLite)
+### 5. Second SQL database (SQLite) 🟡
 
 **People**: Serhii
 
@@ -312,7 +325,7 @@ Not applicable in April: streaming subscriptions (validated in the SQL runtime w
 
 #### Priority queue
 
-**VP1: End-to-end vertical slice — author, emit, migrate, query SQLite**
+**VP1: End-to-end vertical slice — author, emit, migrate, query SQLite** 🟡
 
 This is a single forcing function that tests every layer of the stack against a second SQL target. The layers under test:
 
@@ -333,7 +346,7 @@ Tasks:
 
 Stop condition: A contract authored, emitted, migrated, and queried against SQLite end-to-end. The adapter can be rough. The point is that every layer — emit, migrate, generate SQL, execute, decode results — works without Postgres assumptions. Where it doesn't, we've found and fixed (or documented) the coupling points. Then stop — SQLite feature parity, performance, and production readiness are May.
 
-**VP2: D1 extensibility** *(optional, architectural check)*
+**VP2: D1 extensibility** ✅ *(optional, architectural check)*
 
 Cloudflare D1 is SQLite-at-the-edge, accessed via HTTP inside Workers. If the SQLite adapter bakes in assumptions that prevent an HTTP-based D1 adapter from layering on top (e.g. native bindings, local filesystem), the path to edge framework support is blocked.
 
@@ -347,7 +360,7 @@ Stop condition: A written assessment of whether D1 can layer on the SQLite found
 
 ---
 
-### 6. Contributor readiness
+### 6. Contributor readiness 🔴
 
 **People**: unassigned (depends on stable interfaces from workstreams 2–5; a good workstream for someone who finishes early)
 
@@ -357,7 +370,7 @@ The milestone goal is "ready for external contributions." The other workstreams 
 
 #### Priority queue
 
-**VP1: An external contributor can build an extension end-to-end using only published docs and examples**
+**VP1: An external contributor can build an extension end-to-end using only published docs and examples** 🔴
 
 User story: Someone unfamiliar with the codebase wants to build a middleware extension. They find a "build your first extension" guide, follow it, and have a working extension without asking the team any questions. They can also browse example extensions (SQL target, Postgres extension, middleware, framework integration) as templates for other extension types.
 
@@ -369,4 +382,3 @@ Tasks:
 4. **Handoff to developer relations** — package the docs, examples, and guide for the dev relations team to use in community outreach (reaching out to authors of Prisma generators, Arktype, Zod, NestJS, and other packages with close integrations — see [community-generator-migration-analysis.md](../reference/community-generator-migration-analysis.md)).
 
 Stop condition: A team member who hasn't worked on extensions can scaffold and build a trivial middleware extension using only the docs and examples, without asking questions. Then stop — comprehensive docs, video tutorials, and community management are the dev relations team's job.
-
