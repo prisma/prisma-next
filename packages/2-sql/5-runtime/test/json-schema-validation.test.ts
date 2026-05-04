@@ -416,6 +416,44 @@ describe('JSON Schema encoding validation', () => {
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
     });
   });
+
+  // Codec bodies may also stamp a fully-formed `RUNTIME.ENCODE_FAILED`
+  // envelope themselves (carrying their own `details`/`cause` contract).
+  // Re-wrapping that envelope through `wrapEncodeFailure` would drop the
+  // codec-author-supplied details and produce a misleading double-wrap.
+  // The doc on `encodeParams` later in this file already promises the
+  // pass-through; pin it.
+  it('passes RUNTIME.ENCODE_FAILED envelopes from codec.encode through unchanged', async () => {
+    const stampingRegistry = createCodecRegistry();
+    stampingRegistry.register(
+      codec<'stamped/encode@1', readonly [], string, JsonValue>({
+        typeId: 'stamped/encode@1',
+        targetTypes: ['jsonb'],
+        encode: () => {
+          throw Object.assign(new Error('codec-stamped envelope'), {
+            code: 'RUNTIME.ENCODE_FAILED',
+            category: 'RUNTIME',
+            severity: 'error',
+            details: {
+              codecId: 'stamped/encode@1',
+              codecAuthorContext: 'preserved verbatim',
+            },
+          });
+        },
+        decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
+      }),
+    );
+
+    await expect(
+      encodeParam({ ignored: 'value' }, { codecId: 'stamped/encode@1' }, 0, stampingRegistry, {}),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.ENCODE_FAILED',
+      details: {
+        codecAuthorContext: 'preserved verbatim',
+      },
+      message: 'codec-stamped envelope',
+    });
+  });
 });
 
 // =============================================================================
@@ -623,6 +661,49 @@ describe('JSON Schema decoding validation', () => {
       decodeRow(row, plan, inlineValidatingRegistry, undefined, {}),
     ).rejects.toMatchObject({
       code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+    });
+  });
+
+  // Symmetric to the encode-side guard: a codec body may stamp a fully-
+  // formed `RUNTIME.DECODE_FAILED` envelope itself, with its own
+  // `details`/`cause` contract. Re-wrapping through `wrapDecodeFailure`
+  // would drop the codec-author-supplied details and produce a
+  // misleading double-wrap. The doc on `decodeRow` already promises this
+  // pass-through; pin it.
+  it('passes RUNTIME.DECODE_FAILED envelopes from codec.decode through unchanged', async () => {
+    const stampingRegistry = createCodecRegistry();
+    stampingRegistry.register(
+      codec<'stamped/decode@1', readonly [], string, JsonValue>({
+        typeId: 'stamped/decode@1',
+        targetTypes: ['jsonb'],
+        encode: (v: JsonValue) => JSON.stringify(v),
+        decode: () => {
+          throw Object.assign(new Error('codec-stamped decode envelope'), {
+            code: 'RUNTIME.DECODE_FAILED',
+            category: 'RUNTIME',
+            severity: 'error',
+            details: {
+              codecId: 'stamped/decode@1',
+              codecAuthorContext: 'preserved verbatim',
+            },
+          });
+        },
+      }),
+    );
+
+    const plan = createTestPlan({
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'stamped/decode@1'),
+      ]),
+    });
+
+    const row = { metadata: '{"anything":"goes"}' };
+    await expect(decodeRow(row, plan, stampingRegistry, undefined, {})).rejects.toMatchObject({
+      code: 'RUNTIME.DECODE_FAILED',
+      details: {
+        codecAuthorContext: 'preserved verbatim',
+      },
+      message: 'codec-stamped decode envelope',
     });
   });
 
