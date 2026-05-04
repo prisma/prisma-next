@@ -250,6 +250,15 @@ async function decodeField(
   try {
     decoded = await codec.decode(wireValue, cellCtx);
   } catch (error) {
+    // Per-library JSON-with-schema codecs (e.g. `arktype/json@1`) validate
+    // inside `decode` and throw `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`
+    // directly. The unified codec descriptor model documented in ADR 208
+    // promises this stable code surfaces unchanged. Without this rethrow,
+    // `wrapDecodeFailure` would re-wrap it as `RUNTIME.DECODE_FAILED`,
+    // breaking the contract for the inline-validation path. The post-
+    // decode `validateJsonValue` path below already has the equivalent
+    // rethrow guard for the legacy validator-registry case.
+    if (isJsonSchemaValidationError(error)) throw error;
     wrapDecodeFailure(error, alias, ref, codec, wireValue);
   }
 

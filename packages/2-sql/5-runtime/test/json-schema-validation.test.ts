@@ -551,6 +551,45 @@ describe('JSON Schema decoding validation', () => {
     });
   });
 
+  // ADR 208 § Case J: per-library JSON-with-schema codecs (e.g.
+  // `arktype/json@1`) validate inside `decode` and throw
+  // `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly. The runtime must
+  // surface that stable code unchanged — without the rethrow guard in
+  // `decodeField`, `wrapDecodeFailure` would re-wrap the error as
+  // `RUNTIME.DECODE_FAILED` and the documented error contract would
+  // break for the inline-validation path.
+  it('preserves RUNTIME.JSON_SCHEMA_VALIDATION_FAILED thrown from codec.decode', async () => {
+    const inlineValidatingRegistry = createCodecRegistry();
+    inlineValidatingRegistry.register(
+      codec<'inline/json@1', readonly [], string, JsonValue>({
+        typeId: 'inline/json@1',
+        targetTypes: ['jsonb'],
+        encode: (v: JsonValue) => JSON.stringify(v),
+        decode: () => {
+          throw Object.assign(new Error('inline schema rejected payload'), {
+            code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+            category: 'RUNTIME',
+            severity: 'error',
+            details: { codecId: 'inline/json@1' },
+          });
+        },
+      }),
+    );
+
+    const plan = createTestPlan({
+      ast: projectionAst([
+        ProjectionItem.of('metadata', ColumnRef.of('user', 'metadata'), 'inline/json@1'),
+      ]),
+    });
+
+    const row = { metadata: '{"anything":"goes"}' };
+    await expect(
+      decodeRow(row, plan, inlineValidatingRegistry, undefined, {}),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+    });
+  });
+
   // ---------------------------------------------------------------------------
   // Codec-authored error.message redaction — DEFERRED follow-up.
   //
