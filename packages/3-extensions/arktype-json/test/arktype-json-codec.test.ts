@@ -347,11 +347,12 @@ describe('decodeJson schema enforcement', () => {
   });
 });
 
-describe('arktypeJsonEmitCodec (emit-only shim)', () => {
-  // The emit-only codec carries `renderOutputType` so the framework
-  // emitter's `CodecLookup` can resolve the column's TS type at emit
-  // time. encode/decode are sentinels that throw if invoked — runtime
-  // materialization always goes through the descriptor's factory.
+describe('arktypeJsonEmitCodec (metadata-only shim)', () => {
+  // The metadata-only codec carries `renderOutputType` (read by the
+  // framework emitter's `CodecLookup`) and `meta.db.sql.postgres.nativeType`
+  // (read by the postgres SQL renderer's cast policy). encode/decode are
+  // sentinels that throw if invoked — runtime materialization always
+  // goes through the descriptor's factory.
   it('exposes the codec id and native type', () => {
     expect(arktypeJsonEmitCodec.id).toBe(ARKTYPE_JSON_CODEC_ID);
     expect(arktypeJsonEmitCodec.targetTypes).toEqual([ARKTYPE_JSON_NATIVE_TYPE]);
@@ -378,16 +379,16 @@ describe('arktypeJsonEmitCodec (emit-only shim)', () => {
   });
 
   it('encode/decode reject because runtime materialization goes through the descriptor', async () => {
-    await expect(arktypeJsonEmitCodec.encode('value', CALL_CTX)).rejects.toThrow(/emit-only/);
-    await expect(arktypeJsonEmitCodec.decode('wire', CALL_CTX)).rejects.toThrow(/emit-only/);
+    await expect(arktypeJsonEmitCodec.encode('value', CALL_CTX)).rejects.toThrow(/metadata-only/);
+    await expect(arktypeJsonEmitCodec.decode('wire', CALL_CTX)).rejects.toThrow(/metadata-only/);
   });
 
   it('encodeJson/decodeJson throw because runtime materialization goes through the descriptor', () => {
     // Mirrors `encode`/`decode`: a contract-load path that resolved to
-    // this emit-only stub must fail fast at the JSON boundary instead
+    // this metadata-only stub must fail fast at the JSON boundary instead
     // of silently returning unvalidated payloads.
-    expect(() => arktypeJsonEmitCodec.encodeJson('payload')).toThrow(/emit-only/);
-    expect(() => arktypeJsonEmitCodec.decodeJson({ a: 1 })).toThrow(/emit-only/);
+    expect(() => arktypeJsonEmitCodec.encodeJson('payload')).toThrow(/metadata-only/);
+    expect(() => arktypeJsonEmitCodec.decodeJson({ a: 1 })).toThrow(/metadata-only/);
   });
 });
 

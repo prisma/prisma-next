@@ -35,7 +35,7 @@ import type {
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import { codec, type Codec as SqlCodec } from '@prisma-next/sql-relational-core/ast';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -327,26 +327,32 @@ function renderArktypeJsonOutputTypeFromUnknownParams(
 }
 
 /**
- * Emit-only `Codec` instance for `arktype/json@1`. Threaded through the
- * pack-meta's `codecInstances` array so the emitter's `CodecLookup` can
- * find a `renderOutputType` for the codec id (the emitter consults the
- * codec-id-keyed `CodecLookup` at the framework boundary; the unified
- * descriptor's `renderOutputType` is the long-term home for the renderer
- * but the emit-path glue still routes through `CodecLookup`).
+ * Metadata `Codec` instance for `arktype/json@1`. Threaded through the
+ * pack-meta's `codecInstances` array (control plane) AND the runtime
+ * descriptor's `types.codecTypes.codecInstances` (runtime plane) so two
+ * codec-id-keyed lookups resolve:
  *
- * All conversion methods are sentinels that throw if invoked — runtime
- * materialization always goes through `arktypeJsonCodec.factory`'s
- * curried `(params) => (ctx) => Codec`, never through this instance.
- * `encodeJson`/`decodeJson` throw alongside `encode`/`decode` so a
- * mistaken contract-load that resolved to this stub fails fast at the
- * JSON boundary instead of silently returning unvalidated payloads. A
- * future cleanup could route the emit path through the descriptor map
- * directly and retire this shim.
+ * - The framework emitter's `CodecLookup` reads `renderOutputType` to
+ *   stamp `Vector<…>` / arktype-schema-shaped types into `contract.d.ts`.
+ * - The Postgres SQL renderer's `extractCodecLookup` reads
+ *   `meta.db.sql.postgres.nativeType` to render `$N::jsonb` casts at
+ *   parameter binding sites (`json` / `jsonb` are excluded from
+ *   `POSTGRES_INFERRABLE_NATIVE_TYPES`, so the cast is not optional).
+ *
+ * Conversion methods (`encode` / `decode` / `encodeJson` / `decodeJson`)
+ * are sentinels that throw if invoked — runtime dispatch goes through
+ * `arktypeJsonCodec.factory(params)(ctx)` via the unified descriptor map,
+ * never through this instance. The sentinels exist so a mistaken
+ * contract-load that resolved to this stub fails fast at the JSON
+ * boundary instead of silently returning unvalidated payloads. A future
+ * cleanup that routes the emit path through `descriptorFor` and the
+ * runtime cast lookup through the descriptor map retires this shim
+ * (TML-2357).
  */
 const ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR =
-  'arktype-json codec instances must be materialized via the descriptor factory; this is an emit-only stub';
+  'arktype-json codec instances must be materialized via the descriptor factory; this is a metadata-only stub';
 
-export const arktypeJsonEmitCodec: Codec<
+export const arktypeJsonEmitCodec: SqlCodec<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
   string,
@@ -355,6 +361,15 @@ export const arktypeJsonEmitCodec: Codec<
   id: ARKTYPE_JSON_CODEC_ID,
   targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
   traits: ['equality'] as const,
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'jsonb',
+        },
+      },
+    },
+  },
   encode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
   decode: () => Promise.reject(new Error(ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR)),
   encodeJson: () => {

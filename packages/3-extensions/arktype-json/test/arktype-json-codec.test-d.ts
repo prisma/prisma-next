@@ -1,3 +1,4 @@
+import type { JsonValue } from '@prisma-next/contract/types';
 import type {
   Codec,
   CodecDescriptor,
@@ -24,7 +25,12 @@ export type _Arktype_TakesCtx = Assert<IsEqual<Parameters<ProductType>[0], Codec
 
 type ProductResolved = ReturnType<ProductType>;
 type ProductJs =
-  ProductResolved extends Codec<'arktype/json@1', readonly ['equality'], string, infer Js>
+  ProductResolved extends Codec<
+    'arktype/json@1',
+    readonly ['equality'],
+    string | JsonValue,
+    infer Js
+  >
     ? Js
     : never;
 
@@ -43,7 +49,7 @@ const audit = arktypeJson(auditSchema);
 type AuditType = typeof audit.type;
 type AuditResolved = ReturnType<AuditType>;
 type AuditJs =
-  AuditResolved extends Codec<'arktype/json@1', readonly ['equality'], string, infer Js>
+  AuditResolved extends Codec<'arktype/json@1', readonly ['equality'], string | JsonValue, infer Js>
     ? Js
     : never;
 type AuditInfer = typeof auditSchema.infer;

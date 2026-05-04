@@ -1,5 +1,10 @@
+import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import { describe, expect, it } from 'vitest';
-import { ARKTYPE_JSON_CODEC_ID, arktypeJsonCodec } from '../src/core/arktype-json-codec';
+import {
+  ARKTYPE_JSON_CODEC_ID,
+  arktypeJsonCodec,
+  arktypeJsonEmitCodec,
+} from '../src/core/arktype-json-codec';
 import { arktypeJsonExtensionDescriptor } from '../src/exports/control';
 import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
@@ -30,6 +35,31 @@ describe('arktypeJsonRuntimeDescriptor', () => {
     const instance = arktypeJsonRuntimeDescriptor.create();
     expect(instance.familyId).toBe('sql');
     expect(instance.targetId).toBe('postgres');
+  });
+
+  // The runtime descriptor must surface `arktypeJsonEmitCodec` through
+  // `types.codecTypes.codecInstances` so the postgres adapter's
+  // `extractCodecLookup` can resolve `arktype/json@1` for cast-policy
+  // metadata. Without this, `renderTypedParam` throws "assembled codec
+  // lookup has no entry" the first time a query touches an arktypeJson
+  // column. Regression guard for the bug shipped in #402.
+  it('exposes arktype/json@1 metadata through types.codecTypes.codecInstances', () => {
+    const codecInstances = arktypeJsonRuntimeDescriptor.types?.codecTypes?.codecInstances;
+    expect(codecInstances).toContain(arktypeJsonEmitCodec);
+  });
+
+  it('extractCodecLookup over the runtime descriptor resolves arktype/json@1', () => {
+    const lookup = extractCodecLookup([arktypeJsonRuntimeDescriptor]);
+    const resolved = lookup.get(ARKTYPE_JSON_CODEC_ID);
+    expect(resolved).toBe(arktypeJsonEmitCodec);
+  });
+
+  // jsonb is excluded from POSTGRES_INFERRABLE_NATIVE_TYPES, so the
+  // SQL renderer's cast policy depends on this metadata field to emit
+  // `$N::jsonb` at parameter sites. Pin the meta shape so a future
+  // refactor doesn't silently drop it.
+  it('arktypeJsonEmitCodec carries postgres jsonb native-type metadata', () => {
+    expect(arktypeJsonEmitCodec.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
   });
 });
 
