@@ -2285,7 +2285,7 @@ importers:
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
       arktype:
-        specifier: ^2.1.29
+        specifier: ~2.1.29
         version: 2.1.29
     devDependencies:
       '@prisma-next/sql-contract':
