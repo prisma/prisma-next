@@ -37,6 +37,17 @@ const sqlFamilyPack = {
           default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
         },
       },
+      updatedAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sql/timestamp@1',
+          nativeType: 'timestamp',
+          executionDefaults: {
+            onCreate: { kind: 'generator', id: 'timestampNow' },
+            onUpdate: { kind: 'generator', id: 'timestampNow' },
+          },
+        },
+      },
       uuid: {
         kind: 'fieldPreset',
         output: {
@@ -215,6 +226,7 @@ describe('contract DSL helper vocabulary', () => {
               shortCode: field.nanoid({ size: 16 }).column('short_code'),
               email: field.text().unique({ name: 'audit_entry_email_key' }),
               createdAt: field.createdAt().column('created_at'),
+              updatedAt: field.updatedAt().column('updated_at'),
               reviewedAt: field.timestamp().optional().column('reviewed_at'),
             },
           }).sql({
@@ -270,6 +282,11 @@ describe('contract DSL helper vocabulary', () => {
         ref: { table: 'audit_entry', column: 'id' },
         onCreate: { kind: 'generator', id: 'uuidv4' },
       },
+      {
+        ref: { table: 'audit_entry', column: 'updated_at' },
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
     ]);
     expect(
       (contract.models.AuditEntry as unknown as { storage: { fields: Record<string, unknown> } })
@@ -286,6 +303,7 @@ describe('contract DSL helper vocabulary', () => {
       ({ field }) => {
         const textState = field.text().build();
         const timestampState = field.timestamp().build();
+        const updatedAtState = field.updatedAt().build();
         const uuidState = field.uuid().build();
         const nanoidState = field.nanoid({ size: 16 }).build();
         const uuidV4IdState = field.id.uuidv4().build();
@@ -296,6 +314,9 @@ describe('contract DSL helper vocabulary', () => {
         expectTypeOf(timestampState.descriptor?.codecId).toEqualTypeOf<
           'sql/timestamp@1' | undefined
         >();
+        expectTypeOf(updatedAtState.descriptor?.codecId).toEqualTypeOf<
+          'sql/timestamp@1' | undefined
+        >();
         expectTypeOf(uuidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
         expectTypeOf(nanoidState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
         expectTypeOf(uuidV4IdState.descriptor?.codecId).toEqualTypeOf<'sql/char@1' | undefined>();
@@ -304,6 +325,10 @@ describe('contract DSL helper vocabulary', () => {
 
         expect(uuidState.descriptor?.typeParams).toEqual({ length: 36 });
         expect(nanoidState.descriptor?.typeParams).toEqual({ length: 16 });
+        expect(updatedAtState.executionDefaults).toEqual({
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        });
         expect(uuidV4IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv4' });
         expect(uuidV7IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv7' });
         expect(nanoidIdState.executionDefault).toEqual({

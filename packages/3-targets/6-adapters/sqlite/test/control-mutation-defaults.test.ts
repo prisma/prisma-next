@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createSqliteDefaultFunctionRegistry } from '../src/core/control-mutation-defaults';
+import {
+  createSqliteDefaultFunctionRegistry,
+  createSqliteMutationDefaultGeneratorDescriptors,
+} from '../src/core/control-mutation-defaults';
+import runtimeAdapterDescriptor from '../src/core/runtime-adapter';
 
 const stubSpan = {
   start: { offset: 0, line: 1, column: 1 },
@@ -72,5 +76,25 @@ describe('createSqliteDefaultFunctionRegistry — dbgenerated canonicalization',
       ok: true,
       value: { kind: 'storage', defaultValue: { kind: 'function', expression: 'random()' } },
     });
+  });
+});
+
+describe('createSqliteMutationDefaultGeneratorDescriptors', () => {
+  const descriptors = createSqliteMutationDefaultGeneratorDescriptors();
+
+  it('includes timestampNow for SQLite DateTime columns', () => {
+    const descriptor = descriptors.find((d) => d.id === 'timestampNow');
+
+    expect(descriptor?.applicableCodecIds).toEqual(['sqlite/datetime@1']);
+  });
+});
+
+describe('sqlite runtime mutation default generators', () => {
+  it('provides timestampNow as a Date generator', () => {
+    const generator = runtimeAdapterDescriptor
+      .mutationDefaultGenerators()
+      .find((entry) => entry.id === 'timestampNow');
+
+    expect(generator?.generate()).toBeInstanceOf(Date);
   });
 });

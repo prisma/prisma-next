@@ -79,6 +79,15 @@ export const postgresTarget: TargetPackRef<'sql', 'postgres'> = {
   capabilities: {},
 };
 
+export const sqliteTarget: TargetPackRef<'sql', 'sqlite'> = {
+  kind: 'target',
+  familyId: 'sql',
+  targetId: 'sqlite',
+  id: 'sqlite',
+  version: '0.0.1',
+  capabilities: {},
+};
+
 export const pgvectorExtensionPack: ExtensionPackRef<'sql', 'postgres'> = {
   kind: 'extension',
   familyId: 'sql',
@@ -120,6 +129,18 @@ export const postgresScalarTypeDescriptors = new Map([
   ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
   ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
   ['Bytes', { codecId: 'pg/bytea@1', nativeType: 'bytea' }],
+] as const);
+
+export const sqliteScalarTypeDescriptors = new Map([
+  ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
+  ['Boolean', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
+  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
+  ['BigInt', { codecId: 'sqlite/bigint@1', nativeType: 'integer' }],
+  ['Float', { codecId: 'sqlite/real@1', nativeType: 'real' }],
+  ['Decimal', { codecId: 'sqlite/text@1', nativeType: 'text' }],
+  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text' }],
+  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
+  ['Bytes', { codecId: 'sqlite/blob@1', nativeType: 'blob' }],
 ] as const);
 
 export const postgresCodecIdOnlyDescriptors = new Map<string, string>([
@@ -404,6 +425,10 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
               : 21;
           return { codecId: 'sql/char@1', nativeType: 'character', typeParams: { length } };
         },
+      },
+      {
+        id: 'timestampNow',
+        applicableCodecIds: ['pg/timestamp@1', 'pg/timestamptz@1', 'sqlite/datetime@1'],
       },
     ],
   };

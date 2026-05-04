@@ -306,6 +306,7 @@ describe('applyMutationDefaults', () => {
           columns: {
             id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
             slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            email: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
           },
           uniques: [],
           indexes: [],
@@ -360,7 +361,7 @@ describe('applyMutationDefaults', () => {
     const applied = context.applyMutationDefaults({
       op: 'update',
       table: 'user',
-      values: {},
+      values: { email: 'alice@example.com' },
     });
 
     expect(applied).toEqual([
@@ -370,5 +371,20 @@ describe('applyMutationDefaults', () => {
       },
     ]);
     expect((applied[0]?.value as string).length).toBe(6);
+  });
+
+  it('skips update defaults for empty update payloads', () => {
+    const context = createExecutionContext({
+      contract: contractWithDefaults,
+      stack: createStack(),
+    });
+
+    const applied = context.applyMutationDefaults({
+      op: 'update',
+      table: 'user',
+      values: {},
+    });
+
+    expect(applied).toEqual([]);
   });
 });

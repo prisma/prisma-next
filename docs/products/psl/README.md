@@ -7,7 +7,7 @@ Scope: **PSL → SQL Contract IR** via `@prisma-next/psl-parser` and `@prisma-ne
 ## What PSL v1 can do today (high level)
 
 - **Models, enums, and named types** (`types { ... }`) with deterministic parsing and span-aware diagnostics.
-- **SQL storage mapping** for a Postgres-first subset: tables, columns, primary keys, uniques, indexes, and foreign keys.
+- **SQL storage mapping** for a SQL subset: tables, columns, primary keys, uniques, indexes, and foreign keys.
 - **Defaults** for a curated set of TS-aligned functions and literals, lowered into either storage defaults or execution defaults.
 - **Extension-pack parity (minimal)**: namespaced constructor expressions such as `pgvector.Vector(...)` when the corresponding pack is composed in config.
 
@@ -60,6 +60,10 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 - Supported defaults are split into:
   - **Storage defaults**: literals, `autoincrement()`, `now()`, `dbgenerated("...")`
   - **Execution defaults** (mutation-time generators): `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(n)`
+- Timestamp authoring follows Prisma ORM’s shape for supported SQL targets:
+  - create timestamps use `DateTime @default(now())`, which remains a storage default owned by the database
+  - update timestamps use no-argument `DateTime @updatedAt`, which lowers to a `timestampNow` execution default on create and non-empty update mutations
+- Prisma Next does not add a PSL `@createdAt` alias.
 - **`cuid()` (cuid v1) is explicitly unsupported**; diagnostics guide users to `cuid(2)`.
 - **`dbgenerated("...")` is string-literal based** and (in v1) preserves the parsed contents as-is (escape sequences are not normalized).
 

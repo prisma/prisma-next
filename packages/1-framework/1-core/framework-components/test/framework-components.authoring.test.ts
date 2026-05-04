@@ -345,6 +345,49 @@ describe('authoring template resolution', () => {
     });
   });
 
+  it('resolves phase-specific execution defaults from field presets', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        executionDefaults: {
+          onCreate: {
+            kind: 'arg',
+            index: 0,
+            path: ['create'],
+          },
+          onUpdate: {
+            kind: 'arg',
+            index: 0,
+            path: ['update'],
+          },
+        },
+      },
+    } as const;
+
+    expect(
+      instantiateAuthoringFieldPreset(descriptor, [
+        {
+          create: { kind: 'generator', id: 'timestampNow' },
+          update: { kind: 'generator', id: 'timestampNow' },
+        },
+      ]),
+    ).toEqual({
+      descriptor: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+      },
+      nullable: false,
+      executionDefaults: {
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+      id: false,
+      unique: false,
+    });
+  });
+
   it('stringifies primitive function default expressions', () => {
     const descriptor = {
       kind: 'fieldPreset',

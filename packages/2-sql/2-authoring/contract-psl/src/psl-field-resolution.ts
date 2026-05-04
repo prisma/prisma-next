@@ -1,5 +1,9 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefault,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultRegistry,
@@ -27,6 +31,7 @@ export type ResolvedField = {
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
   readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: Omit<ExecutionMutationDefault, 'ref'>;
   readonly isId: boolean;
   readonly isUnique: boolean;
   readonly idName?: string;
@@ -64,6 +69,7 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
   'id',
   'unique',
   'default',
+  'updatedAt',
   'relation',
   'map',
 ]);
@@ -136,6 +142,88 @@ function extractFieldConstraintNames(input: {
     code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
   });
   return { idAttribute, uniqueAttribute, idName, uniqueName };
+}
+
+const TIMESTAMP_NOW_GENERATOR_ID = 'timestampNow';
+
+function reportInvalidUpdatedAt(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly attribute: PslAttribute;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly message: string;
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    message: `Field "${input.model.name}.${input.field.name}" @updatedAt ${input.message}`,
+    sourceId: input.sourceId,
+    span: input.attribute.span,
+  });
+}
+
+function lowerUpdatedAtAttribute(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly attribute: PslAttribute;
+  readonly descriptor: ColumnDescriptor;
+  readonly defaultAttribute: PslAttribute | undefined;
+  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): Omit<ExecutionMutationDefault, 'ref'> | undefined {
+  if (input.attribute.args.length > 0) {
+    reportInvalidUpdatedAt({
+      ...input,
+      message: 'does not accept arguments. Use @updatedAt.',
+    });
+    return undefined;
+  }
+  if (input.defaultAttribute) {
+    reportInvalidUpdatedAt({
+      ...input,
+      message: 'cannot be combined with @default.',
+    });
+    return undefined;
+  }
+  if (input.field.optional) {
+    reportInvalidUpdatedAt({
+      ...input,
+      message: 'cannot be optional. Remove "?" or remove @updatedAt.',
+    });
+    return undefined;
+  }
+  if (input.field.list) {
+    reportInvalidUpdatedAt({
+      ...input,
+      message: 'cannot be a list field. Use a singular DateTime field.',
+    });
+    return undefined;
+  }
+
+  const generatorDescriptor = input.generatorDescriptorById.get(TIMESTAMP_NOW_GENERATOR_ID);
+  if (!generatorDescriptor) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Field "${input.model.name}.${input.field.name}" @updatedAt requires mutation default generator "${TIMESTAMP_NOW_GENERATOR_ID}".`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  if (!generatorDescriptor.applicableCodecIds.includes(input.descriptor.codecId)) {
+    reportInvalidUpdatedAt({
+      ...input,
+      message: `requires a timestamp-compatible field, received codecId "${input.descriptor.codecId}".`,
+    });
+    return undefined;
+  }
+
+  const generated = { kind: 'generator' as const, id: TIMESTAMP_NOW_GENERATOR_ID };
+  return {
+    onCreate: generated,
+    onUpdate: generated,
+  };
 }
 
 export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {
@@ -235,6 +323,19 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     }
 
     const defaultAttribute = getAttribute(field.attributes, 'default');
+    const updatedAtAttribute = getAttribute(field.attributes, 'updatedAt');
+    const updatedAtExecutionDefaults = updatedAtAttribute
+      ? lowerUpdatedAtAttribute({
+          model,
+          field,
+          attribute: updatedAtAttribute,
+          descriptor,
+          defaultAttribute,
+          generatorDescriptorById,
+          diagnostics,
+          sourceId,
+        })
+      : undefined;
     const loweredDefault = defaultAttribute
       ? lowerDefaultForField({
           modelName: model.name,
@@ -283,6 +384,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       descriptor,
       ...ifDefined('defaultValue', loweredDefault.defaultValue),
       ...ifDefined('executionDefault', loweredDefault.executionDefault),
+      ...ifDefined('executionDefaults', updatedAtExecutionDefaults),
       isId: Boolean(idAttribute),
       isUnique: Boolean(uniqueAttribute),
       ...ifDefined('idName', idName),

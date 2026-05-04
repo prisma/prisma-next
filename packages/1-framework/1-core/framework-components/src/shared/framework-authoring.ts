@@ -63,10 +63,16 @@ export type AuthoringColumnDefaultTemplate =
   | AuthoringColumnDefaultTemplateLiteral
   | AuthoringColumnDefaultTemplateFunction;
 
+export interface AuthoringExecutionDefaultsTemplate {
+  readonly onCreate?: AuthoringTemplateValue;
+  readonly onUpdate?: AuthoringTemplateValue;
+}
+
 export interface AuthoringFieldPresetOutput extends AuthoringStorageTypeTemplate {
   readonly nullable?: boolean;
   readonly default?: AuthoringColumnDefaultTemplate;
   readonly executionDefault?: AuthoringTemplateValue;
+  readonly executionDefaults?: AuthoringExecutionDefaultsTemplate;
   readonly id?: boolean;
   readonly unique?: boolean;
 }
@@ -327,6 +333,29 @@ function resolveAuthoringColumnDefaultTemplate(
   };
 }
 
+function resolveAuthoringExecutionDefaultsTemplate(
+  template: AuthoringExecutionDefaultsTemplate,
+  args: readonly unknown[],
+): {
+  readonly onCreate?: unknown;
+  readonly onUpdate?: unknown;
+} {
+  return {
+    ...ifDefined(
+      'onCreate',
+      template.onCreate !== undefined
+        ? resolveAuthoringTemplateValue(template.onCreate, args)
+        : undefined,
+    ),
+    ...ifDefined(
+      'onUpdate',
+      template.onUpdate !== undefined
+        ? resolveAuthoringTemplateValue(template.onUpdate, args)
+        : undefined,
+    ),
+  };
+}
+
 export function instantiateAuthoringTypeConstructor(
   descriptor: AuthoringTypeConstructorDescriptor,
   args: readonly unknown[],
@@ -358,6 +387,10 @@ export function instantiateAuthoringFieldPreset(
         readonly expression: string;
       };
   readonly executionDefault?: unknown;
+  readonly executionDefaults?: {
+    readonly onCreate?: unknown;
+    readonly onUpdate?: unknown;
+  };
   readonly id: boolean;
   readonly unique: boolean;
 } {
@@ -374,6 +407,12 @@ export function instantiateAuthoringFieldPreset(
       'executionDefault',
       descriptor.output.executionDefault !== undefined
         ? resolveAuthoringTemplateValue(descriptor.output.executionDefault, args)
+        : undefined,
+    ),
+    ...ifDefined(
+      'executionDefaults',
+      descriptor.output.executionDefaults !== undefined
+        ? resolveAuthoringExecutionDefaultsTemplate(descriptor.output.executionDefaults, args)
         : undefined,
     ),
     id: descriptor.output.id ?? false,

@@ -109,6 +109,131 @@ const int4Column = {
   nativeType: 'int4',
 } as const satisfies ColumnTypeDescriptor;
 
+const bareSqlFamilyPack = {
+  kind: 'family',
+  id: 'sql',
+  familyId: 'sql',
+  version: '0.0.1',
+} as const satisfies FamilyPackRef<'sql'>;
+
+const sqliteTimestampTargetPack = {
+  kind: 'target',
+  id: 'sqlite',
+  familyId: 'sql',
+  targetId: 'sqlite',
+  version: '0.0.1',
+  authoring: {
+    field: {
+      int: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sqlite/integer@1',
+          nativeType: 'integer',
+        },
+      },
+      text: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sqlite/text@1',
+          nativeType: 'text',
+        },
+      },
+      createdAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sqlite/datetime@1',
+          nativeType: 'text',
+          default: {
+            kind: 'function',
+            expression: 'now()',
+          },
+        },
+      },
+      updatedAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'sqlite/datetime@1',
+          nativeType: 'text',
+          executionDefaults: {
+            onCreate: { kind: 'generator', id: 'timestampNow' },
+            onUpdate: { kind: 'generator', id: 'timestampNow' },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies TargetPackRef<'sql', 'sqlite'>;
+
+const postgresTimestampTargetPack = {
+  kind: 'target',
+  id: 'postgres',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  authoring: {
+    field: {
+      int: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'pg/int4@1',
+          nativeType: 'int4',
+        },
+      },
+      text: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'pg/text@1',
+          nativeType: 'text',
+        },
+      },
+      createdAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'pg/timestamptz@1',
+          nativeType: 'timestamptz',
+          default: {
+            kind: 'function',
+            expression: 'now()',
+          },
+        },
+      },
+      updatedAt: {
+        kind: 'fieldPreset',
+        output: {
+          codecId: 'pg/timestamptz@1',
+          nativeType: 'timestamptz',
+          executionDefaults: {
+            onCreate: { kind: 'generator', id: 'timestampNow' },
+            onUpdate: { kind: 'generator', id: 'timestampNow' },
+          },
+        },
+      },
+    },
+  },
+} as const satisfies TargetPackRef<'sql', 'postgres'>;
+
+const postgresTimestampScalarTypeDescriptors = new Map([
+  ['Int', { codecId: 'pg/int4@1', nativeType: 'int4' }],
+  ['String', { codecId: 'pg/text@1', nativeType: 'text' }],
+  ['DateTime', { codecId: 'pg/timestamptz@1', nativeType: 'timestamptz' }],
+  ['Json', { codecId: 'pg/jsonb@1', nativeType: 'jsonb' }],
+] as const);
+
+const postgresTimestampAuthoringContributions = {
+  field: postgresTimestampTargetPack.authoring.field,
+} as const satisfies AuthoringContributions;
+
+const sqliteTimestampScalarTypeDescriptors = new Map([
+  ['Int', { codecId: 'sqlite/integer@1', nativeType: 'integer' }],
+  ['String', { codecId: 'sqlite/text@1', nativeType: 'text' }],
+  ['DateTime', { codecId: 'sqlite/datetime@1', nativeType: 'text' }],
+  ['Json', { codecId: 'sqlite/json@1', nativeType: 'text' }],
+] as const);
+
+const sqliteTimestampAuthoringContributions = {
+  field: sqliteTimestampTargetPack.authoring.field,
+} as const satisfies AuthoringContributions;
+
 const representativePslSchema = `types {
   Embedding1536 = pgvector.Vector(1536)
 }
@@ -229,6 +354,48 @@ function buildTsContract() {
   );
 }
 
+function buildSqliteTimestampTsContract() {
+  return defineContract(
+    {
+      family: bareSqlFamilyPack,
+      target: sqliteTimestampTargetPack,
+    },
+    ({ field, model }) => ({
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.int().id(),
+            email: field.text(),
+            createdAt: field.createdAt(),
+            updatedAt: field.updatedAt(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    }),
+  );
+}
+
+function buildPostgresTimestampTsContract() {
+  return defineContract(
+    {
+      family: bareSqlFamilyPack,
+      target: postgresTimestampTargetPack,
+    },
+    ({ field, model }) => ({
+      models: {
+        User: model('User', {
+          fields: {
+            id: field.int().id(),
+            email: field.text(),
+            createdAt: field.createdAt(),
+            updatedAt: field.updatedAt(),
+          },
+        }).sql({ table: 'user' }),
+      },
+    }),
+  );
+}
+
 describe('TS and PSL authoring parity', () => {
   it('lowers the same representative contract to identical output', () => {
     const tsContract = buildTsContract();
@@ -258,5 +425,57 @@ describe('TS and PSL authoring parity', () => {
     const tsLines = countSemanticLines(representativeTsAuthoring);
 
     expect(tsLines).toBeLessThanOrEqual(Math.ceil(pslLines * 1.6));
+  });
+
+  it('lowers SQLite timestamp helpers to the same contract as PSL timestamp attributes', () => {
+    const tsContract = buildSqliteTimestampTsContract();
+    const pslDocument = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  email String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const interpreted = interpretPslDocumentToSqlContract({
+      document: pslDocument,
+      target: sqliteTimestampTargetPack,
+      scalarTypeDescriptors: sqliteTimestampScalarTypeDescriptors,
+      controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+      authoringContributions: sqliteTimestampAuthoringContributions,
+    });
+
+    expect(interpreted.ok).toBe(true);
+    if (!interpreted.ok) return;
+
+    expect(interpreted.value).toEqual(tsContract);
+  });
+
+  it('lowers Postgres timestamp helpers to the same contract as PSL timestamp attributes', () => {
+    const tsContract = buildPostgresTimestampTsContract();
+    const pslDocument = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  email String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const interpreted = interpretPslDocumentToSqlContract({
+      document: pslDocument,
+      target: postgresTimestampTargetPack,
+      scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
+      controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
+      authoringContributions: postgresTimestampAuthoringContributions,
+    });
+
+    expect(interpreted.ok).toBe(true);
+    if (!interpreted.ok) return;
+
+    expect(interpreted.value).toEqual(tsContract);
   });
 });

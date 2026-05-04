@@ -13,7 +13,6 @@ import {
   type ContractValueObject,
   coreHash,
   type ExecutionMutationDefault,
-  type ExecutionMutationDefaultValue,
   type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -37,6 +36,7 @@ import type {
 type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
+type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 function encodeDefaultLiteralValue(
   value: ColumnDefaultLiteralInputValue,
@@ -103,6 +103,22 @@ function isValueObjectField(
   field: FieldNode | ValueObjectFieldNode,
 ): field is ValueObjectFieldNode {
   return 'valueObjectName' in field;
+}
+
+function resolveExecutionDefaultPhases(
+  field: FieldNode | ValueObjectFieldNode,
+  fieldLabel: string,
+): ExecutionMutationDefaultPhases | undefined {
+  if (field.executionDefault && field.executionDefaults) {
+    throw new Error(`${fieldLabel} cannot define both executionDefault and executionDefaults.`);
+  }
+  if (field.executionDefault) {
+    return { onCreate: field.executionDefault };
+  }
+  if (!field.executionDefaults?.onCreate && !field.executionDefaults?.onUpdate) {
+    return undefined;
+  }
+  return field.executionDefaults;
 }
 
 const JSONB_CODEC_ID = 'pg/jsonb@1';
@@ -198,15 +214,22 @@ export function buildSqlContractFromDefinition(
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
 
     for (const field of semanticModel.fields) {
-      if (field.executionDefault) {
+      const executionDefaultPhases = resolveExecutionDefaultPhases(
+        field,
+        `Field "${semanticModel.modelName}.${field.fieldName}"`,
+      );
+      if (executionDefaultPhases) {
+        const executionDefaultProperty = field.executionDefault
+          ? 'executionDefault'
+          : 'executionDefaults';
         if (field.default !== undefined) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefault.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and ${executionDefaultProperty}.`,
           );
         }
         if (field.nullable) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefault is present.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when ${executionDefaultProperty} is present.`,
           );
         }
       }
@@ -227,10 +250,11 @@ export function buildSqlContractFromDefinition(
         domainFieldRefs[field.fieldName] = { kind: 'scalar', many: true };
       }
 
-      if ('executionDefault' in field && field.executionDefault) {
+      if (executionDefaultPhases) {
         executionDefaults.push({
           ref: { table: tableName, column: field.columnName },
-          onCreate: field.executionDefault as ExecutionMutationDefaultValue,
+          ...ifDefined('onCreate', executionDefaultPhases.onCreate),
+          ...ifDefined('onUpdate', executionDefaultPhases.onUpdate),
         });
       }
     }

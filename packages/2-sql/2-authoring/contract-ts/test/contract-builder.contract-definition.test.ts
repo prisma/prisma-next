@@ -230,6 +230,41 @@ describe('shared contract definition lowering', () => {
     });
   });
 
+  it('builds phase-specific execution defaults', () => {
+    const contract = buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      models: [
+        {
+          modelName: 'User',
+          tableName: 'app_user',
+          fields: [
+            {
+              fieldName: 'updatedAt',
+              columnName: 'updated_at',
+              descriptor: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+              },
+              nullable: false,
+              executionDefaults: {
+                onCreate: { kind: 'generator', id: 'timestampNow' },
+                onUpdate: { kind: 'generator', id: 'timestampNow' },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(contract.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'app_user', column: 'updated_at' },
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+    ]);
+  });
+
   it('rejects generated fields that also declare storage defaults', () => {
     expect(() =>
       buildSqlContractFromDefinition({

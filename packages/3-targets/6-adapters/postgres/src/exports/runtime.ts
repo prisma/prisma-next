@@ -27,13 +27,19 @@ function createPostgresCodecRegistry(): CodecRegistry {
 }
 
 function createPostgresMutationDefaultGenerators() {
-  return builtinGeneratorIds.map((id) => ({
-    id,
-    generate: (params?: Record<string, unknown>) => {
-      const spec: GeneratedValueSpec = params ? { id, params } : { id };
-      return generateId(spec);
+  return [
+    ...builtinGeneratorIds.map((id) => ({
+      id,
+      generate: (params?: Record<string, unknown>) => {
+        const spec: GeneratedValueSpec = params ? { id, params } : { id };
+        return generateId(spec);
+      },
+    })),
+    {
+      id: 'timestampNow',
+      generate: () => new Date(),
     },
-  }));
+  ];
 }
 
 /**

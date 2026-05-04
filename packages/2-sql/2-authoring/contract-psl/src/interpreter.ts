@@ -77,19 +77,19 @@ import {
 
 export interface InterpretPslDocumentToSqlContractInput {
   readonly document: ParsePslDocumentResult;
-  readonly target: TargetPackRef<'sql', 'postgres'>;
+  readonly target: TargetPackRef<'sql', string>;
   readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnDescriptor>;
   readonly composedExtensionPacks?: readonly string[];
-  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
   readonly controlMutationDefaults?: ControlMutationDefaults;
   readonly authoringContributions?: AuthoringContributions;
 }
 
 function buildComposedExtensionPackRefs(
-  target: TargetPackRef<'sql', 'postgres'>,
+  target: TargetPackRef<'sql', string>,
   extensionIds: readonly string[],
-  extensionPackRefs: readonly ExtensionPackRef<'sql', 'postgres'>[] = [],
-): Record<string, ExtensionPackRef<'sql', 'postgres'>> | undefined {
+  extensionPackRefs: readonly ExtensionPackRef<'sql', string>[] = [],
+): Record<string, ExtensionPackRef<'sql', string>> | undefined {
   if (extensionIds.length === 0) {
     return undefined;
   }
@@ -106,7 +106,7 @@ function buildComposedExtensionPackRefs(
           familyId: target.familyId,
           targetId: target.targetId,
           version: '0.0.1',
-        } satisfies ExtensionPackRef<'sql', 'postgres'>),
+        } satisfies ExtensionPackRef<'sql', string>),
     ]),
   );
 }
@@ -763,6 +763,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         nullable: resolvedField.field.optional,
         ...ifDefined('default', resolvedField.defaultValue),
         ...ifDefined('executionDefault', resolvedField.executionDefault),
+        ...ifDefined('executionDefaults', resolvedField.executionDefaults),
       })),
       ...(primaryKeyColumns.length > 0
         ? {

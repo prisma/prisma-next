@@ -563,6 +563,7 @@ function resolveModelNode(
       nullable: fieldState.nullable,
       ...(fieldState.default ? { default: fieldState.default } : {}),
       ...(fieldState.executionDefault ? { executionDefault: fieldState.executionDefault } : {}),
+      ...(fieldState.executionDefaults ? { executionDefaults: fieldState.executionDefaults } : {}),
     });
   }
 

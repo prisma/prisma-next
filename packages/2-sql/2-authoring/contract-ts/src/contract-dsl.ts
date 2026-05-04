@@ -1,6 +1,7 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
+  ExecutionMutationDefault,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 import type {
@@ -27,6 +28,7 @@ export type NamingConfig = {
 };
 
 type NamedStorageTypeRef = string | StorageTypeInstance;
+type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
@@ -47,6 +49,7 @@ export type ScalarFieldState<
   readonly columnName?: ColumnName | undefined;
   readonly default?: ColumnDefault | undefined;
   readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
 } & (IdSpec extends NamedConstraintSpec ? { readonly id: IdSpec } : { readonly id?: undefined }) &
   (UniqueSpec extends NamedConstraintSpec
     ? { readonly unique: UniqueSpec }
@@ -60,6 +63,7 @@ type AnyScalarFieldState = {
   readonly columnName?: string | undefined;
   readonly default?: ColumnDefault | undefined;
   readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
   readonly id?: NamedConstraintSpec | undefined;
   readonly unique?: NamedConstraintSpec | undefined;
 };
@@ -383,6 +387,10 @@ export function buildFieldPreset(
     ...ifDefined(
       'executionDefault',
       preset.executionDefault as ExecutionMutationDefaultValue | undefined,
+    ),
+    ...ifDefined(
+      'executionDefaults',
+      preset.executionDefaults as ExecutionMutationDefaultPhases | undefined,
     ),
     ...(preset.id
       ? {

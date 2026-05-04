@@ -15,6 +15,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
+- Interpret SQL timestamp semantics: `DateTime @default(now())` as a storage default and `DateTime @updatedAt` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
 - Lower supported default functions through composed registry inputs
 - Support selected Postgres native-type attributes on named types for brownfield round-trips (`@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, `@db.Json`)
@@ -42,7 +43,7 @@ The **pure interpreter entrypoint** specifically excludes:
 - Artifact emission (`contract.json`, `contract.d.ts`) and hashing
 - CLI or ControlClient orchestration
 
-Current scope is SQL/Postgres-first: callers pass Postgres-oriented scalar descriptors and target context in v1.
+Current scope is SQL target-specific: callers pass scalar descriptors and target context assembled for the active SQL target.
 
 Unsupported PSL constructs in v1 (strict errors):
 
@@ -62,6 +63,12 @@ Supported `@default(...)` surface in v1 when composed contributors provide handl
 - Execution defaults: `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(<2-255>)`
 - Explicitly unsupported in v1: `cuid()` (diagnostic suggests `cuid(2)`)
 - `dbgenerated("...")` preserves the parsed PSL string-literal contents as-is (escaped sequences are not normalized in v1).
+
+Supported timestamp attribute surface:
+
+- `createdAt DateTime @default(now())` lowers to the target storage default and does not create an execution mutation default.
+- `updatedAt DateTime @updatedAt` lowers to `timestampNow` on create and on non-empty update mutations. This is application-side because Prisma’s `@updatedAt` semantics are mutation-aware, not a database trigger.
+- `@createdAt` is not supported as a PSL alias.
 
 ## Public API
 

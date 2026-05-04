@@ -16,7 +16,7 @@ This package is part of the SQL family namespace (`packages/2-sql/2-authoring/co
 
 - the SQL contract DSL centered on `defineContract(...)`
 - the base structural helpers exported from `./contract-builder`: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.createdAt()`, and `type.enum(...)`
+- an optional callback overload that exposes pack-composed helper namespaces such as `field.id.uuidv7()`, `field.text()`, `field.createdAt()`, `field.updatedAt()`, and `type.enum(...)`
 - lowering from authored model definitions into the canonical SQL `Contract`
 
 ## Responsibilities
@@ -109,7 +109,7 @@ export const contract = defineContract({
 
 ### Callback Helper Vocabulary
 
-Pack-provided helper presets are available through the callback overload. This is the surface that exposes `field.id.*`, `field.text()`, `field.createdAt()`, `type.sql.String(...)`, and extension helpers such as `type.pgvector.Vector(...)`.
+Pack-provided helper presets are available through the callback overload. This is the surface that exposes `field.id.*`, `field.text()`, `field.createdAt()`, `field.updatedAt()`, `type.sql.String(...)`, and extension helpers such as `type.pgvector.Vector(...)`.
 
 ```typescript
 import pgvector from '@prisma-next/extension-pgvector/pack';
@@ -136,6 +136,8 @@ export const contract = defineContract(
         shortName: field.namedType(types.ShortName),
         role: field.namedType(types.Role),
         embedding: field.namedType(types.Embedding1536).optional(),
+        createdAt: field.createdAt(),
+        updatedAt: field.updatedAt(),
       },
     });
 
@@ -192,7 +194,8 @@ const Membership = model('Membership', {
 ### Helper Notes
 
 - Structural helpers: `field.column(...)`, `field.generated(...)`, `field.namedType(...)`, plus `model(...)` and `rel.*`
-- Callback helper presets: `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.createdAt()`, and `type.*`
+- Callback helper presets: `field.id.uuidv4()`, `field.id.uuidv7()`, `field.id.nanoid({ size })`, `field.uuid()`, `field.text()`, `field.timestamp()`, `field.createdAt()`, `field.updatedAt()`, and `type.*`
+- Timestamp helpers mirror PSL semantics: `field.createdAt()` lowers to a target storage `now()` default, while `field.updatedAt()` lowers to the target-owned `timestampNow` execution default for create and non-empty update mutations.
 - Keep field-local and FK-local storage overrides next to the authoring site with `field.sql(...)` and `rel.belongsTo(...).sql({ fk })`
 - Prefer typed local refs such as `field.namedType(types.Role)`, `User.refs.id`, and `User.ref('id')` when those tokens are available
 - See [API.md](./API.md) for generated-field spec semantics, validation rules, and typed-reference warning behavior

@@ -1,4 +1,5 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -8,6 +9,8 @@ import {
   createBuiltinLikeControlMutationDefaults,
   postgresScalarTypeDescriptors,
   postgresTarget,
+  sqliteScalarTypeDescriptors,
+  sqliteTarget,
 } from './fixtures';
 
 describe('interpretPslDocumentToSqlContract default lowering', () => {
@@ -220,5 +223,124 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
         },
       },
     });
+  });
+
+  it('lowers @updatedAt to create and update execution defaults', () => {
+    const document = parsePslDocument({
+      schema: `model Timestamped {
+  id Int @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    expect(storage.tables['timestamped']?.columns['createdAt']?.default).toEqual({
+      kind: 'function',
+      expression: 'now()',
+    });
+    expect(result.value.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'timestamped', column: 'updatedAt' },
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+    ]);
+  });
+
+  it('returns diagnostics for invalid @updatedAt usage', () => {
+    const document = parsePslDocument({
+      schema: `model InvalidUpdatedAt {
+  id Int @id
+  withArg DateTime @updatedAt(foo)
+  onText String @updatedAt
+  optional DateTime? @updatedAt
+  list DateTime[] @updatedAt
+  withDefault DateTime @updatedAt @default(now())
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('does not accept arguments'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('timestamp-compatible'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('cannot be optional'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('cannot be a list'),
+        }),
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('cannot be combined with @default'),
+        }),
+      ]),
+    );
+  });
+
+  it('lowers SQLite @updatedAt to SQLite timestamp codecs', () => {
+    const document = parsePslDocument({
+      schema: `model Timestamped {
+  id Int @id
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContractInternal({
+      document,
+      target: sqliteTarget,
+      scalarTypeDescriptors: sqliteScalarTypeDescriptors,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    expect(storage.tables['timestamped']?.columns['updatedAt']).toMatchObject({
+      codecId: 'sqlite/datetime@1',
+      nativeType: 'text',
+      nullable: false,
+    });
+    expect(result.value.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'timestamped', column: 'updatedAt' },
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+    ]);
   });
 });

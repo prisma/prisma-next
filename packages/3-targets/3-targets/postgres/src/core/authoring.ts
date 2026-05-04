@@ -100,4 +100,21 @@ export const postgresAuthoringFieldPresets = {
       },
     },
   },
+  updatedAt: {
+    kind: 'fieldPreset',
+    output: {
+      codecId: 'pg/timestamptz@1',
+      nativeType: 'timestamptz',
+      executionDefaults: {
+        onCreate: {
+          kind: 'generator',
+          id: 'timestampNow',
+        },
+        onUpdate: {
+          kind: 'generator',
+          id: 'timestampNow',
+        },
+      },
+    },
+  },
 } as const satisfies AuthoringFieldNamespace;

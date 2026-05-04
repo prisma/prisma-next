@@ -1,10 +1,16 @@
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefault,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
 } from '@prisma-next/contract-authoring';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+
+export type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 export interface FieldNode {
   readonly fieldName: string;
@@ -13,6 +19,7 @@ export interface FieldNode {
   readonly nullable: boolean;
   readonly default?: ColumnDefault;
   readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }
 
@@ -72,6 +79,7 @@ export interface ValueObjectFieldNode {
   readonly nullable: boolean;
   readonly default?: ColumnDefault;
   readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }
 

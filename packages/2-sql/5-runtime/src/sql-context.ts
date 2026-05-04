@@ -658,6 +658,9 @@ function applyMutationDefaults(
   if (defaults.length === 0) {
     return [];
   }
+  if (options.op === 'update' && Object.keys(options.values).length === 0) {
+    return [];
+  }
 
   const applied: AppliedMutationDefault[] = [];
   const appliedColumns = new Set<string>();
