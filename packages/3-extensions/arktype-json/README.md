@@ -55,6 +55,12 @@ In the emitted `contract.d.ts`, `Product.spec` resolves to
 `{ name: string; price: number; description?: string }` — the schema's
 expression renders directly into the field type.
 
+> **No-emit caveat.** Today, importing the TS contract directly without
+> running `pnpm emit` resolves `Product.spec` to `unknown` (the codec's
+> base `output` type). The schema's inferred shape only flows into the
+> field type after emit. Parameterized no-emit resolution is tracked
+> under TML-2357 — see [ADR 208 § No-emit type resolution](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md).
+
 ## Pack registration
 
 Add the runtime descriptor to your runtime stack and the control descriptor

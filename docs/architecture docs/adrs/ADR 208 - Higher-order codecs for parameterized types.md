@@ -113,7 +113,11 @@ The same `vector(1536)` participates in four code paths. Each reads a different 
 
 ### 2. No-emit type resolution
 
-`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` follows `typeRef` through `storage.types`, then synthetically applies `CodecInstanceContext` to the column's `type` slot at the type level and reads the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this produces `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']`. Nullability is reattached uniformly.
+> **Status — partial.** As shipped, `@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` resolves through `CodecTypesFromDefinition[codecId]['output']` only. Parameterized columns therefore fall back to the codec's base output type in no-emit mode: `vector(1536)` resolves to `number[]` (the codec's base `output`) instead of `Vector<1536>`, and `arktypeJson(schema)` resolves to `unknown` because `@prisma-next/extension-arktype-json/codec-types` declares its `arktype/json@1` entry's `output` as `unknown`. Authors who skip `pnpm emit` get codec-base types, not the parameterized refinements emitted into `contract.d.ts`. Tracked under TML-2357.
+>
+> The shape described below is the eventual target: the `type: (ctx: CodecInstanceContext) => Codec<…, Js>` slot is already on `ColumnTypeDescriptor` (authoring-time only, never serialized) so `arktypeJson(schema).type` carries the inferred shape at the type level today. What's missing is the `FieldOutputType` resolver wiring that follows `typeRef` and applies the slot to read the `Js` parameter off the resulting codec.
+
+`@prisma-next/sql-contract-ts`'s `FieldOutputType<Definition, Model, Field>` will follow `typeRef` through `storage.types`, then synthetically apply `CodecInstanceContext` to the column's `type` slot at the type level and read the `Js` parameter off the resulting `Codec<…, Js>`. For `vector(1536)`, this will produce `Vector<1536>` (literal `N` preserved through curried application). For non-parameterized columns (no `type` slot), it falls back to `CodecTypes[codecId]['output']` (today's behavior for every column). Nullability is reattached uniformly.
 
 ### 3. Emit-path rendering
 
