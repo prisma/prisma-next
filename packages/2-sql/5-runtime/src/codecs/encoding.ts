@@ -1,5 +1,6 @@
 import {
   checkAborted,
+  isRuntimeError,
   raceAgainstAbort,
   runtimeError,
 } from '@prisma-next/framework-components/runtime';
@@ -125,6 +126,17 @@ async function encodeParamValue(
   try {
     return await codec.encode(value, ctx);
   } catch (error) {
+    // Per-library JSON-with-schema codecs validate inside `encode` (same
+    // shape as their `decode` validation, see ADR 208 § Case J) and throw
+    // `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly. The unified codec
+    // descriptor model promises this stable code surfaces unchanged on
+    // both directions of the wire boundary. Without this rethrow,
+    // `wrapEncodeFailure` would re-wrap as `RUNTIME.ENCODE_FAILED` and
+    // break the stable-code contract on the write side — symmetric to
+    // the decode-side guard in `decoding.ts`.
+    if (isRuntimeError(error) && error.code === 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED') {
+      throw error;
+    }
     wrapEncodeFailure(error, metadata, paramIndex, codec.id);
   }
 }

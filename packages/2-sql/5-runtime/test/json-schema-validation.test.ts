@@ -380,6 +380,42 @@ describe('JSON Schema encoding validation', () => {
     );
     expect(result).toBe('{"age":30}');
   });
+
+  // Symmetric to the decode-side guard: per-library JSON-with-schema
+  // codecs (e.g. `arktype/json@1`) validate inside `encode` and throw
+  // `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` directly. The runtime must
+  // surface that stable code unchanged on the write side — not rewrap
+  // it as `RUNTIME.ENCODE_FAILED`.
+  it('preserves RUNTIME.JSON_SCHEMA_VALIDATION_FAILED thrown from codec.encode', async () => {
+    const inlineValidatingRegistry = createCodecRegistry();
+    inlineValidatingRegistry.register(
+      codec<'inline/json@1', readonly [], string, JsonValue>({
+        typeId: 'inline/json@1',
+        targetTypes: ['jsonb'],
+        encode: () => {
+          throw Object.assign(new Error('inline schema rejected payload on write'), {
+            code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+            category: 'RUNTIME',
+            severity: 'error',
+            details: { codecId: 'inline/json@1' },
+          });
+        },
+        decode: (w: string) => (typeof w === 'string' ? JSON.parse(w) : w) as JsonValue,
+      }),
+    );
+
+    await expect(
+      encodeParam(
+        { wrong: 'shape' },
+        { codecId: 'inline/json@1' },
+        0,
+        inlineValidatingRegistry,
+        {},
+      ),
+    ).rejects.toMatchObject({
+      code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+    });
+  });
 });
 
 // =============================================================================
