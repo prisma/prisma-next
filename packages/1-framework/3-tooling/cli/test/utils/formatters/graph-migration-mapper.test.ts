@@ -333,6 +333,25 @@ describe('migrationGraphToRenderInput', () => {
     expect(edge?.label).toBe('m1 ⧗  provides ["users.email-unique", "orders.total-non-negative"]');
   });
 
+  it('JSON-quotes ids that contain punctuation', () => {
+    // validateInvariantId rejects whitespace + ASCII control chars but does
+    // not forbid commas, brackets, or quotes. The JSON.stringify quoting is
+    // what makes those ids unambiguous in the rendered label — `provides
+    // [foo,bar]` would read as two ids, `["foo,bar"]` as one. This pins
+    // the contract that the graph render's quoting matches the format the
+    // error envelopes use for the same data.
+    const graph = buildGraph([
+      {
+        ...entry(ROOT, 'A', 'm1'),
+        invariants: ['weird,id', 'has"quote'],
+      },
+    ]);
+    const result = migrationGraphToRenderInput(makeInput({ graph, contractHash: 'A' }));
+
+    const label = result.graph.edges[0]?.label;
+    expect(label).toBe('m1  provides ["weird,id", "has\\"quote"]');
+  });
+
   it('addPathBetween skips when nodes missing from graph', () => {
     const graph = buildGraph([entry(ROOT, 'A', 'm1')]);
     const result = migrationGraphToRenderInput(
