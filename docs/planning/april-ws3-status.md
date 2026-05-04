@@ -1,6 +1,45 @@
-# WS3: Runtime Pipeline — April Status & May Handoff
+# April Status & May Handoff
 
-**Context**: This document captures the end-of-April state of the Runtime pipeline workstream defined in [april-milestone.md § Workstream 3](./april-milestone.md). It is intended as input for May planning — specifically [WS2: Transactions + query surface](./may-milestone.md#ws2-transactions--query-surface), which is the direct continuation of this work.
+**Context**: This document captures the end-of-April carry-over that must survive May planning. It started as the Runtime pipeline handoff from [april-milestone.md § Workstream 3](./april-milestone.md#3-runtime-pipeline-orm-query-builders-middleware-framework-integration), and now also tracks the unfinished Contract authoring work from [april-milestone.md § Workstream 2](./april-milestone.md#2-contract-authoring-psl--typescript). Runtime work maps primarily to [WS2: Transactions + query surface](./may-milestone.md#ws2-transactions--query-surface). Contract authoring maps to [WS5: Contract authoring for greenfield](./may-milestone.md#ws5-contract-authoring-for-greenfield), with small dependencies on the facade/config work from WS1 and the workflow commands from WS7.
+
+---
+
+## Contract authoring (PSL + TypeScript) — April carry-over
+
+**Owner recommendation**: Alberto should continue this lane. He already worked on the contract side, and the remaining work has enough context in ADR 096/100/170 and the TS/PSL provider split that handing it off would mostly create ramp-up cost.
+
+**April source**: [Contract authoring (PSL + TypeScript)](./april-milestone.md#2-contract-authoring-psl--typescript)
+
+### Status snapshot
+
+| Item | April state | May action |
+|---|---|---|
+| Language server update | Listed as a non-VP task; not completed in April | Ship the mechanical update first: the VS Code language server loads `prisma-next.config.ts`, resolves the selected target/extensions, interprets Prisma Next PSL through the composed contributions, and accepts new ADR 170 helper syntax without false red squiggles. |
+| PSL grammar extensibility by extensions | Deferred, with the design leaning explicitly toward a closed grammar | Do not build a grammar plugin system in May. Document and enforce the policy that extensions contribute first-class concepts through ADR 170 helpers/presets and existing syntax, not new top-level grammar forms. |
+| Helper vocabulary, parameterized type polish, preset coverage | Deferred after the VP stop condition | Complete the common greenfield helper set that WS5 needs: family-provided constructors, target-specific native type constructors, extension namespaced constructors, and field presets with defaults/constraints where the owning pack declares them. |
+| Language server rewrite away from Rust dependency | Deferred | Carry as a May decision/spike after the mechanical update. The rewrite should not block EA unless the coupled Rust language-server path cannot support Prisma Next semantics cleanly. |
+| TypeScript contract introspection | Not captured explicitly in April, but belongs to the same TS-first contract lane | Make `.ts` contracts inspectable by tooling through the TypeScript contract provider: config/facade discovery, deterministic evaluation constraints from ADR 096/100, canonical JSON emission, and parity checks against PSL-authored equivalents. If "introspection" means database-to-TypeScript reverse rendering rather than source-contract inspection, split that as a separate June-sized follow-up before implementation. |
+
+### Must-do in May
+
+1. **Language server mechanical update**: load `prisma-next.config.ts`, use the same composed authoring contributions as emit, and validate a schema using at least one family helper and one extension namespaced helper. The checkpoint is simple: a representative Prisma Next PSL file that emits successfully also opens in VS Code without false diagnostics for the new syntax.
+2. **TypeScript contract introspection path**: prove that `contract: './prisma/contract.ts'` is a first-class tooling input, not just an app-code pattern. The same config path should emit canonical `contract.json`/`contract.d.ts`, support the one-package facade provider selection, and produce the same `coreHash` as the equivalent PSL fixture.
+3. **ADR 170 helper coverage**: finish the helper/preset vocabulary needed for the May greenfield skeleton and app-port schemas. This is the shared source of truth for both PSL and TS authoring, so the task is not "add more parser cases"; it is "make packs own the helper definitions and make both surfaces consume them."
+4. **Closed grammar policy**: turn the deferred PSL grammar extensibility decision into documentation and diagnostics. If an extension needs a new concept, it should be represented through an existing construct or an ADR, not by silently expanding the parser.
+
+### Should-do in May
+
+5. **Language server rewrite spike**: decide whether rewriting away from the Rust dependency is necessary for EA. The useful output is a go/no-go with one concrete reason: either the mechanical update is enough for May, or the current dependency prevents Prisma Next semantics from being represented without fragile patches.
+
+### Notes for the May planner
+
+- WS5 should be framed as **Contract authoring for greenfield**, not PSL-only. PSL is still the primary EA authoring surface, but the TS provider, TS source-contract inspection, and PSL/TS parity are the reason the April workstream existed.
+- TypeScript contract introspection should be scoped narrowly unless proven otherwise: inspect/evaluate a TS-authored contract module under the configured provider and produce canonical artifacts. Database-to-TypeScript generation is a different adoption problem and should not be smuggled into this lane without an explicit decision.
+- The April "Deferred (May)" line about PSL grammar extensibility is a policy item, not an implementation request. The work is to make the closed-grammar decision visible and testable so extension authors know where to contribute helpers.
+
+---
+
+## Runtime pipeline — April status & May handoff
 
 **Linear project**: [WS3: Runtime pipeline](https://linear.app/prisma-company/project/ws3-runtime-pipeline-49d3eb5be604)
 
@@ -8,9 +47,9 @@
 
 ---
 
-## Status snapshot (as of 2026-04-28)
+### Status snapshot (as of 2026-04-28)
 
-### Validation points
+#### Validation points
 
 | VP | Title | Progress | Stop condition met? |
 |---|---|---|---|
@@ -22,9 +61,9 @@
 | Side quest | Comparative benchmarks | 0% | No — not started |
 | — | Refactoring & clean up | 0% | N/A — bucket for follow-ups surfaced during VP1–VP3 |
 
-### Per-ticket status
+#### Per-ticket status
 
-#### VP1: Transactions and SQL DSL as escape hatch — Done
+##### VP1: Transactions and SQL DSL as escape hatch — Done
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -34,7 +73,7 @@
 
 Stop condition (a script that opens a transaction, does two ORM mutations, executes a SQL DSL query within the same transaction, and commits, plus a standalone SQL DSL query) is met. The transactional client (`PostgresTransactionContext`) deliberately does **not** expose a nested `transaction` method — pinned by `transaction.types.test-d.ts`.
 
-#### VP2: Extension-contributed operations across both query surfaces — Done (with caveat)
+##### VP2: Extension-contributed operations across both query surfaces — Done (with caveat)
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -50,7 +89,7 @@ Stop condition (a script that opens a transaction, does two ORM mutations, execu
 
 Practically: VP2's *stop condition* (a pgvector op usable on both surfaces, trait gating works on both) is met, but **the architectural cleanup it depends on is still open** (TML-2163) and a real-contract regression test is missing.
 
-#### VP3: RSC concurrency safety — Done
+##### VP3: RSC concurrency safety — Done
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -58,7 +97,7 @@ Practically: VP2's *stop condition* (a pgvector op usable on both surfaces, trai
 
 The PoC ran 5 parallel Server Components plus a server action and `/diag`/`/stress` routes with k6. The PoC validated that runtime state, Collection caching, and connection pooling behave correctly under RSC concurrency, and identified one non-correctness finding (H2: cold-start marker-read storm) plus one shape-of-fix item (H3) — both pinned by integration tests.
 
-#### VP4: Middleware supports request rewriting — In progress
+##### VP4: Middleware supports request rewriting — In progress
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -66,11 +105,11 @@ The PoC ran 5 parallel Server Components plus a server action and `/diag`/`/stre
 
 Stop condition (a repeated query is served from cache without hitting the database) is **not yet met**, but the underlying interface change (intercept + identity key) has landed. This is the single biggest April carry-over.
 
-#### VP5: Runtime interfaces accommodate streaming subscriptions — Not started
+##### VP5: Runtime interfaces accommodate streaming subscriptions — Not started
 
 No Linear tickets were created for VP5. Supabase adapter with streaming capability, runtime `subscribe()` operation, and cancellation/cleanup are all unstarted. This is a deliberate de-prioritization in favor of finishing VP4; it should be re-litigated for May (see "Open question" below).
 
-#### Side quest: Comparative benchmarks — Not started
+##### Side quest: Comparative benchmarks — Not started
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -79,7 +118,7 @@ No Linear tickets were created for VP5. Supabase adapter with streaming capabili
 
 The "publish as soon as the ORM has enough query support to run the suite" precondition is now realistic — VP1 and VP2 are done.
 
-### Refactoring & clean-up bucket
+#### Refactoring & clean-up bucket
 
 Surfaced during April work; not on the VP path but flagged for May:
 
@@ -91,7 +130,7 @@ Surfaced during April work; not on the VP path but flagged for May:
 | [TML-2303](https://linear.app/prisma-company/issue/TML-2303) | Dedupe in-flight contract verification (RSC H2 fix) | Backlog | Medium | ~10-line behavior fix in `RuntimeCoreImpl.verifyPlanIfNeeded()`. Not a correctness bug — wasted marker reads on cold start. Tightens existing PoC integration test from `markerReads ∈ [1, K]` to `markerReads === 1`. |
 | [TML-2197](https://linear.app/prisma-company/issue/TML-2197) | Consolidate `RuntimeError` creation into a canonical foundation package | Backlog | Medium | Five inconsistent error sites, none matching ADR 027. Prerequisite for opening the framework to external contributors per ADR 027. Filed by William. |
 
-### Triage / non-VP backlog
+#### Triage / non-VP backlog
 
 | Ticket | Title | Status | Notes |
 |---|---|---|---|
@@ -100,7 +139,7 @@ Surfaced during April work; not on the VP path but flagged for May:
 
 ---
 
-## What April proved (and what it didn't)
+### What April proved (and what it didn't)
 
 **Proved:**
 
@@ -118,11 +157,11 @@ Surfaced during April work; not on the VP path but flagged for May:
 
 ---
 
-## Recommended carry-over into May
+### Recommended carry-over into May
 
 May's [WS2: Transactions + query surface](./may-milestone.md#ws2-transactions--query-surface) is the natural home for the VP1/VP2/VP3 follow-ups; VP4/VP5 sit in a more cross-cutting spot that may need its own home. Suggested grouping:
 
-### Must-do in May (blocks May goals or contributors)
+#### Must-do in May (blocks May goals or contributors)
 
 1. **Finish VP4 — caching middleware end-to-end**: [TML-2143](https://linear.app/prisma-company/issue/TML-2143). The `intercept` hook, `identityKey`, and `canonicalStringify` plumbing have been authored on the `cache-middleware-intercept` / `cache-middleware-impl` branches but are not yet merged to `main`; the remaining work is to land them and prove the caching middleware end-to-end (short-circuit + result injection) against a real database, plus the spec/plan documents already in the branch. **Highest priority carry-over.**
 2. **VP2 architectural cleanup**: [TML-2163](https://linear.app/prisma-company/issue/TML-2163) — shared operator-trait mapping. High priority, blocks consistent SQL DSL trait gating.
@@ -130,13 +169,13 @@ May's [WS2: Transactions + query surface](./may-milestone.md#ws2-transactions--q
 4. **`sql.lateral` capability bug**: [TML-2299](https://linear.app/prisma-company/issue/TML-2299). Without this, `lateralJoin` is `never` on real contracts — directly blocks the SQL DSL escape-hatch promise.
 5. **RSC H2 fix**: [TML-2303](https://linear.app/prisma-company/issue/TML-2303). Small, scoped, has a written-up fix shape and a test ready to be tightened.
 
-### Should-do in May (high value, medium scope)
+#### Should-do in May (high value, medium scope)
 
 6. **Extension operation nullability**: [TML-2218](https://linear.app/prisma-company/issue/TML-2218). Design is complete; implementation should ship Approach 2 (overloads). Unblocks ergonomic pgvector-style ops and is referenced repeatedly in extension authoring.
 7. **Comparative benchmark suite**: [TML-2165](https://linear.app/prisma-company/issue/TML-2165) and [TML-2183](https://linear.app/prisma-company/issue/TML-2183). Precondition (enough ORM/SQL DSL coverage) is now met. High-visibility content piece.
 8. **Error consolidation**: [TML-2197](https://linear.app/prisma-company/issue/TML-2197). Maps cleanly to May [WS6 Milestone 1: Error envelope consistency](./may-milestone.md#milestone-1-error-envelope-consistency). Should likely move to WS6 in Linear.
 
-### Open question for May planning — VP5 (streaming subscriptions)
+#### Open question for May planning — VP5 (streaming subscriptions)
 
 VP5 was scoped in April (Supabase adapter + `subscribe()` runtime op + cancellation) and **was not started**. May milestone WS2 does not pick this up. Two options:
 
@@ -145,13 +184,13 @@ VP5 was scoped in April (Supabase adapter + `subscribe()` runtime op + cancellat
 
 The Mongo workstream tracks change streams as `FL-14 → "Future (WS3 VP5)"` in [mongo-target/next-steps.md](./mongo-target/next-steps.md), which assumes option 1. This should be confirmed in May planning.
 
-### Ongoing triage
+#### Ongoing triage
 
 [TML-2137](https://linear.app/prisma-company/issue/TML-2137) and [TML-2138](https://linear.app/prisma-company/issue/TML-2138) (extension ops in `aggregate`/`groupBy`/`having`) remain in triage. Decide whether to pull them into the May SQL query builder maturity milestone or defer past May.
 
 ---
 
-## Notes for the May planner
+### Notes for the May planner
 
 - VP1/VP2/VP3 stop conditions have all been met, but each left exactly one architectural follow-up open: TML-2163 (VP2), TML-2299 (VP2 real-contract regression coverage), and TML-2303 (VP3 H2 fix). May should not start new query-surface work without scheduling these — they are the part of the April work that was deliberately bounded by the stop condition.
 - The middleware intercept plumbing has shipped; pulling the caching middleware over the finish line should be small but is non-trivial because it's the first user of the new hook against a real database.

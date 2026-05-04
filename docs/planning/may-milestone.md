@@ -250,19 +250,21 @@ Checkpoint: `migration plan`, `migration apply`, and `migration status` work cor
 
 ---
 
-## WS5: PSL authoring for greenfield
+## WS5: Contract authoring for greenfield
 
-**People**: queued (picked up when an earlier workstream completes; gated on WS1 M1 audit)
+**People**: Alberto
 
-PSL is the primary authoring surface for the EA audience. A greenfield user picking up Prisma Next will write a `schema.prisma` for their domain — orgs, users, memberships, posts, tags, audit columns — and expect the language to handle the patterns they already know from any modern ORM. Today the SQL PSL provider has gaps that turn common greenfield patterns into roadblocks (native scalar arrays, composite primary keys, `@updatedAt`, inline `@db.X`).
+PSL is the primary authoring surface for the EA audience, but the April workstream was explicitly **Contract authoring (PSL + TypeScript)**. A greenfield user picking up Prisma Next will write a `schema.prisma` for their domain — orgs, users, memberships, posts, tags, audit columns — and expect the language to handle the patterns they already know from any modern ORM. A TS-first user should be able to point config at `contract.ts`, have tooling inspect it deterministically, and get the same canonical contract artifacts as the PSL path.
 
-**Scope is greenfield only.** This workstream does not own P7→PN upgrade syntax (`@ignore`, `@@schema`, implicit many-to-many, views, `Unsupported(...)` round-trip) — those are June concerns once the EA story is real. The acceptance test is "a typical SaaS skeleton authors cleanly in PSL without workarounds."
+**Scope is greenfield only.** This workstream does not own P7→PN upgrade syntax (`@ignore`, `@@schema`, implicit many-to-many, views, `Unsupported(...)` round-trip) — those are June concerns once the EA story is real. The acceptance test is "a typical SaaS skeleton authors cleanly in PSL without workarounds, while the equivalent TS contract can be inspected and emitted through the same config-driven tooling."
 
 **Key risks**:
 
 - Some gaps (native scalar arrays, composite PKs) require contract-IR and codec changes that ripple through emit, migrate, and ORM, not just the PSL layer. The work is wider than its name suggests.
 - The list of "common greenfield patterns" can grow without bound. Without a tight bound, this workstream becomes "make PSL match Prisma 7" — exactly the June work we're deferring.
 - Some changes (inline `@db.X`) interact with the printer's named-type strategy and risk producing inconsistent contracts on a `infer → edit → emit` round-trip.
+- TypeScript contracts must remain deterministic and inspectable by tooling. If the TS path silently imports app code or diverges from the PSL canonicalization path, TS-first becomes a second product instead of a second authoring surface.
+- Language-server support is a trust issue. If the emitter accepts Prisma Next PSL but the editor marks it invalid, users will assume the product is broken.
 
 #### Milestone 1: Greenfield gap inventory (gate)
 
@@ -272,9 +274,10 @@ Tasks:
 
 1. **Reconcile the audit with greenfield exemplars** — cross-reference scout findings with at least two reference schemas: a SaaS skeleton (orgs, users, memberships, posts, tags, audit timestamps) and one public starter (e.g. T3-shaped Next.js app).
 2. **Classify and cut** — confirm each item is greenfield-shaped and not P7-upgrade-shaped. Items that don't fit get explicitly listed in the June milestone doc rather than implicitly deferred.
-3. **Document the in-scope set** — produce a short, ticket-backed plan covering at most two weeks of one engineer.
+3. **Port April contract-authoring carry-over** — pull the unfinished April items from [april-ws3-status.md § Contract authoring](./april-ws3-status.md#contract-authoring-psl--typescript--april-carry-over): language-server update, ADR 170 helper/preset polish, closed PSL grammar policy, language-server rewrite spike, and TypeScript contract introspection.
+4. **Document the in-scope set** — produce a short, ticket-backed plan covering at most two weeks of one engineer.
 
-Checkpoint: A scoped, prioritized backlog of greenfield-blocker PSL gaps exists. Items deferred to June are explicitly captured in the June milestone draft.
+Checkpoint: A scoped, prioritized backlog of greenfield-blocker contract-authoring gaps exists. Items deferred to June are explicitly captured in the June milestone draft, and the April carry-over items have a named May home or a written no-go.
 
 #### Milestone 2: High-frequency authoring fixes
 
@@ -287,19 +290,34 @@ Tasks:
 3. **`@updatedAt`** — register as a built-in execution default that updates on every mutation. Wire through both SQL and Mongo ORM mutation paths.
 4. **Inline `@db.X`** — accept native-type attributes directly on model fields (`email String @db.VarChar(255)`), or — if the named-type architecture makes that disruptive — emit an actionable diagnostic that produces a one-step fix-it suggestion pointing to the `types {}` alias.
 
-Checkpoint: A SaaS skeleton schema (orgs, users, memberships with composite PK, posts with `tags String[]`, audit `createdAt`/`updatedAt` columns, `@db.Text` descriptions, `@db.VarChar` slugs) authors cleanly in PSL, emits a working contract, migrates onto a fresh Postgres database without manual edits, and round-trips through `contract infer` back to an equivalent PSL source.
+Checkpoint: A SaaS skeleton schema (orgs, users, memberships with composite PK, posts with `tags String[]`, audit `createdAt`/`updatedAt` columns, `@db.Text` descriptions, `@db.VarChar` slugs) authors cleanly in PSL, emits a working contract, migrates onto a fresh Postgres database without manual edits, and round-trips through `contract infer` back to an equivalent PSL source. Equivalent TS-authoring fixtures that touch the same contract-IR changes continue to emit the same canonical contract.
 
-#### Milestone 3: Authoring ergonomics
+#### Milestone 3: Shared helper vocabulary + TS contract introspection
 
-The remaining items the scout flagged that affect "first 30 minutes of use" but don't require the same depth of refactor.
+April stopped after proving that symmetric PSL/TS authoring is possible. May needs the less glamorous part: finishing the helper vocabulary, making presets feel intentional, and making `.ts` contracts inspectable by config-driven tooling instead of only by app code.
 
 Tasks:
 
-1. **Diagnostic quality on rejected constructs** — every `PSL_UNSUPPORTED_*` diagnostic carries an explicit hint: what's not supported, why, and the recommended workaround (or "deferred to June, see <link>").
-2. **Test-backed parity inventory** — replace ad-hoc product docs with a parity matrix derived from the diagnostic registry plus integration test fixtures, so it can't drift unnoticed. Owner can be DevRel later, but the source of truth is the codebase.
-3. **TS-authoring spillover** — items the scout flags in TS authoring that overlap with the PSL gaps fixed in M2 are filed and addressed where they share a contract-IR change; otherwise queued for June.
+1. **ADR 170 helper/preset coverage** — finish the family-provided constructors, target-native constructors, extension namespaced constructors, and common field presets needed by the greenfield skeleton and WS1 app-port schemas. Both PSL and TS lower through the same definitions.
+2. **TypeScript contract introspection** — make `contract: './prisma/contract.ts'` a first-class tooling input: config/facade provider selection, deterministic source-contract inspection under ADR 096/100 constraints, canonical JSON emission, and `contract.d.ts` generation.
+3. **PSL/TS parity fixtures** — keep representative PSL and TS contracts side-by-side and assert identical canonical JSON/coreHash when they express the same schema, including one family helper and one extension helper.
+4. **Diagnostic quality on rejected constructs** — every `PSL_UNSUPPORTED_*` diagnostic carries an explicit hint: what's not supported, why, and the recommended workaround (or "deferred to June, see <link>").
+5. **Test-backed parity inventory** — replace ad-hoc product docs with a parity matrix derived from the diagnostic registry plus integration test fixtures, so it can't drift unnoticed. Owner can be DevRel later, but the source of truth is the codebase.
 
-Checkpoint: A first-time user opens the docs, sees the supported PSL surface and known limitations, authors a contract, and recovers gracefully from any limitation diagnostic.
+Checkpoint: A first-time user opens the docs, sees the supported authoring surface and known limitations, authors a contract, and recovers gracefully from any limitation diagnostic. A TS-first user can point config at `contract.ts`, emit canonical artifacts, and get the same `coreHash` as the equivalent PSL fixture.
+
+#### Milestone 4: Language-server support
+
+The editor must agree with the emitter. This milestone ships the mechanical language-server update from April and turns the Rust-dependency rewrite into a deliberate decision instead of a vague deferred item.
+
+Tasks:
+
+1. **Load Prisma Next config** — the VS Code extension's language server finds and loads `prisma-next.config.ts`, resolving the selected target and extension packs.
+2. **Use composed authoring contributions** — diagnostics and completions are derived from the same helper/preset registry used by emit, so ADR 170 constructors and field presets don't require language-server-specific hardcoding.
+3. **Closed grammar diagnostics** — unsupported extension grammar forms produce an explicit diagnostic explaining that extensions contribute through existing syntax and ADR 170 helpers, not parser plugins.
+4. **Rewrite go/no-go** — decide whether the language server must be rewritten away from the Rust dependency for EA. The default path is to ship the mechanical update; the rewrite proceeds only if the current dependency blocks Prisma Next semantics in a concrete way.
+
+Checkpoint: A representative Prisma Next PSL schema that uses a family helper, a target-native helper, and an extension namespaced helper emits successfully and opens in VS Code without false red squiggles. The language-server rewrite has a written go/no-go with the reason.
 
 ---
 
