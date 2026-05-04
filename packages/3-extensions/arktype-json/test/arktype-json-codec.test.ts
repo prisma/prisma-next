@@ -117,6 +117,23 @@ describe('arktypeJson encode/decode (Promise-lifted async surface)', () => {
       description: 'A widget',
     });
   });
+
+  // Postgres `pg` driver returns `jsonb` cells as already-parsed JS values
+  // by default. The codec must accept both wire shapes — string and
+  // pre-parsed JsonValue — to match `pgJsonbCodec`'s tolerance.
+  it('decode accepts already-parsed jsonb values from the driver', async () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    const wire = { name: 'Widget', price: 10 };
+    expect(await codec.decode(wire, CALL_CTX)).toEqual(wire);
+  });
+
+  it('decode validates pre-parsed payloads against the schema', async () => {
+    const codec = arktypeJson(productSchema).type(SYNTH_CTX);
+    const wire = { name: 'Widget' };
+    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(
+      /JSON_SCHEMA_VALIDATION_FAILED|price/,
+    );
+  });
 });
 
 describe('arktypeJson roundtrip', () => {

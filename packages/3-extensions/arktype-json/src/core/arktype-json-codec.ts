@@ -75,12 +75,14 @@ export type ArktypeJsonTypeParams = {
 /**
  * Codec instance returned by `arktypeJson(schema)(ctx)` and by
  * `arktypeJsonCodec.factory(typeParams)(ctx)`. The `TInferred` slot
- * carries the arktype schema's inferred output type.
+ * carries the arktype schema's inferred output type. The wire type is
+ * `string | JsonValue` to accommodate Postgres drivers that return
+ * `jsonb` cells as already-parsed JS values.
  */
 export type ArktypeJsonCodec<TInferred> = Codec<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
-  string,
+  string | JsonValue,
   TInferred
 >;
 
@@ -183,12 +185,18 @@ function arktypeJsonCodecForSchema<TInferred>(
   }
 
   return (_ctx) =>
-    codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string, TInferred>({
+    codec<typeof ARKTYPE_JSON_CODEC_ID, readonly ['equality'], string | JsonValue, TInferred>({
       typeId: ARKTYPE_JSON_CODEC_ID,
       targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
       traits: ['equality'] as const,
       encode: (value: TInferred): string => serializeToJsonSafe(value).wire,
-      decode: (wire: string): TInferred => validateSchema(JSON.parse(wire)),
+      // Postgres `jsonb` columns are returned as already-parsed JS values
+      // by some drivers (`pg` does this by default for jsonb) and as raw
+      // JSON strings by others. Mirror `pgJsonbCodec`'s `string | JsonValue`
+      // tolerance so a select against an arktypeJson column doesn't
+      // SyntaxError when the driver hands us a pre-parsed object.
+      decode: (wire: string | JsonValue): TInferred =>
+        validateSchema(typeof wire === 'string' ? JSON.parse(wire) : wire),
       encodeJson: (value: TInferred): JsonValue => serializeToJsonSafe(value).json,
       decodeJson: (json: JsonValue) => validateSchema(json),
     }) as ArktypeJsonCodec<TInferred>;
