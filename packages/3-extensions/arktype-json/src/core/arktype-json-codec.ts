@@ -35,7 +35,7 @@ import type {
   CodecInstanceContext,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
-import { codec, type Codec as SqlCodec } from '@prisma-next/sql-relational-core/ast';
+import { codec } from '@prisma-next/sql-relational-core/ast';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
 // ── Constants ────────────────────────────────────────────────────────────
@@ -339,6 +339,17 @@ function renderArktypeJsonOutputTypeFromUnknownParams(
  *   parameter binding sites (`json` / `jsonb` are excluded from
  *   `POSTGRES_INFERRABLE_NATIVE_TYPES`, so the cast is not optional).
  *
+ * The declared type is the framework `Codec` plus a structural intersection
+ * carrying `meta`. We intentionally do NOT widen to the SQL `Codec`
+ * extension here: `meta` is the only SQL-leaning slot the stub needs, and
+ * coupling the family-agnostic descriptor's `codecInstances` slot to a
+ * specific family layer would block reuse for any future non-SQL family
+ * (e.g. a Mongo arktype variant) that wants the same renderer-lookup
+ * shape. The SQL renderer reads `meta` structurally via its own
+ * `as SqlCodec | undefined` cast at the lookup boundary, so the field
+ * is consumed without requiring the source declaration to participate
+ * in the SQL family's type hierarchy.
+ *
  * Conversion methods (`encode` / `decode` / `encodeJson` / `decodeJson`)
  * are sentinels that throw if invoked — runtime dispatch goes through
  * `arktypeJsonCodec.factory(params)(ctx)` via the unified descriptor map,
@@ -352,12 +363,30 @@ function renderArktypeJsonOutputTypeFromUnknownParams(
 const ARKTYPE_JSON_RUNTIME_DISPATCH_ERROR =
   'arktype-json codec instances must be materialized via the descriptor factory; this is a metadata-only stub';
 
-export const arktypeJsonEmitCodec: SqlCodec<
+/**
+ * Structural shape of the SQL renderer's `meta.db.sql.<dialect>.nativeType`
+ * read. Co-located with the codec rather than imported from
+ * `sql-relational-core` so this package's family-agnostic codec stub
+ * doesn't depend on the SQL family's type hierarchy.
+ */
+type SqlNativeTypeMeta = {
+  readonly db: {
+    readonly sql: {
+      readonly postgres: {
+        readonly nativeType: 'jsonb';
+      };
+    };
+  };
+};
+
+export const arktypeJsonEmitCodec: Codec<
   typeof ARKTYPE_JSON_CODEC_ID,
   readonly ['equality'],
   string,
   unknown
-> = {
+> & {
+  readonly meta: SqlNativeTypeMeta;
+} = {
   id: ARKTYPE_JSON_CODEC_ID,
   targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
   traits: ['equality'] as const,
