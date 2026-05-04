@@ -78,6 +78,24 @@ The pathfinder **owns** the structural fallback BFS for the unsatisfiable case; 
 
 **Implemented decision:** the canonical manifest value flows through the control-api boundary on `MigrationApplyStep.providedInvariants` and onward via `MigrationPlan.providedInvariants?`; each target runner reads `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. **Why:** single source of truth aligned with the manifest (`migration verify` re-derives `providedInvariants` from ops at load time and rejects manifest mismatch — `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`), removing both the spec's earlier `SqlMigrationRunnerExecuteOptions.invariants?` caller channel and the redundant runner-side `deriveProvidedInvariants(plan.operations)` call. Earlier spec text proposing either pattern is **obsolete-by-design**.
 
+### Performance and the absence of a hard guard
+
+`findPathWithInvariants`'s worst case is `O((V + E) · 2^k)` where `k` is the count of required invariants — each node can be reached once per distinct covered subset. The encoding is a `Set<string>` of invariant ids with state key `${node}\0${[...covered].sort().join('\0')}` (an earlier 30-bit-mask version was simpler-per-state but added enough machinery — edge-mask cache, mask-cap throw guard, collision regression test — that the `Set<string>` form was preferred even at a ~1.4× per-state cost on production-typical inputs).
+
+**Production-typical inputs stay sub-millisecond.** The dominant case is `effectiveRequired = ref.invariants − marker.invariants` collapsing to `k = 0` (ref unchanged → short-circuits to `findPath`) or `k = 1` (one new invariant introduced this PR) against a stick-shaped or mostly-stick migration graph. Measured wall times on a developer laptop:
+
+| Case | k | Wall time |
+|---|---:|---:|
+| `stick(n=1000)` | 1 | 0.50 ms |
+| `mostly-stick(spine=1000, 5% branch rate)` | 1 | 0.55 ms |
+| `mostly-stick(spine=1000, 5% branch rate)` | 2 | 1.20 ms |
+
+Pathological inputs (high feature-branch density, many required invariants) degrade onto the `2^k` curve — `branchy(spine=1000, density=0.05)` reaches ~80 ms at `k = 8`, ~8.7 s at `k = 16` — but materialising those inputs requires either a fresh database catching up to a long-applied ref or a ref edited extensively without ever being applied. Both are exceptional, not typical.
+
+**No hard guard for v1.** The `Set<string>` encoding has no length ceiling; the algorithm has no refusal threshold. Production won't generate the inputs where the curve hurts. A soft `--verbose` heads-up at large `k` (e.g. `k ≥ 16`) is cheap if we want a polite signal; not required.
+
+If real usage ever pushes routine `k > 20`, the algorithm needs a different approach — heuristic A*, dominance pruning, or precomputed reach sets per invariant. Deferrable until we have actual graphs and refs to optimise against.
+
 ### Status diagnostic: `MIGRATION.INVARIANTS_PENDING`
 
 When the marker’s structural hash matches the **ref target** but **required invariants remain** (`effectiveRequired` non-empty after subtracting marker invariants / path decision semantics), **`migration status --ref`** emits an **`severity: 'info'`** diagnostic with code **`MIGRATION.INVARIANTS_PENDING`** so the UX does not claim “up to date” while invariant work remains. (Source: `packages/1-framework/3-tooling/cli/src/commands/migration-status.ts`; integration Journey T — `test/integration/test/cli-journeys/invariant-routing.e2e.test.ts`.)
