@@ -199,6 +199,27 @@ export interface CodecDescriptor<P = void> {
    * with `ctx` carrying the column set the resulting codec serves.
    */
   readonly factory: (params: P) => (ctx: CodecInstanceContext) => Codec;
+  /**
+   * Declares that the codec's `encode` produces structurally equivalent
+   * wire output regardless of `params` — i.e. picking any resolved
+   * instance of this codec id at the encode-side `forCodecId` lookup
+   * yields the same wire payload. Optional; defaults to `false`.
+   *
+   * When `true`, the runtime registry does NOT mark the codec id as
+   * ambiguous when multiple distinct resolved instances share it (e.g.
+   * two `arktypeJson(...)` columns with different schemas). The encode
+   * dispatch can pick any of the resolved instances safely; decode
+   * dispatch still uses `forColumn(table, column)` to get the
+   * instance-specific schema.
+   *
+   * This is the AC-5-deferred bridge for parameterized codecs whose
+   * encode is intrinsically per-call-stateless w.r.t. params (pgvector
+   * formats `[v1,v2,...]` regardless of dimension; arktype-json's
+   * encode is `JSON.stringify` with no schema check). Once
+   * `ParamRef.refs` plumbing lands (TML-2357 § AC-5), encode will use
+   * `forColumn` directly and this flag becomes vestigial.
+   */
+  readonly encodeIsParamsIndependent?: boolean;
 }
 
 /**

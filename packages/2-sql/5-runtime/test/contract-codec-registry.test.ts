@@ -289,6 +289,113 @@ describe('ContractCodecRegistry', () => {
 
     expect(context.contractCodecs.forCodecId('does-not-exist@1')).toBeUndefined();
   });
+
+  // Two parameterized columns with distinct typeParams resolve to two
+  // distinct codec instances under the same codec id. By default that's
+  // ambiguous — `forCodecId` rejects rather than silently bind to the
+  // first registered instance.
+  it('forCodecId throws RUNTIME.TYPE_PARAMS_INVALID when multiple distinct instances share a parameterized codec id', () => {
+    const contract = createTestContract({
+      Doc: {
+        small: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 768 },
+        },
+        large: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 1536 },
+        },
+      },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [createVectorExtensionDescriptor()],
+    });
+
+    expect(() => context.contractCodecs.forCodecId('pg/vector@1')).toThrow(
+      /resolves to multiple parameterized instances/,
+    );
+  });
+
+  // Descriptors that declare `encodeIsParamsIndependent: true` opt out of
+  // the ambiguity rejection. Two distinct resolved instances under the
+  // same codec id are then acceptable for the encode-side `forCodecId`
+  // fallback because every instance encodes equivalently. Decode still
+  // uses `forColumn` to get the instance-specific schema.
+  it('forCodecId tolerates multiple instances when descriptor.encodeIsParamsIndependent is true', () => {
+    // Build a parameterized descriptor flagged params-independent.
+    const factory: (params: { length: number }) => (ctx: CodecInstanceContext) => Codec =
+      (params) => () =>
+        makeVectorCodec({ length: params.length });
+
+    const paramsIndependentDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension' as const,
+      id: 'pgvector-params-independent',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => {
+        const r = createCodecRegistry();
+        r.register(makeVectorCodec());
+        return r;
+      },
+      parameterizedCodecs: () => [
+        {
+          codecId: 'pg/vector@1',
+          traits: ['equality'],
+          targetTypes: ['vector'],
+          paramsSchema: {
+            '~standard': {
+              version: 1,
+              vendor: 'test',
+              validate: (value) => ({ value: value as { length: number } }),
+            },
+          },
+          factory,
+          encodeIsParamsIndependent: true,
+        },
+      ],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const contract = createTestContract({
+      Doc: {
+        small: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 768 },
+        },
+        large: {
+          nativeType: 'vector',
+          codecId: 'pg/vector@1',
+          nullable: false,
+          typeParams: { length: 1536 },
+        },
+      },
+    });
+
+    const context = createTestContext(contract, createStubAdapter(), {
+      extensionPacks: [paramsIndependentDescriptor],
+    });
+
+    // forCodecId resolves to one of the registered instances rather than
+    // throwing. Per-column dispatch via forColumn still distinguishes
+    // them.
+    const fromCodecId = context.contractCodecs.forCodecId('pg/vector@1');
+    expect(fromCodecId).toBeDefined();
+
+    const small = context.contractCodecs.forColumn('Doc', 'small');
+    const large = context.contractCodecs.forColumn('Doc', 'large');
+    expect((small as Codec & { meta: { length: number } }).meta.length).toBe(768);
+    expect((large as Codec & { meta: { length: number } }).meta.length).toBe(1536);
+  });
 });
 
 describe('CodecDescriptorRegistry', () => {
