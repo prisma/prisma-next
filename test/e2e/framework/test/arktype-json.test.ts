@@ -18,7 +18,7 @@ import { runDbInit } from './utils';
 // in decode) surfaced only in production. This file exercises the full
 // pipeline:
 //
-//   create → encode (schema validate + JSON.stringify) → SQL renderer
+//   create → encode (JSON.stringify) → SQL renderer
 //   ($N::jsonb cast lookup) → driver write → driver read (pre-parsed
 //   JSON for jsonb on `pg`) → decode (schema validate) → ORM result.
 
