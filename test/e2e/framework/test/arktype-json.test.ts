@@ -70,21 +70,24 @@ describe('arktype-json column round-trip', { timeout: timeouts.spinUpPpgDev }, (
     });
   });
 
-  it('rejects writes that violate the arktype schema with the stable error code', async () => {
-    // Encode validates the payload before serialization. The codec throws
-    // `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`; the runtime must surface
-    // that stable code unchanged on the write side (symmetric to the
-    // decode-side rethrow guard, see ADR 208 § Case J).
-    // Cast through `unknown` to deliberately bypass the static type
-    // (which would block the missing `age` field at compile time) and
-    // surface the runtime schema check as the only enforcement point.
+  it('writes succeed even for schema-violating payloads; reads enforce the schema', async () => {
+    // Encode is intentionally schema-independent (ADR 208 § Case J +
+    // encode-fallback trade-off): encode-side validation would make the
+    // codec params-dependent, breaking the codec-id-only dispatch the
+    // runtime uses today. A schema-violating write therefore commits;
+    // the next read of that row throws `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`
+    // from the decode boundary. This matches the JSON-validator
+    // philosophy: validate when reading (payloads can come from any
+    // source), not when writing.
     const incompleteProfile = { name: 'bob' } as unknown as { name: string; age: number };
     await withPostgresClient(async (db) => {
+      const created = await db.orm.Embedding.create({
+        embedding: buildEmbedding(1),
+        profile: incompleteProfile,
+      });
+
       await expect(
-        db.orm.Embedding.create({
-          embedding: buildEmbedding(1),
-          profile: incompleteProfile,
-        }),
+        db.orm.Embedding.where((e) => e.id.eq(created.id)).first(),
       ).rejects.toMatchObject({
         code: 'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
       });

@@ -153,13 +153,12 @@ describe('arktypeJson roundtrip', () => {
     expect(restored).toEqual(original);
   });
 
-  // The codec derives both `encode` (wire string) and `encodeJson`
-  // (JsonValue) outputs from the same `JSON.stringify` → `JSON.parse`
-  // round-trip, then runs the schema on the normalized payload. Without
-  // this unification, `encodeJson` would emit non-JSON-safe values
-  // unchanged while `encode` silently dropped or transformed them,
-  // producing wire payloads the codec'\''s own decode path would later
-  // reject. The next two tests pin both halves of that contract.
+  // Encode is intentionally schema-independent (see ADR 208 § Case J and
+  // the encode-fallback trade-off). Both `encode` and `encodeJson` derive
+  // their output from the same `JSON.stringify` → `JSON.parse` round-trip
+  // so a non-plain-object runtime value (class instance, etc.) still
+  // produces the same JSON-safe shape on both surfaces. Schema validation
+  // runs on read.
   it('encode and encodeJson agree on the normalized payload', async () => {
     const codec = arktypeJson(productSchema).type(SYNTH_CTX);
     const original = { name: 'Widget', price: 10, description: 'desc' };
@@ -168,14 +167,13 @@ describe('arktypeJson roundtrip', () => {
     expect(wire).toBe(JSON.stringify(json));
   });
 
-  it('encode rejects non-JSON-safe runtime values via the shared validator', async () => {
+  it('encode normalizes class-instance inputs to a JSON-safe wire shape', async () => {
+    // Class instance with prototype-only methods. `JSON.stringify` strips
+    // those, so the normalized wire payload is `{ name, price }`. The
+    // codec doesn't validate against the schema on encode (that's a
+    // decode-side concern under the JSON-validator philosophy), but the
+    // round-trip must still produce a JSON-safe value.
     const codec = arktypeJson(productSchema).type(SYNTH_CTX);
-    // Class instance with extra prototype-only methods. `JSON.stringify`
-    // strips those so the wire payload normalizes to `{ name, price }`,
-    // but the schema must still accept the normalized shape — this case
-    // does. The check ensures the unification path runs without
-    // throwing for legitimate JSON-safe payloads even when the runtime
-    // type isn'\''t a plain object.
     class Widget {
       constructor(
         public name: string,
@@ -191,21 +189,50 @@ describe('arktypeJson roundtrip', () => {
   });
 
   it('encode rejects values that are not representable as JSON', async () => {
-    // A schema whose inferred type accepts a function field would never
-    // be authored intentionally — but the type system can'\''t catch that
-    // for `unknown`-typed schemas at runtime. Cast through the typed
-    // surface to model the case where a runtime value is structurally
-    // unserializable; both encode paths must reject.
+    // `JSON.stringify(undefined)` returns `undefined`, not a string. The
+    // codec rejects with a plain `Error` rather than a runtime envelope:
+    // the runtime wraps it as `RUNTIME.ENCODE_FAILED` at the dispatch
+    // boundary. The codec doesn't pre-stamp a stable code here because
+    // the underlying problem is a JS-level serialization failure, not a
+    // schema rejection — and stamping a schema code would be misleading
+    // now that schema validation no longer runs on encode.
     const anySchema = type('object');
     const codec = arktypeJson(anySchema).type(SYNTH_CTX);
-    // `JSON.stringify(undefined)` returns `undefined`, not a string; the
-    // serializeToJsonSafe guard rejects this with a clear schema-failure
-    // code rather than a downstream `JSON.parse(undefined)` SyntaxError.
     await expect(codec.encode(undefined as never, CALL_CTX)).rejects.toThrow(
-      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+      /not representable as JSON/,
     );
-    expect(() => codec.encodeJson(undefined as never)).toThrow(
-      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+    expect(() => codec.encodeJson(undefined as never)).toThrow(/not representable as JSON/);
+  });
+
+  // F02 — Postgres drivers can return `jsonb` cells as already-parsed JS
+  // values, including primitive types. For an arktype `type('string')`
+  // schema, a stored `"alice"` arrives as the bare JS string `alice` —
+  // a SyntaxError on `JSON.parse(wire)`. The decode path tries
+  // `JSON.parse` first (covering raw-JSON-text drivers and pre-parsed
+  // objects/arrays/numbers/bools/null) and falls back to the original
+  // string when parsing throws (covering pre-parsed JSON string
+  // primitives).
+  it('decode accepts pre-parsed JSON string primitives for string-schema columns', async () => {
+    const stringSchema = type('string');
+    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
+    expect(await codec.decode('alice', CALL_CTX)).toBe('alice');
+  });
+
+  it('decode still parses raw-JSON-text wire for string-schema columns', async () => {
+    const stringSchema = type('string');
+    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
+    // Raw JSON text wire — `JSON.parse('"bob"')` returns the string `bob`.
+    expect(await codec.decode('"bob"', CALL_CTX)).toBe('bob');
+  });
+
+  it('decode rejects pre-parsed primitives that violate the schema', async () => {
+    const stringSchema = type('string');
+    const codec = arktypeJson(stringSchema).type(SYNTH_CTX);
+    // Pre-parsed number primitive — fails string-schema validation. The
+    // wire is `42` (not a string), goes straight through `parseWireValue`
+    // (non-string branch), and the schema rejects it.
+    await expect(codec.decode(42, CALL_CTX)).rejects.toThrow(
+      /JSON_SCHEMA_VALIDATION_FAILED|string/,
     );
   });
 });

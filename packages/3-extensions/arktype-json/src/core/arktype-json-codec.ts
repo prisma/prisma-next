@@ -151,36 +151,36 @@ function arktypeJsonCodecForSchema<TInferred>(
   }
 
   // Derive both `encode` (wire string) and `encodeJson` (JsonValue)
-  // outputs from the same `JSON.stringify` → `JSON.parse` round-trip,
-  // then validate the normalized payload through the schema. Without
-  // this normalization, a non-JSON-safe runtime value (e.g. a class
-  // instance, a function field on a narrowed type) could slip through
-  // `encodeJson` unchanged while `encode` silently dropped or
-  // transformed it — producing wire payloads the codec's own decode
-  // path would later reject. The serialize/parse round-trip also
-  // produces the JSON-safe shape required by the contract IR's
-  // `JsonValue` surface, so `encodeJson` no longer needs a blind cast.
+  // outputs from the same `JSON.stringify` → `JSON.parse` round-trip.
+  // Encode is intentionally **schema-independent**: the schema check
+  // runs only on `decode` (and `decodeJson`), matching the JSON-validator
+  // philosophy that wire payloads may originate from any source — this
+  // writer, a previous schema version, a manual SQL `INSERT`, a sibling
+  // service. Validation belongs at the read boundary.
+  //
+  // Beyond the philosophical fit, encode-side schema validation would
+  // make the resolved codec parameter-dependent. Today's encode dispatch
+  // (`encodeParamValue` → `contractCodecs.forCodecId(codecId)`) carries
+  // only the codec id, so two `arktypeJson(...)` columns with distinct
+  // schemas would resolve through `forCodecId` and hit the registry's
+  // ambiguity rejection (`RUNTIME.TYPE_PARAMS_INVALID`). Until
+  // `ParamRef.refs` plumbing lands (TML-2357 § AC-5), encode must stay
+  // params-independent or arktype-json contracts with multiple typed
+  // JSON columns become unusable.
   function serializeToJsonSafe(value: TInferred): { wire: string; json: JsonValue } {
     // `JSON.stringify` returns `string | undefined` — `undefined`
     // happens when the input is `undefined` itself or contains only
-    // unserializable values (functions, symbols). Reject explicitly so
-    // the caller sees the schema-failure code rather than a downstream
-    // `JSON.parse(undefined)` SyntaxError.
+    // unserializable values (functions, symbols). Reject explicitly
+    // so the caller sees a clear `RUNTIME.ENCODE_FAILED` envelope
+    // (the runtime wraps this throw via `wrapEncodeFailure`) rather
+    // than a downstream `JSON.parse(undefined)` SyntaxError.
     const wire: string | undefined = JSON.stringify(value);
     if (typeof wire !== 'string') {
-      throw runtimeError(
-        'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      throw new Error(
         `arktype-json value is not representable as JSON (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
-        { codecId: ARKTYPE_JSON_CODEC_ID },
       );
     }
     const json = JSON.parse(wire) as JsonValue;
-    // Validate the normalized payload — the round-trip strips
-    // class-prototype shape and arktype-narrowed fields, and the
-    // schema must still accept the result. Run validation and discard
-    // its return value (we keep `json` as the JsonValue, not the
-    // schema's `inferOut` which already matches `TInferred`).
-    validateSchema(json);
     return { wire, json };
   }
 
@@ -190,16 +190,50 @@ function arktypeJsonCodecForSchema<TInferred>(
       targetTypes: [ARKTYPE_JSON_NATIVE_TYPE],
       traits: ['equality'] as const,
       encode: (value: TInferred): string => serializeToJsonSafe(value).wire,
-      // Postgres `jsonb` columns are returned as already-parsed JS values
-      // by some drivers (`pg` does this by default for jsonb) and as raw
-      // JSON strings by others. Mirror `pgJsonbCodec`'s `string | JsonValue`
-      // tolerance so a select against an arktypeJson column doesn't
-      // SyntaxError when the driver hands us a pre-parsed object.
-      decode: (wire: string | JsonValue): TInferred =>
-        validateSchema(typeof wire === 'string' ? JSON.parse(wire) : wire),
+      decode: (wire: string | JsonValue): TInferred => validateSchema(parseWireValue(wire)),
       encodeJson: (value: TInferred): JsonValue => serializeToJsonSafe(value).json,
       decodeJson: (json: JsonValue) => validateSchema(json),
     }) as ArktypeJsonCodec<TInferred>;
+}
+
+/**
+ * Normalize a JSONB wire value to its decoded shape regardless of the
+ * driver's pre-parsing behavior.
+ *
+ * Postgres `jsonb` columns can come back from the driver as either a raw
+ * JSON-text string (e.g. `'{"name":"alice"}'`) or an already-parsed JS
+ * value (object/array/primitive). The `pg` driver pre-parses by default;
+ * other drivers vary. The codec doesn't know which mode it's in, and the
+ * two are indistinguishable at the type level (`JsonValue` includes
+ * `string`, so a pre-parsed JSONB string primitive `"alice"` arrives as
+ * the bare JS string `alice`).
+ *
+ * Resolution: when the wire is a string, attempt `JSON.parse`. If that
+ * succeeds, the wire was raw JSON text — use the parsed value. If it
+ * throws (the string isn't valid JSON syntax), the wire was a pre-parsed
+ * JSON string primitive — pass it through unchanged. Non-string wires
+ * (objects, arrays, numbers, booleans, `null`) are already pre-parsed
+ * and pass through directly.
+ *
+ * Edge case: a stored JSON string `"hello"` arrives pre-parsed as `hello`.
+ * `JSON.parse("hello")` throws, so the original string is returned —
+ * correct. A stored JSON string `"123"` arrives pre-parsed as `123`. But
+ * `JSON.parse("123")` returns the number `123` — wrong if the stored
+ * value was the string `"123"`. This collision is intrinsic to the
+ * driver-mode ambiguity and matches what `pgJsonbCodec` does today; if
+ * lossless distinction is required, callers should disable driver
+ * pre-parsing or pin to a driver mode that reports the wire shape.
+ */
+function parseWireValue(wire: string | JsonValue): JsonValue {
+  if (typeof wire !== 'string') return wire;
+  try {
+    return JSON.parse(wire) as JsonValue;
+  } catch (_error) {
+    // Wire isn't valid JSON syntax — driver pre-parsed a JSON string
+    // primitive (e.g. `"alice"` → `alice`). Pass it through and let the
+    // schema decide if a string is acceptable.
+    return wire;
+  }
 }
 
 // ── Column-author surface ────────────────────────────────────────────────
@@ -431,6 +465,14 @@ export const arktypeJsonCodec: CodecDescriptor<ArktypeJsonTypeParams> = {
   targetTypes: [ARKTYPE_JSON_NATIVE_TYPE] as const,
   paramsSchema: arktypeJsonParamsSchema,
   renderOutputType: renderArktypeJsonOutputType,
+  // arktype-json's `encode` is `JSON.stringify` with no schema check
+  // (validation runs on decode only). Distinct schemas produce distinct
+  // resolved codec instances under the same `arktype/json@1` codec id,
+  // but every instance encodes equivalently — so the runtime registry's
+  // ambiguity guard would be over-conservative without this opt-in.
+  // Allows contracts to carry multiple `arktypeJson(...)` columns
+  // pre-TML-2357 (before `ParamRef.refs` lands).
+  encodeIsParamsIndependent: true,
   factory: (params) => {
     const schema = rehydrateSchema(params.jsonIr);
     // The rehydrated schema's `expression` must match the serialized one.
