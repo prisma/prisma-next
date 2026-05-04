@@ -1,14 +1,6 @@
 # ADR 176 — Data migrations as invariant-guarded transitions
 
-> **Refined by [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).** The conceptual model below — *desired state = target hash + required data invariants*, idempotent guarded transitions, decoupling correctness from a single canonical history — stands. ADR 208 records the v1 implementation choices that close several open questions on this ADR:
->
-> - **Identity is *named*, not predicate-based.** A data invariant in v1 is a stable string (`invariantId`) declared on a `DataTransformOperation`. It is *not* a checkable predicate carried by the routing layer. The data transform's `check` is still authoritative for "does the data currently satisfy X" — but the routing layer reads the *id*, not the predicate.
-> - **`marker.invariants` records *applied-at-least-once*, not currently-true.** Routing's contract is "route through a path that has applied X," not "route through a path where the data currently satisfies X." See ADR 208 §"Marker semantics".
-> - **Routing is co-located (Model A), not independent (Model B).** Data ops live on the same migration package as the structural ops they depend on; the migration's `providedInvariants` aggregate participates in `migrationHash` and travels through `MigrationEdge.invariants`.
-> - **Routing policy.** Shortest path covering the effective required set (`ref.invariants − marker.invariants`); deterministic tie-break per ADR 039; fail-closed via `MIGRATION.UNKNOWN_INVARIANT` and `MIGRATION.NO_INVARIANT_PATH` (pathfinder-time, with structural fallback path attached).
-> - **Ledger design (deferred).** The marker is the authoritative store for v1; per-migration provenance ("X was first applied by M1 at T1") is left to a future ledger evolution if/when product surfaces a need.
->
-> The "Open questions" section at the bottom of this ADR is closed by those decisions. The "Pure data migrations" sketch is realised as **self-edges** — migrations with `from === to` carrying ≥1 data op, see [ADR 001 §Self-edges](ADR%20001%20-%20Migrations%20as%20Edges.md).
+> **Refined by [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).** ADR 208 records the v1 implementation of the model described here and resolves the open questions below. The conceptual model in this ADR remains accurate.
 
 ## At a glance
 
@@ -120,14 +112,12 @@ The runner should fail closed (with clear diagnostics) when:
 
 ### Open questions
 
-These were the open questions when this ADR landed. See the v1 resolutions called out in the banner at the top of this file, and [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the implementation detail.
-
-- **Concrete format/location of environment refs.** *Resolved.* `migrations/refs/<name>.json`, one file per ref, each carrying `{ hash, invariants }`. Edited manually for v1; updates flow through normal code review.
-- **Model A vs Model B preference.** *Resolved as Model A (co-located).* Data ops travel with their migration package; `providedInvariants` is part of the canonical manifest form and `migrationHash` covers it.
-- **Default routing policy.** *Resolved.* Shortest path covering the effective required set (`ref.invariants − marker.invariants`), with the deterministic tie-break from [ADR 039](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md). Fail-closed on unsatisfiable; semantic carve-up between `UNKNOWN_INVARIANT` (typo / not authored) and `NO_INVARIANT_PATH` (declared but off-path).
-- **Ledger design.** *Deferred for v1.* The marker stores applied-at-least-once; the ledger does not yet carry per-invariant provenance. Future work if audit/compliance needs surface — orthogonal to the routing layer.
+- ~~**Concrete format/location of environment refs**: Who updates them — human or CI/CD automation?~~ **Resolved** by [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md): per-file `migrations/refs/<name>.json` carrying `{ hash, invariants }`, edited manually for v1.
+- ~~**Model A vs Model B preference**: Co-located or independent? Both are viable; the system could support both with a clear default.~~ **Resolved as Model A (co-located)** in [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
+- ~~**Default routing policy**: When multiple invariant-satisfying routes exist, how does the router choose?~~ **Resolved** in [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md): shortest path covering `ref.invariants − marker.invariants` with the deterministic tie-break from [ADR 039](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md).
+- **Ledger design**: What does the optional ledger look like? Minimal: invariant name + timestamp + success/failure. *Deferred — the marker stores applied-at-least-once; per-invariant ledger provenance is future work. See [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).*
 
 ## Related
 
 - [7. Migration System](../subsystems/7.%20Migration%20System.md) — structural migration routing and graph model
-- [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — the v1 implementation that closes the open questions above
+- [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) — v1 implementation
