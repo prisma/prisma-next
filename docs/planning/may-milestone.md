@@ -15,12 +15,14 @@
 
 April was architectural validation. May builds on what landed and finishes the items that didn't reach their stop condition. Source-of-truth status:
 
-- **WS1 Migration system** 🟡 — Data-migration graph & invariant-aware routing ✅. Manual authoring and graph-scale measurement: ❓ (verify with Saevar).
-- **WS2 Contract authoring** ❓ — PSL/TS symmetric authoring, terseness, invisible emit: status unconfirmed (verify with Alberto).
-- **WS3 Runtime pipeline** 🟡 — Transactions ✅, RSC concurrency ✅, extension ops 🟡 (real-contract regression coverage missing; TML-2163, TML-2299 open), caching middleware 🟡 (intercept plumbing landed; user story not end-to-end), streaming subscriptions 🔴 (unstarted). Detailed status: [april-ws3-status.md](./april-ws3-status.md).
-- **WS4 MongoDB** 🟡 — Contract extraction ✅, ORM consolidation ✅, polymorphism ✅, data migrations ✅, query builder ✅. Schema migrations ⚠️.
-- **WS5 SQLite** 🔴 — Not started.
+- **WS1 Migration system** 🟡 — Manual migration authoring ✅, graph scales with large contracts ✅, data-migration graph + invariant-aware routing 🟡 (M4 ref-routing landed; full stop condition not yet met).
+- **WS2 Contract authoring** ✅ — PSL/TS symmetric authoring (ADR 170), terseness, invisible emit: all stop conditions met.
+- **WS3 Runtime pipeline** 🟡 — Transactions ✅, RSC concurrency ✅, extension ops 🟡 (real-contract regression coverage missing; TML-2163, TML-2299 open), caching middleware 🟡 (intercept plumbing landed; user story not end-to-end), streaming subscriptions 🔴 (unstarted), benchmarks side quest 🟡 (precondition met, suite not built). Detailed status: [april-ws3-status.md](./april-ws3-status.md).
+- **WS4 MongoDB** ✅ — Contract extraction, ORM consolidation, polymorphism, schema migrations, data migrations, query builder — all stop conditions met.
+- **WS5 SQLite** 🟡 — End-to-end vertical slice 🟡 (in progress), D1 extensibility check ✅.
 - **WS6 Contributor readiness** 🔴 — Not started.
+
+This is meaningfully better than the worst-case assumption. WS2 and WS4 are fully closed; WS5 has more momentum than expected. **Implication for May staffing**: WS5 (PSL authoring) and WS6 (CLI/errors) were originally queued behind unfinished workstreams; the actual carry-over weight (mostly in WS3) is lighter than feared. Reassess capacity allocation in the planning session.
 
 ### April carry-overs that need explicit homes in May
 
