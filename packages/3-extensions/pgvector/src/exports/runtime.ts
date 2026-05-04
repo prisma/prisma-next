@@ -46,6 +46,17 @@ const parameterizedCodecDescriptors = [
     paramsSchema: vectorParamsSchema,
     renderOutputType: (params: { readonly length: number }) => `Vector<${params.length}>`,
     factory: vectorFactory,
+    // pgvector's wire format `[v1,v2,...]` is dimension-independent — every
+    // resolved instance encodes equivalently regardless of declared length.
+    // Today the factory dodges the registry's reference-based ambiguity
+    // check by returning `sharedVectorCodec` for every params, so two
+    // `vector(N)` columns of different lengths happen to share one codec
+    // instance. Declare the invariant explicitly so a future refactor that
+    // closes over `params` (e.g. capping wire length to declared dimension
+    // — see comment above `vectorFactory`) keeps multi-column contracts
+    // working without surprises. Becomes vestigial when AC-5 (TML-2357)
+    // threads `ParamRef.refs` through column-bound construction sites.
+    encodeIsParamsIndependent: true,
   },
 ] as const satisfies ReadonlyArray<
   RuntimeParameterizedCodecDescriptor<{ readonly length: number }>
