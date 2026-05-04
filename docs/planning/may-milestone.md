@@ -22,7 +22,9 @@ April was architectural validation. May builds on what landed and finishes the i
 - **WS5 SQLite** 🟡 — End-to-end vertical slice 🟡 (in progress), D1 extensibility check ✅.
 - **WS6 Contributor readiness** 🔴 — Not started.
 
-This is meaningfully better than the worst-case assumption. WS2 and WS4 are fully closed; WS5 has more momentum than expected. **Implication for May staffing**: WS5 (PSL authoring) and WS6 (CLI/errors) were originally queued behind unfinished workstreams; the actual carry-over weight (mostly in WS3) is lighter than feared. Reassess capacity allocation in the planning session.
+> Above uses April workstream numbering. May renumbers (see workstreams below): May WS5 = Contract authoring (greenfield), May WS6 = CLI/errors, May WS7 = Developer workflow commands.
+
+This is meaningfully better than the worst-case assumption. April-WS2 (Contract authoring) and April-WS4 (MongoDB) are fully closed, freeing Alberto and Will/Serhii respectively. April-WS5 (SQLite) has more momentum than expected. **Implication for May staffing**: Alberto is now assigned to May WS5 (Contract authoring), and May WS6/WS7 remain queued. The actual carry-over weight (mostly in April-WS3 runtime) is lighter than feared. Reassess capacity allocation in the planning session — there may be room to lift one of WS6/WS7 out of the queue.
 
 ### April carry-overs that need explicit homes in May
 
