@@ -49,6 +49,8 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 ## M1 — Framework SPI
 
+**Status: ✅ SATISFIED.** All 28 M1-owned ACs PASS; reviewed across two rounds; `AC-AST1..5`, `AC-LOW1..6`, `AC-PLAN1..3`, `AC-MUT1..5`, `AC-EX1`, `AC-ABT1..4`, `AC-FAM1..2`, `AC-TYPE1..2` all promoted with file:line evidence. AC-E2E1/AC-E2E2 from `raw-sql-ast-node` are migration-factories-coupled and stay M3-scoped. Mongo runtime wiring deferred to [TML-2376](https://linear.app/prisma-company/issue/TML-2376) — see § Open items 7. Commits: `1d8b70943..9425690fa` (raw-sql-ast-node + AC-ABT1) and `314011400..33a6e5ad5` (param-mutator + AC-ABT2..4 + family + types).
+
 **Goal.** Land the two framework-side prerequisites (`RawSqlExpr` AST node + lowerer arm; `beforeExecute` mutator + `MiddlewareContext.signal`) on `main`. No cipherstash surface yet.
 
 **Visible value.** Other extensions immediately benefit from the seams. After M1, any extension author can write a bulk-pattern middleware following the [middleware-param-transform task spec](specs/middleware-param-transform.spec.md)'s grounding example, and any caller can construct a `RawSqlExpr`-bearing `SqlQueryPlan` for `dataTransform` consumption.
@@ -85,6 +87,12 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 ---
 
 ## M2 — Store-only round-trip
+
+**Status: 🟡 PARTIALLY SHIPPED.** Split into three sub-rounds during execution; M2.a + M2.b SATISFIED; M2.c remaining. Full breakdown:
+
+- **M2.a — package skeleton + envelope + codec — ✅ SATISFIED** (12 ACs PASS: `AC-PKG1..3`, `AC-ENV1/2/4`, `AC-CODEC1..5`, `AC-INSTALL1`). Bootstraps `packages/3-extensions/cipherstash/`; `EncryptedString` envelope with module-scoped `WeakMap` handle storage; `cipherstash/string@1` codec; `RuntimeParameterizedCodecDescriptor` with arktype `{equality, freeTextSearch}` schema; `databaseDependencies.init` shape with placeholder install SQL; `CipherstashSdk` interface (`decrypt`/`bulkEncrypt`/`bulkDecrypt`). Commits: `2b2efbe75..2d05b90d3` + `6bbbee20f..0d558b1b2` (F3+F4 cleanup).
+- **M2.b — PSL constructor + TS factory + parity — ✅ SATISFIED** (12 ACs PASS: `AC-CTOR1..4`, `AC-LOWER1..4`, `AC-ALIAS1..2`, `AC-PARITY1..2`). PSL constructor `cipherstash.EncryptedString({ equality, freeTextSearch })`; TS factory `encryptedString({...})`; PSL↔TS parity fixture at `test/integration/test/authoring/parity/cipherstash-encrypted-string/`; `dbInit` DDL snapshot (no live DB). Required a framework-level addition: `kind: 'boolean'` arm on `AuthoringArgumentDescriptor` (additive, three-file change, zero impact on existing extensions). Commits: `584bbcda6..c48d4d7ad`. Codec-SDK binding refactor deferred to a follow-up Linear ticket — see § Open items 8.
+- **M2.c — bulk-encrypt middleware + live integration — ⏳ NOT STARTED.** Remaining M2 work; entry conditions and task list documented below.
 
 **Goal.** `EncryptedString` works as a column type for *storage* — encrypt on write, decode-into-envelope on read, retrieve plaintext via `await envelope.decrypt()`. No search operators yet (queries are key-lookup or full-table scan only). No migration factories yet (the test suite uses hand-written DDL fixtures).
 
@@ -123,9 +131,26 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 **Commit.** One or two PRs depending on review size. The PSL constructor (and its parity test) and the runtime/codec/middleware/install can naturally split.
 
+### M2.c remaining work — concrete task list
+
+> Picked up by the developer continuing this project. Each task has the AC(s) it clears.
+
+- [ ] **T2.c.1 — Vendor real EQL bundle.** Replace the placeholder string in `packages/3-extensions/cipherstash/src/core/eql-bundle.ts` (~17 lines today, marked `TODO M2.c`) with the real `EQL_INSTALL_SQL` constant copied from `/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/cipherstash-integration/reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts` (untracked file in the adjacent worktree, ~170 KB inlined SQL). Confirms `AC-INSTALL1` against the real bundle.
+- [ ] **T2.c.2 — `bulkEncryptMiddleware` factory.** Implement at `packages/3-extensions/cipherstash/src/middleware/bulk-encrypt.ts`. The stub at `src/exports/middleware.ts` (currently `export {}`) becomes the public re-export. Uses M1's `SqlParamRefMutator.entries()` + `replaceValues()` to rewrite cipherstash envelope plaintexts to ciphertexts in one bulk call per routing key. Per the spec's `bulkEncryptMiddleware(sdk: CipherstashSdk)` shape and § Bulk-encrypt middleware code in `specs/envelope-codec-extension.spec.md`. Plaintext-zeroing default per § Open items 6 (overwrite handle plaintext with `undefined` post-encrypt). Clears `AC-MW1..5`.
+- [ ] **T2.c.3 — Routing-key derivation.** Implement `groupByRoutingKey(targets)` per § Open items 5 — default "always derived from `(table, column)`". Confirm with CipherStash team; if CS confirms a different default, escalate as a deferral / spec amendment.
+- [ ] **T2.c.4 — Live-Postgres + EQL integration test (storage round-trip).** Hand-write a `migration.ts` test fixture under `test/integration/` that exercises the M2 storage round-trip: insert via `db.insert(User, { email: EncryptedString.from('alice@example.com') })`; verify the wire row is `eql_v2_encrypted` JSONB; `findUnique` returns an envelope; `await envelope.decrypt()` returns the plaintext. Uses a mock `CipherstashSdk` (counter-instrumented) so the bulk-call assertion in the next bullet is clean. Clears the live-DB portion of `AC-E2E1` (storage subset).
+- [ ] **T2.c.5 — Bulk-call counter test.** Add an integration assertion: inserting 10 rows × 1 column issues exactly **one** `bulkEncrypt` call. Clears the storage half of `AC-E2E2` (the read-side `bulkDecrypt` half is M4-scoped via `decryptAll`).
+- [ ] **T2.c.6 — `dbInit` against a fresh Postgres database.** Verify `eql_v2` schema is reachable; `cs_configuration_v2` table exists; re-running `dbInit` is idempotent (hits the precheck short-circuit). Clears `AC-INSTALL2` + `AC-INSTALL3`.
+- [ ] **T2.c.7 — Project 1 (PSL-driven) end-to-end test.** A second integration test driven entirely from PSL (the `psl-encrypted-string-constructor` task spec's `AC-E2E1`) covering the same storage round-trip. Should reuse most of T2.c.4's harness with a different contract source.
+- [ ] **T2.c.8 — Validate gates.** `pnpm typecheck`, `pnpm test:packages`, `pnpm test:integration` (or its scoped equivalent), `pnpm lint:deps` all green. The cipherstash package gains `@prisma-next/sql-relational-core` as a runtime dep (for `SqlParamRefMutator` + `ParamRefHandle` types) if not already present.
+
+**Entry conditions.** Live Postgres database with EQL extension installed (or installable by `dbInit`) reachable from the test runner. The CI `test:integration` scripts spin up Postgres in containers; confirm the EQL bundle install works against that setup before expanding the harness.
+
 ---
 
 ## M3 — `eq` operator + manual `addSearchConfig` migration
+
+**Status: ⏳ NOT STARTED.** Blocked on M2.c. No commits, no ACs promoted.
 
 **Goal.** A `findMany({ where: { email: { equals: 'alice@example.com' } } })` against a cipherstash column works against live Postgres + EQL. The user authors a hand-written migration calling `cipherstash.addSearchConfig({ table, column, equality: true })`; the migration installs the EQL search-config row; the query works.
 
@@ -160,6 +185,8 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 ---
 
 ## M4 — `ilike` + `activatePendingSearches` + `decryptAll`
+
+**Status: ⏳ NOT STARTED.** Blocked on M3.
 
 **Goal.** Complete the Project 1 user-facing surface: `findMany({ where: { email: { contains: 'alice' } } })` works (free-text search via EQL `ilike`); `decryptAll(rows)` materializes plaintext for batches of envelopes; the migration factories cover both `equality` and `freeTextSearch` modes plus the `activatePendingSearches` final step.
 
@@ -200,6 +227,8 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 ## M5 — Close-out
 
+**Status: ⏳ NOT STARTED.** Blocked on M4.
+
 **Scope.** Project lifecycle close-out per `projects/README.md`.
 
 **Tasks.**
@@ -221,13 +250,21 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 # Status
 
+> Last updated 2026-05-05. Detailed AC scoreboard lives in [`reviews/code-review.md`](reviews/code-review.md). Branch: `tml-2373-project-1-searchable-encryption-mvp`. AC totals at last update: **52 PASS / 0 FAIL / 48 NOT VERIFIED**.
+
 | Milestone | Scope | Status |
 |---|---|---|
-| M1 — Framework SPI | `raw-sql-ast-node` + `middleware-param-transform` | not started |
-| M2 — Store-only round-trip | `psl-encrypted-string-constructor` + `envelope-codec` storage path | blocked on M1 |
-| M3 — `eq` operator + manual `addSearchConfig` | Operator lowering + migration factories (`equality` mode) | blocked on M2 |
-| M4 — `ilike` + `activatePending` + `decryptAll` | Remaining surface from `envelope-codec` + `migration-factories` | blocked on M3 |
-| M5 — Close-out | Lifecycle close-out per `projects/README.md` | blocked on M4 |
+| **M1 — Framework SPI** | `raw-sql-ast-node` + `middleware-param-transform` | **SATISFIED** (28 ACs PASS; reviewed across two rounds) |
+| **M2.a — Cipherstash package skeleton + envelope + codec** | Bootstrap `packages/3-extensions/cipherstash/`; `EncryptedString` envelope + handle; `cipherstash/string@1` codec; `RuntimeParameterizedCodecDescriptor`; `databaseDependencies.init` shape (placeholder install SQL) | **SATISFIED** (12 ACs PASS; reviewed; F3+F4 cleanup) |
+| **M2.b — PSL constructor + TS factory + parity** | `cipherstash.EncryptedString({ equality, freeTextSearch })` PSL constructor; `encryptedString({...})` TS factory; PSL↔TS parity fixture; dbInit DDL snapshot (no live DB) | **SATISFIED** (12 ACs PASS; reviewed; 0 findings) |
+| **M2.c — Bulk-encrypt middleware + live integration** | `bulkEncryptMiddleware` factory consuming M1's mutator + signal; vendor real `EQL_INSTALL_SQL` from `reference/cipherstash/...`; live-Postgres + EQL integration test for storage round-trip; bulk-call counter | NOT STARTED — requires live Postgres + EQL infra (`AC-INSTALL2`/`AC-INSTALL3`/`AC-E2E1..3`) |
+| **M3 — `eq` operator + manual `addSearchConfig`** | Operator lowering for `eq` against cipherstash columns; `addSearchConfig({ equality })` migration factory; integration test driving a real migration file | NOT STARTED |
+| **M4 — `ilike` + `activatePending` + `decryptAll`** | `ilike` arm on operator lowering; `decryptAll(rows, opts?)` walker; `freeTextSearch` migration mode; `activatePendingSearches()` factory; full `AC-UMB1..7` | NOT STARTED |
+| **M5 — Close-out** | Lifecycle close-out per `projects/README.md` (migrate long-lived docs, strip `projects/` references, delete `projects/cipherstash-integration/project-1/`) | NOT STARTED |
+
+**M2 sub-round split rationale.** The plan describes M2 as a single milestone with the closing note "Commit. One or two PRs depending on review size." The orchestration cycle split it into three sub-rounds so each lands a coherent, reviewable slice without blocking on infrastructure that isn't yet configured: M2.a is unit-testable in isolation, M2.b adds the authoring surface and a parity test that runs without a live DB, M2.c adds the middleware and exercises the live-Postgres + EQL path. M2.a and M2.b are SATISFIED on the branch; M2.c is the remaining M2 work.
+
+**M2.c entry conditions.** The implementer can land the bulk-encrypt middleware, vendor the real EQL bundle, and write the integration tests without infrastructure — but `AC-INSTALL2`, `AC-INSTALL3`, and `AC-E2E1..3` only clear once a live Postgres database with EQL installed is reachable from the test runner. The reference EQL bundle lives in an adjacent worktree at `/Users/wmadden/Projects/prisma/prisma-next-ws/worktrees/cipherstash-integration/reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts` (untracked there); the M2.c implementer copies it into `packages/3-extensions/cipherstash/src/core/eql-bundle.ts` and replaces the placeholder constant.
 
 # Open items
 

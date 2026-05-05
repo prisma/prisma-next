@@ -20,13 +20,15 @@ This project is the *production* integration — superseding the first attempt �
 
 # Status
 
+> Milestone-level breakdown + AC scoreboard live in [`plan.md`](plan.md) and [`reviews/code-review.md`](reviews/code-review.md). Last updated 2026-05-05.
+
 | Task spec | Status |
 |---|---|
-| [envelope-codec-extension](specs/envelope-codec-extension.spec.md) — runtime pattern + codec + EQL bundle install + operator lowering | Drafted |
-| [middleware-param-transform](specs/middleware-param-transform.spec.md) — mutable `beforeExecute` seam | Drafted |
-| [psl-encrypted-string-constructor](specs/psl-encrypted-string-constructor.spec.md) — PSL `cipherstash.EncryptedString(...)` constructor + parity test | Drafted |
-| [raw-sql-ast-node](specs/raw-sql-ast-node.spec.md) — `RawSqlExpr` AST node + Postgres lowerer arm + `planFromAst` envelope helper | Drafted |
-| [migration-factories](specs/migration-factories.spec.md) — `addSearchConfig` / `activatePendingSearches` as `DataTransformOperation`s carrying `invariantId`s | Drafted |
+| [raw-sql-ast-node](specs/raw-sql-ast-node.spec.md) — `RawSqlExpr` AST node + Postgres lowerer arm + `planFromAst` envelope helper | **Shipped** in M1 (15 ACs PASS; AC-E2E1/E2E2 are migration-factories-coupled and remain M3-scoped) |
+| [middleware-param-transform](specs/middleware-param-transform.spec.md) — mutable `beforeExecute` seam | **Shipped** in M1 (14 ACs PASS; Mongo runtime wiring deferred to [TML-2376](https://linear.app/prisma-company/issue/TML-2376)) |
+| [psl-encrypted-string-constructor](specs/psl-encrypted-string-constructor.spec.md) — PSL `cipherstash.EncryptedString(...)` constructor + parity test | **Shipped** in M2.b (12 of 13 ACs PASS; AC-E2E1 deferred to M2.c — needs live Postgres + EQL) |
+| [envelope-codec-extension](specs/envelope-codec-extension.spec.md) — runtime pattern + codec + EQL bundle install + operator lowering | **Partially shipped** — codec + envelope class + `RuntimeParameterizedCodecDescriptor` + stub `databaseDependencies.init` shipped in M2.a (12 ACs PASS); bulk-encrypt middleware (`AC-MW1..5`) + real EQL bundle vendor + live integration tests (`AC-INSTALL2/3`, `AC-E2E1..3`) deferred to M2.c; `decryptAll` (`AC-DEC1..4`) and operator lowering (`AC-OP1..4`) deferred to M4/M3 respectively |
+| [migration-factories](specs/migration-factories.spec.md) — `addSearchConfig` / `activatePendingSearches` as `DataTransformOperation`s carrying `invariantId`s | Drafted (all ACs pending; scope is M3 + M4) |
 
 # Requirements
 
