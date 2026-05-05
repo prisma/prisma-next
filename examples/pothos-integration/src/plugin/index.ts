@@ -8,12 +8,7 @@ import SchemaBuilder, {
 } from '@pothos/core';
 import type { GraphQLFieldResolver, GraphQLResolveInfo } from 'graphql';
 import { applySelectionToCollection } from './auto-include';
-import {
-  PRISMA_NEXT_PREPARED,
-  PRISMA_NEXT_RELATION,
-  PRISMA_NEXT_RELATION_COUNT,
-  PRISMA_NEXT_SELECT_FIELD,
-} from './types';
+import { PRISMA_NEXT_PREPARED, PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
 
 const pluginName = 'prismaNext';
 
@@ -95,12 +90,6 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
         }
         return value;
       };
-    }
-
-    // ---- t.exposeX: passthrough that reads the column off parent.
-    const selectField = ext[PRISMA_NEXT_SELECT_FIELD] as string | undefined;
-    if (selectField) {
-      return (parent) => (parent as Record<string, unknown>)[selectField];
     }
 
     return resolver;

@@ -59,7 +59,6 @@ export type PrismaNextModelName<TContract> = TContract extends {
  * `extensions` map.
  */
 export const PRISMA_NEXT_MODEL = 'pothosPrismaNextModel';
-export const PRISMA_NEXT_SELECT_FIELD = 'pothosPrismaNextSelectField';
 export const PRISMA_NEXT_RELATION = 'pothosPrismaNextRelation';
 export const PRISMA_NEXT_RELATION_COUNT = 'pothosPrismaNextRelationCount';
 export const PRISMA_NEXT_PREPARED = 'pothosPrismaNextPrepared';
