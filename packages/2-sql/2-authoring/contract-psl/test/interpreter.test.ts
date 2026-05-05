@@ -191,7 +191,7 @@ model Comment {
     });
   });
 
-  it('emits sql model without primary key', () => {
+  it('emits sql model with no @id and no @@id', () => {
     const document = parsePslDocument({
       schema: `model IdlessThing {
   email String @unique
@@ -209,15 +209,21 @@ model Comment {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        idlessThing: {
+          columns: {
+            email: { codecId: 'pg/text@1', nativeType: 'text' },
+            token: { codecId: 'pg/text@1', nativeType: 'text' },
+          },
+          uniques: [{ columns: ['email'] }],
+        },
+      },
+    });
+    // `toMatchObject` with `primaryKey: undefined` requires the key to be
+    // present — assert absence directly via a narrowed accessor instead.
     const storage = result.value.storage as SqlStorage;
     expect(storage.tables['idlessThing']?.primaryKey).toBeUndefined();
-    expect(storage.tables['idlessThing']).toMatchObject({
-      columns: {
-        email: { codecId: 'pg/text@1', nativeType: 'text' },
-        token: { codecId: 'pg/text@1', nativeType: 'text' },
-      },
-      uniques: [{ columns: ['email'] }],
-    });
     expect(result.value.models).toMatchObject({
       IdlessThing: {
         storage: {
@@ -251,9 +257,12 @@ model Comment {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['compositeThing']?.primaryKey).toEqual({
-      columns: ['email', 'token'],
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        compositeThing: {
+          primaryKey: { columns: ['email', 'token'] },
+        },
+      },
     });
   });
 
@@ -278,10 +287,15 @@ model Comment {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const storage = result.value.storage as SqlStorage;
-    expect(storage.tables['composite_thing']?.primaryKey).toEqual({
-      columns: ['email_address', 'api_token'],
-      name: 'composite_thing_pkey',
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        composite_thing: {
+          primaryKey: {
+            columns: ['email_address', 'api_token'],
+            name: 'composite_thing_pkey',
+          },
+        },
+      },
     });
   });
 
@@ -447,6 +461,69 @@ model Member {
           },
         },
       },
+    });
+  });
+
+  // Round-trip companion to packages/2-sql/9-family/test/psl-contract-infer/print-psl/print-psl.core.test.ts
+  // The PSL strings below are copied verbatim from the printer's snapshots so
+  // a drift on either side breaks one of the two suites. Spec: id-less SQL
+  // tables and composite-PK tables emitted by introspection must round-trip
+  // through the SQL PSL interpreter.
+  describe('round-trips printer output', () => {
+    it('accepts the printer output for an id-less table', () => {
+      const printed = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+
+// WARNING: This table has no primary key in the database
+model AuditLog {
+  event     String
+  timestamp DateTime
+
+  @@map("audit_log")
+}
+`;
+      const document = parsePslDocument({ schema: printed, sourceId: 'schema.prisma' });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const storage = result.value.storage as SqlStorage;
+      expect(storage.tables['audit_log']?.primaryKey).toBeUndefined();
+      expect(result.value.models).toMatchObject({
+        AuditLog: { storage: { table: 'audit_log' } },
+      });
+    });
+
+    it('accepts the printer output for a composite-PK table', () => {
+      const printed = `// Contract inferred from the live database schema. Edit as needed, then run \`prisma-next contract emit\`.
+
+model OrderItem {
+  orderId   Int @map("order_id")
+  productId Int @map("product_id")
+  quantity  Int
+
+  @@id([orderId, productId], map: "order_item_pkey")
+  @@map("order_item")
+}
+`;
+      const document = parsePslDocument({ schema: printed, sourceId: 'schema.prisma' });
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.storage).toMatchObject({
+        tables: {
+          order_item: {
+            primaryKey: {
+              columns: ['order_id', 'product_id'],
+              name: 'order_item_pkey',
+            },
+          },
+        },
+      });
     });
   });
 });

@@ -795,9 +795,7 @@ model User {
       expect.arrayContaining([
         expect.objectContaining({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: expect.stringContaining(
-            'Model "Thing" defines identity both inline with @id and at model level with @@id',
-          ),
+          message: 'Model "Thing" cannot declare both field-level @id and model-level @@id',
         }),
       ]),
     );
@@ -931,6 +929,33 @@ model User {
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
           message:
             'Model "Thing" @@id cannot include optional field "email"; primary key columns must be NOT NULL',
+        }),
+      ]),
+    );
+  });
+
+  it('rejects inline @id on multiple fields', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  a Int @id
+  b Int @id
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message:
+            'Model "Thing" cannot declare inline @id on multiple fields; use model-level @@id([...]) for composite identity',
         }),
       ]),
     );

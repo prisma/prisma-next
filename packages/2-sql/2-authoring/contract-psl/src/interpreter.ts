@@ -461,18 +461,24 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     scalarTypeDescriptors: input.scalarTypeDescriptors,
   });
 
-  const primaryKeyFields = resolvedFields.filter((field) => field.isId);
-  const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
-  const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
-  const inlinePrimaryKey =
-    primaryKeyColumns.length > 0
-      ? {
-          columns: primaryKeyColumns,
-          ...ifDefined('name', primaryKeyName),
-        }
-      : undefined;
-  let modelPrimaryKey: PrimaryKeyNode | undefined;
-  let modelPrimaryKeySpan: ContractSourceDiagnosticSpan | undefined;
+  const inlineIdFields = resolvedFields.filter((field) => field.isId);
+  if (inlineIdFields.length > 1) {
+    diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${model.name}" cannot declare inline @id on multiple fields; use model-level @@id([...]) for composite identity`,
+      sourceId,
+      span: model.span,
+    });
+  }
+  const singleInlineIdField = inlineIdFields.length === 1 ? inlineIdFields[0] : undefined;
+  let primaryKey: PrimaryKeyNode | undefined = singleInlineIdField
+    ? {
+        columns: [singleInlineIdField.columnName],
+        ...ifDefined('name', singleInlineIdField.idName),
+      }
+    : undefined;
+  const hasInlinePrimaryKey = primaryKey !== undefined;
+  let blockPrimaryKeyDeclared = false;
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of model.fields) {
@@ -559,13 +565,23 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
     if (modelAttribute.name === 'id') {
-      if (modelPrimaryKey) {
+      if (blockPrimaryKeyDeclared) {
         diagnostics.push({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
           message: `Model "${model.name}" declares @@id more than once`,
           sourceId,
           span: modelAttribute.span,
         });
+        continue;
+      }
+      if (hasInlinePrimaryKey) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" cannot declare both field-level @id and model-level @@id`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        blockPrimaryKeyDeclared = true;
         continue;
       }
       const fieldNames = parseAttributeFieldList({
@@ -625,11 +641,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         span: modelAttribute.span,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
-      modelPrimaryKey = {
+      primaryKey = {
         columns: columnNames,
         ...ifDefined('name', constraintName),
       };
-      modelPrimaryKeySpan = modelAttribute.span;
+      blockPrimaryKeyDeclared = true;
       continue;
     }
     if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
@@ -826,17 +842,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       referencedColumns,
     });
   }
-
-  if (inlinePrimaryKey && modelPrimaryKey) {
-    diagnostics.push({
-      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-      message: `Model "${model.name}" defines identity both inline with @id and at model level with @@id. Pick one identity style.`,
-      sourceId,
-      span: modelPrimaryKeySpan ?? model.span,
-    });
-  }
-
-  const primaryKey = modelPrimaryKey ?? inlinePrimaryKey;
 
   return {
     modelNode: {
