@@ -68,6 +68,41 @@ type NumericPostField = import('../../src/types').NumericFieldNames<
 
 describe('integration/include', () => {
   it(
+    'depth-1 include against an emitted contract fires a single SQL execution (regression guard for namespaced capability lookup)',
+    async () => {
+      // Guards against regressing the fix that taught `selectIncludeStrategy`
+      // to read capability flags from the contract's `targetFamily` and
+      // `target` namespaces. The default `getTestContract()` carries
+      // `postgres: { lateral: true, jsonAgg: true, ... }` — the emitter's
+      // actual output shape. Prior to the fix, this exact test would fire
+      // 2 SQL queries instead of 1, against a real driver.
+      await withCollectionRuntime(async (runtime) => {
+        const users = createUsersCollection(runtime);
+
+        await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+        await seedPosts(runtime, [{ id: 10, title: 'Post A', userId: 1, views: 100 }]);
+
+        runtime.resetExecutions();
+        const rows = await users.include('posts').all();
+
+        expect(rows).toEqual([
+          {
+            id: 1,
+            name: 'Alice',
+            email: 'alice@example.com',
+            invitedById: null,
+            address: null,
+            posts: [{ id: 10, title: 'Post A', userId: 1, views: 100, embedding: null }],
+          },
+        ]);
+        // The point of the test: 1 execution, not N+1.
+        expect(runtime.executions).toHaveLength(1);
+      });
+    },
+    timeouts.spinUpPpgDev,
+  );
+
+  it(
     'include() stitches one-to-many and one-to-one relations from real rows',
     async () => {
       await withCollectionRuntime(async (runtime) => {
