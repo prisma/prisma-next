@@ -592,9 +592,9 @@ In v2, conditionally skip the await/reshape wrap when the walker returns `noopRe
 
 Summary of prisma-next-side gaps surfaced by building the demo:
 
-1. **W-8 (orm-client)** — **biggest, most visible**: `selectIncludeStrategy` looks for capability flags at the wrong level of `contract.capabilities`. Falls back to `'multiQuery'` for every emitted contract. Even a 2-level `users { comments { body } }` fires 2 SQL queries instead of 1. **Real bug. Affects all prisma-next orm-client users**, not just this demo. Fix proposal in W-8 above.
-2. **W-1 (orm-client)**: nested-stitch FK augmentation is depth-1 only; should recursively descend into `state.includes` and add their `localColumns`. **Real bug.**
-3. **D-4 (orm-client)**: `combine` triggers multi-query strategy even when `lateral && jsonAgg` are available — *additional* fallback on top of W-8. Optimization opportunity once W-8 is fixed.
-4. **Misc**: `db.sql.X.insert([row, row])` (multi-row insert) doesn't exist; only single-row. Minor seeding ergonomics.
-5. **Misc**: import path for `SqlMiddleware` is `@prisma-next/sql-runtime` (root), not `@prisma-next/sql-runtime/middleware` as I expected. Worth a re-export or doc nudge.
-6. **Misc**: count branches in `combine` appear to fetch all matching rows then count in memory (visible in the SQL log: `SELECT post.* WHERE post.authorId IN (...)` for the `postCount` branch with no filter), rather than `SELECT authorId, COUNT(*) GROUP BY authorId`. Functionally correct, ergonomically wasteful for large relations.
+1. **W-8 (orm-client)** ✅ **fixed in this branch**: `selectIncludeStrategy` looks for capability flags at the wrong level of `contract.capabilities`. Falls back to `'multiQuery'` for every emitted contract. Fix landed; `users { comments { body } }` is now 1 SQL query. Real bug, affected all prisma-next orm-client users.
+2. **Issue A (orm-client)** — `hasNestedIncludes` short-circuit forces depth-2+ to multi-query. Detailed walkthrough in [`issues.md`](./issues.md#issue-a--hasnestedincludes-short-circuit). **Real bug, real perf cost. ~1-2 weeks of work, plus an ADR.**
+3. **Issue B (orm-client)** — `hasComplexIncludeDescriptors` short-circuit forces every `combine`/`scalar` include to multi-query. Detailed walkthrough in [`issues.md`](./issues.md#issue-b--hascomplexincludedescriptors-short-circuit-combine--scalar). **Real bug** — additional fallback on top of W-8 — but the fix has a real correctness landmine (SQL aggregation semantics differ from the current JS-side reduction for some codecs). ~3-7 days plus an ADR.
+4. **W-1 (orm-client)**: nested-stitch FK augmentation is depth-1 only; should recursively descend into `state.includes` and add their `localColumns`. Real bug. Subsumed by Issue A's fix (the single-query path doesn't have this problem because all FK columns are emitted into one statement).
+5. **Misc**: `db.sql.X.insert([row, row])` (multi-row insert) doesn't exist; only single-row. Minor seeding ergonomics.
+6. **Misc**: import path for `SqlMiddleware` is `@prisma-next/sql-runtime` (root), not `@prisma-next/sql-runtime/middleware` as I expected. Worth a re-export or doc nudge.
