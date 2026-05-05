@@ -439,6 +439,124 @@ File a Linear ticket against prisma-next runtime: "teach `dispatchWithSingleQuer
 
 ---
 
+## W-8: orm-client's `selectIncludeStrategy` reads capabilities from the wrong path
+
+**Real prisma-next bug. Independent of W-1.**
+
+### What
+
+Every nested include through the orm-client falls back to the multi-query strategy — even when the contract has `jsonAgg: true` (which should pick `'correlated'`, single-query). Reason: the strategy detection looks for capability flags at the wrong level of nesting in `contract.capabilities`.
+
+### Why — the gory detail
+
+`selectIncludeStrategy` (`packages/3-extensions/sql-orm-client/src/include-strategy.ts:6-20`):
+
+```ts
+export function selectIncludeStrategy(contract: Contract<SqlStorage>): IncludeStrategy {
+  const capabilities = contract.capabilities as Record<string, unknown> | undefined;
+  const hasLateral = hasCapability(capabilities?.['lateral']);   // ← top-level 'lateral'
+  const hasJsonAgg = hasCapability(capabilities?.['jsonAgg']);   // ← top-level 'jsonAgg'
+
+  if (hasLateral && hasJsonAgg) return 'lateral';
+  if (hasJsonAgg) return 'correlated';
+  return 'multiQuery';
+}
+```
+
+It reads `contract.capabilities['lateral']` / `['jsonAgg']` directly. But the contract emitter outputs capabilities **nested under a target/family namespace** (typically `sql`, `postgres`, `sqlite`, etc.):
+
+```json
+"capabilities": {
+  "sql": {
+    "jsonAgg": true,
+    "limit": true,
+    "orderBy": true,
+    "returning": true,
+    "foreignKeys": true
+  }
+}
+```
+
+So:
+- `capabilities['lateral']` → undefined → `hasCapability(undefined)` → false
+- `capabilities['jsonAgg']` → undefined → false
+- strategy → `'multiQuery'`
+
+Every nested include becomes N+1 SQL queries instead of one.
+
+The orm-client's own integration test that supposedly exercises the lateral path (`packages/3-extensions/sql-orm-client/test/integration/include.test.ts:332-337`) sidesteps this by passing capabilities at the **top level** via a test helper:
+
+```ts
+const users = createUsersCollectionWithCapabilities(runtime, {
+  lateral: { enabled: true },
+  jsonAgg: { enabled: true },
+});
+```
+
+— a shape that matches what `selectIncludeStrategy` looks for but **not** what real emitted contracts produce. So the `'lateral'` / `'correlated'` branches of the dispatcher are dead code in practice.
+
+### Concrete demo evidence
+
+A trivial 2-level query with no combine, no count, no nested args:
+
+```graphql
+{ users { comments { body } } }
+```
+
+Should resolve in one SQL statement (correlated subquery + jsonAgg). Actually fires two:
+
+```sql
+-- query 1
+SELECT "user"."id" AS "id" FROM "user"
+-- query 2
+SELECT "comment"."body" AS "body", "comment"."authorId" AS "authorId" FROM "comment"
+WHERE "comment"."authorId" IN (?, ?)
+```
+
+### Cost
+
+- **Demo: works**, but every demo response shows N+1 query counts to the audience. The Pothos author *will* notice.
+- **Real prisma-next users**: every relation-loading workload pays the multi-query overhead, even targets that could otherwise do correlated/lateral subqueries.
+- This is a much bigger blast radius than I initially attributed to D-4 (combine-only) — D-4 is a special case of W-8.
+
+### Fix (proposed)
+
+`selectIncludeStrategy` should drill into the target/family namespace before checking flags. Something like:
+
+```ts
+function flagAcross(capabilities: unknown, flag: string): boolean {
+  if (!capabilities || typeof capabilities !== 'object') return false;
+  const c = capabilities as Record<string, unknown>;
+  // Direct hit (test-fixture shape)
+  if (c[flag] === true) return true;
+  if (hasCapability(c[flag])) return true;
+  // Nested under target/family
+  for (const ns of Object.values(c)) {
+    if (ns && typeof ns === 'object' && (ns as Record<string, unknown>)[flag] === true) {
+      return true;
+    }
+  }
+  return false;
+}
+```
+
+Then:
+
+```ts
+const hasLateral = flagAcross(contract.capabilities, 'lateral');
+const hasJsonAgg = flagAcross(contract.capabilities, 'jsonAgg');
+```
+
+The test helper structure (`{ lateral: { enabled: true } }`) and the emitter structure (`{ sql: { jsonAgg: true } }`) both work.
+
+### Action item
+
+**File a Linear ticket against prisma-next (orm-client).** This affects every user, not just this demo. Title: "selectIncludeStrategy reads capabilities at the wrong path; falls back to multi-query for emitted contracts". Reference: `packages/3-extensions/sql-orm-client/src/include-strategy.ts:6-20`.
+
+This subsumes W-3 / D-4 in priority — fixing W-8 makes simple nested includes one query, but combine still falls back due to the separate `hasComplexIncludeDescriptors` check (D-4).
+
+---
+
 ## W-7: Manual `Promise<unknown>` wrap on `t.prismaField` resolver result for M2 reshape
 
 ### What
@@ -474,8 +592,9 @@ In v2, conditionally skip the await/reshape wrap when the walker returns `noopRe
 
 Summary of prisma-next-side gaps surfaced by building the demo:
 
-1. **W-1 (orm-client)**: nested-stitch FK augmentation is depth-1 only; should recursively descend into `state.includes` and add their `localColumns`. **Real bug.**
-2. **D-4 (orm-client)**: `combine` triggers multi-query strategy even when `lateral && jsonAgg` are available. **Optimization opportunity.** Visible to demo users via `extensions.prismaNext.executionCount` — every combine-using query shows N+1 instead of 1.
-3. **Misc**: `db.sql.X.insert([row, row])` (multi-row insert) doesn't exist; only single-row. Minor seeding ergonomics.
-4. **Misc**: import path for `SqlMiddleware` is `@prisma-next/sql-runtime` (root), not `@prisma-next/sql-runtime/middleware` as I expected. Worth a re-export or doc nudge.
-5. **Misc**: count branches in `combine` appear to fetch all matching rows then count in memory (visible in the SQL log: `SELECT post.* WHERE post.authorId IN (...)` for the `postCount` branch with no filter), rather than `SELECT authorId, COUNT(*) GROUP BY authorId`. Functionally correct, ergonomically wasteful for large relations. Worth a Linear ticket on top of #2.
+1. **W-8 (orm-client)** — **biggest, most visible**: `selectIncludeStrategy` looks for capability flags at the wrong level of `contract.capabilities`. Falls back to `'multiQuery'` for every emitted contract. Even a 2-level `users { comments { body } }` fires 2 SQL queries instead of 1. **Real bug. Affects all prisma-next orm-client users**, not just this demo. Fix proposal in W-8 above.
+2. **W-1 (orm-client)**: nested-stitch FK augmentation is depth-1 only; should recursively descend into `state.includes` and add their `localColumns`. **Real bug.**
+3. **D-4 (orm-client)**: `combine` triggers multi-query strategy even when `lateral && jsonAgg` are available — *additional* fallback on top of W-8. Optimization opportunity once W-8 is fixed.
+4. **Misc**: `db.sql.X.insert([row, row])` (multi-row insert) doesn't exist; only single-row. Minor seeding ergonomics.
+5. **Misc**: import path for `SqlMiddleware` is `@prisma-next/sql-runtime` (root), not `@prisma-next/sql-runtime/middleware` as I expected. Worth a re-export or doc nudge.
+6. **Misc**: count branches in `combine` appear to fetch all matching rows then count in memory (visible in the SQL log: `SELECT post.* WHERE post.authorId IN (...)` for the `postCount` branch with no filter), rather than `SELECT authorId, COUNT(*) GROUP BY authorId`. Functionally correct, ergonomically wasteful for large relations.
