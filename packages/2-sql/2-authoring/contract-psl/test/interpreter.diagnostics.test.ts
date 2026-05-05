@@ -125,7 +125,6 @@ model User {
     expect(result.failure.diagnostics.map((diagnostic) => diagnostic.code)).toEqual(
       expect.arrayContaining([
         'PSL_UNSUPPORTED_NAMED_TYPE_BASE',
-        'PSL_MISSING_PRIMARY_KEY',
         'PSL_UNSUPPORTED_FIELD_TYPE',
         'PSL_INVALID_RELATION_TARGET',
       ]),

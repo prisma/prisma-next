@@ -1,4 +1,5 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -187,6 +188,100 @@ model Comment {
           },
         },
       },
+    });
+  });
+
+  it('emits sql model without primary key', () => {
+    const document = parsePslDocument({
+      schema: `model IdlessThing {
+  email String @unique
+  token String
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    expect(storage.tables['idlessThing']?.primaryKey).toBeUndefined();
+    expect(storage.tables['idlessThing']).toMatchObject({
+      columns: {
+        email: { codecId: 'pg/text@1', nativeType: 'text' },
+        token: { codecId: 'pg/text@1', nativeType: 'text' },
+      },
+      uniques: [{ columns: ['email'] }],
+    });
+    expect(result.value.models).toMatchObject({
+      IdlessThing: {
+        storage: {
+          table: 'idlessThing',
+          fields: {
+            email: { column: 'email' },
+            token: { column: 'token' },
+          },
+        },
+      },
+    });
+  });
+
+  it('emits composite model id as primary key', () => {
+    const document = parsePslDocument({
+      schema: `model CompositeThing {
+  email String
+  token String
+
+  @@id([email, token])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    expect(storage.tables['compositeThing']?.primaryKey).toEqual({
+      columns: ['email', 'token'],
+    });
+  });
+
+  it('emits mapped composite model id name and columns', () => {
+    const document = parsePslDocument({
+      schema: `model CompositeThing {
+  email String @map("email_address")
+  token String @map("api_token")
+
+  @@id([email, token], map: "composite_thing_pkey")
+  @@map("composite_thing")
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const storage = result.value.storage as SqlStorage;
+    expect(storage.tables['composite_thing']?.primaryKey).toEqual({
+      columns: ['email_address', 'api_token'],
+      name: 'composite_thing_pkey',
     });
   });
 

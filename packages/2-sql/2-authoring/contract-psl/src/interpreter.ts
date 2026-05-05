@@ -35,6 +35,7 @@ import {
   type ForeignKeyNode,
   type IndexNode,
   type ModelNode,
+  type PrimaryKeyNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -463,15 +464,15 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
   const primaryKeyFields = resolvedFields.filter((field) => field.isId);
   const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
   const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
-  const isVariantModel = model.attributes.some((attr) => attr.name === 'base');
-  if (primaryKeyColumns.length === 0 && !isVariantModel) {
-    diagnostics.push({
-      code: 'PSL_MISSING_PRIMARY_KEY',
-      message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
-      sourceId,
-      span: model.span,
-    });
-  }
+  const inlinePrimaryKey =
+    primaryKeyColumns.length > 0
+      ? {
+          columns: primaryKeyColumns,
+          ...ifDefined('name', primaryKeyName),
+        }
+      : undefined;
+  let modelPrimaryKey: PrimaryKeyNode | undefined;
+  let modelPrimaryKeySpan: ContractSourceDiagnosticSpan | undefined;
 
   const resultBackrelationCandidates: ModelBackrelationCandidate[] = [];
   for (const field of model.fields) {
@@ -555,6 +556,44 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
     if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {
+      continue;
+    }
+    if (modelAttribute.name === 'id') {
+      const fieldNames = parseAttributeFieldList({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        messagePrefix: `Model "${model.name}" @@id`,
+      });
+      if (!fieldNames) {
+        continue;
+      }
+      const columnNames = mapFieldNamesToColumns({
+        modelName: model.name,
+        fieldNames,
+        mapping,
+        sourceId,
+        diagnostics,
+        span: modelAttribute.span,
+        contextLabel: `Model "${model.name}" @@id`,
+      });
+      if (!columnNames) {
+        continue;
+      }
+      const constraintName = parseConstraintMapArgument({
+        attribute: modelAttribute,
+        sourceId,
+        diagnostics,
+        entityLabel: `Model "${model.name}" @@id`,
+        span: modelAttribute.span,
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      });
+      modelPrimaryKey = {
+        columns: columnNames,
+        ...ifDefined('name', constraintName),
+      };
+      modelPrimaryKeySpan = modelAttribute.span;
       continue;
     }
     if (modelAttribute.name === 'unique' || modelAttribute.name === 'index') {
@@ -752,6 +791,17 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     });
   }
 
+  if (inlinePrimaryKey && modelPrimaryKey) {
+    diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${model.name}" defines identity both inline with @id and at model level with @@id. Pick one identity style.`,
+      sourceId,
+      span: modelPrimaryKeySpan ?? model.span,
+    });
+  }
+
+  const primaryKey = modelPrimaryKey ?? inlinePrimaryKey;
+
   return {
     modelNode: {
       modelName: model.name,
@@ -764,14 +814,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         ...ifDefined('default', resolvedField.defaultValue),
         ...ifDefined('executionDefaults', resolvedField.executionDefaults),
       })),
-      ...(primaryKeyColumns.length > 0
-        ? {
-            id: {
-              columns: primaryKeyColumns,
-              ...ifDefined('name', primaryKeyName),
-            },
-          }
-        : {}),
+      ...ifDefined('id', primaryKey),
       ...(uniqueConstraints.length > 0 ? { uniques: uniqueConstraints } : {}),
       ...(indexNodes.length > 0 ? { indexes: indexNodes } : {}),
       ...(foreignKeyNodes.length > 0 ? { foreignKeys: foreignKeyNodes } : {}),

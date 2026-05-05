@@ -77,10 +77,6 @@ export const sqlEmission = {
         const table: StorageTable | undefined = storage.tables[tableName];
         assertDefined(table, `Model "${modelName}" references non-existent table "${tableName}"`);
 
-        if (!table.primaryKey) {
-          throw new Error(`Model "${modelName}" table "${tableName}" is missing a primary key`);
-        }
-
         const columnNames = new Set(Object.keys(table.columns));
         const storageFields = model.storage.fields;
         if (!storageFields || Object.keys(storageFields).length === 0) {
