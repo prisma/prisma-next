@@ -429,6 +429,10 @@ export function createBuiltinLikeControlMutationDefaults(): ControlMutationDefau
       {
         id: 'timestampNow',
         applicableCodecIds: ['pg/timestamp@1', 'pg/timestamptz@1', 'sqlite/datetime@1'],
+        buildPhases: () => ({
+          onCreate: { kind: 'generator', id: 'timestampNow' },
+          onUpdate: { kind: 'generator', id: 'timestampNow' },
+        }),
       },
     ],
   };

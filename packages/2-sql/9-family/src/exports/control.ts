@@ -67,5 +67,6 @@ export type {
   StorageTypePlanResult,
 } from '../core/migrations/types';
 export { collectInitDependencies, isDatabaseDependencyProvider } from '../core/migrations/types';
+export { timestampNowControlDescriptor } from '../core/timestamp-now-generator';
 
 export default new SqlFamilyDescriptor();

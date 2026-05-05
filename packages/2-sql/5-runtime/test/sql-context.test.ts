@@ -510,4 +510,69 @@ describe('applyMutationDefaults', () => {
 
     expect(applied).toEqual([]);
   });
+
+  it('fires onUpdate generator with applyOnEmptyUpdate=true on empty update', () => {
+    const sentinelMarker = 'fired';
+    const sentinelGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension' as const,
+      id: 'sentinel-generator-extension',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => createCodecRegistry(),
+      parameterizedCodecs: () => [],
+      mutationDefaultGenerators: () => [
+        {
+          id: 'sentinelOnUpdate',
+          generate: () => sentinelMarker,
+          applyOnEmptyUpdate: true,
+        },
+      ],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const contractWithSentinel: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              touchedAt: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'touchedAt' },
+              onUpdate: { kind: 'generator', id: 'sentinelOnUpdate' },
+            },
+          ],
+        },
+      },
+    };
+
+    const context = createExecutionContext({
+      contract: contractWithSentinel,
+      stack: createStack({ extensionPacks: [sentinelGeneratorExtension] }),
+    });
+
+    const applied = context.applyMutationDefaults({
+      op: 'update',
+      table: 'user',
+      values: {},
+    });
+
+    expect(applied).toEqual([{ column: 'touchedAt', value: sentinelMarker }]);
+  });
 });

@@ -1,4 +1,4 @@
-import type { ColumnDefault, ExecutionMutationDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
@@ -6,7 +6,7 @@ import type {
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 
-export type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
+export type { ExecutionMutationDefaultPhases };
 
 export interface FieldNode {
   readonly fieldName: string;

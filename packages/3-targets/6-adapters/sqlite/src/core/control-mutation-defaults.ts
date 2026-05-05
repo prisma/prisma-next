@@ -1,4 +1,5 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
 import type {
   ControlMutationDefaultEntry,
   MutationDefaultGeneratorDescriptor,
@@ -348,10 +349,7 @@ export function createSqliteMutationDefaultGeneratorDescriptors(): readonly Muta
         },
       }),
     ),
-    {
-      id: 'timestampNow',
-      applicableCodecIds: [SQLITE_DATETIME_CODEC_ID],
-    },
+    timestampNowControlDescriptor([SQLITE_DATETIME_CODEC_ID]),
   ];
 }
 

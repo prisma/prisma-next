@@ -1,9 +1,10 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefault } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import type {
-  ControlMutationDefaultRegistry,
-  MutationDefaultGeneratorDescriptor,
+import {
+  type ControlMutationDefaultRegistry,
+  type MutationDefaultGeneratorDescriptor,
+  TIMESTAMP_NOW_GENERATOR_ID,
 } from '@prisma-next/framework-components/control';
 import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -26,7 +27,7 @@ export type ResolvedField = {
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
-  readonly executionDefaults?: Omit<ExecutionMutationDefault, 'ref'>;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly isId: boolean;
   readonly isUnique: boolean;
   readonly idName?: string;
@@ -139,8 +140,6 @@ function extractFieldConstraintNames(input: {
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
 
-const TIMESTAMP_NOW_GENERATOR_ID = 'timestampNow';
-
 function reportInvalidUpdatedAt(input: {
   readonly model: PslModel;
   readonly field: PslField;
@@ -180,7 +179,7 @@ function lowerUpdatedAtAttribute(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly targetId: string;
-}): Omit<ExecutionMutationDefault, 'ref'> | undefined {
+}): ExecutionMutationDefaultPhases | undefined {
   if (input.attribute.args.length > 0) {
     reportInvalidUpdatedAt({
       ...input,
@@ -228,11 +227,17 @@ function lowerUpdatedAtAttribute(input: {
     return undefined;
   }
 
-  const generated = { kind: 'generator' as const, id: TIMESTAMP_NOW_GENERATOR_ID };
-  return {
-    onCreate: generated,
-    onUpdate: generated,
-  };
+  const phases = generatorDescriptor.buildPhases?.();
+  if (!phases) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Field "${input.model.name}.${input.field.name}" @updatedAt requires the "${TIMESTAMP_NOW_GENERATOR_ID}" generator descriptor to provide \`buildPhases\`.`,
+      sourceId: input.sourceId,
+      span: input.attribute.span,
+    });
+    return undefined;
+  }
+  return phases;
 }
 
 export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {

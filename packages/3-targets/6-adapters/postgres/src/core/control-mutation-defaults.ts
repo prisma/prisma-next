@@ -1,4 +1,5 @@
 import type { ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import { timestampNowControlDescriptor } from '@prisma-next/family-sql/control';
 import type {
   ControlMutationDefaultEntry,
   DefaultFunctionLoweringContext,
@@ -327,10 +328,7 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Mu
         },
       }),
     ),
-    {
-      id: 'timestampNow',
-      applicableCodecIds: [PG_TIMESTAMP_CODEC_ID, PG_TIMESTAMPTZ_CODEC_ID],
-    },
+    timestampNowControlDescriptor([PG_TIMESTAMP_CODEC_ID, PG_TIMESTAMPTZ_CODEC_ID]),
   ];
 }
 

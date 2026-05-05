@@ -319,7 +319,6 @@ describe('authoring template resolution', () => {
           onCreate: {
             kind: 'arg',
             index: 1,
-            path: ['id'],
           },
         },
         nullable: true,
@@ -328,7 +327,12 @@ describe('authoring template resolution', () => {
       },
     } as const;
 
-    expect(instantiateAuthoringFieldPreset(descriptor, [1536, { id: 'generated' }])).toEqual({
+    expect(
+      instantiateAuthoringFieldPreset(descriptor, [
+        1536,
+        { kind: 'generator', id: 'vectorGenerated' },
+      ]),
+    ).toEqual({
       descriptor: {
         codecId: 'test/vector@1',
         nativeType: 'vector',
@@ -342,7 +346,7 @@ describe('authoring template resolution', () => {
         },
       },
       executionDefaults: {
-        onCreate: 'generated',
+        onCreate: { kind: 'generator', id: 'vectorGenerated' },
       },
       id: true,
       unique: true,
@@ -390,6 +394,48 @@ describe('authoring template resolution', () => {
       id: false,
       unique: false,
     });
+  });
+
+  it('rejects executionDefaults phases that resolve to non-generator values', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        executionDefaults: {
+          onCreate: {
+            kind: 'arg',
+            index: 0,
+          },
+        },
+      },
+    } as const;
+
+    expect(() => instantiateAuthoringFieldPreset(descriptor, ['not-a-generator'])).toThrow(
+      /Authoring preset executionDefaults\.onCreate did not resolve to a valid generator descriptor/,
+    );
+  });
+
+  it('rejects executionDefaults phases whose generator id is not a string', () => {
+    const descriptor = {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'test/timestamp@1',
+        nativeType: 'timestamp',
+        executionDefaults: {
+          onUpdate: {
+            kind: 'arg',
+            index: 0,
+          },
+        },
+      },
+    } as const;
+
+    expect(() =>
+      instantiateAuthoringFieldPreset(descriptor, [{ kind: 'generator', id: 42 }]),
+    ).toThrow(
+      /Authoring preset executionDefaults\.onUpdate did not resolve to a valid generator descriptor/,
+    );
   });
 
   it('stringifies primitive function default expressions', () => {

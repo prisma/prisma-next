@@ -1,9 +1,10 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
-  ExecutionMutationDefault,
+  ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import { isColumnDefault } from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
@@ -28,7 +29,6 @@ export type NamingConfig = {
 };
 
 type NamedStorageTypeRef = string | StorageTypeInstance;
-type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 type NamedConstraintNameSpec<Name extends string = string> = {
   readonly name: Name;
@@ -137,12 +137,6 @@ export type GeneratedFieldSpec = {
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
 };
-
-function isColumnDefault(value: unknown): value is ColumnDefault {
-  if (typeof value !== 'object' || value === null) return false;
-  const kind = (value as { kind?: unknown }).kind;
-  return kind === 'literal' || kind === 'function';
-}
 
 function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault): ColumnDefault {
   if (isColumnDefault(value)) {
@@ -381,11 +375,8 @@ export function buildFieldPreset(
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...ifDefined('default', preset.default as ColumnDefault | undefined),
-    ...ifDefined(
-      'executionDefaults',
-      preset.executionDefaults as ExecutionMutationDefaultPhases | undefined,
-    ),
+    ...ifDefined('default', preset.default),
+    ...ifDefined('executionDefaults', preset.executionDefaults),
     ...(preset.id
       ? {
           id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},

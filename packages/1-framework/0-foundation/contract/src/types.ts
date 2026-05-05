@@ -87,17 +87,57 @@ export type ColumnDefault =
     }
   | { readonly kind: 'function'; readonly expression: string };
 
+export function isColumnDefault(value: unknown): value is ColumnDefault {
+  if (typeof value !== 'object' || value === null) return false;
+  const kind = (value as { kind?: unknown }).kind;
+  if (kind === 'literal') {
+    return 'value' in value;
+  }
+  if (kind === 'function') {
+    return typeof (value as { expression?: unknown }).expression === 'string';
+  }
+  return false;
+}
+
 export type ExecutionMutationDefaultValue = {
   readonly kind: 'generator';
   readonly id: GeneratedValueSpec['id'];
   readonly params?: Record<string, unknown>;
 };
 
+export function isExecutionMutationDefaultValue(
+  value: unknown,
+): value is ExecutionMutationDefaultValue {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as {
+    kind?: unknown;
+    id?: unknown;
+    params?: unknown;
+  };
+  if (candidate.kind !== 'generator') return false;
+  if (typeof candidate.id !== 'string') return false;
+  if (
+    candidate.params !== undefined &&
+    (typeof candidate.params !== 'object' ||
+      candidate.params === null ||
+      Array.isArray(candidate.params))
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export type ExecutionMutationDefault = {
   readonly ref: { readonly table: string; readonly column: string };
   readonly onCreate?: ExecutionMutationDefaultValue;
   readonly onUpdate?: ExecutionMutationDefaultValue;
 };
+
+/**
+ * `ExecutionMutationDefault` minus its `ref` — the per-field phases value
+ * authoring layers attach to a column before the column ref is known.
+ */
+export type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 export type ExecutionSection<THash extends string = string> = {
   readonly executionHash: ExecutionHashBase<THash>;

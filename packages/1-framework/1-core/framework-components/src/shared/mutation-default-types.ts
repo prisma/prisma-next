@@ -1,4 +1,17 @@
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefaultPhases,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
+
+/**
+ * Canonical id for the wall-clock-now mutation default generator.
+ *
+ * Authoring surfaces (PSL `@updatedAt`, TS `field.updatedAt()`), control
+ * descriptors, and runtime generators all reference this id. Centralized
+ * here so a future rename or alias is a single edit.
+ */
+export const TIMESTAMP_NOW_GENERATOR_ID = 'timestampNow' as const;
 
 interface SourcePosition {
   readonly offset: number;
@@ -71,6 +84,13 @@ export interface MutationDefaultGeneratorDescriptor {
         readonly typeParams?: Record<string, unknown>;
       }
     | undefined;
+  /**
+   * Construct the `onCreate`/`onUpdate` phases value owned by this
+   * generator. Authoring layers (PSL `@updatedAt`, TS field presets) call
+   * this instead of building the literal inline so PSL/TS-authored
+   * contracts stay byte-equivalent for any future params-bearing generator.
+   */
+  readonly buildPhases?: (args?: Record<string, unknown>) => ExecutionMutationDefaultPhases;
 }
 
 export interface ControlMutationDefaultEntry {

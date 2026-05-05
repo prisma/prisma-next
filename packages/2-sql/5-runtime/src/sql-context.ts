@@ -66,6 +66,14 @@ export interface SqlStaticContributions {
 export interface RuntimeMutationDefaultGenerator {
   readonly id: string;
   readonly generate: (params?: Record<string, unknown>) => unknown;
+  /**
+   * When `true`, this generator's `onUpdate` value still fires for empty
+   * update payloads. Default `false` preserves Prisma's `@updatedAt`
+   * semantics (RD2): no write ⇒ no advance. Future generators that need
+   * sentinel-write behavior (e.g. `revisionBump`, audit-trail markers)
+   * opt in here.
+   */
+  readonly applyOnEmptyUpdate?: boolean;
 }
 
 export interface SqlRuntimeTargetDescriptor<
@@ -686,9 +694,8 @@ function applyMutationDefaults(
   if (defaults.length === 0) {
     return [];
   }
-  if (options.op === 'update' && Object.keys(options.values).length === 0) {
-    return [];
-  }
+
+  const isEmptyUpdate = options.op === 'update' && Object.keys(options.values).length === 0;
 
   const applied: AppliedMutationDefault[] = [];
   const appliedColumns = new Set<string>();
@@ -702,6 +709,16 @@ function applyMutationDefaults(
       options.op === 'create' ? mutationDefault.onCreate : mutationDefault.onUpdate;
     if (!defaultSpec) {
       continue;
+    }
+
+    // RD2: empty update payloads skip onUpdate defaults by default — no
+    // write means no `@updatedAt` advance. Generators that need sentinel-
+    // write semantics opt in via `applyOnEmptyUpdate: true`.
+    if (isEmptyUpdate && defaultSpec.kind === 'generator') {
+      const generator = generatorRegistry.get(defaultSpec.id);
+      if (!generator?.applyOnEmptyUpdate) {
+        continue;
+      }
     }
 
     const columnName = mutationDefault.ref.column;

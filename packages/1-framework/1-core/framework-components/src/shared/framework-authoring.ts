@@ -1,3 +1,10 @@
+import type {
+  ColumnDefault,
+  ColumnDefaultLiteralInputValue,
+  ExecutionMutationDefaultPhases,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
+import { isExecutionMutationDefaultValue } from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type AuthoringArgRef = {
@@ -300,23 +307,18 @@ function resolveAuthoringStorageTypeTemplate(
 function resolveAuthoringColumnDefaultTemplate(
   template: AuthoringColumnDefaultTemplate,
   args: readonly unknown[],
-):
-  | {
-      readonly kind: 'literal';
-      readonly value: unknown;
-    }
-  | {
-      readonly kind: 'function';
-      readonly expression: string;
-    } {
+): ColumnDefault {
   if (template.kind === 'literal') {
     const value = resolveAuthoringTemplateValue(template.value, args);
     if (value === undefined) {
       throw new Error('Resolved authoring literal default must not be undefined');
     }
+    // Resolved literal values originate from author-controlled templates and may
+    // be arbitrary JSON-compatible shapes; ColumnDefaultLiteralInputValue is the
+    // public surface for that union and cannot be narrowed structurally here.
     return {
       kind: 'literal',
-      value,
+      value: value as ColumnDefaultLiteralInputValue,
     };
   }
 
@@ -332,24 +334,35 @@ function resolveAuthoringColumnDefaultTemplate(
   };
 }
 
+function resolveExecutionMutationDefaultPhase(
+  phase: 'onCreate' | 'onUpdate',
+  template: AuthoringTemplateValue,
+  args: readonly unknown[],
+): ExecutionMutationDefaultValue {
+  const value = resolveAuthoringTemplateValue(template, args);
+  if (!isExecutionMutationDefaultValue(value)) {
+    throw new Error(
+      `Authoring preset executionDefaults.${phase} did not resolve to a valid generator descriptor (kind: 'generator', id: string).`,
+    );
+  }
+  return value;
+}
+
 function resolveAuthoringExecutionDefaultsTemplate(
   template: AuthoringExecutionDefaultsTemplate,
   args: readonly unknown[],
-): {
-  readonly onCreate?: unknown;
-  readonly onUpdate?: unknown;
-} {
+): ExecutionMutationDefaultPhases {
   return {
     ...ifDefined(
       'onCreate',
       template.onCreate !== undefined
-        ? resolveAuthoringTemplateValue(template.onCreate, args)
+        ? resolveExecutionMutationDefaultPhase('onCreate', template.onCreate, args)
         : undefined,
     ),
     ...ifDefined(
       'onUpdate',
       template.onUpdate !== undefined
-        ? resolveAuthoringTemplateValue(template.onUpdate, args)
+        ? resolveExecutionMutationDefaultPhase('onUpdate', template.onUpdate, args)
         : undefined,
     ),
   };
@@ -376,19 +389,8 @@ export function instantiateAuthoringFieldPreset(
     readonly typeParams?: Record<string, unknown>;
   };
   readonly nullable: boolean;
-  readonly default?:
-    | {
-        readonly kind: 'literal';
-        readonly value: unknown;
-      }
-    | {
-        readonly kind: 'function';
-        readonly expression: string;
-      };
-  readonly executionDefaults?: {
-    readonly onCreate?: unknown;
-    readonly onUpdate?: unknown;
-  };
+  readonly default?: ColumnDefault;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly id: boolean;
   readonly unique: boolean;
 } {

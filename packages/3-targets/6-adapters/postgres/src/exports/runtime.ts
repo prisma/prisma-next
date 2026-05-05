@@ -1,4 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
+import { timestampNowRuntimeGenerator } from '@prisma-next/family-sql/runtime';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
@@ -35,10 +36,7 @@ function createPostgresMutationDefaultGenerators() {
         return generateId(spec);
       },
     })),
-    {
-      id: 'timestampNow',
-      generate: () => new Date(),
-    },
+    timestampNowRuntimeGenerator(),
   ];
 }
 
