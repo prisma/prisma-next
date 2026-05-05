@@ -182,7 +182,7 @@ Rejected as correctness-breaking. It assumes the database actually traversed eve
 
 Have the runner accept invariants through an option (e.g. `MigrationRunner.execute({ invariants })`), independent of the manifest.
 
-Rejected because the manifest's `providedInvariants` is the canonical source, `migration verify` already enforces consistency between the aggregate and the ops it claims to summarise, and a parallel option channel reintroduces the "forgot to thread the option" footgun against a property the framework already guarantees.
+Rejected because the manifest's `providedInvariants` is the canonical source and `migration verify` already enforces consistency between the aggregate and the ops it claims to summarise. A parallel option channel adds a second source of truth for a property the framework already guarantees, and a "forgot to thread the option" footgun on top.
 
 ## Related
 
