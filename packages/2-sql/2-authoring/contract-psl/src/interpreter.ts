@@ -41,6 +41,7 @@ import {
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import {
+  findDuplicateFieldName,
   getAttribute,
   getPositionalArgument,
   mapFieldNamesToColumns,
@@ -595,12 +596,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (!fieldNames) {
         continue;
       }
-      const seenFieldNames = new Set<string>();
-      const duplicateFieldName = fieldNames.find((name) => {
-        if (seenFieldNames.has(name)) return true;
-        seenFieldNames.add(name);
-        return false;
-      });
+      const duplicateFieldName = findDuplicateFieldName(fieldNames);
       if (duplicateFieldName !== undefined) {
         diagnostics.push({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
@@ -658,6 +654,16 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         entityLabel: attributeLabel,
       });
       if (!fieldNames) {
+        continue;
+      }
+      const duplicateFieldName = findDuplicateFieldName(fieldNames);
+      if (duplicateFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
+          sourceId,
+          span: modelAttribute.span,
+        });
         continue;
       }
       const columnNames = mapFieldNamesToColumns({

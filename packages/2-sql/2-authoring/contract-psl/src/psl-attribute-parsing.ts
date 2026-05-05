@@ -276,6 +276,15 @@ export function parseAttributeFieldList(input: {
   return fields;
 }
 
+export function findDuplicateFieldName(fieldNames: readonly string[]): string | undefined {
+  const seen = new Set<string>();
+  for (const name of fieldNames) {
+    if (seen.has(name)) return name;
+    seen.add(name);
+  }
+  return undefined;
+}
+
 export function mapFieldNamesToColumns(input: {
   readonly modelName: string;
   readonly fieldNames: readonly string[];

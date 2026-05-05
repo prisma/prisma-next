@@ -960,4 +960,58 @@ model User {
       ]),
     );
   });
+
+  it('rejects @@unique with duplicate fields in the list', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  id    Int @id
+  email String
+  @@unique([email, email])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: 'Model "Thing" @@unique list contains duplicate field "email"',
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@index with duplicate fields in the list', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  id    Int @id
+  email String
+  @@index([email, email])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: 'Model "Thing" @@index list contains duplicate field "email"',
+        }),
+      ]),
+    );
+  });
 });
