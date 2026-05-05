@@ -251,13 +251,13 @@ export function parseAttributeFieldList(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly code: string;
-  readonly messagePrefix: string;
+  readonly entityLabel: string;
 }): readonly string[] | undefined {
   const raw = getNamedArgument(input.attribute, 'fields') ?? getPositionalArgument(input.attribute);
   if (!raw) {
     input.diagnostics.push({
       code: input.code,
-      message: `${input.messagePrefix} requires fields list argument`,
+      message: `${input.entityLabel} requires fields list argument`,
       sourceId: input.sourceId,
       span: input.attribute.span,
     });
@@ -267,7 +267,7 @@ export function parseAttributeFieldList(input: {
   if (!fields || fields.length === 0) {
     input.diagnostics.push({
       code: input.code,
-      message: `${input.messagePrefix} requires bracketed field list argument`,
+      message: `${input.entityLabel} requires bracketed field list argument`,
       sourceId: input.sourceId,
       span: input.attribute.span,
     });
@@ -283,7 +283,7 @@ export function mapFieldNamesToColumns(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly span: PslSpan;
-  readonly contextLabel: string;
+  readonly entityLabel: string;
 }): readonly string[] | undefined {
   const columns: string[] = [];
   for (const fieldName of input.fieldNames) {
@@ -291,7 +291,7 @@ export function mapFieldNamesToColumns(input: {
     if (!columnName) {
       input.diagnostics.push({
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        message: `${input.contextLabel} references unknown field "${input.modelName}.${fieldName}"`,
+        message: `${input.entityLabel} references unknown field "${input.modelName}.${fieldName}"`,
         sourceId: input.sourceId,
         span: input.span,
       });

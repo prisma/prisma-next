@@ -564,6 +564,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {
       continue;
     }
+    const attributeLabel = `Model "${model.name}" @@${modelAttribute.name}`;
     if (modelAttribute.name === 'id') {
       if (blockPrimaryKeyDeclared) {
         diagnostics.push({
@@ -589,7 +590,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         sourceId,
         diagnostics,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        messagePrefix: `Model "${model.name}" @@id`,
+        entityLabel: attributeLabel,
       });
       if (!fieldNames) {
         continue;
@@ -603,7 +604,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (duplicateFieldName !== undefined) {
         diagnostics.push({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `Model "${model.name}" @@id list contains duplicate field "${duplicateFieldName}"`,
+          message: `${attributeLabel} list contains duplicate field "${duplicateFieldName}"`,
           sourceId,
           span: modelAttribute.span,
         });
@@ -615,7 +616,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       if (nullableFieldName !== undefined) {
         diagnostics.push({
           code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          message: `Model "${model.name}" @@id cannot include optional field "${nullableFieldName}"; primary key columns must be NOT NULL`,
+          message: `${attributeLabel} cannot include optional field "${nullableFieldName}"; primary key columns must be NOT NULL`,
           sourceId,
           span: modelAttribute.span,
         });
@@ -628,7 +629,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         sourceId,
         diagnostics,
         span: modelAttribute.span,
-        contextLabel: `Model "${model.name}" @@id`,
+        entityLabel: attributeLabel,
       });
       if (!columnNames) {
         continue;
@@ -637,7 +638,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         attribute: modelAttribute,
         sourceId,
         diagnostics,
-        entityLabel: `Model "${model.name}" @@id`,
+        entityLabel: attributeLabel,
         span: modelAttribute.span,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
@@ -654,7 +655,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         sourceId,
         diagnostics,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-        messagePrefix: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
       });
       if (!fieldNames) {
         continue;
@@ -666,7 +667,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         sourceId,
         diagnostics,
         span: modelAttribute.span,
-        contextLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
       });
       if (!columnNames) {
         continue;
@@ -675,7 +676,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         attribute: modelAttribute,
         sourceId,
         diagnostics,
-        entityLabel: `Model "${model.name}" @@${modelAttribute.name}`,
+        entityLabel: attributeLabel,
         span: modelAttribute.span,
         code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
       });
@@ -769,7 +770,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       diagnostics,
       span: relationAttribute.relation.span,
-      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      entityLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
     });
     if (!localColumns) {
       continue;
@@ -781,7 +782,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       sourceId,
       diagnostics,
       span: relationAttribute.relation.span,
-      contextLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
+      entityLabel: `Relation field "${model.name}.${relationAttribute.field.name}"`,
     });
     if (!referencedColumns) {
       continue;
