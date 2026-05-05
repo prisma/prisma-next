@@ -74,6 +74,15 @@ export interface RuntimeMutationDefaultGenerator {
    * opt in here.
    */
   readonly applyOnEmptyUpdate?: boolean;
+  /**
+   * When `true`, a single ORM operation that lowers to one bulk mutation
+   * (e.g. `createMany` over many rows) reuses one generated value across
+   * every row that needs this default. Callers signal a bulk scope by
+   * passing a fresh `acrossRowsCache` to `applyMutationDefaults` and reusing it
+   * across the per-row invocations. Default `false` keeps each invocation
+   * independent (right for per-row identifiers like `cuid`).
+   */
+  readonly stableAcrossRows?: boolean;
 }
 
 export interface SqlRuntimeTargetDescriptor<
@@ -728,12 +737,38 @@ function applyMutationDefaults(
 
     applied.push({
       column: columnName,
-      value: computeExecutionDefaultValue(defaultSpec, generatorRegistry),
+      value: resolveStableAcrossRowsValue(
+        defaultSpec,
+        columnName,
+        generatorRegistry,
+        options.acrossRowsCache,
+      ),
     });
     appliedColumns.add(columnName);
   }
 
   return applied;
+}
+
+function resolveStableAcrossRowsValue(
+  spec: ExecutionMutationDefaultValue,
+  columnName: string,
+  generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
+  acrossRowsCache: Map<string, unknown> | undefined,
+): unknown {
+  if (!acrossRowsCache || spec.kind !== 'generator') {
+    return computeExecutionDefaultValue(spec, generatorRegistry);
+  }
+  const generator = generatorRegistry.get(spec.id);
+  if (!generator?.stableAcrossRows) {
+    return computeExecutionDefaultValue(spec, generatorRegistry);
+  }
+  if (acrossRowsCache.has(columnName)) {
+    return acrossRowsCache.get(columnName);
+  }
+  const value = computeExecutionDefaultValue(spec, generatorRegistry);
+  acrossRowsCache.set(columnName, value);
+  return value;
 }
 
 export function createExecutionContext<

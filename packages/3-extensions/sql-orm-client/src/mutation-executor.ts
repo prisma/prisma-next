@@ -236,6 +236,15 @@ async function updateFirstGraph(
 
   const mappedUpdateData = mapModelDataToStorageRow(contract, modelName, scalarData);
   if (Object.keys(mappedUpdateData).length > 0) {
+    const tableName = resolveModelTableName(contract, modelName);
+    const appliedUpdateDefaults = context.applyMutationDefaults({
+      op: 'update',
+      table: tableName,
+      values: mappedUpdateData,
+    });
+    for (const def of appliedUpdateDefaults) {
+      mappedUpdateData[def.column] = def.value;
+    }
     const pkFilter = buildPrimaryKeyFilterFromRow(contract, modelName, existingRow);
     const pkWhere = shorthandToWhereExpr(
       context,
@@ -246,7 +255,6 @@ async function updateFirstGraph(
       throw new Error(`Failed to build primary key filter for model "${modelName}"`);
     }
 
-    const tableName = resolveModelTableName(contract, modelName);
     const compiled = compileUpdateReturning(
       contract,
       tableName,

@@ -511,6 +511,170 @@ describe('applyMutationDefaults', () => {
     expect(applied).toEqual([]);
   });
 
+  it('reuses one stableAcrossRows generator value across rows when acrossRowsCache is shared', () => {
+    const counterMarker = { invocations: 0 };
+    const counterGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension' as const,
+      id: 'counter-generator-extension',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => createCodecRegistry(),
+      parameterizedCodecs: () => [],
+      mutationDefaultGenerators: () => [
+        {
+          id: 'counter',
+          generate: () => ++counterMarker.invocations,
+          stableAcrossRows: true,
+        },
+      ],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const contractWithCounter: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              touchedAt: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'touchedAt' },
+              onCreate: { kind: 'generator', id: 'counter' },
+            },
+          ],
+        },
+      },
+    };
+
+    const context = createExecutionContext({
+      contract: contractWithCounter,
+      stack: createStack({ extensionPacks: [counterGeneratorExtension] }),
+    });
+
+    const acrossRowsCache = new Map<string, unknown>();
+    const row1 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: { id: 'a' },
+      acrossRowsCache,
+    });
+    const row2 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: { id: 'b' },
+      acrossRowsCache,
+    });
+    const row3 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: { id: 'c' },
+      acrossRowsCache,
+    });
+
+    expect(counterMarker.invocations).toBe(1);
+    expect(row1).toEqual([{ column: 'touchedAt', value: 1 }]);
+    expect(row2).toEqual([{ column: 'touchedAt', value: 1 }]);
+    expect(row3).toEqual([{ column: 'touchedAt', value: 1 }]);
+
+    // Without the shared cache, each call generates fresh.
+    const row4 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: { id: 'd' },
+    });
+    expect(counterMarker.invocations).toBe(2);
+    expect(row4).toEqual([{ column: 'touchedAt', value: 2 }]);
+  });
+
+  it('does not consult acrossRowsCache for generators without stableAcrossRows', () => {
+    const counterMarker = { invocations: 0 };
+    const perRowGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension' as const,
+      id: 'per-row-generator-extension',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => createCodecRegistry(),
+      parameterizedCodecs: () => [],
+      mutationDefaultGenerators: () => [
+        {
+          id: 'perRowCounter',
+          generate: () => ++counterMarker.invocations,
+        },
+      ],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const contractWithCounter: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'perRowCounter' },
+            },
+          ],
+        },
+      },
+    };
+
+    const context = createExecutionContext({
+      contract: contractWithCounter,
+      stack: createStack({ extensionPacks: [perRowGeneratorExtension] }),
+    });
+
+    const acrossRowsCache = new Map<string, unknown>();
+    const row1 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: {},
+      acrossRowsCache,
+    });
+    const row2 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'user',
+      values: {},
+      acrossRowsCache,
+    });
+
+    expect(counterMarker.invocations).toBe(2);
+    expect(row1).toEqual([{ column: 'id', value: 1 }]);
+    expect(row2).toEqual([{ column: 'id', value: 2 }]);
+  });
+
   it('fires onUpdate generator with applyOnEmptyUpdate=true on empty update', () => {
     const sentinelMarker = 'fired';
     const sentinelGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {

@@ -90,6 +90,16 @@ export type MutationDefaultsOptions = {
   readonly op: MutationDefaultsOp;
   readonly table: string;
   readonly values: Record<string, unknown>;
+  /**
+   * Per-bulk-operation cache. When the caller passes the same `Map`
+   * across several `applyMutationDefaults` invocations (one per row of a
+   * bulk insert), generators marked `stableAcrossRows: true` reuse a single
+   * generated value across every row in the bulk instead of recomputing
+   * (and drifting) per row. Keys are the column the generator produced a
+   * value for. Omit (or pass a fresh map per row) to keep behavior
+   * row-independent.
+   */
+  readonly acrossRowsCache?: Map<string, unknown>;
 };
 
 /**
