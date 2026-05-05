@@ -5,13 +5,14 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
 /**
  * Computes a stable content hash for a lowered Mongo execution plan.
  *
- * Internally composes two components separated by `|`:
+ * Internally builds an unambiguous canonical-stringified preimage from
+ * two components:
  *
  * 1. `meta.storageHash` — discriminates by schema. A migration changes the
  *    storage hash, which invalidates cached entries automatically (no
  *    per-app invalidation logic needed for schema changes).
- * 2. `canonicalStringify({ ...exec.command })` — a deterministic
- *    serialization of the wire command that is stable across object key
+ * 2. `exec.command` — the wire command. `canonicalStringify` produces a
+ *    deterministic serialization that is stable across object key
  *    insertion order and that distinguishes types JSON would otherwise
  *    conflate (e.g. `BigInt(1)` vs `1`, `Date` vs ISO string, `Buffer`
  *    vs number array). The spread converts the frozen wire-command
@@ -26,10 +27,15 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * a Mongo `MongoExecutionPlan.command` is the wire command itself —
  * canonicalizing it captures both structure and parameters in one pass.
  *
- * The composed canonical string is then piped through `hashContent` to
- * produce a bounded, opaque digest (see `@prisma-next/utils/hash-content`
- * for the rationale). The two key reasons for hashing rather than using
- * the canonical string directly:
+ * The components are wrapped in an object and canonicalized as a single
+ * unit (rather than concatenated with a delimiter) so component
+ * boundaries are unambiguous and cannot collide with a different split
+ * of the same characters.
+ *
+ * The canonical string is then piped through `hashContent` to produce a
+ * bounded, opaque digest (see `@prisma-next/utils/hash-content` for the
+ * rationale). The two key reasons for hashing rather than using the
+ * canonical string directly:
  *
  * - **Bounded memory.** A command embedding a large document (binary blob,
  *   large nested payload) would otherwise produce a proportionally large
@@ -44,10 +50,15 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * @internal
  */
 export function computeMongoContentHash(exec: MongoExecutionPlan): Promise<string> {
-  // Spread to a plain object: `canonicalStringify` rejects class
-  // instances by design (so `Map`/`Set`/class instances cannot collapse
-  // to `{}` and silently collide). All wire-command data lives on own
-  // enumerable properties, so this preserves the same canonical form
-  // and therefore the same hash.
-  return hashContent(`${exec.meta.storageHash}|${canonicalStringify({ ...exec.command })}`);
+  // Spread `exec.command` to a plain object: `canonicalStringify`
+  // rejects class instances by design (so `Map`/`Set`/class instances
+  // cannot collapse to `{}` and silently collide). All wire-command
+  // data lives on own enumerable properties, so this preserves the
+  // same canonical form and therefore the same hash.
+  return hashContent(
+    canonicalStringify({
+      storageHash: exec.meta.storageHash,
+      command: { ...exec.command },
+    }),
+  );
 }

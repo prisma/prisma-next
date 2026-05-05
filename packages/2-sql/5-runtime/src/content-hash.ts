@@ -5,7 +5,8 @@ import { hashContent } from '@prisma-next/utils/hash-content';
 /**
  * Computes a stable content hash for a lowered SQL execution plan.
  *
- * Internally composes three components separated by `|`:
+ * Internally builds an unambiguous canonical-stringified preimage from
+ * three components:
  *
  * 1. `meta.storageHash` — discriminates by schema. A migration changes the
  *    storage hash, which invalidates cached entries automatically.
@@ -15,15 +16,21 @@ import { hashContent } from '@prisma-next/utils/hash-content';
  *    executions by statement shape (used by telemetry), which is the
  *    opposite of what a content hash needs — we want per-execution
  *    discrimination, not per-statement-shape grouping.
- * 3. `canonicalStringify(exec.params)` — a deterministic serialization of
- *    the bound parameters that is stable across object key insertion order
- *    and that distinguishes types JSON would otherwise conflate (e.g.
- *    `BigInt(1)` vs `1`).
+ * 3. `exec.params` — the bound parameters. `canonicalStringify` produces a
+ *    deterministic serialization that is stable across object key
+ *    insertion order and that distinguishes types JSON would otherwise
+ *    conflate (e.g. `BigInt(1)` vs `1`).
  *
- * The composed canonical string is then piped through `hashContent` to
- * produce a bounded, opaque digest (see `@prisma-next/utils/hash-content`
- * for the rationale). The two key reasons for hashing rather than using
- * the canonical string directly:
+ * The components are wrapped in an object and canonicalized as a single
+ * unit (rather than concatenated with a delimiter) so component
+ * boundaries are unambiguous: any character appearing inside `sql` or
+ * `storageHash` cannot bleed across components and produce a collision
+ * with a different split of the same characters.
+ *
+ * The canonical string is then piped through `hashContent` to produce a
+ * bounded, opaque digest (see `@prisma-next/utils/hash-content` for the
+ * rationale). The two key reasons for hashing rather than using the
+ * canonical string directly:
  *
  * - **Bounded memory.** A query bound to a 10 MB JSON column would
  *   otherwise produce a 10 MB cache key; hashing pins per-key cost at a
@@ -37,5 +44,11 @@ import { hashContent } from '@prisma-next/utils/hash-content';
  * @internal
  */
 export function computeSqlContentHash(exec: SqlExecutionPlan): Promise<string> {
-  return hashContent(`${exec.meta.storageHash}|${exec.sql}|${canonicalStringify(exec.params)}`);
+  return hashContent(
+    canonicalStringify({
+      storageHash: exec.meta.storageHash,
+      sql: exec.sql,
+      params: exec.params,
+    }),
+  );
 }
