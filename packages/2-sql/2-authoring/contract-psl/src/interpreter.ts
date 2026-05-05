@@ -559,6 +559,15 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       continue;
     }
     if (modelAttribute.name === 'id') {
+      if (modelPrimaryKey) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" declares @@id more than once`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
       const fieldNames = parseAttributeFieldList({
         attribute: modelAttribute,
         sourceId,
@@ -567,6 +576,33 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         messagePrefix: `Model "${model.name}" @@id`,
       });
       if (!fieldNames) {
+        continue;
+      }
+      const seenFieldNames = new Set<string>();
+      const duplicateFieldName = fieldNames.find((name) => {
+        if (seenFieldNames.has(name)) return true;
+        seenFieldNames.add(name);
+        return false;
+      });
+      if (duplicateFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" @@id list contains duplicate field "${duplicateFieldName}"`,
+          sourceId,
+          span: modelAttribute.span,
+        });
+        continue;
+      }
+      const nullableFieldName = fieldNames.find(
+        (name) => model.fields.find((f) => f.name === name)?.optional === true,
+      );
+      if (nullableFieldName !== undefined) {
+        diagnostics.push({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: `Model "${model.name}" @@id cannot include optional field "${nullableFieldName}"; primary key columns must be NOT NULL`,
+          sourceId,
+          span: modelAttribute.span,
+        });
         continue;
       }
       const columnNames = mapFieldNamesToColumns({

@@ -694,4 +694,245 @@ model User {
       ]),
     );
   });
+
+  it('rejects @@id with no field list argument', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  @@id()
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('Model "Thing" @@id requires fields list argument'),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@id with empty bracketed field list', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  @@id([])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('@@id requires bracketed field list argument'),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@id referencing an unknown field', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  @@id([nope])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Model "Thing" @@id references unknown field "Thing.nope"',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects inline @id together with @@id', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String @id
+  @@id([email])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining(
+            'Model "Thing" defines identity both inline with @id and at model level with @@id',
+          ),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@id with non-quoted map argument', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  @@id([email], map: not_a_string)
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: expect.stringContaining('@@id map argument must be a quoted string literal'),
+        }),
+      ]),
+    );
+  });
+
+  it('rejects two @@id declarations on the same model', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  token String
+  @@id([email])
+  @@id([token])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: 'Model "Thing" declares @@id more than once',
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@id with duplicate fields in the list', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String
+  @@id([email, email])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message: 'Model "Thing" @@id list contains duplicate field "email"',
+        }),
+      ]),
+    );
+  });
+
+  it('rejects inline @id on an optional field', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String? @id
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message:
+            'Field "Thing.email" @id cannot be optional; primary key columns must be NOT NULL',
+        }),
+      ]),
+    );
+  });
+
+  it('rejects @@id including an optional field', () => {
+    const document = parsePslDocument({
+      schema: `model Thing {
+  email String?
+  @@id([email])
+}
+`,
+      sourceId: 'schema.prisma',
+    });
+    const result = interpretPslDocumentToSqlContract({
+      ...baseInput,
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          message:
+            'Model "Thing" @@id cannot include optional field "email"; primary key columns must be NOT NULL',
+        }),
+      ]),
+    );
+  });
 });

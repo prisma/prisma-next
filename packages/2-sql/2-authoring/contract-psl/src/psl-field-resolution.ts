@@ -343,6 +343,16 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       sourceId,
       diagnostics,
     });
+    let isIdField = Boolean(idAttribute);
+    if (idAttribute && field.optional) {
+      diagnostics.push({
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: `Field "${model.name}.${field.name}" @id cannot be optional; primary key columns must be NOT NULL`,
+        sourceId,
+        span: idAttribute.span,
+      });
+      isIdField = false;
+    }
 
     // Field presets contribute their own default / executionDefaults / id /
     // unique. They take precedence over attribute-derived contributions for
@@ -371,7 +381,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       descriptor,
       ...ifDefined('defaultValue', fieldDefaultValue),
       ...ifDefined('executionDefaults', fieldExecutionDefaults),
-      isId: Boolean(idAttribute) || Boolean(presetContributions?.id),
+      isId: isIdField || Boolean(presetContributions?.id),
       isUnique: Boolean(uniqueAttribute) || Boolean(presetContributions?.unique),
       ...ifDefined('idName', idName),
       ...ifDefined('uniqueName', uniqueName),
