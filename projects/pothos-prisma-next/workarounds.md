@@ -439,9 +439,11 @@ File a Linear ticket against prisma-next runtime: "teach `dispatchWithSingleQuer
 
 ---
 
-## W-8: orm-client's `selectIncludeStrategy` reads capabilities from the wrong path
+## W-8: orm-client's `selectIncludeStrategy` reads capabilities from the wrong path ✅ fixed in `fix/orm-client-include-strategy` (PR #425)
 
 **Real prisma-next bug. Independent of W-1.**
+
+> Status: fixed in `packages/3-extensions/sql-orm-client/src/include-strategy.ts`. The principled fix uses the contract's own `targetFamily` and `target` to scope the capability lookup. Three new emitted-shape unit tests + two regression guards (one MockRuntime, one real Postgres) lock it in. PR: #425.
 
 ### What
 
@@ -519,41 +521,26 @@ WHERE "comment"."authorId" IN (?, ?)
 - **Real prisma-next users**: every relation-loading workload pays the multi-query overhead, even targets that could otherwise do correlated/lateral subqueries.
 - This is a much bigger blast radius than I initially attributed to D-4 (combine-only) — D-4 is a special case of W-8.
 
-### Fix (proposed)
+### The fix that landed
 
-`selectIncludeStrategy` should drill into the target/family namespace before checking flags. Something like:
+`selectIncludeStrategy` now reads capability flags from the contract's `targetFamily` and `target` namespaces — the two layers the contract emitter actually populates:
 
 ```ts
-function flagAcross(capabilities: unknown, flag: string): boolean {
-  if (!capabilities || typeof capabilities !== 'object') return false;
-  const c = capabilities as Record<string, unknown>;
-  // Direct hit (test-fixture shape)
-  if (c[flag] === true) return true;
-  if (hasCapability(c[flag])) return true;
-  // Nested under target/family
-  for (const ns of Object.values(c)) {
-    if (ns && typeof ns === 'object' && (ns as Record<string, unknown>)[flag] === true) {
-      return true;
-    }
-  }
-  return false;
+function capabilityFlag(contract: Contract<SqlStorage>, flag: string): boolean {
+  return (
+    contract.capabilities[contract.targetFamily]?.[flag] === true ||
+    contract.capabilities[contract.target]?.[flag] === true
+  );
 }
 ```
 
-Then:
+Cross-namespace false positives ("postgres.lateral found while running SQLite") are impossible by construction — only the running target's namespaces are inspected.
 
-```ts
-const hasLateral = flagAcross(contract.capabilities, 'lateral');
-const hasJsonAgg = flagAcross(contract.capabilities, 'jsonAgg');
-```
-
-The test helper structure (`{ lateral: { enabled: true } }`) and the emitter structure (`{ sql: { jsonAgg: true } }`) both work.
+The previous version of this entry sketched a `flagAcross` helper that searched all namespaces. That was rejected during review as too loose; the principled namespaced version is what shipped.
 
 ### Action item
 
-**File a Linear ticket against prisma-next (orm-client).** This affects every user, not just this demo. Title: "selectIncludeStrategy reads capabilities at the wrong path; falls back to multi-query for emitted contracts". Reference: `packages/3-extensions/sql-orm-client/src/include-strategy.ts:6-20`.
-
-This subsumes W-3 / D-4 in priority — fixing W-8 makes simple nested includes one query, but combine still falls back due to the separate `hasComplexIncludeDescriptors` check (D-4).
+✅ **Fixed in `fix/orm-client-include-strategy` (PR #425).** This subsumes W-3 / D-4 in priority — fixing W-8 makes simple nested includes one query. Combine still falls back due to the separate `hasComplexIncludeDescriptors` check (D-4); deep nesting still falls back due to `hasNestedIncludes` (Issue A in `issues.md`). Both are documented as separate follow-ups.
 
 ---
 
