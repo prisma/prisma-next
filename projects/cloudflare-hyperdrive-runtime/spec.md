@@ -139,49 +139,51 @@ Worker cold-start (first request after deploy or after isolate eviction) target:
 
 # Acceptance Criteria
 
+> **Status (m4 R1):** 19 / 20 PASS, 1 NOT VERIFIED (AC-12, blocked on real Cloudflare account + Hyperdrive). Evidence per AC is logged in [`assets/ac-verification.md`](assets/ac-verification.md).
+
 ## Facade surface & types
 
-- [ ] **AC1**: `postgresServerless<Contract>({ contractJson, extensions, middleware })` returns a client exposing `sql`, `context`, `stack`, `contract`, and `connect()` — and **does not** expose `orm`, `runtime()`, or `transaction()` (verified by a TypeScript negative-type test).
-- [ ] **AC2**: `db.connect({ url })` returns a `Runtime & AsyncDisposable`. Multiple calls return distinct runtime instances (no closure cache).
+- [x] **AC1**: `postgresServerless<Contract>({ contractJson, extensions, middleware })` returns a client exposing `sql`, `context`, `stack`, `contract`, and `connect()` — and **does not** expose `orm`, `runtime()`, or `transaction()` (verified by a TypeScript negative-type test).
+- [x] **AC2**: `db.connect({ url })` returns a `Runtime & AsyncDisposable`. Multiple calls return distinct runtime instances (no closure cache).
 
 ## Workers compatibility
 
-- [ ] **AC3**: `@prisma-next/postgres-serverless/runtime` (or chosen export path) and its full transitive dependency closure load successfully in the Cloudflare Workers runtime with `compatibility_flags = ["nodejs_compat"]`. Verified by the example Worker booting in `wrangler dev` without import errors.
-- [ ] **AC4**: SQL DSL plan execution, ORM-client query (constructed per-request from `runtime`), and `withTransaction(runtime, ...)` all execute successfully against a Hyperdrive-fronted Postgres in `wrangler dev`.
+- [x] **AC3**: `@prisma-next/postgres-serverless/runtime` (or chosen export path) and its full transitive dependency closure load successfully in the Cloudflare Workers runtime with `compatibility_flags = ["nodejs_compat"]`. Verified by the example Worker booting in `wrangler dev` without import errors.
+- [x] **AC4**: SQL DSL plan execution, ORM-client query (constructed per-request from `runtime`), and `withTransaction(runtime, ...)` all execute successfully against a Hyperdrive-fronted Postgres in `wrangler dev`.
 
 ## Lifecycle
 
-- [ ] **AC5**: The serverless code path opens at most one underlying Postgres connection per `db.connect()` call, and `await using` disposal calls `client.end()` exactly once on scope exit (verified by mocked-`pg` unit test asserting construct/connect/end counts).
-- [ ] **AC6**: `pg-cursor` is reachable on the serverless path and exercised by an integration test that consumes a large-result-set query incrementally and cancels it via early `break` without materializing remaining rows.
-- [ ] **AC7**: No client-side `pg.Pool` is constructed on the serverless code path (verified by mocked-`pg` unit test).
+- [x] **AC5**: The serverless code path opens at most one underlying Postgres connection per `db.connect()` call, and `await using` disposal calls `client.end()` exactly once on scope exit (verified by mocked-`pg` unit test asserting construct/connect/end counts).
+- [x] **AC6**: `pg-cursor` is reachable on the serverless path and exercised by an integration test that consumes a large-result-set query incrementally and cancels it via early `break` without materializing remaining rows.
+- [x] **AC7**: No client-side `pg.Pool` is constructed on the serverless code path (verified by mocked-`pg` unit test).
 
 ## Symmetry & non-regression
 
-- [ ] **AC8**: Existing `postgres({ contract, url })`, `postgres({ contract, pg })`, `postgres({ contract, binding })` Node usage continues to work unchanged. Existing test suites pass.
-- [ ] **AC9**: Construction shape of `postgresServerless({ contractJson, extensions, middleware })` mirrors `postgres({ contractJson, extensions, middleware })` exactly (same option keys, same types where applicable).
+- [x] **AC8**: Existing `postgres({ contract, url })`, `postgres({ contract, pg })`, `postgres({ contract, binding })` Node usage continues to work unchanged. Existing test suites pass.
+- [x] **AC9**: Construction shape of `postgresServerless({ contractJson, extensions, middleware })` mirrors `postgres({ contractJson, extensions, middleware })` exactly (same option keys, same types where applicable).
 
 ## Transactions
 
-- [ ] **AC10**: A multi-statement transaction (e.g. INSERT then UPDATE) executed via `withTransaction(runtime, ...)` against Hyperdrive commits atomically on success and rolls back cleanly on thrown error.
-- [ ] **AC11**: A failed transaction body that triggers ROLLBACK leaves the underlying `pg.Client` in a state that is `client.end()`-able without leaks.
+- [x] **AC10**: A multi-statement transaction (e.g. INSERT then UPDATE) executed via `withTransaction(runtime, ...)` against Hyperdrive commits atomically on success and rolls back cleanly on thrown error.
+- [x] **AC11**: A failed transaction body that triggers ROLLBACK leaves the underlying `pg.Client` in a state that is `client.end()`-able without leaks.
 
 ## Example & docs
 
-- [ ] **AC12**: `examples/prisma-next-cloudflare-worker` deploys to a real Cloudflare account with `wrangler deploy` and successfully serves SQL DSL, ORM, and transaction requests against a real Hyperdrive-fronted Postgres.
-- [ ] **AC13**: The example README documents end-to-end setup including the PPg/Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding, and local dev via `localConnectionString`. Reviewer-verified to be sufficient to bootstrap from scratch.
-- [ ] **AC14**: The new deployment guide is published under `docs/` covering: facade-asymmetry rationale, Cloudflare Workers + Hyperdrive worked example, lifecycle expectations, generality across other per-request runtimes, migration story, known limitations.
+- [ ] **AC12**: `examples/prisma-next-cloudflare-worker` deploys to a real Cloudflare account with `wrangler deploy` and successfully serves SQL DSL, ORM, and transaction requests against a real Hyperdrive-fronted Postgres. **NOT YET VERIFIED — blocked on Cloudflare account + Hyperdrive entitlement; will be closed by plan task M4 4.2.**
+- [x] **AC13**: The example README documents end-to-end setup including the PPg/Postgres origin, `wrangler hyperdrive create`, `wrangler.jsonc` binding, and local dev via `localConnectionString`. Reviewer-verified to be sufficient to bootstrap from scratch.
+- [x] **AC14**: The new deployment guide is published under `docs/` covering: facade-asymmetry rationale, Cloudflare Workers + Hyperdrive worked example, lifecycle expectations, generality across other per-request runtimes, migration story, known limitations.
 
 ## Architecture & quality
 
-- [ ] **AC15**: `pnpm lint:deps` passes; layering and plane rules are not violated.
-- [ ] **AC16**: `pnpm test:packages` passes (no regressions in existing suites).
-- [ ] **AC17**: New code has unit tests for `postgresServerless` (facade construction, `connect()` returning fresh runtimes, `[Symbol.asyncDispose]` calling `client.end()`, no `Pool` allocated, ORM client and transactions threaded through the returned runtime).
-- [ ] **AC18**: An automated integration test for the Worker example exists and runs in CI via `vitest-pool-workers` against a local Postgres.
+- [x] **AC15**: `pnpm lint:deps` passes; layering and plane rules are not violated.
+- [x] **AC16**: `pnpm test:packages` passes (no regressions in existing suites).
+- [x] **AC17**: New code has unit tests for `postgresServerless` (facade construction, `connect()` returning fresh runtimes, `[Symbol.asyncDispose]` calling `client.end()`, no `Pool` allocated, ORM client and transactions threaded through the returned runtime).
+- [x] **AC18**: An automated integration test for the Worker example exists and runs in CI via `vitest-pool-workers` against a local Postgres.
 
 ## Performance & footprint
 
-- [ ] **AC19**: Worker bundle for the example app is under 1 MB compressed (baseline measurement; M1 spike measured 53 KiB gzipped without PN — full bundle expected to land well under target).
-- [ ] **AC20**: Cold-start latency for an ORM `findMany({ take: 10 })` against a warm Hyperdrive pool is under 200 ms p50 in `wrangler dev` (best-effort measurement; revise as needed).
+- [x] **AC19**: Worker bundle for the example app is under 1 MB compressed (measured: 254 KiB gzipped via `pnpm deploy:dry-run`).
+- [x] **AC20**: Cold-start latency for an ORM `findMany({ take: 10 })` against a warm Hyperdrive pool is under 200 ms p50 in `wrangler dev` (measured: ~35 ms cold / ~13 ms warm against local Docker Postgres). Re-measure against real Hyperdrive in plan task 4.2.
 
 # Other Considerations
 
@@ -219,7 +221,9 @@ No new analytics events. Existing telemetry middleware emits the standard query/
 
 # References
 
-- Linear: [TML-2369 — PPg has no connection pooling, add a Hyperdrive driver](https://linear.app/prisma-company/issue/TML-2369/ppg-has-no-connection-pooling-add-a-hyperdrive-driver) (title to be updated to match reframed scope)
+- Linear: [TML-2369 — Deploy Prisma Next on Cloudflare Workers with Hyperdrive](https://linear.app/prisma-company/issue/TML-2369)
+- Linear (follow-up): [TML-2377 — ORM Class-Table-Inheritance bug for `@@base + @@map` discriminator schemas](https://linear.app/prisma-company/issue/TML-2377) — surfaced during M3 implementation; tracked separately, not blocking this project.
+- PR: [#421 — feat(postgres): per-request facade for serverless runtimes](https://github.com/prisma/prisma-next/pull/421)
 - Cloudflare Hyperdrive docs: <https://developers.cloudflare.com/hyperdrive/>
 - ADRs:
   - [ADR 159 — Driver Terminology and Lifecycle](docs/architecture%20docs/adrs/ADR%20159%20-%20Driver%20Terminology%20and%20Lifecycle.md)
