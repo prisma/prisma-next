@@ -157,6 +157,19 @@ function reportInvalidUpdatedAt(input: {
   });
 }
 
+function rejectUpdatedAtOnNonScalar(input: {
+  readonly model: PslModel;
+  readonly field: PslField;
+  readonly attribute: PslAttribute;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+}): void {
+  reportInvalidUpdatedAt({
+    ...input,
+    message: 'can only be used on scalar DateTime fields.',
+  });
+}
+
 function lowerUpdatedAtAttribute(input: {
   readonly model: PslModel;
   readonly field: PslField;
@@ -166,6 +179,7 @@ function lowerUpdatedAtAttribute(input: {
   readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
+  readonly targetId: string;
 }): Omit<ExecutionMutationDefault, 'ref'> | undefined {
   if (input.attribute.args.length > 0) {
     reportInvalidUpdatedAt({
@@ -200,7 +214,7 @@ function lowerUpdatedAtAttribute(input: {
   if (!generatorDescriptor) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Field "${input.model.name}.${input.field.name}" @updatedAt requires mutation default generator "${TIMESTAMP_NOW_GENERATOR_ID}".`,
+      message: `Field "${input.model.name}.${input.field.name}" @updatedAt is not supported by the "${input.targetId}" target adapter. The adapter must register a mutation default generator with id "${TIMESTAMP_NOW_GENERATOR_ID}".`,
       sourceId: input.sourceId,
       span: input.attribute.span,
     });
@@ -247,13 +261,12 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 
     if (field.list && isModelField) {
       if (updatedAtAttribute) {
-        reportInvalidUpdatedAt({
+        rejectUpdatedAtOnNonScalar({
           model,
           field,
           attribute: updatedAtAttribute,
           diagnostics,
           sourceId,
-          message: 'can only be used on scalar DateTime fields.',
         });
       }
       continue;
@@ -272,13 +285,12 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     const relationAttribute = getAttribute(field.attributes, 'relation');
     if (isModelField) {
       if (updatedAtAttribute) {
-        reportInvalidUpdatedAt({
+        rejectUpdatedAtOnNonScalar({
           model,
           field,
           attribute: updatedAtAttribute,
           diagnostics,
           sourceId,
-          message: 'can only be used on scalar DateTime fields.',
         });
         continue;
       }
@@ -354,6 +366,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           generatorDescriptorById,
           diagnostics,
           sourceId,
+          targetId,
         })
       : undefined;
     const loweredDefault = defaultAttribute
