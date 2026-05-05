@@ -306,25 +306,27 @@ export function createPostgresDefaultFunctionRegistry(): ReadonlyMap<
 
 export function createPostgresMutationDefaultGeneratorDescriptors(): readonly MutationDefaultGeneratorDescriptor[] {
   return [
-    ...builtinGeneratorRegistryMetadata.map(({ id, applicableCodecIds }) => ({
-      id,
-      applicableCodecIds,
-      resolveGeneratedColumnDescriptor: ({ generated }) => {
-        if (generated.kind !== 'generator' || generated.id !== id) {
-          return undefined;
-        }
-        const descriptor = resolveBuiltinGeneratedColumnDescriptor({
-          id,
-          ...(generated.params ? { params: generated.params } : {}),
-        });
-        return {
-          codecId: descriptor.type.codecId,
-          nativeType: descriptor.type.nativeType,
-          ...(descriptor.type.typeRef ? { typeRef: descriptor.type.typeRef } : {}),
-          ...(descriptor.typeParams ? { typeParams: descriptor.typeParams } : {}),
-        };
-      },
-    })),
+    ...builtinGeneratorRegistryMetadata.map(
+      ({ id, applicableCodecIds }): MutationDefaultGeneratorDescriptor => ({
+        id,
+        applicableCodecIds,
+        resolveGeneratedColumnDescriptor: ({ generated }) => {
+          if (generated.kind !== 'generator' || generated.id !== id) {
+            return undefined;
+          }
+          const descriptor = resolveBuiltinGeneratedColumnDescriptor({
+            id,
+            ...(generated.params ? { params: generated.params } : {}),
+          });
+          return {
+            codecId: descriptor.type.codecId,
+            nativeType: descriptor.type.nativeType,
+            ...(descriptor.type.typeRef ? { typeRef: descriptor.type.typeRef } : {}),
+            ...(descriptor.typeParams ? { typeParams: descriptor.typeParams } : {}),
+          };
+        },
+      }),
+    ),
     {
       id: 'timestampNow',
       applicableCodecIds: [PG_TIMESTAMP_CODEC_ID, PG_TIMESTAMPTZ_CODEC_ID],

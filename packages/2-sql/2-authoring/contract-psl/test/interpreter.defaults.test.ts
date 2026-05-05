@@ -309,6 +309,40 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     );
   });
 
+  it('rejects @updatedAt on relation fields', () => {
+    const document = parsePslDocument({
+      schema: `model User {
+  id Int @id
+  posts Post[]
+}
+
+model Post {
+  id Int @id
+  userId Int
+  user User @relation(fields: [userId], references: [id]) @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('scalar DateTime'),
+        }),
+      ]),
+    );
+  });
+
   it('lowers SQLite @updatedAt to SQLite timestamp codecs', () => {
     const document = parsePslDocument({
       schema: `model Timestamped {

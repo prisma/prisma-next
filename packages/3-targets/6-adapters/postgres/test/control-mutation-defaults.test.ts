@@ -391,9 +391,9 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
 
 describe('postgres runtime mutation default generators', () => {
   it('provides timestampNow as a Date generator', () => {
-    const generator = runtimeAdapterDescriptor
-      .mutationDefaultGenerators()
-      .find((entry) => entry.id === 'timestampNow');
+    const generator = (runtimeAdapterDescriptor.mutationDefaultGenerators?.() ?? []).find(
+      (entry) => entry.id === 'timestampNow',
+    );
 
     expect(generator?.generate()).toBeInstanceOf(Date);
   });

@@ -247,7 +247,20 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
   const resolvedFields: ResolvedField[] = [];
 
   for (const field of model.fields) {
-    if (field.list && modelNames.has(field.typeName)) {
+    const isModelField = modelNames.has(field.typeName);
+    const updatedAtAttribute = getAttribute(field.attributes, 'updatedAt');
+
+    if (field.list && isModelField) {
+      if (updatedAtAttribute) {
+        reportInvalidUpdatedAt({
+          model,
+          field,
+          attribute: updatedAtAttribute,
+          diagnostics,
+          sourceId,
+          message: 'can only be used on scalar DateTime fields.',
+        });
+      }
       continue;
     }
 
@@ -262,8 +275,21 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
-    if (relationAttribute && modelNames.has(field.typeName)) {
-      continue;
+    if (isModelField) {
+      if (updatedAtAttribute) {
+        reportInvalidUpdatedAt({
+          model,
+          field,
+          attribute: updatedAtAttribute,
+          diagnostics,
+          sourceId,
+          message: 'can only be used on scalar DateTime fields.',
+        });
+        continue;
+      }
+      if (relationAttribute) {
+        continue;
+      }
     }
 
     const isValueObjectField = compositeTypeNames.has(field.typeName);
@@ -323,7 +349,6 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     }
 
     const defaultAttribute = getAttribute(field.attributes, 'default');
-    const updatedAtAttribute = getAttribute(field.attributes, 'updatedAt');
     const updatedAtExecutionDefaults = updatedAtAttribute
       ? lowerUpdatedAtAttribute({
           model,
