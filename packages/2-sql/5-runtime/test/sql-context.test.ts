@@ -294,6 +294,129 @@ describe('contract/stack validation errors', () => {
       }),
     );
   });
+
+  it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR when contract references a generator the stack does not provide', () => {
+    const contractWithUnknownGenerator: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'unregistered' },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithUnknownGenerator, stack: createStack() }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        category: 'RUNTIME',
+        severity: 'error',
+        details: expect.objectContaining({
+          ids: ['unregistered'],
+        }),
+      }),
+    );
+  });
+
+  it('lists all missing mutation default generator ids in a single error', () => {
+    const contractWithMissingGenerators: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+              slug: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'gen-a' },
+            },
+            {
+              ref: { table: 'user', column: 'slug' },
+              onUpdate: { kind: 'generator', id: 'gen-b' },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithMissingGenerators, stack: createStack() }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        details: expect.objectContaining({
+          ids: expect.arrayContaining(['gen-a', 'gen-b']),
+        }),
+      }),
+    );
+  });
+
+  it('passes when all referenced mutation default generator ids are registered', () => {
+    const contractWithRegisteredGenerator: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          user: {
+            columns: {
+              id: { nativeType: 'text', codecId: 'pg/text@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'user', column: 'id' },
+              onCreate: { kind: 'generator', id: 'nanoid' },
+            },
+          ],
+        },
+      },
+    };
+
+    expect(() =>
+      createExecutionContext({ contract: contractWithRegisteredGenerator, stack: createStack() }),
+    ).not.toThrow();
+  });
 });
 
 describe('applyMutationDefaults', () => {

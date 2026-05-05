@@ -598,6 +598,34 @@ function buildContractCodecRegistry(
   return { registry, jsonValidators };
 }
 
+function assertMutationDefaultGeneratorsAvailable(
+  contract: Contract<SqlStorage>,
+  generatorRegistry: ReadonlyMap<string, RuntimeMutationDefaultGenerator>,
+): void {
+  const defaults = contract.execution?.mutations.defaults ?? [];
+  if (defaults.length === 0) return;
+
+  const missing = new Set<string>();
+  for (const mutationDefault of defaults) {
+    for (const phase of [mutationDefault.onCreate, mutationDefault.onUpdate]) {
+      if (!phase) continue;
+      if (phase.kind === 'generator' && !generatorRegistry.has(phase.id)) {
+        missing.add(phase.id);
+      }
+    }
+  }
+
+  if (missing.size === 0) return;
+
+  const ids = Array.from(missing);
+  const idList = ids.map((id) => `'${id}'`).join(', ');
+  throw runtimeError(
+    'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+    `Contract requires mutation default generator(s) ${idList}, but no runtime component provides them.`,
+    { ids },
+  );
+}
+
 function collectMutationDefaultGenerators(
   contributors: ReadonlyArray<SqlStaticContributions & { readonly id: string }>,
 ): ReadonlyMap<string, RuntimeMutationDefaultGenerator> {
@@ -729,6 +757,7 @@ export function createExecutionContext<
     parameterizedCodecDescriptors,
   );
   const mutationDefaultGeneratorRegistry = collectMutationDefaultGenerators(contributors);
+  assertMutationDefaultGeneratorsAvailable(contract, mutationDefaultGeneratorRegistry);
 
   if (parameterizedCodecDescriptors.size > 0) {
     validateColumnTypeParams(contract.storage, parameterizedCodecDescriptors);
