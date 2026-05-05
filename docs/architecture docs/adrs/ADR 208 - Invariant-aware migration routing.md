@@ -184,12 +184,6 @@ Have the runner accept invariants through an option (e.g. `MigrationRunner.execu
 
 Rejected because the manifest's `providedInvariants` is the canonical source, `migration verify` already enforces consistency between the aggregate and the ops it claims to summarise, and a parallel option channel reintroduces the "forgot to thread the option" footgun against a property the framework already guarantees.
 
-### Bitmask encoding of the covered-subset
-
-Encode the covered-subset state as a bitmask over a sorted enumeration of `required`, capped at 30 ids for int32 safety.
-
-Considered and dropped in favour of the `Set<string>` form. The bitmask is faster per state-key operation but adds: an edge-mask cache, a cap-throw guard with its own regression test, and a state-key collision risk that needs its own test. The `Set<string>` form pays a ~1.4× per-state cost on production-typical inputs but eliminates the supporting machinery and the cap. The trade is favourable because production inputs don't reach the regime where the cost would matter.
-
 ## Related
 
 - [ADR 001 — Migrations as Edges](./ADR%20001%20-%20Migrations%20as%20Edges.md) — self-edge rules.
