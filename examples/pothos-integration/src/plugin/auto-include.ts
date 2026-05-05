@@ -1,21 +1,25 @@
 /**
  * Auto-include walker for `t.prismaField` resolvers.
  *
- * Given a `GraphQLResolveInfo` and a base prisma-next `Collection`, walk
- * the GraphQL selection set, recursively chain `.select(...)` and
- * `.include(rel, refineFn)` onto the collection, and return the prepared
- * collection.
+ * Walks the GraphQL ResolveInfo once and returns:
+ * - an `apply` function that applies `.select(...)` and `.include(rel, ...)`
+ *   to a base prisma-next Collection
+ * - a `reshape` function that lifts `combine` branches onto flat parent
+ *   keys and recurses into nested relations
  *
- * The walker reads field-config extensions set by the field builders:
+ * Reads field-config extensions set by the field builders:
  * - PRISMA_NEXT_RELATION: `{ relationName, parentModel, targetModel, cardinality, opts }`
  * - PRISMA_NEXT_RELATION_COUNT: `{ relationName, parentModel, opts }`
  *
- * For M1 we handle:
- * - scalar exposeX: add the column to `.select(...)`
- * - single-field-per-relation: emit a plain `.include(rel, refineFn)`
- *
- * For M2 we extend this with sibling-grouping into `.combine({...})`
- * and a per-row reshape that lifts combine branches up to peer keys.
+ * Emission rules per relation group (all GraphQL fields backed by the
+ * same prisma-next relation):
+ * - 0 fields: nothing.
+ * - 1 row field, no count, alias === relationName: plain `.include(rel, ...)`.
+ *   Result: `parent[relationName] = T | T[]`. No reshape lift at this level
+ *   (recursion may add child reshapes).
+ * - Any other shape: `.include(rel, p => p.combine({ alias: branch, ... }))`.
+ *   Result: `parent[relationName] = { branchAlias1: ..., branchAlias2: ... }`.
+ *   Reshape lifts each branchAlias onto `parent[branchAlias]`.
  */
 import type { BuildCache, SchemaTypes } from '@pothos/core';
 import type { Contract } from '@prisma-next/contract/types';
@@ -59,6 +63,14 @@ interface RelationCountFieldExt {
 
 type AnyCollection = Collection<Contract<SqlStorage>, string, unknown, never>;
 
+export type Reshape = (row: unknown) => unknown;
+const noopReshape: Reshape = (row) => row;
+
+interface PreparedQuery {
+  collection: AnyCollection;
+  reshape: Reshape;
+}
+
 /**
  * Public entry: prepare a Collection for the field's selection.
  */
@@ -66,160 +78,218 @@ export function applySelectionToCollection(
   baseCollection: AnyCollection,
   info: GraphQLResolveInfo,
   buildCache: BuildCache<SchemaTypes>,
-): AnyCollection {
+): PreparedQuery {
   const returnType = getNamedType(info.returnType);
   if (!isObjectType(returnType)) {
-    return baseCollection;
+    return { collection: baseCollection, reshape: noopReshape };
   }
-
   const fieldNode = info.fieldNodes[0];
   if (!fieldNode?.selectionSet) {
-    return baseCollection;
+    return { collection: baseCollection, reshape: noopReshape };
   }
 
-  return applyToCollection(baseCollection, returnType, fieldNode.selectionSet, info, buildCache);
+  const walk = walkSelection(returnType, fieldNode.selectionSet, info, buildCache);
+  return { collection: walk.apply(baseCollection), reshape: walk.reshape };
 }
 
-function applyToCollection(
-  collection: AnyCollection,
+interface WalkResult {
+  apply: (collection: AnyCollection) => AnyCollection;
+  reshape: Reshape;
+}
+
+/**
+ * Walk one level of a GraphQL selection set against a Pothos object
+ * type. Returns:
+ * - `apply`: a function that takes a Collection (for the type) and
+ *   chains the necessary `.select(...)` / `.include(rel, ...)` calls.
+ * - `reshape`: a function that lifts combine branches and recurses.
+ */
+function walkSelection(
   type: GraphQLObjectType,
   selectionSet: SelectionSetNode,
   info: GraphQLResolveInfo,
   buildCache: BuildCache<SchemaTypes>,
-): AnyCollection {
-  const { scalarFields, relationFields, relationCountFields } = collectFields(
-    type,
-    selectionSet,
-    info,
-  );
+): WalkResult {
+  const { scalarFields, relationGroups } = collectFields(type, selectionSet);
 
-  let acc = collection;
-
-  // 0. The orm-client only auto-augments a parent fetch with the immediate
-  //    targetColumn of an include. When THIS fetch is itself a child fetch
-  //    inside a nested-stitch chain, the orm-client doesn't know to also
-  //    select the localColumns the child needs for its own outgoing
-  //    includes. We compensate by explicitly adding those columns to the
-  //    parent's select so nested-stitch can match. (See
-  //    `resolveRowsByParent` / `augmentSelectionForJoinColumns` in
-  //    `collection-dispatch.ts:368-417`.)
+  // Workaround for the orm-client's nested-stitch FK gap (workarounds.md W-1).
   const parentModelName = collectParentModelName(type);
   const fkColumns = parentModelName
-    ? collectLocalFkColumns(buildCache, parentModelName, relationFields)
+    ? collectLocalFkColumnsByGroup(buildCache, parentModelName, relationGroups)
     : new Set<string>();
+  const allSelectFields = new Set<string>([...scalarFields, ...fkColumns]);
 
-  // 1. Apply scalar selection. Prisma-next's `.select(...)` accepts string
-  //    column names. We always include the GraphQL field name; we trust the
-  //    contract that the field name === the model field name (the demo
-  //    schema satisfies this; for general use we'd consult contract.models[
-  //    parentModel].storage.fields[X].column to translate).
-  const allFields = new Set<string>([...scalarFields, ...fkColumns]);
-  if (allFields.size > 0) {
-    const sel = (acc as unknown as { select: (...names: string[]) => AnyCollection }).select;
-    if (typeof sel === 'function') {
-      acc = sel.apply(acc, [...allFields]);
+  // Per-group emission plans (computed eagerly).
+  const groupPlans: GroupPlan[] = [];
+
+  for (const [relationName, group] of relationGroups) {
+    const rowAliases = new Map<string, { walk: WalkResult; cardinality: string }>();
+    const allAliases: string[] = [];
+
+    for (const [alias, entry] of group.rowFields) {
+      const relReturnType = getRelationReturnType(type, entry.fieldNode.name.value);
+      const innerWalk =
+        relReturnType && entry.fieldNode.selectionSet
+          ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, buildCache)
+          : { apply: (c: AnyCollection) => c, reshape: noopReshape };
+      // Wrap apply with the static refine.
+      const opts = entry.ext.opts;
+      const innerWithRefine: WalkResult = {
+        apply: (c) => {
+          let r = c;
+          if (opts.query && typeof opts.query !== 'function') {
+            r = applyStaticRefine(r, opts.query);
+          }
+          return innerWalk.apply(r);
+        },
+        reshape: innerWalk.reshape,
+      };
+      rowAliases.set(alias, { walk: innerWithRefine, cardinality: entry.ext.cardinality });
+      allAliases.push(alias);
     }
-  }
+    const countAliases = new Set<string>();
+    for (const alias of group.countFields.keys()) {
+      countAliases.add(alias);
+      allAliases.push(alias);
+    }
 
-  // 2. Apply each relation as a plain include. M2 expands this to combine
-  //    when multiple GraphQL fields back the same relation.
-  for (const [graphqlFieldName, relInfo] of relationFields) {
-    acc = (
-      acc as unknown as {
-        include: (relName: string, refine?: (rel: AnyCollection) => AnyCollection) => AnyCollection;
-      }
-    ).include(relInfo.ext.relationName, (relCollection: AnyCollection) => {
-      let prepared = relCollection;
+    const totalBranches = rowAliases.size + countAliases.size;
+    const plainEligible = totalBranches === 1 && countAliases.size === 0;
+    const firstRowEntry = rowAliases.entries().next().value;
+    const plainAlias = plainEligible && firstRowEntry ? firstRowEntry[0] : undefined;
+    const plainCardinality =
+      plainEligible && firstRowEntry ? firstRowEntry[1].cardinality : undefined;
 
-      // Apply field-time `query: { where, orderBy, take, skip }` if static.
-      if (relInfo.ext.opts.query && typeof relInfo.ext.opts.query !== 'function') {
-        prepared = applyStaticRefine(prepared, relInfo.ext.opts.query);
-      }
-
-      // Recurse into the relation's subselection.
-      const relReturnType = getRelationReturnType(type, graphqlFieldName);
-      if (relReturnType && relInfo.fieldNode.selectionSet) {
-        prepared = applyToCollection(
-          prepared,
-          relReturnType,
-          relInfo.fieldNode.selectionSet,
-          info,
-          buildCache,
-        );
-      }
-      return prepared;
+    groupPlans.push({
+      relationName,
+      isCombine: !plainEligible,
+      rowAliases,
+      countAliases,
+      allAliases,
+      plainAlias,
+      plainCardinality,
     });
   }
 
-  // 3. Relation-count fields: M1 leaves these unhandled (they only kick in
-  //    in M2 once we have combine emission). The resolver throws a clear
-  //    error if a relation-count field is queried in M1.
-  if (relationCountFields.size > 0) {
-    // Surface a console warning so the demo author sees this isn't wired
-    // until M2.
-    // eslint-disable-next-line no-console
-    console.warn(
-      '[pothos-prisma-next] relationCount fields encountered in M1 walker; not yet wired to combine. ' +
-        `Fields: ${[...relationCountFields.keys()].join(', ')}`,
-    );
-  }
+  // Build the apply function (called at runtime with a real Collection).
+  const apply = (collection: AnyCollection): AnyCollection => {
+    let acc = collection;
 
-  return acc;
+    if (allSelectFields.size > 0) {
+      const sel = (acc as unknown as { select: (...names: string[]) => AnyCollection }).select;
+      if (typeof sel === 'function') {
+        acc = sel.apply(acc, [...allSelectFields]);
+      }
+    }
+
+    for (const plan of groupPlans) {
+      if (!plan.isCombine) {
+        if (plan.plainAlias === undefined) continue;
+        const entry = plan.rowAliases.get(plan.plainAlias);
+        if (!entry) continue;
+        const { walk } = entry;
+        acc = (
+          acc as unknown as {
+            include: (n: string, refine?: (rel: AnyCollection) => AnyCollection) => AnyCollection;
+          }
+        ).include(plan.relationName, (rel) => walk.apply(rel));
+        continue;
+      }
+
+      // Combine: emit one .include(rel, p => p.combine({...})).
+      acc = (
+        acc as unknown as {
+          include: (n: string, refine?: (rel: AnyCollection) => AnyCollection) => AnyCollection;
+        }
+      ).include(plan.relationName, (rel) => {
+        const spec: Record<string, unknown> = {};
+        for (const [alias, { walk }] of plan.rowAliases) {
+          spec[alias] = walk.apply(rel);
+        }
+        for (const alias of plan.countAliases) {
+          spec[alias] = (rel as unknown as { count: () => unknown }).count();
+        }
+        return (
+          rel as unknown as { combine: (s: Record<string, unknown>) => AnyCollection }
+        ).combine(spec);
+      });
+    }
+
+    return acc;
+  };
+
+  // Build the reshape function (called per-row at result-time).
+  const reshape = buildReshape(groupPlans);
+
+  return { apply, reshape };
+}
+
+interface RelationFieldEntry {
+  fieldNode: FieldNode;
+  ext: RelationFieldExt;
+}
+
+interface RelationCountFieldEntry {
+  fieldNode: FieldNode;
+  ext: RelationCountFieldExt;
+}
+
+interface RelationGroup {
+  rowFields: Map<string, RelationFieldEntry>;
+  countFields: Map<string, RelationCountFieldEntry>;
 }
 
 interface CollectedFields {
   scalarFields: Set<string>;
-  relationFields: Map<string, { fieldNode: FieldNode; ext: RelationFieldExt }>;
-  relationCountFields: Map<string, { fieldNode: FieldNode; ext: RelationCountFieldExt }>;
+  relationGroups: Map<string, RelationGroup>;
 }
 
-function collectFields(
-  type: GraphQLObjectType,
-  selectionSet: SelectionSetNode,
-  _info: GraphQLResolveInfo,
-): CollectedFields {
+function collectFields(type: GraphQLObjectType, selectionSet: SelectionSetNode): CollectedFields {
   const scalarFields = new Set<string>();
-  const relationFields = new Map<string, { fieldNode: FieldNode; ext: RelationFieldExt }>();
-  const relationCountFields = new Map<
-    string,
-    { fieldNode: FieldNode; ext: RelationCountFieldExt }
-  >();
+  const relationGroups = new Map<string, RelationGroup>();
   const typeFields = type.getFields();
 
+  function getOrCreateGroup(relationName: string): RelationGroup {
+    let g = relationGroups.get(relationName);
+    if (!g) {
+      g = { rowFields: new Map(), countFields: new Map() };
+      relationGroups.set(relationName, g);
+    }
+    return g;
+  }
+
   for (const sel of selectionSet.selections) {
-    if (sel.kind !== Kind.FIELD) {
-      // M1 doesn't handle fragments; the demo schema doesn't use them.
-      continue;
-    }
-    if (sel.name.value.startsWith('__')) {
-      continue;
-    }
+    if (sel.kind !== Kind.FIELD) continue;
+    if (sel.name.value.startsWith('__')) continue;
 
     const fieldDef = typeFields[sel.name.value];
     if (!fieldDef) continue;
 
     const ext = (fieldDef.extensions ?? {}) as Record<string | symbol, unknown>;
+    const alias = sel.alias?.value ?? sel.name.value;
 
     const relationExt = ext[PRISMA_NEXT_RELATION] as RelationFieldExt | undefined;
     if (relationExt) {
-      const alias = sel.alias?.value ?? sel.name.value;
-      relationFields.set(alias, { fieldNode: sel, ext: relationExt });
+      getOrCreateGroup(relationExt.relationName).rowFields.set(alias, {
+        fieldNode: sel,
+        ext: relationExt,
+      });
       continue;
     }
 
     const countExt = ext[PRISMA_NEXT_RELATION_COUNT] as RelationCountFieldExt | undefined;
     if (countExt) {
-      const alias = sel.alias?.value ?? sel.name.value;
-      relationCountFields.set(alias, { fieldNode: sel, ext: countExt });
+      getOrCreateGroup(countExt.relationName).countFields.set(alias, {
+        fieldNode: sel,
+        ext: countExt,
+      });
       continue;
     }
 
-    // Otherwise treat as a scalar (exposeX-style or simple field).
-    // For exposeX fields, the field name === the model column name.
     scalarFields.add(sel.name.value);
   }
 
-  return { scalarFields, relationFields, relationCountFields };
+  return { scalarFields, relationGroups };
 }
 
 function getRelationReturnType(
@@ -232,25 +302,19 @@ function getRelationReturnType(
   return isObjectType(named) ? named : undefined;
 }
 
-/**
- * Find the prisma-next model name attached to this GraphQL type.
- * `prismaObject` stamps `extensions[PRISMA_NEXT_MODEL]`; types not
- * created via `prismaObject` will lack it.
- */
+function isToManyCardinality(c: string): boolean {
+  return c === '1:N' || c === 'M:N';
+}
+
 function collectParentModelName(type: GraphQLObjectType): string | undefined {
   const ext = (type.extensions ?? {}) as Record<string, unknown>;
   return ext['pothosPrismaNextModel'] as string | undefined;
 }
 
-/**
- * Augment the parent's selectedFields with the localFields needed to
- * satisfy each include's stitching join. Workaround for the orm-client's
- * nested-stitch FK gap (see comment at the call site).
- */
-function collectLocalFkColumns(
+function collectLocalFkColumnsByGroup(
   buildCache: BuildCache<SchemaTypes>,
   parentModelName: string,
-  relationFields: Map<string, { ext: RelationFieldExt }>,
+  relationGroups: Map<string, RelationGroup>,
 ): Set<string> {
   const builder = (
     buildCache as unknown as {
@@ -265,8 +329,8 @@ function collectLocalFkColumns(
   if (!parentModel?.relations) return new Set();
 
   const out = new Set<string>();
-  for (const { ext } of relationFields.values()) {
-    const rel = parentModel.relations[ext.relationName];
+  for (const relationName of relationGroups.keys()) {
+    const rel = parentModel.relations[relationName];
     if (!rel?.on?.localFields) continue;
     for (const f of rel.on.localFields) out.add(f);
   }
@@ -293,4 +357,112 @@ function applyStaticRefine(
     acc = (acc as unknown as { skip: (n: number) => AnyCollection }).skip(refine.skip);
   }
   return acc;
+}
+
+// ---------------------------------------------------------------------------
+// Reshape construction
+// ---------------------------------------------------------------------------
+
+interface GroupPlan {
+  relationName: string;
+  isCombine: boolean;
+  rowAliases: Map<string, { walk: WalkResult; cardinality: string }>;
+  countAliases: Set<string>;
+  allAliases: string[];
+  plainAlias: string | undefined;
+  plainCardinality: string | undefined;
+}
+
+function buildReshape(groupPlans: GroupPlan[]): Reshape {
+  // Per-relation reshape ops: applied to `parent[relationName]`.
+  const relationOps: Array<{
+    relationName: string;
+    op: (value: unknown, parentRow: Record<string, unknown>) => void;
+  }> = [];
+
+  for (const plan of groupPlans) {
+    if (!plan.isCombine) {
+      if (plan.plainAlias === undefined || plan.plainCardinality === undefined) continue;
+      const plainAlias = plan.plainAlias;
+      const inner = plan.rowAliases.get(plainAlias)?.walk.reshape ?? noopReshape;
+      const isList = isToManyCardinality(plan.plainCardinality);
+      const childReshape = makeListOrObjectReshape(inner, isList);
+      const aliasDiffers = plainAlias !== plan.relationName;
+
+      relationOps.push({
+        relationName: plan.relationName,
+        op: (value, parentRow) => {
+          const reshaped = childReshape(value);
+          if (aliasDiffers) {
+            parentRow[plainAlias] = reshaped;
+            // Optional: also delete parent[relationName] since the
+            // resolver will read parent[plainAlias]. Keep both for now.
+          } else {
+            parentRow[plan.relationName] = reshaped;
+          }
+        },
+      });
+      continue;
+    }
+
+    // Combine path: parent[relationName] = { alias1: ..., alias2: ... }.
+    // Reshape each branch and lift onto the parent row.
+    const branchReshapes = new Map<string, Reshape>();
+    for (const [alias, { walk, cardinality }] of plan.rowAliases) {
+      branchReshapes.set(
+        alias,
+        makeListOrObjectReshape(walk.reshape, isToManyCardinality(cardinality)),
+      );
+    }
+
+    relationOps.push({
+      relationName: plan.relationName,
+      op: (value, parentRow) => {
+        if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+          // Unexpected shape — leave alone.
+          return;
+        }
+        const branches = value as Record<string, unknown>;
+        // Reshape row branches recursively.
+        for (const [alias, reshape] of branchReshapes) {
+          if (alias in branches) {
+            branches[alias] = reshape(branches[alias]);
+          }
+        }
+        // Lift every alias onto the parent.
+        for (const alias of plan.allAliases) {
+          if (alias in branches) {
+            parentRow[alias] = branches[alias];
+          }
+        }
+        // Keep parent[relationName] for backwards-compatible reads, but
+        // the resolver checks parent[fieldName] first so it doesn't matter.
+      },
+    });
+  }
+
+  if (relationOps.length === 0) return noopReshape;
+
+  return (row) => {
+    if (row == null || typeof row !== 'object') return row;
+    const r = row as Record<string, unknown>;
+    for (const { relationName, op } of relationOps) {
+      if (relationName in r) {
+        op(r[relationName], r);
+      }
+    }
+    return r;
+  };
+}
+
+function makeListOrObjectReshape(reshape: Reshape, isList: boolean): Reshape {
+  if (reshape === noopReshape) return noopReshape;
+  if (isList) {
+    return (val) => {
+      if (val == null) return val;
+      if (Array.isArray(val)) return val.map(reshape);
+      return reshape(val);
+    };
+  }
+  return (val) => (val == null ? val : reshape(val));
 }

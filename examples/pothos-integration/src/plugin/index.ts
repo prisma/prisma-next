@@ -26,10 +26,11 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
   ): GraphQLFieldResolver<unknown, Types['Context'], object> {
     const ext = (fieldConfig.extensions ?? {}) as Record<string | symbol, unknown>;
 
-    // ---- t.prismaField: prepare a Collection from info, hand it to the user resolver
+    // ---- t.prismaField: prepare a Collection from info, hand it to the user resolver,
+    //      then reshape the result so combine branches lift to flat parent keys.
     if (ext[PRISMA_NEXT_PREPARED]) {
       const modelName = ext[PRISMA_NEXT_PREPARED] as string;
-      return (parent, args, context, info) => {
+      return async (parent, args, context, info) => {
         const opts = this.builder.options.prismaNext;
         const baseCollection = (opts.db as unknown as Record<string, unknown>)[modelName];
         if (!baseCollection) {
@@ -38,12 +39,12 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
               'Make sure the contract has this model and the orm() client was constructed with it.',
           );
         }
-        const prepared = applySelectionToCollection(
+        const { collection, reshape } = applySelectionToCollection(
           baseCollection as never,
           info,
           this.buildCache as never,
         );
-        return (
+        const result = await (
           resolver as unknown as (
             collection: unknown,
             parent: unknown,
@@ -51,23 +52,24 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
             context: unknown,
             info: GraphQLResolveInfo,
           ) => unknown
-        )(prepared, parent, args, context, info);
+        )(collection, parent, args, context, info);
+        if (result == null) return result;
+        return Array.isArray(result) ? result.map((row) => reshape(row)) : reshape(result);
       };
     }
 
-    // ---- t.relation / t.relationCount: read the value from the (possibly reshaped) parent
+    // ---- t.relation: read the value from the (possibly reshaped) parent.
+    //
+    // After the walker's reshape runs, the parent has flat keys: `parent.drafts`,
+    // `parent.posts`, etc. — even when combine was used under the hood. We
+    // first check `parent[fieldName]` (post-reshape), then fall back to the
+    // raw `parent[relationName]` (pre-reshape, which is the plain-include
+    // case where field name === relation name and reshape was a no-op).
     const relation = ext[PRISMA_NEXT_RELATION] as { relationName: string } | undefined;
     if (relation) {
       return (parent, _args, _context, info) => {
-        // M1 single-relation case: the walker emits a plain
-        // `.include(rel, ...)`, which writes the result onto
-        // `parent[relation.relationName]`. The GraphQL field name (which
-        // is `info.fieldName` here) defaults to the relation name unless
-        // the user aliased it — M2 will introduce per-alias reshape.
-        const key = info.fieldName;
-        const value =
-          readReshapedField(parent as Record<string, unknown>, key) ??
-          (parent as Record<string, unknown>)[relation.relationName];
+        const p = parent as Record<string, unknown>;
+        const value = info.fieldName in p ? p[info.fieldName] : p[relation.relationName];
         if (value === undefined) {
           throw new Error(
             `[pothos-prisma-next] Relation '${info.parentType.name}.${info.fieldName}' was reached from a parent ` +
@@ -79,10 +81,12 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
       };
     }
 
+    // ---- t.relationCount: read the value from the (reshape-lifted) parent key.
     const relationCount = ext[PRISMA_NEXT_RELATION_COUNT] as { relationName: string } | undefined;
     if (relationCount) {
       return (parent, _args, _context, info) => {
-        const value = readReshapedField(parent as Record<string, unknown>, info.fieldName);
+        const p = parent as Record<string, unknown>;
+        const value = p[info.fieldName];
         if (value === undefined) {
           throw new Error(
             `[pothos-prisma-next] relationCount '${info.parentType.name}.${info.fieldName}' was reached from a parent ` +
@@ -93,7 +97,7 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
       };
     }
 
-    // ---- t.exposeX: passthrough that reads the column off parent
+    // ---- t.exposeX: passthrough that reads the column off parent.
     const selectField = ext[PRISMA_NEXT_SELECT_FIELD] as string | undefined;
     if (selectField) {
       return (parent) => (parent as Record<string, unknown>)[selectField];
@@ -101,21 +105,6 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
 
     return resolver;
   }
-}
-
-/**
- * Read a field from a parent that may have been reshaped by combine. The
- * walker stores `combine` results under the parent's relation key as
- * `parent[relationName] = { branchA: ..., branchB: ... }`. The reshape
- * (run by `applySelectionToCollection`) lifts those branch values onto
- * `parent[branchAlias]` so resolvers see flat keys regardless of whether
- * combine was used. This helper just falls back to the legacy nested
- * shape if reshape didn't run for some reason (e.g. parent loaded
- * elsewhere).
- */
-function readReshapedField(parent: Record<string, unknown>, alias: string): unknown {
-  if (alias in parent) return parent[alias];
-  return undefined;
 }
 
 SchemaBuilder.registerPlugin(pluginName, PothosPrismaNextPlugin);

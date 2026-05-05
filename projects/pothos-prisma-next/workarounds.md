@@ -410,28 +410,63 @@ Type-engineer per-model row inference before any v2 work. See W-2 action item fo
 
 ---
 
-## D-4: Combine for sibling-aliased fields (M2)
+## D-4: Combine for sibling-aliased fields ✅ landed in M2
 
 ### What
 
-When two GraphQL fields back the same prisma-next relation (`drafts: t.relation('posts', {...})` + `posts: t.relation('posts', {...})`), the walker collapses them into a single `.include('posts', p => p.combine({ drafts: ..., posts: ... }))`. Plugin's `wrapResolve` then reshapes the parent to lift branches up to flat keys.
+When two GraphQL fields back the same prisma-next relation (`drafts: t.relation('posts', { query: { where: { published: 0 } } })` + `publishedPosts: t.relation('posts', { query: { where: { published: 1 } } })`), the walker collapses them into a single `.include('posts', p => p.combine({ drafts: ..., publishedPosts: ... }))`. Plugin's `wrapResolve` then reshapes the parent to lift branches up to flat keys (`parent.drafts`, `parent.publishedPosts`).
+
+`t.relationCount('posts')` is emitted as a `count()` branch in the same combine block.
 
 ### Why
 
 Validated by the existing prisma-next test (`packages/3-extensions/sql-orm-client/test/integration/include.test.ts:288-297`) — combine is the official primitive for this case.
 
-### How (M2 — pending)
+### How (M2 — landed)
 
-Walker: when collecting fields, group `relationFields` by `ext.relationName`. If a group has >1 entry, emit `.include(rel, p => p.combine({ alias: branchCollection, ... }))`. Plugin's `wrapResolve` lifts `parent[relationName][alias]` → `parent[alias]` once per parent row.
+Walker (`src/plugin/auto-include.ts`): when collecting fields, group `relationFields` and `relationCountFields` by `ext.relationName`. If a group has only 1 row field and 0 counts (and the alias matches the relation name), emit a plain `.include(rel, ...)`. Otherwise emit `.include(rel, p => p.combine({ alias: branch, ... }))`. Reshape lifts each branch onto `parent[alias]`. Resolver reads `parent[info.fieldName]` first, then falls back to `parent[relationName]` for the plain-include case.
+
+Verified end-to-end with `users { posts { id } drafts { id } publishedPosts { id } postCount }` returning flat keys with the expected filtered/total values.
 
 ### Cost
 
-- Multi-query strategy currently triggers when combine is present. Acceptable for v1.
+- Multi-query strategy currently triggers when combine is present. Acceptable for v1 (the demo's `extensions.prismaNext.executionCount` shows users see this clearly: 1 outer + N branch queries).
 - **v2 plugin: same pattern**, but prisma-next runtime should later teach the lateral strategy to handle combine in one query.
 
 ### Action item
 
-After M2 is wired, file a Linear ticket against prisma-next runtime: "teach `dispatchWithSingleQueryIncludes` to handle `combine` descriptors so combine-using queries don't fall back to multi-query."
+File a Linear ticket against prisma-next runtime: "teach `dispatchWithSingleQueryIncludes` to handle `combine` descriptors so combine-using queries don't fall back to multi-query." Currently `hasComplexIncludeDescriptors` (`packages/3-extensions/sql-orm-client/src/collection-dispatch.ts:478-480`) immediately routes to multi-query.
+
+---
+
+## W-7: Manual `Promise<unknown>` wrap on `t.prismaField` resolver result for M2 reshape
+
+### What
+
+The plugin's `wrapResolve` for `t.prismaField` now `await`s the user's resolver result before applying the reshape. If the user's resolver returns a non-promise (e.g., synchronous), this still works because of `await`'s identity behaviour, but the plugin's outer wrapper became `async (parent, args, ctx, info) => ...` instead of just returning the resolver's call result.
+
+### Why
+
+In M1, the plugin returned the resolver's promise directly. M2 needs to apply the reshape function *after* the result resolves. So the wrapper became:
+
+```ts
+const result = await resolver(collection, parent, args, context, info);
+if (result == null) return result;
+return Array.isArray(result) ? result.map(reshape) : reshape(result);
+```
+
+### How
+
+Marked the wrapper `async`. GraphQL is fine with promise-returning resolvers; no behavior change for users.
+
+### Cost
+
+- **Demo: works.**
+- **v2 plugin: same pattern.** A v2 might want to skip the await when no reshape is needed (`reshape === noopReshape`) for a tiny perf win.
+
+### Action item
+
+In v2, conditionally skip the await/reshape wrap when the walker returns `noopReshape`. Currently the wrapper always runs.
 
 ---
 
@@ -440,6 +475,7 @@ After M2 is wired, file a Linear ticket against prisma-next runtime: "teach `dis
 Summary of prisma-next-side gaps surfaced by building the demo:
 
 1. **W-1 (orm-client)**: nested-stitch FK augmentation is depth-1 only; should recursively descend into `state.includes` and add their `localColumns`. **Real bug.**
-2. **D-4 (orm-client)**: `combine` triggers multi-query strategy even when `lateral && jsonAgg` are available. **Optimization opportunity.**
+2. **D-4 (orm-client)**: `combine` triggers multi-query strategy even when `lateral && jsonAgg` are available. **Optimization opportunity.** Visible to demo users via `extensions.prismaNext.executionCount` — every combine-using query shows N+1 instead of 1.
 3. **Misc**: `db.sql.X.insert([row, row])` (multi-row insert) doesn't exist; only single-row. Minor seeding ergonomics.
 4. **Misc**: import path for `SqlMiddleware` is `@prisma-next/sql-runtime` (root), not `@prisma-next/sql-runtime/middleware` as I expected. Worth a re-export or doc nudge.
+5. **Misc**: count branches in `combine` appear to fetch all matching rows then count in memory (visible in the SQL log: `SELECT post.* WHERE post.authorId IN (...)` for the `postCount` branch with no filter), rather than `SELECT authorId, COUNT(*) GROUP BY authorId`. Functionally correct, ergonomically wasteful for large relations. Worth a Linear ticket on top of #2.
