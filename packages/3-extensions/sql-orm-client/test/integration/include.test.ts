@@ -47,12 +47,14 @@ function createUsersCollectionWithCapabilities(
   capabilities: Record<string, unknown>,
 ) {
   const base = getTestContract();
+  // Replace capabilities entirely (rather than merging with base) so the
+  // test's intent is unambiguous. Merging with the base contract's
+  // postgres namespace would leak `postgres.lateral` and `postgres.jsonAgg`
+  // into the strategy detection — making it impossible to test the
+  // correlated-only path by passing only `jsonAgg`.
   const contract = {
     ...base,
-    capabilities: {
-      ...base.capabilities,
-      ...capabilities,
-    },
+    capabilities,
   } as typeof base;
 
   const context = { ...getTestContext(), contract };
@@ -333,8 +335,7 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          lateral: { enabled: true },
-          jsonAgg: { enabled: true },
+          postgres: { jsonAgg: true, lateral: true },
         });
 
         await seedUsers(runtime, [
@@ -412,8 +413,7 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          lateral: { enabled: true },
-          jsonAgg: { enabled: true },
+          postgres: { jsonAgg: true, lateral: true },
         });
 
         await seedUsers(runtime, [
@@ -506,7 +506,8 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          jsonAgg: { enabled: true },
+          // jsonAgg without lateral → correlated subquery strategy.
+          sql: { jsonAgg: true },
         });
 
         await seedUsers(runtime, [{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
@@ -547,7 +548,8 @@ describe('integration/include', () => {
     async () => {
       await withCollectionRuntime(async (runtime) => {
         const users = createUsersCollectionWithCapabilities(runtime, {
-          jsonAgg: { enabled: true },
+          // jsonAgg without lateral → correlated subquery strategy.
+          sql: { jsonAgg: true },
         });
 
         await seedUsers(runtime, [
