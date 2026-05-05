@@ -69,7 +69,7 @@ Not a conflict with reconstruction:
 
 ### Integrity checks on load
 
-- **Same source and target check**: reject `from == to` with `MIGRATION.SAME_SOURCE_AND_TARGET` **unless** the migration package carries at least one `data`-class operation. Self-edges with data ops are first-class (pure data migrations on the current contract hash); the rejection is narrowed to ops-free self-edges. See [ADR 001 §Self-edges](ADR%20001%20-%20Migrations%20as%20Edges.md) and [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
+- **Same source and target check**: a self-edge (`from == to`) is rejected with `MIGRATION.SAME_SOURCE_AND_TARGET` unless the migration carries at least one `data`-class operation. Self-edges with data ops are first-class (pure data migrations on the current contract hash). See [ADR 001 §Self-edges](ADR%20001%20-%20Migrations%20as%20Edges.md) and [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 - **Cycle detection**: DFS with color marking, reported as `WARN_MIG_GRAPH_CYCLE` for diagnostics. Cycles are tolerated at runtime — BFS pathfinding uses visited-state tracking to avoid infinite loops (see §Path computation below). See ADR 169 §3.
 - **Parallel edge policy**: two edges with same `(from, to)` but different `opsHash` require label `parallel-ok`, else `ERR_MIG_GRAPH_PARALLEL_EDGE`
 - **Orphan edge detection**: edges unreachable from any genesis or that lead to no declared target are flagged as `WARN_MIG_ORPHAN_EDGE` (excludes edges marked `archived: true`)

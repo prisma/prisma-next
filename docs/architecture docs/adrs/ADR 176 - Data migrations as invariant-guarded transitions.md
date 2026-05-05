@@ -1,6 +1,6 @@
 # ADR 176 — Data migrations as invariant-guarded transitions
 
-> **Refined by [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).** ADR 208 records the v1 implementation of the model described here and resolves the open questions below. The conceptual model in this ADR remains accurate.
+> **Refined by [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).** ADR 208 records how the model described here is implemented and resolves the open questions below. The conceptual model in this ADR remains accurate.
 
 ## At a glance
 
@@ -112,10 +112,10 @@ The runner should fail closed (with clear diagnostics) when:
 
 ### Open questions
 
-- ~~**Concrete format/location of environment refs**: Who updates them — human or CI/CD automation?~~ **Resolved** by [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md): per-file `migrations/refs/<name>.json` carrying `{ hash, invariants }`, edited manually for v1.
+- ~~**Concrete format/location of environment refs**: Who updates them — human or CI/CD automation?~~ **Resolved** by [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md): per-file `migrations/refs/<name>.json` carrying `{ hash, invariants }`, edited manually.
 - ~~**Model A vs Model B preference**: Co-located or independent? Both are viable; the system could support both with a clear default.~~ **Resolved as Model A (co-located)** in [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 - ~~**Default routing policy**: When multiple invariant-satisfying routes exist, how does the router choose?~~ **Resolved** in [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md): shortest path covering `ref.invariants − marker.invariants` with the deterministic tie-break from [ADR 039](ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md).
-- **Ledger design**: What does the optional ledger look like? Minimal: invariant name + timestamp + success/failure. *Deferred — the marker stores applied-at-least-once; per-invariant ledger provenance is future work. See [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).*
+- **Ledger design**: What does the optional ledger look like? Minimal: invariant name + timestamp + success/failure. *Deferred — the marker stores applied-at-least-once; per-invariant ledger provenance is a separable feature on top. See [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).*
 
 ## Related
 

@@ -1,88 +1,151 @@
 # ADR 208 — Invariant-aware migration routing
 
-## Context
+## At a glance
 
-Graph-based migrations route between contract hashes as edges ([ADR 001 — Migrations as Edges](./ADR%20001%20-%20Migrations%20as%20Edges.md)). Two databases can share the same structural hash while differing in data state ([ADR 176 — Data migrations as invariant-guarded transitions](./ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)). The CLI must pick a **shortest** path whose edges **cover** ref-declared invariant ids, persist which invariants have **ever** been applied on the marker, and surface structured outcomes when routing cannot satisfy the ref.
+A team member adds a `phone` column to `users`, wants to enforce `NOT NULL`, and wants production to route through a backfill before reaching the new contract:
 
-## Problem
+```ts
+import { addColumn, dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
 
-We need durable decisions for: (1) how data-transform **identity** splits between display/retry and routing; (2) what the marker’s `invariants` field **means** relative to data-transform `check`; (3) how merges stay **atomic** per storage family; (4) how **ref-driven applies** stay idempotent; (5) how the pathfinder exposes **unreachable vs unsatisfiable** without CLI-side BFS duplication; (6) how **`providedInvariants`** flows from attested manifests into runners (vs a parallel runner option channel).
+export default class AddPhoneNotNull extends Migration {
+  override get operations() {
+    return [
+      addColumn('public', 'users', { name: 'phone', typeSql: 'text', nullable: true }),
+
+      // Routing-visible — refs can require this.
+      dataTransform('Backfill users.phone from legacy profile', {
+        invariantId: 'backfill-user-phone',
+        check: db => db.users.select('id').where((f, fns) => fns.isNull(f.phone)),
+        run:   db => db.users.update({ phone: '' }).where((f, fns) => fns.isNull(f.phone)),
+      }),
+
+      // Path-dependent cleanup — no invariantId, not routing-visible.
+      dataTransform('Strip trailing whitespace from display names', {
+        check: db => db.users.select('id').where((f, fns) => fns.endsWith(f.displayName, ' ')),
+        run:   db => db.users.update({ displayName: fns.trim(f.displayName) }),
+      }),
+
+      setNotNull('public', 'users', 'phone'),
+    ];
+  }
+}
+```
+
+Production declares which data invariants it requires by listing them on the ref:
+
+```json
+// migrations/refs/prod.json
+{ "hash": "sha256:…", "invariants": ["backfill-user-phone"] }
+```
+
+`migration apply --ref prod` then routes through a path that provides the named invariant:
+
+```
+→ prod
+  required   backfill-user-phone
+  applied    (none)
+  missing    backfill-user-phone
+  route      empty → …a94b (1 edge)
+                   └─ 20260424T1030_add_phone_notnull  provides [backfill-user-phone]
+  apply ✓
+```
+
+After apply, the marker remembers `backfill-user-phone` was applied. A second `migration apply --ref prod` short-circuits to a structural BFS — no required invariant remains for routing to satisfy. If the ref had named an invariant no migration provides, the CLI fails with `MIGRATION.UNKNOWN_INVARIANT` before any database activity. If the invariant exists but no path to the target hash covers it, the CLI fails with `MIGRATION.NO_INVARIANT_PATH` and shows the structural fallback path so the author can see why.
 
 ## Decision
 
-### D4 — Split identity on `DataTransformOperation`
+### Identity: `name` for retry/ledger, `invariantId?` for routing
 
-- **`name`** stays the human-facing and retry/ledger-facing label (display, logs, duplicate-run identity as today).
-- **`invariantId?: string`** is optional; when set, the transform is **routing-visible** — refs may require that id. When unset, the transform is path-dependent and not referenceable from refs.
-- Renaming **`name`** does not break routing; renaming **`invariantId`** is a deliberate, reviewable act with a clear blast radius.
+`DataTransformOperation` carries two distinct identifiers:
 
-### Marker semantics — applied-at-least-once, not “currently true”
+- **`name`** is human-readable and identifies the operation for retry / ledger purposes. Renaming it does not affect routing.
+- **`invariantId?: string`** is optional. When set, the transform is *routing-visible* — refs may require that id, and the routing layer reasons about it. When unset, the transform is path-dependent and not addressable from refs.
 
-`ContractMarkerRecord.invariants` is **set-semantic** and **monotonic**: on every successful apply that updates the marker, the storage layer **unions** newly provided ids into the existing set; it **never shrinks** on rollback or re-run. **Two authorities:** the data transform’s **`check`** answers “does the data satisfy X *right now*?”; **`marker.invariants`** answers “has a migration that provides X been **successfully applied at least once** (history)?” — not the same claim.
+The split lets a routing-relevant rename (`invariantId`) be a deliberate, reviewable change with a clear blast radius, while everyday display-text edits to `name` stay safe.
 
-#### Why marker, not ledger or graph-derived
+### Manifest aggregate: `providedInvariants`
+
+A migration's manifest carries `providedInvariants: string[]` — the set of `invariantId`s declared by data transforms in its `ops.json`. The aggregate is derived from ops at emit time and re-derived from `ops.json` at load time; `migration verify` raises `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` if the manifest's stored aggregate disagrees with what the ops actually contain.
+
+The aggregate is part of the manifest's content-addressed hash ([ADR 169](./ADR%20169%20-%20On-disk%20migration%20persistence.md) §3), so an edit to any `invariantId` ripples through the migration's identity.
+
+### Edges carry invariants
+
+`MigrationEdge.invariants` is populated from the manifest's `providedInvariants` at graph-reconstruction time. The graph layer never re-derives from ops — the manifest is the source of truth.
+
+### Routing: `findPathWithInvariants` and `FindPathOutcome`
+
+`findPathWithInvariants(graph, from, to, required)` is the invariant-aware extension of the structural BFS. Given a target hash and a set of required invariant ids, it returns the shortest path whose edges' `invariants` collectively cover `required`, or `null` if no such path exists. When `required` is empty it delegates to `findPath`, so non-invariant-aware callers see byte-identical behaviour.
+
+`findPathWithDecision` wraps this primitive and returns a discriminated `FindPathOutcome`:
+
+| `kind` | Meaning |
+|---|---|
+| `ok` | Path exists covering `required`; the decision carries selection metadata. |
+| `unreachable` | No structural path `from → to` exists in the graph. |
+| `unsatisfiable` | Structurally reachable, but no path covers every required invariant. The outcome carries `structuralPath` (the empty-required structural path, for diagnostics) and `missing` (required ids not covered on that fallback). |
+
+The pathfinder owns the structural-fallback BFS for the unsatisfiable case. Callers consume `outcome.missing` and `outcome.structuralPath` directly when surfacing `MIGRATION.NO_INVARIANT_PATH` — they don't run a second BFS.
+
+### Marker: applied-at-least-once, not currently true
+
+`prisma_contract.marker` carries an `invariants` field — a set of ids that records which invariants have been successfully applied to this database at least once in its history.
+
+The field is **set-semantic** and **monotonic**: every successful apply unions the migration's `providedInvariants` into it; no flow ever shrinks it. Two distinct authorities answer two distinct questions:
+
+- The data transform's `check` answers *"does the data satisfy this invariant right now?"*
+- The marker answers *"has a migration that provides this invariant been applied at least once?"*
+
+These are not the same claim. The marker doesn't reverify the data on rollback or restoration; it records application history, which the data transform's `check` (re-run on every apply) reverifies separately when the data changes.
+
+### Server-side merge for marker invariants
+
+The marker write is atomic per storage family. No client-side compare-and-set loop on `invariants`:
+
+- **Postgres** — the `UPDATE` uses a single self-referential expression that reads, unions, dedupes, and writes the column under the row lock:
+  ```sql
+  invariants = array(select distinct unnest(invariants || $N::text[]) order by 1)
+  ```
+- **MongoDB** — `findOneAndUpdate` with an aggregation pipeline (`$setUnion + $sortArray`); document-level atomic.
+- **SQLite** — the runner reads, unions, and writes inside `BEGIN EXCLUSIVE`, sharing the migration's transaction. SQLite has no native text-array merge.
+
+`invariants: []` on a write is a no-op merge — preserves the existing set, doesn't clobber.
+
+### CLI marker subtraction makes `--ref` idempotent
+
+Before routing, `migration apply --ref` and `migration status --ref` compute:
+
+```
+effectiveRequired = ref.invariants − marker.invariants
+```
+
+The pathfinder receives `effectiveRequired`, not `ref.invariants`. When all of a ref's invariants are already in the marker, `effectiveRequired` is empty and routing falls through to the structural BFS — second applies are byte-identical to non-invariant-aware behaviour.
+
+### `MIGRATION.INVARIANTS_PENDING` covers the in-between
+
+A database can be at the ref's structural target hash *and* missing invariants the ref requires (apply was never run with this ref; ref was edited to add a new invariant; etc.). `migration status --ref` surfaces this as an info diagnostic with code `MIGRATION.INVARIANTS_PENDING` rather than reporting "up to date" — the user is not at the desired state.
+
+### `providedInvariants` flows through the plan envelope
+
+`MigrationApplyStep.providedInvariants` carries the manifest's aggregate from the control-api boundary into the runner; runners read `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. There is no separate runner option for invariants — the manifest aggregate is the single source of truth, and `migration verify` is the integrity gate that ensures the manifest agrees with the ops it claims to summarise.
+
+Self-edges (data-only migrations against the same contract hash) are covered in [ADR 001 §Self-edges](./ADR%20001%20-%20Migrations%20as%20Edges.md); the routing-side rule is that a self-edge carrying a required invariant is a covering edge.
+
+## Why the marker, not the ledger
 
 The marker and the ledger answer different categories of question, and that distinction governs which one stores the applied-invariants set.
 
-- The **marker** is the database's own statement of what the framework has confirmed about it — a framework-issued *guarantee record*. `storageHash` and `profileHash` already record "this database is at contract C with capability profile P"; `invariants` extends the same record with "…and these named data-transform invariants have been applied." The migration runner is the only writer; the rest of the framework reads it to decide whether a plan is applicable, whether a ref is satisfied, and what work routing still has to do.
-- The **ledger** is an *audit artifact* — an append-only log of what happened, when, and (in the future) by whom. Its lifecycle belongs to the user (compliance retention, log compaction, manual cleanup); the framework never assumes a particular row is still there.
+The **marker** is the database's own statement of what the framework has confirmed about it — a framework-issued *guarantee record*. `storageHash` and `profileHash` already record "this database is at contract C with capability profile P"; `invariants` extends the same record with "…and these named data-transform invariants have been applied." The runner is the only writer; the rest of the framework reads the marker to decide whether a plan is applicable, whether a ref is satisfied, and what work routing still has to do.
 
-Framework decisions about applicability and routing must never depend on the audit log. "These invariants have been applied" is a guarantee the framework provides about the database, so it belongs on the guarantee record. Reading it from an append-only log the user is free to truncate would tie routing correctness to ledger retention policy — a *category error*, not just a layering preference.
+The **ledger** is an *audit artifact* — an append-only log of what happened, when, and by whom. Its lifecycle belongs to the user (compliance retention, log compaction, manual cleanup); the framework never assumes a particular row is still there.
 
-Two alternatives were considered against that frame and rejected:
+Framework decisions about applicability and routing must never depend on the audit log. "These invariants have been applied" is a guarantee the framework provides about the database, so it belongs on the guarantee record. Reading it from a log the user is free to truncate would tie routing correctness to ledger retention policy — a category error.
 
-- **Ledger-side storage** — record `(migrationId, invariants)` per applied row and derive the applied set by reading the ledger. Per-migration provenance is a real benefit, but: (a) it makes routing depend on a writable, user-owned audit log; (b) it requires a new ledger-read SPI surface across both storage families; (c) it drags Mongo's ledger up to parity with the SQL ledger, which is its own workstream; (d) it pays for a capability v1 doesn't consume. (a) stands as a principled objection even if the surface costs in (b)–(d) were already paid.
-- **Graph-derived snapshot** — walk `root → marker` in the migration graph and union declared `providedInvariants` from each edge. Rejected as correctness-breaking: it assumes the database actually traversed every edge on that structural path, which the `db update` flow (which advances the marker without going through migrations) violates.
+## Performance
 
-Costs accepted in v1: no per-migration provenance ("X was first applied by M1 on Tuesday"); rollbacks don't subtract (compensating migrations *add* their own `providedInvariants`, and the data transform's `check` is what verifies the data); no explicit revoke story. If product needs surface, the *ledger* can grow per-invariant provenance later — as an audit feature, not as the source of truth for routing.
+`findPathWithInvariants`'s worst case is `O((V + E) · 2^k)` where `k` is the number of required invariants — each node can be reached once per distinct covered subset. The covered subset is a `Set<string>` of invariant ids; the BFS dedup key is `${node}\0${[...covered].sort().join('\0')}`.
 
-### Server-side merge for invariants
-
-- **Postgres** — marker UPDATE sets `invariants` with a **single self-referential** expression (reads current row under the update lock, unions, dedupes, sorts):
-
-```sql
-invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)
-```
-
-(Source: `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts` — `buildMergeMarkerStatements`.)
-
-- **MongoDB** — `updateMarker` uses an **aggregation pipeline** with `$setUnion` and `$sortArray` when `destination.invariants` is supplied; omitting `invariants` leaves the field untouched. (Source: `packages/3-mongo-target/1-mongo-target/src/core/marker-ledger.ts`.)
-
-- **SQLite** — no native text array merge in SQL; the runner merges **inside** `BEGIN EXCLUSIVE` together with marker read/write paths (same transaction as the migration), documented inline on the SQLite runner. (Source: `packages/3-targets/3-targets/sqlite/src/core/migrations/runner.ts`.)
-
-No client-side **compare-and-set loop** on `invariants`; atomicity is at the statement / document / exclusive transaction boundary.
-
-### CLI marker subtraction (idempotent `--ref`)
-
-`migration apply --ref` computes:
-
-`effectiveRequired = ref.invariants \ marker.invariants`
-
-(set difference after `readMarker`). That single subtraction makes **second applies** with the same ref **omit** satisfied invariants. Combined with `findPathWithInvariants(..., ∅)` ≡ structural `findPath` (`migration-graph.ts` in `@prisma-next/migration-tools`), a re-apply with an empty effective required set matches **structural** routing behavior.
-
-### Discriminated `FindPathOutcome`
-
-`findPathWithDecision` returns:
-
-| `kind` | Meaning |
-|--------|---------|
-| `ok` | Path exists covering `required`; `decision` holds selection metadata. |
-| `unreachable` | No structural path `from → to`. |
-| `unsatisfiable` | Structurally reachable but no path covers every required invariant; includes `structuralPath` (= `findPath(from,to)`) and `missing` (⊆ `required` not covered on that fallback). |
-
-The pathfinder **owns** the structural fallback BFS for the unsatisfiable case; callers use `outcome.missing` and `outcome.structuralPath` directly (e.g. `MIGRATION.NO_INVARIANT_PATH`). No second structural BFS in the CLI beyond this API.
-
-(Source: `FindPathOutcome` in `packages/1-framework/3-tooling/migration/src/migration-graph.ts`.)
-
-### Plan envelope carries `providedInvariants`; runners do not re-derive
-
-**Implemented decision:** the canonical manifest value flows through the control-api boundary on `MigrationApplyStep.providedInvariants` and onward via `MigrationPlan.providedInvariants?`; each target runner reads `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. **Why:** single source of truth aligned with the manifest (`migration verify` re-derives `providedInvariants` from ops at load time and rejects manifest mismatch — `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`), removing both the spec's earlier `SqlMigrationRunnerExecuteOptions.invariants?` caller channel and the redundant runner-side `deriveProvidedInvariants(plan.operations)` call. Earlier spec text proposing either pattern is **obsolete-by-design**.
-
-### Performance and the absence of a hard guard
-
-`findPathWithInvariants`'s worst case is `O((V + E) · 2^k)` where `k` is the count of required invariants — each node can be reached once per distinct covered subset. The encoding is a `Set<string>` of invariant ids with state key `${node}\0${[...covered].sort().join('\0')}` (an earlier 30-bit-mask version was simpler-per-state but added enough machinery — edge-mask cache, mask-cap throw guard, collision regression test — that the `Set<string>` form was preferred even at a ~1.4× per-state cost on production-typical inputs).
-
-**Production-typical inputs stay sub-millisecond.** The dominant case is `effectiveRequired = ref.invariants − marker.invariants` collapsing to `k = 0` (ref unchanged → short-circuits to `findPath`) or `k = 1` (one new invariant introduced this PR) against a stick-shaped or mostly-stick migration graph. Measured wall times on a developer laptop:
+In practice, `effectiveRequired` collapses `k` toward zero in steady state. The dominant case is a stick-shaped or mostly-stick migration graph with `k = 0` (ref unchanged → short-circuits to `findPath`) or `k = 1` (one new invariant per change). Measured wall times on a developer laptop:
 
 | Case | k | Wall time |
 |---|---:|---:|
@@ -90,101 +153,52 @@ The pathfinder **owns** the structural fallback BFS for the unsatisfiable case; 
 | `mostly-stick(spine=1000, 5% branch rate)` | 1 | 0.55 ms |
 | `mostly-stick(spine=1000, 5% branch rate)` | 2 | 1.20 ms |
 
-Pathological inputs (high feature-branch density, many required invariants) degrade onto the `2^k` curve — `branchy(spine=1000, density=0.05)` reaches ~80 ms at `k = 8`, ~8.7 s at `k = 16` — but materialising those inputs requires either a fresh database catching up to a long-applied ref or a ref edited extensively without ever being applied. Both are exceptional, not typical.
+Pathological inputs (high feature-branch density with many required invariants) follow the `2^k` curve — `branchy(spine=1000, density=0.05)` reaches ~80 ms at `k = 8` and ~8.7 s at `k = 16`. Materialising those inputs requires either a fresh database catching up to a long-applied ref or a ref edited extensively without ever being applied; neither is typical.
 
-**No hard guard for v1.** The `Set<string>` encoding has no length ceiling; the algorithm has no refusal threshold. Production won't generate the inputs where the curve hurts. A soft `--verbose` heads-up at large `k` (e.g. `k ≥ 16`) is cheap if we want a polite signal; not required.
+The algorithm has no refusal threshold and the encoding has no length cap. If real usage pushes routine `k > 20`, a different approach — heuristic A*, dominance pruning, or precomputed reach sets per invariant — would replace the current BFS.
 
-If real usage ever pushes routine `k > 20`, the algorithm needs a different approach — heuristic A*, dominance pruning, or precomputed reach sets per invariant. Deferrable until we have actual graphs and refs to optimise against.
+## Alternatives considered
 
-### Status diagnostic: `MIGRATION.INVARIANTS_PENDING`
+### Ledger-side storage of the applied-invariants set
 
-When the marker’s structural hash matches the **ref target** but **required invariants remain** (`effectiveRequired` non-empty after subtracting marker invariants / path decision semantics), **`migration status --ref`** emits an **`severity: 'info'`** diagnostic with code **`MIGRATION.INVARIANTS_PENDING`** so the UX does not claim “up to date” while invariant work remains. (Source: `packages/1-framework/3-tooling/cli/src/commands/migration-status.ts`; integration Journey T — `test/integration/test/cli-journeys/invariant-routing.e2e.test.ts`.)
+Record `(migrationId, invariants)` per applied ledger row, derive the applied set by reading the ledger.
 
-### Relation to ADR 001 self-edges
+Rejected because:
 
-Data-op-gated **`from === to`** self-edges, pathfinder covering behavior vs structural **`findPath`**, and runner **upfront skip** / **post-hoc no-op skip** semantics are documented in [ADR 001](./ADR%20001%20-%20Migrations%20as%20Edges.md).
+- Routing would depend on a writable, user-owned audit log (the principled objection — see "Why the marker, not the ledger").
+- Requires a new ledger-read SPI surface across both storage families.
+- Drags MongoDB's ledger up to parity with the SQL ledger, which is its own workstream.
+- Pays for per-migration provenance — a real benefit — that the routing layer doesn't consume.
 
-## Verification
+The principled objection stands even if the surface costs were already paid. Per-migration provenance is a separable feature: the ledger can grow it later as audit data without becoming the source of truth for routing.
 
-Coverage audit for invariant-aware routing acceptance criteria (M1–M4). Project close-out (**AC-Z05**) removes the superseded transient spec/plan once this ADR and ADR 001 amendment land.
+### Graph-derived snapshot of the applied-invariants set
 
-### Authoring + attestation
+Compute the applied set on the fly by walking `root → marker` in the graph and unioning declared `providedInvariants` from each edge.
 
-| AC ID | Evidence (path — test name or note) |
-|-------|-------------------------------------|
-| AC-A01 | `packages/1-framework/1-core/framework-components/src/control/control-migration-types.ts` — type + JSDoc |
-| AC-A02 | `migration-tools` — `packages/1-framework/3-tooling/migration/src/invariants.ts` (`deriveProvidedInvariants`); `packages/1-framework/3-tooling/migration/test/invariants.test.ts` |
-| AC-A03 | `invariants.ts` / `packages/1-framework/3-tooling/migration/test/invariants.test.ts` — malformed id cases |
-| AC-A04 | `invariants.ts` / `packages/1-framework/3-tooling/migration/test/invariants.test.ts` / `packages/1-framework/3-tooling/migration/src/errors.ts` |
-| AC-A05 | `packages/1-framework/3-tooling/migration/src/io.ts` (`MigrationMetadataSchema`); `deriveProvidedInvariants` sort/dedupe |
-| AC-A06 | Emit uses `deriveProvidedInvariants` — `packages/1-framework/3-tooling/migration/test/migration-base.test.ts`, `packages/1-framework/3-tooling/migration/test/io.test.ts`; runners consume `options.plan.providedInvariants ?? []` (postgres/sqlite/mongo) |
-| AC-A07 | `io.ts` re-derive + `packages/1-framework/3-tooling/migration/src/errors.ts`; tests `packages/1-framework/3-tooling/migration/test/io.test.ts` |
-| AC-A08 | `computeMigrationHash` / `packages/1-framework/3-tooling/migration/test/migration-graph.test.ts` |
+Rejected as correctness-breaking. It assumes the database actually traversed every edge on the structural root-to-marker path. The `db update` flow (which advances the marker without going through migrations) violates that assumption: any graph-derived applied set would over-claim invariants the database has never actually been subjected to.
 
-### Edge-level invariants
+### A separate runner option channel for invariants
 
-| AC ID | Evidence |
-|-------|----------|
-| AC-E01 | `packages/1-framework/3-tooling/migration/src/graph.ts` — `MigrationEdge.invariants` |
-| AC-E02 | `migration-graph.ts` — reconstruct from manifest `providedInvariants` |
-| AC-E03 | `migration-graph.test.ts`, `find-path-with-invariants.test.ts` |
+Have the runner accept invariants through an option (e.g. `MigrationRunner.execute({ invariants })`), independent of the manifest.
 
-### Pathfinder primitive
+Rejected because the manifest's `providedInvariants` is the canonical source, `migration verify` already enforces consistency between the aggregate and the ops it claims to summarise, and a parallel option channel reintroduces the "forgot to thread the option" footgun against a property the framework already guarantees.
 
-| AC ID | Evidence |
-|-------|----------|
-| AC-P01–P07 | `packages/1-framework/3-tooling/migration/test/find-path-with-invariants.test.ts` (+ `migration-graph.ts` implementation) |
+### Bitmask encoding of the covered-subset
 
-### Decision metadata + error surface
+Encode the covered-subset state as a bitmask over a sorted enumeration of `required`, capped at 30 ids for int32 safety.
 
-| AC ID | Evidence |
-|-------|----------|
-| AC-D01–D07 | `migration-graph.ts`, `migration-graph.test.ts`; `packages/1-framework/3-tooling/cli/src/utils/command-helpers.ts`, `command-helpers.test.ts`; `packages/1-framework/3-tooling/migration/src/errors.ts`, `migration/test/errors.test.ts`; `migration-status.ts`, `migration-apply.ts`; `test/integration/test/cli-journeys/invariant-routing.e2e.test.ts` (Journey O) |
+Considered and dropped in favour of the `Set<string>` form. The bitmask is faster per state-key operation but adds: an edge-mask cache, a cap-throw guard with its own regression test, and a state-key collision risk that needs its own test. The `Set<string>` form pays a ~1.4× per-state cost on production-typical inputs but eliminates the supporting machinery and the cap. The trade is favourable because production inputs don't reach the regime where the cost would matter.
 
-### Unknown-invariant pre-check
+## Related
 
-| AC ID | Evidence |
-|-------|----------|
-| AC-U01–U05 | `command-helpers.ts` (`collectDeclaredInvariants`); `migration-apply.ts`, `migration-status.ts` order vs connect/pathfinder; `packages/1-framework/3-tooling/cli/test/commands/migration-invariants.test.ts`; e2e Journeys P/Q + mongo parity |
-
-### Marker-side applied invariants
-
-| AC ID | Evidence |
-|-------|----------|
-| AC-M01 | `packages/3-targets/3-targets/postgres/src/core/migrations/statement-builders.ts`, `statement-builders.test.ts` |
-| AC-M02 | Postgres marker DDL only; Arktype row parse — no probe |
-| AC-M03 | `packages/3-mongo-target/1-mongo-target/src/core/marker-ledger.ts` |
-| AC-M04 | `@prisma-next/contract` — `ContractMarkerRecord.invariants` |
-| AC-M05 | **PASS — superseded** — runner reads `options.plan.providedInvariants` (manifest-canonical via `MigrationApplyStep`); this ADR records the deviation from spec F12's `SqlMigrationRunnerExecuteOptions.invariants?` channel |
-| AC-M06 | Postgres UPDATE expression above; SQLite merge in txn (`runner.ts`); Mongo `$setUnion` pipeline |
-| AC-M07 | `packages/3-mongo-target/1-mongo-target/test/marker-ledger.test.ts` |
-| AC-M08 | `db update` / flows with empty derived set; mongo `omit-vs-empty` tests in marker-ledger |
-| AC-M09 | `marker-ledger.test.ts`, sqlite `runner.idempotency.test.ts`, postgres runner idempotency integration |
-| AC-M10 | e2e Journey O step O.10 + mongo parity + marker-ledger union tests |
-| AC-M11 | `marker-ledger.test.ts` absent field |
-
-### CLI integration
-
-| AC ID | Evidence |
-|-------|----------|
-| AC-C01–C06 | `migration-apply.ts` (effectiveRequired); `migration-status.ts` (tree + JSON); Journey O (`invariant-routing.e2e.test.ts`); `find-path-with-invariants.test.ts` F8; CLI snapshots `migration-cli.test.ts`, `output.json-shapes.test.ts` |
-
-### M5 close-out (this PR)
-
-| AC ID | Evidence |
-|-------|----------|
-| AC-Z01 | This §Verification section |
-| AC-Z02 | [ADR 001](./ADR%20001%20-%20Migrations%20as%20Edges.md) amendment (self-edge + references) |
-| AC-Z03 | This ADR |
-| AC-Z04 | Inbound refs updated to ADR 208 (`data-migrations-spec.md`); `rg` after spec/plan removal |
-| AC-Z05 | `git rm` transient `invariant-aware-routing.spec.md` / `...-plan.md` (umbrella folder retained) |
-| AC-Z06 | `data-migrations-spec.md` re-read at close-out — routing pointers aim at ADR 208 |
-
-## References
-
-- [ADR 001 — Migrations as Edges](./ADR%20001%20-%20Migrations%20as%20Edges.md)
-- [ADR 176 — Data migrations as invariant-guarded transitions](./ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md)
+- [ADR 001 — Migrations as Edges](./ADR%20001%20-%20Migrations%20as%20Edges.md) — self-edge rules.
+- [ADR 021 — Contract Marker Storage](./ADR%20021%20-%20Contract%20Marker%20Storage.md) — the marker's role as guarantee record.
+- [ADR 039 — Migration graph path resolution & integrity](./ADR%20039%20-%20Migration%20graph%20path%20resolution%20&%20integrity.md) — `findPathWithInvariants` algorithm details.
+- [ADR 169 — On-disk migration persistence](./ADR%20169%20-%20On-disk%20migration%20persistence.md) — manifest hash coverage and ref structure.
+- [ADR 176 — Data migrations as invariant-guarded transitions](./ADR%20176%20-%20Data%20migrations%20as%20invariant-guarded%20transitions.md) — conceptual model.
+- [ADR 192 — ops.json is the migration contract](./ADR%20192%20-%20ops.json%20is%20the%20migration%20contract.md) — `invariantId` round-trip through the op schema.
 
 ## Decision record
 
-We adopt **`invariantId`** as the opt-in routing key on data transforms; **monotonic marker union** via **family-specific atomic merge**; **`FindPathOutcome`** discrimination for unreachable vs unsatisfiable; **CLI subtraction** `ref.invariants − marker.invariants`; and **manifest-threaded `providedInvariants`** on the migration plan envelope (runners read `options.plan.providedInvariants ?? []`, with **`migration verify`** as the integrity gate against ops).
+`invariantId` is the opt-in routing key on data transforms; the marker stores the monotonic union of applied invariants via storage-family-atomic merge; `findPathWithDecision` discriminates `unreachable` from `unsatisfiable`; the CLI computes `effectiveRequired = ref.invariants − marker.invariants` before routing; and the manifest's `providedInvariants` is the single source of truth, threaded into runners through the plan envelope and verified at load time.
