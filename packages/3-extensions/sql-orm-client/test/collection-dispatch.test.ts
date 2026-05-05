@@ -13,8 +13,15 @@ function withSingleQueryCapabilities(contract: TestContract): TestContract {
     ...contract,
     capabilities: {
       ...contract.capabilities,
-      lateral: { enabled: true },
-      jsonAgg: { enabled: true },
+      [contract.targetFamily]: {
+        ...(contract.capabilities[contract.targetFamily] ?? {}),
+        jsonAgg: true,
+      },
+      [contract.target]: {
+        ...(contract.capabilities[contract.target] ?? {}),
+        jsonAgg: true,
+        lateral: true,
+      },
     },
   } as unknown as TestContract;
 }
@@ -195,7 +202,10 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() multi-query path stitches includes, strips hidden fields, and releases scope', async () => {
-    const contract = getTestContract();
+    // Force multi-query strategy by clearing capabilities. Otherwise
+    // the base test contract's postgres.lateral / postgres.jsonAgg
+    // would route to single-query lateral.
+    const contract = { ...getTestContract(), capabilities: {} } as unknown as TestContract;
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts', (posts) => posts.select('title'));
 
