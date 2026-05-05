@@ -97,7 +97,32 @@ Make SQLite a real SQL authoring target for timestamp defaults instead of relyin
 - `pnpm lint:deps`
 - `pnpm build`
 
+### Milestone 4: ORM-client wiring and across-rows stability (post-review fix)
+
+The first three milestones generalized the SQL mutation-default *runtime contract* and made authoring on Postgres + SQLite emit the right execution defaults. A direct comparison against Prisma 6's `@updatedAt` semantics (Dub port; see `prisma-next-updatedat-expectations.md`) surfaced two compatibility gaps that the prior milestones did not exercise:
+
+1. The high-level ORM `Collection` update paths (`update`, `updateAll`, `updateCount`, `upsert` update branch, and the nested update branch in `updateFirstGraph`) never called `applyMutationDefaults({ op: 'update', ... })`. The runtime correctly skipped on empty payloads and refused to overwrite explicit user values, but no caller invoked it for non-empty updates, so `@updatedAt` never advanced via ORM updates.
+2. Bulk inserts via `Collection.createAll` / `createCount` invoked `applyMutationDefaults` per row, which made `timestampNow` produce a fresh `Date` per row and drift within a single ORM operation. Prisma 6 emits one timestamp per lowered mutation; Prisma Next must do the same.
+
+This milestone closes both gaps without changing the contract IR or the PSL/TS authoring surface.
+
+**Tasks:**
+
+- [x] Wire `applyMutationDefaults({ op: 'update' })` into `Collection.updateAll`, `Collection.updateCount`, the update branch of `Collection.upsert`, and the nested update branch in `updateFirstGraph` (`mutation-executor.ts`). Empty payloads still short-circuit before the runtime call. Satisfies the doc's "Update Semantics", "Explicit Update Value", and "Empty Update Semantics" sections.
+- [x] Add a `stableAcrossRows: boolean` flag to `RuntimeMutationDefaultGenerator` and an `acrossRowsCache?: Map<string, unknown>` parameter to `MutationDefaultsOptions`. Generators that opt in (e.g. `timestampNow`) reuse one generated value across every row of one ORM operation; per-row generators (`cuid`, `uuidv4`, …) stay independent. Satisfies the doc's "Bulk Write Semantics".
+- [x] Mark `timestampNowRuntimeGenerator` with `stableAcrossRows: true` and have `Collection.applyCreateDefaults` allocate one `acrossRowsCache` per bulk insert.
+- [x] Runtime tests: cover the cache contract — shared cache reuses the value across calls; absent cache or non-stable-across-rows generator regenerates per call.
+- [x] ORM-client tests (`collection-mutation-defaults.test.ts`): cover `create` omit/explicit, `createAll` shared timestamp, `updateAll` non-empty/explicit/empty, `updateCount` non-empty/empty, and `upsert` create/update branches including the empty-update branch.
+
+**Validation gate:**
+
+- `pnpm -F @prisma-next/sql-runtime test`
+- `pnpm -F @prisma-next/sql-orm-client test`
+- `pnpm test:packages` (one-off `--concurrency=1` if turbo flake)
+- `pnpm lint:deps`
+
 ## Resolved Decisions
 
 - The internal timestamp generator ID is `timestampNow`.
 - Empty update payloads skip all `onUpdate` execution defaults. Do not add generator-level metadata for `@updatedAt`.
+- The "stable within a single lowered mutation" property in the expectations doc is encoded as `RuntimeMutationDefaultGenerator.stableAcrossRows` (flag) plus `MutationDefaultsOptions.acrossRowsCache` (per-operation scope cache). Naming was chosen over alternatives like `bulkStable`/`bulkCache` to match the expectations doc's wording and to describe the observable property rather than an implementation phrase.
