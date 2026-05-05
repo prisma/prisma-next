@@ -2,33 +2,42 @@
 
 ## At a glance
 
-A team member adds a `phone` column to `users`, wants to enforce `NOT NULL`, and wants production to route through a backfill before reaching the new contract:
+A team member adds a `phone` column to `users`, wants to enforce `NOT NULL`, and wants production to route through a backfill before reaching the new contract. The migration declares the backfill as a routing-visible invariant via `invariantId`:
 
 ```ts
-import { addColumn, dataTransform, Migration, setNotNull } from '@prisma-next/target-postgres/migration';
+// migrations/20260424T1030_add_phone_notnull/migration.ts (schematic; query bodies elided)
+import { addColumn, Migration, MigrationCLI, setNotNull } from '@prisma-next/target-postgres/migration';
+import endContract from './end-contract.json' with { type: 'json' };
 
 export default class AddPhoneNotNull extends Migration {
+  override describe() {
+    return { from: 'sha256:…', to: 'sha256:…' };
+  }
+
   override get operations() {
     return [
-      addColumn('public', 'users', { name: 'phone', typeSql: 'text', nullable: true }),
-
-      // Routing-visible — refs can require this.
-      dataTransform('Backfill users.phone from legacy profile', {
-        invariantId: 'backfill-user-phone',
-        check: db => db.users.select('id').where((f, fns) => fns.isNull(f.phone)),
-        run:   db => db.users.update({ phone: '' }).where((f, fns) => fns.isNull(f.phone)),
+      addColumn('public', 'users', {
+        name: 'phone', typeSql: 'text', defaultSql: '', nullable: true,
       }),
 
-      // Path-dependent cleanup — no invariantId, not routing-visible.
-      dataTransform('Strip trailing whitespace from display names', {
-        check: db => db.users.select('id').where((f, fns) => fns.endsWith(f.displayName, ' ')),
-        run:   db => db.users.update({ displayName: fns.trim(f.displayName) }),
+      // Routing-visible — refs can require this invariant.
+      this.dataTransform(endContract, 'Backfill users.phone', {
+        invariantId: 'backfill-user-phone',
+        check: () => /* … select users where phone is null */,
+        run:   () => /* … update those rows to set phone   */,
+      }),
+
+      // Path-dependent cleanup; no invariantId, not addressable from refs.
+      this.dataTransform(endContract, 'Trim trailing whitespace', {
+        check: () => /* … */,
+        run:   () => /* … */,
       }),
 
       setNotNull('public', 'users', 'phone'),
     ];
   }
 }
+MigrationCLI.run(import.meta.url, AddPhoneNotNull);
 ```
 
 Production declares which data invariants it requires by listing them on the ref:
@@ -38,19 +47,9 @@ Production declares which data invariants it requires by listing them on the ref
 { "hash": "sha256:…", "invariants": ["backfill-user-phone"] }
 ```
 
-`migration apply --ref prod` then routes through a path that provides the named invariant:
+`migration apply --ref prod` then routes through a path that provides the named invariant — applying the schema change *and* the backfill — and records `backfill-user-phone` on the marker on success. A second `migration apply --ref prod` against the same database short-circuits to a structural BFS, because marker subtraction empties the effective required set.
 
-```
-→ prod
-  required   backfill-user-phone
-  applied    (none)
-  missing    backfill-user-phone
-  route      empty → …a94b (1 edge)
-                   └─ 20260424T1030_add_phone_notnull  provides [backfill-user-phone]
-  apply ✓
-```
-
-After apply, the marker remembers `backfill-user-phone` was applied. A second `migration apply --ref prod` short-circuits to a structural BFS — no required invariant remains for routing to satisfy. If the ref had named an invariant no migration provides, the CLI fails with `MIGRATION.UNKNOWN_INVARIANT` before any database activity. If the invariant exists but no path to the target hash covers it, the CLI fails with `MIGRATION.NO_INVARIANT_PATH` and shows the structural fallback path so the author can see why.
+If the ref names an invariant that no migration in the graph provides *and* the marker has not already recorded it, the CLI fails with `MIGRATION.UNKNOWN_INVARIANT` before invoking the pathfinder. If the invariant exists but no path to the target hash covers it, the CLI fails with `MIGRATION.NO_INVARIANT_PATH` and shows the structural fallback path so the author can see why.
 
 ## Decision
 
@@ -65,7 +64,7 @@ The split lets a routing-relevant rename (`invariantId`) be a deliberate, review
 
 ### Manifest aggregate: `providedInvariants`
 
-A migration's manifest carries `providedInvariants: string[]` — the set of `invariantId`s declared by data transforms in its `ops.json`. The aggregate is derived from ops at emit time and re-derived from `ops.json` at load time; `migration verify` raises `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` if the manifest's stored aggregate disagrees with what the ops actually contain.
+A migration's manifest carries `providedInvariants: string[]` — the set of `invariantId`s declared by data transforms in its `ops.json`. The aggregate is derived from ops at emit time and re-derived from `ops.json` whenever a migration is loaded from disk; the load fails with `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` if the manifest's stored aggregate disagrees with what the ops actually contain.
 
 The aggregate is part of the manifest's content-addressed hash ([ADR 169](./ADR%20169%20-%20On-disk%20migration%20persistence.md) §3), so an edit to any `invariantId` ripples through the migration's identity.
 
@@ -127,7 +126,7 @@ A database can be at the ref's structural target hash *and* missing invariants t
 
 ### `providedInvariants` flows through the plan envelope
 
-`MigrationApplyStep.providedInvariants` carries the manifest's aggregate from the control-api boundary into the runner; runners read `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. There is no separate runner option for invariants — the manifest aggregate is the single source of truth, and `migration verify` is the integrity gate that ensures the manifest agrees with the ops it claims to summarise.
+`MigrationApplyStep.providedInvariants` carries the manifest's aggregate from the control-api boundary into the runner; runners read `options.plan.providedInvariants ?? []` for marker writes and self-edge no-op detection. There is no separate runner option for invariants — the manifest aggregate is the single source of truth, and the load-time integrity check (re-derive from ops + recompute the migration hash, both performed when the migration is read from disk) is what ensures the manifest agrees with the ops it claims to summarise.
 
 Self-edges (data-only migrations against the same contract hash) are covered in [ADR 001 §Self-edges](./ADR%20001%20-%20Migrations%20as%20Edges.md); the routing-side rule is that a self-edge carrying a required invariant is a covering edge.
 
@@ -182,7 +181,7 @@ Rejected as correctness-breaking. It assumes the database actually traversed eve
 
 Have the runner accept invariants through an option (e.g. `MigrationRunner.execute({ invariants })`), independent of the manifest.
 
-Rejected because the manifest's `providedInvariants` is the canonical source and `migration verify` already enforces consistency between the aggregate and the ops it claims to summarise. A parallel option channel adds a second source of truth for a property the framework already guarantees, and a "forgot to thread the option" footgun on top.
+Rejected because the manifest's `providedInvariants` is the canonical source and the load-time integrity check already enforces consistency between the aggregate and the ops it claims to summarise. A parallel option channel adds a second source of truth for a property the framework already guarantees, and a "forgot to thread the option" footgun on top.
 
 ## Related
 

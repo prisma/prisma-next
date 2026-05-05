@@ -62,7 +62,7 @@ Because `migrationId` is computed from the manifest and `ops.json`, two `migrati
 
 ### Op schema includes routing-layer fields
 
-`MigrationOpSchema` (Arktype) admits an optional `invariantId: string` on data-transform ops so the field round-trips through `ops.json` validation. The schema stays shallow on operation-specific payload — `invariantId` is the routing-layer carve-out, not a generic op-level extension point. Authoring + emit derives the migration's `providedInvariants` aggregate from the data ops' `invariantId`s; the manifest field is then re-derived from `ops.json` at verify time and compared against the stored copy via `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
+`MigrationOpSchema` (Arktype) admits an optional `invariantId: string` on data-transform ops so the field round-trips through `ops.json` validation. The schema stays shallow on operation-specific payload — `invariantId` is the routing-layer carve-out, not a generic op-level extension point. Authoring + emit derives the migration's `providedInvariants` aggregate from the data ops' `invariantId`s; the manifest field is then re-derived from `ops.json` at load time and compared against the stored copy via `MIGRATION.PROVIDED_INVARIANTS_MISMATCH`. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md).
 
 ## Alternatives considered
 

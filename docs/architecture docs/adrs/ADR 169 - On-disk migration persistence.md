@@ -58,7 +58,7 @@ Migrations are directed edges in a graph where nodes are contract hashes and edg
 - The canonicalized `fromContract`
 - The canonicalized `toContract`
 
-The `from` and `to` hashes are included in the manifest and therefore in the `migrationId`. Changing either endpoint changes the identity. Adding, removing, or renaming an `invariantId` on a data op also changes the identity (it ripples through `providedInvariants` and `ops.json`); see [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md). The migration `verify` step independently re-derives `providedInvariants` from `ops.json` and surfaces a dedicated `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` error if the manifest disagrees — independent integrity layer alongside the hash check.
+The `from` and `to` hashes are included in the manifest and therefore in the `migrationId`. Changing either endpoint changes the identity. Adding, removing, or renaming an `invariantId` on a data op also changes the identity (it ripples through `providedInvariants` and `ops.json`); see [ADR 208](ADR%20208%20-%20Invariant-aware%20migration%20routing.md). When a migration is loaded from disk, the loader independently re-derives `providedInvariants` from `ops.json` and surfaces a dedicated `MIGRATION.PROVIDED_INVARIANTS_MISMATCH` error if the manifest disagrees — independent integrity layer alongside the hash check.
 
 ### 4. Direct SQL on disk
 
