@@ -22,6 +22,10 @@ Introduce an Adapter SPI responsible for lowering the relational AST into concre
 - Auto polyfilling complex features across all dialects
 - Guaranteeing perfect cross-dialect parity for all constructs
 
+## Related
+
+- [ADR 210 — Prepared Statements: Author Surface and Driver SPI](ADR%20210%20-%20Prepared%20Statements%20-%20Author%20Surface%20and%20Driver%20SPI.md) extends the driver SPI with `executePrepared(req)` for handle-keyed reuse of lowered SQL; `lower()` runs once at `$prepare` time and is not invoked on the prepared execute path.
+
 ## SPI shape
 
 ```typescript
