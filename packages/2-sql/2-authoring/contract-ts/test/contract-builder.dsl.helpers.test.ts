@@ -80,7 +80,7 @@ const sqlFamilyPack = {
             codecId: 'sql/char@1',
             nativeType: 'character',
             typeParams: { length: 36 },
-            executionDefault: { kind: 'generator', id: 'uuidv4' },
+            executionDefaults: { onCreate: { kind: 'generator', id: 'uuidv4' } },
             id: true,
           },
         },
@@ -90,7 +90,7 @@ const sqlFamilyPack = {
             codecId: 'sql/char@1',
             nativeType: 'character',
             typeParams: { length: 36 },
-            executionDefault: { kind: 'generator', id: 'uuidv7' },
+            executionDefaults: { onCreate: { kind: 'generator', id: 'uuidv7' } },
             id: true,
           },
         },
@@ -109,10 +109,12 @@ const sqlFamilyPack = {
             codecId: 'sql/char@1',
             nativeType: 'character',
             typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-            executionDefault: {
-              kind: 'generator',
-              id: 'nanoid',
-              params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+            executionDefaults: {
+              onCreate: {
+                kind: 'generator',
+                id: 'nanoid',
+                params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+              },
             },
             id: true,
           },
@@ -329,12 +331,18 @@ describe('contract DSL helper vocabulary', () => {
           onCreate: { kind: 'generator', id: 'timestampNow' },
           onUpdate: { kind: 'generator', id: 'timestampNow' },
         });
-        expect(uuidV4IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv4' });
-        expect(uuidV7IdState.executionDefault).toEqual({ kind: 'generator', id: 'uuidv7' });
-        expect(nanoidIdState.executionDefault).toEqual({
-          kind: 'generator',
-          id: 'nanoid',
-          params: { size: 16 },
+        expect(uuidV4IdState.executionDefaults).toEqual({
+          onCreate: { kind: 'generator', id: 'uuidv4' },
+        });
+        expect(uuidV7IdState.executionDefaults).toEqual({
+          onCreate: { kind: 'generator', id: 'uuidv7' },
+        });
+        expect(nanoidIdState.executionDefaults).toEqual({
+          onCreate: {
+            kind: 'generator',
+            id: 'nanoid',
+            params: { size: 16 },
+          },
         });
         expect(uuidV4IdState.id).toEqual({});
         expect(uuidV7IdState.id).toEqual({});

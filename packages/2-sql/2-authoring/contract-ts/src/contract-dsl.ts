@@ -48,7 +48,6 @@ export type ScalarFieldState<
   readonly nullable: Nullable;
   readonly columnName?: ColumnName | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
   readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
 } & (IdSpec extends NamedConstraintSpec ? { readonly id: IdSpec } : { readonly id?: undefined }) &
   (UniqueSpec extends NamedConstraintSpec
@@ -62,7 +61,6 @@ type AnyScalarFieldState = {
   readonly nullable: boolean;
   readonly columnName?: string | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
   readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
   readonly id?: NamedConstraintSpec | undefined;
   readonly unique?: NamedConstraintSpec | undefined;
@@ -352,7 +350,7 @@ function generatedField<Descriptor extends ColumnTypeDescriptor>(
       ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
     },
     nullable: false,
-    executionDefault: spec.generated,
+    executionDefaults: { onCreate: spec.generated },
   });
 }
 
@@ -384,10 +382,6 @@ export function buildFieldPreset(
     descriptor: preset.descriptor,
     nullable: preset.nullable,
     ...ifDefined('default', preset.default as ColumnDefault | undefined),
-    ...ifDefined(
-      'executionDefault',
-      preset.executionDefault as ExecutionMutationDefaultValue | undefined,
-    ),
     ...ifDefined(
       'executionDefaults',
       preset.executionDefaults as ExecutionMutationDefaultPhases | undefined,

@@ -36,7 +36,6 @@ import type {
 type DomainFieldRef =
   | { readonly kind: 'scalar'; readonly many?: boolean }
   | { readonly kind: 'valueObject'; readonly name: string; readonly many?: boolean };
-type ExecutionMutationDefaultPhases = Omit<ExecutionMutationDefault, 'ref'>;
 
 function encodeDefaultLiteralValue(
   value: ColumnDefaultLiteralInputValue,
@@ -103,22 +102,6 @@ function isValueObjectField(
   field: FieldNode | ValueObjectFieldNode,
 ): field is ValueObjectFieldNode {
   return 'valueObjectName' in field;
-}
-
-function resolveExecutionDefaultPhases(
-  field: FieldNode | ValueObjectFieldNode,
-  fieldLabel: string,
-): ExecutionMutationDefaultPhases | undefined {
-  if (field.executionDefault && field.executionDefaults) {
-    throw new Error(`${fieldLabel} cannot define both executionDefault and executionDefaults.`);
-  }
-  if (field.executionDefault) {
-    return { onCreate: field.executionDefault };
-  }
-  if (!field.executionDefaults?.onCreate && !field.executionDefaults?.onUpdate) {
-    return undefined;
-  }
-  return field.executionDefaults;
 }
 
 const JSONB_CODEC_ID = 'pg/jsonb@1';
@@ -214,22 +197,22 @@ export function buildSqlContractFromDefinition(
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
 
     for (const field of semanticModel.fields) {
-      const executionDefaultPhases = resolveExecutionDefaultPhases(
-        field,
-        `Field "${semanticModel.modelName}.${field.fieldName}"`,
-      );
+      const executionDefaultPhases =
+        field.executionDefaults?.onCreate || field.executionDefaults?.onUpdate
+          ? field.executionDefaults
+          : undefined;
       if (executionDefaultPhases) {
-        const executionDefaultProperty = field.executionDefault
-          ? 'executionDefault'
-          : 'executionDefaults';
         if (field.default !== undefined) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and ${executionDefaultProperty}.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefaults.`,
           );
         }
-        if (field.nullable) {
+        // Nullable is only incompatible with onCreate (the field must hold a
+        // non-null value at insert). onUpdate-only is fine on nullable
+        // columns since they can start as NULL until first update.
+        if (field.nullable && executionDefaultPhases.onCreate) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when ${executionDefaultProperty} is present.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefaults.onCreate is present.`,
           );
         }
       }

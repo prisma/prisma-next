@@ -762,7 +762,6 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
         descriptor: resolvedField.descriptor,
         nullable: resolvedField.field.optional,
         ...ifDefined('default', resolvedField.defaultValue),
-        ...ifDefined('executionDefault', resolvedField.executionDefault),
         ...ifDefined('executionDefaults', resolvedField.executionDefaults),
       })),
       ...(primaryKeyColumns.length > 0

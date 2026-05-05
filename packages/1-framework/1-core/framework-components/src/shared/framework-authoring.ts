@@ -71,7 +71,6 @@ export interface AuthoringExecutionDefaultsTemplate {
 export interface AuthoringFieldPresetOutput extends AuthoringStorageTypeTemplate {
   readonly nullable?: boolean;
   readonly default?: AuthoringColumnDefaultTemplate;
-  readonly executionDefault?: AuthoringTemplateValue;
   readonly executionDefaults?: AuthoringExecutionDefaultsTemplate;
   readonly id?: boolean;
   readonly unique?: boolean;
@@ -386,7 +385,6 @@ export function instantiateAuthoringFieldPreset(
         readonly kind: 'function';
         readonly expression: string;
       };
-  readonly executionDefault?: unknown;
   readonly executionDefaults?: {
     readonly onCreate?: unknown;
     readonly onUpdate?: unknown;
@@ -401,12 +399,6 @@ export function instantiateAuthoringFieldPreset(
       'default',
       descriptor.output.default !== undefined
         ? resolveAuthoringColumnDefaultTemplate(descriptor.output.default, args)
-        : undefined,
-    ),
-    ...ifDefined(
-      'executionDefault',
-      descriptor.output.executionDefault !== undefined
-        ? resolveAuthoringTemplateValue(descriptor.output.executionDefault, args)
         : undefined,
     ),
     ...ifDefined(

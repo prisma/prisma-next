@@ -1,5 +1,5 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefault } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
   AuthoringTypeConstructorDescriptor,
@@ -495,7 +495,7 @@ export function lowerDefaultForField(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
 }): {
   readonly defaultValue?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: Omit<ExecutionMutationDefault, 'ref'>;
 } {
   const positionalEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'positional');
   const namedEntries = input.defaultAttribute.args.filter((arg) => arg.kind === 'named');
@@ -578,7 +578,7 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
-  return { executionDefault: lowered.value.generated };
+  return { executionDefaults: { onCreate: lowered.value.generated } };
 }
 
 export function resolveColumnDescriptor(

@@ -45,10 +45,12 @@ const nanoidIdPreset = {
     codecId: 'sql/char@1',
     nativeType: 'character',
     typeParams: { length: { kind: 'arg', index: 0, path: ['size'], default: 21 } },
-    executionDefault: {
-      kind: 'generator',
-      id: 'nanoid',
-      params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+    executionDefaults: {
+      onCreate: {
+        kind: 'generator',
+        id: 'nanoid',
+        params: { size: { kind: 'arg', index: 0, path: ['size'] } },
+      },
     },
     id: true,
   },

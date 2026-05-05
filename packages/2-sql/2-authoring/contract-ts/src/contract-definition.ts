@@ -1,8 +1,4 @@
-import type {
-  ColumnDefault,
-  ExecutionMutationDefault,
-  ExecutionMutationDefaultValue,
-} from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefault } from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
@@ -18,7 +14,6 @@ export interface FieldNode {
   readonly descriptor: ColumnTypeDescriptor;
   readonly nullable: boolean;
   readonly default?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }
@@ -78,7 +73,6 @@ export interface ValueObjectFieldNode {
   readonly valueObjectName: string;
   readonly nullable: boolean;
   readonly default?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly many?: boolean;
 }

@@ -315,10 +315,12 @@ describe('authoring template resolution', () => {
             },
           },
         },
-        executionDefault: {
-          kind: 'arg',
-          index: 1,
-          path: ['id'],
+        executionDefaults: {
+          onCreate: {
+            kind: 'arg',
+            index: 1,
+            path: ['id'],
+          },
         },
         nullable: true,
         id: true,
@@ -339,7 +341,9 @@ describe('authoring template resolution', () => {
           length: 1536,
         },
       },
-      executionDefault: 'generated',
+      executionDefaults: {
+        onCreate: 'generated',
+      },
       id: true,
       unique: true,
     });

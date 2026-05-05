@@ -1,9 +1,5 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type {
-  ColumnDefault,
-  ExecutionMutationDefault,
-  ExecutionMutationDefaultValue,
-} from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefault } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultRegistry,
@@ -30,7 +26,6 @@ export type ResolvedField = {
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
   readonly executionDefaults?: Omit<ExecutionMutationDefault, 'ref'>;
   readonly isId: boolean;
   readonly isUnique: boolean;
@@ -373,11 +368,10 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           diagnostics,
         })
       : {};
-    if (field.optional && loweredDefault.executionDefault) {
+    const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
+    if (field.optional && loweredOnCreate) {
       const generatorDescription =
-        loweredDefault.executionDefault.kind === 'generator'
-          ? `"${loweredDefault.executionDefault.id}"`
-          : 'for this field';
+        loweredOnCreate.kind === 'generator' ? `"${loweredOnCreate.id}"` : 'for this field';
       diagnostics.push({
         code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
         message: `Field "${model.name}.${field.name}" cannot be optional when using execution default ${generatorDescription}. Remove "?" or use a storage default.`,
@@ -386,10 +380,10 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    if (loweredDefault.executionDefault) {
-      const generatorDescriptor = generatorDescriptorById.get(loweredDefault.executionDefault.id);
+    if (loweredOnCreate) {
+      const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
-        generated: loweredDefault.executionDefault,
+        generated: loweredOnCreate,
       });
       if (generatedDescriptor) {
         descriptor = generatedDescriptor;
@@ -403,13 +397,17 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       diagnostics,
     });
 
+    // `loweredDefault.executionDefaults` (from `@default(generator())`, on-create only)
+    // and `updatedAtExecutionDefaults` (from `@updatedAt`, both phases) are mutually
+    // exclusive on a given field — `lowerUpdatedAtAttribute` already rejects
+    // `@updatedAt @default(...)` — so a simple `??` is safe here.
+    const fieldExecutionDefaults = updatedAtExecutionDefaults ?? loweredDefault.executionDefaults;
     resolvedFields.push({
       field,
       columnName: mappedColumnName,
       descriptor,
       ...ifDefined('defaultValue', loweredDefault.defaultValue),
-      ...ifDefined('executionDefault', loweredDefault.executionDefault),
-      ...ifDefined('executionDefaults', updatedAtExecutionDefaults),
+      ...ifDefined('executionDefaults', fieldExecutionDefaults),
       isId: Boolean(idAttribute),
       isUnique: Boolean(uniqueAttribute),
       ...ifDefined('idName', idName),

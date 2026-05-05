@@ -36,7 +36,7 @@ describe('shared contract definition lowering', () => {
                 typeParams: { length: 36 },
               },
               nullable: false,
-              executionDefault: { kind: 'generator', id: 'uuidv4' },
+              executionDefaults: { onCreate: { kind: 'generator', id: 'uuidv4' } },
             },
             {
               fieldName: 'role',
@@ -286,16 +286,18 @@ describe('shared contract definition lowering', () => {
                   kind: 'function',
                   expression: 'gen_random_uuid()',
                 },
-                executionDefault: {
-                  kind: 'generator',
-                  id: 'uuidv4',
+                executionDefaults: {
+                  onCreate: {
+                    kind: 'generator',
+                    id: 'uuidv4',
+                  },
                 },
               },
             ],
           },
         ],
       }),
-    ).toThrow('Field "User.id" cannot define both default and executionDefault.');
+    ).toThrow('Field "User.id" cannot define both default and executionDefaults.');
   });
 
   it('rejects generated fields that are still marked nullable', () => {
@@ -315,16 +317,58 @@ describe('shared contract definition lowering', () => {
                   nativeType: 'text',
                 },
                 nullable: true,
-                executionDefault: {
-                  kind: 'generator',
-                  id: 'uuidv4',
+                executionDefaults: {
+                  onCreate: {
+                    kind: 'generator',
+                    id: 'uuidv4',
+                  },
                 },
               },
             ],
           },
         ],
       }),
-    ).toThrow('Field "User.id" cannot be nullable when executionDefault is present.');
+    ).toThrow('Field "User.id" cannot be nullable when executionDefaults.onCreate is present.');
+  });
+
+  it('allows nullable fields with onUpdate-only executionDefaults', () => {
+    const contract = buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      models: [
+        {
+          modelName: 'User',
+          tableName: 'app_user',
+          fields: [
+            {
+              fieldName: 'id',
+              columnName: 'id',
+              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
+              nullable: false,
+            },
+            {
+              fieldName: 'touchedAt',
+              columnName: 'touched_at',
+              descriptor: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+              },
+              nullable: true,
+              executionDefaults: {
+                onUpdate: { kind: 'generator', id: 'timestampNow' },
+              },
+            },
+          ],
+          id: { columns: ['id'] },
+        },
+      ],
+    });
+
+    expect(contract.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'app_user', column: 'touched_at' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+    ]);
   });
 
   it('rejects nullable identity fields', () => {
