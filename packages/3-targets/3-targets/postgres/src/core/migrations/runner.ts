@@ -12,7 +12,6 @@ import type {
 } from '@prisma-next/family-sql/control';
 import { runnerFailure, runnerSuccess } from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
-import type { DataTransformOperation } from '@prisma-next/framework-components/control';
 import { SqlQueryError } from '@prisma-next/sql-errors';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Result } from '@prisma-next/utils/result';
@@ -43,18 +42,6 @@ const DEFAULT_CONFIG: RunnerConfig = {
 };
 
 const LOCK_DOMAIN = 'prisma_next.contract.marker';
-
-function isDataTransformOperation(op: unknown): op is DataTransformOperation {
-  return (
-    typeof op === 'object' &&
-    op !== null &&
-    'operationClass' in op &&
-    (op as { operationClass: string }).operationClass === 'data' &&
-    'name' in op &&
-    'check' in op &&
-    'run' in op
-  );
-}
 
 /**
  * Deep clones and freezes a record object to prevent mutation.
@@ -174,23 +161,18 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
         });
       }
 
-      // Self-edge no-op detection: a self-edge migration with zero ops in
-      // the plan that brings no new invariants produced no observable
-      // change. Skip the marker + ledger writes so an idempotent re-apply
-      // of a self-edge data transform doesn't churn updatedAt or pile up
-      // empty ledger entries. db update no-ops still write a ledger entry
-      // as audit trail.
-      //
-      // TODO(invariant-routing follow-up): `executeDataTransform` always
-      // counts every op it visits (including self-skips via `check === true`
-      // or empty idempotency probe), so `operationsExecuted === 0` here
-      // means "the plan had zero ops" rather than "every op self-skipped".
-      // The CLI is unaffected today because `migration-apply.ts` marker-
-      // subtraction empties `effectiveRequired` first and short-circuits
-      // before we run; the non-CLI re-apply path needs a per-op `executed`
-      // flag threaded through `executeDataTransform` to recover the
-      // intended check. See review thread A13 / future M5 ADR draft.
-      const incomingInvariants = options.plan.providedInvariants;
+      // Self-edge no-op detection: a self-edge migration whose ops all
+      // self-skipped (every op pre-satisfied) and that brings no new
+      // invariants produced no observable change. Skip the marker +
+      // ledger writes so an idempotent re-apply of a self-edge data
+      // transform doesn't churn updatedAt or pile up empty ledger
+      // entries. With data transforms now flowing through the unified
+      // op loop, a pre-satisfied DT lands in the
+      // `postcheckAlreadySatisfied` skip path which does not increment
+      // `operationsExecuted`, so the check below correctly distinguishes
+      // "every op self-skipped" from "the plan had ops that ran". `db
+      // update` no-ops still write a ledger entry as audit trail.
+      const incomingInvariants = options.plan.providedInvariants ?? [];
       const existingInvariants = new Set(existingMarker?.invariants ?? []);
       const incomingIsSubsetOfExisting = incomingInvariants.every((id) =>
         existingInvariants.has(id),
@@ -235,19 +217,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     for (const operation of options.plan.operations) {
       options.callbacks?.onOperationStart?.(operation);
       try {
-        // Data transform operations have a different execution lifecycle
-        if (operation.operationClass === 'data' && isDataTransformOperation(operation)) {
-          const dtResult = await this.executeDataTransform(driver, operation, {
-            runIdempotency,
-          });
-          if (!dtResult.ok) {
-            return dtResult;
-          }
-          executedOperations.push(operation);
-          operationsExecuted += 1;
-          continue;
-        }
-
         // Idempotency probe: only run if both postchecks and idempotency checks are enabled
         if (runPostchecks && runIdempotency) {
           const postcheckAlreadySatisfied = await this.expectationsAreSatisfied(
@@ -300,80 +269,6 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     return ok({ operationsExecuted, executedOperations });
   }
 
-  /**
-   * Executes a data transform operation with the check → (skip or run) → check lifecycle.
-   *
-   * 1. If check is a query AST: render to SQL, execute. Empty result = already applied (skip).
-   * 2. If check is `true`: always skip. If `false`: always run.
-   * 3. Execute run ASTs (rendered to SQL) sequentially.
-   * 4. Re-execute check as post-run validation. If violations remain, fail.
-   */
-  private async executeDataTransform(
-    driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
-    op: DataTransformOperation,
-    options: { runIdempotency: boolean },
-  ): Promise<Result<void, SqlMigrationRunnerFailure>> {
-    // Step 1: Check (skip guard)
-    if (op.check === true) {
-      // Always skip, regardless of idempotency setting
-      return okVoid();
-    }
-    if (options.runIdempotency && op.check !== null && op.check !== false) {
-      const checkResult = await driver.query(op.check.sql, op.check.params);
-      if (checkResult.rows.length === 0) {
-        // No violations — already applied, skip
-        return okVoid();
-      }
-    }
-
-    // Step 2: Execute run steps
-    if (op.run) {
-      for (const plan of op.run) {
-        try {
-          await driver.query(plan.sql, plan.params);
-        } catch (error: unknown) {
-          if (SqlQueryError.is(error)) {
-            return runnerFailure(
-              'EXECUTION_FAILED',
-              `Data transform "${op.name}" failed: ${error.message}`,
-              {
-                why: error.message,
-                meta: {
-                  operationId: op.id,
-                  dataTransformName: op.name,
-                  sql: plan.sql,
-                  sqlState: error.sqlState,
-                },
-              },
-            );
-          }
-          throw error;
-        }
-      }
-    }
-
-    // Step 3: Post-run validation (check again)
-    if (op.check !== null && op.check !== false) {
-      const checkResult = await driver.query(op.check.sql, op.check.params);
-      if (checkResult.rows.length > 0) {
-        return runnerFailure(
-          'POSTCHECK_FAILED',
-          `Data transform "${op.name}" did not resolve all violations (${checkResult.rows.length} remaining)`,
-          {
-            why: `After executing the data transform, the check query still returns ${checkResult.rows.length} violation(s).`,
-            meta: {
-              operationId: op.id,
-              dataTransformName: op.name,
-              remainingViolations: checkResult.rows.length,
-            },
-          },
-        );
-      }
-    }
-
-    return okVoid();
-  }
-
   private async ensureControlTables(
     driver: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>['driver'],
   ): Promise<void> {
@@ -389,7 +284,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     phase: 'precheck' | 'postcheck',
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         const code = phase === 'precheck' ? 'PRECHECK_FAILED' : 'POSTCHECK_FAILED';
         return runnerFailure(
@@ -415,7 +310,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Promise<Result<void, SqlMigrationRunnerFailure>> {
     for (const step of steps) {
       try {
-        await driver.query(step.sql);
+        await driver.query(step.sql, step.params ?? []);
       } catch (error: unknown) {
         // Catch SqlQueryError and include normalized metadata
         if (SqlQueryError.is(error)) {
@@ -479,7 +374,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
       return false;
     }
     for (const step of steps) {
-      const result = await driver.query(step.sql);
+      const result = await driver.query(step.sql, step.params ?? []);
       if (!this.stepResultIsTrue(result.rows)) {
         return false;
       }
@@ -651,7 +546,7 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
     options: SqlMigrationRunnerExecuteOptions<PostgresPlanTargetDetails>,
     existingMarker: ContractMarkerRecord | null,
   ): Promise<void> {
-    const incomingInvariants = options.plan.providedInvariants;
+    const incomingInvariants = options.plan.providedInvariants ?? [];
     const writeStatements = buildMergeMarkerStatements({
       storageHash: options.plan.destination.storageHash,
       profileHash:

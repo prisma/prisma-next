@@ -3,16 +3,28 @@
     "id": "data_migration.handle-nulls-user-displayName",
     "label": "Data transform: handle-nulls-user-displayName",
     "operationClass": "data",
-    "name": "handle-nulls-user-displayName",
-    "source": "migration.ts",
-    "check": {
-      "sql": "SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1",
-      "params": []
+    "target": {
+      "id": "postgres"
     },
-    "run": [
+    "precheck": [
       {
+        "description": "Check handle-nulls-user-displayName has work to do",
+        "sql": "SELECT EXISTS (SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
+        "params": []
+      }
+    ],
+    "execute": [
+      {
+        "description": "Run handle-nulls-user-displayName",
         "sql": "UPDATE \"user\" SET \"displayName\" = $1 WHERE \"displayName\" IS NULL",
         "params": ["Anonymous"]
+      }
+    ],
+    "postcheck": [
+      {
+        "description": "Verify handle-nulls-user-displayName resolved all violations",
+        "sql": "SELECT NOT EXISTS (SELECT \"id\" AS \"id\" FROM \"user\" WHERE \"displayName\" IS NULL LIMIT 1) AS ok",
+        "params": []
       }
     ]
   },
