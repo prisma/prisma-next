@@ -244,7 +244,7 @@ export const sqlEmission = {
       const indexes = table.indexes
         .map((i) => {
           const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
-          const name = i.name ? `; readonly name: ${serializeValue(i.name)}` : '';
+          const name = i.name !== undefined ? `; readonly name: ${serializeValue(i.name)}` : '';
           const indexType =
             i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
           const indexOptions =

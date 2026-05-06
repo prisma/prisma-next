@@ -705,9 +705,9 @@ function createConstraintsDsl() {
     return {
       kind: 'index',
       fields: normalizeFieldRefInput(fieldOrFields),
-      ...(options?.name ? { name: options.name } : {}),
-      ...(options?.type ? { type: options.type } : {}),
-      ...(options?.options ? { options: options.options } : {}),
+      ...(options?.name !== undefined ? { name: options.name } : {}),
+      ...(options?.type !== undefined ? { type: options.type } : {}),
+      ...(options?.options !== undefined ? { options: options.options } : {}),
     };
   }
 
