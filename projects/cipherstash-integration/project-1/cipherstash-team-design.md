@@ -29,8 +29,6 @@ The extension exposes searchable-encryption as a first-class column type, while 
 ### Authoring a column (PSL)
 
 ```prisma
-import "cipherstash" as cs
-
 model User {
   id    String                          @id
   email cs.EncryptedString({ equality: true, freeTextSearch: true })
@@ -41,8 +39,6 @@ model User {
 Or with a named type alias:
 
 ```prisma
-import "cipherstash" as cs
-
 types {
   Email = cs.EncryptedString({ equality: true, freeTextSearch: true })
 }
