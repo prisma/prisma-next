@@ -36,9 +36,9 @@ No global `declare module` augmentation is used; the merged set is purely a func
 
 ### 4. Validation seam at the SQL-family boundary
 
-Registry-aware validation runs from `validateSqlStorage`, the SQL family's storage validator that the framework's `validateContract` dispatches into. Framework core stays family-agnostic: it does not know about indexes, let alone index types. When an `IndexDef` carries a `type`, `validateSqlStorage` looks up the entry and validates `options` against the entry's arktype validator in strict mode. An unregistered `type`, an `options` payload that fails the validator, an unexpected key under `options`, or `options` set without `type` are all rejected with errors that name the offending index type or key.
+Registry-aware validation runs from `validateSqlStorage`, the SQL family's storage validator that the framework's `validateContract` dispatches into. Framework core stays family-agnostic: it does not know about indexes, let alone index types. When an `IndexDef` carries a `type`, `validateSqlStorage` looks up the entry and validates `options` against the entry's arktype validator. An unregistered `type`, an `options` payload that fails the validator, or `options` set without `type` are all rejected with errors that name the offending index type or key.
 
-Strict mode is deliberate: an entry's option shape is a contract between the registrar and the renderer. An unrecognised key is much more likely to be a typo than a genuine extension point, and silently dropping it at validate time would mask it from authors and produce surprising DDL.
+Strictness — whether unknown keys in `options` are rejected — is a property of the validator each registrant constructs, not something the framework imposes on top. arktype is loose-by-default; a registrant who wants extra-key rejection opts in when building their option-shape validator. The recommendation is to do so: an entry's option shape is a contract between the registrant and the renderer, and an unrecognised key is much more likely to be a typo than a genuine extension point. Silently dropping it at validate time would mask it from authors and produce surprising DDL.
 
 ### 5. Single framework-owned renderer for `WITH (...)`
 
@@ -54,7 +54,7 @@ When an extension pack declares its index types, the factory call site is the si
 
 When a contract is defined, two things happen — strictly per-contract, with no global state. On the type side, the contract-definition pipeline walks the attached packs, gathers each pack's `__indexTypes`, and intersects them via `UnionToIntersection`. The merged map is what narrows `options` per-`type` for `constraints.index(...)`. Every contract sees only the packs it asked for. On the runtime side, contract assembly creates a fresh per-contract registry and calls `register` for each entry the attached packs contribute. A duplicate `type` across packs surfaces as a registration-time error naming the conflict; this is contract-level, not workspace-level.
 
-When a contract is validated at runtime, `validateSqlStorage` consults that contract's registry. Lookup is by `type` literal; validation of `options` is one arktype invocation per index in strict mode. The framework owns the Postgres-shaped renderer for `options`; per-entry validators have no rendering responsibility and no rendering surface area.
+When a contract is validated at runtime, `validateSqlStorage` consults that contract's registry. Lookup is by `type` literal; validation of `options` is one arktype invocation per index, against whichever shape the registrant constructed (loose or strict). The framework owns the Postgres-shaped renderer for `options`; per-entry validators have no rendering responsibility and no rendering surface area.
 
 When the Postgres adapter renders DDL, it consults only the validated IR. The renderer never re-invokes the registry: by the time a node reaches the adapter, its `options` is already canonical. This keeps the adapter's surface narrow and means the registry's correctness needs to hold only at validate time.
 
