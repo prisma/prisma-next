@@ -633,7 +633,7 @@ function normalizeTargetFieldRefInput(input: TargetFieldRef | readonly TargetFie
   };
 }
 
-function createConstraintsDsl() {
+function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, never>>() {
   function ref<ModelName extends string, FieldName extends string>(
     modelName: ModelName,
     fieldName: FieldName,
@@ -686,18 +686,18 @@ function createConstraintsDsl() {
 
   function index<FieldName extends string, Name extends string | undefined = undefined>(
     field: ColumnRef<FieldName>,
-    options?: ConstraintOptions<Name>,
+    options?: IndexInput<Name, IndexTypes>,
   ): IndexConstraint<readonly [FieldName], Name>;
   function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: ConstraintOptions<Name>,
+    options?: IndexInput<Name, IndexTypes>,
   ): IndexConstraint<FieldNames, Name>;
   function index(
     fieldOrFields: ColumnRef | readonly ColumnRef[],
     options?: {
       readonly name?: string;
       readonly type?: string;
-      readonly options?: Record<string, unknown>;
+      readonly options?: unknown;
     },
   ): IndexConstraint {
     return {
@@ -705,7 +705,9 @@ function createConstraintsDsl() {
       fields: normalizeFieldRefInput(fieldOrFields),
       ...(options?.name !== undefined ? { name: options.name } : {}),
       ...(options?.type !== undefined ? { type: options.type } : {}),
-      ...(options?.options !== undefined ? { options: options.options } : {}),
+      ...(options?.options !== undefined
+        ? { options: options.options as Record<string, unknown> }
+        : {}),
     };
   }
 
@@ -863,8 +865,10 @@ function createAttributeConstraintsDsl(): AttributeContext<
   };
 }
 
-function createSqlConstraintsDsl(): SqlContext<Record<string, ScalarFieldBuilder>>['constraints'] {
-  const constraints = createConstraintsDsl();
+function createSqlConstraintsDsl<
+  IndexTypes extends IndexTypeMap = Record<never, never>,
+>(): SqlContext<Record<string, ScalarFieldBuilder>, IndexTypes>['constraints'] {
+  const constraints = createConstraintsDsl<IndexTypes>();
   return {
     index: constraints.index,
     foreignKey: constraints.foreignKey,
@@ -1088,10 +1092,7 @@ export class ContractModelBuilder<
     }
     return buildStageSpec(this.sqlFactory, {
       cols: createColumnRefs(this.stageOne.fields),
-      constraints: createSqlConstraintsDsl() as unknown as SqlContext<
-        Fields,
-        IndexTypes
-      >['constraints'],
+      constraints: createSqlConstraintsDsl<IndexTypes>(),
     });
   }
 }
