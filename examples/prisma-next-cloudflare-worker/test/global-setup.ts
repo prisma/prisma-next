@@ -2,12 +2,10 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Client } from 'pg';
+import type { ProvidedContext } from 'vitest';
 
 interface GlobalSetupContext {
-  provide<K extends keyof import('vitest').ProvidedContext & string>(
-    key: K,
-    value: import('vitest').ProvidedContext[K],
-  ): void;
+  provide<K extends keyof ProvidedContext & string>(key: K, value: ProvidedContext[K]): void;
 }
 
 declare module 'vitest' {
