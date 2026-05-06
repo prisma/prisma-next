@@ -79,7 +79,7 @@ Add the dispatch *mechanism* as a generic, registry-driven walker. No user-visib
 - [ ] Extend the namespace gate (`checkUncomposedNamespace`, `psl-column-resolution.ts:84-103`) to exempt `temporal` alongside `db`, `familyId`, and `targetId`. Document the rationale inline (forward-compat with the JS/TS Temporal API). Satisfies TC1, TC3, TC6c, TC8.
 - [x] **Diagnostic code work:**
   - **Rename `PSL_INVALID_TYPE_CONSTRUCTOR_ARITY` → `PSL_INVALID_NAMESPACED_CALL_ARITY`.** Discovered during Phase A: that code name doesn't exist. Type-constructor arity errors emit `PSL_INVALID_ATTRIBUTE_ARGUMENT`; field-preset arity errors do the same. Honest rename is a wider refactor (touches genuine attribute-arg uses too) and deferred — see RD11. Field-preset arity errors use `PSL_INVALID_ATTRIBUTE_ARGUMENT` for now.
-  - **Added codes**: `PSL_UNKNOWN_FIELD_PRESET`, `PSL_PRESET_AND_DEFAULT_CONFLICT`, `PSL_PRESET_AND_ID_CONFLICT`, `PSL_PRESET_AND_UPDATED_AT_CONFLICT` (transient — removed in Phase C), `PSL_PRESET_NOT_OPTIONAL`, `PSL_PRESET_NOT_LIST`.
+  - **Added codes**: `PSL_UNKNOWN_FIELD_PRESET`, `PSL_PRESET_AND_DEFAULT_CONFLICT`, `PSL_PRESET_AND_ID_CONFLICT`, `PSL_PRESET_NOT_OPTIONAL`, `PSL_PRESET_NOT_LIST`. (`PSL_PRESET_AND_UPDATED_AT_CONFLICT` was added in Phase A and removed in Phase C alongside the `@updatedAt` attribute path.)
   - **Do not** reuse `PSL_INVALID_DEFAULT_APPLICABILITY` for the preset+`@default` collision — the actual error is "duplicate default," not "not applicable here." Added `PSL_PRESET_AND_DEFAULT_CONFLICT` and used it. Satisfies TC6a–TC6f.
 - [ ] Add edge-case validation in the preset resolver:
   - Optional preset (`temporal.updatedAt()?`) → `PSL_PRESET_NOT_OPTIONAL`.

@@ -440,7 +440,7 @@ describe('TS and PSL authoring parity', () => {
   id Int @id
   email String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt temporal.updatedAt()
 }`,
       sourceId: 'schema.prisma',
     });
@@ -466,7 +466,7 @@ describe('TS and PSL authoring parity', () => {
   id Int @id
   email String
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt temporal.updatedAt()
 }`,
       sourceId: 'schema.prisma',
     });

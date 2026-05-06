@@ -86,7 +86,7 @@ export interface MutationDefaultGeneratorDescriptor {
     | undefined;
   /**
    * Construct the `onCreate`/`onUpdate` phases value owned by this
-   * generator. Authoring layers (PSL `@updatedAt`, TS field presets) call
+   * generator. Authoring layers (PSL `temporal.updatedAt()`, TS field presets) call
    * this instead of building the literal inline so PSL/TS-authored
    * contracts stay byte-equivalent for any future params-bearing generator.
    */

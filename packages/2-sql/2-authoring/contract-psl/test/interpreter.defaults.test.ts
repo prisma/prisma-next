@@ -225,12 +225,67 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     });
   });
 
-  it('lowers @updatedAt to create and update execution defaults', () => {
+  // The temporal preset registry inline test fixtures use to exercise the
+  // PSL-side preset surface for Postgres + SQLite. Real targets ship the
+  // same shapes via `target.authoring.field.temporal.{createdAt,updatedAt}`.
+  const postgresTemporalContributions = {
+    field: {
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            default: { kind: 'function', expression: 'now()' },
+          },
+        },
+        updatedAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            executionDefaults: {
+              onCreate: { kind: 'generator', id: 'timestampNow' },
+              onUpdate: { kind: 'generator', id: 'timestampNow' },
+            },
+          },
+        },
+      },
+    },
+  } as const;
+
+  const sqliteTemporalContributions = {
+    field: {
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sqlite/datetime@1',
+            nativeType: 'text',
+            default: { kind: 'function', expression: 'now()' },
+          },
+        },
+        updatedAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sqlite/datetime@1',
+            nativeType: 'text',
+            executionDefaults: {
+              onCreate: { kind: 'generator', id: 'timestampNow' },
+              onUpdate: { kind: 'generator', id: 'timestampNow' },
+            },
+          },
+        },
+      },
+    },
+  } as const;
+
+  it('lowers temporal.updatedAt() to create and update execution defaults', () => {
     const document = parsePslDocument({
       schema: `model Timestamped {
   id Int @id
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt temporal.updatedAt()
 }`,
       sourceId: 'schema.prisma',
     });
@@ -238,6 +293,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     const result = interpretPslDocumentToSqlContract({
       document,
       controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: postgresTemporalContributions,
     });
 
     expect(result.ok).toBe(true);
@@ -257,98 +313,12 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     ]);
   });
 
-  it('returns diagnostics for invalid @updatedAt usage', () => {
-    const document = parsePslDocument({
-      schema: `model InvalidUpdatedAt {
-  id Int @id
-  withArg DateTime @updatedAt(foo)
-  onText String @updatedAt
-  optional DateTime? @updatedAt
-  list DateTime[] @updatedAt
-  withDefault DateTime @updatedAt @default(now())
-}`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('does not accept arguments'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('timestamp-compatible'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('cannot be optional'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('cannot be a list'),
-        }),
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('cannot be combined with @default'),
-        }),
-      ]),
-    );
-  });
-
-  it('rejects @updatedAt on relation fields', () => {
-    const document = parsePslDocument({
-      schema: `model User {
-  id Int @id
-  posts Post[]
-}
-
-model Post {
-  id Int @id
-  userId Int
-  user User @relation(fields: [userId], references: [id]) @updatedAt
-}`,
-      sourceId: 'schema.prisma',
-    });
-
-    const result = interpretPslDocumentToSqlContract({
-      document,
-      controlMutationDefaults: builtinControlMutationDefaults,
-    });
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-
-    expect(result.failure.diagnostics).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-          sourceId: 'schema.prisma',
-          message: expect.stringContaining('scalar DateTime'),
-        }),
-      ]),
-    );
-  });
-
-  it('lowers SQLite @updatedAt to SQLite timestamp codecs', () => {
+  it('lowers SQLite temporal.updatedAt() to SQLite timestamp codecs', () => {
     const document = parsePslDocument({
       schema: `model Timestamped {
   id Int @id
   createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  updatedAt temporal.updatedAt()
 }`,
       sourceId: 'schema.prisma',
     });
@@ -358,6 +328,7 @@ model Post {
       target: sqliteTarget,
       scalarTypeDescriptors: sqliteScalarTypeDescriptors,
       controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: sqliteTemporalContributions,
     });
 
     expect(result.ok).toBe(true);
@@ -376,6 +347,66 @@ model Post {
         onUpdate: { kind: 'generator', id: 'timestampNow' },
       },
     ]);
+  });
+
+  it('emits a migration hint when @updatedAt is used (after attribute removal)', () => {
+    const document = parsePslDocument({
+      schema: `model Stale {
+  id Int @id
+  updatedAt DateTime @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    expect(result.failure.diagnostics).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
+          sourceId: 'schema.prisma',
+          message: expect.stringContaining('temporal.updatedAt()'),
+        }),
+      ]),
+    );
+  });
+
+  it('suppresses the @updatedAt migration hint when the field already declares a temporal preset', () => {
+    // `temporal.updatedAt() @updatedAt` is a half-migrated field. The
+    // attribute is unsupported (no longer in BUILTIN_FIELD_ATTRIBUTE_NAMES),
+    // so the diagnostic still fires — but we don't tell users to do what
+    // they already did. The migration hint is suppressed; only the bare
+    // unsupported-attribute message is emitted.
+    const document = parsePslDocument({
+      schema: `model Migrated {
+  id Int @id
+  updatedAt temporal.updatedAt() @updatedAt
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: postgresTemporalContributions,
+    });
+
+    expect(result.ok).toBe(false);
+    if (result.ok) return;
+
+    const updatedAtDiagnostic = result.failure.diagnostics.find(
+      (diagnostic) =>
+        diagnostic.code === 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE' &&
+        diagnostic.message.includes('@updatedAt'),
+    );
+    expect(updatedAtDiagnostic).toBeDefined();
+    expect(updatedAtDiagnostic?.message).not.toContain('temporal.updatedAt()');
   });
 
   it('resolves a synthetic field preset through the field-preset dispatch path (genericness)', () => {
@@ -564,33 +595,6 @@ model Post {
             code: 'PSL_UNKNOWN_FIELD_PRESET',
             sourceId: 'schema.prisma',
             message: expect.stringContaining('temporal.foo'),
-          }),
-        ]),
-      );
-    });
-
-    it('rejects field-preset call combined with @updatedAt with PSL_PRESET_AND_UPDATED_AT_CONFLICT', () => {
-      const document = parsePslDocument({
-        schema: `model Bad {
-  id Int @id
-  example temporal.exampleField() @updatedAt
-}`,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToSqlContract({
-        document,
-        controlMutationDefaults: builtinControlMutationDefaults,
-        authoringContributions: syntheticPresetContributions,
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_PRESET_AND_UPDATED_AT_CONFLICT',
-            sourceId: 'schema.prisma',
           }),
         ]),
       );

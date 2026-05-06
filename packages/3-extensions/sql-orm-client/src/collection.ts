@@ -120,7 +120,7 @@ function applyCreateDefaults(
   rows: Record<string, unknown>[],
 ): void {
   // Per-operation cache so generators marked `stableAcrossRows: true`
-  // (e.g. `timestampNow` for `@updatedAt`) reuse one generated value across
+  // (e.g. `timestampNow` for `temporal.updatedAt()`) reuse one generated value across
   // every row in this insert, while per-row generators (e.g. `cuid`) still
   // vary as expected.
   const acrossRowsCache = rows.length > 1 ? new Map<string, unknown>() : undefined;

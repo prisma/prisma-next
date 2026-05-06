@@ -1,10 +1,9 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
 import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
-import {
-  type ControlMutationDefaultRegistry,
-  type MutationDefaultGeneratorDescriptor,
-  TIMESTAMP_NOW_GENERATOR_ID,
+import type {
+  ControlMutationDefaultRegistry,
+  MutationDefaultGeneratorDescriptor,
 } from '@prisma-next/framework-components/control';
 import type { PslAttribute, PslField, PslModel } from '@prisma-next/psl-parser';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -65,10 +64,32 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
   'id',
   'unique',
   'default',
-  'updatedAt',
   'relation',
   'map',
 ]);
+
+/**
+ * Hardcoded migration hint for attributes that have been removed from PSL in
+ * favor of the field-preset surface. The hint text is appended to the
+ * `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` message so users porting Prisma 6
+ * schemas see "use this preset instead" inline. Suppressed when the field
+ * already declares a `temporal.*` preset call (the user has already
+ * migrated; the hint would tell them to do what they just did).
+ *
+ * Add an entry here when removing another attribute. Keep this small —
+ * if the table grows past a handful of entries, factor out into a proper
+ * registry.
+ */
+function getRemovedAttributeHint(attributeName: string): string | undefined {
+  if (attributeName === 'updatedAt') {
+    return 'Use `temporal.updatedAt()` as a field-preset call instead.';
+  }
+  return undefined;
+}
+
+function fieldDeclaresTemporalPreset(field: PslField): boolean {
+  return field.typeConstructor?.path[0] === 'temporal';
+}
 
 function validateFieldAttributes(input: {
   readonly model: PslModel;
@@ -99,9 +120,16 @@ function validateFieldAttributes(input: {
       continue;
     }
 
+    const baseMessage = `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`;
+    const removedHint = getRemovedAttributeHint(attribute.name);
+    const message =
+      removedHint && !fieldDeclaresTemporalPreset(input.field)
+        ? `${baseMessage}. ${removedHint}`
+        : baseMessage;
+
     input.diagnostics.push({
       code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-      message: `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
+      message,
       sourceId: input.sourceId,
       span: attribute.span,
     });
@@ -140,106 +168,6 @@ function extractFieldConstraintNames(input: {
   return { idAttribute, uniqueAttribute, idName, uniqueName };
 }
 
-function reportInvalidUpdatedAt(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
-  readonly attribute: PslAttribute;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly sourceId: string;
-  readonly message: string;
-}): void {
-  input.diagnostics.push({
-    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
-    message: `Field "${input.model.name}.${input.field.name}" @updatedAt ${input.message}`,
-    sourceId: input.sourceId,
-    span: input.attribute.span,
-  });
-}
-
-function rejectUpdatedAtOnNonScalar(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
-  readonly attribute: PslAttribute;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly sourceId: string;
-}): void {
-  reportInvalidUpdatedAt({
-    ...input,
-    message: 'can only be used on scalar DateTime fields.',
-  });
-}
-
-function lowerUpdatedAtAttribute(input: {
-  readonly model: PslModel;
-  readonly field: PslField;
-  readonly attribute: PslAttribute;
-  readonly descriptor: ColumnDescriptor;
-  readonly defaultAttribute: PslAttribute | undefined;
-  readonly generatorDescriptorById: ReadonlyMap<string, MutationDefaultGeneratorDescriptor>;
-  readonly diagnostics: ContractSourceDiagnostic[];
-  readonly sourceId: string;
-  readonly targetId: string;
-}): ExecutionMutationDefaultPhases | undefined {
-  if (input.attribute.args.length > 0) {
-    reportInvalidUpdatedAt({
-      ...input,
-      message: 'does not accept arguments. Use @updatedAt.',
-    });
-    return undefined;
-  }
-  if (input.defaultAttribute) {
-    reportInvalidUpdatedAt({
-      ...input,
-      message: 'cannot be combined with @default.',
-    });
-    return undefined;
-  }
-  if (input.field.optional) {
-    reportInvalidUpdatedAt({
-      ...input,
-      message: 'cannot be optional. Remove "?" or remove @updatedAt.',
-    });
-    return undefined;
-  }
-  if (input.field.list) {
-    reportInvalidUpdatedAt({
-      ...input,
-      message: 'cannot be a list field. Use a singular DateTime field.',
-    });
-    return undefined;
-  }
-
-  const generatorDescriptor = input.generatorDescriptorById.get(TIMESTAMP_NOW_GENERATOR_ID);
-  if (!generatorDescriptor) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Field "${input.model.name}.${input.field.name}" @updatedAt is not supported by the "${input.targetId}" target adapter. The adapter must register a mutation default generator with id "${TIMESTAMP_NOW_GENERATOR_ID}".`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  if (!generatorDescriptor.applicableCodecIds.includes(input.descriptor.codecId)) {
-    reportInvalidUpdatedAt({
-      ...input,
-      message: `requires a timestamp-compatible field, received codecId "${input.descriptor.codecId}".`,
-    });
-    return undefined;
-  }
-
-  const phases = generatorDescriptor.buildPhases?.();
-  if (!phases) {
-    input.diagnostics.push({
-      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
-      message: `Field "${input.model.name}.${input.field.name}" @updatedAt requires the "${TIMESTAMP_NOW_GENERATOR_ID}" generator descriptor to provide \`buildPhases\`.`,
-      sourceId: input.sourceId,
-      span: input.attribute.span,
-    });
-    return undefined;
-  }
-  return phases;
-}
-
 export function collectResolvedFields(input: CollectResolvedFieldsInput): ResolvedField[] {
   const {
     model,
@@ -262,18 +190,8 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 
   for (const field of model.fields) {
     const isModelField = modelNames.has(field.typeName);
-    const updatedAtAttribute = getAttribute(field.attributes, 'updatedAt');
 
     if (field.list && isModelField) {
-      if (updatedAtAttribute) {
-        rejectUpdatedAtOnNonScalar({
-          model,
-          field,
-          attribute: updatedAtAttribute,
-          diagnostics,
-          sourceId,
-        });
-      }
       continue;
     }
 
@@ -288,20 +206,8 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
-    if (isModelField) {
-      if (updatedAtAttribute) {
-        rejectUpdatedAtOnNonScalar({
-          model,
-          field,
-          attribute: updatedAtAttribute,
-          diagnostics,
-          sourceId,
-        });
-        continue;
-      }
-      if (relationAttribute) {
-        continue;
-      }
+    if (isModelField && relationAttribute) {
+      continue;
     }
 
     const isValueObjectField = compositeTypeNames.has(field.typeName);
@@ -397,19 +303,6 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    const updatedAtExecutionDefaults = updatedAtAttribute
-      ? lowerUpdatedAtAttribute({
-          model,
-          field,
-          attribute: updatedAtAttribute,
-          descriptor,
-          defaultAttribute,
-          generatorDescriptorById,
-          diagnostics,
-          sourceId,
-          targetId,
-        })
-      : undefined;
     const loweredDefault = defaultAttribute
       ? lowerDefaultForField({
           modelName: model.name,
@@ -454,40 +347,23 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     // Field presets contribute their own default / executionDefaults / id /
     // unique. They take precedence over attribute-derived contributions for
     // this field, since a preset *is* the field declaration. Conflicts with
-    // `@default` and optional are already rejected above; conflicts with
-    // explicit `@id` and `@updatedAt` would be redundant noise on the
-    // resolved field, so we surface them as hard errors here for symmetry.
-    if (presetContributions) {
-      if (idAttribute && !presetContributions.id) {
-        diagnostics.push({
-          code: 'PSL_PRESET_AND_ID_CONFLICT',
-          message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @id. Use a preset that contributes id semantics, or drop @id.`,
-          sourceId,
-          span: idAttribute.span,
-        });
-        continue;
-      }
-      if (updatedAtAttribute) {
-        diagnostics.push({
-          code: 'PSL_PRESET_AND_UPDATED_AT_CONFLICT',
-          message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @updatedAt. The preset already specifies execution defaults.`,
-          sourceId,
-          span: updatedAtAttribute.span,
-        });
-        continue;
-      }
+    // `@default` and optional are already rejected above; explicit `@id`
+    // would be redundant noise on the resolved field, so we surface it as
+    // a hard error here for symmetry.
+    if (presetContributions && idAttribute && !presetContributions.id) {
+      diagnostics.push({
+        code: 'PSL_PRESET_AND_ID_CONFLICT',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @id. Use a preset that contributes id semantics, or drop @id.`,
+        sourceId,
+        span: idAttribute.span,
+      });
+      continue;
     }
 
-    // `loweredDefault.executionDefaults` (from `@default(generator())`, on-create only)
-    // and `updatedAtExecutionDefaults` (from `@updatedAt`, both phases) are mutually
-    // exclusive on a given field — `lowerUpdatedAtAttribute` already rejects
-    // `@updatedAt @default(...)` — so a simple `??` is safe here.
-    // Field-preset contributions take precedence over both attribute-derived
+    // Field-preset contributions take precedence over attribute-derived
     // sources when present.
     const fieldExecutionDefaults =
-      presetContributions?.executionDefaults ??
-      updatedAtExecutionDefaults ??
-      loweredDefault.executionDefaults;
+      presetContributions?.executionDefaults ?? loweredDefault.executionDefaults;
     const fieldDefaultValue = presetContributions?.default ?? loweredDefault.defaultValue;
     resolvedFields.push({
       field,
