@@ -10,6 +10,8 @@ import {
   validateContract as frameworkValidateContract,
 } from '@prisma-next/contract/validate-contract';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { type } from 'arktype';
+import type { IndexTypeRegistry } from './index-types';
 import type { SqlModelStorage, SqlStorage, StorageColumn, StorageTable } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
 
@@ -144,10 +146,46 @@ function validateContractLogic(contract: Contract<SqlStorage>): void {
   }
 }
 
-function validateSqlStorage(contract: Contract): void {
+function validateIndexTypes(
+  contract: SqlValidationContract,
+  indexTypeRegistry: IndexTypeRegistry | undefined,
+): void {
+  for (const [tableName, table] of Object.entries(contract.storage.tables)) {
+    for (const index of table.indexes) {
+      if (index.type === undefined && index.options !== undefined) {
+        throw new ContractValidationError(
+          `Table "${tableName}" index on columns [${index.columns.join(', ')}] has options without a type`,
+          'storage',
+        );
+      }
+      if (index.type === undefined || indexTypeRegistry === undefined) continue;
+      const entry = indexTypeRegistry.get(index.type);
+      if (entry === undefined) {
+        throw new ContractValidationError(
+          `Table "${tableName}" index on columns [${index.columns.join(', ')}] uses unregistered index type "${index.type}"`,
+          'storage',
+        );
+      }
+      const optionsValue = index.options ?? {};
+      const result = entry.options(optionsValue);
+      if (result instanceof type.errors) {
+        throw new ContractValidationError(
+          `Table "${tableName}" index on columns [${index.columns.join(', ')}] has invalid options for type "${index.type}": ${result.summary}`,
+          'storage',
+        );
+      }
+    }
+  }
+}
+
+function validateSqlStorageWith(
+  contract: Contract,
+  indexTypeRegistry: IndexTypeRegistry | undefined,
+): void {
   const sqlContract = validateSqlContract<SqlValidationContract>(contract);
   validateContractLogic(sqlContract);
   validateModelStorageReferences(sqlContract);
+  validateIndexTypes(sqlContract, indexTypeRegistry);
   const semanticErrors = validateStorageSemantics(sqlContract.storage);
   if (semanticErrors.length > 0) {
     throw new ContractValidationError(
@@ -155,6 +193,10 @@ function validateSqlStorage(contract: Contract): void {
       'storage',
     );
   }
+}
+
+function validateSqlStorage(contract: Contract): void {
+  validateSqlStorageWith(contract, undefined);
 }
 
 function decodeContractDefaults<T extends Contract<SqlStorage>>(
@@ -210,11 +252,20 @@ function decodeContractDefaults<T extends Contract<SqlStorage>>(
   } as T;
 }
 
+export interface ValidateContractOptions {
+  readonly indexTypeRegistry?: IndexTypeRegistry;
+}
+
 export function validateContract<TContract extends Contract<SqlStorage>>(
   value: unknown,
   codecLookup: CodecLookup,
+  options?: ValidateContractOptions,
 ): TContract {
-  const validated = frameworkValidateContract<TContract>(value, validateSqlStorage);
+  const indexTypeRegistry = options?.indexTypeRegistry;
+  const storageValidator = indexTypeRegistry
+    ? (contract: Contract) => validateSqlStorageWith(contract, indexTypeRegistry)
+    : validateSqlStorage;
+  const validated = frameworkValidateContract<TContract>(value, storageValidator);
   try {
     return decodeContractDefaults(validated, codecLookup);
   } catch (error) {
