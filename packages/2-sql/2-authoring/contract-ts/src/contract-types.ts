@@ -34,6 +34,25 @@ type MergeExtensionCodecTypesSafe<Packs> =
       : MergeExtensionCodecTypes<Packs>
     : Record<string, never>;
 
+export type ExtractIndexTypesFromPack<P> = P extends { __indexTypes?: infer I }
+  ? I extends Record<string, { readonly options: unknown }>
+    ? I
+    : Record<never, never>
+  : Record<never, never>;
+
+type AllIndexTypeLiterals<Packs> =
+  Packs extends Record<string, unknown>
+    ? { [K in keyof Packs]: keyof ExtractIndexTypesFromPack<Packs[K]> }[keyof Packs] & string
+    : never;
+
+export type MergeExtensionIndexTypes<Packs extends Record<string, unknown>> = {
+  readonly [Lit in AllIndexTypeLiterals<Packs>]: {
+    [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
+      ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
+      : never;
+  }[keyof Packs];
+};
+
 export type MergeExtensionPackRefs<
   Existing extends Record<string, unknown> | undefined,
   Added extends Record<string, ExtensionPackRef<'sql', string>>,
@@ -63,6 +82,16 @@ type CodecTypesFromDefinition<Definition> = ExtractCodecTypesFromPack<
   Definition extends { readonly target: infer Target } ? Target : never
 > &
   MergeExtensionCodecTypesSafe<DefinitionExtensionPacks<Definition>>;
+
+type DefinitionTarget<Definition> = Definition extends { readonly target: infer Target }
+  ? Target
+  : never;
+
+type AllPacks<Definition> = DefinitionExtensionPacks<Definition> & {
+  readonly __target: DefinitionTarget<Definition>;
+};
+
+export type IndexTypesFromDefinition<Definition> = MergeExtensionIndexTypes<AllPacks<Definition>>;
 
 type DefinitionModels<Definition> = Definition extends {
   readonly models?: unknown;
@@ -514,6 +543,8 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
+  } & {
+    readonly __indexTypes?: IndexTypesFromDefinition<Definition>;
   } & {
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>
