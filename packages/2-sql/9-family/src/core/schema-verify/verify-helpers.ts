@@ -21,6 +21,25 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import type { ComponentDatabaseDependency } from '../migrations/types';
 
+function stableStringify(value: Record<string, unknown> | undefined): string {
+  if (value === undefined) return '';
+  const sorted = Object.keys(value)
+    .sort()
+    .reduce<Record<string, unknown>>((acc, key) => {
+      acc[key] = value[key];
+      return acc;
+    }, {});
+  return JSON.stringify(sorted);
+}
+
+function indexExtrasMatch(
+  contractIndex: Index,
+  schemaIndex: { readonly type?: string; readonly options?: Record<string, unknown> },
+): boolean {
+  if ((contractIndex.type ?? null) !== (schemaIndex.type ?? null)) return false;
+  return stableStringify(contractIndex.options) === stableStringify(schemaIndex.options);
+}
+
 /**
  * Compares two arrays of strings for equality (order-sensitive).
  */
@@ -391,13 +410,19 @@ export function verifyIndexes(
 
     // Check for any matching index (unique or non-unique)
     // A unique index can satisfy a non-unique index requirement (stronger satisfies weaker)
-    const matchingIndex = schemaIndexes.find((idx) =>
-      arraysEqual(idx.columns, contractIndex.columns),
+    const matchingIndex = schemaIndexes.find(
+      (idx) =>
+        arraysEqual(idx.columns, contractIndex.columns) && indexExtrasMatch(contractIndex, idx),
     );
 
-    // Also check if a unique constraint satisfies the index requirement
+    // Also check if a unique constraint satisfies the index requirement.
+    // Unique constraints carry no type/options of their own, so they can only
+    // satisfy a contract index that doesn't request a specific type/options.
     const matchingUniqueConstraint =
-      !matchingIndex && schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
+      !matchingIndex &&
+      contractIndex.type === undefined &&
+      contractIndex.options === undefined &&
+      schemaUniques.find((u) => arraysEqual(u.columns, contractIndex.columns));
 
     if (!matchingIndex && !matchingUniqueConstraint) {
       issues.push({
@@ -442,8 +467,9 @@ export function verifyIndexes(
         continue;
       }
 
-      const matchingIndex = contractIndexes.find((idx) =>
-        arraysEqual(idx.columns, schemaIndex.columns),
+      const matchingIndex = contractIndexes.find(
+        (idx) =>
+          arraysEqual(idx.columns, schemaIndex.columns) && indexExtrasMatch(idx, schemaIndex),
       );
 
       if (!matchingIndex) {

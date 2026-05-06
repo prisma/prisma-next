@@ -334,6 +334,142 @@ describe('verifySqlSchema - semantic satisfaction', () => {
         }),
       );
     });
+
+    it('fails when contract index type differs from schema index type (same columns)', () => {
+      const contract = createTestContract({
+        doc: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          { indexes: [{ columns: ['body'], type: 'gin' }] },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        doc: createSchemaTable(
+          'doc',
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          { indexes: [{ columns: ['body'], unique: false, name: 'doc_body_idx' }] },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: true,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({ kind: 'index_mismatch', table: 'doc' }),
+      );
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({ kind: 'extra_index', table: 'doc' }),
+      );
+    });
+
+    it('fails when contract index options differ from schema index options', () => {
+      const contract = createTestContract({
+        doc: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          {
+            indexes: [{ columns: ['body'], type: 'gin', options: { fastupdate: false } }],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        doc: createSchemaTable(
+          'doc',
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          {
+            indexes: [
+              {
+                columns: ['body'],
+                unique: false,
+                name: 'doc_body_idx',
+                type: 'gin',
+                options: { fastupdate: true },
+              },
+            ],
+          },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: true,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(false);
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({ kind: 'index_mismatch', table: 'doc' }),
+      );
+      expect(result.schema.issues).toContainEqual(
+        expect.objectContaining({ kind: 'extra_index', table: 'doc' }),
+      );
+    });
+
+    it('passes when contract type/options match schema type/options exactly', () => {
+      const contract = createTestContract({
+        doc: createContractTable(
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          {
+            indexes: [{ columns: ['body'], type: 'gin', options: { fastupdate: false } }],
+          },
+        ),
+      });
+
+      const schema = createTestSchemaIR({
+        doc: createSchemaTable(
+          'doc',
+          {
+            id: { nativeType: 'int4', nullable: false },
+            body: { nativeType: 'text', nullable: false },
+          },
+          {
+            indexes: [
+              {
+                columns: ['body'],
+                unique: false,
+                name: 'doc_body_idx',
+                type: 'gin',
+                options: { fastupdate: false },
+              },
+            ],
+          },
+        ),
+      });
+
+      const result = verifySqlSchema({
+        contract,
+        schema,
+        strict: true,
+        typeMetadataRegistry: emptyTypeMetadataRegistry,
+        frameworkComponents: [],
+      });
+
+      expect(result.ok).toBe(true);
+      expect(result.schema.issues).toHaveLength(0);
+    });
   });
 
   describe('foreign key', () => {
