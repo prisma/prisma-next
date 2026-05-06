@@ -15,7 +15,7 @@ This keeps core/CLI source-agnostic while giving PSL-first SQL users a one-line 
 
 - Interpret `ParsePslDocumentResult` into SQL `Contract`
 - Interpret generic PSL attributes into SQL contract semantics (`@id`, `@unique`, `@default`, `@relation`, `@map`, `@@map`)
-- Interpret SQL timestamp semantics: `DateTime @default(now())` as a storage default and `DateTime @updatedAt` as an execution mutation default
+- Interpret SQL timestamp semantics: `DateTime @default(now())` (or the equivalent `temporal.createdAt()` field-preset call) as a storage default, and `temporal.updatedAt()` as an execution mutation default
 - Lower shared constructor expressions in both `types {}` blocks and inline field positions (for example `ShortName = sql.String(length: 35)` and `embedding pgvector.Vector(length: 1536)?`)
 - Lower supported default functions through composed registry inputs
 - Support selected Postgres native-type attributes on named types for brownfield round-trips (`@db.Char`, `@db.VarChar`, `@db.Numeric`, `@db.Uuid`, `@db.SmallInt`, `@db.Real`, `@db.Timestamp`, `@db.Timestamptz`, `@db.Date`, `@db.Time`, `@db.Timetz`, `@db.Json`)
@@ -64,10 +64,11 @@ Supported `@default(...)` surface in v1 when composed contributors provide handl
 - Explicitly unsupported in v1: `cuid()` (diagnostic suggests `cuid(2)`)
 - `dbgenerated("...")` preserves the parsed PSL string-literal contents as-is (escaped sequences are not normalized in v1).
 
-Supported timestamp attribute surface:
+Supported timestamp authoring surface:
 
-- `createdAt DateTime @default(now())` lowers to the target storage default and does not create an execution mutation default.
-- `updatedAt DateTime @updatedAt` lowers to `timestampNow` on create and on non-empty update mutations. This is application-side because Prisma’s `@updatedAt` semantics are mutation-aware, not a database trigger.
+- `createdAt DateTime @default(now())` and `createdAt temporal.createdAt()` both lower to the target storage default and do not create an execution mutation default.
+- `updatedAt temporal.updatedAt()` lowers to `timestampNow` on create and on non-empty update mutations. This is application-side because update-time semantics are mutation-aware, not a database trigger.
+- The Prisma-flavored `@updatedAt` attribute is not supported; references produce `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` with a migration hint pointing at `temporal.updatedAt()`. The hint is suppressed when the field already declares any `temporal.*` preset.
 - `@createdAt` is not supported as a PSL alias.
 
 ## Public API

@@ -60,10 +60,10 @@ This is a deliberate “strict subset” choice: PSL v1 is bounded by the curren
 - Supported defaults are split into:
   - **Storage defaults**: literals, `autoincrement()`, `now()`, `dbgenerated("...")`
   - **Execution defaults** (mutation-time generators): `uuid()`, `uuid(4)`, `uuid(7)`, `cuid(2)`, `ulid()`, `nanoid()`, `nanoid(n)`
-- Timestamp authoring follows Prisma ORM’s shape for supported SQL targets:
-  - create timestamps use `DateTime @default(now())`, which remains a storage default owned by the database
-  - update timestamps use no-argument `DateTime @updatedAt`, which lowers to a `timestampNow` execution default on create and non-empty update mutations
-- Prisma Next does not add a PSL `@createdAt` alias.
+- Timestamp authoring uses the curated `temporal.*` field-preset namespace:
+  - create timestamps use `temporal.createdAt()` (or the equivalent `DateTime @default(now())`), both lowering to the same database-owned storage default
+  - update timestamps use `temporal.updatedAt()`, which lowers to a `timestampNow` execution default on create and non-empty update mutations
+- The Prisma-flavored `@updatedAt` attribute is **not supported**; references produce `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` with a migration hint pointing at `temporal.updatedAt()`.
 - **`cuid()` (cuid v1) is explicitly unsupported**; diagnostics guide users to `cuid(2)`.
 - **`dbgenerated("...")` is string-literal based** and (in v1) preserves the parsed contents as-is (escape sequences are not normalized).
 
