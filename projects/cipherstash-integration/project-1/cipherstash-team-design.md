@@ -134,26 +134,33 @@ export default class M_001_add_encrypted_email_search extends Migration {
   }
 
   override get operations() {
-    const entries = [
-      ...addSearchConfig(
+    return [
+      addSearchConfig(
         { table: 'user', column: 'email', equality: true, freeTextSearch: true },
+        endContract,
+      ),
+      addSearchConfig(
+        { table: 'order', column: 'shippingAddress', equality: true },
         endContract,
       ),
       activatePendingSearches(endContract),
     ];
-
-    return entries.map(({ invariantId, run }) =>
-      this.dataTransform(endContract, invariantId, { invariantId, run }),
-    );
   }
 }
 
 MigrationCLI.run(import.meta.url, M_001_add_encrypted_email_search);
 ```
 
-A migration is a class extending `Migration` whose `operations` getter returns an array of operation objects; `MigrationCLI.run(...)` at the bottom is the standard runner shim. DDL ops (`createTable`, `addColumn`, etc.) — when present — sit alongside the cipherstash entries in the same array. The example above shows a pure search-config migration for an `email` column whose DDL landed in a prior migration.
+A migration is a class extending `Migration` whose `operations` getter returns an array of operation objects; `MigrationCLI.run(...)` at the bottom is the standard runner shim. DDL ops (`createTable`, `addColumn`, etc.) — when present — sit alongside the cipherstash entries in the same array.
 
-`addSearchConfig({...}, endContract)` returns a readonly array of `AddSearchConfigEntry` records — one per enabled mode flag, each carrying a deterministic `invariantId` (e.g. `cipherstash.search-config.user.email.unique`) and a `run()` closure that builds a `SqlQueryPlan`. `activatePendingSearches(endContract)` returns a single such entry. The user wraps each entry via the standard `this.dataTransform(endContract, invariantId, { invariantId, run })` factory, which yields a `DataTransformOperation` (`operationClass: 'data'`) — the operation class that participates in invariant-aware ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404).
+Each factory returns **one** operation:
+
+- `addSearchConfig({ table, column, equality?, freeTextSearch? }, endContract)` returns a single op for that `(table, column)` pair. When applied, the op executes one EQL `add_search_config` statement per enabled mode flag — so the `email` call above runs two `add_search_config` statements (`unique` + `match`) within one op. Operations model their `execute` payload as an array of SQL statements, so multi-statement work fits naturally inside a single op without manual unrolling.
+- `activatePendingSearches(endContract)` returns a single op invoking EQL's pending-activation function once for the whole migration.
+
+The op carries a deterministic `invariantId` (e.g. `cipherstash.search-config.user.email`) for invariant-aware migration ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404), so future migrations can encode "depends on the user.email search config existing" via a ref against that id.
+
+This shape is deliberately **planner-friendly**. In Project 2, the migration planner walks the contract diff and emits one literal `addSearchConfig({...}, endContract)` line per model field that has search modes declared — the planner doesn't need to emit loops, control flow, or per-mode unrolling. In Project 1 the same lines are hand-written; the surface is identical.
 
 Bootstrap (the EQL extension install, `cs_configuration_v2` table creation, etc.) is handled by Prisma Next's `databaseDependencies.init` machinery — the user runs `db init` once per database and the EQL bundle is applied. Re-running `db init` short-circuits via the precheck (`information_schema.tables` lookup for `cs_configuration_v2`).
 
@@ -211,7 +218,7 @@ We treat the wire shape as opaque. Whatever your EQL install puts on disk (the `
 
 ### 3. EQL search-config registration via raw SQL
 
-The migration factories `addSearchConfig` and `activatePendingSearches` produce `DataTransformOperation`s whose execution lowers to your EQL function calls (`eql_v2.add_search_config`, `eql_v2.activate_pending_searches`, etc.) via parameterized raw SQL. Per the spec, each factory invocation is one operation per mode flag; `equality: true` produces one operation, `equality + freeTextSearch` produces two; the `unique` / `match` / `text` index modes flow through unchanged.
+The migration factories `addSearchConfig` and `activatePendingSearches` produce one operation each whose execution lowers to your EQL function calls (`eql_v2.add_search_config`, `eql_v2.activate_pending_searches`, etc.) via parameterized raw SQL. An `addSearchConfig({...})` call covering both `equality: true` and `freeTextSearch: true` runs two `eql_v2.add_search_config` statements within one operation (`unique` index for equality, `match` index for free-text); the index-name and `cast_as` mapping flows through unchanged.
 
 We plan to defer to your existing `operation-templates.ts` from the `cipherstash/stack` reference repo as the source of truth for the exact SQL function calls. If you've evolved that surface since the first-attempt repo, point us at the current canonical reference.
 
@@ -229,8 +236,8 @@ The package is organized along the boundaries Prisma Next's extension protocol e
 ├── cipherstash/string@1  (codec — target type eql_v2_encrypted, traits ['equality'])
 ├── bulkEncryptMiddleware (SQL middleware, write-side coalescing)
 ├── decryptAll            (read-side coalescing utility)
-├── addSearchConfig       (migration factory, multi-op)
-├── activatePendingSearches (migration factory, single-op)
+├── addSearchConfig       (migration factory — one op per (table, column))
+├── activatePendingSearches (migration factory — one op per migration)
 └── control descriptor    (declares EQL install via databaseDependencies.init)
 ```
 
