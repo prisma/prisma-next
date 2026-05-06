@@ -14,7 +14,8 @@
  * 2. The `reshape` path — verified by feeding synthetic result rows
  *    to the returned reshape function and asserting on the lifted shape.
  */
-import type { BuildCache, SchemaTypes } from '@pothos/core';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type DocumentNode,
   type FieldNode,
@@ -345,12 +346,12 @@ function buildFixtureSchema(): {
 }
 
 /**
- * Build a stub BuildCache that exposes the contract the walker needs to
+ * Build a stub Contract that exposes the relation metadata the walker needs to
  * read for the W-1 (FK columns) workaround. The relation metadata
  * matches the fixture schema above.
  */
-function buildStubBuildCache(): BuildCache<SchemaTypes> {
-  const contract = {
+function buildStubContract(): Contract<SqlStorage> {
+  return {
     models: {
       User: {
         relations: {
@@ -370,10 +371,7 @@ function buildStubBuildCache(): BuildCache<SchemaTypes> {
         },
       },
     },
-  };
-  return {
-    builder: { options: { prismaNext: { contract } } },
-  } as unknown as BuildCache<SchemaTypes>;
+  } as unknown as Contract<SqlStorage>;
 }
 
 /** Parse `query { users { ... } }` and pull out the inner User selection set. */
@@ -424,7 +422,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     expect(selectCall).toBeDefined();
@@ -440,7 +438,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -459,7 +457,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     // `id` is the localField for posts (mock contract). It should be
@@ -474,7 +472,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -493,7 +491,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -511,7 +509,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -531,7 +529,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -587,7 +585,7 @@ describe('auto-include walker · apply path', () => {
 
     const base = createRecordingCollection();
     const ctx = { tenantId: 'tenant-42' };
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), ctx);
+    applySelectionToCollection(base as never, info, buildStubContract(), ctx);
 
     expect(captured).toHaveLength(1);
     expect(captured[0]?.args).toEqual({ onlyPublished: true });
@@ -616,7 +614,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(Post, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     expect(selectCall?.args).toEqual(['published']);
@@ -644,7 +642,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     expect([...(selectCall?.args ?? [])].sort()).toEqual(['firstName', 'lastName']);
@@ -666,7 +664,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     expect(selectCall?.args).toEqual(['id']);
@@ -683,7 +681,7 @@ describe('auto-include walker · apply path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -700,7 +698,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+    applySelectionToCollection(base as never, info, buildStubContract(), {});
 
     const userIncludes = base.calls.filter((c) => c.method === 'include');
     expect(userIncludes).toHaveLength(1);
@@ -732,7 +730,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -747,7 +745,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -765,7 +763,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -794,7 +792,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -822,7 +820,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -838,7 +836,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 
@@ -854,7 +852,7 @@ describe('auto-include walker · reshape path', () => {
     const { reshape } = applySelectionToCollection(
       createRecordingCollection() as never,
       info,
-      buildStubBuildCache(),
+      buildStubContract(),
       {},
     );
 

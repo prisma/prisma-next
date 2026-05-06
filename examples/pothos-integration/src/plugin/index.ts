@@ -7,7 +7,7 @@ import SchemaBuilder, {
   type SchemaTypes,
 } from '@pothos/core';
 import type { GraphQLFieldResolver, GraphQLResolveInfo } from 'graphql';
-import { applySelectionToCollection } from './auto-include';
+import { applySelectionToCollection, type WalkerCollection } from './auto-include';
 import { PRISMA_NEXT_PREPARED, PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
 
 const pluginName = 'prismaNext';
@@ -27,7 +27,15 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
       const modelName = ext[PRISMA_NEXT_PREPARED] as string;
       return async (parent, args, context, info) => {
         const opts = this.builder.options.prismaNext;
-        const baseCollection = (opts.db as unknown as Record<string, unknown>)[modelName];
+        // `opts.db`'s type is a per-model record — `PrismaNextDb<TContract>`
+        // is `{ [M in keyof models]: Collection<TContract, M> }`. The model
+        // name we read off the field config is a string (registered by the
+        // PRISMA_NEXT_PREPARED extension at field-build time), so we treat
+        // `db` as a string-keyed record here. The runtime guard catches the
+        // mismatch case the type alone can't (model registered on the
+        // schema but missing from `db`).
+        const db = opts.db as unknown as Record<string, WalkerCollection>;
+        const baseCollection = db[modelName];
         if (!baseCollection) {
           throw new Error(
             `[pothos-prisma-next] No collection registered for model '${modelName}' on builder.options.prismaNext.db. ` +
@@ -35,9 +43,9 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
           );
         }
         const { collection, reshape } = applySelectionToCollection(
-          baseCollection as never,
+          baseCollection,
           info,
-          this.buildCache as never,
+          opts.contract,
           context,
         );
         const result = await (

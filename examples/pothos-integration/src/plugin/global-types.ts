@@ -164,10 +164,18 @@ declare global {
     }
 
     export interface SchemaBuilderOptions<Types extends SchemaTypes> {
-      // Types is reachable as PothosSchemaTypes via the augmentation
-      // mechanism; we keep `Contract<SqlStorage>` as a permissive default
-      // rather than threading the per-builder PrismaNextContract through.
-      prismaNext: PrismaNextPluginOptions<Contract<SqlStorage>> & { _types?: Types };
+      // The per-builder typed contract flows through here as
+      // `Types['PrismaNextContract']`. The conditional fallback to
+      // `Contract<SqlStorage>` keeps the options compatible when a
+      // consumer doesn't set `PrismaNextContract` in their UserSchemaTypes
+      // (the default-contract case). With it set, both `contract` and
+      // `db` are fully typed against the user's contract and the walker
+      // can drop its cast-soup.
+      prismaNext: PrismaNextPluginOptions<
+        Types['PrismaNextContract'] extends Contract<SqlStorage>
+          ? Types['PrismaNextContract']
+          : Contract<SqlStorage>
+      >;
     }
 
     export interface SchemaBuilder<Types extends SchemaTypes> {

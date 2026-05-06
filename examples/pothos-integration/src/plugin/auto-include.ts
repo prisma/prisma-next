@@ -21,10 +21,8 @@
  *   Result: `parent[relationName] = { branchAlias1: ..., branchAlias2: ... }`.
  *   Reshape lifts each branchAlias onto `parent[branchAlias]`.
  */
-import type { BuildCache, SchemaTypes } from '@pothos/core';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Collection } from '@prisma-next/sql-orm-client';
 import {
   type FieldNode,
   type GraphQLObjectType,
@@ -89,7 +87,35 @@ interface RelationCountFieldExt {
   };
 }
 
-type AnyCollection = Collection<Contract<SqlStorage>, string, unknown, never>;
+/**
+ * Structural shape of the Collection methods the walker chains.
+ *
+ * The orm-client's `Collection<TContract, ModelName, Row, State>` is fully
+ * typed (column tuples on `.select`, contract-derived relation names on
+ * `.include`, etc.). The walker, however, operates on *runtime* metadata
+ * — it learns the model name and column list from the GraphQL query, not
+ * from generic parameters — so it can't satisfy those tight constraints
+ * at the type level.
+ *
+ * Rather than `as unknown as { method: ... }` at every call site, we
+ * declare the loose-but-honest shape once here and assert each base
+ * Collection into it at the boundary. The orm-client's narrower types
+ * are still authoritative for end users; this just expresses what the
+ * walker depends on without lying about each method individually.
+ */
+export interface WalkerCollection {
+  select(...fields: string[]): WalkerCollection;
+  include(name: string, refine?: (rel: WalkerCollection) => WalkerCollection): WalkerCollection;
+  combine(spec: Record<string, unknown>): WalkerCollection;
+  count(): unknown;
+  where(input: unknown): WalkerCollection;
+  orderBy(input: unknown): WalkerCollection;
+  take(n: number): WalkerCollection;
+  skip(n: number): WalkerCollection;
+}
+
+/** Internal alias to keep call sites short. */
+type AnyCollection = WalkerCollection;
 
 export type Reshape = (row: unknown) => unknown;
 const noopReshape: Reshape = (row) => row;
@@ -105,11 +131,14 @@ interface PreparedQuery {
  * `context` is forwarded so any nested `t.relation('rel', { query: (args, ctx) => ... })`
  * callback fires with the request's context. `info.variableValues` is read
  * inside the walker to resolve per-relation `args` from each FieldNode.
+ * `contract` is needed for the W-1 FK-augmentation workaround (the parent
+ * .select(...) needs every nested relation's localFields to keep the
+ * multi-query stitch working past depth 2).
  */
 export function applySelectionToCollection(
   baseCollection: AnyCollection,
   info: GraphQLResolveInfo,
-  buildCache: BuildCache<SchemaTypes>,
+  contract: Contract<SqlStorage>,
   context: unknown,
 ): PreparedQuery {
   const returnType = getNamedType(info.returnType);
@@ -121,7 +150,7 @@ export function applySelectionToCollection(
     return { collection: baseCollection, reshape: noopReshape };
   }
 
-  const walk = walkSelection(returnType, fieldNode.selectionSet, info, buildCache, context);
+  const walk = walkSelection(returnType, fieldNode.selectionSet, info, contract, context);
   return { collection: walk.apply(baseCollection), reshape: walk.reshape };
 }
 
@@ -141,7 +170,7 @@ function walkSelection(
   type: GraphQLObjectType,
   selectionSet: SelectionSetNode,
   info: GraphQLResolveInfo,
-  buildCache: BuildCache<SchemaTypes>,
+  contract: Contract<SqlStorage>,
   context: unknown,
 ): WalkResult {
   const { scalarFields, relationGroups } = collectFields(type, selectionSet);
@@ -149,7 +178,7 @@ function walkSelection(
   // Workaround for the orm-client's nested-stitch FK gap (workarounds.md W-1).
   const parentModelName = collectParentModelName(type);
   const fkColumns = parentModelName
-    ? collectLocalFkColumnsByGroup(buildCache, parentModelName, relationGroups)
+    ? collectLocalFkColumnsByGroup(contract, parentModelName, relationGroups)
     : new Set<string>();
   const allSelectFields = new Set<string>([...scalarFields, ...fkColumns]);
 
@@ -164,7 +193,7 @@ function walkSelection(
       const relReturnType = getRelationReturnType(type, entry.fieldNode.name.value);
       const innerWalk =
         relReturnType && entry.fieldNode.selectionSet
-          ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, buildCache, context)
+          ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, contract, context)
           : { apply: (c: AnyCollection) => c, reshape: noopReshape };
       // Wrap apply with the user's `query` refine — a fluent callback
       // matching the `Collection.include('rel', refineFn)` shape. Resolved
@@ -218,10 +247,7 @@ function walkSelection(
     let acc = collection;
 
     if (allSelectFields.size > 0) {
-      const sel = (acc as unknown as { select: (...names: string[]) => AnyCollection }).select;
-      if (typeof sel === 'function') {
-        acc = sel.apply(acc, [...allSelectFields]);
-      }
+      acc = acc.select(...allSelectFields);
     }
 
     for (const plan of groupPlans) {
@@ -230,30 +256,20 @@ function walkSelection(
         const entry = plan.rowAliases.get(plan.plainAlias);
         if (!entry) continue;
         const { walk } = entry;
-        acc = (
-          acc as unknown as {
-            include: (n: string, refine?: (rel: AnyCollection) => AnyCollection) => AnyCollection;
-          }
-        ).include(plan.relationName, (rel) => walk.apply(rel));
+        acc = acc.include(plan.relationName, (rel) => walk.apply(rel));
         continue;
       }
 
       // Combine: emit one .include(rel, p => p.combine({...})).
-      acc = (
-        acc as unknown as {
-          include: (n: string, refine?: (rel: AnyCollection) => AnyCollection) => AnyCollection;
-        }
-      ).include(plan.relationName, (rel) => {
+      acc = acc.include(plan.relationName, (rel) => {
         const spec: Record<string, unknown> = {};
         for (const [alias, { walk }] of plan.rowAliases) {
           spec[alias] = walk.apply(rel);
         }
         for (const alias of plan.countAliases) {
-          spec[alias] = (rel as unknown as { count: () => unknown }).count();
+          spec[alias] = rel.count();
         }
-        return (
-          rel as unknown as { combine: (s: Record<string, unknown>) => AnyCollection }
-        ).combine(spec);
+        return rel.combine(spec);
       });
     }
 
@@ -380,17 +396,11 @@ function collectParentModelName(type: GraphQLObjectType): string | undefined {
 }
 
 function collectLocalFkColumnsByGroup(
-  buildCache: BuildCache<SchemaTypes>,
+  contract: Contract<SqlStorage>,
   parentModelName: string,
   relationGroups: Map<string, RelationGroup>,
 ): Set<string> {
-  const builder = (
-    buildCache as unknown as {
-      builder: { options: { prismaNext: { contract: Contract<SqlStorage> } } };
-    }
-  ).builder;
-  const contract = builder.options.prismaNext.contract;
-  const models = (contract as unknown as { models: Record<string, unknown> }).models;
+  const models = contract.models;
   const parentModel = models[parentModelName] as
     | { relations?: Record<string, { on?: { localFields?: readonly string[] } }> }
     | undefined;
