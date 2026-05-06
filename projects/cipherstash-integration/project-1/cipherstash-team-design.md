@@ -121,26 +121,39 @@ console.log(rows[0].email.decrypt());   // synchronous; cached plaintext
 
 ```ts
 // migration.ts
-import { addSearchConfig, activatePendingSearches } from '@prisma-next/extension-cipherstash/migration';
+import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
+import {
+  addSearchConfig,
+  activatePendingSearches,
+} from '@prisma-next/extension-cipherstash/migration';
+import endContract from './end-contract.json' with { type: 'json' };
 
-export default migration({
-  endContract,
-  async up(this) {
-    // ... DDL operations to create columns ...
+export default class M_001_add_encrypted_email_search extends Migration {
+  override describe() {
+    return { from: 'sha256:...', to: 'sha256:...' };
+  }
 
-    for (const op of addSearchConfig(
-      { table: 'User', column: 'email', equality: true, freeTextSearch: true },
-      endContract,
-    )) {
-      this.dataTransform(endContract, op);
-    }
+  override get operations() {
+    const entries = [
+      ...addSearchConfig(
+        { table: 'user', column: 'email', equality: true, freeTextSearch: true },
+        endContract,
+      ),
+      activatePendingSearches(endContract),
+    ];
 
-    this.dataTransform(endContract, activatePendingSearches(endContract));
-  },
-});
+    return entries.map(({ invariantId, run }) =>
+      this.dataTransform(endContract, invariantId, { invariantId, run }),
+    );
+  }
+}
+
+MigrationCLI.run(import.meta.url, M_001_add_encrypted_email_search);
 ```
 
-`addSearchConfig({...})` produces one `DataTransformOperation` per enabled mode flag (one for `equality`, one for `freeTextSearch`); `activatePendingSearches()` produces a single op invoking the EQL pending-activation function. Each op carries an `invariantId` for invariant-aware migration ref routing. The factories return read-only arrays the user iterates and wraps with `this.dataTransform(...)`.
+A migration is a class extending `Migration` whose `operations` getter returns an array of operation objects; `MigrationCLI.run(...)` at the bottom is the standard runner shim. DDL ops (`createTable`, `addColumn`, etc.) — when present — sit alongside the cipherstash entries in the same array. The example above shows a pure search-config migration for an `email` column whose DDL landed in a prior migration.
+
+`addSearchConfig({...}, endContract)` returns a readonly array of `AddSearchConfigEntry` records — one per enabled mode flag, each carrying a deterministic `invariantId` (e.g. `cipherstash.search-config.user.email.unique`) and a `run()` closure that builds a `SqlQueryPlan`. `activatePendingSearches(endContract)` returns a single such entry. The user wraps each entry via the standard `this.dataTransform(endContract, invariantId, { invariantId, run })` factory, which yields a `DataTransformOperation` (`operationClass: 'data'`) — the operation class that participates in invariant-aware ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404).
 
 Bootstrap (the EQL extension install, `cs_configuration_v2` table creation, etc.) is handled by Prisma Next's `databaseDependencies.init` machinery — the user runs `db init` once per database and the EQL bundle is applied. Re-running `db init` short-circuits via the precheck (`information_schema.tables` lookup for `cs_configuration_v2`).
 
