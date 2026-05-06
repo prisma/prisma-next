@@ -25,10 +25,10 @@ export function buildSchema(runtime: Runtime) {
       // collapses them into a single `.include('posts', p => p.combine({...}))`.
       // The wrapResolve reshape lifts each branch onto the parent.
       drafts: t.relation('posts', {
-        query: { where: { published: 0 } },
+        query: (rel) => rel.where({ published: 0 }),
       }),
       publishedPosts: t.relation('posts', {
-        query: { where: { published: 1 } },
+        query: (rel) => rel.where({ published: 1 }),
       }),
       // Peer count field — emitted as a `count()` branch in the same
       // combine block as `drafts` / `publishedPosts`.

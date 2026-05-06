@@ -57,6 +57,15 @@ const POTHOS_EXPOSED_FIELD = 'pothosExposedField';
  */
 const POTHOS_FIELD_OPTIONS = 'pothosOptions';
 
+/**
+ * Fluent `query` callback users pass to `t.relation(...)`. Receives the
+ * relation collection (the same shape `Collection.include('rel', fn)`
+ * exposes), the field's resolved args, and the request context, and
+ * returns the refined collection. Stored on the relation field's
+ * extensions and invoked by the walker at apply time.
+ */
+type QueryRefineCallback = (rel: AnyCollection, args: unknown, ctx: unknown) => AnyCollection;
+
 interface RelationFieldExt {
   relationName: string;
   parentModel: string;
@@ -66,9 +75,7 @@ interface RelationFieldExt {
     description?: string;
     nullable?: boolean;
     args?: unknown;
-    query?:
-      | { where?: unknown; orderBy?: unknown; take?: number; skip?: number }
-      | ((args: unknown, ctx: unknown) => unknown);
+    query?: QueryRefineCallback;
   };
 }
 
@@ -159,28 +166,21 @@ function walkSelection(
         relReturnType && entry.fieldNode.selectionSet
           ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, buildCache, context)
           : { apply: (c: AnyCollection) => c, reshape: noopReshape };
-      // Wrap apply with the refine. Both the static (object) and dynamic
-      // (callback) forms of `query` are supported. The dynamic form
-      // receives the field's resolved args (via getArgumentValues against
-      // the parent type's field def) and the request context.
+      // Wrap apply with the user's `query` refine — a fluent callback
+      // matching the `Collection.include('rel', refineFn)` shape. Resolved
+      // args come from getArgumentValues against the parent type's field
+      // def; ctx is the request context threaded down from prismaField.
       const opts = entry.ext.opts;
       const innerWithRefine: WalkResult = {
         apply: (c) => {
           let r = c;
-          if (opts.query !== undefined) {
-            const refine =
-              typeof opts.query === 'function'
-                ? (() => {
-                    const fieldDef = type.getFields()[entry.fieldNode.name.value];
-                    const args = fieldDef
-                      ? getArgumentValues(fieldDef, entry.fieldNode, info.variableValues)
-                      : {};
-                    return opts.query(args, context);
-                  })()
-                : opts.query;
-            if (refine && typeof refine === 'object') {
-              r = applyStaticRefine(r, refine as RelationRefine);
-            }
+          if (typeof opts.query === 'function') {
+            const fieldDef = type.getFields()[entry.fieldNode.name.value];
+            const args = fieldDef
+              ? getArgumentValues(fieldDef, entry.fieldNode, info.variableValues)
+              : {};
+            const refined = opts.query(r, args, context);
+            if (refined != null) r = refined;
           }
           return innerWalk.apply(r);
         },
@@ -403,32 +403,6 @@ function collectLocalFkColumnsByGroup(
     for (const f of rel.on.localFields) out.add(f);
   }
   return out;
-}
-
-interface RelationRefine {
-  where?: unknown;
-  orderBy?: unknown;
-  take?: number;
-  skip?: number;
-}
-
-function applyStaticRefine(collection: AnyCollection, refine: RelationRefine): AnyCollection {
-  let acc = collection;
-  if (refine.where !== undefined) {
-    acc = (acc as unknown as { where: (w: unknown) => AnyCollection }).where(refine.where);
-  }
-  if (refine.orderBy !== undefined) {
-    acc = (acc as unknown as { orderBy: (o: unknown) => AnyCollection }).orderBy(
-      refine.orderBy as never,
-    );
-  }
-  if (refine.take !== undefined) {
-    acc = (acc as unknown as { take: (n: number) => AnyCollection }).take(refine.take);
-  }
-  if (refine.skip !== undefined) {
-    acc = (acc as unknown as { skip: (n: number) => AnyCollection }).skip(refine.skip);
-  }
-  return acc;
 }
 
 // ---------------------------------------------------------------------------

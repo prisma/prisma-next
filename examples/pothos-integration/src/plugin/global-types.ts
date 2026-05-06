@@ -13,10 +13,13 @@ import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Collection,
+  DefaultCollectionTypeState,
   DefaultModelRow,
+  IncludeRefinementCollection,
+  IncludeRefinementResult,
+  IsToManyRelation,
   RelatedModelName,
   RelationNames,
-  ShorthandWhereFilter,
 } from '@prisma-next/sql-orm-client';
 import type { GraphQLResolveInfo } from 'graphql';
 import type { PothosPrismaNextPlugin } from './index';
@@ -48,18 +51,45 @@ type RelationsOnModel<
   : string;
 
 /**
- * The where-shape for a relation's target model. Mirrors the orm-client's
- * `ShorthandWhereFilter` so `t.relation('posts', { query: { where: ... } })`
- * autocompletes from the contract instead of accepting `unknown`.
+ * Input/output type for a relation's `query` callback — the same shape
+ * `Collection.include('rel', refineFn)` accepts. Lets consumers chain
+ * `.where(...).orderBy(...).take(...)` against the relation collection
+ * exactly as they'd write it directly against the orm-client; no
+ * structural-literal `{ where, orderBy, take }` shape from plugin-prisma's
+ * Prisma-input-tree heritage.
  */
-type RelationWhere<
+type RelationCollectionFor<
   Types extends SchemaTypes,
   ModelName extends string,
   RelName extends string,
 > = Types['PrismaNextContract'] extends Contract<SqlStorage>
-  ? ShorthandWhereFilter<
+  ? IncludeRefinementCollection<
       Types['PrismaNextContract'],
-      RelatedModelName<Types['PrismaNextContract'], ModelName, RelName>
+      RelatedModelName<Types['PrismaNextContract'], ModelName, RelName> & string,
+      DefaultModelRow<
+        Types['PrismaNextContract'],
+        RelatedModelName<Types['PrismaNextContract'], ModelName, RelName> & string
+      >,
+      DefaultCollectionTypeState,
+      IsToManyRelation<Types['PrismaNextContract'], ModelName, RelName> extends infer M extends
+        boolean
+        ? M
+        : false
+    >
+  : never;
+
+type RelationRefineResult<
+  Types extends SchemaTypes,
+  ModelName extends string,
+  RelName extends string,
+> = Types['PrismaNextContract'] extends Contract<SqlStorage>
+  ? IncludeRefinementResult<
+      Types['PrismaNextContract'],
+      RelatedModelName<Types['PrismaNextContract'], ModelName, RelName> & string,
+      IsToManyRelation<Types['PrismaNextContract'], ModelName, RelName> extends infer M extends
+        boolean
+        ? M
+        : false
     >
   : unknown;
 
@@ -229,12 +259,20 @@ interface PrismaNextRelationOptions<
   description?: string;
   nullable?: boolean;
   args?: Args;
-  query?:
-    | RelationRefine<Types, ModelName, RelName>
-    | ((
-        args: InputShapeFromFields<Args>,
-        ctx: Types['Context'],
-      ) => RelationRefine<Types, ModelName, RelName>);
+  /**
+   * Fluent refiner. Receives the relation's collection (the same shape
+   * `db.Parent.include('rel', refineFn)` exposes — chainable
+   * `.where(...).orderBy(...).take(...)` etc.) along with the field's
+   * resolved `args` and the request `ctx`, and returns the refined
+   * collection. Plugin-prisma's structural `query: { where, orderBy }`
+   * literal would mismatch prisma-next's fluent API; this matches it
+   * directly so consumers write the same idiom they'd write inline.
+   */
+  query?: (
+    rel: RelationCollectionFor<Types, ModelName, RelName>,
+    args: InputShapeFromFields<Args>,
+    ctx: Types['Context'],
+  ) => RelationRefineResult<Types, ModelName, RelName>;
 }
 
 interface PrismaNextRelationCountOptions<Types extends SchemaTypes, Args extends InputFieldMap> {
@@ -245,21 +283,4 @@ interface PrismaNextRelationCountOptions<Types extends SchemaTypes, Args extends
   // .relation's where, and the orm-client surface for branch-where on
   // a count is in flux.
   where?: unknown | ((args: InputShapeFromFields<Args>, ctx: Types['Context']) => unknown);
-}
-
-interface RelationRefine<
-  Types extends SchemaTypes,
-  ModelName extends string,
-  RelName extends string,
-> {
-  where?: RelationWhere<Types, ModelName, RelName>;
-  // `orderBy` in the orm-client is an accessor callback, not a literal —
-  // covering it via type would require lifting `OrderByItem`-builders into
-  // this interface and gets noisy. Static literal is permissive but
-  // structural; revisit when Pothos consumers actually want it typed.
-  orderBy?: unknown;
-  take?: number;
-  skip?: number;
-  distinct?: readonly string[];
-  distinctOn?: readonly string[];
 }

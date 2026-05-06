@@ -203,9 +203,11 @@ interface RelationExtSpec {
   parentModel: string;
   targetModel: string;
   cardinality: '1:1' | '1:N' | 'N:1' | 'M:N';
-  query?:
-    | { where?: unknown; orderBy?: unknown; take?: number; skip?: number }
-    | ((args: unknown, ctx: unknown) => unknown);
+  // The fluent refiner shape the walker expects (after the move from
+  // structural literals): `(rel, args, ctx) => rel.<chain>`. Tests pass
+  // a function that mimics calling `.where(...)` on the recording
+  // collection and returning it.
+  query?: (rel: RecordingCollection, args: unknown, ctx: unknown) => RecordingCollection;
 }
 
 function relationExt(spec: RelationExtSpec): Record<string, unknown> {
@@ -303,7 +305,7 @@ function buildFixtureSchema(): {
           parentModel: 'User',
           targetModel: 'Post',
           cardinality: '1:N',
-          query: { where: { published: 0 } },
+          query: (rel) => rel.where({ published: 0 }),
         }),
       },
       publishedPosts: {
@@ -313,7 +315,7 @@ function buildFixtureSchema(): {
           parentModel: 'User',
           targetModel: 'Post',
           cardinality: '1:N',
-          query: { where: { published: 1 } },
+          query: (rel) => rel.where({ published: 1 }),
         }),
       },
       // Peer count.
@@ -518,7 +520,12 @@ describe('auto-include walker · apply path', () => {
     expect(combineCall?.args[0]).toEqual(['postCount']);
   });
 
-  it('applies static field-time refine (where/orderBy/take/skip) to the relation', () => {
+  it('invokes the fluent `query` refiner against the relation collection', () => {
+    // `t.relation('posts', { query: (rel) => rel.where({ published: 0 }) })`
+    // shape: the walker must invoke the callback with the relation's
+    // collection and chain whatever the user returned. The recording
+    // collection's `.where` call should land inside the .include's
+    // refineFn invocation.
     const { User } = buildFixtureSchema();
     const sel = selectionSetFromQuery('{ users { drafts { id } } }');
     const info = buildResolveInfo(User, sel);
@@ -526,28 +533,21 @@ describe('auto-include walker · apply path', () => {
     const base = createRecordingCollection();
     applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
-    // A single field on a relation (even with a non-matching alias) takes
-    // the plain-include path. The reshape handles the alias→relationName
-    // lift; no combine emission is needed at the apply level. The
-    // refineFn passed to .include() must call .where with the static
-    // query so the orm-client filters the relation rows correctly.
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
     expect(includes[0]?.args).toEqual(['posts']);
-    // No combine for a single-branch relation.
     expect(includes[0]?.inner?.find((c) => c.method === 'combine')).toBeUndefined();
-    // The static refine should land as a .where on the rel collection.
     const whereCall = includes[0]?.inner?.find((c) => c.method === 'where');
     expect(whereCall).toBeDefined();
     expect(whereCall?.args[0]).toEqual({ published: 0 });
   });
 
-  it('invokes a function-form `query` callback with field args and the request context', () => {
-    // `t.relation('posts', { args, query: (args, ctx) => ({ where: ... }) })`
-    // shape: the dynamic query callback must fire at apply-time so the
-    // refine reflects per-request input. Older versions of the walker
-    // typechecked the signature but never called the function, returning
-    // unfiltered rows. Regression guard.
+  it('passes resolved field args and the request ctx to the `query` callback', () => {
+    // The walker must thread per-field GraphQL args (resolved via
+    // getArgumentValues against the parent type's field def) and the
+    // request context into the user's refine callback. Regression guard
+    // for the dynamic-args path (T1-2 — a previous version typechecked
+    // the signature but never invoked it).
     const captured: { args: unknown; ctx: unknown }[] = [];
 
     const Post = new ObjectType({
@@ -572,10 +572,10 @@ describe('auto-include walker · apply path', () => {
             parentModel: 'User',
             targetModel: 'Post',
             cardinality: '1:N',
-            query: (args: unknown, ctx: unknown) => {
+            query: (rel, args, ctx) => {
               captured.push({ args, ctx });
               const a = args as { onlyPublished?: boolean };
-              return { where: { published: a.onlyPublished ? 1 : 0 } };
+              return rel.where({ published: a.onlyPublished ? 1 : 0 });
             },
           }),
         },

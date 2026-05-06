@@ -1,4 +1,9 @@
 export { Collection } from '../collection';
+export type {
+  IncludeRefinementCollection,
+  IncludeRefinementResult,
+  IsToManyRelation,
+} from '../collection-internal-types';
 export { all, and, not, or } from '../filters';
 export { GroupedCollection } from '../grouped-collection';
 export type { OrmOptions } from '../orm';

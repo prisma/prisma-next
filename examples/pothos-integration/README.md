@@ -62,14 +62,6 @@ The demo's drafts/publishedPosts/postCount query is the canonical example: today
 
 The sqlite adapter exposes `text/integer/real/blob/datetime/json/bigint` columns (`packages/3-targets/6-adapters/sqlite/src/exports/column-types.ts`) but no boolean. Postgres has `boolColumn` + `pg/bool@1`; sqlite would need the equivalent (storing as INTEGER 0/1 with a codec that decodes to TS `boolean`). Today the demo's `Post.published` is declared `integerColumn`, so the GraphQL surface is `Int!` (`t.exposeInt('published')` returns 0 or 1). With a boolean codec it would be `t.exposeBoolean('published')` and serialise as a real `Boolean!`. The plugin needs no changes — this is purely a sqlite-adapter coverage gap.
 
-### orm-client write surface: no batched insert
-
-`db.sql.User.insert([row1, row2])` doesn't exist; only single-row insert. Minor seeding ergonomics — the demo seed loops one row at a time. Not blocking, but the omission is surprising for anyone coming from Prisma's `createMany`.
-
-### sql-runtime: middleware export path
-
-`SqlMiddleware` is exported from `@prisma-next/sql-runtime` (root) rather than `@prisma-next/sql-runtime/middleware` as I expected from the package layout. Worth either a re-export under the more specific path or a doc nudge in the README.
-
 ## Run it
 
 ```bash
@@ -145,11 +137,14 @@ const builder = new SchemaBuilder<{
 // src/schema.ts (truncated)
 builder.prismaObject('User', {
   fields: (t) => ({
-    id: t.field({ type: 'ID', resolve: (parent) => (parent as Record<string, unknown>).id }),
-    firstName: t.field({ type: 'String', resolve: (parent) => (parent as Record<string, unknown>).firstName }),
+    id: t.exposeID('id'),
+    firstName: t.exposeString('firstName'),
     posts: t.relation('posts'),
-    drafts: t.relation('posts', { query: { where: { published: 0 } } }),
-    publishedPosts: t.relation('posts', { query: { where: { published: 1 } } }),
+    // Fluent refiner — same shape `Collection.include('rel', refineFn)` exposes.
+    // `rel` is contract-typed, so `rel.where({...})` autocompletes against
+    // Post's columns; misspellings are compile errors.
+    drafts: t.relation('posts', { query: (rel) => rel.where({ published: 0 }) }),
+    publishedPosts: t.relation('posts', { query: (rel) => rel.where({ published: 1 }) }),
     postCount: t.relationCount('posts'),
   }),
 });
