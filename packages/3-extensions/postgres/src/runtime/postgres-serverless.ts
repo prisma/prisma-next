@@ -152,13 +152,25 @@ export default function postgresServerless<TContract extends Contract<SqlStorage
       const client = new Client({ connectionString: url });
       await driver.connect({ kind: 'pgClient', client });
 
-      const runtime = createRuntime({
-        stackInstance,
-        context,
-        driver,
-        verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
-        ...ifDefined('middleware', options.middleware),
-      });
+      let runtime: Runtime;
+      try {
+        runtime = createRuntime({
+          stackInstance,
+          context,
+          driver,
+          verify: options.verify ?? { mode: 'onFirstUse', requireMarker: false },
+          ...ifDefined('middleware', options.middleware),
+        });
+      } catch (err) {
+        // The driver is bound to the pg.Client at this point; without a runtime
+        // to wrap it, the caller has no handle to dispose. Close the driver so
+        // the underlying pg.Client is released even if its TCP socket has not
+        // yet opened (lazy connect): keeps cleanup symmetric with successful
+        // construction and prevents real socket leaks if pg ever changes its
+        // connect semantics.
+        await driver.close().catch(() => undefined);
+        throw err;
+      }
 
       Object.defineProperty(runtime, Symbol.asyncDispose, {
         value: () => runtime.close(),

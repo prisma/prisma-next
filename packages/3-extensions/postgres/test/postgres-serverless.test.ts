@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   sqlBuilder: vi.fn(),
   driverCreate: vi.fn(),
   driverConnect: vi.fn(),
+  driverClose: vi.fn(),
   validateContract: vi.fn(),
   poolCtor: vi.fn(),
   clientCtor: vi.fn(),
@@ -76,6 +77,7 @@ describe('postgresServerless', () => {
     mocks.createSqlExecutionStack.mockReset();
     mocks.driverCreate.mockReset();
     mocks.driverConnect.mockReset();
+    mocks.driverClose.mockReset();
     mocks.validateContract.mockReset();
     mocks.poolCtor.mockReset();
     mocks.clientCtor.mockReset();
@@ -96,7 +98,12 @@ describe('postgresServerless', () => {
     });
     mocks.instantiateExecutionStack.mockReturnValue({ adapter: {} });
     mocks.driverConnect.mockResolvedValue(undefined);
-    mocks.driverCreate.mockReturnValue({ id: 'driver-instance', connect: mocks.driverConnect });
+    mocks.driverClose.mockResolvedValue(undefined);
+    mocks.driverCreate.mockReturnValue({
+      id: 'driver-instance',
+      connect: mocks.driverConnect,
+      close: mocks.driverClose,
+    });
     mocks.runtimeClose.mockResolvedValue(undefined);
     mocks.createRuntime.mockImplementation(() => ({
       id: 'runtime-instance',
@@ -202,6 +209,33 @@ describe('postgresServerless', () => {
     expect(mocks.driverCreate).toHaveBeenCalledTimes(2);
     expect(mocks.driverConnect).toHaveBeenCalledTimes(2);
     expect(mocks.createRuntime).toHaveBeenCalledTimes(2);
+  });
+
+  it('closes the driver if createRuntime throws after connect() resolved', async () => {
+    const failure = new Error('createRuntime boom');
+    mocks.createRuntime.mockImplementation(() => {
+      throw failure;
+    });
+
+    const db = postgresServerless({ contract });
+
+    await expect(db.connect({ url: 'postgres://localhost:5432/db' })).rejects.toBe(failure);
+
+    expect(mocks.driverConnect).toHaveBeenCalledTimes(1);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('rethrows the original error even when driver.close itself fails during cleanup', async () => {
+    const failure = new Error('createRuntime boom');
+    mocks.createRuntime.mockImplementation(() => {
+      throw failure;
+    });
+    mocks.driverClose.mockRejectedValue(new Error('close boom'));
+
+    const db = postgresServerless({ contract });
+
+    await expect(db.connect({ url: 'postgres://localhost:5432/db' })).rejects.toBe(failure);
+    expect(mocks.driverClose).toHaveBeenCalledTimes(1);
   });
 
   it('returned runtime is AsyncDisposable and disposes via close()', async () => {
