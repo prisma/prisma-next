@@ -184,10 +184,10 @@ If you start fresh, **keep**:
 
 For when you're reading the orm-client / contract source:
 
-- **Row inference**: `packages/3-extensions/sql-orm-client/src/types.ts` — `DefaultModelRow`, `RelationNames`, `RelatedModelName`, `ShorthandWhereFilter`.
+- **Row inference**: `@prisma-next/sql-orm-client` (public exports) — `DefaultModelRow`, `RelationNames`, `RelatedModelName`, `ShorthandWhereFilter`. Source at `packages/3-extensions/sql-orm-client/src/types.ts`.
 - **Codec output chain**: `packages/2-sql/4-lanes/relational-core/src/types.ts` — `ComputeColumnJsType`.
-- **Collection API**: `packages/3-extensions/sql-orm-client/src/collection.ts` — `where`, `orderBy`, `include`, `combine`, `all`, `firstOrThrow`.
-- **Include refinement shape**: `packages/3-extensions/sql-orm-client/src/collection-internal-types.ts` — `IncludeRefinementCollection`, `IsToManyRelation`.
+- **Collection API**: `packages/3-extensions/sql-orm-client/src/collection.ts` — `where`, `orderBy`, `include`, `combine`, `all`, `firstOrThrow`, `toArray`.
+- **Include refinement shape**: `IncludeRefinementCollection`, `IncludeRefinementResult`, `IsToManyRelation` are publicly exported from `@prisma-next/sql-orm-client` (the demo plugin re-uses them for `t.relation`'s `query` callback type). Source at `packages/3-extensions/sql-orm-client/src/collection-internal-types.ts`.
 - **Strategy selection**: `packages/3-extensions/sql-orm-client/src/include-strategy.ts` — capability-driven lateral/correlated/multi-query dispatch.
 - **Middleware**: `@prisma-next/sql-runtime` exports `SqlMiddleware`.
 

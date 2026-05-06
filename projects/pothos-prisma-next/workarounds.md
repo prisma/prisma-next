@@ -405,9 +405,11 @@ I assumed per-model row inference required a codec-output registry that didn't e
 
 ## D-4: Combine for sibling-aliased fields ✅ landed in M2
 
+> **Note on the example below.** The original M2 design used the structural-literal `query: { where: ... }` shape (mirroring plugin-prisma's surface). After comparing against the orm-client's idiom, the plugin moved to a fluent refiner callback — `query: (rel, args, ctx) => rel.where(...)` — which exactly matches `Collection.include('rel', refineFn)`. Behaviour and walker emission are identical; only the `query` shape changed. See the handoff notes for the rationale.
+
 ### What
 
-When two GraphQL fields back the same prisma-next relation (`drafts: t.relation('posts', { query: { where: { published: 0 } } })` + `publishedPosts: t.relation('posts', { query: { where: { published: 1 } } })`), the walker collapses them into a single `.include('posts', p => p.combine({ drafts: ..., publishedPosts: ... }))`. Plugin's `wrapResolve` then reshapes the parent to lift branches up to flat keys (`parent.drafts`, `parent.publishedPosts`).
+When two GraphQL fields back the same prisma-next relation (`drafts: t.relation('posts', { query: (rel) => rel.where({ published: 0 }) })` + `publishedPosts: t.relation('posts', { query: (rel) => rel.where({ published: 1 }) })`), the walker collapses them into a single `.include('posts', p => p.combine({ drafts: ..., publishedPosts: ... }))`. Plugin's `wrapResolve` then reshapes the parent to lift branches up to flat keys (`parent.drafts`, `parent.publishedPosts`).
 
 `t.relationCount('posts')` is emitted as a `count()` branch in the same combine block.
 

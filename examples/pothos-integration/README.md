@@ -6,11 +6,13 @@ A working `@pothos/plugin-prisma-next`-style plugin built against the prisma-nex
 
 ## What's in scope
 
-- `builder.prismaObject('User', { fields: t => ({...}) })` — register a GraphQL type bound to a prisma-next contract model.
-- `t.relation('posts')` — list / single relation field; auto-included by the walker.
-- `t.relation('drafts', { query: { where: ... } })` — multiple GraphQL fields backed by the same prisma-next relation, with different filters. Resolves in a single nested-include via prisma-next's `combine`.
+- `builder.prismaObject('User', { fields: t => ({...}) })` — register a GraphQL type bound to a prisma-next contract model. Returns a typed `ObjectRef<Types, RowFor<...>>` so consumers can capture and reuse it.
+- `t.exposeID/String/Int/Float/Boolean(name)` — the column name is contract-typed against the model's row, and the walker reads the column dependency off Pothos's `pothosExposedField` extension automatically. No plugin overrides.
+- `t.relation('posts')` — list / single relation field; auto-included by the walker. Relation name is contract-typed: typos are compile errors.
+- `t.relation('posts', { query: (rel, args, ctx) => rel.where({ published: 0 }) })` — fluent refiner matching `Collection.include('rel', refineFn)`'s shape. `rel.where(...)`'s shape is contract-typed against the related model. Multiple sibling fields backing the same relation collapse into one `combine` block.
 - `t.relationCount('posts')` — peer `Int!` field exposing the count of related rows. Emitted as a `count()` branch in the same combine block as the rows.
-- `t.prismaField({ type: 'User', resolve: (collection, ...) => ... })` — entry-point field that hands the user resolver a Collection pre-prepared with the auto-include selection. The user chains `.where(...).all().firstOrThrow()` themselves.
+- `t.prismaField({ type: 'User' | ['User'], resolve: (collection, ...) => ... })` — entry-point field that hands the user resolver a Collection pre-prepared with the auto-include selection. Singular form: chain `.firstOrThrow()`. List form: chain `.toArray()`. Pothos's own type-resolver handles list-vs-single output typing.
+- `t.field({ select: { col: true }, resolve: (parent) => ... })` — typed `select` augmentation on `t.field` for computed resolvers that need columns the user didn't expose. Keys are contract-typed against the parent row.
 - Per-request SQL execution capture surfaced to GraphQL response `extensions.prismaNext` (mirroring what Pothos+Prisma users do via Prisma's `$on('query')` hook).
 
 ## What's deliberately not implemented
@@ -108,8 +110,8 @@ The drafts/posts/postCount headline differentiator — multiple GraphQL fields b
 {
   users {
     id firstName
-    drafts { id title }            # t.relation('posts', { query: { where: { published: 0 } } })
-    publishedPosts { id title }    # t.relation('posts', { query: { where: { published: 1 } } })
+    drafts { id title }            # t.relation('posts', { query: (rel) => rel.where({ published: 0 }) })
+    publishedPosts { id title }    # t.relation('posts', { query: (rel) => rel.where({ published: 1 }) })
     postCount                      # t.relationCount('posts')
   }
 }
