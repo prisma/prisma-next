@@ -211,7 +211,15 @@ function mapIssueToCall(
       ];
       for (const index of contractTable.indexes) {
         const indexName = index.name ?? `${issue.table}_${index.columns.join('_')}_idx`;
-        calls.push(new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns]));
+        const extras: { type?: string; options?: Record<string, unknown> } = {};
+        if (index.type !== undefined) extras.type = index.type;
+        if (index.options !== undefined) extras.options = index.options;
+        const hasExtras = index.type !== undefined || index.options !== undefined;
+        calls.push(
+          hasExtras
+            ? new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns], extras)
+            : new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns]),
+        );
       }
       const explicitIndexColumnSets = new Set(
         contractTable.indexes.map((idx) => idx.columns.join(',')),

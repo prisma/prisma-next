@@ -506,6 +506,8 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
   readonly tableName: string;
   readonly indexName: string;
   readonly columns: readonly string[];
+  readonly indexType: string | undefined;
+  readonly options: Record<string, unknown> | undefined;
   readonly label: string;
 
   constructor(
@@ -513,22 +515,43 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
     tableName: string,
     indexName: string,
     columns: readonly string[],
+    extras?: { readonly type?: string; readonly options?: Record<string, unknown> },
   ) {
     super();
     this.schemaName = schemaName;
     this.tableName = tableName;
     this.indexName = indexName;
     this.columns = columns;
+    this.indexType = extras?.type;
+    this.options = extras?.options;
     this.label = `Create index "${indexName}" on "${tableName}"`;
     this.freeze();
   }
 
   toOp(): Op {
-    return createIndex(this.schemaName, this.tableName, this.indexName, this.columns);
+    const extras: { type?: string; options?: Record<string, unknown> } = {};
+    if (this.indexType !== undefined) extras.type = this.indexType;
+    if (this.options !== undefined) extras.options = this.options;
+    const hasExtras = this.indexType !== undefined || this.options !== undefined;
+    return hasExtras
+      ? createIndex(this.schemaName, this.tableName, this.indexName, this.columns, extras)
+      : createIndex(this.schemaName, this.tableName, this.indexName, this.columns);
   }
 
   renderTypeScript(): string {
-    return `createIndex(${jsonToTsSource(this.schemaName)}, ${jsonToTsSource(this.tableName)}, ${jsonToTsSource(this.indexName)}, ${jsonToTsSource(this.columns)})`;
+    const args = [
+      jsonToTsSource(this.schemaName),
+      jsonToTsSource(this.tableName),
+      jsonToTsSource(this.indexName),
+      jsonToTsSource(this.columns),
+    ];
+    if (this.indexType !== undefined || this.options !== undefined) {
+      const extrasParts: string[] = [];
+      if (this.indexType !== undefined) extrasParts.push(`type: ${jsonToTsSource(this.indexType)}`);
+      if (this.options !== undefined) extrasParts.push(`options: ${jsonToTsSource(this.options)}`);
+      args.push(`{ ${extrasParts.join(', ')} }`);
+    }
+    return `createIndex(${args.join(', ')})`;
   }
 }
 
