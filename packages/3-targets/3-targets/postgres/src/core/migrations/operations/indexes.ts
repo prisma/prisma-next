@@ -32,9 +32,9 @@ export function createIndex(
   const qualified = qualifyTableName(schemaName, tableName);
   const columnList = columns.map(quoteIdentifier).join(', ');
   const using = extras?.type ? ` USING ${quoteIdentifier(extras.type)}` : '';
-  const optionsEntries = extras?.options ? Object.entries(extras.options) : [];
+  const options = extras?.options;
   const withClause =
-    optionsEntries.length > 0 ? ` WITH (${renderIndexOptions(extras!.options!)})` : '';
+    options && Object.keys(options).length > 0 ? ` WITH (${renderIndexOptions(options)})` : '';
   return {
     id: `index.${tableName}.${indexName}`,
     label: `Create index "${indexName}" on "${tableName}"`,
