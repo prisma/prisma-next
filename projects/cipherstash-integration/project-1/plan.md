@@ -39,9 +39,9 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 ## #404 — invariant-aware ref routing (M4) + self-edge support
 
-**What it adds:** Routes downstream migration operations across `DataTransformOperation`s by `invariantId`. Reads `invariantId` from `operationClass: 'data'` ops via `deriveProvidedInvariants`.
+**What it adds:** Routes downstream migration operations by `invariantId`. As of writing, `deriveProvidedInvariants` reads `invariantId` from `operationClass: 'data'` (`DataTransformOperation`) ops only.
 
-**What we consume from it:** Nothing at execute time. Our migration-factories produce `DataTransformOperation`s carrying `invariantId` fields (per the [migration-factories task spec](specs/migration-factories.spec.md)). The `invariantId` is data the operation carries; nothing reads it until #404 lands. Project 1's own integration tests don't exercise cross-migration ref routing, so the field-being-set-but-unread behavior is invisible at the AC level.
+**What we consume from it:** Nothing at execute time. Our migration-factories produce ops that carry `invariantId` fields (per the [migration-factories task spec](specs/migration-factories.spec.md)). The exact underlying op shape is open (the spec captures three options at OQ2 — extend `DataTransformOperation`, extend `SqlMigrationPlanOperation`, or introduce a new shape) and is the implementer's call. Whichever option lands, the op must be reachable by `deriveProvidedInvariants`. Project 1's own integration tests don't exercise cross-migration ref routing, so the field-being-set-but-unread behavior is invisible at the AC level.
 
 **Coordination:** None. Project 1 ships with `invariantId`-carrying ops; the routing benefit becomes effective when #404 lands on `main`, retroactively.
 
@@ -167,7 +167,7 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 **Implementation sketch.**
 
 - Operator lowering: implement `queryOperations` handlers for `eq` against `cipherstash/string@1` columns. Lowering produces `eql_v2.eq("col", eql_v2.encrypt($1, ...))` (or the EQL canonical form — confirm against `reference/cipherstash/stack/packages/stack/src/prisma/core/operation-templates.ts`, the spec's open question 1).
-- `addSearchConfig({ ... })` factory in `exports/migration.ts`. Constructs `RawSqlExpr` instances directly via the package-internal API delivered by M1's `raw-sql-ast-node`. Each entry produces a `SqlQueryPlan` via `planFromAst(ast, contract)` and is wrapped by the user via `this.dataTransform(...)` in their `migration.ts`.
+- `addSearchConfig({ ... })` factory in `exports/migration.ts`. Returns a single migration operation per `(table, column)` call; the op's `execute` payload carries one step per enabled mode flag. Each step's SQL is built from a `RawSqlExpr` AST instance (constructed via the package-internal API delivered by M1's `raw-sql-ast-node`) lowered through `planFromAst(ast, contract)`. The user places the returned op directly in their migration's `operations` array — no `this.dataTransform(...)` wrapping at the call site. Underlying op-shape choice (extend `DataTransformOperation`, extend `SqlMigrationPlanOperation`, or new shape) is the implementer's call per migration-factories OQ2.
 - The `equality` mapping → EQL `'unique'` index (the spec's table). For M3 only the `equality` flag is exercised; `freeTextSearch` defers to M4.
 - Hand-author the integration test's `migration.ts` — the M3 test fixture is a real migration file under `test/integration/`.
 
@@ -204,8 +204,8 @@ Two PRs are open against `main` that touch surfaces this project also touches. P
 
 - Add the `ilike` arm to the operator lowering implemented in M3.
 - Implement `decryptAll(rows, opts?)` walker in `exports/decrypt-all.ts`. Bulk amortization — one `bulkDecrypt` per routing key.
-- Extend `addSearchConfig` to emit the `freeTextSearch` → EQL `'match'` index entry alongside `equality`.
-- Implement `activatePendingSearches()` as a single-entry factory.
+- Extend `addSearchConfig` so a call with both `equality: true` and `freeTextSearch: true` produces a single op with two `execute` steps (`unique` + `match`).
+- Implement `activatePendingSearches()` returning a single op invoking the EQL pending-activation function.
 - Update the integration migration `migration.ts` fixture from M3 to call `addSearchConfig({ ..., freeTextSearch: true })` and `activatePendingSearches()`.
 
 **Validation gate.**
