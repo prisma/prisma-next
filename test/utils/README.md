@@ -58,6 +58,9 @@ flowchart TD
 
 - `createDevDatabase(options?)`: Creates a dev database instance
 - `withDevDatabase(fn, options?)`: Executes a function with a dev database, auto-cleanup
+- `createRealPostgresDatabase(options?)`: Creates a dedicated temporary database on a real Postgres server
+- `withRealPostgresDatabase(fn, options?)`: Executes a function against a dedicated temporary real-Postgres database, then drops it
+- `isRealPostgresReachable(options?)`: Probe the base server (use with `describe.skipIf(...)`)
 - `withClient(connectionString, fn)`: Executes a function with a database client, auto-cleanup
 - `teardownTestDatabase(client, tables?)`: Tears down test database
 
@@ -271,6 +274,7 @@ Utilities that don't import `vitest` (e.g., `timeouts`, database helpers) can sa
 ```typescript
 import {
   withDevDatabase,
+  withRealPostgresDatabase,
   withClient,
   teardownTestDatabase,
   collectAsync,
@@ -289,6 +293,34 @@ await withDevDatabase(async ({ connectionString }) => {
     await drainAsyncIterable(someAsyncIterable);
 
     await teardownTestDatabase(client);
+  });
+});
+```
+
+### Real Postgres Tests
+
+Use `withRealPostgresDatabase` when tests need true Postgres semantics that PGlite cannot emulate (for example extension installation SQL, complex PL/pgSQL, or extension-specific types/operators).
+
+- Base server URL defaults to `process.env.PG_TEST_URL`.
+- If unset, it falls back to `postgres://postgres:postgres@127.0.0.1:5432/postgres` (the CI service default and common local Docker setup).
+- Each invocation creates a unique temporary database (default name prefix `pn_test_`) and drops it in cleanup.
+- Override per-call with `{ baseConnectionString, databaseNamePrefix }`.
+- Use `isRealPostgresReachable()` (top-level await) with `describe.skipIf(...)` to skip suites when no Postgres is reachable. `it.skipIf(...)` cannot read a value populated by `beforeAll` because vitest evaluates skip conditions at registration time.
+- Reuses `timeouts.spinUpPpgDev` for `testTimeout` / `hookTimeout` — same timeout class as the dev-database harness.
+
+```typescript
+import {
+  isRealPostgresReachable,
+  withRealPostgresDatabase,
+} from '@prisma-next/test-utils';
+
+const reachable = await isRealPostgresReachable();
+
+describe.skipIf(!reachable)('my live-pg suite', () => {
+  it('round-trips through real Postgres', async () => {
+    await withRealPostgresDatabase(async ({ connectionString }) => {
+      // connectionString points to a unique temporary database
+    });
   });
 });
 ```
