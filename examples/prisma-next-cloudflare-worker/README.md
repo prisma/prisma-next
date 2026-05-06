@@ -88,13 +88,17 @@ curl http://localhost:8787/orm/users?limit=5
 
 ## Deploy
 
-`wrangler.jsonc` carries a placeholder Hyperdrive `id` (`00000000…`). To deploy to a real Cloudflare account, provision a Hyperdrive config first (M4 task 4.2 will land the production guide):
+`wrangler.jsonc` carries a placeholder Hyperdrive `id` (`00000000…`). To deploy to a real Cloudflare account, provision a Hyperdrive config first:
 
 ```bash
 pnpm exec wrangler hyperdrive create my-hyperdrive --connection-string="postgres://…"
 # Replace the "id" in wrangler.jsonc with the printed binding id.
-pnpm deploy
+pnpm run deploy
 ```
+
+> Use `pnpm run deploy` (not `pnpm deploy`). The latter collides with pnpm's built-in `deploy` command and fails with `ERR_PNPM_INVALID_DEPLOY_TARGET`.
+
+> If your origin sits behind Cloudflare Hyperdrive, also pass `cursor: { disabled: true }` to `postgresServerless({...})` in `src/prisma/db.ts`. Hyperdrive currently rejects the `Close portal` message that `pg-cursor` (the default streaming path) sends after an extended-query Execute, leaving the connection wedged. See the deployment guide's "Known limitations" for details.
 
 ## Bundle size
 
