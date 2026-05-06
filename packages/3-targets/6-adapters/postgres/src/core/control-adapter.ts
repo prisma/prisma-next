@@ -352,17 +352,22 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         indisunique: boolean;
         attname: string;
         attnum: number;
+        amname: string;
+        reloptions: readonly string[] | null;
       }>(
         `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
            a.attname,
-           a.attnum
+           a.attnum,
+           am.amname,
+           ic.reloptions
          FROM pg_indexes i
          JOIN pg_class ic ON ic.relname = i.indexname
          JOIN pg_namespace ins ON ins.oid = ic.relnamespace AND ins.nspname = $1
          JOIN pg_index ix ON ix.indexrelid = ic.oid
+         JOIN pg_am am ON am.oid = ic.relam
          JOIN pg_class t ON t.oid = ix.indrelid
          JOIN pg_namespace tn ON tn.oid = t.relnamespace AND tn.nspname = $1
          LEFT JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey) AND a.attnum > 0
@@ -520,7 +525,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       }));
 
       // Process indexes
-      const indexesMap = new Map<string, { columns: string[]; name: string; unique: boolean }>();
+      const indexesMap = new Map<
+        string,
+        {
+          columns: string[];
+          name: string;
+          unique: boolean;
+          type: string | undefined;
+          options: Record<string, string> | undefined;
+        }
+      >();
       for (const idxRow of indexesByTable.get(tableName) ?? []) {
         if (!idxRow.attname) {
           continue;
@@ -529,10 +543,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         if (existing) {
           existing.columns.push(idxRow.attname);
         } else {
+          // Drop btree (the Postgres default) so a contract index without an
+          // explicit type matches a default-method introspected index without
+          // forcing DROP+CREATE on every plan.
+          const indexType = idxRow.amname === 'btree' ? undefined : idxRow.amname;
+          const indexOptions = parsePgReloptions(idxRow.reloptions);
           indexesMap.set(idxRow.indexname, {
             columns: [idxRow.attname],
             name: idxRow.indexname,
             unique: idxRow.indisunique,
+            type: indexType,
+            options: indexOptions,
           });
         }
       }
@@ -540,6 +561,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
         columns: Object.freeze([...idx.columns]) as readonly string[],
         name: idx.name,
         unique: idx.unique,
+        ...(idx.type !== undefined && { type: idx.type }),
+        ...(idx.options !== undefined && { options: idx.options }),
       }));
 
       tables[tableName] = {
@@ -673,6 +696,37 @@ function mapReferentialAction(rule: string): SqlReferentialAction | undefined {
  * Groups an array of objects by a specified key.
  * Returns a Map for O(1) lookup by group key.
  */
+/**
+ * Parses a `pg_class.reloptions` array into a `Record<string, string>`.
+ *
+ * Postgres returns reloptions as a `text[]` whose entries are `key=value`
+ * strings; the value side is always a string regardless of the underlying
+ * scalar type. The verifier compares contract options to introspected
+ * options after coercing both sides to strings, so keeping the raw text
+ * here is correct.
+ *
+ * Returns `undefined` when the input is null/empty (no WITH clause).
+ */
+function parsePgReloptions(
+  reloptions: readonly string[] | null,
+): Record<string, string> | undefined {
+  if (!reloptions || reloptions.length === 0) {
+    return undefined;
+  }
+  const result: Record<string, string> = {};
+  for (const entry of reloptions) {
+    const eq = entry.indexOf('=');
+    if (eq === -1) {
+      // Defensive: skip malformed entries rather than corrupting the IR.
+      continue;
+    }
+    const key = entry.slice(0, eq);
+    const value = entry.slice(eq + 1);
+    result[key] = value;
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
 function groupBy<T, K extends keyof T>(items: readonly T[], key: K): Map<T[K], T[]> {
   const map = new Map<T[K], T[]>();
   for (const item of items) {

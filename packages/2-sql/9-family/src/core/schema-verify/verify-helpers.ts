@@ -21,15 +21,29 @@ import type {
 } from '@prisma-next/sql-schema-ir/types';
 import type { ComponentDatabaseDependency } from '../migrations/types';
 
-function stableStringify(value: Record<string, unknown> | undefined): string {
-  if (value === undefined) return '';
-  const sorted = Object.keys(value)
-    .sort()
-    .reduce<Record<string, unknown>>((acc, key) => {
-      acc[key] = value[key];
-      return acc;
-    }, {});
-  return JSON.stringify(sorted);
+function indexOptionsLooselyEqual(
+  a: Record<string, unknown> | undefined,
+  b: Record<string, unknown> | undefined,
+): boolean {
+  const aKeys = a ? Object.keys(a).sort() : [];
+  const bKeys = b ? Object.keys(b).sort() : [];
+  if (aKeys.length !== bKeys.length) return false;
+  for (let i = 0; i < aKeys.length; i += 1) {
+    if (aKeys[i] !== bKeys[i]) return false;
+  }
+  if (aKeys.length === 0) return true;
+  for (const key of aKeys) {
+    // Postgres introspection returns reloptions values as raw strings (e.g.
+    // `'70'`, `'false'`), while contract option leaves are typed (number,
+    // boolean, string). Compare via String() so a contract `fillfactor: 70`
+    // matches an introspected `fillfactor: '70'` without a spurious mismatch.
+    if (
+      String((a as Record<string, unknown>)[key]) !== String((b as Record<string, unknown>)[key])
+    ) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function indexExtrasMatch(
@@ -37,7 +51,7 @@ function indexExtrasMatch(
   schemaIndex: { readonly type?: string; readonly options?: Record<string, unknown> },
 ): boolean {
   if ((contractIndex.type ?? null) !== (schemaIndex.type ?? null)) return false;
-  return stableStringify(contractIndex.options) === stableStringify(schemaIndex.options);
+  return indexOptionsLooselyEqual(contractIndex.options, schemaIndex.options);
 }
 
 /**
