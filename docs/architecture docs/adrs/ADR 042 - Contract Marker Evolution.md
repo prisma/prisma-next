@@ -1,5 +1,6 @@
 # ADR 042 — Contract marker evolution
 
+> **Note.** [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) adds the `invariants` column to `prisma_contract.marker` directly in the `CREATE TABLE IF NOT EXISTS` DDL rather than using the alter-based migration pattern described here. The pattern in this ADR remains the design of record for schema changes that need to migrate live deployments through `ALTER` statements.
 
 ## Context
 
