@@ -81,7 +81,7 @@ export type FieldOutputTypes = {
     readonly email: CodecTypes['pg/text@1']['output'];
     readonly displayName: CodecTypes['pg/text@1']['output'];
     readonly createdAt: CodecTypes['pg/timestamptz@1']['output'];
-    readonly kind: CodecTypes['pg/enum@1']['output'];
+    readonly kind: 'admin' | 'user';
     readonly address: AddressOutput | null;
   };
 };
