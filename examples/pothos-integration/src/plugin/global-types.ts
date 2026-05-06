@@ -239,7 +239,16 @@ interface PrismaNextRootFieldOptions<
   Args extends InputFieldMap,
   Kind extends FieldKind,
 > {
-  type: ModelName;
+  /**
+   * Singular (`'User'`) or list (`['User']`). Pothos's own
+   * `ShapeFromTypeParam` handles list-vs-single output typing from this
+   * parameter; the resolver always operates on the same Collection
+   * (terminal choice — `.firstOrThrow()` vs `.toArray()` — is the
+   * caller's). The runtime shim in `field-builder.ts` extracts the
+   * model name regardless of form and stashes it in
+   * `PRISMA_NEXT_PREPARED`.
+   */
+  type: ModelName | [ModelName];
   description?: string;
   nullable?: boolean;
   args?: Args;

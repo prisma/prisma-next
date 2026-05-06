@@ -64,8 +64,8 @@ export function buildSchema(runtime: Runtime) {
   builder.queryType({
     fields: (t) => ({
       users: t.prismaField({
-        type: 'User',
-        resolve: (collection) => collection.all().firstOrThrow(),
+        type: ['User'],
+        resolve: (collection) => collection.all().toArray(),
       }),
       userById: t.prismaField({
         type: 'User',

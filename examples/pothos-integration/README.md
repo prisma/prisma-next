@@ -151,6 +151,13 @@ builder.prismaObject('User', {
 
 builder.queryType({
   fields: (t) => ({
+    // List form: `type: ['User']` produces `users: [User!]!`. The
+    // resolver chooses the terminal — `.toArray()` here, `.firstOrThrow()`
+    // on the singular form below.
+    users: t.prismaField({
+      type: ['User'],
+      resolve: (collection) => collection.all().toArray(),
+    }),
     userById: t.prismaField({
       type: 'User',
       args: { id: t.arg.string({ required: true }) },
