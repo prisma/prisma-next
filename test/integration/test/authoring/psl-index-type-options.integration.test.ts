@@ -97,4 +97,52 @@ describe('PSL @@index type and options — integration with real paradedb pack',
       }),
     ).toThrow(/key_field|bm25/);
   });
+
+  it('the registry rejects a PSL-authored index whose type is not registered', () => {
+    const result = interpret(`model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "made-up")
+}`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      tables: { doc: { indexes: [{ columns: ['body'], type: 'made-up' }] } },
+    });
+
+    const registry = createIndexTypeRegistry();
+    for (const entry of paradedbIndexTypes.entries) {
+      registry.register(entry);
+    }
+
+    expect(() =>
+      validateContract<Contract<SqlStorage>>(result.value, emptyCodecLookup, {
+        indexTypeRegistry: registry,
+      }),
+    ).toThrow(/unregistered index type "made-up"/);
+  });
+
+  it('lowers an empty options literal to {} and the registry rejects it for bm25 (missing key_field)', () => {
+    const result = interpret(`model Doc {
+  id Int @id
+  body String
+  @@index([body], type: "bm25", options: {})
+}`);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.value.storage).toMatchObject({
+      tables: { doc: { indexes: [{ columns: ['body'], type: 'bm25', options: {} }] } },
+    });
+
+    const registry = createIndexTypeRegistry();
+    for (const entry of paradedbIndexTypes.entries) {
+      registry.register(entry);
+    }
+
+    expect(() =>
+      validateContract<Contract<SqlStorage>>(result.value, emptyCodecLookup, {
+        indexTypeRegistry: registry,
+      }),
+    ).toThrow(/key_field/);
+  });
 });
