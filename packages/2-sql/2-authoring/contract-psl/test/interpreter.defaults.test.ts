@@ -377,4 +377,63 @@ model Post {
       },
     ]);
   });
+
+  it('resolves a synthetic field preset through the field-preset dispatch path (genericness)', () => {
+    // Registers a synthetic preset under `temporal.exampleField` to confirm
+    // that PSL's field-preset dispatch is generic — it walks
+    // `authoringContributions.field` for any registered preset, not just the
+    // real `temporal.{createdAt,updatedAt}` pair. AC6 / TC7 from
+    // projects/created-updated-at-authoring/spec.md.
+    const document = parsePslDocument({
+      schema: `model Synthetic {
+  id Int @id
+  example temporal.exampleField()
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: {
+        field: {
+          temporal: {
+            exampleField: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+                default: { kind: 'function', expression: "'synthetic-default'" },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        synthetic: {
+          columns: {
+            example: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+              nullable: false,
+              default: {
+                kind: 'function',
+                expression: "'synthetic-default'",
+              },
+            },
+          },
+        },
+      },
+    });
+    // The synthetic preset declares a storage default only — no execution
+    // mutation default should be emitted for the `example` column.
+    const defaults = result.value.execution?.mutations.defaults ?? [];
+    expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
+  });
 });

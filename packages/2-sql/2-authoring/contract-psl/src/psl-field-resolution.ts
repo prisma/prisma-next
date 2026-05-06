@@ -14,7 +14,7 @@ import {
   parseConstraintMapArgument,
   parseMapName,
 } from './psl-attribute-parsing';
-import type { ColumnDescriptor } from './psl-column-resolution';
+import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
   lowerDefaultForField,
@@ -309,6 +309,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
+    let presetContributions: FieldPresetContributions | undefined;
     const resolveInput = {
       field,
       enumTypeDescriptors,
@@ -338,6 +339,17 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         }
         continue;
       }
+      // Field presets are complete declarations — they carry their own codec
+      // and do not compose with `[]` list-of semantics. Reject early.
+      if (resolved.presetContributions) {
+        diagnostics.push({
+          code: 'PSL_PRESET_NOT_LIST',
+          message: `Field "${model.name}.${field.name}" uses a field-preset call as a list element type. Presets cannot be list elements; remove "[]" or use a scalar type.`,
+          sourceId,
+          span: field.span,
+        });
+        continue;
+      }
       scalarCodecId = resolved.descriptor.codecId;
       descriptor = scalarTypeDescriptors.get('Json');
     } else {
@@ -354,13 +366,37 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         continue;
       }
       descriptor = resolved.descriptor;
+      presetContributions = resolved.presetContributions;
     }
 
     if (!descriptor) {
       continue;
     }
 
+    // Field presets are complete declarations: the preset names its own codec
+    // and contributes any combination of default / executionDefaults / id /
+    // unique. Optional and `@default(...)` modifiers contradict that, so they
+    // are hard errors per spec FR7.
+    if (presetContributions && field.optional) {
+      diagnostics.push({
+        code: 'PSL_PRESET_NOT_OPTIONAL',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot be optional. Remove "?" or use a different field type.`,
+        sourceId,
+        span: field.span,
+      });
+      continue;
+    }
+
     const defaultAttribute = getAttribute(field.attributes, 'default');
+    if (presetContributions && defaultAttribute) {
+      diagnostics.push({
+        code: 'PSL_PRESET_AND_DEFAULT_CONFLICT',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @default(...). The preset already specifies the default value.`,
+        sourceId,
+        span: defaultAttribute.span,
+      });
+      continue;
+    }
     const updatedAtExecutionDefaults = updatedAtAttribute
       ? lowerUpdatedAtAttribute({
           model,
@@ -415,19 +451,52 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       diagnostics,
     });
 
+    // Field presets contribute their own default / executionDefaults / id /
+    // unique. They take precedence over attribute-derived contributions for
+    // this field, since a preset *is* the field declaration. Conflicts with
+    // `@default` and optional are already rejected above; conflicts with
+    // explicit `@id` and `@updatedAt` would be redundant noise on the
+    // resolved field, so we surface them as hard errors here for symmetry.
+    if (presetContributions) {
+      if (idAttribute && !presetContributions.id) {
+        diagnostics.push({
+          code: 'PSL_PRESET_AND_ID_CONFLICT',
+          message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @id. Use a preset that contributes id semantics, or drop @id.`,
+          sourceId,
+          span: idAttribute.span,
+        });
+        continue;
+      }
+      if (updatedAtAttribute) {
+        diagnostics.push({
+          code: 'PSL_PRESET_AND_UPDATED_AT_CONFLICT',
+          message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @updatedAt. The preset already specifies execution defaults.`,
+          sourceId,
+          span: updatedAtAttribute.span,
+        });
+        continue;
+      }
+    }
+
     // `loweredDefault.executionDefaults` (from `@default(generator())`, on-create only)
     // and `updatedAtExecutionDefaults` (from `@updatedAt`, both phases) are mutually
     // exclusive on a given field — `lowerUpdatedAtAttribute` already rejects
     // `@updatedAt @default(...)` — so a simple `??` is safe here.
-    const fieldExecutionDefaults = updatedAtExecutionDefaults ?? loweredDefault.executionDefaults;
+    // Field-preset contributions take precedence over both attribute-derived
+    // sources when present.
+    const fieldExecutionDefaults =
+      presetContributions?.executionDefaults ??
+      updatedAtExecutionDefaults ??
+      loweredDefault.executionDefaults;
+    const fieldDefaultValue = presetContributions?.default ?? loweredDefault.defaultValue;
     resolvedFields.push({
       field,
       columnName: mappedColumnName,
       descriptor,
-      ...ifDefined('defaultValue', loweredDefault.defaultValue),
+      ...ifDefined('defaultValue', fieldDefaultValue),
       ...ifDefined('executionDefaults', fieldExecutionDefaults),
-      isId: Boolean(idAttribute),
-      isUnique: Boolean(uniqueAttribute),
+      isId: Boolean(idAttribute) || Boolean(presetContributions?.id),
+      isUnique: Boolean(uniqueAttribute) || Boolean(presetContributions?.unique),
       ...ifDefined('idName', idName),
       ...ifDefined('uniqueName', uniqueName),
       ...ifDefined('many', isListField ? (true as const) : undefined),

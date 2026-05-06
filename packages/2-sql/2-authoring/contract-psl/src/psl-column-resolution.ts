@@ -2,10 +2,13 @@ import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types'
 import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type {
   AuthoringContributions,
+  AuthoringFieldPresetDescriptor,
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
+  isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
   validateAuthoringHelperArguments,
 } from '@prisma-next/framework-components/authoring';
@@ -68,6 +71,46 @@ export function getAuthoringTypeConstructor(
 }
 
 /**
+ * Walks `authoringContributions.field` segment-by-segment and returns the
+ * field-preset descriptor at the resolved path, or `undefined` if no descriptor
+ * is registered.
+ *
+ * Symmetric with `getAuthoringTypeConstructor`. Field presets are strictly
+ * richer than type constructors — they can contribute `default` /
+ * `executionDefaults` / `id` / `unique` / `nullable` in addition to the
+ * `codecId` / `nativeType` / `typeParams` triple. PSL resolution tries field
+ * presets first, then falls back to type constructors on miss (see
+ * `resolveFieldTypeDescriptor`).
+ */
+export function getAuthoringFieldPreset(
+  contributions: AuthoringContributions | undefined,
+  path: readonly string[],
+): AuthoringFieldPresetDescriptor | undefined {
+  let current: unknown = contributions?.field;
+
+  for (const segment of path) {
+    if (typeof current !== 'object' || current === null || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[segment];
+  }
+
+  return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
+}
+
+/**
+ * Curated SQL-family-shared namespaces. Members of this set are exempt from
+ * the namespace gate — they don't require explicit extension composition.
+ *
+ * `temporal` is reserved for date/time field presets (`temporal.createdAt()`,
+ * `temporal.updatedAt()`) and chosen for forward-compatibility with the JS/TS
+ * Temporal API; date codecs are expected to migrate to Temporal-backed
+ * representations, at which point `temporal.*` becomes the natural namespace
+ * for any future date/time helpers.
+ */
+const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
+
+/**
  * Returns the namespace prefix of `attributeName` if it references an
  * unrecognized extension namespace, otherwise `undefined`. A namespace is
  * considered recognized when it is:
@@ -75,11 +118,13 @@ export function getAuthoringTypeConstructor(
  * - `db` (native-type spec, always allowed),
  * - the active family id (e.g. `sql`),
  * - the active target id (e.g. `postgres`),
+ * - a curated framework namespace (e.g. `temporal`),
  * - present in `composedExtensions`.
  *
- * Family/target namespaces are exempted so that e.g. `@sql.foo` surfaces as
- * PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined) rather than
- * PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already composed).
+ * Family/target/curated namespaces are exempted so that e.g. `@sql.foo`
+ * surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined)
+ * rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already
+ * composed).
  */
 export function checkUncomposedNamespace(
   attributeName: string,
@@ -95,6 +140,7 @@ export function checkUncomposedNamespace(
     namespace === 'db' ||
     namespace === context?.familyId ||
     namespace === context?.targetId ||
+    CURATED_NAMESPACES.has(namespace) ||
     composedExtensions.has(namespace)
   ) {
     return undefined;
@@ -206,6 +252,7 @@ export function resolvePslTypeConstructorDescriptor(input: {
     namespace !== 'db' &&
     namespace !== input.familyId &&
     namespace !== input.targetId &&
+    !CURATED_NAMESPACES.has(namespace) &&
     !input.composedExtensions.has(namespace)
   ) {
     reportUncomposedNamespace({
@@ -227,8 +274,99 @@ export function resolvePslTypeConstructorDescriptor(input: {
   });
 }
 
+/**
+ * Instantiates a field-preset call against its descriptor, coercing PSL AST
+ * arguments into the descriptor's typed argument shape and returning the
+ * preset's full set of contract contributions.
+ *
+ * Symmetric with `instantiatePslTypeConstructor` but richer: a field preset
+ * can contribute `default`, `executionDefaults`, `id`, `unique`, and
+ * `nullable` in addition to the storage-type triple. PSL → typed-args
+ * coercion happens here (via `mapPslHelperArgs`) so that
+ * `instantiateAuthoringFieldPreset` itself stays typed-input-only and TS
+ * keeps its zero-runtime-validation cost.
+ */
+export function instantiatePslFieldPreset(input: {
+  readonly call: PslTypeConstructorCall;
+  readonly descriptor: AuthoringFieldPresetDescriptor;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly entityLabel: string;
+}):
+  | {
+      readonly descriptor: ColumnDescriptor;
+      readonly nullable: boolean;
+      readonly default?: ColumnDefault;
+      readonly executionDefaults?: ExecutionMutationDefaultPhases;
+      readonly id: boolean;
+      readonly unique: boolean;
+    }
+  | undefined {
+  const helperPath = input.call.path.join('.');
+  const args = mapPslHelperArgs({
+    args: input.call.args,
+    descriptors: input.descriptor.args ?? [],
+    helperLabel: `preset "${helperPath}"`,
+    span: input.call.span,
+    diagnostics: input.diagnostics,
+    sourceId: input.sourceId,
+    entityLabel: input.entityLabel,
+  });
+  if (!args) {
+    return undefined;
+  }
+
+  try {
+    validateAuthoringHelperArguments(helperPath, input.descriptor.args, args);
+    const instantiated = instantiateAuthoringFieldPreset(input.descriptor, args);
+    return {
+      descriptor: {
+        codecId: instantiated.descriptor.codecId,
+        nativeType: instantiated.descriptor.nativeType,
+        ...(instantiated.descriptor.typeParams !== undefined
+          ? { typeParams: instantiated.descriptor.typeParams }
+          : {}),
+      },
+      nullable: instantiated.nullable,
+      ...(instantiated.default !== undefined ? { default: instantiated.default } : {}),
+      ...(instantiated.executionDefaults !== undefined
+        ? { executionDefaults: instantiated.executionDefaults }
+        : {}),
+      id: instantiated.id,
+      unique: instantiated.unique,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `${input.entityLabel} preset "${helperPath}" ${message}`,
+      sourceId: input.sourceId,
+      span: input.call.span,
+    });
+    return undefined;
+  }
+}
+
+/**
+ * Contract contributions a field preset adds beyond the bare storage-type
+ * triple. Set when a field is resolved through the field-preset dispatch
+ * path; absent when resolved through the type-constructor path or as a
+ * scalar/enum/named-type lookup.
+ */
+export type FieldPresetContributions = {
+  readonly nullable: boolean;
+  readonly id: boolean;
+  readonly unique: boolean;
+  readonly default?: ColumnDefault;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
+};
+
 export type ResolveFieldTypeResult =
-  | { readonly ok: true; readonly descriptor: ColumnDescriptor }
+  | {
+      readonly ok: true;
+      readonly descriptor: ColumnDescriptor;
+      readonly presetContributions?: FieldPresetContributions;
+    }
   | { readonly ok: false; readonly alreadyReported: boolean };
 
 export function resolveFieldTypeDescriptor(input: {
@@ -245,6 +383,42 @@ export function resolveFieldTypeDescriptor(input: {
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
+    // Field-preset dispatch runs first. Field presets carry richer semantics
+    // (storage default + execution defaults + id/unique flags + native type)
+    // than type constructors, so when a path is registered as a field preset
+    // it is the more complete answer. Compose-time collision checks make
+    // double-registration structurally impossible — see
+    // `composed-authoring-helpers.ts`.
+    const presetDescriptor = getAuthoringFieldPreset(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+    if (presetDescriptor) {
+      const instantiated = instantiatePslFieldPreset({
+        call: input.field.typeConstructor,
+        descriptor: presetDescriptor,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        entityLabel: input.entityLabel,
+      });
+      if (!instantiated) {
+        return { ok: false, alreadyReported: true };
+      }
+      const presetContributions: FieldPresetContributions = {
+        nullable: instantiated.nullable,
+        id: instantiated.id,
+        unique: instantiated.unique,
+        ...(instantiated.default !== undefined ? { default: instantiated.default } : {}),
+        ...(instantiated.executionDefaults !== undefined
+          ? { executionDefaults: instantiated.executionDefaults }
+          : {}),
+      };
+      return { ok: true, descriptor: instantiated.descriptor, presetContributions };
+    }
+
+    // Fall through to type-constructor resolution. `resolvePslTypeConstructorDescriptor`
+    // emits the appropriate diagnostic (uncomposed namespace, unsupported field
+    // type) when no descriptor is found in either registry.
     const helperPath = input.field.typeConstructor.path.join('.');
     const descriptor = resolvePslTypeConstructorDescriptor({
       call: input.field.typeConstructor,
