@@ -239,6 +239,7 @@ export async function executeDbInit<TFamilyId extends string, TTargetId extends 
       postchecks: false,
       idempotencyChecks: false,
     },
+    strictVerification: false,
     frameworkComponents,
   });
 
