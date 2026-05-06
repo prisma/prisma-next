@@ -5,11 +5,15 @@ export interface IndexTypeEntry<TOptions = unknown> {
   readonly options: Type<TOptions>;
 }
 
-type IndexTypeMap = { readonly [K in string]: { readonly options: unknown } };
+export type IndexTypeMap = { readonly [K in string]: { readonly options: unknown } };
 
-export interface IndexTypeBuilder<TMap extends IndexTypeMap = Record<never, never>> {
+export interface IndexTypeRegistration<TMap extends IndexTypeMap = Record<never, never>> {
   readonly IndexTypes: TMap;
   readonly entries: ReadonlyArray<IndexTypeEntry>;
+}
+
+export interface IndexTypeBuilder<TMap extends IndexTypeMap = Record<never, never>>
+  extends IndexTypeRegistration<TMap> {
   add<TLit extends string, TOpts>(
     typeLiteral: TLit,
     entry: { readonly options: Type<TOpts> },

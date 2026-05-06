@@ -31,7 +31,8 @@ import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import {
   createIndexTypeRegistry,
-  type IndexTypeEntry,
+  type IndexTypeMap,
+  type IndexTypeRegistration,
   type IndexTypeRegistry,
 } from '@prisma-next/sql-contract/index-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
@@ -278,7 +279,7 @@ interface DescriptorWithStorageTypes {
 }
 
 interface DescriptorWithIndexTypes {
-  readonly indexTypes?: ReadonlyArray<IndexTypeEntry> | undefined;
+  readonly indexTypes?: IndexTypeRegistration<IndexTypeMap> | undefined;
 }
 
 function buildIndexTypeRegistry(
@@ -286,9 +287,9 @@ function buildIndexTypeRegistry(
 ): IndexTypeRegistry {
   const registry = createIndexTypeRegistry();
   for (const descriptor of descriptors) {
-    const entries = descriptor.indexTypes;
-    if (!entries) continue;
-    for (const entry of entries) {
+    const registration = descriptor.indexTypes;
+    if (!registration) continue;
+    for (const entry of registration.entries) {
       registry.register(entry);
     }
   }

@@ -5,6 +5,7 @@ import type {
   StorageHashBase,
 } from '@prisma-next/contract/types';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import type {
   ContractWithTypeMaps,
   Index,
@@ -13,12 +14,7 @@ import type {
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import type { UnionToIntersection } from './authoring-type-utils';
-import type {
-  AttributeStageIdFieldNames,
-  FieldStateOf,
-  IndexTypeMap,
-  ScalarFieldBuilder,
-} from './contract-dsl';
+import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
   ? C extends Record<string, { output: unknown }>
@@ -39,10 +35,10 @@ type MergeExtensionCodecTypesSafe<Packs> =
       : MergeExtensionCodecTypes<Packs>
     : Record<string, never>;
 
-export type ExtractIndexTypesFromPack<P> = P extends { __indexTypes?: infer I }
-  ? I extends IndexTypeMap
-    ? I
-    : Record<never, never>
+export type ExtractIndexTypesFromPack<P> = P extends {
+  readonly indexTypes: IndexTypeRegistration<infer M>;
+}
+  ? M
   : Record<never, never>;
 
 type AllIndexTypeLiterals<Packs> =
@@ -551,8 +547,6 @@ export type SqlContractResult<Definition> = ContractWithTypeMaps<
   Contract<BuiltStorage<Definition>, BuiltModels<Definition>> & {
     readonly target: DefinitionTargetId<Definition>;
     readonly targetFamily: 'sql';
-  } & {
-    readonly __indexTypes?: IndexTypesFromDefinition<Definition>;
   } & {
     readonly extensionPacks: keyof DefinitionExtensionPacks<Definition> extends never
       ? Record<string, never>

@@ -19,8 +19,8 @@ describe('ParadeDB extension', () => {
     });
 
     it('exposes the bm25 entry in indexTypes', () => {
-      expect(paradedbPackMeta.indexTypes).toHaveLength(1);
-      expect(paradedbPackMeta.indexTypes[0]?.type).toBe('bm25');
+      expect(paradedbPackMeta.indexTypes.entries).toHaveLength(1);
+      expect(paradedbPackMeta.indexTypes.entries[0]?.type).toBe('bm25');
     });
   });
 

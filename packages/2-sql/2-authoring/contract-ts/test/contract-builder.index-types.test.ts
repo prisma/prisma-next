@@ -1,32 +1,11 @@
-import type {
-  ExtensionPackRef,
-  FamilyPackRef,
-  TargetPackRef,
-} from '@prisma-next/framework-components/components';
+import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
+import type { IndexTypeRegistration } from '@prisma-next/sql-contract/index-types';
 import { describe, expectTypeOf, it } from 'vitest';
-import { defineContract, field, model } from '../src/contract-builder';
 import type {
   ExtractIndexTypesFromPack,
   IndexTypesFromDefinition,
   MergeExtensionIndexTypes,
 } from '../src/contract-types';
-
-import { columnDescriptor } from './helpers/column-descriptor';
-
-const bareFamilyPack: FamilyPackRef<'sql'> = {
-  kind: 'family',
-  id: 'sql',
-  familyId: 'sql',
-  version: '0.0.1',
-};
-
-const postgresTargetPack: TargetPackRef<'sql', 'postgres'> = {
-  kind: 'target',
-  id: 'postgres',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-};
 
 type DemoIndexTypes = {
   readonly demo: { readonly options: { readonly fillfactor: number } };
@@ -37,37 +16,19 @@ type AnalyticsIndexTypes = {
 };
 
 type DemoPack = ExtensionPackRef<'sql', 'postgres'> & {
-  readonly __indexTypes?: DemoIndexTypes;
+  readonly indexTypes: IndexTypeRegistration<DemoIndexTypes>;
 };
 
 type AnalyticsPack = ExtensionPackRef<'sql', 'postgres'> & {
-  readonly __indexTypes?: AnalyticsIndexTypes;
+  readonly indexTypes: IndexTypeRegistration<AnalyticsIndexTypes>;
 };
-
-const demoPack: DemoPack = {
-  kind: 'extension',
-  id: 'demo',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-};
-
-const analyticsPack: AnalyticsPack = {
-  kind: 'extension',
-  id: 'analytics',
-  familyId: 'sql',
-  targetId: 'postgres',
-  version: '0.0.1',
-};
-
-const int4Column = columnDescriptor('pg/int4@1');
 
 describe('index-type pack threading', () => {
-  it('ExtractIndexTypesFromPack pulls __indexTypes off a pack', () => {
+  it("ExtractIndexTypesFromPack pulls the registration's IndexTypes off a pack", () => {
     expectTypeOf<ExtractIndexTypesFromPack<DemoPack>>().toEqualTypeOf<DemoIndexTypes>();
   });
 
-  it('ExtractIndexTypesFromPack returns an empty record for packs without __indexTypes', () => {
+  it('ExtractIndexTypesFromPack returns an empty record for packs without indexTypes', () => {
     type PlainPack = ExtensionPackRef<'sql', 'postgres'>;
     expectTypeOf<ExtractIndexTypesFromPack<PlainPack>>().toEqualTypeOf<Record<never, never>>();
   });
@@ -103,41 +64,5 @@ describe('index-type pack threading', () => {
     type Definition = { readonly target: TargetPackRef<'sql', 'postgres'> };
     type Resolved = IndexTypesFromDefinition<Definition>;
     expectTypeOf<Resolved>().toEqualTypeOf<Record<never, never>>();
-  });
-
-  it('SqlContractResult exposes __indexTypes carrying the merged map', () => {
-    const contract = defineContract({
-      family: bareFamilyPack,
-      target: postgresTargetPack,
-      extensionPacks: { demo: demoPack, analytics: analyticsPack },
-      models: {
-        User: model('User', {
-          fields: {
-            id: field.column(int4Column).id(),
-          },
-        }).sql({ table: 'user' }),
-      },
-    });
-
-    type Carried = NonNullable<typeof contract.__indexTypes>;
-    expectTypeOf<Carried['demo']['options']>().toEqualTypeOf<{ readonly fillfactor: number }>();
-    expectTypeOf<Carried['analytics']['options']>().toEqualTypeOf<{ readonly bucket: string }>();
-  });
-
-  it('SqlContractResult __indexTypes is empty when no packs contribute', () => {
-    const contract = defineContract({
-      family: bareFamilyPack,
-      target: postgresTargetPack,
-      models: {
-        User: model('User', {
-          fields: {
-            id: field.column(int4Column).id(),
-          },
-        }).sql({ table: 'user' }),
-      },
-    });
-
-    type Carried = NonNullable<typeof contract.__indexTypes>;
-    expectTypeOf<Carried>().toEqualTypeOf<Record<never, never>>();
   });
 });

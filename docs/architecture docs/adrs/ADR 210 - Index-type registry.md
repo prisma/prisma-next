@@ -28,9 +28,9 @@ Index types are contributed via a factory builder. The call site names the liter
 
 The single-declaration-site property is the load-bearing one. It is what lets extension authors add an entry without touching framework code, and what lets the validator and the adapter share a single canonical shape.
 
-### 3. Extension-pack threading via phantom metadata
+### 3. Extension-pack threading via the registration value
 
-Each pack attaches a phantom-typed `__indexTypes` field — a record from `type` literal to its registered option shape — derived from the factory builder. The contract-definition pipeline extracts each pack's contribution, intersects them via `UnionToIntersection`, and threads the merged map into the contract result. When `constraints.index(cols.x, { type: 'X' })` is authored, `options` is narrowed against the merged map's entry for `'X'`; an unregistered `type` literal is a compile error.
+Each pack stores its registered index types in a single field whose value is the read-only output of the factory builder. The same value carries both the runtime entry list and a TypeScript-only phantom carrying the map of literal → option shape; the builder type extends a read-only registration interface that exposes only those two fields, so the pack can't be misused as a mutable registry. The contract-definition pipeline reads each pack's registration, intersects the per-pack maps, and threads the merged map into the contract authoring surface. When `constraints.index(cols.x, { type: 'X' })` is authored, `options` is narrowed against the merged map's entry for `'X'`; an unregistered `type` literal is a compile error.
 
 No global `declare module` augmentation is used; the merged set is purely a function of the packs attached to a given contract. This avoids cross-contract coupling — two contracts with different pack lists in the same workspace see different valid `type` sets, as they should.
 
@@ -50,9 +50,9 @@ Index-IR changes that affect `columns`, `type`, or `options` are emitted by the 
 
 ## How matching, lookup, and dispatch compose
 
-When an extension pack declares its index types, the factory call site is the single point where the type literal is named. The builder produces both a TypeScript-only derivation (the phantom map of literal → option shape) and a list of runtime entries — `(type, options-validator)` pairs ready to be aggregated. The pack attaches the phantom map under its `__indexTypes` field and exposes the entry list on its metadata.
+When an extension pack declares its index types, the factory call site is the single point where the type literal is named. The builder produces a single value that carries both the runtime entry list — `(type, options-validator)` pairs ready to be aggregated — and a TypeScript-only phantom map of literal → option shape. The pack stores that value verbatim in its registration field; both halves stay in lockstep automatically.
 
-When a contract is defined, two things happen — strictly per-contract, with no global state. On the type side, the contract-definition pipeline walks the attached packs, gathers each pack's `__indexTypes`, and intersects them via `UnionToIntersection`. The merged map is what narrows `options` per-`type` for `constraints.index(...)`. Every contract sees only the packs it asked for. On the runtime side, contract assembly creates a fresh per-contract registry and calls `register` for each entry the attached packs contribute. A duplicate `type` across packs surfaces as a registration-time error naming the conflict; this is contract-level, not workspace-level.
+When a contract is defined, two things happen — strictly per-contract, with no global state. On the type side, the contract-definition pipeline walks the attached packs, reads each pack's registration, and intersects the per-pack maps. The merged map is what narrows `options` per-`type` for `constraints.index(...)`. Every contract sees only the packs it asked for. On the runtime side, contract assembly creates a fresh per-contract registry and calls `register` for each entry the attached packs contribute. A duplicate `type` across packs surfaces as a registration-time error naming the conflict; this is contract-level, not workspace-level.
 
 When a contract is validated at runtime, `validateSqlStorage` consults that contract's registry. Lookup is by `type` literal; validation of `options` is one arktype invocation per index, against whichever shape the registrant constructed (loose or strict). The framework owns the Postgres-shaped renderer for `options`; per-entry validators have no rendering responsibility and no rendering surface area.
 
@@ -62,7 +62,7 @@ When the Postgres adapter renders DDL, it consults only the validated IR. The re
 
 **Per-entry rendering hooks.** Let each registered entry carry a function that turns its options into a string. Rejected on uniformity and security grounds. The repo already exposes safe scalar quoting helpers; an extension authoring its own renderer would either duplicate them or, worse, build SQL by string concatenation. The universal renderer is sufficient because validators constrain leaves to scalars.
 
-**`declare module` augmentation for index types.** A common pattern in TypeScript libraries: each pack augments a global type to add its entries. Rejected because it does not compose with our pack model — two contracts in the same workspace would see the union of all packs ever loaded, not just their own. The phantom-typed pack metadata mechanism keeps the merged set scoped to each contract.
+**`declare module` augmentation for index types.** A common pattern in TypeScript libraries: each pack augments a global type to add its entries. Rejected because it does not compose with our pack model — two contracts in the same workspace would see the union of all packs ever loaded, not just their own. Storing the per-pack registration value keeps the merged set scoped to each contract.
 
 **Capability gating per index type.** The capability system exists to negotiate runtime environment features (e.g. is a particular operation supported by this connection, this server version). It is not the right vocabulary for a design-time decision about whether a contract can name a given `type` value. The registry is the design-time vocabulary; capabilities are orthogonal. A registered entry does not assert that the database has the underlying server-side extension installed — that surfaces as a Postgres DDL error at apply time, which is the right behaviour.
 
@@ -74,7 +74,7 @@ When the Postgres adapter renders DDL, it consults only the validated IR. The re
 
 ### Positive
 
-- An extension author adds a new index type by writing a single factory call and attaching the resulting phantom map to their pack. The TS authoring surface, the runtime validator, and the Postgres DDL renderer all light up without touching framework code.
+- An extension author adds a new index type by writing a single factory call and storing the resulting registration on their pack. The TS authoring surface, the runtime validator, and the Postgres DDL renderer all light up without touching framework code.
 - Type narrowing of `options` per-`type` happens at the call site, against the exact set of packs the contract asked for. Unknown types, mistyped keys, and bad values are compile errors at the call site or runtime errors at validate time, not surprise DDL output.
 - The IR vocabulary is dialect-neutral. The contract is portable across adapters even though the renderer is Postgres-shaped today.
 - The validation surface is bounded to one registry lookup plus one arktype invocation per index — no measurable regression versus today's `IndexSchema`.

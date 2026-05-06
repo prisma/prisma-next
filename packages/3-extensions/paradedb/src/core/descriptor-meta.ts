@@ -1,8 +1,7 @@
-import type { IndexTypes } from '../types/index-types';
 import { paradedbIndexTypes } from '../types/index-types';
 import { PARADEDB_EXTENSION_ID } from './constants';
 
-const paradedbPackMetaBase = {
+export const paradedbPackMeta = {
   kind: 'extension',
   id: PARADEDB_EXTENSION_ID,
   familyId: 'sql',
@@ -13,9 +12,5 @@ const paradedbPackMetaBase = {
       'paradedb/bm25': true,
     },
   },
-  indexTypes: paradedbIndexTypes.entries,
+  indexTypes: paradedbIndexTypes,
 } as const;
-
-export const paradedbPackMeta: typeof paradedbPackMetaBase & {
-  readonly __indexTypes?: IndexTypes;
-} = paradedbPackMetaBase;
