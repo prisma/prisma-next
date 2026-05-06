@@ -7,7 +7,7 @@ describe('cipherstash control descriptor — AC-INSTALL1 (databaseDependencies.i
     const init = cipherstashControlDescriptor.databaseDependencies?.init;
     expect(init).toBeDefined();
     expect(init).toHaveLength(1);
-    expect(init?.[0]?.id).toBe('postgres.extension.eql');
+    expect(init?.[0]?.id).toBe('postgres.extension.pgcrypto');
   });
 
   it('init entry has a single install operation targeting postgres', () => {

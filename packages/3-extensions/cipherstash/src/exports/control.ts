@@ -45,7 +45,7 @@ const cipherstashStringControlPlaneHooks: CodecControlHooks = {
 const cipherstashDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
   init: [
     {
-      id: 'postgres.extension.eql',
+      id: 'postgres.extension.pgcrypto',
       label: 'Install EQL extension',
       install: [
         {

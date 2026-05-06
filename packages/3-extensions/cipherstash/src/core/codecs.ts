@@ -31,6 +31,64 @@ export const CIPHERSTASH_STRING_TARGET_TYPE = 'eql_v2_encrypted' as const;
 const CIPHERSTASH_STRING_TRAITS = ['equality'] as const;
 
 /**
+ * `eql_v2_encrypted` is a Postgres composite type defined as
+ * `CREATE TYPE public.eql_v2_encrypted AS (data jsonb)` by the EQL
+ * install bundle. Composite-type wire format is `(field1[,field2,...])`
+ * where strings are double-quoted and embedded `"` are doubled (`""`).
+ *
+ * The cipherstash codec sends the ciphertext payload (a JSON object)
+ * over the wire wrapped in this composite literal so the pg driver's
+ * default text-parameter handling produces a value Postgres can
+ * coerce back into `eql_v2_encrypted`. Mirrors the reference
+ * implementation at `reference/cipherstash/.../drizzle/src/pg/index.ts`.
+ */
+function encodeEqlV2EncryptedWire(payload: unknown): string {
+  const json = JSON.stringify(payload);
+  if (json === undefined) {
+    throw new Error(
+      'cipherstash codec: ciphertext payload is not JSON-serializable. ' +
+        'The CipherStash SDK must return a JSON-encodable bulk-encrypt result.',
+    );
+  }
+  const escaped = json.replaceAll('"', '""');
+  return `("${escaped}")`;
+}
+
+/**
+ * Inverse of `encodeEqlV2EncryptedWire`. Postgres returns
+ * `eql_v2_encrypted` cells in composite text format; the codec reads
+ * the wrapped JSON object back so envelope decoding can hand
+ * `bulkDecrypt` / `decrypt` an SDK-shaped ciphertext.
+ *
+ * Accepts the already-parsed JSON object too — some pg clients (or
+ * downstream conversion middleware) may pre-parse composite cells.
+ */
+function decodeEqlV2EncryptedWire(wire: unknown): unknown {
+  if (wire === null || wire === undefined) return wire;
+  if (typeof wire === 'object') {
+    if ('data' in wire) {
+      return (wire as { data: unknown }).data;
+    }
+    return wire;
+  }
+  if (typeof wire !== 'string') {
+    throw new Error(
+      `cipherstash codec: unexpected wire shape for eql_v2_encrypted: ${typeof wire}`,
+    );
+  }
+  const trimmed = wire.trim();
+  if (!trimmed.startsWith('(') || !trimmed.endsWith(')')) {
+    throw new Error(
+      `cipherstash codec: expected composite literal "(...)" but got: ${trimmed.slice(0, 40)}`,
+    );
+  }
+  const inner = trimmed.slice(1, -1);
+  const unquoted =
+    inner.startsWith('"') && inner.endsWith('"') ? inner.slice(1, -1).replaceAll('""', '"') : inner;
+  return JSON.parse(unquoted);
+}
+
+/**
  * SDK-free codec used in pack-meta (`cipherstashPackMeta.types.codecTypes
  * .codecInstances`). The framework's lookup machinery only reads codec
  * *metadata* (`typeId`, `targetTypes`, `traits`, `renderOutputType`) from
@@ -109,7 +167,7 @@ export function createCipherstashStringCodec(
             'Register the bulk-encrypt middleware in the runtime so envelopes are encrypted before encoding.',
         );
       }
-      return handle.ciphertext;
+      return encodeEqlV2EncryptedWire(handle.ciphertext);
     },
     decode: (wire: unknown, ctx: SqlCodecCallContext): EncryptedString => {
       const column = ctx.column;
@@ -120,7 +178,7 @@ export function createCipherstashStringCodec(
         );
       }
       return EncryptedString.fromInternal({
-        ciphertext: wire,
+        ciphertext: decodeEqlV2EncryptedWire(wire),
         table: column.table,
         column: column.name,
         sdk,

@@ -43,24 +43,45 @@ describe('cipherstash codec — AC-CODEC2 (decode constructs envelope from ctx.c
     const handle = getInternalHandle(envelope);
     expect(handle.table).toBe('user');
     expect(handle.column).toBe('email');
-    expect(handle.ciphertext).toBe(wire);
+    expect(handle.ciphertext).toEqual(wire);
     expect(handle.sdk).toBe(sdk);
+  });
+
+  it('decode unwraps a {data: ...} pg-parsed composite-row shape', async () => {
+    const sdk = makeSdk();
+    const codec = createCipherstashStringCodec(sdk);
+    const inner = { c: 'cipher-blob', i: { t: 'user', c: 'email' }, v: '2' };
+    const ctx: SqlCodecCallContext = { column: { table: 'user', name: 'email' } };
+
+    const envelope = await codec.decode({ data: inner }, ctx);
+    expect(getInternalHandle(envelope).ciphertext).toEqual(inner);
+  });
+
+  it('decode parses a composite literal text "(...)" wire shape', async () => {
+    const sdk = makeSdk();
+    const codec = createCipherstashStringCodec(sdk);
+    const inner = { c: 'cipher-blob' };
+    const composite = `("${JSON.stringify(inner).replaceAll('"', '""')}")`;
+    const ctx: SqlCodecCallContext = { column: { table: 'user', name: 'email' } };
+
+    const envelope = await codec.decode(composite, ctx);
+    expect(getInternalHandle(envelope).ciphertext).toEqual(inner);
   });
 
   it('decode without ctx.column throws (the codec needs the column ref to construct a routing-aware envelope)', async () => {
     const codec = createCipherstashStringCodec(makeSdk());
-    await expect(codec.decode('wire', {})).rejects.toThrow(/requires ctx\.column/);
+    await expect(codec.decode({}, {})).rejects.toThrow(/requires ctx\.column/);
   });
 });
 
 describe('cipherstash codec — AC-CODEC3 (encode reads ciphertext from handle)', () => {
-  it('after the middleware has populated ciphertext, encode returns the ciphertext', async () => {
+  it('encode wraps the handle ciphertext in eql_v2_encrypted composite text format', async () => {
     const codec = createCipherstashStringCodec(makeSdk());
     const envelope = EncryptedString.from('secret');
     setHandleCiphertext(envelope, { c: 'wire-blob' });
 
     const wire = await codec.encode(envelope, {});
-    expect(wire).toEqual({ c: 'wire-blob' });
+    expect(wire).toBe('("{""c"":""wire-blob""}")');
   });
 
   it('encode of an envelope whose ciphertext slot is empty (middleware did not run) throws a clear error', async () => {
