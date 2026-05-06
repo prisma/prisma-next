@@ -522,7 +522,7 @@ const pgByteaCodec = codec({
     }
     const decoded = Buffer.from(json, 'base64');
     if (decoded.toString('base64') !== json) {
-      throw new Error(`Invalid base64 string for pg/bytea@1: ${json}`);
+      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
     }
     return new Uint8Array(decoded);
   },
