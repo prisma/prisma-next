@@ -379,7 +379,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.table_name = i.tablename
                AND tc.constraint_name = i.indexname
            )
-         ORDER BY i.tablename, i.indexname, a.attnum`,
+         ORDER BY i.tablename, i.indexname, array_position(ix.indkey::int[], a.attnum)`,
         [schema],
       ),
       // Query extensions
