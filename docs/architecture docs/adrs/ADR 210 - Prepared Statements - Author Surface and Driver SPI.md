@@ -156,7 +156,7 @@ The `PreparedStatement` carries no parameter values, no row data, and no SQL sec
 
 **D. Auto-detect topologies that do not support server-side reuse.** Rejected. Detection is unreliable across deployment topologies. Misdetecting in either direction is worse than asking users to flip a flag once: a false positive disables a real optimisation; a false negative causes runtime errors deep inside hot loops. The explicit option puts the decision where the deployment topology is known.
 
-**E. Allocate the driver handle at `$prepare` time.** Rejected. Forces driver I/O into a method whose contract is "no I/O", and mints handles for connections the statement may never reach. Lazy allocation on first execute matches the lifetime of the underlying server-side state and keeps `$prepare` cheap, sync-shaped, and idempotent.
+**E. Allocate the driver handle at `$prepare` time.** Rejected. Forces driver I/O into a method whose contract is "no I/O", and mints handles for connections the statement may never reach. Lazy allocation on first execute matches the lifetime of the underlying server-side state and keeps `$prepare` cheap, I/O-free, and idempotent.
 
 **F. Mandate a single stale-detection policy across drivers.** Rejected. The detection signal is target-specific; the framework's job is to pin the contract (clear, allocate, retry once, surface), not to legislate a detection mechanism a target may not be able to provide. Symmetric policy at the contract level, asymmetric policy at the trigger level.
 
