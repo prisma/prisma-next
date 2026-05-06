@@ -163,10 +163,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
     );
   });
 
-  it('imported bare model() (not the helpers form) does not narrow — degraded but accepted', () => {
-    // The bare `model()` import has no pack info, so its IndexTypes default
-    // to a wildcard. `type: 'made-up'` typechecks because narrowing only
-    // applies inside the helpers factory — this documents the boundary.
+  it('imported bare model() rejects any type/options — strict by default', () => {
     const Doc = model('Doc', {
       fields: {
         id: field.column(int4Column).id(),
@@ -174,7 +171,29 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       },
     }).sql(({ cols, constraints }) => ({
       table: 'doc',
-      indexes: [constraints.index(cols.body, { type: 'made-up', options: {} })],
+      indexes: [
+        // @ts-expect-error - bare model() has no attached packs, so no index
+        // type literals are registered; type/options aren't allowed at all.
+        constraints.index(cols.body, { type: 'made-up', options: {} }),
+      ],
+    }));
+
+    defineContract({
+      family: sqlFamily,
+      target: postgresPack,
+      models: { Doc },
+    });
+  });
+
+  it('imported bare model() still accepts a default index with no type/options', () => {
+    const Doc = model('Doc', {
+      fields: {
+        id: field.column(int4Column).id(),
+        body: field.column(textColumn),
+      },
+    }).sql(({ cols, constraints }) => ({
+      table: 'doc',
+      indexes: [constraints.index(cols.body)],
     }));
 
     defineContract({

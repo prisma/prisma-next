@@ -539,8 +539,6 @@ type ConstraintOptions<Name extends string | undefined = string | undefined> = {
 
 export type IndexTypeMap = Record<string, { readonly options: unknown }>;
 
-export type WildcardIndexTypes = Record<string, { readonly options: Record<string, unknown> }>;
-
 type IndexInput<
   Name extends string | undefined,
   IndexTypes extends IndexTypeMap,
@@ -688,11 +686,11 @@ function createConstraintsDsl() {
 
   function index<FieldName extends string, Name extends string | undefined = undefined>(
     field: ColumnRef<FieldName>,
-    options?: IndexInput<Name, WildcardIndexTypes>,
+    options?: IndexInput<Name, Record<never, never>>,
   ): IndexConstraint<readonly [FieldName], Name>;
   function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: IndexInput<Name, WildcardIndexTypes>,
+    options?: IndexInput<Name, Record<never, never>>,
   ): IndexConstraint<FieldNames, Name>;
   function index(
     fieldOrFields: ColumnRef | readonly ColumnRef[],
@@ -811,7 +809,7 @@ type PackAwareSqlConstraints<IndexTypes extends IndexTypeMap> = {
 
 export type SqlContext<
   Fields extends Record<string, ScalarFieldBuilder>,
-  IndexTypes extends IndexTypeMap = WildcardIndexTypes,
+  IndexTypes extends IndexTypeMap = Record<never, never>,
 > = {
   readonly cols: FieldRefs<Fields>;
   readonly constraints: PackAwareSqlConstraints<IndexTypes>;
@@ -982,7 +980,7 @@ export class ContractModelBuilder<
   Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
   AttributesSpec extends ModelAttributesSpec | undefined = undefined,
   SqlSpec extends SqlStageSpec | undefined = undefined,
-  IndexTypes extends IndexTypeMap = WildcardIndexTypes,
+  IndexTypes extends IndexTypeMap = Record<never, never>,
 > {
   declare readonly __name: ModelName;
   declare readonly __fields: Fields;
