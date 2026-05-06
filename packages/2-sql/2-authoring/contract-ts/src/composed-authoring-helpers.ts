@@ -26,6 +26,12 @@ import type {
   TupleFromArgumentDescriptors,
   UnionToIntersection,
 } from './authoring-type-utils';
+import type {
+  AnyRelationBuilder,
+  ContractModelBuilder,
+  IndexTypeMap,
+  ScalarFieldBuilder,
+} from './contract-dsl';
 import { buildFieldPreset, field, model, rel } from './contract-dsl';
 
 type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
@@ -93,6 +99,53 @@ type TypeHelpersFromNamespace<Namespace> = {
 
 type CoreFieldHelpers = Pick<typeof field, 'column' | 'generated' | 'namedType'>;
 
+type ExtractIndexTypesFromPack<P> = P extends { __indexTypes?: infer I }
+  ? I extends IndexTypeMap
+    ? I
+    : Record<never, never>
+  : Record<never, never>;
+
+type AllPackIndexTypeLiterals<Packs> =
+  Packs extends Record<string, unknown>
+    ? { [K in keyof Packs]: keyof ExtractIndexTypesFromPack<Packs[K]> }[keyof Packs] & string
+    : never;
+
+type MergedPackIndexTypes<Packs> = {
+  readonly [Lit in AllPackIndexTypeLiterals<Packs>]: Extract<
+    {
+      [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
+        ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
+        : never;
+    }[keyof Packs],
+    { readonly options: unknown }
+  >;
+};
+
+type MergeAllPackIndexTypes<Family, Target, ExtensionPacks> =
+  MergedPackIndexTypes<
+    { readonly __family: Family; readonly __target: Target } & ExtensionPacks
+  > extends infer M extends IndexTypeMap
+    ? M
+    : Record<never, never>;
+
+type PackAwareModel<IndexTypes extends IndexTypeMap> = {
+  <
+    const ModelName extends string,
+    Fields extends Record<string, ScalarFieldBuilder>,
+    Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
+  >(
+    modelName: ModelName,
+    input: { readonly fields: Fields; readonly relations?: Relations },
+  ): ContractModelBuilder<ModelName, Fields, Relations, undefined, undefined, IndexTypes>;
+  <
+    Fields extends Record<string, ScalarFieldBuilder>,
+    Relations extends Record<string, AnyRelationBuilder> = Record<never, never>,
+  >(input: {
+    readonly fields: Fields;
+    readonly relations?: Relations;
+  }): ContractModelBuilder<undefined, Fields, Relations, undefined, undefined, IndexTypes>;
+};
+
 export type ComposedAuthoringHelpers<
   Family extends FamilyPackRef<string>,
   Target extends TargetPackRef<'sql', string>,
@@ -104,7 +157,7 @@ export type ComposedAuthoringHelpers<
         ExtractFieldNamespaceFromPack<Target> &
         MergeExtensionFieldNamespaces<ExtensionPacks>
     >;
-  readonly model: typeof model;
+  readonly model: PackAwareModel<MergeAllPackIndexTypes<Family, Target, ExtensionPacks>>;
   readonly rel: typeof rel;
   readonly type: TypeHelpersFromNamespace<
     ExtractTypeNamespaceFromPack<Family> &

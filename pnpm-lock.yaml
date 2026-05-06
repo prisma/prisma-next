@@ -3775,6 +3775,9 @@ importers:
       '@prisma-next/extension-arktype-json':
         specifier: workspace:*
         version: link:../../packages/3-extensions/arktype-json
+      '@prisma-next/extension-paradedb':
+        specifier: workspace:*
+        version: link:../../packages/3-extensions/paradedb
       '@prisma-next/extension-pgvector':
         specifier: workspace:*
         version: link:../../packages/3-extensions/pgvector
