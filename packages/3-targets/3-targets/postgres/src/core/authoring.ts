@@ -1,3 +1,4 @@
+import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type {
   AuthoringFieldNamespace,
   AuthoringTypeNamespace,
@@ -89,34 +90,8 @@ export const postgresAuthoringFieldPresets = {
       nativeType: 'timestamptz',
     },
   },
-  temporal: {
-    createdAt: {
-      kind: 'fieldPreset',
-      output: {
-        codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
-        default: {
-          kind: 'function',
-          expression: 'now()',
-        },
-      },
-    },
-    updatedAt: {
-      kind: 'fieldPreset',
-      output: {
-        codecId: 'pg/timestamptz@1',
-        nativeType: 'timestamptz',
-        executionDefaults: {
-          onCreate: {
-            kind: 'generator',
-            id: 'timestampNow',
-          },
-          onUpdate: {
-            kind: 'generator',
-            id: 'timestampNow',
-          },
-        },
-      },
-    },
-  },
+  temporal: temporalAuthoringPresets({
+    codecId: 'pg/timestamptz@1',
+    nativeType: 'timestamptz',
+  }),
 } as const satisfies AuthoringFieldNamespace;

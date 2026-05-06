@@ -1,3 +1,4 @@
+import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import {
   type MutationDefaultGeneratorDescriptor,
   TIMESTAMP_NOW_GENERATOR_ID,
@@ -39,5 +40,46 @@ export function timestampNowRuntimeGenerator(): RuntimeMutationDefaultGenerator 
     id: TIMESTAMP_NOW_GENERATOR_ID,
     generate: () => new Date(),
     stableAcrossRows: true,
+  };
+}
+
+/**
+ * Builds the canonical `temporal.{createdAt,updatedAt}` field-preset pair
+ * for a SQL target. `createdAt` lowers to a `now()` storage default;
+ * `updatedAt` lowers to the `timestampNow` execution generator on both
+ * `onCreate` and `onUpdate` (RD: "last modified time", non-null). Targets
+ * supply the codec/native-type pair that matches their timestamp column;
+ * everything else is shared so PSL `temporal.updatedAt()` and TS
+ * `field.temporal.updatedAt()` lower to byte-identical contracts across
+ * targets by construction.
+ */
+export function temporalAuthoringPresets(input: {
+  readonly codecId: string;
+  readonly nativeType: string;
+}): {
+  readonly createdAt: AuthoringFieldPresetDescriptor;
+  readonly updatedAt: AuthoringFieldPresetDescriptor;
+} {
+  const { codecId, nativeType } = input;
+  return {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId,
+        nativeType,
+        default: { kind: 'function', expression: 'now()' },
+      },
+    },
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId,
+        nativeType,
+        executionDefaults: {
+          onCreate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },
+          onUpdate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },
+        },
+      },
+    },
   };
 }

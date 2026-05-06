@@ -1,41 +1,9 @@
+import { temporalAuthoringPresets } from '@prisma-next/family-sql/control';
 import type { AuthoringFieldNamespace } from '@prisma-next/framework-components/authoring';
 
 export const sqliteAuthoringFieldPresets = {
-  dateTime: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sqlite/datetime@1',
-      nativeType: 'text',
-    },
-  },
-  temporal: {
-    createdAt: {
-      kind: 'fieldPreset',
-      output: {
-        codecId: 'sqlite/datetime@1',
-        nativeType: 'text',
-        default: {
-          kind: 'function',
-          expression: 'now()',
-        },
-      },
-    },
-    updatedAt: {
-      kind: 'fieldPreset',
-      output: {
-        codecId: 'sqlite/datetime@1',
-        nativeType: 'text',
-        executionDefaults: {
-          onCreate: {
-            kind: 'generator',
-            id: 'timestampNow',
-          },
-          onUpdate: {
-            kind: 'generator',
-            id: 'timestampNow',
-          },
-        },
-      },
-    },
-  },
+  temporal: temporalAuthoringPresets({
+    codecId: 'sqlite/datetime@1',
+    nativeType: 'text',
+  }),
 } as const satisfies AuthoringFieldNamespace;
