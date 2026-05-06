@@ -9,8 +9,12 @@ import type { CipherstashSdk } from './sdk';
  *
  * - **Write side** — `EncryptedString.from(plaintext)` produces a handle
  *   with `plaintext` populated and `ciphertext` empty. The bulk-encrypt
- *   middleware (M2.c) populates `ciphertext` and overwrites `plaintext`
- *   with `undefined` for memory hygiene before `codec.encode` runs.
+ *   middleware (M2.c) populates `ciphertext` and stamps `(table, column)`
+ *   onto the handle; `plaintext` is **retained** post-encrypt (Project 1
+ *   does not zero plaintext — see umbrella spec § Open items 6 and the
+ *   AC-MW5 text in `envelope-codec-extension.spec.md`). As a side effect,
+ *   a write-side envelope's `decrypt()` returns the original plaintext
+ *   synchronously without consulting the SDK.
  * - **Read side** — `EncryptedString.fromInternal({...})` (called from
  *   `codec.decode`) produces a handle with `ciphertext` populated and
  *   `{table, column, sdk}` carrying the routing context for
@@ -41,10 +45,43 @@ export function getInternalHandle(envelope: EncryptedString): EncryptedStringHan
   return handle;
 }
 
+/**
+ * Stamp the wire ciphertext onto an envelope's handle. Called by the
+ * bulk-encrypt middleware after a `bulkEncrypt` round-trip.
+ *
+ * Per Project 1's standing decision (umbrella spec § Open items 6 and
+ * AC-MW5), the handle's `plaintext` slot is **retained** — it is *not*
+ * zeroed alongside the ciphertext write. As a result, a write-side
+ * envelope's `decrypt()` continues to return the original plaintext
+ * synchronously after the middleware runs, without consulting the SDK.
+ */
 export function setHandleCiphertext(envelope: EncryptedString, ciphertext: unknown): void {
   const handle = getInternalHandle(envelope);
   handle.ciphertext = ciphertext;
-  handle.plaintext = undefined;
+}
+
+/**
+ * Stamp the encrypt-side `(table, column)` routing context onto a
+ * write-side envelope's handle. Called by the bulk-encrypt middleware
+ * before grouping envelopes into per-routing-key bulk-encrypt batches.
+ *
+ * Idempotent and write-once-wins: if the handle already carries
+ * `(table, column)` (e.g. the envelope was constructed via
+ * `fromInternal` on the read side and is being re-inserted), the
+ * existing values are preserved.
+ */
+export function setHandleRoutingKey(
+  envelope: EncryptedString,
+  table: string,
+  column: string,
+): void {
+  const handle = getInternalHandle(envelope);
+  if (handle.table === undefined) {
+    handle.table = table;
+  }
+  if (handle.column === undefined) {
+    handle.column = column;
+  }
 }
 
 export function setHandlePlaintextCache(envelope: EncryptedString, plaintext: string): void {
@@ -77,8 +114,13 @@ export interface EncryptedStringFromInternalArgs {
 export class EncryptedString {
   /**
    * Construct from plaintext. The bulk-encrypt middleware (M2.c)
-   * populates the handle's ciphertext slot and overwrites the
-   * plaintext slot before the codec encodes the envelope to wire.
+   * populates the handle's ciphertext slot before the codec encodes
+   * the envelope to wire. The handle's plaintext slot is **retained**
+   * post-encrypt (Project 1 does not zero plaintext — see umbrella
+   * spec § Open items 6 and AC-MW5 in
+   * `envelope-codec-extension.spec.md`); as a side effect,
+   * `envelope.decrypt()` returns the original plaintext synchronously
+   * for the lifetime of the envelope.
    */
   static from(plaintext: string): EncryptedString {
     const envelope = new EncryptedString();

@@ -1,7 +1,10 @@
 /**
- * Placeholder for the `bulkEncryptMiddleware(sdk: CipherstashSdk)` factory.
- * The subpath ships today so the package's surface area stays stable across
- * the in-progress milestones; see `DEVELOPING.md` § Forthcoming surface for
- * the implementation timeline.
+ * Public middleware surface for the cipherstash extension.
+ *
+ * Consumers register the bulk-encrypt middleware in their runtime so
+ * `EncryptedString` envelopes embedded in `INSERT` / `UPDATE` plans get
+ * encrypted in batches before encode runs. See package README for the
+ * recommended runtime composition (extension pack registers it
+ * automatically; manual middleware lists may add it explicitly).
  */
-export {};
+export { bulkEncryptMiddleware } from '../middleware/bulk-encrypt';
