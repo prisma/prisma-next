@@ -998,11 +998,11 @@ describe('validateContract', () => {
       ).not.toThrow();
     });
 
-    it('skips type-vs-registry lookup when no registry is provided', () => {
+    it('rejects a typed index when no registry is provided (defaults to empty)', () => {
       const contract = makeContractWithIndex({ columns: ['body'], type: 'anything' });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup),
-      ).not.toThrow();
+      expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
+        /unregistered index type "anything"/,
+      );
     });
 
     it('still rejects options-without-type when no registry is provided', () => {
@@ -1013,6 +1013,16 @@ describe('validateContract', () => {
       expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
         /options/,
       );
+    });
+
+    it('rejects a typed index when an empty registry is supplied explicitly', () => {
+      const registry = createIndexTypeRegistry();
+      const contract = makeContractWithIndex({ columns: ['body'], type: 'made-up' });
+      expect(() =>
+        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
+          indexTypeRegistry: registry,
+        }),
+      ).toThrow(/unregistered index type "made-up"/);
     });
   });
 });

@@ -11,7 +11,7 @@ import {
 } from '@prisma-next/contract/validate-contract';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { type } from 'arktype';
-import type { IndexTypeRegistry } from './index-types';
+import { createIndexTypeRegistry, type IndexTypeRegistry } from './index-types';
 import type { SqlModelStorage, SqlStorage, StorageColumn, StorageTable } from './types';
 import { validateSqlContract, validateStorageSemantics } from './validators';
 
@@ -148,7 +148,7 @@ function validateContractLogic(contract: Contract<SqlStorage>): void {
 
 function validateIndexTypes(
   contract: SqlValidationContract,
-  indexTypeRegistry: IndexTypeRegistry | undefined,
+  indexTypeRegistry: IndexTypeRegistry,
 ): void {
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
     for (const index of table.indexes) {
@@ -158,7 +158,7 @@ function validateIndexTypes(
           'storage',
         );
       }
-      if (index.type === undefined || indexTypeRegistry === undefined) continue;
+      if (index.type === undefined) continue;
       const entry = indexTypeRegistry.get(index.type);
       if (entry === undefined) {
         throw new ContractValidationError(
@@ -178,10 +178,7 @@ function validateIndexTypes(
   }
 }
 
-function validateSqlStorageWith(
-  contract: Contract,
-  indexTypeRegistry: IndexTypeRegistry | undefined,
-): void {
+function validateSqlStorage(contract: Contract, indexTypeRegistry: IndexTypeRegistry): void {
   const sqlContract = validateSqlContract<SqlValidationContract>(contract);
   validateContractLogic(sqlContract);
   validateModelStorageReferences(sqlContract);
@@ -193,10 +190,6 @@ function validateSqlStorageWith(
       'storage',
     );
   }
-}
-
-function validateSqlStorage(contract: Contract): void {
-  validateSqlStorageWith(contract, undefined);
 }
 
 function decodeContractDefaults<T extends Contract<SqlStorage>>(
@@ -261,10 +254,12 @@ export function validateContract<TContract extends Contract<SqlStorage>>(
   codecLookup: CodecLookup,
   options?: ValidateContractOptions,
 ): TContract {
-  const indexTypeRegistry = options?.indexTypeRegistry;
-  const storageValidator = indexTypeRegistry
-    ? (contract: Contract) => validateSqlStorageWith(contract, indexTypeRegistry)
-    : validateSqlStorage;
+  // Empty registry rather than `undefined`: a contract that names an index
+  // `type` without a corresponding registered entry must fail validation
+  // regardless of whether the caller wired up packs. The registry is the
+  // design-time gate per ADR 210.
+  const indexTypeRegistry = options?.indexTypeRegistry ?? createIndexTypeRegistry();
+  const storageValidator = (contract: Contract) => validateSqlStorage(contract, indexTypeRegistry);
   const validated = frameworkValidateContract<TContract>(value, storageValidator);
   try {
     return decodeContractDefaults(validated, codecLookup);

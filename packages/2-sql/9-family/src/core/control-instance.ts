@@ -29,6 +29,11 @@ import {
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
 import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
+import {
+  createIndexTypeRegistry,
+  type IndexTypeEntry,
+  type IndexTypeRegistry,
+} from '@prisma-next/sql-contract/index-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -272,6 +277,24 @@ interface DescriptorWithStorageTypes {
     | undefined;
 }
 
+interface DescriptorWithIndexTypes {
+  readonly indexTypes?: ReadonlyArray<IndexTypeEntry> | undefined;
+}
+
+function buildIndexTypeRegistry(
+  descriptors: readonly DescriptorWithIndexTypes[],
+): IndexTypeRegistry {
+  const registry = createIndexTypeRegistry();
+  for (const descriptor of descriptors) {
+    const entries = descriptor.indexTypes;
+    if (!entries) continue;
+    for (const entry of entries) {
+      registry.register(entry);
+    }
+  }
+  return registry;
+}
+
 function buildSqlTypeMetadataRegistry(options: {
   readonly target: DescriptorWithStorageTypes;
   readonly adapter: DescriptorWithStorageTypes & { readonly targetId: string };
@@ -313,12 +336,15 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   }
 
   const target = stack.target as unknown as TargetDescriptor<'sql', TTargetId> &
-    DescriptorWithStorageTypes;
+    DescriptorWithStorageTypes &
+    DescriptorWithIndexTypes;
   const adapter = stack.adapter as unknown as SqlControlAdapterDescriptor<TTargetId> &
-    DescriptorWithStorageTypes;
+    DescriptorWithStorageTypes &
+    DescriptorWithIndexTypes;
   const extensions =
     stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
-      DescriptorWithStorageTypes)[];
+      DescriptorWithStorageTypes &
+      DescriptorWithIndexTypes)[];
 
   // Descriptor self-consistency check.
   // Each extension that exposes a `contractSpace` must publish a
@@ -351,6 +377,8 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     extensionPacks: extensions,
   });
 
+  const indexTypeRegistry = buildIndexTypeRegistry([adapter, target, ...extensions]);
+
   // Family-instance methods accept `ControlDriverInstance<'sql', string>` —
   // the family API isn't generic on the target id. Letting `isSqlControlAdapter`
   // default its type parameter narrows the adapter to `SqlControlAdapter<string>`,
@@ -373,7 +401,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     typeMetadataRegistry,
 
     validateContract(contractJson: unknown): Contract {
-      return sqlValidateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup);
+      return sqlValidateContract<Contract<SqlStorage>>(contractJson, emptyCodecLookup, {
+        indexTypeRegistry,
+      });
     },
 
     async verify(verifyOptions: {
@@ -392,7 +422,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       } = verifyOptions;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract, emptyCodecLookup);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(rawContract, emptyCodecLookup, {
+        indexTypeRegistry,
+      });
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash = contract.profileHash;
@@ -505,7 +537,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     async schemaVerify(options: SchemaVerifyOptions): Promise<VerifyDatabaseSchemaResult> {
       const { driver, contract: contractInput, strict, context, frameworkComponents } = options;
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup, {
+        indexTypeRegistry,
+      });
 
       const controlAdapter = getControlAdapter();
       const schemaIR = await controlAdapter.introspect(driver, contractInput);
@@ -552,7 +586,9 @@ export function createSqlFamilyInstance<TTargetId extends string>(
       const { driver, contract: contractInput, contractPath, configPath } = options;
       const startTime = Date.now();
 
-      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup);
+      const contract = sqlValidateContract<Contract<SqlStorage>>(contractInput, emptyCodecLookup, {
+        indexTypeRegistry,
+      });
 
       const contractStorageHash = contract.storage.storageHash;
       const contractProfileHash =
