@@ -153,9 +153,11 @@ Once fixed in the orm-client, the walker workaround (`collectLocalFkColumns` in 
 
 ---
 
-## W-2: `t.exposeID/String/etc` doesn't typecheck against `Record<string, unknown>` parents
+## W-2: `t.exposeID/String/etc` against the loose parent shape ✅ fixed in `examples/pothos-integration/src/plugin/global-types.ts`
 
-### What
+> **Update.** I originally claimed this was blocked by missing type-level machinery and would need a several-day "infer model row from Contract" project. That was wrong. The orm-client already exports `DefaultModelRow<TContract, ModelName>` (`packages/3-extensions/sql-orm-client/src/types.ts:429`), which is exactly that inference. Wiring it into Pothos's `prismaObject` was a 5-line change. The plugin now plumbs `RowFor<Types, ModelName> = DefaultModelRow<Types['PrismaNextContract'], ModelName>` through the `ObjectFieldBuilder`'s `ParentShape` slot, and `t.exposeID/String/...` works as you'd expect. The original analysis below is preserved for the "why this fails when the shape is loose" walk-through; the action-item sketch is no longer accurate.
+
+### What (originally)
 
 Pothos's `t.exposeX(name)` helpers fail TypeScript checks when the parent shape is loose. Used `t.field({ type: 'X', resolve })` instead.
 
@@ -171,39 +173,34 @@ export type CompatibleTypes<Types, ParentShape, Type, Nullable> = {
 }[keyof ParentShape] & string;
 ```
 
-For our `ParentShape = Record<string, unknown>`:
+For our original `ParentShape = Record<string, unknown>`:
 - `keyof Record<string, unknown>` is `string`
 - `Record<string, unknown>['anything'] = unknown`
 - `Awaited<unknown> extends ShapeFromTypeParam<Types, 'ID', true>` → `unknown extends string | null` → **false**
 
-So all keys map to `never`, and the constraint resolves to `never & string = never`. Hence `t.exposeID('id')` errors with *"Argument of type '\"id\"' is not assignable to parameter of type 'never'"*.
+So all keys map to `never`, and the constraint resolves to `never & string = never`. Hence `t.exposeID('id')` errored with *"Argument of type '\"id\"' is not assignable to parameter of type 'never'"*.
 
-### How — the workaround
+### The fix that landed
 
-Use `t.field({ type: 'ID', resolve: parent => (parent as Record<string, unknown>)['id'] as string })` instead. Verbose, ugly, but explicit and correct.
+`global-types.ts` declares:
+
+```ts
+type RowFor<Types extends SchemaTypes, ModelName extends string> =
+  Types['PrismaNextContract'] extends Contract<SqlStorage>
+    ? DefaultModelRow<Types['PrismaNextContract'], ModelName>
+    : Record<string, unknown>;
+```
+
+Then `prismaObject<ModelName>`'s options interface threads `ModelName` through, and the `fields(t)` callback receives `ObjectFieldBuilder<Types, RowFor<Types, ModelName>>`. With `Types['PrismaNextContract']` set to the user's typed Contract, `RowFor` resolves to `{ id: string; firstName: string; ... }` per model, and Pothos's `CompatibleTypes` lookup returns the actual field names instead of `never`. `prismaField`'s `collection` arg got the same upgrade so `db.User.where(...).all().firstOrThrow()` chains without a cast.
 
 ### Cost
 
-- **Demo: works**, but every scalar field is ~5 lines instead of 1.
-- **v2 plugin: blocking**. Real users won't accept this verbosity.
+- **Demo: clean.** Every scalar field is one line (`t.exposeID('id')`); the `userById` resolver no longer needs a `as unknown as {...}` cast.
+- **v2 plugin: same machinery is the right answer.** `DefaultModelRow` is already the orm-client's canonical row shape; the plugin reuses it instead of re-deriving.
 
-### Action item
+### Why the original fear was wrong
 
-In a v2, infer the parent row shape from `Contract['models'][ModelName]['fields']`:
-
-```ts
-type InferModelRow<TContract, ModelName> = TContract extends {
-  models: { [K in ModelName]: { fields: infer F } };
-} ? {
-  [Field in keyof F]: F[Field] extends { nullable: true; type: { codecId: infer C } }
-    ? CodecOutput<C> | null
-    : F[Field] extends { type: { codecId: infer C } }
-      ? CodecOutput<C>
-      : unknown;
-} : never;
-```
-
-Plug that into `prismaObject`'s ref creation so the parent shape is concrete per-model. Pothos's `CompatibleTypes` will then resolve to actual field names. Pothos-prisma did the equivalent via its generator (`Prisma.UserSelect` etc.); we'd compute it directly from `Contract`.
+I assumed Pothos-prisma's "generator → `Prisma.User` types" pattern was load-bearing and that prisma-next would need an analogous codec-output registry. It already has one — codec output types are carried as phantom `TJs` in each `Codec<Id, TWire, TJs, TParams, THelper>`, surfaced through `ComputeColumnJsType` (`packages/2-sql/4-lanes/relational-core/src/types.ts:132`), and finally assembled into `DefaultModelRow`. The orm-client's `firstOrThrow()` and the SQL builder's `.build()` both terminate in this chain — that's why their return types come back fully decoded. The Pothos plugin just had to reuse the same chain.
 
 ---
 
@@ -385,28 +382,24 @@ After the demo conversation, decide whether to add a lazy-load path. If yes, add
 
 ---
 
-## D-3: Loose `Record<string, unknown>` parent shape
+## D-3: Loose `Record<string, unknown>` parent shape ✅ replaced with per-model row inference (W-2 fix)
 
-### What
+### What (originally)
 
-Parent rows are typed as `Record<string, unknown>` rather than per-model row inference.
+Parent rows were typed as `Record<string, unknown>` rather than per-model row inference. Resolvers cast `parent as Record<string, unknown>` to access fields.
 
-### Why
+### Why I thought we needed to punt
 
-Per-model row inference from `Contract['models'][...]['fields']` is a serious type-engineering project (see W-2). For a same-day demo it was a deliberate punt.
+I assumed per-model row inference required a codec-output registry that didn't exist yet, and would gate on a contract-API-surface decision. That was wrong (see W-2's "Why the original fear was wrong"). The orm-client's `DefaultModelRow` is exactly that inference, public, exported, and ready to plug in.
 
-### How
+### What landed
 
-`prismaObject` returns `ObjectRef<Types, Record<string, unknown>>`. Resolvers cast `parent as Record<string, unknown>` to access fields.
+`prismaObject<ModelName>` now hands the field-builder `ObjectFieldBuilder<Types, RowFor<Types, ModelName>>` where `RowFor` resolves to `DefaultModelRow<Types['PrismaNextContract'], ModelName>`. Resolvers see the real per-field types (`parent.id: string`, `parent.published: number`, etc.), no casts.
 
 ### Cost
 
-- **Demo: works**, but every field resolver carries a cast.
-- **v2 plugin: blocking.** Real users won't accept this.
-
-### Action item
-
-Type-engineer per-model row inference before any v2 work. See W-2 action item for the sketch.
+- **Demo: clean.**
+- **v2 plugin: same approach is the right one.** Reuses orm-client machinery rather than reinventing it.
 
 ---
 

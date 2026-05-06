@@ -7,33 +7,16 @@ import { createBuilder } from './builder';
  * that demonstrate the canonical auto-include flow AND the M2 headline
  * differentiator: drafts + posts as siblings on the same prisma-next
  * relation, plus a peer postCount field.
- *
- * Uses `t.field({ type: 'X', resolve })` instead of `t.exposeX` because the
- * loose `Record<string, unknown>` parent shape we hand to `prismaObject`
- * doesn't satisfy Pothos's `CompatibleTypes` constraint on exposeX. See
- * workarounds.md W-2.
  */
 export function buildSchema(runtime: Runtime) {
   const { builder } = createBuilder(runtime);
 
   builder.prismaObject('User', {
     fields: (t) => ({
-      id: t.field({
-        type: 'ID',
-        resolve: (parent) => (parent as Record<string, unknown>)['id'] as string,
-      }),
-      firstName: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['firstName'] as string,
-      }),
-      lastName: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['lastName'] as string,
-      }),
-      email: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['email'] as string,
-      }),
+      id: t.exposeID('id'),
+      firstName: t.exposeString('firstName'),
+      lastName: t.exposeString('lastName'),
+      email: t.exposeString('email'),
       // Plain include — single GraphQL field on `posts` relation.
       posts: t.relation('posts'),
       comments: t.relation('comments'),
@@ -55,21 +38,15 @@ export function buildSchema(runtime: Runtime) {
 
   builder.prismaObject('Post', {
     fields: (t) => ({
-      id: t.field({
-        type: 'ID',
-        resolve: (parent) => (parent as Record<string, unknown>)['id'] as string,
-      }),
-      title: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['title'] as string,
-      }),
-      content: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['content'] as string,
-      }),
+      id: t.exposeID('id'),
+      title: t.exposeString('title'),
+      content: t.exposeString('content'),
+      // The contract stores `published` as an integer (0/1) — sqlite has no
+      // boolean codec — but the GraphQL surface advertises a Boolean here.
+      // Coerce explicitly; the parent shape is now concrete so no cast.
       published: t.field({
         type: 'Boolean',
-        resolve: (parent) => Boolean((parent as Record<string, unknown>)['published']),
+        resolve: (parent) => Boolean(parent.published),
       }),
       author: t.relation('author'),
       comments: t.relation('comments'),
@@ -78,14 +55,8 @@ export function buildSchema(runtime: Runtime) {
 
   builder.prismaObject('Comment', {
     fields: (t) => ({
-      id: t.field({
-        type: 'ID',
-        resolve: (parent) => (parent as Record<string, unknown>)['id'] as string,
-      }),
-      body: t.field({
-        type: 'String',
-        resolve: (parent) => (parent as Record<string, unknown>)['body'] as string,
-      }),
+      id: t.exposeID('id'),
+      body: t.exposeString('body'),
       author: t.relation('author'),
       post: t.relation('post'),
     }),
@@ -103,16 +74,7 @@ export function buildSchema(runtime: Runtime) {
           id: t.arg.string({ required: true }),
         },
         resolve: (collection, _root, args) =>
-          (
-            collection as unknown as {
-              where: (w: unknown) => {
-                all: () => { firstOrThrow: () => Promise<unknown> };
-              };
-            }
-          )
-            .where({ id: args.id })
-            .all()
-            .firstOrThrow(),
+          collection.where({ id: args.id }).all().firstOrThrow(),
       }),
     }),
   });

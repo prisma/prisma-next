@@ -30,7 +30,6 @@ This is a single-day demo. Out of scope for v1:
 - Capability gating at schema-build time.
 - TypeScript generator (types derive directly from `Contract`).
 - Type tests / automated regression coverage.
-- Per-model row inference (parent shapes are `Record<string, unknown>` — every field uses `t.field({ type, resolve })` instead of `t.exposeID/String/...`).
 
 See [`projects/pothos-prisma-next/workarounds.md`](../../projects/pothos-prisma-next/workarounds.md) for the full log of workarounds applied and load-bearing decisions made along the way, including a detailed walkthrough of the orm-client nested-stitch FK gap that needed fixing in the walker.
 
@@ -40,7 +39,6 @@ Functional everywhere; observable rough edges to call out:
 
 - **Every relation level is its own SQL statement.** Verified to 4 levels (`users → posts → comments → author`) — correct results, but the demo response's `extensions.prismaNext.executions` shows N+1 query counts: 1 outer SELECT plus one per relation level rather than a single nested-include statement. Even on Postgres (`LATERAL` + `json_agg`) and SQLite (`json_group_array`), the orm-client falls back to the multi-query strategy whenever the include shape is depth-2+ or uses combine/scalar. Cause: prisma-next gaps detailed below (Issue A, Issue B). The headline `drafts`/`publishedPosts`/`postCount` query is 4 statements; could be 1.
 - **`t.relation` outside `t.prismaField` throws.** Plugin-scope choice (D-2): rather than a silent lazy-load N+1, the resolver fails fast with a message naming the field path. Means a v2 plugin needs a deliberate dataloader integration before lifting the restriction.
-- **Per-field verbosity from the loose parent shape.** Every scalar field uses `t.field({ type, resolve })` because `t.exposeID/String/...` requires a concrete parent shape — the demo punts to `Record<string, unknown>` (D-3). Not blocking for the demo conversation; blocking for any v2.
 
 ## Prisma-next limitations the plugin is bumping into
 
@@ -59,10 +57,6 @@ The demo's drafts/publishedPosts/postCount query is the canonical example: today
 ### orm-client: nested-stitch FK augmentation is depth-1 only
 
 **W-1.** Detail in [`projects/pothos-prisma-next/workarounds.md#w-1-orm-client-recursive-nested-stitch-foreign-key-gap`](../../projects/pothos-prisma-next/workarounds.md#w-1-orm-client-recursive-nested-stitch-foreign-key-gap). On the multi-query path, `resolveRowsByParent` (`collection-dispatch.ts:368-417`) only auto-augments the immediate FK column needed to join children to their direct parent. It does not augment FK columns the children themselves need to join to *their* children. Result: a 3+ level deep multi-query stitch silently drops the next level (returns `null` for the grandchild relation). The plugin works around this in `auto-include.ts` by collecting every nested relation's `localFields` and adding them to the parent's `.select(...)`. Once Issue A lands, this becomes moot for the single-query path; the multi-query path still has the bug as a fallback.
-
-### typing: no per-model row shape derivable from Contract
-
-**W-2 / D-3.** Detail in [`projects/pothos-prisma-next/workarounds.md`](../../projects/pothos-prisma-next/workarounds.md). Pothos's `t.exposeID('id')` checks the parent shape against the GraphQL type via `CompatibleTypes<Types, ParentShape, 'ID', true>`. With `ParentShape = Record<string, unknown>`, every key resolves to `never`. To make `t.expose*` work, prisma-next needs an exported helper type that maps `Contract['models'][ModelName]['fields']` to a concrete row shape (decoding each field's codec into its TS output type, respecting nullability). Plugin-prisma gets this for free from Prisma's generator (`Prisma.UserSelect` etc.); we'd compute it directly from `Contract`. Not a bug in the runtime — a missing tool in the typing surface. Blocking for any v2 plugin that wants Pothos-prisma-grade ergonomics.
 
 ### orm-client write surface: no batched insert
 

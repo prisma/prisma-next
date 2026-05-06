@@ -8,18 +8,24 @@ import type {
 } from '@pothos/core';
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { Collection } from '@prisma-next/sql-orm-client';
+import type { Collection, DefaultModelRow } from '@prisma-next/sql-orm-client';
 import type { GraphQLResolveInfo } from 'graphql';
 import type { PothosPrismaNextPlugin } from './index';
 import type { PrismaNextPluginOptions } from './types';
 
 /**
- * Type-level surface of the plugin. Kept deliberately loose for the
- * demo — the exposeX / relation / prismaField surfaces use `unknown`
- * generously rather than threading per-model row inference through. A
- * tighter v2 would mirror pothos-prisma's `ShapeFromSelection` and per-
- * model row computation.
+ * Resolve the per-model parent row shape from the user's Contract using the
+ * orm-client's `DefaultModelRow`. Pothos's `t.exposeID/String/...` reads
+ * keys off this shape, so plumbing the concrete row type through is what
+ * makes those compatibility constraints succeed.
  */
+type RowFor<
+  Types extends SchemaTypes,
+  ModelName extends string,
+> = Types['PrismaNextContract'] extends Contract<SqlStorage>
+  ? DefaultModelRow<Types['PrismaNextContract'], ModelName>
+  : Record<string, unknown>;
+
 declare global {
   export namespace PothosSchemaTypes {
     export interface Plugins<Types extends SchemaTypes> {
@@ -46,7 +52,7 @@ declare global {
     export interface SchemaBuilder<Types extends SchemaTypes> {
       prismaObject<ModelName extends string>(
         modelName: ModelName,
-        options: PrismaNextObjectTypeOptions<Types>,
+        options: PrismaNextObjectTypeOptions<Types, ModelName>,
       ): unknown;
     }
 
@@ -73,10 +79,10 @@ declare global {
   }
 }
 
-interface PrismaNextObjectTypeOptions<Types extends SchemaTypes> {
+interface PrismaNextObjectTypeOptions<Types extends SchemaTypes, ModelName extends string> {
   description?: string;
   fields?: (
-    t: PothosSchemaTypes.ObjectFieldBuilder<Types, Record<string, unknown>>,
+    t: PothosSchemaTypes.ObjectFieldBuilder<Types, RowFor<Types, ModelName>>,
   ) => Record<string, FieldRef<Types, unknown>>;
 }
 
@@ -96,7 +102,9 @@ interface PrismaNextRootFieldOptions<
   // it in the runtime resolver).
   _kind?: Kind;
   resolve: (
-    collection: Collection<Contract<SqlStorage>, ModelName>,
+    collection: Types['PrismaNextContract'] extends Contract<SqlStorage>
+      ? Collection<Types['PrismaNextContract'], ModelName>
+      : Collection<Contract<SqlStorage>, ModelName>,
     parent: ParentShape,
     args: InputShapeFromFields<Args>,
     context: Types['Context'],
