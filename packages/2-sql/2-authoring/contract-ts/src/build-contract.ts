@@ -207,12 +207,9 @@ export function buildSqlContractFromDefinition(
             `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefaults.`,
           );
         }
-        // Nullable is only incompatible with onCreate (the field must hold a
-        // non-null value at insert). onUpdate-only is fine on nullable
-        // columns since they can start as NULL until first update.
-        if (field.nullable && executionDefaultPhases.onCreate) {
+        if (field.nullable) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefaults.onCreate is present.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefaults are present.`,
           );
         }
       }

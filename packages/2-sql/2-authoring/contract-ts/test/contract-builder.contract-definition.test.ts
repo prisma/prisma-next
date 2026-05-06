@@ -328,47 +328,7 @@ describe('shared contract definition lowering', () => {
           },
         ],
       }),
-    ).toThrow('Field "User.id" cannot be nullable when executionDefaults.onCreate is present.');
-  });
-
-  it('allows nullable fields with onUpdate-only executionDefaults', () => {
-    const contract = buildSqlContractFromDefinition({
-      target: postgresTargetPack,
-      models: [
-        {
-          modelName: 'User',
-          tableName: 'app_user',
-          fields: [
-            {
-              fieldName: 'id',
-              columnName: 'id',
-              descriptor: { codecId: 'pg/int4@1', nativeType: 'int4' },
-              nullable: false,
-            },
-            {
-              fieldName: 'touchedAt',
-              columnName: 'touched_at',
-              descriptor: {
-                codecId: 'pg/timestamptz@1',
-                nativeType: 'timestamptz',
-              },
-              nullable: true,
-              executionDefaults: {
-                onUpdate: { kind: 'generator', id: 'timestampNow' },
-              },
-            },
-          ],
-          id: { columns: ['id'] },
-        },
-      ],
-    });
-
-    expect(contract.execution?.mutations.defaults).toEqual([
-      {
-        ref: { table: 'app_user', column: 'touched_at' },
-        onUpdate: { kind: 'generator', id: 'timestampNow' },
-      },
-    ]);
+    ).toThrow('Field "User.id" cannot be nullable when executionDefaults are present.');
   });
 
   it('rejects nullable identity fields', () => {
