@@ -686,11 +686,11 @@ function createConstraintsDsl() {
 
   function index<FieldName extends string, Name extends string | undefined = undefined>(
     field: ColumnRef<FieldName>,
-    options?: IndexInput<Name, Record<never, never>>,
+    options?: ConstraintOptions<Name>,
   ): IndexConstraint<readonly [FieldName], Name>;
   function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: IndexInput<Name, Record<never, never>>,
+    options?: ConstraintOptions<Name>,
   ): IndexConstraint<FieldNames, Name>;
   function index(
     fieldOrFields: ColumnRef | readonly ColumnRef[],

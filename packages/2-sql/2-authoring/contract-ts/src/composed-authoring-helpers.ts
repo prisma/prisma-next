@@ -33,6 +33,7 @@ import type {
   ScalarFieldBuilder,
 } from './contract-dsl';
 import { buildFieldPreset, field, model, rel } from './contract-dsl';
+import type { MergeExtensionIndexTypes } from './contract-types';
 
 type ExtractTypeNamespaceFromPack<Pack> = Pack extends {
   readonly authoring?: { readonly type?: infer Namespace extends AuthoringTypeNamespace };
@@ -99,34 +100,14 @@ type TypeHelpersFromNamespace<Namespace> = {
 
 type CoreFieldHelpers = Pick<typeof field, 'column' | 'generated' | 'namedType'>;
 
-type ExtractIndexTypesFromPack<P> = P extends { __indexTypes?: infer I }
-  ? I extends IndexTypeMap
-    ? I
-    : Record<never, never>
-  : Record<never, never>;
-
-type AllPackIndexTypeLiterals<Packs> =
-  Packs extends Record<string, unknown>
-    ? { [K in keyof Packs]: keyof ExtractIndexTypesFromPack<Packs[K]> }[keyof Packs] & string
-    : never;
-
-type MergedPackIndexTypes<Packs> = {
-  readonly [Lit in AllPackIndexTypeLiterals<Packs>]: Extract<
-    {
-      [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
-        ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
-        : never;
-    }[keyof Packs],
-    { readonly options: unknown }
-  >;
-};
-
-type MergeAllPackIndexTypes<Family, Target, ExtensionPacks> =
-  MergedPackIndexTypes<
-    { readonly __family: Family; readonly __target: Target } & ExtensionPacks
-  > extends infer M extends IndexTypeMap
-    ? M
-    : Record<never, never>;
+type MergeAllPackIndexTypes<Family, Target, ExtensionPacks> = MergeExtensionIndexTypes<
+  { readonly __family: Family; readonly __target: Target } & (ExtensionPacks extends Record<
+    string,
+    unknown
+  >
+    ? ExtensionPacks
+    : Record<never, never>)
+>;
 
 type PackAwareModel<IndexTypes extends IndexTypeMap> = {
   <

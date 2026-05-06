@@ -13,7 +13,12 @@ import type {
   TypeMaps,
 } from '@prisma-next/sql-contract/types';
 import type { UnionToIntersection } from './authoring-type-utils';
-import type { AttributeStageIdFieldNames, FieldStateOf, ScalarFieldBuilder } from './contract-dsl';
+import type {
+  AttributeStageIdFieldNames,
+  FieldStateOf,
+  IndexTypeMap,
+  ScalarFieldBuilder,
+} from './contract-dsl';
 
 export type ExtractCodecTypesFromPack<P> = P extends { __codecTypes?: infer C }
   ? C extends Record<string, { output: unknown }>
@@ -35,7 +40,7 @@ type MergeExtensionCodecTypesSafe<Packs> =
     : Record<string, never>;
 
 export type ExtractIndexTypesFromPack<P> = P extends { __indexTypes?: infer I }
-  ? I extends Record<string, { readonly options: unknown }>
+  ? I extends IndexTypeMap
     ? I
     : Record<never, never>
   : Record<never, never>;
@@ -46,11 +51,14 @@ type AllIndexTypeLiterals<Packs> =
     : never;
 
 export type MergeExtensionIndexTypes<Packs extends Record<string, unknown>> = {
-  readonly [Lit in AllIndexTypeLiterals<Packs>]: {
-    [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
-      ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
-      : never;
-  }[keyof Packs];
+  readonly [Lit in AllIndexTypeLiterals<Packs>]: Extract<
+    {
+      [K in keyof Packs]: Lit extends keyof ExtractIndexTypesFromPack<Packs[K]>
+        ? ExtractIndexTypesFromPack<Packs[K]>[Lit]
+        : never;
+    }[keyof Packs],
+    { readonly options: unknown }
+  >;
 };
 
 export type MergeExtensionPackRefs<
