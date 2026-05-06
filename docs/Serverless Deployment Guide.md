@@ -92,7 +92,9 @@ Wrangler prints a binding ID. Wire it into `wrangler.jsonc`:
 }
 ```
 
-`nodejs_compat` is required: the Postgres driver (`pg`) uses several Node built-ins that workerd polyfills under that flag. The audit that informed this guide confirmed `pg` + `pg-cursor` work under `nodejs_compat` end-to-end (open / read / cursor early-break / close).
+`nodejs_compat` is required: the Postgres driver (`pg`) uses several Node built-ins that workerd polyfills under that flag. The M1 audit confirmed `pg` + `pg-cursor` work under `nodejs_compat` end-to-end (open / read / cursor early-break / close) when validated against a localhost Postgres origin and against `vitest-pool-workers`'s miniflare emulator — i.e., paths that do not put real Hyperdrive in front of the origin.
+
+> **Production caveat — read this before deploying.** Against real Hyperdrive, the default cursor path hangs (`pg-cursor`'s extended-query named portal trips a Hyperdrive parser bug — full diagnostic in the [Cursor mode hangs on Cloudflare Hyperdrive](#known-limitations) entry below). Until the upstream fix lands, pass `cursor: { disabled: true }` to `postgresServerless({...})`. The miniflare emulator and localhost Postgres paths above don't reproduce the hang, so the example's local tests pass with cursor enabled — the bug only surfaces against a real deployed Hyperdrive config.
 
 #### 3. Local dev
 
@@ -125,7 +127,10 @@ export const db = postgresServerless<Contract>({
   contractJson,
   // middleware: [...],   // optional — telemetry, lints, budgets, ...
   // extensions: [...],   // optional
-  // cursor: { ... },     // optional — defaults to enabled
+  // cursor: { disabled: true },  // REQUIRED if your origin is behind Cloudflare
+                                  // Hyperdrive — see Production caveat above.
+                                  // Default is enabled; safe to leave as-is on
+                                  // any non-Hyperdrive origin.
 });
 ```
 
