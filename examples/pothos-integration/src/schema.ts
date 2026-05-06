@@ -1,6 +1,5 @@
 import type { Runtime } from '@prisma-next/sql-runtime';
 import { createBuilder } from './builder';
-import { PRISMA_NEXT_COLUMNS } from './plugin/types';
 
 /**
  * The demo Pothos schema. Defines `User`, `Post`, `Comment` mirroring the
@@ -42,16 +41,12 @@ export function buildSchema(runtime: Runtime) {
       id: t.exposeID('id'),
       title: t.exposeString('title'),
       content: t.exposeString('content'),
-      // The contract stores `published` as an integer (0/1) — sqlite has no
-      // boolean codec — but the GraphQL surface advertises a Boolean here.
-      // Computed resolver, so the column dependency is declared explicitly
-      // for the auto-include walker (an `exposeX` field would set this
-      // automatically via `pothosExposedField`).
-      published: t.field({
-        type: 'Boolean',
-        resolve: (parent) => Boolean(parent.published),
-        extensions: { [PRISMA_NEXT_COLUMNS]: ['published'] },
-      }),
+      // Contract types `published` as `integerColumn`, so the GraphQL surface
+      // is `Int!` and `t.exposeInt('published')` typechecks. A real `Boolean`
+      // surface needs a `booleanColumn` in the sqlite adapter (which doesn't
+      // exist yet — flagged as an adapter gap in the README's prisma-next
+      // limitations section).
+      published: t.exposeInt('published'),
       author: t.relation('author'),
       comments: t.relation('comments'),
     }),

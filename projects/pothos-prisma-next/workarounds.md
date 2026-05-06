@@ -568,6 +568,34 @@ In v2, conditionally skip the await/reshape wrap when the walker returns `noopRe
 
 ---
 
+## W-9: sqlite adapter has no `booleanColumn` / `sqlite/bool@1` codec
+
+### What
+
+The sqlite adapter (`packages/3-targets/6-adapters/sqlite`) exposes `textColumn / integerColumn / realColumn / blobColumn / datetimeColumn / jsonColumn / bigintColumn` (`src/exports/column-types.ts:1-9`). No boolean. Postgres has the equivalent (`boolColumn` + `pg/bool@1` codec). Demo's `Post.published` is declared `integerColumn` because there's no other choice, so the row decodes to `number` and the GraphQL surface is honest about that with `t.exposeInt('published')` (returns 0 or 1).
+
+### Why it surfaced here
+
+I went around in circles because I was treating "GraphQL wants Boolean but the row is Int" as a plugin problem to paper over with custom resolvers + extension plumbing. It isn't — the contract is the source of truth and the surface should follow it. With a real boolean codec the field is `t.exposeBoolean('published')` and Pothos's `CompatibleTypes` accepts it; without one, the right move is to expose the int.
+
+### How — the action item
+
+Add to `packages/3-targets/6-adapters/sqlite`:
+
+1. `SQLITE_BOOL_CODEC_ID = 'sqlite/bool@1'` in `src/core/codec-ids.ts`.
+2. `booleanColumn = { codecId: SQLITE_BOOL_CODEC_ID, nativeType: 'integer' }` in `src/core/column-types.ts`, re-exported.
+3. Codec definition (decode int → boolean, encode boolean → int 0/1) in the sqlite codec registry.
+4. Native-type mapping update so the introspector / migrator recognises it.
+
+Cost: small. Postgres's `bool` codec already exists as a reference. Once it lands, the demo's `Post.published` goes back to `t.exposeBoolean('published')` with no plugin-side changes.
+
+### Cost
+
+- **Demo today**: `t.exposeInt('published')` is honest but the GraphQL surface is `Int!` rather than the more natural `Boolean!`.
+- **Real users**: anyone using sqlite + booleans has to encode/decode manually (or use `t.field({ select: { col: true }, ... })` with a JS coercion).
+
+---
+
 ## Open issues to flag back to the team
 
 Summary of prisma-next-side gaps surfaced by building the demo:

@@ -622,17 +622,21 @@ describe('auto-include walker · apply path', () => {
     expect(selectCall?.args).toEqual(['published']);
   });
 
-  it('honours an explicit PRISMA_NEXT_COLUMNS extension on a t.field with a computed resolver', () => {
+  it('honours `t.field({ select: {...} })` for a computed resolver that needs columns', () => {
     // Multi-column dependency: `fullName: parent.firstName + ' ' + parent.lastName`
-    // declares both columns via PRISMA_NEXT_COLUMNS. Computed-resolver
-    // analogue of T1-3.
+    // declares both columns via the contract-typed `select` option on
+    // `t.field`. Pothos core preserves the original options at the field
+    // config's `pothosOptions` extension; the walker reads `select` off
+    // that. Computed-resolver analogue of T1-3.
     const User = new ObjectType({
       name: 'User',
       extensions: { [PRISMA_NEXT_MODEL]: 'User' },
       fields: () => ({
         fullName: {
           type: new GraphQLNonNull(GraphQLString),
-          extensions: { pothosPrismaNextColumns: ['firstName', 'lastName'] },
+          extensions: {
+            pothosOptions: { select: { firstName: true, lastName: true } },
+          },
         },
       }),
     });
@@ -646,7 +650,7 @@ describe('auto-include walker · apply path', () => {
     expect([...(selectCall?.args ?? [])].sort()).toEqual(['firstName', 'lastName']);
   });
 
-  it('skips fields that have no exposed column and no PRISMA_NEXT_COLUMNS extension', () => {
+  it('skips fields with no exposed column and no select dependency', () => {
     // A `t.field` with a constant resolver depends on no parent columns.
     // The walker must not invent a SELECT for it.
     const User = new ObjectType({
@@ -654,7 +658,7 @@ describe('auto-include walker · apply path', () => {
       extensions: { [PRISMA_NEXT_MODEL]: 'User' },
       fields: () => ({
         id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
-        // No exposed column, no PRISMA_NEXT_COLUMNS — pure compute.
+        // No exposed column, no select — pure compute.
         plugin: { type: new GraphQLNonNull(GraphQLString) },
       }),
     });

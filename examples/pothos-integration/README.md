@@ -58,6 +58,10 @@ The demo's drafts/publishedPosts/postCount query is the canonical example: today
 
 **W-1.** Detail in [`projects/pothos-prisma-next/workarounds.md#w-1-orm-client-recursive-nested-stitch-foreign-key-gap`](../../projects/pothos-prisma-next/workarounds.md#w-1-orm-client-recursive-nested-stitch-foreign-key-gap). On the multi-query path, `resolveRowsByParent` (`collection-dispatch.ts:368-417`) only auto-augments the immediate FK column needed to join children to their direct parent. It does not augment FK columns the children themselves need to join to *their* children. Result: a 3+ level deep multi-query stitch silently drops the next level (returns `null` for the grandchild relation). The plugin works around this in `auto-include.ts` by collecting every nested relation's `localFields` and adding them to the parent's `.select(...)`. Once Issue A lands, this becomes moot for the single-query path; the multi-query path still has the bug as a fallback.
 
+### sqlite adapter: no `booleanColumn` / `sqlite/bool@1` codec
+
+The sqlite adapter exposes `text/integer/real/blob/datetime/json/bigint` columns (`packages/3-targets/6-adapters/sqlite/src/exports/column-types.ts`) but no boolean. Postgres has `boolColumn` + `pg/bool@1`; sqlite would need the equivalent (storing as INTEGER 0/1 with a codec that decodes to TS `boolean`). Today the demo's `Post.published` is declared `integerColumn`, so the GraphQL surface is `Int!` (`t.exposeInt('published')` returns 0 or 1). With a boolean codec it would be `t.exposeBoolean('published')` and serialise as a real `Boolean!`. The plugin needs no changes — this is purely a sqlite-adapter coverage gap.
+
 ### orm-client write surface: no batched insert
 
 `db.sql.User.insert([row1, row2])` doesn't exist; only single-row insert. Minor seeding ergonomics — the demo seed loops one row at a time. Not blocking, but the omission is surprising for anyone coming from Prisma's `createMany`.

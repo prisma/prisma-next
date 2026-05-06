@@ -35,7 +35,7 @@ import {
   Kind,
   type SelectionSetNode,
 } from 'graphql';
-import { PRISMA_NEXT_COLUMNS, PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
+import { PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
 
 /**
  * Extension key set automatically by Pothos core's `exposeField` (which
@@ -47,6 +47,15 @@ import { PRISMA_NEXT_COLUMNS, PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT }
  * Source: `@pothos/core` `fieldUtils/base.ts:107`.
  */
 const POTHOS_EXPOSED_FIELD = 'pothosExposedField';
+
+/**
+ * Extension key Pothos core uses to stash the original `t.field` /
+ * `t.exposeX` options object (`pothosOptions: options as never` in
+ * `@pothos/core` `fieldUtils/base.ts:75`). The walker reads `select`
+ * off this object — that's the contract-typed `select` augmentation
+ * declared in `global-types.ts`.
+ */
+const POTHOS_FIELD_OPTIONS = 'pothosOptions';
 
 interface RelationFieldExt {
   relationName: string;
@@ -326,21 +335,24 @@ function collectFields(type: GraphQLObjectType, selectionSet: SelectionSetNode):
     //    column name the user passed (which is type-checked against the
     //    parent row shape via Pothos's `CompatibleTypes` constraint).
     //
-    // 2. `PRISMA_NEXT_COLUMNS` — set by the user via `t.field({ extensions })`
-    //    when a JS-computed resolver needs one or more columns fetched
-    //    (e.g. `fullName = firstName + ' ' + lastName`).
+    // 2. `t.field({ select: { col1: true, col2: true } })` — the typed
+    //    `select` option (declared on `ObjectFieldOptions` in
+    //    global-types.ts). For computed resolvers that depend on one or
+    //    more columns from the parent row (`fullName = firstName + ' ' +
+    //    lastName`). Pothos preserves the original options at
+    //    `pothosOptions`; the walker reads `select` off that.
     //
-    // A `t.field` with neither extension contributes no SELECT — its
-    // resolver runs against whatever else the row already carries. This
-    // is the same model plugin-prisma uses (`pothosPrismaSelect`).
+    // A `t.field` with neither contributes no SELECT — its resolver runs
+    // against whatever else the row already carries. Same model
+    // plugin-prisma uses (`pothosPrismaSelect`).
     const exposed = ext[POTHOS_EXPOSED_FIELD];
     if (typeof exposed === 'string') {
       scalarFields.add(exposed);
     }
-    const explicit = ext[PRISMA_NEXT_COLUMNS];
-    if (Array.isArray(explicit)) {
-      for (const col of explicit) {
-        if (typeof col === 'string') scalarFields.add(col);
+    const opts = ext[POTHOS_FIELD_OPTIONS] as { select?: Record<string, unknown> } | undefined;
+    if (opts?.select && typeof opts.select === 'object') {
+      for (const col of Object.keys(opts.select)) {
+        if (opts.select[col] === true) scalarFields.add(col);
       }
     }
   }

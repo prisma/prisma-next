@@ -62,16 +62,3 @@ export const PRISMA_NEXT_MODEL = 'pothosPrismaNextModel';
 export const PRISMA_NEXT_RELATION = 'pothosPrismaNextRelation';
 export const PRISMA_NEXT_RELATION_COUNT = 'pothosPrismaNextRelationCount';
 export const PRISMA_NEXT_PREPARED = 'pothosPrismaNextPrepared';
-/**
- * Column dependencies for a non-relation field. Set automatically by the
- * overridden `t.exposeID/Int/Float/String/Boolean[List]` to the column name
- * the user passed; users can also set it directly on `t.field({ extensions })`
- * to declare what columns a JS-computed resolver reads from the parent row.
- *
- * The walker unions every selected field's column list into the parent
- * collection's `.select(...)`. A field with no `PRISMA_NEXT_COLUMNS` extension
- * (e.g. a plain `t.field` with a resolver that only computes from constants
- * or args) contributes nothing — the row will only carry the columns some
- * field actually asked for.
- */
-export const PRISMA_NEXT_COLUMNS = 'pothosPrismaNextColumns';

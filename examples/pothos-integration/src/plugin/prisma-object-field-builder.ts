@@ -7,6 +7,11 @@ import { PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
 interface RelationMeta {
   to: string;
   cardinality: '1:1' | '1:N' | 'N:1' | 'M:N' | string;
+  on?: { localFields?: readonly string[] };
+}
+
+interface ModelFields {
+  [name: string]: { nullable?: boolean } | undefined;
 }
 
 interface RelationOpts {
@@ -47,7 +52,7 @@ export class PrismaNextObjectFieldBuilder<
     this.contract = contract;
   }
 
-  override relation(name: string, options?: RelationOpts) {
+  relation(name: string, options?: RelationOpts) {
     const opts = options ?? {};
     const meta = this.#getRelationMeta(name);
     const targetRef = getOrCreateModelRef(
@@ -55,11 +60,12 @@ export class PrismaNextObjectFieldBuilder<
       meta.to,
     );
     const isToMany = meta.cardinality === '1:N' || meta.cardinality === 'M:N';
+    const defaultNullable = isToMany ? false : this.#isToOneRelationNullable(meta);
 
     return (this as unknown as { field: (cfg: unknown) => unknown }).field({
       type: isToMany ? [targetRef] : targetRef,
       description: opts.description,
-      nullable: opts.nullable ?? !isToMany,
+      nullable: opts.nullable ?? defaultNullable,
       args: opts.args,
       extensions: {
         [PRISMA_NEXT_RELATION]: {
@@ -78,7 +84,7 @@ export class PrismaNextObjectFieldBuilder<
     }) as never;
   }
 
-  override relationCount(name: string, options?: RelationCountOpts) {
+  relationCount(name: string, options?: RelationCountOpts) {
     const opts = options ?? {};
     this.#getRelationMeta(name); // Throws if relation doesn't exist on this model.
 
@@ -120,5 +126,24 @@ export class PrismaNextObjectFieldBuilder<
       );
     }
     return rel;
+  }
+
+  /**
+   * A to-one relation is nullable iff any of its local FK fields is
+   * nullable (e.g. an optional belongsTo). Defaults to nullable when the
+   * contract doesn't expose localFields — safer than asserting non-null.
+   */
+  #isToOneRelationNullable(meta: RelationMeta): boolean {
+    const local = meta.on?.localFields;
+    if (!local || local.length === 0) return true;
+    const models = (this.contract as { models: Record<string, unknown> }).models;
+    const model = models[this.modelName] as { fields?: ModelFields } | undefined;
+    const fields = model?.fields;
+    if (!fields) return true;
+    for (const fk of local) {
+      const f = fields[fk];
+      if (!f || f.nullable !== false) return true;
+    }
+    return false;
   }
 }
