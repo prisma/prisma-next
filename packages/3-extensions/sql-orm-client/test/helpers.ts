@@ -27,19 +27,21 @@ export function getTestContract(): TestContract {
 /**
  * Override the capabilities of a {@link TestContract} for a test scenario.
  *
- * The narrow `TestContract` type fixes capabilities to the exact shape
- * found in `fixtures/generated/contract.json` (e.g. the `postgres`
- * namespace's specific readonly fields). Tests need to construct
- * contracts with arbitrary capability shapes — empty, only-jsonAgg,
- * cross-namespace, etc. — that don't fit that narrow type.
+ * The narrow `TestContract` type fixes `capabilities` to the literal shape
+ * generated for `fixtures/generated/contract.json`. Tests need contracts
+ * with arbitrary capability shapes — empty, only-jsonAgg, cross-namespace,
+ * etc. — and want the override's literal types preserved so capability-
+ * dependent type checks remain meaningful.
  *
- * This helper centralizes the structural cast so call sites stay clean.
+ * The result widens `TestContract`'s `capabilities` slot to the caller's
+ * `TCaps`, which the framework `Contract` interface already permits
+ * (`capabilities: Record<string, Record<string, boolean>>`).
  */
-export function withCapabilities(
+export function withCapabilities<TCaps extends Record<string, Record<string, boolean>>>(
   contract: TestContract,
-  capabilities: Record<string, Record<string, boolean>>,
-): TestContract {
-  return { ...contract, capabilities } as unknown as TestContract;
+  capabilities: TCaps,
+): Omit<TestContract, 'capabilities'> & { readonly capabilities: TCaps } {
+  return { ...contract, capabilities };
 }
 
 const testContext: ExecutionContext<TestContract> = createExecutionContext({

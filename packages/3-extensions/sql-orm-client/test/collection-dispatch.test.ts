@@ -8,7 +8,7 @@ import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
 import { createMockRuntime, getTestContract, withCapabilities } from './helpers';
 
-function withSingleQueryCapabilities(contract: TestContract): TestContract {
+function withSingleQueryCapabilities(contract: TestContract) {
   return withCapabilities(contract, {
     ...contract.capabilities,
     [contract.targetFamily]: {
@@ -30,7 +30,7 @@ function withSingleQueryCapabilities(contract: TestContract): TestContract {
  * contract" — the regression scenario the principled namespaced lookup
  * was introduced to handle.
  */
-function withEmittedSqlCapabilities(contract: TestContract): TestContract {
+function withEmittedSqlCapabilities(contract: TestContract) {
   return withCapabilities(contract, {
     sql: { jsonAgg: true, returning: true },
     postgres: { jsonAgg: true, lateral: true, returning: true },
