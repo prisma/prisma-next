@@ -1,5 +1,3 @@
-import type { Contract, PlanMeta } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   type ColumnRef,
   InsertAst,
@@ -21,15 +19,19 @@ import type {
 } from '../src/core/sdk';
 import { bulkEncryptMiddleware } from '../src/middleware/bulk-encrypt';
 
-const baseMeta: PlanMeta = {
+const baseMeta = {
   target: 'postgres',
   storageHash: 'sha256:test',
   lane: 'dsl',
-};
+} as const;
 
 function createCtx(overrides?: Partial<SqlMiddlewareContext>): SqlMiddlewareContext {
-  return {
-    contract: {} as Contract<SqlStorage>,
+  // The test exercises middleware behaviour against the public
+  // `SqlMiddlewareContext` shape; the underlying contract carrier is
+  // never consulted by the middleware so we leave it as an opaque
+  // sentinel.
+  const baseCtx: SqlMiddlewareContext = {
+    contract: {} as SqlMiddlewareContext['contract'],
     mode: 'strict' as const,
     now: () => Date.now(),
     log: {
@@ -37,8 +39,8 @@ function createCtx(overrides?: Partial<SqlMiddlewareContext>): SqlMiddlewareCont
       warn: vi.fn(),
       error: vi.fn(),
     },
-    ...overrides,
   };
+  return { ...baseCtx, ...overrides };
 }
 
 interface CounterSdk extends CipherstashSdk {

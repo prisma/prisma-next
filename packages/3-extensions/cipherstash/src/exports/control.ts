@@ -6,11 +6,18 @@
  * `databaseDependencies.init` block that installs the EQL Postgres
  * extension before any cipherstash-bound migration executes.
  *
- * **AC-INSTALL1** is satisfied at the *shape* level in M2.a; the
- * placeholder install SQL points at the M2.c bundle vendor task.
- * **AC-INSTALL2** (live-Postgres `dbInit` succeeds) and
- * **AC-INSTALL3** (idempotency) require the real bundle and a live
- * Postgres harness — both deferred to M2.c.
+ * - **AC-INSTALL1** — descriptor shape and live SQL bundle (M2.c).
+ * - **AC-INSTALL2** — `dbInit` against a fresh Postgres database
+ *   creates the `eql_v2` schema (verified by the integration test).
+ * - **AC-INSTALL3** — idempotency: the precheck short-circuits when
+ *   `public.eql_v2_configuration` already exists, so a repeat
+ *   `dbInit` skips the install step.
+ *
+ * Note: the spec text predates the upstream `encrypt-query-language`
+ * rename of `cs_configuration_v2` to `eql_v2_configuration`; the
+ * implementation tracks the upstream bundle. The spec acceptance
+ * criteria (AC-INSTALL2/3) target "the EQL configuration table" — the
+ * upstream rename is the source of truth for the table identifier.
  */
 
 import type {
@@ -42,16 +49,21 @@ const cipherstashDatabaseDependencies: ComponentDatabaseDependencies<unknown> = 
       label: 'Install EQL extension',
       install: [
         {
-          id: 'eql.install',
+          // The op id must start with `extension.` for the postgres
+          // migration planner to classify it as a dependency op (runs
+          // before table creates). See
+          // `packages/3-targets/3-targets/postgres/src/core/migrations/issue-planner.ts`
+          // `classifyCall(...)` for the rawSql / id-prefix rule.
+          id: 'extension.eql.install',
           label: 'Install EQL bundle',
           summary:
-            'Installs the EQL Postgres extension bundle (encrypted-aware operators + cs_configuration_v2)',
+            'Installs the EQL Postgres extension bundle (encrypted-aware operators + eql_v2_configuration)',
           operationClass: 'additive',
           target: { id: 'postgres' },
           precheck: [
             {
               description: 'verify EQL is not already installed',
-              sql: "SELECT NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'cs_configuration_v2')",
+              sql: "SELECT NOT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'eql_v2_configuration')",
             },
           ],
           execute: [

@@ -1,17 +1,22 @@
 /**
- * Placeholder for the vendored EQL Postgres install bundle.
+ * Vendored EQL Postgres install bundle.
  *
- * The real bundle (~170KB of inlined SQL) lives at
- * `reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts`
- * in the first-attempt repo (adjacent worktree); it gets copied into
- * this package in M2.c when the live-Postgres + live-EQL integration
- * tests come online and exercise AC-INSTALL2 / AC-INSTALL3.
+ * The bundle is the canonical install SQL for the EQL Postgres
+ * extension (encrypt-query-language). It is sourced from a pinned EQL
+ * release and committed to source control as a TypeScript string
+ * literal so installation works offline and the SQL is trivially
+ * inlinable into both ESM and CJS dist outputs.
  *
- * For M2.a (this round), AC-INSTALL1 verifies only the *shape* of the
- * `databaseDependencies.init` declaration; the placeholder SQL string
- * keeps the descriptor exercise-able without committing the large
- * vendored file ahead of the integration-test plumbing.
+ * The constant is the input to `databaseDependencies.init` (see
+ * `src/exports/control.ts`); when a control plane runs `dbInit`
+ * against a fresh Postgres database, the runtime executes this SQL
+ * once. Subsequent `dbInit` calls short-circuit through the
+ * `cs_configuration_v2`/`eql_v2` schema precheck (AC-INSTALL3).
+ *
+ * To bump the pinned version, replace `eql-install.generated.ts` from
+ * the upstream `encrypt-query-language` release. The generated file is
+ * intentionally separated from this module so the version-bump diff
+ * stays mechanical and auditable.
  */
 
-export const EQL_INSTALL_SQL =
-  '-- TODO M2.c: vendor EQL_INSTALL_SQL from reference/cipherstash/stack/packages/stack/src/prisma/core/eql-bundle.ts';
+export { EQL_INSTALL_SQL, EQL_INSTALL_VERSION } from './eql-install.generated';
