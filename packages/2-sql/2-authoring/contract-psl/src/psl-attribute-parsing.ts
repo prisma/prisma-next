@@ -133,6 +133,132 @@ export function getPositionalArguments(attribute: PslAttribute): readonly string
     .map((arg) => (arg.kind === 'positional' ? arg.value : ''));
 }
 
+/**
+ * Parses a PSL object-literal attribute argument value of the form
+ * `{ key1: "value1", key2: "value2" }` into a `Record<string, string>`.
+ *
+ * V1 admits string literals only as leaf values. Boolean and number
+ * literals are rejected. Trailing commas are allowed.
+ *
+ * Returns the parsed record, or pushes a diagnostic and returns undefined
+ * on malformed input or non-string leaves.
+ */
+export function parseObjectLiteralStringMap(input: {
+  readonly raw: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly entityLabel: string;
+}): Record<string, string> | undefined {
+  const trimmed = input.raw.trim();
+  if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+    return pushInvalidAttributeArgument({
+      diagnostics: input.diagnostics,
+      sourceId: input.sourceId,
+      span: input.span,
+      message: `${input.entityLabel} expected an object literal value of the form { key: "value", ... }`,
+    });
+  }
+  const body = trimmed.slice(1, -1).trim();
+  if (body.length === 0) {
+    return {};
+  }
+  const result: Record<string, string> = {};
+  for (const part of splitObjectLiteralEntries(body)) {
+    const colonAt = findTopLevelColon(part);
+    if (colonAt === -1) {
+      return pushInvalidAttributeArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: input.span,
+        message: `${input.entityLabel} object-literal entry "${part}" is missing a "key: value" colon`,
+      });
+    }
+    const key = part.slice(0, colonAt).trim();
+    const rawValue = part.slice(colonAt + 1).trim();
+    if (key.length === 0 || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) {
+      return pushInvalidAttributeArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: input.span,
+        message: `${input.entityLabel} object-literal key "${key}" must be a bare identifier`,
+      });
+    }
+    const parsedString = parseQuotedStringLiteral(rawValue);
+    if (parsedString === undefined) {
+      return pushInvalidAttributeArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: input.span,
+        message: `${input.entityLabel} object-literal value for "${key}" must be a quoted string literal`,
+      });
+    }
+    if (Object.hasOwn(result, key)) {
+      return pushInvalidAttributeArgument({
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        span: input.span,
+        message: `${input.entityLabel} object-literal key "${key}" appears more than once`,
+      });
+    }
+    result[key] = parsedString;
+  }
+  return result;
+}
+
+function splitObjectLiteralEntries(body: string): readonly string[] {
+  const parts: string[] = [];
+  let depthBrace = 0;
+  let depthBracket = 0;
+  let depthParen = 0;
+  let quote: '"' | "'" | null = null;
+  let start = 0;
+  for (let index = 0; index < body.length; index += 1) {
+    const ch = body[index] ?? '';
+    if (quote) {
+      if (ch === quote && body[index - 1] !== '\\') {
+        quote = null;
+      }
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === '{') depthBrace += 1;
+    else if (ch === '}') depthBrace = Math.max(0, depthBrace - 1);
+    else if (ch === '[') depthBracket += 1;
+    else if (ch === ']') depthBracket = Math.max(0, depthBracket - 1);
+    else if (ch === '(') depthParen += 1;
+    else if (ch === ')') depthParen = Math.max(0, depthParen - 1);
+    else if (ch === ',' && depthBrace === 0 && depthBracket === 0 && depthParen === 0) {
+      const segment = body.slice(start, index).trim();
+      if (segment.length > 0) parts.push(segment);
+      start = index + 1;
+    }
+  }
+  const tail = body.slice(start).trim();
+  if (tail.length > 0) parts.push(tail);
+  return parts;
+}
+
+function findTopLevelColon(entry: string): number {
+  let quote: '"' | "'" | null = null;
+  for (let index = 0; index < entry.length; index += 1) {
+    const ch = entry[index] ?? '';
+    if (quote) {
+      if (ch === quote && entry[index - 1] !== '\\') quote = null;
+      continue;
+    }
+    if (ch === '"' || ch === "'") {
+      quote = ch;
+      continue;
+    }
+    if (ch === ':') return index;
+  }
+  return -1;
+}
+
 export function pushInvalidAttributeArgument(input: {
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
