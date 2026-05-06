@@ -8,7 +8,7 @@ import type { RuntimeMutationDefaultGenerator } from '@prisma-next/sql-runtime';
  * Builds the canonical control-plane descriptor for the wall-clock-now
  * mutation default generator. Targets contribute only their applicable
  * codec ids; the descriptor's `id`, `buildPhases`, and any future shared
- * behavior live here so PSL `@updatedAt` and TS `field.updatedAt()`
+ * behavior live here so PSL `temporal.updatedAt()` and TS `field.temporal.updatedAt()`
  * lower to byte-identical contracts across targets.
  */
 export function timestampNowControlDescriptor(

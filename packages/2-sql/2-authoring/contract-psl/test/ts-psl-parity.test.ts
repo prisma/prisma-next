@@ -26,14 +26,16 @@ const sqlFamilyPack = {
           nativeType: 'text',
         },
       },
-      createdAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-          default: {
-            kind: 'function',
-            expression: 'now()',
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sql/timestamp@1',
+            nativeType: 'timestamp',
+            default: {
+              kind: 'function',
+              expression: 'now()',
+            },
           },
         },
       },
@@ -138,25 +140,27 @@ const sqliteTimestampTargetPack = {
           nativeType: 'text',
         },
       },
-      createdAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sqlite/datetime@1',
-          nativeType: 'text',
-          default: {
-            kind: 'function',
-            expression: 'now()',
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sqlite/datetime@1',
+            nativeType: 'text',
+            default: {
+              kind: 'function',
+              expression: 'now()',
+            },
           },
         },
-      },
-      updatedAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sqlite/datetime@1',
-          nativeType: 'text',
-          executionDefaults: {
-            onCreate: { kind: 'generator', id: 'timestampNow' },
-            onUpdate: { kind: 'generator', id: 'timestampNow' },
+        updatedAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sqlite/datetime@1',
+            nativeType: 'text',
+            executionDefaults: {
+              onCreate: { kind: 'generator', id: 'timestampNow' },
+              onUpdate: { kind: 'generator', id: 'timestampNow' },
+            },
           },
         },
       },
@@ -186,25 +190,27 @@ const postgresTimestampTargetPack = {
           nativeType: 'text',
         },
       },
-      createdAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'pg/timestamptz@1',
-          nativeType: 'timestamptz',
-          default: {
-            kind: 'function',
-            expression: 'now()',
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            default: {
+              kind: 'function',
+              expression: 'now()',
+            },
           },
         },
-      },
-      updatedAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'pg/timestamptz@1',
-          nativeType: 'timestamptz',
-          executionDefaults: {
-            onCreate: { kind: 'generator', id: 'timestampNow' },
-            onUpdate: { kind: 'generator', id: 'timestampNow' },
+        updatedAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'pg/timestamptz@1',
+            nativeType: 'timestamptz',
+            executionDefaults: {
+              onCreate: { kind: 'generator', id: 'timestampNow' },
+              onUpdate: { kind: 'generator', id: 'timestampNow' },
+            },
           },
         },
       },
@@ -274,7 +280,7 @@ const representativeTsAuthoring = `defineContract(
         email: field.text().unique({ name: 'user_email_key' }),
         role: field.namedType(types.Role),
         embedding: field.namedType(types.Embedding1536).optional(),
-        createdAt: field.createdAt(),
+        createdAt: field.temporal.createdAt(),
       },
       relations: { posts: rel.hasMany(() => Post, { by: 'authorId' }) },
     }).sql({ table: 'user' });
@@ -313,7 +319,7 @@ function buildTsContract() {
           email: field.text().unique({ name: 'user_email_key' }),
           role: field.namedType(types.Role),
           embedding: field.namedType(types.Embedding1536).optional(),
-          createdAt: field.createdAt(),
+          createdAt: field.temporal.createdAt(),
         },
       });
 
@@ -366,8 +372,8 @@ function buildSqliteTimestampTsContract() {
           fields: {
             id: field.int().id(),
             email: field.text(),
-            createdAt: field.createdAt(),
-            updatedAt: field.updatedAt(),
+            createdAt: field.temporal.createdAt(),
+            updatedAt: field.temporal.updatedAt(),
           },
         }).sql({ table: 'user' }),
       },
@@ -387,8 +393,8 @@ function buildPostgresTimestampTsContract() {
           fields: {
             id: field.int().id(),
             email: field.text(),
-            createdAt: field.createdAt(),
-            updatedAt: field.updatedAt(),
+            createdAt: field.temporal.createdAt(),
+            updatedAt: field.temporal.updatedAt(),
           },
         }).sql({ table: 'user' }),
       },

@@ -29,7 +29,7 @@ export const contract = defineContract(
       fields: {
         id: field.id.uuidv4(),
         email: field.text(),
-        createdAt: field.createdAt(),
+        createdAt: field.temporal.createdAt(),
         kind: field.namedType(types.user_type),
         address: field.json().optional(),
       },
@@ -40,7 +40,7 @@ export const contract = defineContract(
         id: field.id.uuidv4(),
         title: field.text(),
         userId: field.uuid(),
-        createdAt: field.createdAt(),
+        createdAt: field.temporal.createdAt(),
         embedding: field.namedType(types.Embedding1536).optional(),
       },
     });

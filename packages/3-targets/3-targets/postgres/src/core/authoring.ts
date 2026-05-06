@@ -89,30 +89,32 @@ export const postgresAuthoringFieldPresets = {
       nativeType: 'timestamptz',
     },
   },
-  createdAt: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'pg/timestamptz@1',
-      nativeType: 'timestamptz',
-      default: {
-        kind: 'function',
-        expression: 'now()',
+  temporal: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        default: {
+          kind: 'function',
+          expression: 'now()',
+        },
       },
     },
-  },
-  updatedAt: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'pg/timestamptz@1',
-      nativeType: 'timestamptz',
-      executionDefaults: {
-        onCreate: {
-          kind: 'generator',
-          id: 'timestampNow',
-        },
-        onUpdate: {
-          kind: 'generator',
-          id: 'timestampNow',
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'pg/timestamptz@1',
+        nativeType: 'timestamptz',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'timestampNow',
+          },
+          onUpdate: {
+            kind: 'generator',
+            id: 'timestampNow',
+          },
         },
       },
     },

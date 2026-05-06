@@ -161,7 +161,7 @@ export const contract = defineContract(
           id: field.id.uuidv7(),
           email: field.text().unique(),
           name: field.text().optional(),
-          createdAt: field.createdAt(),
+          createdAt: field.temporal.createdAt(),
         },
         relations: {
           posts: rel.hasMany('Post', { by: 'authorId' }),
@@ -174,7 +174,7 @@ export const contract = defineContract(
           title: field.text(),
           content: field.text().optional(),
           authorId: field.uuid(),
-          createdAt: field.createdAt(),
+          createdAt: field.temporal.createdAt(),
         },
         relations: {
           author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),

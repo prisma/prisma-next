@@ -7,7 +7,7 @@ import type {
 /**
  * Canonical id for the wall-clock-now mutation default generator.
  *
- * Authoring surfaces (PSL `@updatedAt`, TS `field.updatedAt()`), control
+ * Authoring surfaces (PSL `temporal.updatedAt()`, TS `field.temporal.updatedAt()`), control
  * descriptors, and runtime generators all reference this id. Centralized
  * here so a future rename or alias is a single edit.
  */

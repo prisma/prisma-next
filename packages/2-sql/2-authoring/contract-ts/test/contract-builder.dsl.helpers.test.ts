@@ -29,22 +29,24 @@ const sqlFamilyPack = {
         kind: 'fieldPreset',
         output: { codecId: 'sql/timestamp@1', nativeType: 'timestamp' },
       },
-      createdAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-          default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
+      temporal: {
+        createdAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sql/timestamp@1',
+            nativeType: 'timestamp',
+            default: { kind: 'function', expression: 'CURRENT_TIMESTAMP' },
+          },
         },
-      },
-      updatedAt: {
-        kind: 'fieldPreset',
-        output: {
-          codecId: 'sql/timestamp@1',
-          nativeType: 'timestamp',
-          executionDefaults: {
-            onCreate: { kind: 'generator', id: 'timestampNow' },
-            onUpdate: { kind: 'generator', id: 'timestampNow' },
+        updatedAt: {
+          kind: 'fieldPreset',
+          output: {
+            codecId: 'sql/timestamp@1',
+            nativeType: 'timestamp',
+            executionDefaults: {
+              onCreate: { kind: 'generator', id: 'timestampNow' },
+              onUpdate: { kind: 'generator', id: 'timestampNow' },
+            },
           },
         },
       },
@@ -227,8 +229,8 @@ describe('contract DSL helper vocabulary', () => {
               actorId: field.uuid().column('actor_id'),
               shortCode: field.nanoid({ size: 16 }).column('short_code'),
               email: field.text().unique({ name: 'audit_entry_email_key' }),
-              createdAt: field.createdAt().column('created_at'),
-              updatedAt: field.updatedAt().column('updated_at'),
+              createdAt: field.temporal.createdAt().column('created_at'),
+              updatedAt: field.temporal.updatedAt().column('updated_at'),
               reviewedAt: field.timestamp().optional().column('reviewed_at'),
             },
           }).sql({
@@ -305,7 +307,7 @@ describe('contract DSL helper vocabulary', () => {
       ({ field }) => {
         const textState = field.text().build();
         const timestampState = field.timestamp().build();
-        const updatedAtState = field.updatedAt().build();
+        const updatedAtState = field.temporal.updatedAt().build();
         const uuidState = field.uuid().build();
         const nanoidState = field.nanoid({ size: 16 }).build();
         const uuidV4IdState = field.id.uuidv4().build();
@@ -599,7 +601,7 @@ describe('contract DSL helper vocabulary', () => {
                 .text()
                 .unique()
                 .sql({ unique: { name: 'audit_entry_email_key' } }),
-              createdAt: field.createdAt().sql({ column: 'created_at' }),
+              createdAt: field.temporal.createdAt().sql({ column: 'created_at' }),
             },
           }).sql({
             table: 'audit_entry',

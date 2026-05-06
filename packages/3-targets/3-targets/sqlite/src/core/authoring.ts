@@ -8,30 +8,32 @@ export const sqliteAuthoringFieldPresets = {
       nativeType: 'text',
     },
   },
-  createdAt: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sqlite/datetime@1',
-      nativeType: 'text',
-      default: {
-        kind: 'function',
-        expression: 'now()',
+  temporal: {
+    createdAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        default: {
+          kind: 'function',
+          expression: 'now()',
+        },
       },
     },
-  },
-  updatedAt: {
-    kind: 'fieldPreset',
-    output: {
-      codecId: 'sqlite/datetime@1',
-      nativeType: 'text',
-      executionDefaults: {
-        onCreate: {
-          kind: 'generator',
-          id: 'timestampNow',
-        },
-        onUpdate: {
-          kind: 'generator',
-          id: 'timestampNow',
+    updatedAt: {
+      kind: 'fieldPreset',
+      output: {
+        codecId: 'sqlite/datetime@1',
+        nativeType: 'text',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'timestampNow',
+          },
+          onUpdate: {
+            kind: 'generator',
+            id: 'timestampNow',
+          },
         },
       },
     },
