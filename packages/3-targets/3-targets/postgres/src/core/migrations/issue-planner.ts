@@ -15,6 +15,7 @@ import type {
   SqlPlannerConflict,
   SqlPlannerConflictLocation,
 } from '@prisma-next/family-sql/control';
+import { arraysEqual } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type {
@@ -454,8 +455,19 @@ function mapIssueToCall(
         return notOk(issueConflict('indexIncompatible', 'Index issue has no table name'));
       if (isMissing(issue) && issue.expected) {
         const columns = issue.expected.split(', ');
-        const indexName = `${issue.table}_${columns.join('_')}_idx`;
-        return ok([new CreateIndexCall(schemaName, issue.table, indexName, columns)]);
+        const contractIndex = ctx.toContract.storage.tables[issue.table]?.indexes.find((idx) =>
+          arraysEqual(idx.columns, columns),
+        );
+        const indexName = contractIndex?.name ?? `${issue.table}_${columns.join('_')}_idx`;
+        const extras: { type?: string; options?: Record<string, unknown> } = {};
+        if (contractIndex?.type !== undefined) extras.type = contractIndex.type;
+        if (contractIndex?.options !== undefined) extras.options = contractIndex.options;
+        const hasExtras = extras.type !== undefined || extras.options !== undefined;
+        return ok([
+          hasExtras
+            ? new CreateIndexCall(schemaName, issue.table, indexName, columns, extras)
+            : new CreateIndexCall(schemaName, issue.table, indexName, columns),
+        ]);
       }
       return notOk(
         issueConflict(
