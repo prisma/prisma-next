@@ -31,7 +31,7 @@ export class EncryptedString {
 The class owns its handle internally — closure / private field / WeakMap; the choice is an implementation detail. The handle carries:
 
 - **Write side** (after `from(plaintext)`): plaintext + an empty `ciphertext` slot.
-- **After bulk-encrypt middleware runs**: ciphertext + the column identity from `SqlCodecCallContext.column` + SDK routing keys (dataset, key id) needed for `bulkEncrypt`. The plaintext slot is overwritten with `undefined` for memory hygiene.
+- **After bulk-encrypt middleware runs**: ciphertext + the column identity from `SqlCodecCallContext.column` + SDK routing keys (dataset, key id) needed for `bulkEncrypt`. The plaintext slot is retained (see § Open Question 5 — Project 1 does not zero plaintext post-encrypt). As a side effect, a write-side envelope's `decrypt()` returns the original plaintext synchronously without an SDK round-trip.
 - **Read side** (after `codec.decode`): ciphertext + `{ table, column }` from `SqlCodecCallContext.column` + SDK routing keys needed for `bulkDecrypt`.
 
 The handle has **no exported TypeScript surface**. Inside the package, codec / middleware / `decryptAll` reach into the handle via package-internal helpers (a private symbol on the envelope, a `WeakMap`, or `#`-prefixed fields — implementation choice).
@@ -246,7 +246,7 @@ packages/3-extensions/cipherstash/
 - **Selective-by-column `decryptAll`.** First-pass walks every envelope it finds. Selective convenience is a follow-on if there's demand.
 - **KMS provider abstraction.** This package is CipherStash-specific.
 - **Re-implementing the CipherStash SDK.** Wraps the existing SDK; bulk surface mismatches escalate to the CipherStash team.
-- **Automatic plaintext zeroing on the user's `from(plaintext)` argument.** The middleware overwrites the handle's plaintext slot post-encrypt; the user's original `string` argument lifecycle is the user's concern.
+- **Plaintext zeroing of any kind.** Per § Open Question 5, Project 1 does not zero the envelope handle's plaintext slot post-encrypt, and does not expose an explicit `dispose()` API. Users with hardened secrets-hygiene requirements drop envelope references promptly to let GC reclaim plaintexts. Revisit if the CipherStash team or an early consumer asks for stricter behavior.
 - **Re-encryption migration.** Adopting CipherStash for an existing column requires a one-off data migration; not a primitive in this spec.
 
 # Acceptance Criteria
@@ -278,7 +278,7 @@ packages/3-extensions/cipherstash/
 - [ ] **AC-MW2**: For multiple routing keys, exactly one `bulkEncrypt` per group.
 - [ ] **AC-MW3**: The middleware forwards `ctx.signal` to the SDK; an aborted signal at `beforeExecute` entry surfaces `RUNTIME.ABORTED { phase: 'beforeExecute' }`.
 - [ ] **AC-MW4**: After the middleware runs, `codec.encode` receives ciphertext via the envelope's handle.
-- [ ] **AC-MW5**: After the middleware runs, the handle's plaintext slot is `undefined` (memory hygiene).
+- [ ] **AC-MW5**: After the middleware runs, the handle's plaintext slot retains its original value (Project 1 does not zero plaintext post-encrypt — see § Open Question 5). Verifiable via the public surface: `await envelope.decrypt()` on a write-side envelope returns the original plaintext synchronously without invoking the mock SDK's single-cell `decrypt` (counter remains 0).
 
 ## `decryptAll`
 
@@ -345,10 +345,10 @@ See umbrella spec.
 # Open Questions
 
 1. **Canonical EQL operator lowering shape.** The first-attempt's `operation-templates.ts` is the source-of-truth for the exact SQL function calls (`eql_v2.eq` vs `eql_v2.encrypted_eq` etc.). This spec defers to that file but flags the lift as a concrete task.
-2. **Routing-key surface in user config.** ZeroKMS bulk calls group by `(dataset, keyId)`. Currently the handle is expected to derive routing keys from `(table, column)` plus extension-level config; whether per-column key-id override surfaces in the `encryptedString({...})` factory is open. Default: no per-column override; derived from `(table, column)`.
+2. **Routing-key surface in user config — RESOLVED (2026-05-06).** Routing key is `{ table, column }`, derived from the envelope handle's `(table, column)` slots. No per-column key-id override on `encryptedString({...})` in Project 1. Matches the reference SDK's `bulkEncrypt(plaintexts, { column, table })` shape and is already locked into the `CipherstashSdk` interface (`packages/3-extensions/cipherstash/src/core/sdk.ts:55-59`). Question being raised with the CipherStash team — see `cipherstash-team-questions.md` § Routing-key derivation; if they want a different shape, they extend the surface in a follow-up.
 3. **Phase tag for `decryptAll` aborts.** `decryptAll` runs *outside* a `runtime.execute()` call, so phase tags `'encode'` / `'decode'` / `'stream'` don't fit cleanly. Default: `'decode'` (user's mental model is "decode-side"). Consider inventing `'decrypt-all'` if we want stricter attribution.
 4. **`JSON.stringify(envelope)` behavior.** Should it produce a placeholder (`{ "$encryptedString": "<opaque>" }`), throw, or return `undefined` (which `JSON.stringify` treats as field omission)? Default: placeholder. Confirm.
-5. **Plaintext memory hygiene strictness.** The middleware overwrites the handle's plaintext slot post-encrypt. Should the envelope class additionally implement explicit zeroization (e.g. `envelope.dispose()`) for users with hardened secrets-hygiene requirements? Default: no — lifecycle is GC-driven, dispose is a phase-2 add-on.
+5. **Plaintext memory hygiene strictness — RESOLVED (2026-05-06).** Project 1 does not zero the envelope handle's plaintext slot post-encrypt, and does not expose an explicit `dispose()` API. Rationale: zeroing in JS is best-effort (strings are immutable); the GC-driven lifecycle is sufficient for Project 1's bounded scope. As a side effect, a write-side envelope's `decrypt()` returns the original plaintext synchronously without consulting the SDK. Question being raised with the CipherStash team — see `cipherstash-team-questions.md` § Plaintext zeroing; if they want stricter behavior, the M2.a-shipped `setHandleCiphertext` helper is the right hook to flip in a follow-up.
 6. **`expandNativeType` for `eql_v2_encrypted`.** Pgvector's `expandNativeType` produces `vector(1536)` from `nativeType: 'vector'` + `typeParams: { length: 1536 }`. Cipherstash's `eql_v2_encrypted` is a fixed JSONB-domain type; the search-mode params don't affect the column's DDL type expression — they affect runtime behavior + the migration-factories DDL. Is `expandNativeType` a no-op for cipherstash? Default: yes, return `nativeType` unchanged.
 
 # Alternatives Considered

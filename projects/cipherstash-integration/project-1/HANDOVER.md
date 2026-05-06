@@ -4,7 +4,7 @@
 
 ## TL;DR
 
-**Project 1 is ~60% shipped on `tml-2373-project-1-searchable-encryption-mvp`.** Three of five milestones (M1, M2.a, M2.b) are SATISFIED on the branch with **52 ACs PASS / 0 FAIL / 48 NOT VERIFIED**. The remaining work is **M2.c** (bulk-encrypt middleware + real EQL bundle + live Postgres + EQL integration tests), then **M3** (`eq` operator + manual `addSearchConfig` migration), then **M4** (`ilike` + `decryptAll` + `activatePending`), then **M5** (close-out). Two follow-up Linear tickets exist; one ([TML-2376](https://linear.app/prisma-company/issue/TML-2376)) is filed, one ([codec-SDK binding refactor](#follow-up-tickets)) is pending manual filing — body staged in `reviews/code-review.md § Orchestrator notes — M2.b R1`.
+**Project 1 is ~60% shipped on `tml-2373-project-1-searchable-encryption-mvp`.** Three of five milestones (M1, M2.a, M2.b) are SATISFIED on the branch with **52 ACs PASS / 0 FAIL / 48 NOT VERIFIED**. The remaining work is **M2.c** (bulk-encrypt middleware + real EQL bundle + live Postgres + EQL integration tests), then **M3** (`eq` operator + manual `addSearchConfig` migration), then **M4** (`ilike` + `decryptAll` + `activatePending`), then **M5** (close-out). Two follow-up Linear tickets are filed: [TML-2376](https://linear.app/prisma-company/issue/TML-2376) (Mongo middleware param-mutator runtime wiring) and [TML-2388](https://linear.app/prisma-company/issue/TML-2388) (codec-SDK binding refactor).
 
 ## Where to start (5-minute orientation)
 
@@ -49,7 +49,7 @@ Authoring surface — both PSL and TS produce byte-identical `contract.json` for
 - Required a small framework addition: `kind: 'boolean'` arm on `AuthoringArgumentDescriptor` (commit `584bbcda6`). Three-file additive change; zero impact on existing extensions.
 - AC-CTOR1..4, AC-LOWER1..4, AC-ALIAS1..2, AC-PARITY1..2 all PASS. Commits `584bbcda6..c48d4d7ad`.
 
-**Defer in scope:** Codec-SDK binding refactor (cipherstash needed two codecs — SDK-free for pack-meta, SDK-bound for runtime). The clean fix is to thread SDK per-call via `CodecCallContext` rather than capturing it at codec construction. M3+ framework scope. **Linear ticket pending manual filing** — body staged in `reviews/code-review.md § Orchestrator notes — M2.b R1` and reproduced under [§ Follow-up tickets](#follow-up-tickets) below.
+**Defer in scope:** Codec-SDK binding refactor (cipherstash needed two codecs — SDK-free for pack-meta, SDK-bound for runtime). The clean fix is to thread SDK per-call via `CodecCallContext` rather than capturing it at codec construction. M3+ framework scope. Filed as [TML-2388](https://linear.app/prisma-company/issue/TML-2388); the original accepted-deferral record lives in `reviews/code-review.md § Orchestrator notes — M2.b R1`.
 
 ## What remains
 
@@ -151,21 +151,9 @@ pnpm test:integration                             # live-DB suite — needed for
 
 `MongoRuntime` doesn't yet construct/thread a `MongoParamRefMutator`. The Mongo type seam + `flattenMongoParamRefs` helper + unit tests landed in M1 (sufficient for AC-FAM1/FAM2 per the AC text), but end-to-end runtime wiring requires deferring `resolveValue` past `beforeExecute` in `packages/3-mongo-target/2-mongo-adapter/src/mongo-adapter.ts`. Architectural change to Mongo's lowering contract; outside Project 1 (Postgres-only).
 
-### Codec-SDK binding refactor (pending manual filing)
+### TML-2388 (filed) — Codec-SDK binding refactor
 
-**Why pending:** Linear MCP auth was skipped in the previous session; ticket body needs to be pasted into Linear by hand.
-
-**Title:** `Codec-SDK binding refactor — thread SDK per-call via CodecCallContext instead of capturing it at codec construction`
-
-**Project:** Cipherstash Integration (`ff77ef2c-5792-445b-8019-5ded03e2a29f`)
-
-**Parent:** TML-2373
-
-**Priority:** Medium
-
-**Body:** see `reviews/code-review.md § Orchestrator notes — M2.b R1` for the staged markdown body (full § Context / § Proposed refactor / § Why deferred / § Acceptance criteria / § Non-goals / § References).
-
-**Plan.md cross-link:** `plan.md § Open items` item 8 currently reads "Linear ticket pending"; replace with the TML-xxxx number once filed.
+Cipherstash's runtime codec captures `CipherstashSdk` in its `decode` closure, which collides with pack-meta consumers that read codec metadata at contract-emit time before any SDK exists. M2.b shipped a two-codec workaround (`cipherstashStringCodecMetadata` + `createCipherstashStringCodec(sdk)`); the clean fix threads SDK per-call via `CodecCallContext` and touches every codec in the repo, so it's M3+ framework scope. Filed as [TML-2388 — Codec-SDK binding refactor](https://linear.app/prisma-company/issue/TML-2388) (Medium, parent TML-2373). Original accepted-deferral record: `reviews/code-review.md § Orchestrator notes — M2.b R1`.
 
 ### Smaller observations not yet ticketed
 
@@ -183,8 +171,8 @@ These appear in `plan.md § Open items` as items 1-6. Most are still relevant fo
 - Item 2 — operator lowering source-of-truth → **pending; resolve in M3**. Confirm against `reference/cipherstash/.../operation-templates.ts`.
 - Item 3 — migration factory naming (single vs split) → **pending; resolve in M3**.
 - Item 4 — EQL `activate_pending_searches` exact function name → **pending; resolve in M4**.
-- Item 5 — routing-key derivation → **enters M2.c**. Default "always derived from `(table, column)`"; confirm with CipherStash team early in M2.c.
-- Item 6 — plaintext-zeroing default → **enters M2.c**. Default yes (memory hygiene).
+- Item 5 — routing-key derivation → **resolved (2026-05-06)**. Routing key is `{ table, column }`; no per-column override in Project 1. CipherStash team will be consulted post-delivery — see `cipherstash-team-questions.md`.
+- Item 6 — plaintext-zeroing default → **resolved (2026-05-06)**. Project 1 does not zero plaintext post-encrypt. M2.c implementer removes the existing `handle.plaintext = undefined` line in `setHandleCiphertext` (`packages/3-extensions/cipherstash/src/core/envelope.ts:44-48`) and flips `AC-MW5`. Question for the CipherStash team is in `cipherstash-team-questions.md`.
 
 ## Subagent / orchestration context
 
@@ -203,7 +191,6 @@ If you'd rather not use the skill — totally fine; the spec, plan, code-review,
 - [ ] Skim `reviews/code-review.md` § Summary + § Acceptance criteria scoreboard.
 - [ ] Read this file's [§ What remains](#what-remains) section + `plan.md § M2 → ### M2.c remaining work`.
 - [ ] Confirm Postgres + EQL infra availability (or add it as a pre-T2.c.1 step).
-- [ ] File the codec-SDK binding refactor Linear ticket (body in `reviews/code-review.md § Orchestrator notes — M2.b R1`); update `plan.md § Open items` item 8 with the TML-xxxx number.
-- [ ] Confirm with CipherStash team: routing-key derivation default (`(table, column)`); plaintext-zeroing default (yes).
+- [ ] Read `cipherstash-team-questions.md` if you'll be talking to the CipherStash team. Two design defaults are queued for them to validate post-delivery (routing-key derivation; plaintext zeroing). Decisions are already baked into the spec/plan and don't gate M2.c — but if their answers diverge from our defaults, the doc explains exactly what changes.
 
 Good luck — the foundation is solid, the codec/envelope/parity-test surfaces are well-tested, and the remaining work is well-scoped. Reach out to the previous driver via Linear if you hit unexpected blockers.
