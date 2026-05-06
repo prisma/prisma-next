@@ -345,6 +345,23 @@ describe('adapter-postgres codecs', () => {
     it('throws on non-string input to decodeJson', () => {
       expect(() => byteaCodec.decodeJson(42)).toThrow('Expected base64 string for pg/bytea@1');
     });
+
+    it('throws on invalid base64 characters in decodeJson', () => {
+      // The bytea codec must reject malformed base64 rather than silently
+      // skipping invalid characters and producing arbitrary bytes — see
+      // https://github.com/prisma/prisma-next/pull/428.
+      expect(() => byteaCodec.decodeJson('!!!not base64!!!')).toThrow(
+        /Invalid base64 string for pg\/bytea@1/,
+      );
+    });
+
+    it('throws on base64 with stray whitespace in decodeJson', () => {
+      // Whitespace decodes to valid bytes via Buffer.from, but the round-trip
+      // comparison rejects non-canonical input.
+      expect(() => byteaCodec.decodeJson('SGVs bG8=')).toThrow(
+        /Invalid base64 string for pg\/bytea@1/,
+      );
+    });
   });
 
   describe('interval codec', () => {

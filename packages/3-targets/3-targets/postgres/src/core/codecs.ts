@@ -520,7 +520,11 @@ const pgByteaCodec = codec({
     if (typeof json !== 'string') {
       throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
     }
-    return new Uint8Array(Buffer.from(json, 'base64'));
+    const decoded = Buffer.from(json, 'base64');
+    if (decoded.toString('base64') !== json) {
+      throw new Error(`Invalid base64 string for pg/bytea@1: ${json}`);
+    }
+    return new Uint8Array(decoded);
   },
   meta: {
     db: {
