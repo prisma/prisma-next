@@ -31,7 +31,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
         }).sql(({ cols, constraints }) => ({
           table: 'doc',
           indexes: [
-            constraints.index(cols.body, {
+            constraints.index([cols.body], {
               type: 'bm25',
               options: { key_field: 'id' },
               name: 'doc_body_bm25_idx',
@@ -68,9 +68,9 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
         }).sql(({ cols, constraints }) => ({
           table: 'doc',
           indexes: [
-            // @ts-expect-error — bm25 options is { key_field: string } in strict mode; unknown_key is rejected
-            constraints.index(cols.body, {
+            constraints.index([cols.body], {
               type: 'bm25',
+              // @ts-expect-error — bm25 options is { key_field: string } in strict mode; unknown_key is rejected
               options: { key_field: 'id', unknown_key: 'x' },
             }),
           ],
@@ -96,9 +96,9 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
         }).sql(({ cols, constraints }) => ({
           table: 'doc',
           indexes: [
-            // @ts-expect-error — bm25 options requires key_field
-            constraints.index(cols.body, {
+            constraints.index([cols.body], {
               type: 'bm25',
+              // @ts-expect-error — bm25 options requires key_field
               options: {},
             }),
           ],
@@ -124,10 +124,10 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
         }).sql(({ cols, constraints }) => ({
           table: 'doc',
           indexes: [
-            // @ts-expect-error — only 'bm25' is registered when paradedb is attached; 'made-up' is not
-            constraints.index(cols.body, {
+            constraints.index([cols.body], {
+              // @ts-expect-error — only 'bm25' is registered when paradedb is attached; 'made-up' is not
               type: 'made-up',
-              options: {},
+              options: { key_field: 'id' },
             }),
           ],
         }));
@@ -153,7 +153,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
           table: 'doc',
           indexes: [
             // @ts-expect-error — providing options without a type is a compile error when packs contribute index types
-            constraints.index(cols.body, {
+            constraints.index([cols.body], {
               options: { key_field: 'id' },
             }),
           ],
@@ -174,7 +174,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       indexes: [
         // @ts-expect-error - bare model() has no attached packs, so no index
         // type literals are registered; type/options aren't allowed at all.
-        constraints.index(cols.body, { type: 'made-up', options: {} }),
+        constraints.index([cols.body], { type: 'made-up', options: {} }),
       ],
     }));
 
@@ -193,7 +193,7 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       },
     }).sql(({ cols, constraints }) => ({
       table: 'doc',
-      indexes: [constraints.index(cols.body)],
+      indexes: [constraints.index([cols.body])],
     }));
     expectTypeOf<typeof Doc.__indexTypes>().toEqualTypeOf<Record<never, never>>();
 

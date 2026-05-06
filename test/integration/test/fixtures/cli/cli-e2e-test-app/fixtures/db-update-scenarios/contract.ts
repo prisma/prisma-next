@@ -45,7 +45,7 @@ const Project = model('Project', {
   },
 }).sql(({ cols, constraints }) => ({
   table: 'project',
-  indexes: [constraints.index(cols.accountId)],
+  indexes: [constraints.index([cols.accountId])],
   foreignKeys: [constraints.foreignKey(cols.accountId, Account.refs.id)],
 }));
 

@@ -227,7 +227,7 @@ describe('referential actions integration', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'post',
-            indexes: [constraints.index(cols.userId)],
+            indexes: [constraints.index([cols.userId])],
             foreignKeys: [
               constraints.foreignKey(cols.userId, User.refs.id, {
                 onDelete: 'cascade',
@@ -323,7 +323,7 @@ describe('referential actions integration', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'post',
-            indexes: [constraints.index(cols.userId)],
+            indexes: [constraints.index([cols.userId])],
             foreignKeys: [
               constraints.foreignKey(cols.userId, User.refs.id, {
                 onDelete: 'cascade',
@@ -397,7 +397,7 @@ describe('referential actions integration', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'post',
-            indexes: [constraints.index(cols.userId)],
+            indexes: [constraints.index([cols.userId])],
             foreignKeys: [
               constraints.foreignKey(cols.userId, User.refs.id, {
                 onDelete: 'cascade',
@@ -498,7 +498,7 @@ describe('referential actions integration', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'post',
-            indexes: [constraints.index(cols.userId)],
+            indexes: [constraints.index([cols.userId])],
             foreignKeys: [constraints.foreignKey(cols.userId, User.refs.id)],
           }));
 
@@ -574,7 +574,7 @@ describe('referential actions integration', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'post',
-          indexes: [constraints.index(cols.userId)],
+          indexes: [constraints.index([cols.userId])],
           foreignKeys: [
             constraints.foreignKey(cols.userId, User.refs.id, {
               onDelete: 'cascade',

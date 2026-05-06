@@ -293,7 +293,7 @@ const representativeTsAuthoring = `defineContract(
       relations: { author: rel.belongsTo(User, { from: 'authorId', to: 'id' }) },
     }).sql(({ cols, constraints }) => ({
       table: 'post',
-      indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
+      indexes: [constraints.index([cols.authorId], { name: 'post_author_id_idx' })],
       foreignKeys: [constraints.foreignKey(cols.authorId, User.refs.id, { name: 'post_author_id_fkey', onDelete: 'cascade' })],
     }));
     return { types, models: { User, Post } };
@@ -334,7 +334,7 @@ function buildTsContract() {
         },
       }).sql(({ cols, constraints }) => ({
         table: 'post',
-        indexes: [constraints.index(cols.authorId, { name: 'post_author_id_idx' })],
+        indexes: [constraints.index([cols.authorId], { name: 'post_author_id_idx' })],
         foreignKeys: [
           constraints.foreignKey(cols.authorId, UserBase.refs.id, {
             name: 'post_author_id_fkey',

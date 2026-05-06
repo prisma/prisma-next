@@ -684,16 +684,12 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
     };
   }
 
-  function index<FieldName extends string, Name extends string | undefined = undefined>(
-    field: ColumnRef<FieldName>,
-    options?: IndexInput<Name, IndexTypes>,
-  ): IndexConstraint<readonly [FieldName], Name>;
   function index<FieldNames extends readonly string[], Name extends string | undefined = undefined>(
     fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
     options?: IndexInput<Name, IndexTypes>,
   ): IndexConstraint<FieldNames, Name>;
   function index(
-    fieldOrFields: ColumnRef | readonly ColumnRef[],
+    fields: readonly ColumnRef[],
     options?: {
       readonly name?: string;
       readonly type?: string;
@@ -702,7 +698,7 @@ function createConstraintsDsl<IndexTypes extends IndexTypeMap = Record<never, ne
   ): IndexConstraint {
     return {
       kind: 'index',
-      fields: normalizeFieldRefInput(fieldOrFields),
+      fields: normalizeFieldRefInput(fields),
       ...(options?.name !== undefined ? { name: options.name } : {}),
       ...(options?.type !== undefined ? { type: options.type } : {}),
       ...(options?.options !== undefined
@@ -792,16 +788,13 @@ type AttributeContext<Fields extends Record<string, ScalarFieldBuilder>> = {
   readonly constraints: Pick<ConstraintsDsl, 'id' | 'unique'>;
 };
 
-type PackAwareIndex<IndexTypes extends IndexTypeMap> = {
-  <FieldName extends string, Name extends string | undefined = undefined>(
-    field: ColumnRef<FieldName>,
-    options?: IndexInput<Name, IndexTypes>,
-  ): IndexConstraint<readonly [FieldName], Name>;
-  <FieldNames extends readonly string[], Name extends string | undefined = undefined>(
-    fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
-    options?: IndexInput<Name, IndexTypes>,
-  ): IndexConstraint<FieldNames, Name>;
-};
+type PackAwareIndex<IndexTypes extends IndexTypeMap> = <
+  FieldNames extends readonly string[],
+  Name extends string | undefined = undefined,
+>(
+  fields: { readonly [K in keyof FieldNames]: ColumnRef<FieldNames[K] & string> },
+  options?: IndexInput<Name, IndexTypes>,
+) => IndexConstraint<FieldNames, Name>;
 
 type PackAwareSqlConstraints<IndexTypes extends IndexTypeMap> = {
   readonly foreignKey: ConstraintsDsl['foreignKey'];

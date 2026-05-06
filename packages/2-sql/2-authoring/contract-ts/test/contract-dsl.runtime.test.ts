@@ -137,7 +137,7 @@ describe('contract DSL runtime helpers', () => {
       },
     }).sql(({ cols, constraints }) => ({
       indexes: [
-        constraints.index(cols.teamId, {
+        constraints.index([cols.teamId], {
           name: 'audit_log_team_id_idx',
           type: 'hash',
           options: { fillfactor: 70 },

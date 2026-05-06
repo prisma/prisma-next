@@ -39,7 +39,7 @@ describe('SQLite Migration E2E - Destructive operations', () => {
           ...pack,
           models: {
             User: model('User', { fields: { id: int.id(), email: text } }).sql((ctx) => ({
-              indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
+              indexes: [ctx.constraints.index([ctx.cols.email], { name: 'idx_users_email' })],
             })),
           },
         }),
@@ -63,7 +63,7 @@ describe('SQLite Migration E2E - Destructive operations', () => {
           models: {
             User: model('User', { fields: { id: int.id(), email: text, name: text } }).sql(
               (ctx) => ({
-                indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_email' })],
+                indexes: [ctx.constraints.index([ctx.cols.email], { name: 'idx_email' })],
               }),
             ),
           },
@@ -72,7 +72,9 @@ describe('SQLite Migration E2E - Destructive operations', () => {
           ...pack,
           models: {
             User: model('User', { fields: { id: int.id(), email: text, name: text } }).sql(
-              (ctx) => ({ indexes: [ctx.constraints.index(ctx.cols.name, { name: 'idx_name' })] }),
+              (ctx) => ({
+                indexes: [ctx.constraints.index([ctx.cols.name], { name: 'idx_name' })],
+              }),
             ),
           },
         }),

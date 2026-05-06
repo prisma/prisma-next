@@ -82,7 +82,7 @@ When the Postgres adapter renders DDL, it consults only the validated IR. The re
 ### Negative
 
 - The IR rename touches a small but non-trivial set of in-repo call sites in lockstep. We accept this in exchange for not carrying a shim for fields that nothing populates.
-- Adapters other than Postgres (notably MySQL/MariaDB, which has no `WITH (...)` syntax for indexes, and MSSQL, which has no `USING <method>`) need their own rendering paths if they ever want to read `type`/`options`. The IR vocabulary stays neutral; the renderer is per-adapter.
+- Future SQL adapters that don't share Postgres's `USING <method> WITH (...)` shape would need their own rendering path if they ever want to read `type`/`options`. The IR vocabulary stays neutral; the renderer is per-adapter.
 - Any change to an index's `type` or `options` rebuilds the index. This is an inherent property of how Postgres handles index method and `WITH`-key changes, not a regression introduced here.
 - PSL must learn object-literal grammar for `options: { ... }`. V1 admits string literals as leaves only; booleans and numbers are deferred to the same follow-up that seeds built-in entries (which actually need them).
 
@@ -90,7 +90,7 @@ When the Postgres adapter renders DDL, it consults only the validated IR. The re
 
 - Built-in registry entries for `btree`, `hash`, `gin`, `gist`, `brin`, `spgist`. Tracked as a follow-up. V1 ships the mechanism; in-repo extensions that already needed a registry-shaped helper are migrated onto it in the same change.
 - Boolean and number literals in PSL `options` payloads. V1 supports string-leaf only; the parser extension and the built-in-entry seeding ship together.
-- MySQL, MariaDB, and MSSQL adapter rendering. The IR vocabulary is neutral; the renderer is Postgres-shaped.
+- Rendering paths for any future SQL adapter beyond Postgres. The IR vocabulary is neutral; the renderer is Postgres-shaped.
 - Per-column index options (e.g. `gist`'s per-column operator classes). V1 carries `options` as a single object on the index, not per-column.
 - `ALTER INDEX` paths for `type`/`options` changes. Always `DROP` + `CREATE`.
 - Capability gating per index type. The registry is the design-time gate; runtime extension presence is verified by Postgres at apply time.

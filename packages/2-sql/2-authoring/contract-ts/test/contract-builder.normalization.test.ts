@@ -184,7 +184,7 @@ describe('contract builder normalization', () => {
           }).sql(({ cols, constraints }) => ({
             table: 'items',
             indexes: [
-              constraints.index(cols.description, {
+              constraints.index([cols.description], {
                 name: 'search_idx',
                 type: 'bm25',
                 options: { key_field: 'id' },
@@ -217,7 +217,7 @@ describe('contract builder normalization', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email)],
+          indexes: [constraints.index([cols.email])],
         })),
       },
     });

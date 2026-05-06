@@ -417,7 +417,7 @@ describe('contract definition lowering runtime checks', () => {
       },
     }).sql(({ cols, constraints }) => ({
       indexes: [
-        constraints.index(cols.userId, {
+        constraints.index([cols.userId], {
           name: 'membership_user_id_idx',
           type: 'hash',
           options: { fillfactor: 70 },

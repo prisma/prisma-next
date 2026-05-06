@@ -164,7 +164,7 @@ describe('SQLite Migration E2E - From empty schema', () => {
               fields: { id: int.id(), name: text, date: text, location: text.optional() },
             }).sql((ctx) => ({
               indexes: [
-                ctx.constraints.index(ctx.cols.date, { name: 'idx_events_date' }),
+                ctx.constraints.index([ctx.cols.date], { name: 'idx_events_date' }),
                 ctx.constraints.index([ctx.cols.name, ctx.cols.date], {
                   name: 'idx_events_name_date',
                 }),
@@ -264,7 +264,7 @@ describe('SQLite Migration E2E - Schema evolution', () => {
           ...pack,
           models: {
             User: model('User', { fields: { id: int.id(), email: text } }).sql((ctx) => ({
-              indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
+              indexes: [ctx.constraints.index([ctx.cols.email], { name: 'idx_users_email' })],
             })),
           },
         }),
@@ -293,7 +293,7 @@ describe('SQLite Migration E2E - Schema evolution', () => {
                 status: text.default('active'),
               },
             }).sql((ctx) => ({
-              indexes: [ctx.constraints.index(ctx.cols.email, { name: 'idx_users_email' })],
+              indexes: [ctx.constraints.index([ctx.cols.email], { name: 'idx_users_email' })],
             })),
             Post: model('Post', {
               fields: { id: int.id(), title: text, userId: int.column('user_id') },

@@ -122,7 +122,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email)],
+          indexes: [constraints.index([cols.email])],
         })),
       },
     });
@@ -141,7 +141,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email, { name: 'user_email_idx' })],
+          indexes: [constraints.index([cols.email], { name: 'user_email_idx' })],
         })),
       },
     });
@@ -230,7 +230,7 @@ describe('contract definition constraint support', () => {
             },
           }).sql(({ cols, constraints }) => ({
             table: 'user',
-            indexes: [constraints.index(cols.id, { name: 'user_pkey' })],
+            indexes: [constraints.index([cols.id], { name: 'user_pkey' })],
           })),
         },
       }),
@@ -248,7 +248,7 @@ describe('contract definition constraint support', () => {
           },
         }).sql(({ cols, constraints }) => ({
           table: 'user',
-          indexes: [constraints.index(cols.email), constraints.index(cols.username)],
+          indexes: [constraints.index([cols.email]), constraints.index([cols.username])],
         })),
       },
     });
