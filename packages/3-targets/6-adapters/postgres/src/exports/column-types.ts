@@ -10,6 +10,7 @@ import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
+  PG_BYTEA_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
@@ -147,6 +148,19 @@ export function varbitColumn(length: number): ColumnTypeDescriptor & {
     typeParams: { length },
   } as const;
 }
+
+/**
+ * Postgres `bytea` column descriptor — variable-length binary string.
+ *
+ * Round-trips as `Uint8Array` on the JS side. The pg wire-protocol text
+ * encoding (`\x` followed by hex-encoded bytes, canonical for Postgres ≥ 9.0)
+ * and binary encoding are both handled by the underlying driver; the codec
+ * only normalizes the JS-side representation to a plain `Uint8Array` view.
+ */
+export const byteaColumn = {
+  codecId: PG_BYTEA_CODEC_ID,
+  nativeType: 'bytea',
+} as const satisfies ColumnTypeDescriptor;
 
 export function intervalColumn(precision?: number): ColumnTypeDescriptor & {
   readonly typeParams?: { readonly precision: number };

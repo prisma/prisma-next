@@ -19,6 +19,7 @@ import { type as arktype } from 'arktype';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
+  PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
@@ -502,6 +503,36 @@ const pgVarbitCodec = codec<
   },
 });
 
+const pgByteaCodec = codec({
+  typeId: PG_BYTEA_CODEC_ID,
+  targetTypes: ['bytea'],
+  traits: ['equality'],
+  encode: (value: Uint8Array): Uint8Array => value,
+  decode: (wire: Uint8Array): Uint8Array =>
+    // Postgres node drivers commonly return Buffer instances (which extend
+    // Uint8Array) — normalize to a plain Uint8Array view so engine-agnostic
+    // consumers don't accidentally observe Buffer-specific APIs.
+    wire instanceof Uint8Array && wire.constructor === Uint8Array
+      ? wire
+      : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength),
+  encodeJson: (value: Uint8Array): string => Buffer.from(value).toString('base64'),
+  decodeJson: (json): Uint8Array => {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
+    }
+    return new Uint8Array(Buffer.from(json, 'base64'));
+  },
+  meta: {
+    db: {
+      sql: {
+        postgres: {
+          nativeType: 'bytea',
+        },
+      },
+    },
+  },
+});
+
 const pgEnumCodec = codec({
   typeId: PG_ENUM_CODEC_ID,
   targetTypes: ['enum'],
@@ -610,6 +641,7 @@ const codecs = defineCodecs()
   .add('bool', pgBoolCodec)
   .add('bit', pgBitCodec)
   .add('bit varying', pgVarbitCodec)
+  .add('bytea', pgByteaCodec)
   .add('interval', pgIntervalCodec)
   .add('enum', pgEnumCodec)
   .add('json', pgJsonCodec)

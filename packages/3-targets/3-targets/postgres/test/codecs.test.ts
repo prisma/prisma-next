@@ -8,6 +8,7 @@ describe('adapter-postgres codecs', () => {
       'bit',
       'bit varying',
       'bool',
+      'bytea',
       'char',
       'character',
       'character varying',
@@ -289,6 +290,60 @@ describe('adapter-postgres codecs', () => {
       const value = '00001111';
       const decoded = await varbitCodec.decode(value, {});
       expect(decoded).toBe(value);
+    });
+  });
+
+  describe('bytea codec', () => {
+    const byteaCodec = codecDefinitions.bytea.codec as {
+      encode: (value: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
+      decode: (wire: Uint8Array, ctx: SqlCodecCallContext) => Promise<Uint8Array>;
+      encodeJson: (value: Uint8Array) => unknown;
+      decodeJson: (json: unknown) => Uint8Array;
+    };
+
+    it('round-trips a small payload', async () => {
+      const input = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+      const encoded = await byteaCodec.encode(input, {});
+      const decoded = await byteaCodec.decode(encoded, {});
+      expect(decoded).toEqual(input);
+    });
+
+    it('round-trips an empty payload', async () => {
+      const input = new Uint8Array(0);
+      const encoded = await byteaCodec.encode(input, {});
+      const decoded = await byteaCodec.decode(encoded, {});
+      expect(decoded).toEqual(input);
+      expect(decoded.byteLength).toBe(0);
+    });
+
+    it('normalizes Buffer wire values to a plain Uint8Array view', async () => {
+      const buffer = Buffer.from([0x01, 0x02, 0x03]);
+      const decoded = await byteaCodec.decode(buffer, {});
+      expect(decoded).toBeInstanceOf(Uint8Array);
+      expect(decoded.constructor).toBe(Uint8Array);
+      expect(Array.from(decoded)).toEqual([0x01, 0x02, 0x03]);
+    });
+
+    it('encodes Uint8Array to base64 in JSON form', () => {
+      const input = new Uint8Array([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+      expect(byteaCodec.encodeJson(input)).toBe('aGVsbG8=');
+    });
+
+    it('decodes base64 string back to Uint8Array in JSON form', () => {
+      const decoded = byteaCodec.decodeJson('aGVsbG8=');
+      expect(decoded).toBeInstanceOf(Uint8Array);
+      expect(Array.from(decoded)).toEqual([0x68, 0x65, 0x6c, 0x6c, 0x6f]);
+    });
+
+    it('round-trips through encodeJson / decodeJson', () => {
+      const input = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+      const json = byteaCodec.encodeJson(input);
+      const decoded = byteaCodec.decodeJson(json);
+      expect(Array.from(decoded)).toEqual(Array.from(input));
+    });
+
+    it('throws on non-string input to decodeJson', () => {
+      expect(() => byteaCodec.decodeJson(42)).toThrow('Expected base64 string for pg/bytea@1');
     });
   });
 
