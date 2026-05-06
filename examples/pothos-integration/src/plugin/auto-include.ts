@@ -29,12 +29,24 @@ import {
   type FieldNode,
   type GraphQLObjectType,
   type GraphQLResolveInfo,
+  getArgumentValues,
   getNamedType,
   isObjectType,
   Kind,
   type SelectionSetNode,
 } from 'graphql';
-import { PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
+import { PRISMA_NEXT_COLUMNS, PRISMA_NEXT_RELATION, PRISMA_NEXT_RELATION_COUNT } from './types';
+
+/**
+ * Extension key set automatically by Pothos core's `exposeField` (which
+ * `t.exposeID/Int/Float/String/Boolean[List]` all funnel through). Carries
+ * the column name passed to `exposeX(name, ...)` so the walker can map a
+ * GraphQL field selection back to its parent-row column without guessing
+ * from the GraphQL field name.
+ *
+ * Source: `@pothos/core` `fieldUtils/base.ts:107`.
+ */
+const POTHOS_EXPOSED_FIELD = 'pothosExposedField';
 
 interface RelationFieldExt {
   relationName: string;
@@ -73,11 +85,16 @@ interface PreparedQuery {
 
 /**
  * Public entry: prepare a Collection for the field's selection.
+ *
+ * `context` is forwarded so any nested `t.relation('rel', { query: (args, ctx) => ... })`
+ * callback fires with the request's context. `info.variableValues` is read
+ * inside the walker to resolve per-relation `args` from each FieldNode.
  */
 export function applySelectionToCollection(
   baseCollection: AnyCollection,
   info: GraphQLResolveInfo,
   buildCache: BuildCache<SchemaTypes>,
+  context: unknown,
 ): PreparedQuery {
   const returnType = getNamedType(info.returnType);
   if (!isObjectType(returnType)) {
@@ -88,7 +105,7 @@ export function applySelectionToCollection(
     return { collection: baseCollection, reshape: noopReshape };
   }
 
-  const walk = walkSelection(returnType, fieldNode.selectionSet, info, buildCache);
+  const walk = walkSelection(returnType, fieldNode.selectionSet, info, buildCache, context);
   return { collection: walk.apply(baseCollection), reshape: walk.reshape };
 }
 
@@ -109,6 +126,7 @@ function walkSelection(
   selectionSet: SelectionSetNode,
   info: GraphQLResolveInfo,
   buildCache: BuildCache<SchemaTypes>,
+  context: unknown,
 ): WalkResult {
   const { scalarFields, relationGroups } = collectFields(type, selectionSet);
 
@@ -130,15 +148,30 @@ function walkSelection(
       const relReturnType = getRelationReturnType(type, entry.fieldNode.name.value);
       const innerWalk =
         relReturnType && entry.fieldNode.selectionSet
-          ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, buildCache)
+          ? walkSelection(relReturnType, entry.fieldNode.selectionSet, info, buildCache, context)
           : { apply: (c: AnyCollection) => c, reshape: noopReshape };
-      // Wrap apply with the static refine.
+      // Wrap apply with the refine. Both the static (object) and dynamic
+      // (callback) forms of `query` are supported. The dynamic form
+      // receives the field's resolved args (via getArgumentValues against
+      // the parent type's field def) and the request context.
       const opts = entry.ext.opts;
       const innerWithRefine: WalkResult = {
         apply: (c) => {
           let r = c;
-          if (opts.query && typeof opts.query !== 'function') {
-            r = applyStaticRefine(r, opts.query);
+          if (opts.query !== undefined) {
+            const refine =
+              typeof opts.query === 'function'
+                ? (() => {
+                    const fieldDef = type.getFields()[entry.fieldNode.name.value];
+                    const args = fieldDef
+                      ? getArgumentValues(fieldDef, entry.fieldNode, info.variableValues)
+                      : {};
+                    return opts.query(args, context);
+                  })()
+                : opts.query;
+            if (refine && typeof refine === 'object') {
+              r = applyStaticRefine(r, refine as RelationRefine);
+            }
           }
           return innerWalk.apply(r);
         },
@@ -286,7 +319,30 @@ function collectFields(type: GraphQLObjectType, selectionSet: SelectionSetNode):
       continue;
     }
 
-    scalarFields.add(sel.name.value);
+    // Column dependency lookup. Two sources, in order:
+    //
+    // 1. `pothosExposedField` — set automatically by Pothos core for every
+    //    `t.exposeID/Int/Float/String/Boolean[List]` field, carrying the
+    //    column name the user passed (which is type-checked against the
+    //    parent row shape via Pothos's `CompatibleTypes` constraint).
+    //
+    // 2. `PRISMA_NEXT_COLUMNS` — set by the user via `t.field({ extensions })`
+    //    when a JS-computed resolver needs one or more columns fetched
+    //    (e.g. `fullName = firstName + ' ' + lastName`).
+    //
+    // A `t.field` with neither extension contributes no SELECT — its
+    // resolver runs against whatever else the row already carries. This
+    // is the same model plugin-prisma uses (`pothosPrismaSelect`).
+    const exposed = ext[POTHOS_EXPOSED_FIELD];
+    if (typeof exposed === 'string') {
+      scalarFields.add(exposed);
+    }
+    const explicit = ext[PRISMA_NEXT_COLUMNS];
+    if (Array.isArray(explicit)) {
+      for (const col of explicit) {
+        if (typeof col === 'string') scalarFields.add(col);
+      }
+    }
   }
 
   return { scalarFields, relationGroups };
@@ -337,10 +393,14 @@ function collectLocalFkColumnsByGroup(
   return out;
 }
 
-function applyStaticRefine(
-  collection: AnyCollection,
-  refine: { where?: unknown; orderBy?: unknown; take?: number; skip?: number },
-): AnyCollection {
+interface RelationRefine {
+  where?: unknown;
+  orderBy?: unknown;
+  take?: number;
+  skip?: number;
+}
+
+function applyStaticRefine(collection: AnyCollection, refine: RelationRefine): AnyCollection {
   let acc = collection;
   if (refine.where !== undefined) {
     acc = (acc as unknown as { where: (w: unknown) => AnyCollection }).where(refine.where);

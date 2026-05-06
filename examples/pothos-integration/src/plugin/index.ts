@@ -38,6 +38,7 @@ export class PothosPrismaNextPlugin<Types extends SchemaTypes> extends BasePlugi
           baseCollection as never,
           info,
           this.buildCache as never,
+          context,
         );
         const result = await (
           resolver as unknown as (

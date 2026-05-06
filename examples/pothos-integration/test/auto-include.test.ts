@@ -40,6 +40,17 @@ import {
   PRISMA_NEXT_RELATION_COUNT,
 } from '../src/plugin/types';
 
+/**
+ * `t.exposeX(name)` in production sets Pothos core's `pothosExposedField`
+ * extension on the field config to the column name. The fixture mirrors
+ * that: every plain scalar field gets the extension so the walker maps
+ * the GraphQL field back to its parent-row column. Same shape Pothos's
+ * built-in `exposeField` produces (`@pothos/core` `fieldUtils/base.ts`).
+ */
+function exposed(column: string): { pothosExposedField: string } {
+  return { pothosExposedField: column };
+}
+
 // ---------------------------------------------------------------------------
 // Recording Collection mock
 // ---------------------------------------------------------------------------
@@ -192,7 +203,9 @@ interface RelationExtSpec {
   parentModel: string;
   targetModel: string;
   cardinality: '1:1' | '1:N' | 'N:1' | 'M:N';
-  query?: { where?: unknown; orderBy?: unknown; take?: number; skip?: number };
+  query?:
+    | { where?: unknown; orderBy?: unknown; take?: number; skip?: number }
+    | ((args: unknown, ctx: unknown) => unknown);
 }
 
 function relationExt(spec: RelationExtSpec): Record<string, unknown> {
@@ -232,8 +245,8 @@ function buildFixtureSchema(): {
     name: 'Comment',
     extensions: { [PRISMA_NEXT_MODEL]: 'Comment' },
     fields: () => ({
-      id: { type: new GraphQLNonNull(GraphQLID) },
-      body: { type: new GraphQLNonNull(GraphQLString) },
+      id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+      body: { type: new GraphQLNonNull(GraphQLString), extensions: exposed('body') },
       author: {
         type: User,
         extensions: relationExt({
@@ -250,9 +263,9 @@ function buildFixtureSchema(): {
     name: 'Post',
     extensions: { [PRISMA_NEXT_MODEL]: 'Post' },
     fields: () => ({
-      id: { type: new GraphQLNonNull(GraphQLID) },
-      title: { type: new GraphQLNonNull(GraphQLString) },
-      published: { type: new GraphQLNonNull(GraphQLBoolean) },
+      id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+      title: { type: new GraphQLNonNull(GraphQLString), extensions: exposed('title') },
+      published: { type: new GraphQLNonNull(GraphQLBoolean), extensions: exposed('published') },
       comments: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(Comment))),
         extensions: relationExt({
@@ -269,9 +282,9 @@ function buildFixtureSchema(): {
     name: 'User',
     extensions: { [PRISMA_NEXT_MODEL]: 'User' },
     fields: () => ({
-      id: { type: new GraphQLNonNull(GraphQLID) },
-      firstName: { type: new GraphQLNonNull(GraphQLString) },
-      lastName: { type: new GraphQLNonNull(GraphQLString) },
+      id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+      firstName: { type: new GraphQLNonNull(GraphQLString), extensions: exposed('firstName') },
+      lastName: { type: new GraphQLNonNull(GraphQLString), extensions: exposed('lastName') },
       // Plain include, alias === relationName.
       posts: {
         type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(Post))),
@@ -409,7 +422,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     expect(selectCall).toBeDefined();
@@ -425,7 +438,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -444,7 +457,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const selectCall = base.calls.find((c) => c.method === 'select');
     // `id` is the localField for posts (mock contract). It should be
@@ -459,7 +472,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -478,7 +491,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -496,7 +509,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const includes = base.calls.filter((c) => c.method === 'include');
     expect(includes).toHaveLength(1);
@@ -511,7 +524,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     // A single field on a relation (even with a non-matching alias) takes
     // the plain-include path. The reshape handles the alias→relationName
@@ -529,6 +542,132 @@ describe('auto-include walker · apply path', () => {
     expect(whereCall?.args[0]).toEqual({ published: 0 });
   });
 
+  it('invokes a function-form `query` callback with field args and the request context', () => {
+    // `t.relation('posts', { args, query: (args, ctx) => ({ where: ... }) })`
+    // shape: the dynamic query callback must fire at apply-time so the
+    // refine reflects per-request input. Older versions of the walker
+    // typechecked the signature but never called the function, returning
+    // unfiltered rows. Regression guard.
+    const captured: { args: unknown; ctx: unknown }[] = [];
+
+    const Post = new ObjectType({
+      name: 'Post',
+      extensions: { [PRISMA_NEXT_MODEL]: 'Post' },
+      fields: () => ({
+        id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+      }),
+    });
+    const User = new ObjectType({
+      name: 'User',
+      extensions: { [PRISMA_NEXT_MODEL]: 'User' },
+      fields: () => ({
+        id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+        posts: {
+          type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(Post))),
+          args: {
+            onlyPublished: { type: GraphQLBoolean },
+          },
+          extensions: relationExt({
+            relationName: 'posts',
+            parentModel: 'User',
+            targetModel: 'Post',
+            cardinality: '1:N',
+            query: (args: unknown, ctx: unknown) => {
+              captured.push({ args, ctx });
+              const a = args as { onlyPublished?: boolean };
+              return { where: { published: a.onlyPublished ? 1 : 0 } };
+            },
+          }),
+        },
+      }),
+    });
+
+    const sel = selectionSetFromQuery('{ users { posts(onlyPublished: true) { id } } }');
+    const info = buildResolveInfo(User, sel);
+
+    const base = createRecordingCollection();
+    const ctx = { tenantId: 'tenant-42' };
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), ctx);
+
+    expect(captured).toHaveLength(1);
+    expect(captured[0]?.args).toEqual({ onlyPublished: true });
+    expect(captured[0]?.ctx).toBe(ctx);
+    const includes = base.calls.filter((c) => c.method === 'include');
+    expect(includes).toHaveLength(1);
+    const whereCall = includes[0]?.inner?.find((c) => c.method === 'where');
+    expect(whereCall?.args[0]).toEqual({ published: 1 });
+  });
+
+  it('selects the column name passed to exposeX, decoupled from the GraphQL field name', () => {
+    // T1-3 regression. The walker must read `pothosExposedField` (set by
+    // Pothos core for every t.exposeID/Int/.../Boolean field) rather than
+    // shoving the GraphQL field name into .select. Otherwise renaming the
+    // field (`isPublished` over column `published`) silently breaks the
+    // SQL.
+    const Post = new ObjectType({
+      name: 'Post',
+      extensions: { [PRISMA_NEXT_MODEL]: 'Post' },
+      fields: () => ({
+        // GraphQL field name `isPublished`, backing column `published`.
+        isPublished: { type: GraphQLBoolean, extensions: exposed('published') },
+      }),
+    });
+    const sel = selectionSetFromQuery('{ posts { isPublished } }');
+    const info = buildResolveInfo(Post, sel);
+
+    const base = createRecordingCollection();
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+
+    const selectCall = base.calls.find((c) => c.method === 'select');
+    expect(selectCall?.args).toEqual(['published']);
+  });
+
+  it('honours an explicit PRISMA_NEXT_COLUMNS extension on a t.field with a computed resolver', () => {
+    // Multi-column dependency: `fullName: parent.firstName + ' ' + parent.lastName`
+    // declares both columns via PRISMA_NEXT_COLUMNS. Computed-resolver
+    // analogue of T1-3.
+    const User = new ObjectType({
+      name: 'User',
+      extensions: { [PRISMA_NEXT_MODEL]: 'User' },
+      fields: () => ({
+        fullName: {
+          type: new GraphQLNonNull(GraphQLString),
+          extensions: { pothosPrismaNextColumns: ['firstName', 'lastName'] },
+        },
+      }),
+    });
+    const sel = selectionSetFromQuery('{ users { fullName } }');
+    const info = buildResolveInfo(User, sel);
+
+    const base = createRecordingCollection();
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+
+    const selectCall = base.calls.find((c) => c.method === 'select');
+    expect([...(selectCall?.args ?? [])].sort()).toEqual(['firstName', 'lastName']);
+  });
+
+  it('skips fields that have no exposed column and no PRISMA_NEXT_COLUMNS extension', () => {
+    // A `t.field` with a constant resolver depends on no parent columns.
+    // The walker must not invent a SELECT for it.
+    const User = new ObjectType({
+      name: 'User',
+      extensions: { [PRISMA_NEXT_MODEL]: 'User' },
+      fields: () => ({
+        id: { type: new GraphQLNonNull(GraphQLID), extensions: exposed('id') },
+        // No exposed column, no PRISMA_NEXT_COLUMNS — pure compute.
+        plugin: { type: new GraphQLNonNull(GraphQLString) },
+      }),
+    });
+    const sel = selectionSetFromQuery('{ users { id plugin } }');
+    const info = buildResolveInfo(User, sel);
+
+    const base = createRecordingCollection();
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
+
+    const selectCall = base.calls.find((c) => c.method === 'select');
+    expect(selectCall?.args).toEqual(['id']);
+  });
+
   it('lifts plain-include result onto an aliased GraphQL field name (alias !== relationName)', () => {
     // `drafts: t.relation('posts', { where: ... })` — relation is `posts`
     // but the GraphQL field is `drafts`. Plain include emits result as
@@ -541,6 +680,7 @@ describe('auto-include walker · apply path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1', posts: [{ id: 'p-draft', title: 'WIP' }] };
@@ -556,7 +696,7 @@ describe('auto-include walker · apply path', () => {
     const info = buildResolveInfo(User, sel);
 
     const base = createRecordingCollection();
-    applySelectionToCollection(base as never, info, buildStubBuildCache());
+    applySelectionToCollection(base as never, info, buildStubBuildCache(), {});
 
     const userIncludes = base.calls.filter((c) => c.method === 'include');
     expect(userIncludes).toHaveLength(1);
@@ -589,6 +729,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1', firstName: 'Alice' };
@@ -603,6 +744,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1', posts: [{ id: 'p1' }, { id: 'p2' }] };
@@ -620,6 +762,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     // Simulate orm-client output: combine result lives under the relation name.
@@ -648,6 +791,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = {
@@ -675,6 +819,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1', bestFriend: null };
@@ -690,6 +835,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1', posts: [] };
@@ -705,6 +851,7 @@ describe('auto-include walker · reshape path', () => {
       createRecordingCollection() as never,
       info,
       buildStubBuildCache(),
+      {},
     );
 
     const row = { id: '1' }; // posts not present (would happen if upstream load failed)
