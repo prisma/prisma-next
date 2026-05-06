@@ -532,10 +532,7 @@ export class CreateIndexCall extends PostgresOpFactoryCallNode {
     const extras: { type?: string; options?: Record<string, unknown> } = {};
     if (this.indexType !== undefined) extras.type = this.indexType;
     if (this.options !== undefined) extras.options = this.options;
-    const hasExtras = this.indexType !== undefined || this.options !== undefined;
-    return hasExtras
-      ? createIndex(this.schemaName, this.tableName, this.indexName, this.columns, extras)
-      : createIndex(this.schemaName, this.tableName, this.indexName, this.columns);
+    return createIndex(this.schemaName, this.tableName, this.indexName, this.columns, extras);
   }
 
   renderTypeScript(): string {

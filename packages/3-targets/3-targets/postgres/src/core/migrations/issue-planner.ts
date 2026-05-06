@@ -215,11 +215,8 @@ function mapIssueToCall(
         const extras: { type?: string; options?: Record<string, unknown> } = {};
         if (index.type !== undefined) extras.type = index.type;
         if (index.options !== undefined) extras.options = index.options;
-        const hasExtras = index.type !== undefined || index.options !== undefined;
         calls.push(
-          hasExtras
-            ? new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns], extras)
-            : new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns]),
+          new CreateIndexCall(schemaName, issue.table, indexName, [...index.columns], extras),
         );
       }
       const explicitIndexColumnSets = new Set(
@@ -462,12 +459,7 @@ function mapIssueToCall(
         const extras: { type?: string; options?: Record<string, unknown> } = {};
         if (contractIndex?.type !== undefined) extras.type = contractIndex.type;
         if (contractIndex?.options !== undefined) extras.options = contractIndex.options;
-        const hasExtras = extras.type !== undefined || extras.options !== undefined;
-        return ok([
-          hasExtras
-            ? new CreateIndexCall(schemaName, issue.table, indexName, columns, extras)
-            : new CreateIndexCall(schemaName, issue.table, indexName, columns),
-        ]);
+        return ok([new CreateIndexCall(schemaName, issue.table, indexName, columns, extras)]);
       }
       return notOk(
         issueConflict(

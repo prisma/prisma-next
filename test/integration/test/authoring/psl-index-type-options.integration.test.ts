@@ -4,6 +4,7 @@
  * registered bm25 index-type entry.
  */
 import type { Contract } from '@prisma-next/contract/types';
+import { ContractValidationError } from '@prisma-next/contract/validate-contract';
 import { paradedbIndexTypes } from '@prisma-next/extension-paradedb/index-types';
 import paradedbPack from '@prisma-next/extension-paradedb/pack';
 import { emptyCodecLookup } from '@prisma-next/framework-components/codec';
@@ -91,11 +92,18 @@ describe('PSL @@index type and options — integration with real paradedb pack',
       registry.register(entry);
     }
 
-    expect(() =>
+    let thrown: unknown;
+    try {
       validateContract<Contract<SqlStorage>>(result.value, emptyCodecLookup, {
         indexTypeRegistry: registry,
-      }),
-    ).toThrow(/key_field|bm25/);
+      });
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeInstanceOf(ContractValidationError);
+    const message = (thrown as ContractValidationError).message;
+    expect(message).toContain('bm25');
+    expect(message).toContain('key_field');
   });
 
   it('the registry rejects a PSL-authored index whose type is not registered', () => {

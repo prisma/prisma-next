@@ -12,7 +12,7 @@ import paradedbPack from '@prisma-next/extension-paradedb/pack';
 import sqlFamily from '@prisma-next/family-sql/pack';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import postgresPack from '@prisma-next/target-postgres/pack';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, expectTypeOf, it } from 'vitest';
 
 describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   it('typechecks and accepts a well-formed bm25 index via the helpers factory', () => {
@@ -195,11 +195,38 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       table: 'doc',
       indexes: [constraints.index(cols.body)],
     }));
+    expectTypeOf<typeof Doc.__indexTypes>().toEqualTypeOf<Record<never, never>>();
 
     defineContract({
       family: sqlFamily,
       target: postgresPack,
       models: { Doc },
     });
+  });
+
+  it("helpers-bound model() carries the merged packs' index-type map", () => {
+    defineContract(
+      {
+        family: sqlFamily,
+        target: postgresPack,
+        extensionPacks: { paradedb: paradedbPack },
+      },
+      ({ model: helperModel, field: helperField }) => {
+        const Doc = helperModel('Doc', {
+          fields: {
+            id: helperField.column(int4Column).id(),
+            body: helperField.column(textColumn),
+          },
+        });
+        expectTypeOf<typeof Doc.__indexTypes>().toMatchTypeOf<{
+          readonly bm25: { readonly options: { readonly key_field: string } };
+        }>();
+        return {
+          models: {
+            Doc: Doc.sql({ table: 'doc' }),
+          },
+        };
+      },
+    );
   });
 });
