@@ -322,4 +322,50 @@ describe('createComposedAuthoringHelpers', () => {
       }),
     ).toThrow('Duplicate authoring field helper "column". Core field helpers reserve that name.');
   });
+
+  it('rejects ambiguous paths registered as both a field preset and a type constructor', () => {
+    // Same path (`shared.thing`) is registered as a field preset on the
+    // target and as a type constructor on an extension pack — this would
+    // make PSL resolution ambiguous (field-preset wins per RD9, but the
+    // double-registration is still a registry-coherence bug). The
+    // composition layer rejects it with a clear error.
+    const targetWithFieldPreset = {
+      ...bareTargetPack,
+      authoring: {
+        field: {
+          shared: {
+            thing: textPreset,
+          },
+        },
+      },
+    } as const satisfies TargetPackRef<'sql', 'postgres'>;
+
+    const extensionWithTypeConstructor = {
+      kind: 'extension',
+      id: 'colliding-pack',
+      familyId: 'sql',
+      targetId: 'postgres',
+      version: '0.0.1',
+      authoring: {
+        type: {
+          shared: {
+            thing: {
+              kind: 'typeConstructor',
+              output: { codecId: 'sql/text@1', nativeType: 'text' },
+            },
+          },
+        },
+      },
+    } as const satisfies ExtensionPackRef<'sql', 'postgres'>;
+
+    expect(() =>
+      createComposedAuthoringHelpers({
+        family: bareFamilyPack,
+        target: targetWithFieldPreset,
+        extensionPacks: {
+          extensionWithTypeConstructor,
+        },
+      }),
+    ).toThrow('Ambiguous authoring registry path "shared.thing"');
+  });
 });

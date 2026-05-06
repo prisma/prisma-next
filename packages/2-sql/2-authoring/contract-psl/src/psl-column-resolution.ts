@@ -416,10 +416,28 @@ export function resolveFieldTypeDescriptor(input: {
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
     }
 
+    // Field-preset walker missed. If the namespace is a curated framework
+    // namespace (`temporal.*`, etc.), curated namespaces are reserved for
+    // field presets — a miss is a typo, not a request to look elsewhere.
+    // Emit PSL_UNKNOWN_FIELD_PRESET with a span on the preset name and bail
+    // before the type-constructor fallback. Compose-time collision checks
+    // already prevent a curated path from also being a type constructor.
+    const helperPath = input.field.typeConstructor.path.join('.');
+    const namespacePrefix =
+      input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
+    if (namespacePrefix && CURATED_NAMESPACES.has(namespacePrefix)) {
+      input.diagnostics.push({
+        code: 'PSL_UNKNOWN_FIELD_PRESET',
+        message: `${input.entityLabel} references unknown field preset "${helperPath}". Check the spelling against the available presets in the "${namespacePrefix}" namespace.`,
+        sourceId: input.sourceId,
+        span: input.field.typeConstructor.span,
+      });
+      return { ok: false, alreadyReported: true };
+    }
+
     // Fall through to type-constructor resolution. `resolvePslTypeConstructorDescriptor`
     // emits the appropriate diagnostic (uncomposed namespace, unsupported field
     // type) when no descriptor is found in either registry.
-    const helperPath = input.field.typeConstructor.path.join('.');
     const descriptor = resolvePslTypeConstructorDescriptor({
       call: input.field.typeConstructor,
       authoringContributions: input.authoringContributions,

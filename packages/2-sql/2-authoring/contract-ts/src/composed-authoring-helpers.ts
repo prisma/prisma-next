@@ -195,11 +195,70 @@ function composeFieldNamespace(components: readonly AuthoringComponent[]): Autho
   return merged as AuthoringFieldNamespace;
 }
 
+/**
+ * Walks a composed namespace and yields every leaf path (dot-joined) where the
+ * resident value is recognized by `isLeaf`. Used to detect cross-registry
+ * collisions: a path registered as both a field preset and a type constructor
+ * would make PSL resolution ambiguous (field presets win at runtime per RD9,
+ * but the registration is still a registry-coherence bug).
+ */
+function collectLeafPaths(
+  namespace: Record<string, unknown>,
+  isLeaf: (value: unknown) => boolean,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      paths.push(...collectLeafPaths(value as Record<string, unknown>, isLeaf, currentPath));
+    }
+  }
+  return paths;
+}
+
+/**
+ * Defense-in-depth check that rejects any path appearing in both
+ * `authoringContributions.field` and `authoringContributions.type`. Runtime
+ * resolution prefers field presets on collision (see
+ * `getAuthoringFieldPreset` / `resolveFieldTypeDescriptor`), but a path
+ * registered in both is a registry-author mistake — surface it at composition
+ * time with a clear error rather than letting it reach PSL resolution.
+ */
+function assertNoCrossRegistryCollisions(
+  typeNamespace: AuthoringTypeNamespace,
+  fieldNamespace: AuthoringFieldNamespace,
+): void {
+  const typePaths = new Set(
+    collectLeafPaths(
+      typeNamespace as unknown as Record<string, unknown>,
+      isAuthoringTypeConstructorDescriptor,
+    ),
+  );
+  if (typePaths.size === 0) {
+    return;
+  }
+  for (const fieldPath of collectLeafPaths(
+    fieldNamespace as unknown as Record<string, unknown>,
+    isAuthoringFieldPresetDescriptor,
+  )) {
+    if (typePaths.has(fieldPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+      );
+    }
+  }
+}
+
 function createComposedFieldHelpers(
-  components: readonly AuthoringComponent[],
+  fieldNamespace: AuthoringFieldNamespace,
 ): CoreFieldHelpers & Record<string, unknown> {
   const helperNamespace = createFieldHelpersFromNamespace(
-    composeFieldNamespace(components),
+    fieldNamespace,
     ({ helperPath, descriptor }) =>
       createFieldPresetHelper({
         helperPath,
@@ -247,10 +306,14 @@ export function createComposedAuthoringHelpers<
     ...extensionValues,
   ];
 
+  const typeNamespace = composeTypeNamespace(components);
+  const fieldNamespace = composeFieldNamespace(components);
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+
   return {
-    field: createComposedFieldHelpers(components),
+    field: createComposedFieldHelpers(fieldNamespace),
     model,
     rel,
-    type: createTypeHelpersFromNamespace(composeTypeNamespace(components)),
+    type: createTypeHelpersFromNamespace(typeNamespace),
   } as ComposedAuthoringHelpers<Family, Target, ExtensionPacks>;
 }

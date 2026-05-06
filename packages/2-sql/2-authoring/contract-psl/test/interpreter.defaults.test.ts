@@ -436,4 +436,164 @@ model Post {
     const defaults = result.value.execution?.mutations.defaults ?? [];
     expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
   });
+
+  // Field-preset misuse cases. The preset is a complete field declaration —
+  // optional (?), list ([]), @default(...), @id, @updatedAt all contradict
+  // that and produce hard errors per spec FR7.
+  describe('field-preset misuse', () => {
+    const syntheticPresetContributions = {
+      field: {
+        temporal: {
+          exampleField: {
+            kind: 'fieldPreset',
+            output: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+              default: { kind: 'function', expression: "'synthetic-default'" },
+            },
+          },
+        },
+      },
+    } as const;
+
+    it('rejects optional field-preset call with PSL_PRESET_NOT_OPTIONAL', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField()?
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_NOT_OPTIONAL',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('rejects field-preset call combined with @default(...) with PSL_PRESET_AND_DEFAULT_CONFLICT', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField() @default(now())
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_AND_DEFAULT_CONFLICT',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('rejects field-preset call combined with @id when preset does not contribute id', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField() @id
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_AND_ID_CONFLICT',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('rejects an unknown preset name in a curated namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
+      // `temporal.foo()` is a curated namespace (no extension composition
+      // needed) but the preset name is not registered. Should produce
+      // PSL_UNKNOWN_FIELD_PRESET, NOT fall through to PSL_UNSUPPORTED_FIELD_TYPE.
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.foo()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        // No temporal.foo registered.
+        authoringContributions: { field: { temporal: {} }, type: {} },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNKNOWN_FIELD_PRESET',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('temporal.foo'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects field-preset call combined with @updatedAt with PSL_PRESET_AND_UPDATED_AT_CONFLICT', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField() @updatedAt
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_AND_UPDATED_AT_CONFLICT',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+  });
 });
