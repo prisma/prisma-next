@@ -11,7 +11,7 @@
  *   override get operations() {
  *     return [
  *       this.dataTransform(endContract, 'backfill emails', {
- *         check: () => db.users.count().where(({ email }) => email.isNull()),
+ *         check: () => db.users.select('id').where(({ email }) => email.isNull()).limit(1),
  *         run:   () => db.users.update({ email: '' }).where(({ email }) => email.isNull()),
  *       }),
  *     ];
@@ -34,6 +34,15 @@
  *   when nothing remains to backfill).
  * - postcheck `SELECT NOT EXISTS (<check>) AS ok` asserts the work is
  *   complete after the run steps execute.
+ *
+ * The `check` plan is therefore expected to be a **rowset query whose
+ * presence of any row signals "work remains"** — typically `select('id')
+ * .where(<violation predicate>).limit(1)`. Scalar/aggregate shapes
+ * (`count(*)`, `bool_and(...)`) do not work under this contract: they
+ * always return exactly one row, so `EXISTS` is always true and
+ * `NOT EXISTS` is always false. (This is the same row-presence contract
+ * the pre-unification runner relied on; the wrapping is just lifting it
+ * into SQL.)
  *
  * Each `run` plan becomes an execute step. Because the `Step.params`
  * field threads through `driver.query(sql, params)`, the user's bound
@@ -75,7 +84,13 @@ export interface DataTransformOptions {
    * not referenceable from refs.
    */
   readonly invariantId?: string;
-  /** Optional pre-flight query. `undefined` means "no check". */
+  /**
+   * Optional pre-flight query. `undefined` means "no check". When
+   * supplied, the closure must return a **rowset query** whose
+   * presence of any row signals "violations remain". Conventional
+   * shape: `db.<table>.select('id').where(<violation>).limit(1)`.
+   * Scalar/aggregate shapes do not satisfy this contract.
+   */
   readonly check?: DataTransformClosure;
   /** One or more mutation queries to execute. */
   readonly run: DataTransformClosure | readonly DataTransformClosure[];
