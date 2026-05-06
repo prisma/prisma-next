@@ -411,8 +411,8 @@ describe('contract definition lowering runtime checks', () => {
       indexes: [
         constraints.index(cols.userId, {
           name: 'membership_user_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         }),
       ],
     }));
@@ -432,8 +432,8 @@ describe('contract definition lowering runtime checks', () => {
       {
         columns: ['userId'],
         name: 'membership_user_id_idx',
-        using: 'hash',
-        config: { fillfactor: 70 },
+        type: 'hash',
+        options: { fillfactor: 70 },
       },
     ]);
     expect(membership?.foreignKeys).toEqual([

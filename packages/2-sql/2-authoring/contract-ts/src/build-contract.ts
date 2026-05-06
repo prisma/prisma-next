@@ -277,8 +277,8 @@ export function buildSqlContractFromDefinition(
       indexes: (semanticModel.indexes ?? []).map((i) => ({
         columns: i.columns,
         ...ifDefined('name', i.name),
-        ...ifDefined('using', i.using),
-        ...ifDefined('config', i.config),
+        ...ifDefined('type', i.type),
+        ...ifDefined('options', i.options),
       })),
       foreignKeys,
       ...(semanticModel.id

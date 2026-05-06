@@ -29,7 +29,7 @@ export type Bm25ExpressionFieldConfig = {
 export type Bm25FieldConfig = Bm25ColumnFieldConfig | Bm25ExpressionFieldConfig;
 
 /**
- * BM25 index configuration payload stored in `IndexDef.config`.
+ * BM25 index configuration payload stored in `IndexDef.options`.
  */
 export type Bm25IndexConfig = {
   readonly keyField: string;
@@ -148,14 +148,14 @@ export const bm25 = {
  * Creates a generic index definition with a ParadeDB BM25 payload.
  *
  * `columns` only includes real table columns so core index validation remains
- * target-agnostic. Expression fields stay in extension-owned `config.fields`.
+ * target-agnostic. Expression fields stay in extension-owned `options.fields`.
  */
 export function bm25Index(opts: Bm25IndexOptions): IndexDef {
   return {
     columns: opts.fields.flatMap((field) => ('column' in field ? [field.column] : [])),
     ...(opts.name !== undefined && { name: opts.name }),
-    using: 'bm25',
-    config: {
+    type: 'bm25',
+    options: {
       keyField: opts.keyField,
       fields: opts.fields,
     } satisfies Bm25IndexConfig,

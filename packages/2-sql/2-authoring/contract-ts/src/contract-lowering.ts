@@ -574,8 +574,8 @@ function resolveModelNode(
   const indexes = (spec.sqlSpec?.indexes ?? []).map((index) => ({
     columns: mapFieldNamesToColumnNames(spec.modelName, index.fields, spec.fieldToColumn),
     ...(index.name ? { name: index.name } : {}),
-    ...(index.using ? { using: index.using } : {}),
-    ...(index.config ? { config: index.config } : {}),
+    ...(index.type ? { type: index.type } : {}),
+    ...(index.options ? { options: index.options } : {}),
   })) satisfies readonly IndexNode[];
   const foreignKeys = resolveForeignKeyNodes(spec, allSpecs);
   const relations = Object.entries(spec.relations).map(([relationName, relationBuilder]) =>

@@ -125,8 +125,8 @@ describe('contract DSL runtime helpers', () => {
       indexes: [
         constraints.index(cols.teamId, {
           name: 'audit_log_team_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         }),
       ],
       foreignKeys: [
@@ -146,8 +146,8 @@ describe('contract DSL runtime helpers', () => {
           kind: 'index',
           fields: ['teamId'],
           name: 'audit_log_team_id_idx',
-          using: 'hash',
-          config: { fillfactor: 70 },
+          type: 'hash',
+          options: { fillfactor: 70 },
         },
       ],
       foreignKeys: [

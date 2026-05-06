@@ -539,8 +539,8 @@ type ConstraintOptions<Name extends string | undefined = string | undefined> = {
 
 type IndexOptions<Name extends string | undefined = string | undefined> =
   ConstraintOptions<Name> & {
-    readonly using?: string;
-    readonly config?: Record<string, unknown>;
+    readonly type?: string;
+    readonly options?: Record<string, unknown>;
   };
 
 type ForeignKeyOptions<Name extends string | undefined = string | undefined> =
@@ -577,8 +577,8 @@ export type IndexConstraint<
   readonly kind: 'index';
   readonly fields: FieldNames;
   readonly name?: Name;
-  readonly using?: string;
-  readonly config?: Record<string, unknown>;
+  readonly type?: string;
+  readonly options?: Record<string, unknown>;
 };
 
 export type ForeignKeyConstraint<
@@ -690,8 +690,8 @@ function createConstraintsDsl() {
       kind: 'index',
       fields: normalizeFieldRefInput(fieldOrFields),
       ...(options?.name ? { name: options.name } : {}),
-      ...(options?.using ? { using: options.using } : {}),
-      ...(options?.config ? { config: options.config } : {}),
+      ...(options?.type ? { type: options.type } : {}),
+      ...(options?.options ? { options: options.options } : {}),
     };
   }
 

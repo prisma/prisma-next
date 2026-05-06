@@ -873,9 +873,9 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
+                type: 'bm25',
                 name: 'search_idx',
-                config: {
+                options: {
                   keyField: 'id',
                   fields: [
                     {
@@ -894,8 +894,8 @@ describe('sql-target-family-hook', () => {
     });
 
     const types = generateContractDts(ir, sqlEmission, [], [], testHashes);
-    expect(types).toContain("readonly using: 'bm25'");
-    expect(types).toContain("readonly config: { readonly keyField: 'id'");
+    expect(types).toContain("readonly type: 'bm25'");
+    expect(types).toContain("readonly options: { readonly keyField: 'id'");
     expect(types).toContain("readonly name: 'search_idx'");
     expect(types).toContain("readonly column: 'description'");
     expect(types).toContain("readonly tokenizer: 'simple'");
@@ -918,8 +918,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   fields: [
                     {
@@ -958,8 +958,8 @@ describe('sql-target-family-hook', () => {
             indexes: [
               {
                 columns: ['description'],
-                using: 'bm25',
-                config: {
+                type: 'bm25',
+                options: {
                   keyField: 'id',
                   'min-token-size': 2,
                   fields: [{ column: 'description', tokenizerParams: { 'max-ngram': 5 } }],

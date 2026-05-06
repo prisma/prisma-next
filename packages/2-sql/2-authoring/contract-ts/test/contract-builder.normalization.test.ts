@@ -181,8 +181,8 @@ describe('contract builder normalization', () => {
           indexes: [
             constraints.index(cols.description, {
               name: 'search_idx',
-              using: 'bm25',
-              config: {
+              type: 'bm25',
+              options: {
                 keyField: 'id',
                 fields: [{ column: 'description', tokenizer: 'simple' }],
               },
@@ -196,9 +196,9 @@ describe('contract builder normalization', () => {
     expect(indexes).toHaveLength(1);
     expect(indexes[0]).toMatchObject({
       columns: ['description'],
-      using: 'bm25',
+      type: 'bm25',
       name: 'search_idx',
-      config: {
+      options: {
         keyField: 'id',
         fields: [{ column: 'description', tokenizer: 'simple' }],
       },
@@ -219,8 +219,8 @@ describe('contract builder normalization', () => {
           table: 'items',
           indexes: [
             constraints.index(cols.description, {
-              using: 'bm25',
-              config: {
+              type: 'bm25',
+              options: {
                 keyField: 'id',
                 fields: [
                   { column: 'description' },
@@ -238,9 +238,9 @@ describe('contract builder normalization', () => {
     });
 
     const idx = contract.storage.tables.items.indexes[0]!;
-    expect(idx.using).toBe('bm25');
-    expect((idx.config as { fields: readonly unknown[] }).fields).toHaveLength(2);
-    expect((idx.config as { fields: readonly unknown[] }).fields[1]).toMatchObject({
+    expect(idx.type).toBe('bm25');
+    expect((idx.options as { fields: readonly unknown[] }).fields).toHaveLength(2);
+    expect((idx.options as { fields: readonly unknown[] }).fields[1]).toMatchObject({
       expression: "description || ' ' || category",
       alias: 'concat',
     });

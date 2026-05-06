@@ -96,8 +96,8 @@ const UniqueConstraintSchema = type.declare<UniqueConstraint>().type({
 export const IndexSchema = type({
   columns: type.string.array().readonly(),
   'name?': 'string',
-  'using?': 'string',
-  'config?': 'Record<string, unknown>',
+  'type?': 'string',
+  'options?': 'Record<string, unknown>',
 });
 
 export const ForeignKeyReferencesSchema = type.declare<ForeignKeyReferences>().type({
@@ -384,8 +384,8 @@ export function validateStorageSemantics(storage: SqlStorage): string[] {
 
       const signature = JSON.stringify({
         columns: index.columns,
-        using: index.using ?? null,
-        config: index.config ?? null,
+        type: index.type ?? null,
+        options: index.options ?? null,
       });
       if (seenIndexDefinitions.has(signature)) {
         errors.push(

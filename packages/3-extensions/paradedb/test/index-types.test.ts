@@ -148,15 +148,15 @@ describe('ParadeDB extension', () => {
       expect(indexDef).toEqual({
         columns: ['description'],
         name: 'search_idx',
-        using: 'bm25',
-        config: {
+        type: 'bm25',
+        options: {
           keyField: 'id',
           fields: [{ column: 'description', tokenizer: 'simple' }],
         },
       });
     });
 
-    it('keeps expression fields in config while preserving core-safe columns', () => {
+    it('keeps expression fields in options while preserving core-safe columns', () => {
       const indexDef = bm25Index({
         keyField: 'id',
         fields: [
@@ -166,7 +166,7 @@ describe('ParadeDB extension', () => {
       });
 
       expect(indexDef.columns).toEqual(['description']);
-      expect(indexDef.config).toEqual({
+      expect(indexDef.options).toEqual({
         keyField: 'id',
         fields: [
           { column: 'description' },

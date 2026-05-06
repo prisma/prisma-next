@@ -245,10 +245,11 @@ export const sqlEmission = {
         .map((i) => {
           const cols = i.columns.map((c: string) => serializeValue(c)).join(', ');
           const name = i.name ? `; readonly name: ${serializeValue(i.name)}` : '';
-          const using = i.using !== undefined ? `; readonly using: ${serializeValue(i.using)}` : '';
-          const config =
-            i.config !== undefined ? `; readonly config: ${serializeValue(i.config)}` : '';
-          return `{ readonly columns: readonly [${cols}]${name}${using}${config} }`;
+          const indexType =
+            i.type !== undefined ? `; readonly type: ${serializeValue(i.type)}` : '';
+          const indexOptions =
+            i.options !== undefined ? `; readonly options: ${serializeValue(i.options)}` : '';
+          return `{ readonly columns: readonly [${cols}]${name}${indexType}${indexOptions} }`;
         })
         .join(', ');
       tableParts.push(`indexes: readonly [${indexes}]`);
