@@ -47,7 +47,7 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
-  type ExtractDescriptorCodecTypes,
+  type ExtractCodecTypes,
   SqlCharCodec,
   SqlFloatCodec,
   SqlIntCodec,
@@ -1158,7 +1158,7 @@ pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 
 // ---------------------------------------------------------------------------
 // Class-form descriptor map (TML-2357 M0 Phase B5/C). Keyed by scalar name
-// so {@link CodecTypes} resolves through `ExtractDescriptorCodecTypes`,
+// so {@link CodecTypes} resolves through `ExtractCodecTypes`,
 // preserving the input/output/traits shape downstream consumers
 // (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths
 // rely on. The list view (`codecDescriptorClassList`) iterates these in the
@@ -1198,7 +1198,7 @@ const codecDescriptorMap = {
   jsonb: pgJsonbDescriptorClass,
 } as const;
 
-export type CodecTypes = ExtractDescriptorCodecTypes<typeof codecDescriptorMap>;
+export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;
 
 export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
   Object.values(codecDescriptorMap);

@@ -43,7 +43,7 @@ import {
   type ColumnHelperForStrict,
   column,
 } from '@prisma-next/framework-components/codec';
-import type { ExtractDescriptorCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
 
@@ -158,7 +158,7 @@ pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
 // ---------------------------------------------------------------------------
 // Class-form descriptor map (TML-2357 M0 Phase B5/C). Single entry today:
 // `pg/vector@1`. Keyed by scalar name so {@link CodecTypes} resolves through
-// `ExtractDescriptorCodecTypes`, preserving the input/output/traits shape
+// `ExtractCodecTypes`, preserving the input/output/traits shape
 // downstream consumers (`descriptor-meta.ts`, `exports/codec-types.ts`)
 // rely on. The list view (`codecDescriptorClassList`) iterates these in
 // the emit-stable order via `Object.values`.
@@ -168,7 +168,7 @@ const codecDescriptorMap = {
   vector: pgVectorDescriptorClass,
 } as const;
 
-export type CodecTypes = ExtractDescriptorCodecTypes<typeof codecDescriptorMap>;
+export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;
 
 export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
   Object.values(codecDescriptorMap);

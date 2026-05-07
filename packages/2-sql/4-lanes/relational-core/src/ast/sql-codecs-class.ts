@@ -1,5 +1,5 @@
 /**
- * Class-based form of the six SQL base codecs (TML-2357 M0 Phase B1).
+ * Class-based form of the six SQL base codecs (TML-2357 M0 Phase B1/C).
  *
  * Each codec ships as three artifacts:
  *
@@ -14,10 +14,9 @@
  *    {@link ColumnSpec} via the framework {@link column} packager. The
  *    helper is tied to its descriptor with `satisfies ColumnHelperFor`.
  *
- * The legacy `mkCodec` / `defineCodec` forms in `sql-codecs.ts` remain
- * during M0 Phase B for compatibility with downstream consumers (legacy
- * `sqlCodecDefinitions` + descriptor exports). The class form is the M2
- * target shape; both coexist until Phase C collapses the legacy exports.
+ * After Phase C, this file is the canonical source of SQL base codec
+ * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
+ * carriers in `sql-codecs.ts` retired with the deletion sweep.
  */
 
 import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
