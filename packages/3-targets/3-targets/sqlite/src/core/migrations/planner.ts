@@ -3,9 +3,14 @@ import type {
   MigrationOperationPolicy,
   SqlMigrationPlanner,
   SqlMigrationPlannerPlanOptions,
+  SqlMigrationPlanOperation,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks, plannerFailure } from '@prisma-next/family-sql/control';
+import {
+  extractCodecControlHooks,
+  planFieldEventOperations,
+  plannerFailure,
+} from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -16,6 +21,7 @@ import type {
 import { parseSqliteDefault } from '../default-normalizer';
 import { normalizeSqliteNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
+import { RawSqlCall } from './op-factory-call';
 import {
   type SqliteMigrationDestinationInfo,
   TypeScriptRenderableSqliteMigration,
@@ -112,6 +118,28 @@ export class SqliteMigrationPlanner
       return plannerFailure(result.failure);
     }
 
+    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
+    // structural DDL. Sub-spec § 5 fixes the ordering as
+    // `structural → added → dropped → altered`, with within-group sorting by
+    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
+    // Hook fires only at the application emitter — extension-space planning
+    // (M2 R2) never reaches this helper.
+    const fieldEventOps = planFieldEventOperations({
+      priorContract: options.fromContract,
+      newContract: options.contract,
+      codecHooks,
+    });
+    // `extractCodecControlHooks` erases target-details to `unknown`; codec
+    // authors target a specific lane (here, sqlite) and produce ops whose
+    // target-details are `SqlitePlanTargetDetails`-shaped by construction.
+    // The cast re-specializes the type at this trust boundary.
+    const calls = [
+      ...result.value.calls,
+      ...fieldEventOps.map(
+        (op) => new RawSqlCall(op as SqlMigrationPlanOperation<SqlitePlanTargetDetails>),
+      ),
+    ];
+
     const destination: SqliteMigrationDestinationInfo = {
       storageHash: options.contract.storage.storageHash,
       ...(options.contract.profileHash !== undefined
@@ -122,7 +150,7 @@ export class SqliteMigrationPlanner
     return {
       kind: 'success' as const,
       plan: new TypeScriptRenderableSqliteMigration(
-        result.value.calls,
+        calls,
         {
           from: options.fromContract?.storage.storageHash ?? null,
           to: options.contract.storage.storageHash,

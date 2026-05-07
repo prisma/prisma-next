@@ -15,6 +15,7 @@ export {
   dataTransform,
 } from '../core/migrations/operations/data-transform';
 export { createIndex, dropIndex } from '../core/migrations/operations/indexes';
+export { rawSql } from '../core/migrations/operations/raw';
 export { createTable, dropTable, recreateTable } from '../core/migrations/operations/tables';
 // Target-owned base class for migrations. Aliased to `Migration` so
 // user-edited migration.ts files (and the renderer's scaffold) read as
