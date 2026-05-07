@@ -60,17 +60,28 @@ export interface ColumnSpec<R, P extends Record<string, unknown> | undefined>
  * the result of `descriptor.factory(params)` — direct method invocation
  * binds the descriptor's method-level generic at the call site and the
  * literal flows through `R`.
+ *
+ * `nativeType` is the column's database-native type spelling — the value
+ * the postgres adapter's migration planner, the SQL renderer's cast
+ * policy, and the contract's `meta.db.<family>.<target>.nativeType` slot
+ * read. Per-codec helpers pass the literal native-type string for their
+ * codec (e.g. `'text'`, `'int4'`, `'character varying'`); for codecs
+ * whose native-type spelling depends on parameters (none today; reserved
+ * for future shapes), the helper computes the rendered string before
+ * calling `column`. The framework does not derive the value from
+ * `codecId` — that mapping is target-specific and lives at the helper.
  */
 export function column<R, P extends Record<string, unknown> | undefined>(
   codecFactory: (ctx: CodecInstanceContext) => R,
   codecId: string,
   typeParams: P,
+  nativeType: string,
 ): ColumnSpec<R, P> {
   return {
     codecFactory,
     codecId,
     typeParams,
-    nativeType: codecId,
+    nativeType,
   };
 }
 

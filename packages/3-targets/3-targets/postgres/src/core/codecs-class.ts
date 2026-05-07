@@ -168,7 +168,7 @@ export class PgTextDescriptor extends CodecDescriptorImpl<void> {
 export const pgTextDescriptorClass = new PgTextDescriptor();
 
 export const pgTextColumn = () =>
-  column(pgTextDescriptorClass.factory(), pgTextDescriptorClass.codecId, undefined);
+  column(pgTextDescriptorClass.factory(), pgTextDescriptorClass.codecId, undefined, 'text');
 
 pgTextColumn satisfies ColumnHelperFor<PgTextDescriptor>;
 pgTextColumn satisfies ColumnHelperForStrict<PgTextDescriptor>;
@@ -211,7 +211,7 @@ export class PgInt4Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt4DescriptorClass = new PgInt4Descriptor();
 
 export const pgInt4Column = () =>
-  column(pgInt4DescriptorClass.factory(), pgInt4DescriptorClass.codecId, undefined);
+  column(pgInt4DescriptorClass.factory(), pgInt4DescriptorClass.codecId, undefined, 'int4');
 
 pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
 pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;
@@ -254,7 +254,7 @@ export class PgInt2Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt2DescriptorClass = new PgInt2Descriptor();
 
 export const pgInt2Column = () =>
-  column(pgInt2DescriptorClass.factory(), pgInt2DescriptorClass.codecId, undefined);
+  column(pgInt2DescriptorClass.factory(), pgInt2DescriptorClass.codecId, undefined, 'int2');
 
 pgInt2Column satisfies ColumnHelperFor<PgInt2Descriptor>;
 pgInt2Column satisfies ColumnHelperForStrict<PgInt2Descriptor>;
@@ -297,7 +297,7 @@ export class PgInt8Descriptor extends CodecDescriptorImpl<void> {
 export const pgInt8DescriptorClass = new PgInt8Descriptor();
 
 export const pgInt8Column = () =>
-  column(pgInt8DescriptorClass.factory(), pgInt8DescriptorClass.codecId, undefined);
+  column(pgInt8DescriptorClass.factory(), pgInt8DescriptorClass.codecId, undefined, 'int8');
 
 pgInt8Column satisfies ColumnHelperFor<PgInt8Descriptor>;
 pgInt8Column satisfies ColumnHelperForStrict<PgInt8Descriptor>;
@@ -340,7 +340,7 @@ export class PgFloat4Descriptor extends CodecDescriptorImpl<void> {
 export const pgFloat4DescriptorClass = new PgFloat4Descriptor();
 
 export const pgFloat4Column = () =>
-  column(pgFloat4DescriptorClass.factory(), pgFloat4DescriptorClass.codecId, undefined);
+  column(pgFloat4DescriptorClass.factory(), pgFloat4DescriptorClass.codecId, undefined, 'float4');
 
 pgFloat4Column satisfies ColumnHelperFor<PgFloat4Descriptor>;
 pgFloat4Column satisfies ColumnHelperForStrict<PgFloat4Descriptor>;
@@ -383,7 +383,7 @@ export class PgFloat8Descriptor extends CodecDescriptorImpl<void> {
 export const pgFloat8DescriptorClass = new PgFloat8Descriptor();
 
 export const pgFloat8Column = () =>
-  column(pgFloat8DescriptorClass.factory(), pgFloat8DescriptorClass.codecId, undefined);
+  column(pgFloat8DescriptorClass.factory(), pgFloat8DescriptorClass.codecId, undefined, 'float8');
 
 pgFloat8Column satisfies ColumnHelperFor<PgFloat8Descriptor>;
 pgFloat8Column satisfies ColumnHelperForStrict<PgFloat8Descriptor>;
@@ -426,7 +426,7 @@ export class PgBoolDescriptor extends CodecDescriptorImpl<void> {
 export const pgBoolDescriptorClass = new PgBoolDescriptor();
 
 export const pgBoolColumn = () =>
-  column(pgBoolDescriptorClass.factory(), pgBoolDescriptorClass.codecId, undefined);
+  column(pgBoolDescriptorClass.factory(), pgBoolDescriptorClass.codecId, undefined, 'bool');
 
 pgBoolColumn satisfies ColumnHelperFor<PgBoolDescriptor>;
 pgBoolColumn satisfies ColumnHelperForStrict<PgBoolDescriptor>;
@@ -475,7 +475,12 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
 export const pgNumericDescriptorClass = new PgNumericDescriptor();
 
 export const pgNumericColumn = (params: NumericParams) =>
-  column(pgNumericDescriptorClass.factory(params), pgNumericDescriptorClass.codecId, params);
+  column(
+    pgNumericDescriptorClass.factory(params),
+    pgNumericDescriptorClass.codecId,
+    params,
+    'numeric',
+  );
 
 pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
 pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
@@ -524,7 +529,12 @@ export class PgTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams> 
 export const pgTimestampDescriptorClass = new PgTimestampDescriptor();
 
 export const pgTimestampColumn = (params: PrecisionParams = {}) =>
-  column(pgTimestampDescriptorClass.factory(params), pgTimestampDescriptorClass.codecId, params);
+  column(
+    pgTimestampDescriptorClass.factory(params),
+    pgTimestampDescriptorClass.codecId,
+    params,
+    'timestamp',
+  );
 
 pgTimestampColumn satisfies ColumnHelperFor<PgTimestampDescriptor>;
 pgTimestampColumn satisfies ColumnHelperForStrict<PgTimestampDescriptor>;
@@ -574,6 +584,7 @@ export const pgTimestamptzColumn = (params: PrecisionParams = {}) =>
     pgTimestamptzDescriptorClass.factory(params),
     pgTimestamptzDescriptorClass.codecId,
     params,
+    'timestamptz',
   );
 
 pgTimestamptzColumn satisfies ColumnHelperFor<PgTimestamptzDescriptor>;
@@ -620,7 +631,7 @@ export class PgTimeDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgTimeDescriptorClass = new PgTimeDescriptor();
 
 export const pgTimeColumn = (params: PrecisionParams = {}) =>
-  column(pgTimeDescriptorClass.factory(params), pgTimeDescriptorClass.codecId, params);
+  column(pgTimeDescriptorClass.factory(params), pgTimeDescriptorClass.codecId, params, 'time');
 
 pgTimeColumn satisfies ColumnHelperFor<PgTimeDescriptor>;
 pgTimeColumn satisfies ColumnHelperForStrict<PgTimeDescriptor>;
@@ -666,7 +677,12 @@ export class PgTimetzDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgTimetzDescriptorClass = new PgTimetzDescriptor();
 
 export const pgTimetzColumn = (params: PrecisionParams = {}) =>
-  column(pgTimetzDescriptorClass.factory(params), pgTimetzDescriptorClass.codecId, params);
+  column(
+    pgTimetzDescriptorClass.factory(params),
+    pgTimetzDescriptorClass.codecId,
+    params,
+    'timetz',
+  );
 
 pgTimetzColumn satisfies ColumnHelperFor<PgTimetzDescriptor>;
 pgTimetzColumn satisfies ColumnHelperForStrict<PgTimetzDescriptor>;
@@ -713,7 +729,7 @@ export class PgBitDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const pgBitDescriptorClass = new PgBitDescriptor();
 
 export const pgBitColumn = (params: LengthParams = {}) =>
-  column(pgBitDescriptorClass.factory(params), pgBitDescriptorClass.codecId, params);
+  column(pgBitDescriptorClass.factory(params), pgBitDescriptorClass.codecId, params, 'bit');
 
 pgBitColumn satisfies ColumnHelperFor<PgBitDescriptor>;
 pgBitColumn satisfies ColumnHelperForStrict<PgBitDescriptor>;
@@ -759,7 +775,12 @@ export class PgVarbitDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const pgVarbitDescriptorClass = new PgVarbitDescriptor();
 
 export const pgVarbitColumn = (params: LengthParams = {}) =>
-  column(pgVarbitDescriptorClass.factory(params), pgVarbitDescriptorClass.codecId, params);
+  column(
+    pgVarbitDescriptorClass.factory(params),
+    pgVarbitDescriptorClass.codecId,
+    params,
+    'bit varying',
+  );
 
 pgVarbitColumn satisfies ColumnHelperFor<PgVarbitDescriptor>;
 pgVarbitColumn satisfies ColumnHelperForStrict<PgVarbitDescriptor>;
@@ -806,7 +827,12 @@ export class PgIntervalDescriptor extends CodecDescriptorImpl<PrecisionParams> {
 export const pgIntervalDescriptorClass = new PgIntervalDescriptor();
 
 export const pgIntervalColumn = (params: PrecisionParams = {}) =>
-  column(pgIntervalDescriptorClass.factory(params), pgIntervalDescriptorClass.codecId, params);
+  column(
+    pgIntervalDescriptorClass.factory(params),
+    pgIntervalDescriptorClass.codecId,
+    params,
+    'interval',
+  );
 
 pgIntervalColumn satisfies ColumnHelperFor<PgIntervalDescriptor>;
 pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
@@ -860,7 +886,7 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<EnumParams> {
 export const pgEnumDescriptorClass = new PgEnumDescriptor();
 
 export const pgEnumColumn = (params: EnumParams = {}) =>
-  column(pgEnumDescriptorClass.factory(params), pgEnumDescriptorClass.codecId, params);
+  column(pgEnumDescriptorClass.factory(params), pgEnumDescriptorClass.codecId, params, 'enum');
 
 pgEnumColumn satisfies ColumnHelperFor<PgEnumDescriptor>;
 pgEnumColumn satisfies ColumnHelperForStrict<PgEnumDescriptor>;
@@ -905,7 +931,7 @@ export class PgJsonDescriptor extends CodecDescriptorImpl<void> {
 export const pgJsonDescriptorClass = new PgJsonDescriptor();
 
 export const pgJsonColumn = () =>
-  column(pgJsonDescriptorClass.factory(), pgJsonDescriptorClass.codecId, undefined);
+  column(pgJsonDescriptorClass.factory(), pgJsonDescriptorClass.codecId, undefined, 'json');
 
 pgJsonColumn satisfies ColumnHelperFor<PgJsonDescriptor>;
 pgJsonColumn satisfies ColumnHelperForStrict<PgJsonDescriptor>;
@@ -949,7 +975,7 @@ export class PgJsonbDescriptor extends CodecDescriptorImpl<void> {
 export const pgJsonbDescriptorClass = new PgJsonbDescriptor();
 
 export const pgJsonbColumn = () =>
-  column(pgJsonbDescriptorClass.factory(), pgJsonbDescriptorClass.codecId, undefined);
+  column(pgJsonbDescriptorClass.factory(), pgJsonbDescriptorClass.codecId, undefined, 'jsonb');
 
 pgJsonbColumn satisfies ColumnHelperFor<PgJsonbDescriptor>;
 pgJsonbColumn satisfies ColumnHelperForStrict<PgJsonbDescriptor>;

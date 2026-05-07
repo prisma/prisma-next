@@ -113,7 +113,7 @@ export class SqlTextDescriptor extends CodecDescriptorImpl<void> {
 export const sqlTextDescriptorClass = new SqlTextDescriptor();
 
 export const sqlTextColumn = () =>
-  column(sqlTextDescriptorClass.factory(), sqlTextDescriptorClass.codecId, undefined);
+  column(sqlTextDescriptorClass.factory(), sqlTextDescriptorClass.codecId, undefined, 'text');
 
 sqlTextColumn satisfies ColumnHelperFor<SqlTextDescriptor>;
 sqlTextColumn satisfies ColumnHelperForStrict<SqlTextDescriptor>;
@@ -155,7 +155,7 @@ export class SqlIntDescriptor extends CodecDescriptorImpl<void> {
 export const sqlIntDescriptorClass = new SqlIntDescriptor();
 
 export const sqlIntColumn = () =>
-  column(sqlIntDescriptorClass.factory(), sqlIntDescriptorClass.codecId, undefined);
+  column(sqlIntDescriptorClass.factory(), sqlIntDescriptorClass.codecId, undefined, 'int');
 
 sqlIntColumn satisfies ColumnHelperFor<SqlIntDescriptor>;
 sqlIntColumn satisfies ColumnHelperForStrict<SqlIntDescriptor>;
@@ -197,7 +197,7 @@ export class SqlFloatDescriptor extends CodecDescriptorImpl<void> {
 export const sqlFloatDescriptorClass = new SqlFloatDescriptor();
 
 export const sqlFloatColumn = () =>
-  column(sqlFloatDescriptorClass.factory(), sqlFloatDescriptorClass.codecId, undefined);
+  column(sqlFloatDescriptorClass.factory(), sqlFloatDescriptorClass.codecId, undefined, 'float');
 
 sqlFloatColumn satisfies ColumnHelperFor<SqlFloatDescriptor>;
 sqlFloatColumn satisfies ColumnHelperForStrict<SqlFloatDescriptor>;
@@ -244,7 +244,7 @@ export class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const sqlCharDescriptorClass = new SqlCharDescriptor();
 
 export const sqlCharColumn = (params: LengthParams = {}) =>
-  column(sqlCharDescriptorClass.factory(params), sqlCharDescriptorClass.codecId, params);
+  column(sqlCharDescriptorClass.factory(params), sqlCharDescriptorClass.codecId, params, 'char');
 
 sqlCharColumn satisfies ColumnHelperFor<SqlCharDescriptor>;
 sqlCharColumn satisfies ColumnHelperForStrict<SqlCharDescriptor>;
@@ -289,7 +289,12 @@ export class SqlVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
 export const sqlVarcharDescriptorClass = new SqlVarcharDescriptor();
 
 export const sqlVarcharColumn = (params: LengthParams = {}) =>
-  column(sqlVarcharDescriptorClass.factory(params), sqlVarcharDescriptorClass.codecId, params);
+  column(
+    sqlVarcharDescriptorClass.factory(params),
+    sqlVarcharDescriptorClass.codecId,
+    params,
+    'varchar',
+  );
 
 sqlVarcharColumn satisfies ColumnHelperFor<SqlVarcharDescriptor>;
 sqlVarcharColumn satisfies ColumnHelperForStrict<SqlVarcharDescriptor>;
@@ -335,7 +340,12 @@ export class SqlTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams>
 export const sqlTimestampDescriptorClass = new SqlTimestampDescriptor();
 
 export const sqlTimestampColumn = (params: PrecisionParams = {}) =>
-  column(sqlTimestampDescriptorClass.factory(params), sqlTimestampDescriptorClass.codecId, params);
+  column(
+    sqlTimestampDescriptorClass.factory(params),
+    sqlTimestampDescriptorClass.codecId,
+    params,
+    'timestamp',
+  );
 
 sqlTimestampColumn satisfies ColumnHelperFor<SqlTimestampDescriptor>;
 sqlTimestampColumn satisfies ColumnHelperForStrict<SqlTimestampDescriptor>;

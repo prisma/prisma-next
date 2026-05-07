@@ -98,9 +98,12 @@ sqlTimestampColumn satisfies ColumnHelperForStrict<SqlTimestampDescriptor>;
 
 test('coarse satisfies catches wrong typeParams shape on sqlCharColumn', () => {
   const brokenHelper = (length: number) =>
-    column(sqlCharDescriptorClass.factory({ length }), sqlCharDescriptorClass.codecId, {
-      wrongKey: length,
-    });
+    column(
+      sqlCharDescriptorClass.factory({ length }),
+      sqlCharDescriptorClass.codecId,
+      { wrongKey: length },
+      'char',
+    );
   // @ts-expect-error -- typeParams shape doesn't satisfy ColumnHelperFor<SqlCharDescriptor> (missing `length`)
   brokenHelper satisfies ColumnHelperFor<SqlCharDescriptor>;
   // @ts-expect-error -- strict shape catches the same mismatch
@@ -114,7 +117,7 @@ test('strict satisfies catches wrong codec wired in', () => {
   // `{ readonly length?: number }`), so this exercises both axes; we
   // assert the strict failure for the codec mismatch.
   const wrongCodecHelper = (length: number) =>
-    column(sqlTextDescriptorClass.factory(), sqlCharDescriptorClass.codecId, { length });
+    column(sqlTextDescriptorClass.factory(), sqlCharDescriptorClass.codecId, { length }, 'char');
   wrongCodecHelper satisfies ColumnHelperFor<SqlCharDescriptor>;
   // @ts-expect-error -- codec is SqlTextCodec, not SqlCharCodec
   wrongCodecHelper satisfies ColumnHelperForStrict<SqlCharDescriptor>;
