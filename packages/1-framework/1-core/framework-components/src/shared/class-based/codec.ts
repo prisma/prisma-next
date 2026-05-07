@@ -1,17 +1,24 @@
 /**
- * Class-based `Codec` abstract base — Pattern E spike.
+ * Class-based `Codec` abstract base — Pattern E.
  *
- * Sibling of {@link import('../codec-types').Codec} (the interface form).
- * Lives in parallel for the `class-based-codec-design.spec.md` spike: the
- * existing interface stays as the production shape; this class form is
- * exercised end-to-end for `pgInt4` and `pgVector` to validate per-codec
- * helpers + `satisfies` discipline preserve method-level generics.
+ * Concrete codec authors extend this class to declare a typed runtime
+ * codec instance. The base carries a variance-erased descriptor
+ * reference (`CodecDescriptor<any>`); `id` and `traits` proxy through
+ * the descriptor so one source of truth governs both metadata reads
+ * and aliasing semantics (alias subclasses inherit the descriptor's
+ * id automatically).
  *
- * Class generic shape mirrors the interface: `Id`, `TTraits`, `TWire`,
- * `TInput`. The instance carries the descriptor reference so `id` and
- * `traits` proxy through one source of truth. See spec § "Class
- * hierarchy" for the design rationale (instance-side aliasing, codec
- * subclass uniformity across the codec spectrum).
+ * Class generic shape: `Id`, `TTraits`, `TWire`, `TInput`. Method
+ * generics on the codec subclass's own surface (e.g. arktype-json's
+ * schema generic, pgvector's dimension generic) flow through the
+ * subclass's constructor and propagate via the descriptor's typed
+ * `factory(params)` return at *direct* call sites.
+ *
+ * Sibling of {@link import('../codec-types').Codec} (legacy interface
+ * form) during TML-2357 M0 Phase B; Phase C deletes the interface
+ * form once every codec migrates. See
+ * `projects/codec-registration-completion/specs/class-based-codec-design.spec.md`
+ * § "Class hierarchy" for the design rationale.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

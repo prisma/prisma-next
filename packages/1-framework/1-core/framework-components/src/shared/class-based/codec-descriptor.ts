@@ -1,15 +1,23 @@
 /**
- * Class-based `CodecDescriptor` abstract base — Pattern E spike.
+ * Class-based `CodecDescriptor` abstract base — Pattern E.
  *
- * Sibling of {@link import('../codec-types').CodecDescriptor} (the
- * interface form). Concrete codec authors `extend` this class to
- * declare their codec id, traits, target types, params schema, and the
- * `factory(params)` that materializes a typed `Codec<...>`.
+ * Concrete codec authors `extend` this class to declare their codec
+ * id, traits, target types, params schema, the `factory(params)` that
+ * materializes a typed `Codec<...>`, and (optionally) a
+ * `renderOutputType(params)` for the emit path.
  *
  * The factory's method-level generic is the load-bearing piece for
  * literal preservation: per-codec column helpers invoke
  * `descriptor.factory(...)` *directly*, and the direct call binds the
- * generic at its call site (see [Pattern E proof](../../../wip/codec-class-variance-proof/06-per-codec-helpers.ts)).
+ * generic at its call site. Type extraction (`ReturnType<D['factory']>`,
+ * structural matching) widens method generics to their constraint —
+ * that's why the column-helper surface is per-codec, not polymorphic.
+ *
+ * Sibling of {@link import('../codec-types').CodecDescriptor} (legacy
+ * interface form) during TML-2357 M0 Phase B; Phase C deletes the
+ * interface form. See
+ * `projects/codec-registration-completion/specs/class-based-codec-design.spec.md`
+ * for the full design.
  */
 
 import type { StandardSchemaV1 } from '@standard-schema/spec';

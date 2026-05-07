@@ -1,10 +1,11 @@
 /**
- * `column()` packager + `ColumnHelperFor<D>` shapes — Pattern E spike.
+ * `column()` packager + `ColumnHelperFor<D>` shapes — Pattern E.
  *
  * Trivial, non-polymorphic column packager. Generic over `R` (the codec
  * instance type returned by the descriptor's curried factory) and `P`
  * (the typeParams record). The framework does NOT try to infer `R` and
- * `P` from a descriptor — that path is the variance trap. Per-codec
+ * `P` from a descriptor — that path is the variance trap (see the
+ * playground proof at `wip/m0-class-variance-proof.md`). Per-codec
  * helpers absorb the descriptor relationship instead and tie themselves
  * to their descriptor via `satisfies ColumnHelperFor<D>` /
  * `ColumnHelperForStrict<D>`.
@@ -50,10 +51,11 @@ export type ColumnSpec<R, P> = {
 };
 
 /**
- * Spike-time compatibility check: `ColumnSpec<R, P>` is structurally
+ * Compile-time compatibility check: `ColumnSpec<R, P>` is structurally
  * compatible with the legacy `ColumnTypeDescriptor` shape (modulo
  * `typeParams` widening to `Record<string, unknown>`). Codec authors
- * pass `ColumnSpec` instances to legacy contract sites without changes.
+ * pass `ColumnSpec` instances to contract authoring sites that consume
+ * `ColumnTypeDescriptor` without an explicit `extends`.
  */
 export type _ColumnSpecIsColumnTypeDescriptorCompatible<
   R,

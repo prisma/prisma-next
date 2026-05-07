@@ -1,13 +1,22 @@
 /**
- * Class-based codec exports — Pattern E spike.
+ * Class-based codec exports — Pattern E.
  *
- * Parallel surface to {@link import('./codec')}. The interface form
- * (`Codec`/`CodecDescriptor` types) stays as the production shape; this
- * module exposes the class-based hierarchy plus the `column()`
- * packager and `ColumnHelperFor<D>` shapes used by per-codec helpers.
+ * Canonical class hierarchy and column-packaging machinery for the
+ * codec model. Codec authors `extend` the {@link Codec} and
+ * {@link CodecDescriptor} abstract bases, write a per-codec column
+ * helper that calls `descriptor.factory(...)` directly, and tie the
+ * helper to its descriptor with `satisfies ColumnHelperFor<D>` (or
+ * `ColumnHelperForStrict<D>`).
  *
- * Spike scope is `pgInt4` (non-parameterized) and `pgVector`
- * (parameterized) only — see `class-based-codec-design.spec.md`.
+ * Co-exists with the legacy interface form
+ * ({@link import('../shared/codec-types').Codec},
+ * {@link import('../shared/codec-types').CodecDescriptor}) during
+ * TML-2357 M0 Phase B. Phase C deletes the interface form once every
+ * codec migrates; this becomes the canonical surface.
+ *
+ * See `projects/codec-registration-completion/specs/class-based-codec-design.spec.md`
+ * for the full design, the per-codec authoring patterns, and the
+ * variance discipline the helpers rely on.
  */
 
 export { Codec } from '../shared/class-based/codec';
