@@ -1,6 +1,7 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import { expectTypeOf, test } from 'vitest';
-import type { Codec, CodecTrait } from '../src/shared/codec-types';
+import type { Codec } from '../src/shared/codec';
+import type { CodecTrait } from '../src/shared/codec-types';
 
 test('encode is required and Promise-returning', () => {
   expectTypeOf<Codec>().toHaveProperty('encode');

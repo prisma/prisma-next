@@ -1,4 +1,4 @@
-import type { AnyCodecDescriptor } from './codec-types';
+import type { AnyCodecDescriptor } from './codec-descriptor';
 import type { AuthoringContributions } from './framework-authoring';
 import type { ControlMutationDefaults } from './mutation-default-types';
 import type { TypesImportSpec } from './types-import-spec';

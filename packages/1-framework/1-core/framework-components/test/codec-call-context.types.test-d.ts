@@ -1,5 +1,6 @@
 import { expectTypeOf, test } from 'vitest';
-import type { Codec, CodecCallContext } from '../src/shared/codec-types';
+import type { Codec } from '../src/shared/codec';
+import type { CodecCallContext } from '../src/shared/codec-types';
 
 test('CodecCallContext is signal-only at the framework level', () => {
   type Signal = NonNullable<CodecCallContext['signal']>;

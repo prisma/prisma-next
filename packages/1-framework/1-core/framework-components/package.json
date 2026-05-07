@@ -31,7 +31,6 @@
   ],
   "exports": {
     "./authoring": "./dist/authoring.mjs",
-    "./class-based-codec": "./dist/class-based-codec.mjs",
     "./codec": "./dist/codec.mjs",
     "./components": "./dist/components.mjs",
     "./control": "./dist/control.mjs",

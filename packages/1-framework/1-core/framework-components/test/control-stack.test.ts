@@ -257,9 +257,11 @@ describe('extractCodecLookup', () => {
       decode: async (v: unknown) => v,
       encodeJson: (v: unknown) => v,
       decodeJson: (j: unknown) => j,
-    }) as unknown as import('../src/shared/codec-types').Codec;
+    }) as unknown as import('../src/shared/codec').Codec;
 
-  const stubDescriptor = (id: string): import('../src/shared/codec-types').AnyCodecDescriptor => ({
+  const stubDescriptor = (
+    id: string,
+  ): import('../src/shared/codec-descriptor').AnyCodecDescriptor => ({
     codecId: id,
     traits: [],
     targetTypes: [],

@@ -272,7 +272,7 @@ export function assembleControlMutationDefaults(
 export function extractCodecLookup(
   descriptors: ReadonlyArray<Pick<ComponentMetadata & { id?: string }, 'types' | 'id'>>,
 ): CodecLookup {
-  const byId = new Map<string, import('../shared/codec-types').Codec>();
+  const byId = new Map<string, import('../shared/codec').Codec>();
   const targetTypesById = new Map<string, readonly string[]>();
   const metaById = new Map<string, import('../shared/codec-types').CodecMeta>();
   const renderersById = new Map<string, (params: Record<string, unknown>) => string | undefined>();

@@ -1,43 +1,53 @@
 /**
- * Framework-level type tests for the class-based codec hierarchy +
- * `column()` packager + `ColumnHelperFor<D>` shapes (Pattern E).
+ * Framework-level type tests for the codec abstract class hierarchy +
+ * `column()` packager + `ColumnHelperFor<D>` shapes.
  *
  * Uses inline fixture descriptors so the test is framework-internal
  * (no cross-package deps). Negative tests assert the variance discipline:
  * literal preservation through per-codec helpers' direct calls; satisfies
  * shape catches typeParams-shape and codec-wiring mistakes.
  *
- * Refs: TML-2357 M0 Phase A T0.A.3,
- * `projects/codec-registration-completion/specs/class-based-codec-design.spec.md`.
+ * Refs: TML-2357 M0 Phase A.
  */
 
+import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { expectTypeOf, test } from 'vitest';
 import {
-  Codec,
-  CodecDescriptor,
+  type Codec,
+  type CodecCallContext,
+  type CodecDescriptor,
+  CodecDescriptorImpl,
+  CodecImpl,
+  type CodecInstanceContext,
+  type CodecTrait,
   type ColumnHelperFor,
   type ColumnHelperForStrict,
   type ColumnSpec,
   column,
-} from '../src/exports/class-based-codec';
-import type { CodecCallContext, CodecInstanceContext, CodecTrait } from '../src/shared/codec-types';
-import { voidParamsSchema } from '../src/shared/codec-types';
+  voidParamsSchema,
+} from '../src/exports/codec';
 
 // ---------------------------------------------------------------------------
-// Inline fixture: non-parameterized codec (mirrors the spec's Case 1).
+// Inline fixture: non-parameterized codec.
 // ---------------------------------------------------------------------------
 
-class Int4FixtureCodec extends Codec<'demo/int4@1', readonly ['equality'], number, number> {
+class Int4FixtureCodec extends CodecImpl<'demo/int4@1', readonly ['equality'], number, number> {
   async encode(value: number, _ctx: CodecCallContext): Promise<number> {
     return value;
   }
   async decode(wire: number, _ctx: CodecCallContext): Promise<number> {
     return wire;
   }
+  encodeJson(value: number): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): number {
+    return json as number;
+  }
 }
 
-class Int4FixtureDescriptor extends CodecDescriptor<void> {
+class Int4FixtureDescriptor extends CodecDescriptorImpl<void> implements CodecDescriptor<void> {
   override readonly codecId = 'demo/int4@1' as const;
   override readonly traits: readonly CodecTrait[] = ['equality'];
   override readonly targetTypes: readonly string[] = ['int4'];
@@ -57,7 +67,7 @@ int4Fixture satisfies ColumnHelperForStrict<Int4FixtureDescriptor>;
 
 // ---------------------------------------------------------------------------
 // Inline fixture: parameterized codec with literal preservation
-// (mirrors the spec's Case 2 — pgvector-shaped).
+// (pgvector-shaped).
 // ---------------------------------------------------------------------------
 
 type VectorParams = { readonly length: number };
@@ -69,7 +79,7 @@ const vectorFixtureParamsSchema: StandardSchemaV1<VectorParams> = {
   },
 };
 
-class VectorFixtureCodec<N extends number> extends Codec<
+class VectorFixtureCodec<N extends number> extends CodecImpl<
   'demo/vector@1',
   readonly ['equality'],
   string,
@@ -87,9 +97,18 @@ class VectorFixtureCodec<N extends number> extends Codec<
   async decode(wire: string, _ctx: CodecCallContext): Promise<number[]> {
     return wire.slice(1, -1).split(',').map(Number);
   }
+  encodeJson(value: number[]): JsonValue {
+    return value;
+  }
+  decodeJson(json: JsonValue): number[] {
+    return json as number[];
+  }
 }
 
-class VectorFixtureDescriptor extends CodecDescriptor<VectorParams> {
+class VectorFixtureDescriptor
+  extends CodecDescriptorImpl<VectorParams>
+  implements CodecDescriptor<VectorParams>
+{
   override readonly codecId = 'demo/vector@1' as const;
   override readonly traits: readonly CodecTrait[] = ['equality'];
   override readonly targetTypes: readonly string[] = ['vector'];
@@ -134,7 +153,7 @@ test('non-parameterized helper packages void typeParams', () => {
 
 test('ResolvedCodec extracts the typed codec from a column spec', () => {
   type ResolvedCodec<C> =
-    C extends ColumnSpec<infer R, unknown>
+    C extends ColumnSpec<infer R, never>
       ? R
       : C extends { codecFactory: (ctx: CodecInstanceContext) => infer R }
         ? R
@@ -185,19 +204,10 @@ test('strict satisfies catches wrong codec wired in', () => {
 // Heterogeneous-storage variance erasure
 // ---------------------------------------------------------------------------
 
-test('AnyCodecDescriptor stores parameterized + non-parameterized descriptors', () => {
+test('CodecDescriptor<unknown> stores parameterized + non-parameterized descriptors', () => {
   type AnyDesc = CodecDescriptor<unknown> | CodecDescriptor<VectorParams>;
-  // The variance-erased CodecDescriptor<any> must be assignable from
-  // both concrete descriptor classes for registry storage to work.
   const reg = new Map<string, CodecDescriptor<unknown>>();
-  // Both assignments compile — the descriptor reference erases variance
-  // when the registry's value type is `CodecDescriptor<unknown>`-shaped.
-  reg.set(int4FixtureDescriptor.codecId, int4FixtureDescriptor);
-  // Vector descriptor's TParams is non-void; it casts into the variance-
-  // erased registry slot the same way `AnyCodecDescriptor` is the
-  // canonical alias. We don't expose `as`-casts to consumers; the
-  // registry reads back a typed value at retrieval time and narrows
-  // through `instanceof` checks before calling `factory`.
+  reg.set(int4FixtureDescriptor.codecId, int4FixtureDescriptor as CodecDescriptor<unknown>);
   reg.set(vectorFixtureDescriptor.codecId, vectorFixtureDescriptor as CodecDescriptor<unknown>);
   expectTypeOf<typeof reg>().toMatchTypeOf<Map<string, AnyDesc>>();
 });
