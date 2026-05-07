@@ -41,9 +41,9 @@ function createLengthTypeHelper(
 // the M2 cleanup commit.
 // ---------------------------------------------------------------------------
 
-const sqlCharEncode = (value: string): string => value;
-const sqlCharDecode = (wire: string): string => wire.trimEnd();
-const sqlCharRenderOutputType = (typeParams: { readonly length?: number }) => {
+export const sqlCharEncode = (value: string): string => value;
+export const sqlCharDecode = (wire: string): string => wire.trimEnd();
+export const sqlCharRenderOutputType = (typeParams: { readonly length?: number }) => {
   const length = typeParams.length;
   if (length === undefined) return undefined;
   if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
@@ -54,9 +54,9 @@ const sqlCharRenderOutputType = (typeParams: { readonly length?: number }) => {
   return `Char<${length}>`;
 };
 
-const sqlVarcharEncode = (value: string): string => value;
-const sqlVarcharDecode = (wire: string): string => wire;
-const sqlVarcharRenderOutputType = (typeParams: { readonly length?: number }) => {
+export const sqlVarcharEncode = (value: string): string => value;
+export const sqlVarcharDecode = (wire: string): string => wire;
+export const sqlVarcharRenderOutputType = (typeParams: { readonly length?: number }) => {
   const length = typeParams.length;
   if (length === undefined) return undefined;
   if (typeof length !== 'number' || !Number.isFinite(length) || !Number.isInteger(length)) {
@@ -67,19 +67,19 @@ const sqlVarcharRenderOutputType = (typeParams: { readonly length?: number }) =>
   return `Varchar<${length}>`;
 };
 
-const sqlIntEncode = (value: number): number => value;
-const sqlIntDecode = (wire: number): number => wire;
+export const sqlIntEncode = (value: number): number => value;
+export const sqlIntDecode = (wire: number): number => wire;
 
-const sqlFloatEncode = (value: number): number => value;
-const sqlFloatDecode = (wire: number): number => wire;
+export const sqlFloatEncode = (value: number): number => value;
+export const sqlFloatDecode = (wire: number): number => wire;
 
-const sqlTextEncode = (value: string): string => value;
-const sqlTextDecode = (wire: string): string => wire;
+export const sqlTextEncode = (value: string): string => value;
+export const sqlTextDecode = (wire: string): string => wire;
 
-const sqlTimestampEncode = (value: Date): Date => value;
-const sqlTimestampDecode = (wire: Date): Date => wire;
-const sqlTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
-const sqlTimestampDecodeJson = (json: JsonValue): Date => {
+export const sqlTimestampEncode = (value: Date): Date => value;
+export const sqlTimestampDecode = (wire: Date): Date => wire;
+export const sqlTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
+export const sqlTimestampDecodeJson = (json: JsonValue): Date => {
   if (typeof json !== 'string') {
     throw new Error(`Expected ISO date string for sql/timestamp@1, got ${typeof json}`);
   }
@@ -89,7 +89,7 @@ const sqlTimestampDecodeJson = (json: JsonValue): Date => {
   }
   return date;
 };
-const sqlTimestampRenderOutputType = (typeParams: { readonly precision?: number }) => {
+export const sqlTimestampRenderOutputType = (typeParams: { readonly precision?: number }) => {
   const precision = typeParams.precision;
   if (precision === undefined) {
     return 'Timestamp';
