@@ -1,3 +1,5 @@
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-lane-context';
 import { Collection } from '../src/collection';
 import type { MockRuntime, TestContract } from './helpers';
@@ -7,7 +9,7 @@ export type TestModelName = Extract<keyof TestContract['models'], string>;
 
 export const baseContract = getTestContract();
 
-function contextForContract(contract: TestContract): ExecutionContext<TestContract> {
+function contextForContract(contract: Contract<SqlStorage>): ExecutionContext<TestContract> {
   const base = getTestContext();
   if (contract === baseContract) return base;
   return { ...base, contract } as ExecutionContext<TestContract>;
@@ -15,7 +17,7 @@ function contextForContract(contract: TestContract): ExecutionContext<TestContra
 
 export function createCollectionFor<ModelName extends TestModelName>(
   modelName: ModelName,
-  contract: TestContract = baseContract,
+  contract: Contract<SqlStorage> = baseContract,
 ): {
   collection: Collection<TestContract, ModelName>;
   runtime: MockRuntime;

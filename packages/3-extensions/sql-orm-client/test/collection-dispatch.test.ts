@@ -6,17 +6,35 @@ import type { IncludeExpr } from '../src/types';
 import { emptyState } from '../src/types';
 import { createCollectionFor } from './collection-fixtures';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContract } from './helpers';
+import { createMockRuntime, getTestContract, withCapabilities } from './helpers';
 
-function withSingleQueryCapabilities(contract: TestContract): TestContract {
-  return {
-    ...contract,
-    capabilities: {
-      ...contract.capabilities,
-      lateral: { enabled: true },
-      jsonAgg: { enabled: true },
+function withSingleQueryCapabilities(contract: TestContract) {
+  return withCapabilities(contract, {
+    ...contract.capabilities,
+    [contract.targetFamily]: {
+      ...(contract.capabilities[contract.targetFamily] ?? {}),
+      jsonAgg: true,
     },
-  } as unknown as TestContract;
+    [contract.target]: {
+      ...(contract.capabilities[contract.target] ?? {}),
+      jsonAgg: true,
+      lateral: true,
+    },
+  });
+}
+
+/**
+ * Mirrors the shape produced by the contract emitter: capability flags
+ * nested under the family + target namespaces, with no top-level entries.
+ * Used to assert "single-query path is selected for an emitted-shape
+ * contract" — the regression scenario the principled namespaced lookup
+ * was introduced to handle.
+ */
+function withEmittedSqlCapabilities(contract: TestContract) {
+  return withCapabilities(contract, {
+    sql: { jsonAgg: true, returning: true },
+    postgres: { jsonAgg: true, lateral: true, returning: true },
+  });
 }
 
 function addConnection(
@@ -69,6 +87,36 @@ describe('collection-dispatch', () => {
     }).toArray();
 
     expect(rows).toEqual([{ id: 1, name: 'Alice', email: 'alice@example.com' }]);
+  });
+
+  it('dispatchCollectionRows() depth-1 include with emitted-shape capabilities fires a single SQL execution (regression guard for namespaced capability lookup)', async () => {
+    // Guards against regressing the fix that taught `selectIncludeStrategy`
+    // to read capability flags from the contract's `targetFamily` and
+    // `target` namespaces. Prior to that fix, every emitted contract fell
+    // back to multi-query for nested includes — silently, because
+    // functional correctness was unaffected. This test fails fast if the
+    // regression returns: an emitted-shape contract should resolve a
+    // depth-1 include in one SQL execution, not two.
+    const contract = withEmittedSqlCapabilities(getTestContract());
+    const { collection, runtime } = createCollectionFor('User', contract);
+    const scoped = collection.select('name').include('posts');
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', posts: '[{"id":10,"title":"Post A","user_id":1,"views":3}]' }],
+    ]);
+
+    const rows = await dispatchCollectionRows<Record<string, unknown>>({
+      contract,
+      runtime,
+      state: scoped.state,
+      tableName: scoped.tableName,
+      modelName: scoped.modelName,
+    }).toArray();
+
+    expect(rows).toEqual([
+      { name: 'Alice', posts: [{ id: 10, title: 'Post A', userId: 1, views: 3 }] },
+    ]);
+    // The point of the test: 1 execution, not N+1.
+    expect(runtime.executions).toHaveLength(1);
   });
 
   it('dispatchCollectionRows() single-query path returns empty rows and releases scope', async () => {
@@ -195,7 +243,10 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() multi-query path stitches includes, strips hidden fields, and releases scope', async () => {
-    const contract = getTestContract();
+    // Force multi-query strategy by clearing capabilities. Otherwise
+    // the base test contract's postgres.lateral / postgres.jsonAgg
+    // would route to single-query lateral.
+    const contract = withCapabilities(getTestContract(), {});
     const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.select('name').include('posts', (posts) => posts.select('title'));
 
@@ -237,13 +288,18 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() multi-query path handles empty parent result sets', async () => {
-    const { collection, runtime } = createCollectionFor('User');
+    // Force multi-query strategy so the empty-parent early return inside
+    // `dispatchWithMultiQueryIncludes` is actually exercised. The base
+    // contract's postgres.lateral / postgres.jsonAgg would otherwise
+    // route to single-query lateral.
+    const contract = withCapabilities(getTestContract(), {});
+    const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.include('posts');
 
     runtime.setNextResults([[]]);
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
-      contract: collection.ctx.context.contract,
+      contract,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
