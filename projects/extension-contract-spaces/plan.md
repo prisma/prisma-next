@@ -2,9 +2,13 @@
 
 ## Summary
 
-Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` units that the framework treats uniformly — so extensions become first-class schema contributors using the same planner, runner, verifier, and migration shape as application authoring. As part of the project, the in-tree extensions (cipherstash, pgvector, arktype-json) are migrated to contract spaces and the existing `databaseDependencies.init` mechanism is removed. The cipherstash blocker (TML-2373) is unblocked by M3.
+Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` units that the framework treats uniformly — so extensions become first-class schema contributors using the same planner, runner, verifier, and migration shape as application authoring. As part of the project, the in-tree workspace extension that uses `databaseDependencies.init` (pgvector — confirmed sole consumer by spike) is migrated to a contract space; cipherstash is authored fresh on the new mechanism. arktype-json is out of scope (spike confirmed it ships no `databaseDependencies` and needs no DB scaffolding). After both extensions ship, the `databaseDependencies` mechanism is removed. The cipherstash blocker (TML-2373) is unblocked by M3.
 
 **Spec:** `projects/extension-contract-spaces/spec.md`
+
+**Sub-specs:**
+- `specs/framework-mechanism.spec.md` — drives M1 + M2.
+- `specs/cipherstash-migration.spec.md` — drives M3.
 
 ## Collaborators
 
@@ -13,7 +17,7 @@ Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` un
 | Maker        | William Madden                       | Drives execution                                                  |
 | Reviewer     | _TBD (framework team)_               | Architectural review across planner / runner / verifier           |
 | Collaborator | Cipherstash project (TML-2373)       | Immediate consumer; needs the unblock                             |
-| Collaborator | pgvector / arktype-json maintainers  | Their extensions are migrated under (τ)                           |
+| Collaborator | pgvector maintainers                 | pgvector is migrated to a contract space under M4                 |
 
 (Confirm collaborators during refinement.)
 
@@ -27,14 +31,14 @@ Every milestone is safe to deploy immediately because the contract-space mechani
 
 The marker schema gains a `space` column with a one-shot framework-internal migration that promotes the existing single-row marker to `(space='app', …)` shape. The migration is idempotent; deployments mid-rollout see no semantic change. No feature flags are required.
 
-## Sub-spec recommendations
+## Sub-specs
 
-Two milestones warrant their own task specs because their implementation detail is large enough to crowd the project plan:
+Two milestones have task specs because their implementation detail is large enough to crowd the project plan:
 
-- `specs/framework-mechanism.spec.md` — captures the precise API shapes for the per-space planner / runner / verifier + extension descriptor's `contractSpace` field + layout convention + pinned per-space artefact emission rules (file paths, canonicalisation, drift detection). Drives M1 and M2.
-- `specs/cipherstash-migration.spec.md` — captures cipherstash's contract-space contents, baseline migration shape (how the vendored bundle SQL is referenced byte-for-byte), codec hook behaviour, the E2E test design against live Postgres + EQL, and the bump-cipherstash diff scenario (TC-25). Drives M3.
+- [`specs/framework-mechanism.spec.md`](./specs/framework-mechanism.spec.md) — locks down API shapes for the per-space planner / runner / verifier, the `contractSpace` extension-descriptor field, the marker schema migration SQL, the pinned per-space artefact layout + canonicalisation rules, the codec lifecycle hook, and the per-space `db init` / `db update` flows. Drives M1 and M2.
+- [`specs/cipherstash-migration.spec.md`](./specs/cipherstash-migration.spec.md) — locks down cipherstash's package layout, contract IR contents, baseline migration shape (with the EQL bundle byte-equivalence rule), codec hook behaviour, descriptor wiring, and four end-to-end test scenarios (initial, drop, bump, revert workaround). Drives M3.
 
-M4 (pgvector + arktype-json + monorepo example) and M5 (cleanup) are small enough to be captured inline in this plan; no task spec needed.
+M4 (pgvector + monorepo example) and M5 (`databaseDependencies` removal + close-out) are small enough to be captured inline in this plan; no task spec needed.
 
 ## Test Design
 
@@ -59,9 +63,7 @@ Test cases derived from each acceptance criterion in the spec. Tasks reference t
 | AC-10 | TC-15 | pgvector contract space declares `vector` type                                                                                  | Unit        | M4        | pgvector's `contract.json` declares `vector` type                                                      |
 | AC-10 | TC-16 | User adds pgvector + `vector(N)` column → `migrate` + `apply` succeeds; marker has 2 rows                                       | Integration | M4        | Marker has rows for `app` and `pgvector` with expected hashes                                          |
 | AC-10 | TC-17 | dbInit on resulting database succeeds in strict mode                                                                            | Integration | M4        | Strict-mode dbInit returns success                                                                     |
-| AC-11 | TC-18 | arktype-json extension migrated to a contract space                                                                             | Integration | M4        | arktype-json contract space loads + migrations apply (or no-op contract space if it ships nothing DB-side) |
-| AC-11 | TC-19 | `databaseDependencies` types/functions removed from framework                                                                    | Build       | M5        | Build fails if any reference remains; grep returns no consumer matches                                 |
-| AC-11 | TC-20 | No in-tree extension references `databaseDependencies.init`                                                                      | Lint/Build  | M5        | `pnpm lint:deps` passes; grep across `packages/3-extensions/` returns no matches                       |
+| AC-11 | TC-19 | `ComponentDatabaseDependencies` and `databaseDependencies` removed from framework + pgvector                                     | Build       | M5        | Build fails if any reference remains; rg returns no consumer matches                                   |
 | AC-12 | TC-21 | Fresh database with cipherstash → `db init` walks cipherstash graph + synthesizes app-space delta in single transaction         | Integration | M3        | Single transaction; marker rows for both spaces with expected hashes                                   |
 | AC-13 | TC-22 | User removes extension while marker row remains → `dbInit` fails with orphan-row error and remediation hint                     | Integration | M1        | Clear error identifying orphan row + recommended manual cleanup                                        |
 | NFR1  | TC-23 | `strictVerification: false` workaround removed from cipherstash-related test setups                                             | Build/Lint  | M3        | grep returns no matches in cipherstash tests / examples                                                |
@@ -73,9 +75,9 @@ Test cases derived from each acceptance criterion in the spec. Tasks reference t
 | AC-2  | TC-29 | After `migrate` with cipherstash declared, pinned `migrations/cipherstash/{contract.json,contract.d.ts,refs/head.json}` exist  | Integration | M3        | Files exist; byte-equivalent to descriptor's current values via canonicalization                       |
 | FR-17 | TC-30 | Bump descriptor's `contractJson` without running `migrate` → next `migrate` invocation surfaces drift warning before emitting   | Unit        | M1        | Drift detection emits a clear "extension bumped — run migrate to materialise" message                  |
 
-Decision/spike tasks (not in this table):
+Decision/spike tasks (resolved during plan finalisation):
 
-- T4.4 — investigate what `databaseDependencies` arktype-json ships and what shape its contract space takes. Unblocks TC-18.
+- ~~T4.4~~ — arktype-json scope spike. **Resolved**: arktype-json ships no `databaseDependencies` (jsonb is built-in); no contract space needed. Dropped from scope.
 
 ## Milestones
 
@@ -94,7 +96,7 @@ Introduce the framework's per-space planner/runner/verifier and the extension de
 - [ ] **T1.7** Migration package emission helper: serialize an in-memory `MigrationPackage` (manifest + ops + contract.json snapshot) to per-space subdirectory; canonicalized for byte-determinism. (satisfies: TC-3, TC-4)
 - [ ] **T1.8** Pinned per-space artefact emission: on every `migrate`, write (or overwrite) `migrations/<space-id>/contract.json`, `migrations/<space-id>/contract.d.ts`, `migrations/<space-id>/refs/head.json` from each loaded extension's descriptor `contractSpace` values. Canonicalised for byte-determinism. (satisfies: TC-25, TC-29)
 - [ ] **T1.9** Drift detection at `migrate` time: compare descriptor's current `contractJson` against the on-disk pinned version; if diverged but no new migrations are being emitted (e.g. user bumped a non-changing extension), surface a clear warning. (satisfies: TC-30)
-- [ ] **T1.10** Synthetic test extension exercising the contract-space path end-to-end (declares one type, one baseline migration, one head ref); used as scaffolding for later milestones' E2E tests. Includes a "deletable node_modules" test fixture that exercises TC-26.
+- [ ] **T1.10** Synthetic test extension at `packages/3-extensions/test-contract-space/` (private workspace package, mirrors pgvector's package shape — package.json, tsdown, vitest, src/exports/control.ts). Declares one composite type, one baseline migration, one head ref. Used as scaffolding for later milestones' E2E tests; exercises the same module-graph descriptor-import path a real extension would use. Includes a "deletable node_modules" test fixture that exercises TC-26.
 
 **Validation gate:**
 
@@ -151,19 +153,16 @@ A task spec at `specs/cipherstash-migration.spec.md` captures the implementation
 - `pnpm lint:deps`
 - `pnpm build`
 
-### Milestone 4: Migrate pgvector + arktype-json + monorepo example
+### Milestone 4: Migrate pgvector + monorepo example
 
-Migrate the remaining in-tree extensions to contract spaces. After this milestone, no in-tree extension uses `databaseDependencies.init`. A monorepo example demonstrates the same mechanism applies to internal-package contract owners.
+Migrate the only existing workspace consumer of `databaseDependencies` (pgvector) to a contract space. A monorepo example demonstrates the same mechanism applies to internal-package contract owners. arktype-json was investigated during plan finalisation and confirmed out of scope (no `databaseDependencies`, jsonb built-in, no contract space needed).
 
 **Tasks:**
 
 - [ ] **T4.1** Author pgvector's contract space contents: `vector` type (parameterized native type) declared in `contract.json`. Author baseline migration: `installVectorExtension` op carrying `CREATE EXTENSION IF NOT EXISTS vector` DDL + postcondition check; carries `pgvector:install-vector-v1` invariantId. (satisfies: TC-15)
-- [ ] **T4.2** Wire pgvector descriptor's `contractSpace`; remove `databaseDependencies.init`. (satisfies: TC-15, TC-16, TC-17)
+- [ ] **T4.2** Wire pgvector descriptor's `contractSpace`; remove `databaseDependencies` from `packages/3-extensions/pgvector/src/exports/control.ts`. (satisfies: TC-15, TC-16, TC-17)
 - [ ] **T4.3** End-to-end integration test for pgvector: user schema with `vector(N)` column → migrate → apply → query. Assert pinned `migrations/pgvector/{contract.json,contract.d.ts,refs/head.json}` are written with byte-equivalent content. (satisfies: TC-16, TC-17)
-- [ ] **T4.4** Spike: investigate what arktype-json's `databaseDependencies` ships today and what its contract space contents should be. Surface findings + recommend layout. Possible outcomes: (a) it ships database-side dependencies that need a contract space; (b) it's type-only and a no-op contract space (empty contract.json + no migrations) suffices; (c) something else. (unblocks: T4.5, TC-18)
-- [ ] **T4.5** Author arktype-json's contract space + baseline migration per T4.4 outcome; wire descriptor; remove `databaseDependencies.init`. (satisfies: TC-18)
-- [ ] **T4.6** End-to-end integration test for arktype-json. (satisfies: TC-18)
-- [ ] **T4.7** Monorepo example: two internal packages each declare a contract space + an aggregator package depending on both. Build, emit per-space migrations, apply. (satisfies: TC-8)
+- [ ] **T4.4** Monorepo example: two internal packages each declare a contract space + an aggregator package depending on both. Build, emit per-space migrations, apply. (satisfies: TC-8)
 
 **Validation gate:**
 
@@ -176,19 +175,19 @@ Migrate the remaining in-tree extensions to contract spaces. After this mileston
 
 ### Milestone 5: Remove `databaseDependencies` mechanism + close-out
 
-Remove the `databaseDependencies.init` mechanism from the framework. All in-tree extensions are already migrated; the field is unused. Migrate finalized ADRs into `docs/`, strip transient project references, delete `projects/extension-contract-spaces/`.
+Remove the `databaseDependencies` mechanism from the framework. After M3 + M4 land, the only remaining consumer is gone (pgvector was the sole workspace consumer; cipherstash never used it). The blast radius is small — confirmed by spike: 3 files (the type def, the re-export, and pgvector's now-removed usage). Migrate finalised ADRs into `docs/`, strip transient project references, delete `projects/extension-contract-spaces/`.
 
 **Tasks:**
 
-- [ ] **T5.1** Remove `ComponentDatabaseDependencies`, `ComponentDatabaseDependency`, `DatabaseDependencyProvider`, `collectInitDependencies`, `isDatabaseDependencyProvider`, `verifyDatabaseDependencies` from the SQL family. Remove `databaseDependencies?` field from extension descriptor types. (satisfies: TC-19)
-- [ ] **T5.2** Remove all references in test code, examples, and downstream packages. Audit via `rg 'databaseDependencies' packages/ test/ examples/`. (satisfies: TC-19, TC-20)
-- [ ] **T5.3** New ADR — Contract spaces. Captures the design (per-space planner / runner / verifier, descriptor model, layout convention, marker schema change, db init/update semantics).
+- [ ] **T5.1** Remove `ComponentDatabaseDependencies` and `ComponentDatabaseDependency` types from `packages/2-sql/9-family/src/core/migrations/types.ts`. Remove the re-export from `packages/2-sql/9-family/src/exports/control.ts`. Remove the `databaseDependencies?` field from `SqlControlExtensionDescriptor`. Remove any planner / runner / verifier code paths that consume `databaseDependencies`. (satisfies: TC-19)
+- [ ] **T5.2** Audit: `rg 'ComponentDatabaseDependencies|ComponentDatabaseDependency|databaseDependencies' packages/ examples/` returns zero matches. (satisfies: TC-19)
+- [ ] **T5.3** New ADR — Contract spaces. Captures the design (per-space planner / runner / verifier, descriptor model, layout convention, pinned per-space artefacts, marker schema change, db init/update semantics).
 - [ ] **T5.4** New ADR — Codec lifecycle hooks. Captures the hook contract (synchronous, app-space-bound, IR scope, altered semantics).
-- [ ] **T5.5** Update ADR 154 — record partial supersession; mark `databaseDependencies` removed.
+- [ ] **T5.5** Update ADR 154 — record supersession; mark `databaseDependencies` removed.
 - [ ] **T5.6** Update ADR 021 — record marker schema gain of `space` column; PK change.
-- [ ] **T5.7** Update subsystem docs: Migration System (per-space planner/runner/verifier; ADR 208 use in db init/update), Ecosystem Extensions & Packs (descriptor model; contract space authoring guide).
+- [ ] **T5.7** Update subsystem docs: Migration System (per-space planner/runner/verifier; ADR 208 use in db init/update; pinned per-space artefact layout), Ecosystem Extensions & Packs (descriptor model; contract space authoring guide).
 - [ ] **T5.8** NFR5 perf benchmark: emit + dbInit with 0 vs 1 extensions; assert < 5% delta. Capture results in `docs/`. (satisfies: TC-24)
-- [ ] **T5.9** Close-out: migrate finalized ADRs into `docs/architecture docs/adrs/`. Strip references to `projects/extension-contract-spaces/` across the repo (replace with canonical `docs/` links). Delete `projects/extension-contract-spaces/`. PR title or branch references TML-2397 so Linear's GitHub integration auto-completes the issue on merge.
+- [ ] **T5.9** Close-out: migrate finalised ADRs into `docs/architecture docs/adrs/`. Strip references to `projects/extension-contract-spaces/` across the repo (replace with canonical `docs/` links). Delete `projects/extension-contract-spaces/`. PR title or branch references TML-2397 so Linear's GitHub integration auto-completes the issue on merge.
 
 **Validation gate:**
 
@@ -196,18 +195,23 @@ Remove the `databaseDependencies.init` mechanism from the framework. All in-tree
 - `pnpm test:all` (workspace-wide because we delete public API surfaces)
 - `pnpm lint:deps`
 - `pnpm build`
-- `rg 'databaseDependencies' packages/ test/ examples/` returns no matches
+- `rg 'ComponentDatabaseDependencies|ComponentDatabaseDependency|databaseDependencies' packages/ examples/` returns no matches
 
 ## Open Items
 
 Carrying forward from `spec.md` § Open Questions:
 
-1. **`invariantId` namespacing convention.** Recommended default: prefix convention (`cipherstash:install-eql-v1`, `app:create-table-User-v1`, `cipherstash-codec:User.email@v1`). Alternative: structured records. Decide during M1 / M3 implementation.
+1. **`invariantId` namespacing convention.** Recommended default: prefix convention (`cipherstash:install-eql-v1`, `app:create-table-User-v1`, `cipherstash-codec:User.email@v1`). Alternative: structured records. Decide during M1 / M3 implementation; captured in `specs/framework-mechanism.spec.md` for M1 and `specs/cipherstash-migration.spec.md` for M3.
 2. **Cipherstash project (TML-2373) integration path.** Whether the in-flight cipherstash project pivots to consume this mechanism, continues with its current band-aid until this lands, or pauses. Decision deferred to a separate conversation; not a plan-level question.
 
 Plan-derived items needing resolution during execution:
 
-3. **arktype-json's contract space shape.** T4.4 spike answers this; surface findings before T4.5.
-4. **Synthetic test extension package location.** T1.8 introduces a test-only extension; decide whether it lives under `packages/3-extensions/` or under a test-fixtures dir during M1.
-5. **Marker schema migration safety.** T1.1 changes the marker table's primary key from `id` to `space`. This is a one-shot framework-internal migration; needs careful handling for deployments that may have multiple running processes. Verify via shadow-DB preflight (per ADR 029).
-6. **Reviewer assignment.** No specific reviewer named yet; resolve before M1 starts.
+3. **Marker schema migration safety.** T1.1 changes the marker table's primary key from `id` to `space`. This is a one-shot framework-internal migration; needs careful handling for deployments that may have multiple running processes. Verify via shadow-DB preflight (per ADR 029).
+4. **Reviewer assignment.** No specific reviewer named yet; resolve before M1 starts.
+
+Resolved during plan finalisation:
+
+- ~~**arktype-json's contract space shape.**~~ Spike (T4.4) confirmed: arktype-json ships no `databaseDependencies` and needs no DB scaffolding (jsonb is built-in). Dropped from scope.
+- ~~**Synthetic test extension package location.**~~ Locked: `packages/3-extensions/test-contract-space/` as a private workspace package (mirrors pgvector's shape; exercises real descriptor-import path).
+- ~~**Linear project elevation.**~~ Decision: keep TML-2397 as a single tracking issue (no Linear project / per-deliverable issues).
+- ~~**Sub-spec timing.**~~ Decision: drafted now (alongside this plan). See `specs/framework-mechanism.spec.md` and `specs/cipherstash-migration.spec.md`.
