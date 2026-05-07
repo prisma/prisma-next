@@ -1,20 +1,41 @@
+import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
+import {
+  sqlCharDescriptorClass,
+  sqlVarcharDescriptorClass,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { codecDescriptorDefinitions } from '../src/core/codecs';
+import { pgCharDescriptor, pgVarcharDescriptor } from '../src/core/codecs';
+import {
+  pgBitDescriptorClass,
+  pgBoolDescriptorClass,
+  pgEnumDescriptorClass,
+  pgInt4DescriptorClass,
+  pgIntervalDescriptorClass,
+  pgJsonbDescriptorClass,
+  pgJsonDescriptorClass,
+  pgNumericDescriptorClass,
+  pgTextDescriptorClass,
+  pgTimeDescriptorClass,
+  pgTimestampDescriptorClass,
+  pgTimestamptzDescriptorClass,
+  pgTimetzDescriptorClass,
+  pgVarbitDescriptorClass,
+} from '../src/core/codecs-class';
 
 // `renderOutputType` is a `CodecDescriptor`-side concern after the SQL
 // `Codec` narrow (TML-2357 M2 Phase B). Tests read the renderer from
-// the descriptor list keyed by scalar.
+// the class-form descriptor directly.
 function rendererFor(
-  scalar: keyof typeof codecDescriptorDefinitions,
+  descriptor: AnyCodecDescriptor,
 ): ((typeParams: Record<string, unknown>) => string | undefined) | undefined {
-  return codecDescriptorDefinitions[scalar].descriptor.renderOutputType as
+  return descriptor.renderOutputType as
     | ((typeParams: Record<string, unknown>) => string | undefined)
     | undefined;
 }
 
 describe('codec renderOutputType', () => {
   describe('pg/char@1', () => {
-    const renderer = rendererFor('character');
+    const renderer = rendererFor(pgCharDescriptor);
 
     it('renders Char<length> when length is present', () => {
       expect(renderer?.({ length: 36 })).toBe('Char<36>');
@@ -30,7 +51,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/varchar@1', () => {
-    const renderer = rendererFor('character varying');
+    const renderer = rendererFor(pgVarcharDescriptor);
 
     it('renders Varchar<length>', () => {
       expect(renderer?.({ length: 255 })).toBe('Varchar<255>');
@@ -46,7 +67,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('sql/char@1', () => {
-    const renderer = rendererFor('char');
+    const renderer = rendererFor(sqlCharDescriptorClass);
 
     it('renders Char<length>', () => {
       expect(renderer?.({ length: 36 })).toBe('Char<36>');
@@ -54,7 +75,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('sql/varchar@1', () => {
-    const renderer = rendererFor('varchar');
+    const renderer = rendererFor(sqlVarcharDescriptorClass);
 
     it('renders Varchar<length>', () => {
       expect(renderer?.({ length: 100 })).toBe('Varchar<100>');
@@ -62,7 +83,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/numeric@1', () => {
-    const renderer = rendererFor('numeric');
+    const renderer = rendererFor(pgNumericDescriptorClass);
 
     it('renders Numeric<P, S> when both precision and scale are present', () => {
       expect(renderer?.({ precision: 10, scale: 2 })).toBe('Numeric<10, 2>');
@@ -78,7 +99,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/bit@1', () => {
-    const renderer = rendererFor('bit');
+    const renderer = rendererFor(pgBitDescriptorClass);
 
     it('renders Bit<length>', () => {
       expect(renderer?.({ length: 8 })).toBe('Bit<8>');
@@ -90,7 +111,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/varbit@1', () => {
-    const renderer = rendererFor('bit varying');
+    const renderer = rendererFor(pgVarbitDescriptorClass);
 
     it('renders VarBit<length>', () => {
       expect(renderer?.({ length: 16 })).toBe('VarBit<16>');
@@ -98,7 +119,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/timestamp@1', () => {
-    const renderer = rendererFor('timestamp');
+    const renderer = rendererFor(pgTimestampDescriptorClass);
 
     it('renders Timestamp<P> when precision is present', () => {
       expect(renderer?.({ precision: 3 })).toBe('Timestamp<3>');
@@ -110,7 +131,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/timestamptz@1', () => {
-    const renderer = rendererFor('timestamptz');
+    const renderer = rendererFor(pgTimestamptzDescriptorClass);
 
     it('renders Timestamptz<P>', () => {
       expect(renderer?.({ precision: 6 })).toBe('Timestamptz<6>');
@@ -122,7 +143,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/time@1', () => {
-    const renderer = rendererFor('time');
+    const renderer = rendererFor(pgTimeDescriptorClass);
 
     it('renders Time<P>', () => {
       expect(renderer?.({ precision: 0 })).toBe('Time<0>');
@@ -130,7 +151,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/timetz@1', () => {
-    const renderer = rendererFor('timetz');
+    const renderer = rendererFor(pgTimetzDescriptorClass);
 
     it('renders Timetz<P>', () => {
       expect(renderer?.({ precision: 3 })).toBe('Timetz<3>');
@@ -138,7 +159,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/interval@1', () => {
-    const renderer = rendererFor('interval');
+    const renderer = rendererFor(pgIntervalDescriptorClass);
 
     it('renders Interval<P>', () => {
       expect(renderer?.({ precision: 3 })).toBe('Interval<3>');
@@ -146,7 +167,7 @@ describe('codec renderOutputType', () => {
   });
 
   describe('pg/enum@1', () => {
-    const renderer = rendererFor('enum');
+    const renderer = rendererFor(pgEnumDescriptorClass);
 
     it('renders literal union from values', () => {
       expect(renderer?.({ values: ['USER', 'ADMIN'] })).toBe("'USER' | 'ADMIN'");
@@ -169,27 +190,27 @@ describe('codec renderOutputType', () => {
   // the generic CodecTypes accessor.
   describe('pg/jsonb@1', () => {
     it('has no renderOutputType (raw JSONB)', () => {
-      expect(rendererFor('jsonb')).toBeUndefined();
+      expect(rendererFor(pgJsonbDescriptorClass)).toBeUndefined();
     });
   });
 
   describe('pg/json@1', () => {
     it('has no renderOutputType (raw JSON)', () => {
-      expect(rendererFor('json')).toBeUndefined();
+      expect(rendererFor(pgJsonDescriptorClass)).toBeUndefined();
     });
   });
 
   describe('non-parameterized codecs', () => {
     it('pg/int4@1 has no renderOutputType', () => {
-      expect(rendererFor('int4')).toBeUndefined();
+      expect(rendererFor(pgInt4DescriptorClass)).toBeUndefined();
     });
 
     it('pg/text@1 has no renderOutputType', () => {
-      expect(rendererFor('text')).toBeUndefined();
+      expect(rendererFor(pgTextDescriptorClass)).toBeUndefined();
     });
 
     it('pg/bool@1 has no renderOutputType', () => {
-      expect(rendererFor('bool')).toBeUndefined();
+      expect(rendererFor(pgBoolDescriptorClass)).toBeUndefined();
     });
   });
 });

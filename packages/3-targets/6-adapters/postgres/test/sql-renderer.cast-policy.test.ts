@@ -5,7 +5,6 @@ import { validateContract } from '@prisma-next/sql-contract/validate';
 import {
   BinaryExpr,
   ColumnRef,
-  mkCodec,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -16,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { renderLoweredSql } from '../src/core/sql-renderer';
 import type { PostgresContract } from '../src/core/types';
 import { createComposedPostgresAdapter } from './helpers/composed-adapter';
+import { defineTestCodec } from './test-codec';
 
 const emptyLookup: CodecLookup = {
   get: () => undefined,
@@ -90,7 +90,7 @@ function selectWithParam(column: string, codecId: string | undefined, value: unk
 
 describe('renderLoweredSql cast policy', () => {
   it('emits $N::<nativeType> when the codec nativeType is outside the inferrable set', () => {
-    const fooCodec: Codec = mkCodec({
+    const fooCodec: Codec = defineTestCodec({
       typeId: 'app/test-foo@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -112,7 +112,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec nativeType is inferrable', () => {
-    const integerCodec: Codec = mkCodec({
+    const integerCodec: Codec = defineTestCodec({
       typeId: 'pg/int4@1',
       encode: (value: number): number => value,
       decode: (wire: number): number => wire,
@@ -134,7 +134,7 @@ describe('renderLoweredSql cast policy', () => {
   });
 
   it('emits plain $N when the codec carries no nativeType metadata', () => {
-    const enumCodec: Codec = mkCodec({
+    const enumCodec: Codec = defineTestCodec({
       typeId: 'pg/enum@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,
@@ -195,7 +195,7 @@ describe('renderLoweredSql cast policy', () => {
 
 describe('renderLoweredSql cast policy via stack-derived lookup', () => {
   it('emits the extension-codec cast when the codec is contributed via stack.extensionPacks', () => {
-    const geographyCodec: Codec = mkCodec({
+    const geographyCodec: Codec = defineTestCodec({
       typeId: 'app/geography@1',
       encode: (value: string): string => value,
       decode: (wire: string): string => wire,

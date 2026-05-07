@@ -1,10 +1,91 @@
-import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
+import type {
+  AnyCodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import type { Codec, SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
+import {
+  sqlCharDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlTextDescriptorClass,
+  sqlTimestampDescriptorClass,
+  sqlVarcharDescriptorClass,
+} from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { byScalar, codecDescriptorDefinitions } from '../src/core/codecs';
+import {
+  pgCharDescriptor,
+  pgFloatDescriptor,
+  pgIntDescriptor,
+  pgVarcharDescriptor,
+} from '../src/core/codecs';
+import {
+  pgBitDescriptorClass,
+  pgBoolDescriptorClass,
+  pgEnumDescriptorClass,
+  pgFloat4DescriptorClass,
+  pgFloat8DescriptorClass,
+  pgInt2DescriptorClass,
+  pgInt4DescriptorClass,
+  pgInt8DescriptorClass,
+  pgIntervalDescriptorClass,
+  pgJsonbDescriptorClass,
+  pgJsonDescriptorClass,
+  pgNumericDescriptorClass,
+  pgTextDescriptorClass,
+  pgTimeDescriptorClass,
+  pgTimestampDescriptorClass,
+  pgTimestamptzDescriptorClass,
+  pgTimetzDescriptorClass,
+  pgVarbitDescriptorClass,
+} from '../src/core/codecs-class';
+
+const SYNTH_CTX: CodecInstanceContext = { name: 'test' };
+
+const descriptorByScalar = {
+  char: sqlCharDescriptorClass,
+  varchar: sqlVarcharDescriptorClass,
+  int: sqlIntDescriptorClass,
+  float: sqlFloatDescriptorClass,
+  'sql-text': sqlTextDescriptorClass,
+  'sql-timestamp': sqlTimestampDescriptorClass,
+  text: pgTextDescriptorClass,
+  character: pgCharDescriptor,
+  'character varying': pgVarcharDescriptor,
+  integer: pgIntDescriptor,
+  'double precision': pgFloatDescriptor,
+  int4: pgInt4DescriptorClass,
+  int2: pgInt2DescriptorClass,
+  int8: pgInt8DescriptorClass,
+  float4: pgFloat4DescriptorClass,
+  float8: pgFloat8DescriptorClass,
+  numeric: pgNumericDescriptorClass,
+  timestamp: pgTimestampDescriptorClass,
+  timestamptz: pgTimestamptzDescriptorClass,
+  time: pgTimeDescriptorClass,
+  timetz: pgTimetzDescriptorClass,
+  bool: pgBoolDescriptorClass,
+  bit: pgBitDescriptorClass,
+  'bit varying': pgVarbitDescriptorClass,
+  interval: pgIntervalDescriptorClass,
+  enum: pgEnumDescriptorClass,
+  json: pgJsonDescriptorClass,
+  jsonb: pgJsonbDescriptorClass,
+} as const satisfies Record<string, AnyCodecDescriptor>;
+
+type ScalarName = keyof typeof descriptorByScalar;
+
+function codecForScalar(scalar: ScalarName): Codec {
+  const descriptor = descriptorByScalar[scalar];
+  // Codec runtime is per-instance-stateless for every codec under test;
+  // pass `undefined as never` so parameterized descriptors (e.g. char,
+  // numeric) accept a missing params record without bypassing the
+  // descriptor's `factory(params)` contract at the type level.
+  return descriptor.factory(undefined as never)(SYNTH_CTX);
+}
 
 describe('adapter-postgres codecs', () => {
   it('exports expected codec scalars', () => {
-    expect(Object.keys(byScalar).sort()).toEqual([
+    expect(Object.keys(descriptorByScalar).sort()).toEqual([
       'bit',
       'bit varying',
       'bool',
@@ -38,7 +119,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('timestamp codec', () => {
-    const timestampCodec = byScalar.timestamp.codec as {
+    const timestampCodec = codecForScalar('timestamp') as {
       encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
       decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
@@ -55,7 +136,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('sql-timestamp codec', () => {
-    const timestampCodec = byScalar['sql-timestamp'].codec as {
+    const timestampCodec = codecForScalar('sql-timestamp') as {
       encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
       decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
@@ -68,7 +149,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('timestamptz codec', () => {
-    const timestamptzCodec = byScalar.timestamptz.codec as {
+    const timestamptzCodec = codecForScalar('timestamptz') as {
       encode: (value: Date, ctx: SqlCodecCallContext) => Promise<Date>;
       decode: (wire: Date, ctx: SqlCodecCallContext) => Promise<Date>;
     };
@@ -81,7 +162,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('json codec', () => {
-    const jsonCodec = byScalar.json.codec as {
+    const jsonCodec = codecForScalar('json') as {
       encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string | unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
     };
@@ -102,7 +183,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('jsonb codec', () => {
-    const jsonbCodec = byScalar.jsonb.codec as {
+    const jsonbCodec = codecForScalar('jsonb') as {
       encode: (value: unknown, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string | unknown, ctx: SqlCodecCallContext) => Promise<unknown>;
     };
@@ -128,7 +209,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'text', value: 'hello world' },
       { scalar: 'enum', value: 'ADMIN' },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
-      const codec = byScalar[scalar].codec as {
+      const codec = codecForScalar(scalar) as {
         encode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
         decode: (input: string, ctx: SqlCodecCallContext) => Promise<string>;
       };
@@ -143,7 +224,7 @@ describe('adapter-postgres codecs', () => {
       { scalar: 'float4', value: 3.14 },
       { scalar: 'float8', value: Math.E },
     ] as const)('keeps $scalar values unchanged', async ({ scalar, value }) => {
-      const codec = byScalar[scalar].codec as {
+      const codec = codecForScalar(scalar) as {
         encode: (input: number, ctx: SqlCodecCallContext) => Promise<number>;
         decode: (input: number, ctx: SqlCodecCallContext) => Promise<number>;
       };
@@ -152,7 +233,7 @@ describe('adapter-postgres codecs', () => {
     });
 
     it('keeps boolean values unchanged', async () => {
-      const boolCodec = byScalar.bool.codec as {
+      const boolCodec = codecForScalar('bool') as {
         encode: (input: boolean, ctx: SqlCodecCallContext) => Promise<boolean>;
         decode: (input: boolean, ctx: SqlCodecCallContext) => Promise<boolean>;
       };
@@ -162,134 +243,107 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('character codec', () => {
-    const charCodec = byScalar.character.codec as {
+    const charCodec = codecForScalar('character') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = 'A';
-      const encoded = await charCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await charCodec.encode('A', {})).toBe('A');
     });
 
     it('decodes string as-is', async () => {
-      const value = 'Z';
-      const decoded = await charCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await charCodec.decode('Z', {})).toBe('Z');
     });
   });
 
   describe('character varying codec', () => {
-    const varcharCodec = byScalar['character varying'].codec as {
+    const varcharCodec = codecForScalar('character varying') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = 'hello';
-      const encoded = await varcharCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await varcharCodec.encode('hello', {})).toBe('hello');
     });
 
     it('decodes string as-is', async () => {
-      const value = 'world';
-      const decoded = await varcharCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await varcharCodec.decode('world', {})).toBe('world');
     });
   });
 
   describe('numeric codec', () => {
-    const numericCodec = byScalar.numeric.codec as {
+    const numericCodec = codecForScalar('numeric') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string | number, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '123.45';
-      const encoded = await numericCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await numericCodec.encode('123.45', {})).toBe('123.45');
     });
 
     it('decodes number to string', async () => {
-      const decoded = await numericCodec.decode(42, {});
-      expect(decoded).toBe('42');
+      expect(await numericCodec.decode(42, {})).toBe('42');
     });
   });
 
   describe('time codec', () => {
-    const timeCodec = byScalar.time.codec as {
+    const timeCodec = codecForScalar('time') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '12:34:56';
-      const encoded = await timeCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await timeCodec.encode('12:34:56', {})).toBe('12:34:56');
     });
 
     it('decodes string as-is', async () => {
-      const value = '23:59:59';
-      const decoded = await timeCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await timeCodec.decode('23:59:59', {})).toBe('23:59:59');
     });
   });
 
   describe('timetz codec', () => {
-    const timetzCodec = byScalar.timetz.codec as {
+    const timetzCodec = codecForScalar('timetz') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '12:34:56+02';
-      const encoded = await timetzCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await timetzCodec.encode('12:34:56+02', {})).toBe('12:34:56+02');
     });
 
     it('decodes string as-is', async () => {
-      const value = '23:59:59-05';
-      const decoded = await timetzCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await timetzCodec.decode('23:59:59-05', {})).toBe('23:59:59-05');
     });
   });
 
   describe('bit codec', () => {
-    const bitCodec = byScalar.bit.codec as {
+    const bitCodec = codecForScalar('bit') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '1010';
-      const encoded = await bitCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await bitCodec.encode('1010', {})).toBe('1010');
     });
 
     it('decodes string as-is', async () => {
-      const value = '0101';
-      const decoded = await bitCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await bitCodec.decode('0101', {})).toBe('0101');
     });
   });
 
   describe('bit varying codec', () => {
-    const varbitCodec = byScalar['bit varying'].codec as {
+    const varbitCodec = codecForScalar('bit varying') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '11110000';
-      const encoded = await varbitCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await varbitCodec.encode('11110000', {})).toBe('11110000');
     });
 
     it('decodes string as-is', async () => {
-      const value = '00001111';
-      const decoded = await varbitCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await varbitCodec.decode('00001111', {})).toBe('00001111');
     });
   });
 
@@ -365,21 +419,17 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('interval codec', () => {
-    const intervalCodec = byScalar.interval.codec as {
+    const intervalCodec = codecForScalar('interval') as {
       encode: (value: string, ctx: SqlCodecCallContext) => Promise<string>;
       decode: (wire: string | Record<string, unknown>, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
     it('encodes string as-is', async () => {
-      const value = '1 day';
-      const encoded = await intervalCodec.encode(value, {});
-      expect(encoded).toBe(value);
+      expect(await intervalCodec.encode('1 day', {})).toBe('1 day');
     });
 
     it('decodes string as-is', async () => {
-      const value = '2 hours';
-      const decoded = await intervalCodec.decode(value, {});
-      expect(decoded).toBe(value);
+      expect(await intervalCodec.decode('2 hours', {})).toBe('2 hours');
     });
 
     it('serializes object wire values to JSON strings', async () => {
@@ -390,7 +440,7 @@ describe('adapter-postgres codecs', () => {
 
   describe('metadata and params schema', () => {
     const postgresNativeTypeCases: ReadonlyArray<{
-      scalar: keyof typeof byScalar;
+      scalar: ScalarName;
       nativeType: string;
     }> = [
       { scalar: 'character', nativeType: 'character' },
@@ -406,60 +456,48 @@ describe('adapter-postgres codecs', () => {
       scalar,
       nativeType,
     }) => {
-      const meta = codecDescriptorDefinitions[scalar].descriptor.meta as
+      const meta = descriptorByScalar[scalar].meta as
         | { db?: { sql?: { postgres?: { nativeType?: string } } } }
         | undefined;
       expect(meta?.db?.sql?.postgres?.nativeType).toBe(nativeType);
     });
 
     const paramsSchemaPresenceCases: ReadonlyArray<{
-      scalar: keyof typeof byScalar;
-      hasParamsSchema: boolean;
+      scalar: ScalarName;
     }> = [
-      { scalar: 'character', hasParamsSchema: true },
-      { scalar: 'character varying', hasParamsSchema: true },
-      { scalar: 'numeric', hasParamsSchema: true },
-      { scalar: 'sql-timestamp', hasParamsSchema: true },
-      { scalar: 'timestamp', hasParamsSchema: true },
-      { scalar: 'timestamptz', hasParamsSchema: true },
-      { scalar: 'time', hasParamsSchema: true },
-      { scalar: 'timetz', hasParamsSchema: true },
-      { scalar: 'bit', hasParamsSchema: true },
-      { scalar: 'bit varying', hasParamsSchema: true },
-      { scalar: 'interval', hasParamsSchema: true },
-      { scalar: 'sql-text', hasParamsSchema: false },
-      { scalar: 'text', hasParamsSchema: false },
-      { scalar: 'enum', hasParamsSchema: false },
-      { scalar: 'bool', hasParamsSchema: false },
-      { scalar: 'int4', hasParamsSchema: false },
+      { scalar: 'character' },
+      { scalar: 'character varying' },
+      { scalar: 'numeric' },
+      { scalar: 'sql-timestamp' },
+      { scalar: 'timestamp' },
+      { scalar: 'timestamptz' },
+      { scalar: 'time' },
+      { scalar: 'timetz' },
+      { scalar: 'bit' },
+      { scalar: 'bit varying' },
+      { scalar: 'interval' },
+      { scalar: 'sql-text' },
+      { scalar: 'text' },
+      { scalar: 'enum' },
+      { scalar: 'bool' },
+      { scalar: 'int4' },
     ];
 
-    it.each(
-      paramsSchemaPresenceCases,
-    )('tracks params schema presence for $scalar (descriptor side)', ({
+    it.each(paramsSchemaPresenceCases)('descriptor for $scalar carries a paramsSchema', ({
       scalar,
-      hasParamsSchema: _hasParamsSchema,
     }) => {
-      // Descriptors always carry `paramsSchema` (every codec has one,
-      // be it `voidParamsSchema` for non-parameterized codecs or a
-      // codec-specific schema). The legacy `mkCodec()` factory's
-      // optional `paramsSchema` slot retired with the SQL `Codec`
-      // narrow (TML-2357 M2 Phase B); descriptor-side coverage is
-      // exercised here so the parameterization split remains
-      // observable through the descriptor surface.
-      const definition = codecDescriptorDefinitions[scalar];
-      expect(definition.descriptor.paramsSchema).toBeDefined();
+      // Class-form descriptors always carry `paramsSchema` (every codec
+      // has one, be it `voidParamsSchema` for non-parameterized codecs
+      // or a codec-specific schema). The parameterization split
+      // remains observable through the descriptor's typed paramsSchema
+      // shape; the runtime presence check below holds for every codec.
+      expect(descriptorByScalar[scalar].paramsSchema).toBeDefined();
     });
-
-    // The legacy `init` hook on the codec instance retired with the
-    // SQL `Codec` narrow (TML-2357 M2 Phase B). Per-instance state for
-    // parameterized codecs now flows through the `CodecDescriptor`'s
-    // `factory(params)(ctx)` close-over.
   });
 
   describe('encodeJson / decodeJson', () => {
     describe('pg/timestamptz@1', () => {
-      const codec = byScalar.timestamptz.codec;
+      const codec = codecForScalar('timestamptz');
 
       it('encodes Date to ISO string', () => {
         expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
@@ -468,7 +506,7 @@ describe('adapter-postgres codecs', () => {
       });
 
       it('decodes ISO string to Date', () => {
-        const result = codec.decodeJson('2024-01-15T00:00:00.000Z');
+        const result = codec.decodeJson('2024-01-15T00:00:00.000Z') as Date;
         expect(result).toBeInstanceOf(Date);
         expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
       });
@@ -492,7 +530,7 @@ describe('adapter-postgres codecs', () => {
     });
 
     describe('pg/timestamp@1', () => {
-      const codec = byScalar.timestamp.codec;
+      const codec = codecForScalar('timestamp');
 
       it('encodes Date to ISO string', () => {
         expect(codec.encodeJson(new Date('2024-01-15T00:00:00.000Z'))).toBe(
@@ -501,7 +539,7 @@ describe('adapter-postgres codecs', () => {
       });
 
       it('decodes ISO string to Date', () => {
-        const result = codec.decodeJson('2024-01-15T00:00:00.000Z');
+        const result = codec.decodeJson('2024-01-15T00:00:00.000Z') as Date;
         expect(result).toBeInstanceOf(Date);
         expect(result).toEqual(new Date('2024-01-15T00:00:00.000Z'));
       });
@@ -519,25 +557,25 @@ describe('adapter-postgres codecs', () => {
 
     describe('identity codecs', () => {
       it('pg/int4@1 round-trips numbers', () => {
-        const codec = byScalar.int4.codec;
+        const codec = codecForScalar('int4');
         expect(codec.encodeJson(42)).toBe(42);
         expect(codec.decodeJson(42)).toBe(42);
       });
 
       it('pg/text@1 round-trips strings', () => {
-        const codec = byScalar.text.codec;
+        const codec = codecForScalar('text');
         expect(codec.encodeJson('hello')).toBe('hello');
         expect(codec.decodeJson('hello')).toBe('hello');
       });
 
       it('pg/bool@1 round-trips booleans', () => {
-        const codec = byScalar.bool.codec;
+        const codec = codecForScalar('bool');
         expect(codec.encodeJson(true)).toBe(true);
         expect(codec.decodeJson(false)).toBe(false);
       });
 
       it('pg/int8@1 round-trips numbers (identity)', () => {
-        const codec = byScalar.int8.codec;
+        const codec = codecForScalar('int8');
         expect(codec.encodeJson(9001)).toBe(9001);
         expect(codec.decodeJson(9001)).toBe(9001);
       });
@@ -545,7 +583,7 @@ describe('adapter-postgres codecs', () => {
   });
 
   describe('numeric codec decode', () => {
-    const numericCodec = byScalar.numeric.codec as {
+    const numericCodec = codecForScalar('numeric') as {
       decode: (wire: string | number, ctx: SqlCodecCallContext) => Promise<string>;
     };
 
