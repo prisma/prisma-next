@@ -36,6 +36,7 @@ function createContext(): SqlMiddlewareContext & {
       error: vi.fn(),
       debug,
     },
+    contentHash: async () => 'mock-hash',
   };
 }
 
