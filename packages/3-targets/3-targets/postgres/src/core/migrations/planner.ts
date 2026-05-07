@@ -2,9 +2,14 @@ import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationOperationPolicy,
   SqlMigrationPlannerPlanOptions,
+  SqlMigrationPlanOperation,
   SqlPlannerFailureResult,
 } from '@prisma-next/family-sql/control';
-import { extractCodecControlHooks, plannerFailure } from '@prisma-next/family-sql/control';
+import {
+  extractCodecControlHooks,
+  planFieldEventOperations,
+  plannerFailure,
+} from '@prisma-next/family-sql/control';
 import { verifySqlSchema } from '@prisma-next/family-sql/schema-verify';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
@@ -16,8 +21,10 @@ import type {
 import { parsePostgresDefault } from '../default-normalizer';
 import { normalizeSchemaNativeType } from '../native-type-normalizer';
 import { planIssues } from './issue-planner';
+import { RawSqlCall } from './op-factory-call';
 import { TypeScriptRenderablePostgresMigration } from './planner-produced-postgres-migration';
 import { postgresPlannerStrategies } from './planner-strategies';
+import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 type PlannerFrameworkComponents = SqlMigrationPlannerPlanOptions extends {
   readonly frameworkComponents: infer T;
@@ -145,9 +152,31 @@ export class PostgresMigrationPlanner implements MigrationPlanner<'sql', 'postgr
       return plannerFailure(result.failure);
     }
 
+    // Codec lifecycle hook (T2.2): inline `onFieldEvent`-emitted ops after
+    // structural DDL. Sub-spec § 5 fixes the ordering as
+    // `structural → added → dropped → altered`, with within-group sorting by
+    // `(tableName, fieldName)` deterministic for byte-stable re-emits.
+    // Hook fires only at the application emitter — extension-space planning
+    // (M2 R2) never reaches this helper.
+    const fieldEventOps = planFieldEventOperations({
+      priorContract: options.fromContract,
+      newContract: options.contract,
+      codecHooks,
+    });
+    // `extractCodecControlHooks` erases target-details to `unknown`; codec
+    // authors target a specific lane (here, postgres) and produce ops whose
+    // target-details are `PostgresPlanTargetDetails`-shaped by construction.
+    // The cast re-specializes the type at this trust boundary.
+    const calls = [
+      ...result.value.calls,
+      ...fieldEventOps.map(
+        (op) => new RawSqlCall(op as SqlMigrationPlanOperation<PostgresPlanTargetDetails>),
+      ),
+    ];
+
     return Object.freeze({
       kind: 'success' as const,
-      plan: new TypeScriptRenderablePostgresMigration(result.value.calls, {
+      plan: new TypeScriptRenderablePostgresMigration(calls, {
         from: options.fromContract?.storage.storageHash ?? null,
         to: options.contract.storage.storageHash,
       }),
