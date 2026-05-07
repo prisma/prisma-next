@@ -34,13 +34,10 @@ export function timestampNowControlDescriptor(
  * `field.temporal.updatedAt()` lower to byte-identical contracts across
  * targets by construction.
  */
-export function temporalAuthoringPresets(input: {
-  readonly codecId: string;
-  readonly nativeType: string;
-}): {
-  readonly createdAt: AuthoringFieldPresetDescriptor;
-  readonly updatedAt: AuthoringFieldPresetDescriptor;
-} {
+export function temporalAuthoringPresets<
+  const CodecId extends string,
+  const NativeType extends string,
+>(input: { readonly codecId: CodecId; readonly nativeType: NativeType }) {
   const { codecId, nativeType } = input;
   return {
     createdAt: {
@@ -62,5 +59,8 @@ export function temporalAuthoringPresets(input: {
         },
       },
     },
+  } as const satisfies {
+    readonly createdAt: AuthoringFieldPresetDescriptor;
+    readonly updatedAt: AuthoringFieldPresetDescriptor;
   };
 }
