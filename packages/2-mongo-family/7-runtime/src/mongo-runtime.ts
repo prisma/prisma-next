@@ -85,6 +85,8 @@ class MongoRuntimeImpl
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
+      // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
+      // the framework parameter type is the cross-family base.
       contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
     };
 
