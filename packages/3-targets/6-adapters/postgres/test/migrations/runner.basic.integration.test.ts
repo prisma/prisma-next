@@ -84,7 +84,7 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         const markerRow = await driver!.query<{
           core_hash: string;
           profile_hash: string;
-        }>('select core_hash, profile_hash from prisma_contract.marker where id = $1', [1]);
+        }>('select core_hash, profile_hash from prisma_contract.marker where space = $1', ['app']);
         expect(markerRow.rows[0]).toMatchObject({
           core_hash: contract.storage.storageHash,
           profile_hash: contract.profileHash,
@@ -151,8 +151,8 @@ describe.sequential('PostgresMigrationRunner - Basic Execution', () => {
         }
 
         const markerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.marker where id = $1',
-          [1],
+          'select count(*)::text as count from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerCount.rows[0]?.count).toBe('1');
         const ledgerCount = await driver!.query<{ count: string }>(

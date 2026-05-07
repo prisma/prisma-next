@@ -81,8 +81,8 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     });
 
     const markerCount = await driver.query<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerCount.rows[0]!.cnt).toBe(1);
 
@@ -128,8 +128,8 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
       'SELECT COUNT(*) as cnt FROM _prisma_ledger',
     );
     const initialUpdatedAt = await driver.query<{ updated_at: string }>(
-      'SELECT updated_at FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT updated_at FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
 
     // True no-op self-edge: origin === destination, no ops, no invariants.
@@ -160,8 +160,8 @@ describe('SqliteMigrationRunner - Idempotency', { timeout: timeouts.databaseOper
     expect(ledgerAfter.rows[0]!.cnt).toBe(initialLedger.rows[0]!.cnt);
 
     const updatedAtAfter = await driver.query<{ updated_at: string }>(
-      'SELECT updated_at FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT updated_at FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(updatedAtAfter.rows[0]!.updated_at).toBe(initialUpdatedAt.rows[0]!.updated_at);
   });

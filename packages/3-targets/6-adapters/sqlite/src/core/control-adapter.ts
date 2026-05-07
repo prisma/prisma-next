@@ -120,8 +120,8 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          meta,
          invariants
        FROM _prisma_marker
-       WHERE id = ?`,
-      [1],
+       WHERE space = ?`,
+      ['app'],
     );
 
     const row = result.rows[0];

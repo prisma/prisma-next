@@ -149,8 +149,8 @@ withTempDir(({ createTempDir }) => {
             // Verify marker was written
             await withClient(connectionString, async (client) => {
               const result = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(result.rows.length).toBe(1);
               expect(result.rows[0]?.core_hash).toBe(parsed.markerHash);
@@ -398,8 +398,8 @@ withTempDir(({ createTempDir }) => {
 
             await withClient(connectionString, async (client) => {
               const marker = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(marker.rows[0]?.core_hash).toBe(firstMigration!.metadata.to);
             });
@@ -528,8 +528,8 @@ withTempDir(({ createTempDir }) => {
             // Verify marker was updated
             await withClient(connectionString, async (client) => {
               const result = await client.query(
-                'SELECT core_hash FROM prisma_contract.marker WHERE id = $1',
-                [1],
+                'SELECT core_hash FROM prisma_contract.marker WHERE space = $1',
+                ['app'],
               );
               expect(result.rows.length).toBe(1);
               expect(result.rows[0]?.core_hash).toBe(secondApply.markerHash);

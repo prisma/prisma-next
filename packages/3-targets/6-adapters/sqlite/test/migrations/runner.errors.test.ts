@@ -120,8 +120,8 @@ describe('SqliteMigrationRunner - Error Scenarios', { timeout: timeouts.database
     expect(failure.summary).toMatch(/does not match plan origin/i);
 
     const markerRow = await driver.query<{ core_hash: string; profile_hash: string }>(
-      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerRow.rows[0]).toMatchObject({
       core_hash: 'sha256:other-contract',

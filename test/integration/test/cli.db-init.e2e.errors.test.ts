@@ -168,7 +168,7 @@ withTempDir(({ createTempDir }) => {
               await client.query('CREATE SCHEMA IF NOT EXISTS prisma_contract');
               await client.query(`
                 CREATE TABLE IF NOT EXISTS prisma_contract.marker (
-                  id INTEGER PRIMARY KEY DEFAULT 1,
+                  space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
                   core_hash TEXT NOT NULL,
                   profile_hash TEXT NOT NULL,
                   contract_json JSONB,
@@ -180,9 +180,9 @@ withTempDir(({ createTempDir }) => {
                 )
               `);
               await client.query(`
-                INSERT INTO prisma_contract.marker (id, core_hash, profile_hash, contract_json)
-                VALUES (1, 'sha256:different-hash', 'sha256:different-profile', '{}')
-                ON CONFLICT (id) DO NOTHING
+                INSERT INTO prisma_contract.marker (space, core_hash, profile_hash, contract_json)
+                VALUES ('app', 'sha256:different-hash', 'sha256:different-profile', '{}')
+                ON CONFLICT (space) DO NOTHING
               `);
             });
 

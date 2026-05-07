@@ -25,6 +25,7 @@ import {
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
+  migrateMarkerSchemaStatements,
   type SqlStatement,
 } from './statement-builders';
 
@@ -274,6 +275,12 @@ class PostgresMigrationRunner implements SqlMigrationRunner<PostgresPlanTargetDe
   ): Promise<void> {
     await this.executeStatement(driver, ensurePrismaContractSchemaStatement);
     await this.executeStatement(driver, ensureMarkerTableStatement);
+    // Idempotent promotion of legacy single-row markers to per-space
+    // shape; no-op on fresh or already-migrated databases. See
+    // `specs/framework-mechanism.spec.md § 2`.
+    for (const stmt of migrateMarkerSchemaStatements) {
+      await this.executeStatement(driver, stmt);
+    }
     await this.executeStatement(driver, ensureLedgerTableStatement);
   }
 

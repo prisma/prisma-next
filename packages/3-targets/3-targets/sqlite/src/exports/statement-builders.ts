@@ -1,4 +1,5 @@
 export {
+  APP_SPACE_ID,
   buildLedgerInsertStatement,
   buildWriteMarkerStatements,
   CONTROL_TABLE_NAMES,
@@ -6,6 +7,7 @@ export {
   ensureMarkerTableStatement,
   LEDGER_TABLE_NAME,
   MARKER_TABLE_NAME,
+  migrateMarkerSchemaSqlite,
   readMarkerStatement,
   type SqlStatement,
 } from '../core/migrations/statement-builders';

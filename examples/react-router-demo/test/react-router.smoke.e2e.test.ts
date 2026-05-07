@@ -19,7 +19,7 @@ const contractJsonPath = join(exampleDir, 'src', 'prisma', 'contract.json');
 const TEST_SCHEMA_SQL = `
 create schema if not exists prisma_contract;
 create table if not exists prisma_contract.marker (
-  id smallint primary key default 1,
+  space text not null primary key default 'app',
   core_hash text not null default '',
   profile_hash text not null default '',
   contract_json jsonb,

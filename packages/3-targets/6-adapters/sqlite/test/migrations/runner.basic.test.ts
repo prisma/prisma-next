@@ -60,8 +60,8 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     expect(tableRow.rows[0]!.cnt).toBe(1);
 
     const markerRow = await driver.query<{ core_hash: string; profile_hash: string }>(
-      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT core_hash, profile_hash FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerRow.rows[0]).toMatchObject({
       core_hash: contract.storage.storageHash,
@@ -124,8 +124,8 @@ describe('SqliteMigrationRunner - Basic Execution', { timeout: timeouts.database
     });
 
     const markerCount = await driver.query<{ cnt: number }>(
-      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE id = ?',
-      [1],
+      'SELECT COUNT(*) as cnt FROM _prisma_marker WHERE space = ?',
+      ['app'],
     );
     expect(markerCount.rows[0]!.cnt).toBe(1);
 

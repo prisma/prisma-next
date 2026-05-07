@@ -153,8 +153,8 @@ describe.sequential('PostgresMigrationRunner - Error Scenarios', () => {
         expect(failure.summary).toMatch(/does not match plan origin/i);
 
         const markerRow = await driver!.query<{ core_hash: string; profile_hash: string }>(
-          'select core_hash, profile_hash from prisma_contract.marker where id = $1',
-          [1],
+          'select core_hash, profile_hash from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerRow.rows[0]).toMatchObject({
           core_hash: 'sha256:other-contract',

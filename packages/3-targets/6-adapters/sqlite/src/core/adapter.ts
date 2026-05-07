@@ -52,8 +52,8 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
       target: 'sqlite',
       capabilities: defaultCapabilities,
       readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where id = ?',
-        params: [1],
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from _prisma_marker where space = ?',
+        params: ['app'],
       }),
       // SQLite stores arrays as JSON-encoded TEXT (no native array type), so the driver returns `invariants` as a string. Decode before delegating to the shared row schema, which expects `string[]`.
       parseMarkerRow: (row: unknown) => {
