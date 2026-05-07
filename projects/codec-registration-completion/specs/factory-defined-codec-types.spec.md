@@ -20,6 +20,46 @@ Consumers that need a codec's type for a specific column (no-emit `FieldOutputTy
 
 Codec authors maintain exactly one type-level surface: the descriptor's factory function (or its class-based equivalent). No parallel `OutputType` HKT field. No hand-written codec-id-keyed type rows. No column-helper `type` slot maintained alongside the factory. The framework's emitted `contract.d.ts` carries codec type rows because emit serializes the type-level result into a static artifact — but those rows are *generated* from the descriptors, not maintained in parallel.
 
+## Data flow
+
+The architecture has one source artifact (the descriptor's factory) and four lifecycle phases that consult it. Every phase consults it at most once; nothing is computed twice or maintained in parallel.
+
+```
+codec author site         descriptor.factory(params) → (ctx) → Codec<...>
+                             ↓ one type-level surface
+                             ↓
+column author site        column(descriptor, params)
+                             │ helper applies descriptor.factory at the type level
+                             │ helper stores typed result on the column spec
+                             ↓
+contract definition       contract carries column specs with their typed codecs
+                             │ flows through the rest of the type system
+                             ↓
+no-emit consumers         FieldOutputType / sql-builder / ORM read the typed
+                          codec from the column spec; descriptor not consulted
+
+emit                      emitter walks descriptors at emit time, evaluates the
+                          factory at the type level, serializes into contract.d.ts
+                          (verified byte-equivalent to the no-emit type per AC-6)
+
+runtime                   descriptorFor(codecId): AnyCodecDescriptor (type-erased)
+                          materialization via descriptor.factory(params)(ctx)
+```
+
+Three patterns fall out of this flow:
+
+1. **Source-of-truth singularity.** The descriptor's factory is the *only* artifact a codec author writes that carries type information. `paramsSchema` and `renderOutputType` are runtime artifacts (validators, string renderers); they don't carry codec types. Column helpers don't hand-roll typed returns; they delegate to the descriptor's factory at the type level.
+
+2. **Two-layer storage separation.** The descriptor is stored twice with different access shapes:
+   - **At the runtime layer**, the framework's heterogeneous registry indexes by `codecId: string` and returns `AnyCodecDescriptor` (variance-erased, correctly so — the runtime needs no types).
+   - **At the type-level layer**, the column spec on the contract is the only access path. It was populated at column-author time by applying the descriptor's factory at the type level; consumers read from there.
+
+   These two paths never cross. Type-level consumers don't query the runtime registry; runtime consumers don't query the contract type.
+
+3. **Emit as serialization, not as parallel.** The emitter walks descriptors, evaluates the factory at the type level (within the type-checker), and serializes the result into `contract.d.ts`. This is descriptor-derived; AC-6 verifies byte-equivalence with the no-emit type to pin the agreement.
+
+The implementation question of *what* the column spec carries — a resolved codec instance, an unapplied factory thunk, a phantom-type marker, or another shape — is deliberately left to the per-approach implementation specs. The AC-5 verification points pin the type-level outcome regardless of representation.
+
 ## Why
 
 ADR 208 diagnosed the problem correctly (line 145):
