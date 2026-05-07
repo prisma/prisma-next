@@ -6,6 +6,7 @@
  * to use core types while SQL-specific code uses the extended types.
  */
 
+import type { Contract } from '@prisma-next/contract/types';
 import type {
   MigrationPlan,
   MigrationPlannerConflict,
@@ -13,8 +14,14 @@ import type {
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
 } from '@prisma-next/framework-components/control';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import { expectTypeOf } from 'vitest';
 import type {
+  ExtensionContractRef,
+  ExtensionContractSpace,
+  ExtensionMigrationPackage,
+  SqlControlExtensionDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanOperation,
   SqlMigrationRunnerFailure,
@@ -51,3 +58,31 @@ expectTypeOf<SqlMigrationRunnerSuccessValue['operationsExecuted']>().toExtend<
 // Test that SqlMigrationRunnerFailure has the required core fields
 expectTypeOf<SqlMigrationRunnerFailure['code']>().toExtend<MigrationRunnerFailure['code']>();
 expectTypeOf<SqlMigrationRunnerFailure['summary']>().toExtend<MigrationRunnerFailure['summary']>();
+
+// Contract-space descriptor surface (project: extension contract spaces).
+//
+// `contractSpace` is the in-memory authoring view a schema-contributing
+// extension publishes via its descriptor module. The framework consumes it
+// only at authoring time (`migrate`) — apply / verify paths read the user's
+// repo. The shape locks down here so downstream emission, planning, and
+// runner code can rely on it.
+expectTypeOf<ExtensionContractRef>().toEqualTypeOf<{
+  readonly hash: string;
+  readonly invariants: readonly string[];
+}>();
+
+expectTypeOf<ExtensionMigrationPackage['dirName']>().toEqualTypeOf<string>();
+expectTypeOf<ExtensionMigrationPackage['metadata']>().toEqualTypeOf<MigrationMetadata>();
+expectTypeOf<ExtensionMigrationPackage['ops']>().toEqualTypeOf<MigrationOps>();
+
+expectTypeOf<ExtensionContractSpace>().toExtend<{
+  readonly contractJson: Contract;
+  readonly migrations: readonly ExtensionMigrationPackage[];
+  readonly headRef: ExtensionContractRef;
+}>();
+
+// `contractSpace` is optional on the descriptor (additive change — existing
+// extensions without a contract space continue to typecheck unchanged).
+expectTypeOf<SqlControlExtensionDescriptor<'postgres'>['contractSpace']>().toEqualTypeOf<
+  ExtensionContractSpace | undefined
+>();
