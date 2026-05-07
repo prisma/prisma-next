@@ -1,5 +1,5 @@
-import { TIMESTAMP_NOW_GENERATOR_ID } from '@prisma-next/framework-components/control';
 import type { RuntimeMutationDefaultGenerator } from '@prisma-next/sql-runtime';
+import { TIMESTAMP_NOW_GENERATOR_ID } from './timestamp-now-generator';
 
 /**
  * Builds the canonical runtime-plane generator for the wall-clock-now

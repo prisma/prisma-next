@@ -106,4 +106,3 @@ export type {
   SourceDiagnostic,
   SourceSpan,
 } from '../shared/mutation-default-types';
-export { TIMESTAMP_NOW_GENERATOR_ID } from '../shared/mutation-default-types';
