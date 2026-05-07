@@ -11,7 +11,7 @@
  */
 
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-import { arktypeJsonCodec } from '../core/arktype-json-codec';
+import { codecDescriptorClassList } from '../core/arktype-json-codec-class';
 import { arktypeJsonPackMeta } from '../core/pack-meta';
 
 export const arktypeJsonRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
@@ -20,7 +20,7 @@ export const arktypeJsonRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgr
   version: arktypeJsonPackMeta.version,
   familyId: 'sql' as const,
   targetId: 'postgres' as const,
-  codecs: () => [arktypeJsonCodec],
+  codecs: () => codecDescriptorClassList,
   create() {
     return {
       familyId: 'sql' as const,

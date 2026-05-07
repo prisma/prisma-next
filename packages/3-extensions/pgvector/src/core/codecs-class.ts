@@ -34,6 +34,7 @@
 
 import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
   CodecImpl,
@@ -152,3 +153,12 @@ export const pgVectorColumn = <N extends number>(length: N) =>
 
 pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
+
+// ---------------------------------------------------------------------------
+// Class-form descriptor list (TML-2357 M0 Phase B5). Single entry today:
+// `pg/vector@1`. Mirrors the legacy `codecDescriptorList` shape so the
+// pgvector contributor pack's unified `codecs:` slot consumption can swap
+// without changing the descriptor sequence the emitter consumes.
+// ---------------------------------------------------------------------------
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [pgVectorDescriptorClass];

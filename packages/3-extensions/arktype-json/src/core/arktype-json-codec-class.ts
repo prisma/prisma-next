@@ -50,6 +50,7 @@
 
 import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
   CodecImpl,
@@ -253,3 +254,13 @@ arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 // `ArktypeJsonCodecClass<unknown>` (the descriptor.factory return).
 // `expectTypeOf` tests cover the literal-preservation property strict
 // satisfies would otherwise enforce.
+
+// ---------------------------------------------------------------------------
+// Class-form descriptor list (TML-2357 M0 Phase B5). Single entry today:
+// `arktype/json@1`. The arktype-json contributor pack's unified `codecs:`
+// slot consumption swaps from the legacy `arktypeJsonCodec`
+// `defineCodec()` carrier to the class-form descriptor without changing
+// the descriptor's `targetTypes`/`meta`/`renderOutputType` shape.
+// ---------------------------------------------------------------------------
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptorClass];

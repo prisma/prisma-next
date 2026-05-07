@@ -1,5 +1,5 @@
 import type { SqlRuntimeExtensionDescriptor } from '@prisma-next/sql-runtime';
-import { codecDescriptorList } from '../core/codecs';
+import { codecDescriptorClassList } from '../core/codecs-class';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
 
 const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
@@ -14,10 +14,10 @@ const pgvectorRuntimeDescriptor: SqlRuntimeExtensionDescriptor<'postgres'> = {
   // SQL renderer's cast-policy lookup.
   types: {
     codecTypes: {
-      codecDescriptors: codecDescriptorList,
+      codecDescriptors: codecDescriptorClassList,
     },
   },
-  codecs: () => codecDescriptorList,
+  codecs: () => codecDescriptorClassList,
   queryOperations: () => pgvectorQueryOperations(),
   create() {
     return {
