@@ -1,4 +1,4 @@
-import type { Contract } from '@prisma-next/contract/types';
+import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_BOX_TABLE, TEST_HEAD_HASH } from './constants';
 
@@ -17,9 +17,9 @@ export const testContractSpaceContract: Contract<SqlStorage> = {
   capabilities: {},
   extensionPacks: {},
   meta: {},
-  profileHash: 'synthetic-test-contract-space-profile-v1' as Contract['profileHash'],
+  profileHash: profileHash('synthetic-test-contract-space-profile-v1'),
   storage: {
-    storageHash: TEST_HEAD_HASH as SqlStorage['storageHash'],
+    storageHash: coreHash(TEST_HEAD_HASH),
     tables: {
       [TEST_BOX_TABLE]: {
         columns: {
