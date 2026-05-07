@@ -262,16 +262,18 @@ Determinism: the alphabetical sort in (4) and the deterministic listing in (5) a
 
 ## 5. Codec lifecycle hook (T2.1, T2.2)
 
-Extend `CodecControlHooks`:
+Extend `CodecControlHooks`. The shipped shape (M2 R1, commit `f7b083c37`):
 
 ```ts
+import type { StorageTable, StorageColumn } from '@prisma-next/sql-contract/types';
+
 type FieldEvent = 'added' | 'dropped' | 'altered';
 
 interface FieldEventContext {
-  readonly priorTable?: TableIR;   // present for 'dropped' and 'altered'
-  readonly newTable?: TableIR;     // present for 'added' and 'altered'
-  readonly priorField?: FieldIR;   // present for 'dropped' and 'altered'
-  readonly newField?: FieldIR;     // present for 'added' and 'altered'
+  readonly priorTable?: StorageTable;    // present for 'dropped' and 'altered'
+  readonly newTable?: StorageTable;      // present for 'added' and 'altered'
+  readonly priorField?: StorageColumn;   // present for 'dropped' and 'altered'
+  readonly newField?: StorageColumn;     // present for 'added' and 'altered'
 }
 
 interface CodecControlHooks<TTargetDetails = unknown> {
@@ -283,12 +285,16 @@ interface CodecControlHooks<TTargetDetails = unknown> {
 }
 ```
 
+`FieldEventContext` uses the SQL family's existing concrete IR types (`StorageTable` / `StorageColumn` from `@prisma-next/sql-contract/types`) rather than abstract `TableIR` / `FieldIR` placeholders — matches the convention already used by other `CodecControlHooks` methods.
+
 Hook contract:
 
 - **Synchronous.** The emitter must be able to assemble the migration JSON without awaiting hooks.
 - **App-space scope only.** `priorTable` and `newTable` are scoped to the application's contract; the hook never sees extension-space IR. This is enforced by API shape — the hook signature has no parameter for cross-space context.
 - **`'altered'` semantics.** Fires when a field exists in both `priorTable` and `newTable` and any field property has changed *except* `codecId`. Codec-id changes are a v1 non-goal (see project spec § Non-goals).
 - **Return value.** `MigrationPlanOperation<TTargetDetails>[]`. Each op must carry its own `invariantId`. Returned ops are inlined into the app-space migration's `ops.json`, alongside the user's own structural ops.
+
+**Wiring helper (T2.1).** Shipped as `planFieldEventOperations(options)` in `@prisma-next/family-sql/control` (alongside the codec-control surface). The helper's return type is `SqlMigrationPlanOperation<unknown>[]` — non-generic at the helper boundary because `extractCodecControlHooks` erases target-details to `unknown` at the codec-extraction boundary (pre-existing behaviour). Each target's planner casts the helper's `unknown` results back to its target-details specialisation at the integration site (scoped per-line `.map(...)` cast with an explanatory comment, per `AGENTS.md` typesafety rules); mirrors the existing `storageTypePlanCallStrategy`'s lift pattern. **No public-API surface change for codec authors** — they still type their `onFieldEvent` hook against their lane's target-details.
 
 **Wiring (T2.2).** In the app-space emitter's per-field diff loop:
 
