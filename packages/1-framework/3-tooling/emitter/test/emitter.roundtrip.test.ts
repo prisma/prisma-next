@@ -171,70 +171,74 @@ describe('emitter round-trip', () => {
     timeouts.typeScriptCompilation,
   );
 
-  it('round-trip with nullable fields', async () => {
-    const ir = createTestContract({
-      storage: {
-        tables: {
-          user: {
-            columns: {
-              id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
-              email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
-              name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+  it(
+    'round-trip with nullable fields',
+    async () => {
+      const ir = createTestContract({
+        storage: {
+          tables: {
+            user: {
+              columns: {
+                id: { codecId: 'pg/int4@1', nativeType: 'int4', nullable: false },
+                email: { codecId: 'pg/text@1', nativeType: 'text', nullable: true },
+                name: { codecId: 'pg/text@1', nativeType: 'text', nullable: false },
+              },
+              primaryKey: { columns: ['id'] },
+              uniques: [],
+              indexes: [],
+              foreignKeys: [],
             },
-            primaryKey: { columns: ['id'] },
-            uniques: [],
-            indexes: [],
-            foreignKeys: [],
           },
         },
-      },
-      extensionPacks: {
-        postgres: { version: '0.0.1' },
-        pg: {},
-      },
-    });
+        extensionPacks: {
+          postgres: { version: '0.0.1' },
+          pg: {},
+        },
+      });
 
-    const codecTypeImports: TypesImportSpec[] = [];
-    const operationTypeImports: TypesImportSpec[] = [];
-    const extensionIds = ['postgres', 'pg'];
-    const options: EmitStackInput = {
-      codecTypeImports,
-      operationTypeImports,
-      extensionIds,
-    };
+      const codecTypeImports: TypesImportSpec[] = [];
+      const operationTypeImports: TypesImportSpec[] = [];
+      const extensionIds = ['postgres', 'pg'];
+      const options: EmitStackInput = {
+        codecTypeImports,
+        operationTypeImports,
+        extensionIds,
+      };
 
-    const result1 = await emit(ir, options, mockSqlHook);
-    const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
+      const result1 = await emit(ir, options, mockSqlHook);
+      const contractJson1 = JSON.parse(result1.contractJson) as Record<string, unknown>;
 
-    const ir2 = createTestContract({
-      targetFamily: contractJson1['targetFamily'] as string,
-      target: contractJson1['target'] as string,
-      roots: contractJson1['roots'] as Record<string, string>,
-      models: contractJson1['models'] as Record<string, unknown>,
-      storage: contractJson1['storage'] as Record<string, unknown>,
-      extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
-      capabilities:
-        (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
-      meta: (contractJson1['meta'] as Record<string, unknown>) || {},
-    });
+      const ir2 = createTestContract({
+        targetFamily: contractJson1['targetFamily'] as string,
+        target: contractJson1['target'] as string,
+        roots: contractJson1['roots'] as Record<string, string>,
+        models: contractJson1['models'] as Record<string, unknown>,
+        storage: contractJson1['storage'] as Record<string, unknown>,
+        extensionPacks: contractJson1['extensionPacks'] as Record<string, unknown>,
+        capabilities:
+          (contractJson1['capabilities'] as Record<string, Record<string, boolean>>) || {},
+        meta: (contractJson1['meta'] as Record<string, unknown>) || {},
+      });
 
-    const result2 = await emit(ir2, options, mockSqlHook);
+      const result2 = await emit(ir2, options, mockSqlHook);
 
-    expect(result1.contractJson).toBe(result2.contractJson);
-    expect(result1.storageHash).toBe(result2.storageHash);
+      expect(result1.contractJson).toBe(result2.contractJson);
+      expect(result1.storageHash).toBe(result2.storageHash);
 
-    const parsed2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
-    const storage = parsed2['storage'] as Record<string, unknown>;
-    const tables = storage['tables'] as Record<string, unknown>;
-    const user = tables['user'] as Record<string, unknown>;
-    const columns = user['columns'] as Record<string, unknown>;
-    const id = columns['id'] as Record<string, unknown>;
-    const email = columns['email'] as Record<string, unknown>;
-    const name = columns['name'] as Record<string, unknown>;
-    expect(id['nullable']).toBe(false);
-    expect(email['nullable']).toBe(true);
-    expect(name['nullable']).toBe(false);
-  });
+      const parsed2 = JSON.parse(result2.contractJson) as Record<string, unknown>;
+      const storage = parsed2['storage'] as Record<string, unknown>;
+      const tables = storage['tables'] as Record<string, unknown>;
+      const user = tables['user'] as Record<string, unknown>;
+      const columns = user['columns'] as Record<string, unknown>;
+      const id = columns['id'] as Record<string, unknown>;
+      const email = columns['email'] as Record<string, unknown>;
+      const name = columns['name'] as Record<string, unknown>;
+      expect(id['nullable']).toBe(false);
+      expect(email['nullable']).toBe(true);
+      expect(name['nullable']).toBe(false);
+    },
+    timeouts.typeScriptCompilation,
+  );
 
   it('round-trip with capabilities', async () => {
     const ir = createTestContract({

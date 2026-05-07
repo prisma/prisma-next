@@ -10,6 +10,7 @@ export default defineConfig({
     pool: 'forks',
     maxWorkers: 1,
     isolate: false,
+    fileParallelism: false,
     testTimeout: timeouts.vitestPackageDefault,
     hookTimeout: timeouts.vitestPackageDefault,
     setupFiles: ['./test/setup.ts'],

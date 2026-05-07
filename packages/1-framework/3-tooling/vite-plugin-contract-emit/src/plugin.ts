@@ -124,6 +124,11 @@ export function prismaVitePlugin(
       log(`  → ${result.files.json}`, 'debug');
       log(`  → ${result.files.dts}`, 'debug');
 
+      if (server) {
+        server.moduleGraph.onFileChange(result.files.json);
+        server.moduleGraph.onFileChange(result.files.dts);
+      }
+
       if (server && !hasQueuedEmit) {
         server.ws.send({ type: 'full-reload' });
       } else if (hasQueuedEmit) {

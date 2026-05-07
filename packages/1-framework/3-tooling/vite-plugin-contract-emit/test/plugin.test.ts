@@ -135,6 +135,7 @@ function createMockServer() {
     ssrLoadModule: vi.fn().mockResolvedValue({}),
     moduleGraph: {
       getModuleById: vi.fn().mockReturnValue(null),
+      onFileChange: vi.fn(),
     },
   };
 }
@@ -413,6 +414,22 @@ describe('prismaVitePlugin', () => {
           configPath: expect.stringContaining('prisma-next.config.ts'),
         }),
       );
+    });
+
+    it('invalidates emitted artifacts after successful emit', async () => {
+      const plugin = prismaVitePlugin('prisma-next.config.ts', { logLevel: 'silent' });
+      const mockServer = createMockServer();
+
+      const configResolved = plugin.configResolved as unknown as (config: { root: string }) => void;
+      configResolved({ root: '/project' });
+
+      const configureServer = plugin.configureServer as unknown as (
+        server: ReturnType<typeof createMockServer>,
+      ) => Promise<void>;
+      await configureServer(mockServer);
+
+      expect(mockServer.moduleGraph.onFileChange).toHaveBeenCalledWith('/out/contract.json');
+      expect(mockServer.moduleGraph.onFileChange).toHaveBeenCalledWith('/out/contract.d.ts');
     });
 
     it('loads config once on startup before the initial emit', async () => {
