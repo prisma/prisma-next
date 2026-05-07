@@ -4,6 +4,8 @@
 
 ## Decision
 
+Foundational precondition surfaced during M2 R4: `defineCodec`'s declared return type drops the codec generics its `spec` argument inferred, so per-target descriptor records carry `CodecDescriptor<void>` and the typed `Codec` flow into no-emit authoring (`field.uuidv4()`) and emit-path `contract.d.ts` `TypeMaps` derivation collapses. Without fixing this, AC-1 / AC-2 / AC-3 / AC-7 below cannot land cleanly. **See [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md) for the full statement; AC-0 below refers to it.**
+
 Every codec contributor in the framework ships native `CodecDescriptor`s. The synthesis bridge that auto-lifts legacy `Codec` instances at context-construction (`synthesizeNonParameterizedDescriptor`) deletes; the `parameterizedCodecs:` registration slot deletes; the legacy SQL adapter `CodecParamsDescriptor` shape deletes; the `JsonSchemaValidatorRegistry` workaround deletes. The runtime `Codec` instance type narrows to a back-referenced behavior shape — it keeps `id` (the descriptor's `codecId`, set by the factory) and the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`); it loses the codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`) and the build-time `renderOutputType?` shim, all of which live only on the descriptor. The emit path consults `descriptorFor(codecId).renderOutputType` directly; no per-library "emit-only Codec" stub is needed (today's `arktypeJsonEmitCodec` retires).
 
 `ParamRef` gains a structural invariant: every `ParamRef` whose `codecId` resolves to a parameterized descriptor (`P` non-`void`) must carry `refs: { table, column }`. Refs are populated from every column-bound construction site in the SQL builder and the ORM client. Encode-side dispatch goes `forColumn(refs.table, refs.column)` for column-bound params and `descriptor.factory(undefined)(syntheticInstanceCtx)` for non-parameterized refs-less params. The legacy `forCodecId` fallback (the AC-5-deferred carve-out parent project left in place) retires for parameterized codec ids.
@@ -85,6 +87,16 @@ What this case pins:
 - The descriptor's `paramsSchema` runs validation at the JSON boundary (`contract.json` → runtime), guaranteeing the params the factory closes over are well-formed before any decode path runs.
 
 ## Acceptance criteria
+
+### AC-0. Typed `Codec` flow through `CodecDescriptor` (precondition)
+
+- `defineCodec({...})` returns a descriptor type that preserves the codec generics inferred from its `spec` argument (`Id`, `TTraits`, `TWire`, `TInput`, `TParams`).
+- Per-target descriptor records (`PgDescriptors`, `SqliteDescriptors`, `PgvectorDescriptors`, `SqlDescriptors`, `ArktypeJsonDescriptors`) carry each entry's full descriptor type by inference.
+- The no-emit authoring chain types end-to-end: `field.uuidv4()` returns a typed field spec; `defineContract({...}, ...)` produces a typed contract; `sqlBuilder<typeof contract>({context})`-produced query expressions type-check correctly-typed parameters and reject incorrectly-typed ones.
+- Emit-path `contract.d.ts` `TypeMaps` projection has correct per-codec-id `{input, output, traits}` shapes; `pnpm fixtures:check` passes.
+- Legacy `mkCodec` typed-instance public export is no longer load-bearing for type flow (precondition for AC-3 / AC-7 deletions).
+
+Full statement: [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md). AC-0 must land before AC-1, AC-2, AC-3, AC-7 can complete.
 
 ### AC-1. Every codec ships as a `CodecDescriptor`
 
