@@ -94,7 +94,8 @@ What this case pins:
 - Per-target descriptor records (`PgDescriptors`, `SqliteDescriptors`, `PgvectorDescriptors`, `SqlDescriptors`, `ArktypeJsonDescriptors`) carry each entry's full descriptor type by inference.
 - The no-emit authoring chain types end-to-end: `field.uuidv4()` returns a typed field spec; `defineContract({...}, ...)` produces a typed contract; `sqlBuilder<typeof contract>({context})`-produced query expressions type-check correctly-typed parameters and reject incorrectly-typed ones.
 - Emit-path `contract.d.ts` `TypeMaps` projection has correct per-codec-id `{input, output, traits}` shapes; `pnpm fixtures:check` passes.
-- Legacy `mkCodec` typed-instance public export is no longer load-bearing for type flow (precondition for AC-3 / AC-7 deletions).
+- **Forcing-function deletion.** Every parallel typed-instance carrier deleted within M0 (closing-grep zero across `packages/ test/ examples/ docs/` for: `mkCodec`, `defineCodecGroup`, `defineCodecBundle`, `CodecDefBuilder`, `CodecDefBuilderImpl`, `ExtractDescriptorCodecTypes` (renamed to `ExtractCodecTypes`), `byScalar`, `dataTypes`, `sqlCodecDefinitions`, `codecDescriptorDefinitions`). Absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393) (the `byScalar` antipattern cleanup).
+- Negative type tests assert the typed-flow chain at `defineCodec` round-trip, per-target descriptor record entries, and the no-emit authoring chain.
 
 Full statement: [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md). AC-0 must land before AC-1, AC-2, AC-3, AC-7 can complete.
 

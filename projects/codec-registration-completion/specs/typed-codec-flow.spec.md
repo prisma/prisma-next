@@ -144,13 +144,43 @@ The emitter, given a descriptor record, produces a `contract.d.ts` whose `TypeMa
 
 **Verification.** `pnpm fixtures:check` passes across all fixture pairs.
 
-### AC-0.5. Legacy `mkCodec` typed-instance source becomes deletable
+### AC-0.5. Forcing function — every parallel typed-instance path deleted
 
-After AC-0.1–AC-0.4 land, the typed flow no longer depends on `mkCodec` (the legacy `codec()`-renamed factory) being a public surface. The factory may still exist as an *internal* helper (e.g. `buildSqlCodec`) called inside `defineCodec` factory closures, but its public export from `@prisma-next/sql-relational-core/ast` is no longer load-bearing for type flow.
+This is the AC that *proves* AC-0.1–AC-0.4 hold in fact and not just nominally. Without an explicit deletion of every parallel typed-instance carrier, M0 could ship while the typed flow is still being load-borne by the legacy instance map and we'd never know. The only way to verify the typed flow runs through descriptors is to delete every other path that could be carrying it and confirm the chain still works.
 
-This AC is the precondition for parent spec AC-3 (Codec narrow), AC-7 (closing-grep zero), and the M2 R4 deletion path that was rolled back.
+**Required deletions inside M0:**
 
-**Verification.** AC-0.5 is verified at a later milestone (M2 R4 retry); for this sub-spec, it is sufficient to demonstrate that AC-0.1–AC-0.3 work *without consulting any `mkCodec`-call-result instance for type information* — the typed-flow path runs entirely through descriptors.
+1. **`mkCodec` public export** from `@prisma-next/sql-relational-core/ast`. The factory may persist as an *internal* helper inside the package (rename to `buildSqlCodec` to make the role explicit; it's the codec-instance builder called inside `defineCodec` factory closures). External callers must reach typed codecs via descriptors.
+
+2. **`CodecDefBuilder` and `CodecDefBuilderImpl`** from `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`. The instance-keyed builder has no remaining role; descriptor-keyed `CodecDescriptorBuilder` (line 709-) absorbs every consumer. Delete the legacy `defineCodecGroup()` factory function exported in parallel.
+
+3. **`ExtractCodecTypes` (relational-core, line 292)** — the instance-keyed projection. The descriptor-keyed `ExtractDescriptorCodecTypes` (line 688) takes its place. **Rename `ExtractDescriptorCodecTypes` → `ExtractCodecTypes`** so there's one canonical name for the projection. Note: the contract-level `ExtractCodecTypes<T>` at `packages/2-sql/1-core/contract/src/types.ts:239` is a different type with a different role and stays as-is.
+
+4. **`byScalar` and `dataTypes` exports** from target/extension packages (`packages/3-targets/3-targets/postgres/src/core/codecs.ts:570`, `packages/3-targets/3-targets/sqlite/src/core/codecs.ts:120`, `packages/3-extensions/pgvector/src/core/codecs.ts:73`, `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts:198`'s `sqlCodecDefinitions`). Migrate adapter consumers (`adapter-postgres/src/core/adapter.ts:42`, `adapter-sqlite/src/core/adapter.ts:53`) to receive codecs through the unified `codecs:` contributor protocol slot — not by importing data structures from the target package. Migrate test consumers (`target-postgres/test/codecs.test.ts`, `target-sqlite/test/codecs.test.ts`, `pgvector/test/codecs.test.ts`) to construct codec instances at the test site via `descriptor.factory(undefined)(ctx)`. **This work absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393)** (filed earlier as a follow-up; now consolidated into M0 because the deletion is the forcing function for AC-0).
+
+5. **Legacy renamed factories** `defineCodecGroup` and `defineCodecBundle` — redundant once `CodecDefBuilder` is deleted and `CodecDescriptorBuilder` is the only builder.
+
+**Closing-grep set.** After M0 lands, every symbol below MUST return zero hits across `packages/`, `test/`, `examples/`, `docs/`:
+
+- `mkCodec` (factory; `buildSqlCodec` is the internal-only replacement and is fine)
+- `defineCodecGroup`
+- `defineCodecBundle`
+- `CodecDefBuilder`
+- `CodecDefBuilderImpl`
+- `ExtractDescriptorCodecTypes` (renamed to `ExtractCodecTypes`)
+- `byScalar`
+- `dataTypes` (the target-codecs export, distinct from any unrelated framework concept)
+- `sqlCodecDefinitions`
+- `codecDescriptorDefinitions` (the dual-shape parallel export retired alongside `byScalar`)
+
+The contract-level `ExtractCodecTypes<T>` in `sql/1-core/contract/src/types.ts` is a different identifier in a different file and stays.
+
+**Why this is the forcing function.** With every parallel typed-instance carrier deleted, the only remaining type-flow path is descriptor → `descriptor.factory` → typed `Codec`. If `defineCodec` doesn't preserve generics, every codec round-trip test (`postgres/test/codecs.test.ts` calls `byScalar.timestamp.codec.encode(value, ctx)` today; after migration, `pgTimestampDescriptor.factory(undefined)({}).encode(value, ctx)`) fails to compile because `value` types as `unknown`. Mechanical, observable, impossible to bypass.
+
+**Verification.**
+- Closing-grep returns zero for every symbol in the set.
+- Every gate in AC-0.6 green.
+- Negative type tests in AC-0.1, AC-0.2, AC-0.3 prove the typed flow is intact at the unit-test level.
 
 ### AC-0.6. Validation gates green throughout
 
@@ -160,13 +190,11 @@ This AC is the precondition for parent spec AC-3 (Codec narrow), AC-7 (closing-g
 
 ## Non-goals
 
-- **`byScalar` map cleanup.** The `byScalar` slot on each target package's codec module is an antipattern (adapters import codec maps from targets at registration time — adapters that need codecs should own them, not import them). Logged as a separate ticket. During implementation of this sub-spec, if `byScalar`'s presence obstructs the type-flow fix, it MAY be deleted opportunistically; otherwise it stays for now and the cleanup ticket handles it later. See [TML-2393](https://linear.app/prisma-company/issue/TML-2393).
-
 - **Heterogeneous descriptor storage ergonomics.** Whether `AnyCodecDescriptor` becomes 5-arg (under Shape A) or stays 1-arg (under Shape B) is the implementation choice. Both shapes are admissible for AC-0.1.
 
 - **Mongo type flow.** Mongo doesn't use this descriptor record pattern at HEAD; its wire-dispatch path is reshaped under [TML-2324](https://linear.app/prisma-company/issue/TML-2324). Out of scope.
 
-- **Renaming `defineCodec` / `CodecDescriptor`.** Names stay; only the type signatures change.
+- **Renaming `defineCodec` / `CodecDescriptor`.** Names stay; only the type signatures change. (`mkCodec` *is* renamed to `buildSqlCodec` per AC-0.5, but only because it's transitioning from public to internal.)
 
 ## References
 

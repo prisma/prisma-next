@@ -29,47 +29,76 @@ All must be green before declaring a milestone done:
 
 ## Milestone M0 — Typed `Codec` flow through `CodecDescriptor`
 
-**Goal**: Fix `defineCodec`'s declared return so it preserves the codec generics (`Id`, `TTraits`, `TWire`, `TInput`) inferred from its `spec` argument. Restore the typed flow `defineCodec → descriptor record → defineContract → field.X() → sqlBuilder<typeof contract>` end-to-end. Emit-path `TypeMaps` derivation continues to work; demo emit byte-identical.
+**Goal**: Fix `defineCodec`'s declared return so it preserves the codec generics (`Id`, `TTraits`, `TWire`, `TInput`) inferred from its `spec` argument. Delete every parallel typed-instance carrier as the forcing function: `mkCodec` public, `CodecDefBuilder`, `ExtractCodecTypes` (instance-keyed), `byScalar` maps, dual-shape parallel exports. Migrate adapters and tests to consume codecs through descriptors. Restore the typed flow `defineCodec → descriptor record → defineContract → field.X() → sqlBuilder<typeof contract>` end-to-end with no parallel structures left.
 
-**Spec ACs addressed**: AC-0 (sub-spec [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md)).
+**Spec ACs addressed**: AC-0 (sub-spec [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md)). Absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393).
 
 ### Tasks
+
+#### Phase A — Fix the typed return (AC-0.1, AC-0.2)
 
 1. **T0.1 — Pick the implementation shape.** Two equivalent options:
    - **Shape A**: parameterize `CodecDescriptor` with `<Id, TTraits, TWire, TInput, TParams>`. `AnyCodecDescriptor = CodecDescriptor<string, readonly CodecTrait[], unknown, unknown, any>`.
    - **Shape B**: keep `CodecDescriptor<P>` one-arg; have `defineCodec` return `CodecDescriptor<TParams> & { codecId: Id; traits: TTraits; factory: typed-factory }` (intersection).
 
-   Decide based on: (a) ergonomics at heterogeneous-storage sites (registration boundary), (b) clarity at consumer extraction sites (`PgDescriptors`, `SqlDescriptors`), (c) impact on `aliasDescriptor` composition (does it need to thread the same generics?). Both honour AC-0; pick the one with the lower diff cost.
+   Decide based on: (a) ergonomics at heterogeneous-storage sites (registration boundary), (b) clarity at consumer extraction sites, (c) impact on `aliasDescriptor` composition. Both honour AC-0.1.
 
-2. **T0.2 — Update `defineCodec`'s signature** in `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts:587-593` per the chosen shape. Internal helper `buildSqlCodec` (the codec-instance builder) keeps its current typed return; only the wrapping descriptor's exposed type changes.
+2. **T0.2 — Update `defineCodec`'s signature** in `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts:587-593` per the chosen shape. Internal helper (rename `mkCodec` → `buildSqlCodec`) keeps its typed return; only the wrapping descriptor's exposed type changes.
 
-3. **T0.3 — Update `CodecDescriptor` (Shape A only)** in `packages/1-framework/1-core/framework-components/src/shared/codec-types.ts`. Add the four extra type parameters with sensible defaults (`Id = string`, `TTraits = readonly CodecTrait[]`, `TWire = unknown`, `TInput = unknown`). Update `AnyCodecDescriptor` type alias.
+3. **T0.3 — Update `CodecDescriptor` (Shape A only)** in `packages/1-framework/1-core/framework-components/src/shared/codec-types.ts`. Four extra type parameters with sensible defaults. Update `AnyCodecDescriptor` alias.
 
-4. **T0.4 — Update derivation helpers.** `DescriptorResolvedCodec` / `DescriptorCodecId` / `DescriptorCodecTraits` / `DescriptorCodecInput` / `ExtractDescriptorCodecTypes` (in `relational-core/ast/codec-types.ts`) extract directly from the descriptor type. No `D extends CodecDescriptor<infer P>` widening; either positional generic extraction (Shape A) or structural extraction (Shape B).
+4. **T0.4 — Update derivation helpers.** `DescriptorResolvedCodec`, `DescriptorCodecId`, `DescriptorCodecTraits`, `DescriptorCodecInput`, `ExtractDescriptorCodecTypes` extract directly from the descriptor type. No `D extends CodecDescriptor<infer P>` widening; positional (Shape A) or structural (Shape B) extraction.
 
-5. **T0.5 — Verify per-target descriptor records carry typed shape.** `PgDescriptors`, `SqliteDescriptors`, `PgvectorDescriptors`, `SqlDescriptors`, `ArktypeJsonDescriptors`. Each becomes `{[K]: defineCodec(...)-result}` typed by inference; no `: CodecDescriptor<...>` annotations widening the entries.
+5. **T0.5 — Verify per-target descriptor records.** `PgDescriptors`, `SqliteDescriptors`, `PgvectorDescriptors`, `SqlDescriptors`, `ArktypeJsonDescriptors`. Each `{[K]: defineCodec(...)-result}` typed by inference; no `: CodecDescriptor<...>` annotations widening entries.
 
-6. **T0.6 — Constructive type tests.** Negative type tests in:
-   - `packages/2-sql/4-lanes/relational-core/test/typed-codec-flow.test-d.ts` — `defineCodec` round-trip extraction matches expected `Codec<...>`.
-   - `packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts` — `PgDescriptors['uuidv4']` extraction matches `Codec<'pg/uuid@1', ..., Buffer, string>`.
-   - `examples/prisma-next-demo/test/no-emit-typed-flow.test-d.ts` (new file) — `field.uuidv4()` returns typed field spec; positive query expression typechecks; negative ones fail.
+#### Phase B — Forcing-function deletion (AC-0.5)
 
-7. **T0.7 — Verify emit-path `TypeMaps` derivation.** Run `pnpm fixtures:check`; confirm zero drift across all fixture pairs. If drift surfaces, the emitter's descriptor-walk path is reading erased generics — fix at the emitter boundary.
+6. **T0.6 — Rename `mkCodec` → `buildSqlCodec` and demote to internal.** Delete public export from `@prisma-next/sql-relational-core/ast`. Migrate any external production callers (≈5 sites in postgres/sqlite/pgvector/arktype-json target codec modules) to wrap inside `defineCodec({factory: () => () => buildSqlCodec({...})})`.
 
-8. **T0.8 — Opportunistic `byScalar` cleanup.** During the implementation, if `byScalar`'s presence in `packages/3-targets/3-targets/postgres/src/core/codecs.ts:518-526` (the `PgByScalar` `readonly codec: Codec` slot) creates impedance with the typed flow, delete or restructure it inline. Otherwise, leave it for the separate antipattern-cleanup ticket. Document any opportunistic cleanup in the M0 commit messages.
+7. **T0.7 — Delete `CodecDefBuilder` / `CodecDefBuilderImpl`** from `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`. Delete `defineCodecGroup()` factory function. Migrate every callsite to `CodecDescriptorBuilder` / `defineCodecBundle()` (which itself gets reduced — see T0.10).
 
-9. **T0.9 — Validation checkpoint** (gates above) and **pause for review**.
+8. **T0.8 — Delete `ExtractCodecTypes` (instance-keyed, line 292)**. Rename `ExtractDescriptorCodecTypes` (line 688) → `ExtractCodecTypes`. Confirm the contract-level `ExtractCodecTypes<T>` in `packages/2-sql/1-core/contract/src/types.ts:239` is untouched (different file, different role).
+
+9. **T0.9 — Delete `byScalar` and `dataTypes` from target/extension packages.** Sites: `packages/3-targets/3-targets/postgres/src/core/codecs.ts:570`, `packages/3-targets/3-targets/sqlite/src/core/codecs.ts:120`, `packages/3-extensions/pgvector/src/core/codecs.ts:73`, `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts:198` (`sqlCodecDefinitions`). Delete the dual-shape parallel exports `codecDescriptorDefinitions` (postgres/sqlite/pgvector). Delete `byScalar` getter from `CodecDescriptorBuilder` if it has no other consumers.
+
+10. **T0.10 — Migrate adapter consumers.** `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:11,42` and `packages/3-targets/6-adapters/sqlite/src/core/adapter.ts:31,53` consume codecs through the unified `codecs:` contributor protocol slot, not by importing `byScalar` from the target package. Each adapter's `Object.values(byScalar)` registration loop becomes a contributor-protocol-driven registration over `descriptor.factory(undefined)(syntheticCtx)`.
+
+11. **T0.11 — Migrate test consumers.** Sites that call `byScalar.timestamp.codec.encode(...)` migrate to `pgTimestampDescriptor.factory(undefined)({}).encode(...)` or use a small per-test helper. Affected fixtures: `packages/3-targets/3-targets/postgres/test/codecs.test.ts` (~30 callsites), `packages/3-targets/3-targets/sqlite/test/codecs.test.ts` (~10), `packages/3-extensions/pgvector/test/codecs.test.ts` (~5), `packages/3-targets/6-adapters/sqlite/test/codecs.test.ts` (~10), `packages/3-targets/3-targets/postgres/test/codec-render-output-type.test.ts`.
+
+12. **T0.12 — Reduce `defineCodecBundle` to a single canonical builder factory** if Phase B leaves it as the sole survivor. If `CodecDescriptorBuilder` is the only builder, consider renaming `defineCodecBundle` → `defineCodecBuilder` or similar (decision deferred to implementation; rename only if it improves clarity).
+
+#### Phase C — Constructive type tests (AC-0.3)
+
+13. **T0.13 — Negative type tests at the `defineCodec` round-trip layer**: `packages/2-sql/4-lanes/relational-core/test/typed-codec-flow.test-d.ts`. `expectTypeOf<DescriptorCodec<typeof someTypedDescriptor>>().toEqualTypeOf<Codec<'pg/int4@1', readonly [], Buffer, number>>()`.
+
+14. **T0.14 — Negative type tests at the per-target descriptor record layer**: `packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts` — `PgDescriptors['uuidv4']` extraction matches `Codec<'pg/uuid@1', ..., Buffer, string>`. Analogous tests in sqlite/pgvector.
+
+15. **T0.15 — Negative type tests at the no-emit authoring chain**: `examples/prisma-next-demo/test/no-emit-typed-flow.test-d.ts` (new file). `field.uuidv4()` returns typed field spec; positive query expression typechecks; negative ones (`f.id` against `1234: number`) fail.
+
+#### Phase D — Validation (AC-0.4, AC-0.6)
+
+16. **T0.16 — Closing-grep verification.** Zero hits across `packages/ test/ examples/ docs/` (excluding `projects/**` and `wip/**`) for: `mkCodec`, `defineCodecGroup`, `defineCodecBundle` (if renamed in T0.12), `CodecDefBuilder`, `CodecDefBuilderImpl`, `ExtractDescriptorCodecTypes`, `byScalar`, `dataTypes` (the target-codec export — disambiguate by context), `sqlCodecDefinitions`, `codecDescriptorDefinitions`.
+
+17. **T0.17 — `pnpm fixtures:check`.** Confirm zero drift across all fixture pairs.
+
+18. **T0.18 — Validation checkpoint** (`pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:e2e`, `pnpm build`, `pnpm fixtures:check`) and **pause for review**.
 
 ### Risks
 
-- **Shape A's ergonomic cost.** 5-arg `CodecDescriptor` makes heterogeneous storage verbose. Mitigated by `AnyCodecDescriptor` alias — most code uses that. If verbosity bites at unexpected sites, fall back to Shape B mid-implementation.
-- **`aliasDescriptor` composition.** Currently signed as `aliasDescriptor<P>(base: CodecDescriptor<P>, ...): CodecDescriptor<P>`. Under Shape A, generics need to thread through. Under Shape B, only the intersection structure changes. Walk the call sites in postgres/codecs.ts before committing to a shape.
-- **Test fixture diff size.** Negative type tests are new files; existing test fixtures that read from descriptors may surface widening drift if the helpers extract differently. Acceptable; fix at the call sites.
-- **TML-2229 regression vs. fix.** This was a regression in TML-2229 that should have been caught there. Landing M0 in TML-2357's branch is the pragmatic path; consider a follow-up ADR documenting the typed-flow design decision (which Shape was chosen and why), once the fix lands.
+- **Shape A's ergonomic cost.** 5-arg `CodecDescriptor` verbose at heterogeneous-storage sites. Mitigated by `AnyCodecDescriptor` alias; fallback to Shape B if verbosity bites unexpectedly.
+- **`aliasDescriptor` composition.** Currently `aliasDescriptor<P>(base: CodecDescriptor<P>, ...): CodecDescriptor<P>`. Under Shape A, generics need to thread through. Walk callsites in postgres/codecs.ts before committing.
+- **Adapter ↔ contributor-protocol migration.** T0.10 changes the adapter-postgres/sqlite registration loop. The contributor protocol's unified `codecs:` slot needs to expose what `byScalar` did (typeId + scalar + factory). Verify the slot's shape is sufficient before deletion; if not, extend it (still in scope for AC-2 of the parent spec).
+- **Test fixture diff volume.** ~50 test sites migrating from `byScalar.X.codec.encode(...)` to `XDescriptor.factory(undefined)({}).encode(...)`. Mechanical; bounded.
+- **TML-2393 absorption.** TML-2393 stated the same scope as T0.9 + T0.10 + T0.11. Once M0 lands, TML-2393 is closed as completed-by-TML-2357.
+- **Commit boundary discipline.** Phase A → Phase B → Phase C is a natural commit-boundary ordering. Phase A alone should typecheck (legacy `mkCodec`/`CodecDefBuilder` still work; the new typed return doesn't break them). Phase B is the deletion that exposes any latent dependencies. If Phase B reveals a load-bearing consumer that isn't on the audit list, surface a deferral.
 
 ### Estimated diff
 
-~5 production files (defineCodec signature + CodecDescriptor type + derivation helpers + per-target record annotations) + ~3 negative type test files + opportunistic `byScalar` cleanup if needed. No new packages.
+- **Phase A**: ~3 production files (codec-types.ts signature + descriptor type + helper renames). Pure-additive on the type layer.
+- **Phase B**: ~10 production files (codec-types.ts deletions + per-target codecs.ts cleanup + adapter consumers) + ~50 test fixture sites. Subsumes TML-2393.
+- **Phase C**: ~3 new test-d files.
+
+Total: ~15 production files + ~50 test sites + 3 new test-d files. Comparable in volume to the original M2 R4 attempt; the difference is that M0 fixes `defineCodec` first so the deletion actually compiles.
 
 ## Milestone M1 — Narrow runtime `Codec` instance + emit through descriptor
 
