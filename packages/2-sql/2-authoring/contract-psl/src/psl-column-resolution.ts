@@ -98,17 +98,12 @@ export function getAuthoringFieldPreset(
   return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
 }
 
-/**
- * Curated SQL-family-shared namespaces. Members of this set are exempt from
- * the namespace gate — they don't require explicit extension composition.
- *
- * `temporal` is reserved for date/time field presets (`temporal.createdAt()`,
- * `temporal.updatedAt()`) and chosen for forward-compatibility with the JS/TS
- * Temporal API; date codecs are expected to migrate to Temporal-backed
- * representations, at which point `temporal.*` becomes the natural namespace
- * for any future date/time helpers.
- */
-const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
+function hasRegisteredFieldNamespace(
+  contributions: AuthoringContributions | undefined,
+  namespace: string,
+): boolean {
+  return contributions?.field !== undefined && Object.hasOwn(contributions.field, namespace);
+}
 
 /**
  * Returns the namespace prefix of `attributeName` if it references an
@@ -118,10 +113,10 @@ const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
  * - `db` (native-type spec, always allowed),
  * - the active family id (e.g. `sql`),
  * - the active target id (e.g. `postgres`),
- * - a curated framework namespace (e.g. `temporal`),
+ * - a registered field-preset namespace (e.g. `temporal`),
  * - present in `composedExtensions`.
  *
- * Family/target/curated namespaces are exempted so that e.g. `@sql.foo`
+ * Family/target/field-preset namespaces are exempted so that e.g. `@sql.foo`
  * surfaces as PSL_UNSUPPORTED_*_ATTRIBUTE (the attribute isn't defined)
  * rather than PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (the namespace is already
  * composed).
@@ -129,7 +124,11 @@ const CURATED_NAMESPACES: ReadonlySet<string> = new Set(['temporal']);
 export function checkUncomposedNamespace(
   attributeName: string,
   composedExtensions: ReadonlySet<string>,
-  context?: { readonly familyId?: string; readonly targetId?: string },
+  context?: {
+    readonly familyId?: string;
+    readonly targetId?: string;
+    readonly authoringContributions?: AuthoringContributions | undefined;
+  },
 ): string | undefined {
   const dotIndex = attributeName.indexOf('.');
   if (dotIndex <= 0 || dotIndex === attributeName.length - 1) {
@@ -140,7 +139,7 @@ export function checkUncomposedNamespace(
     namespace === 'db' ||
     namespace === context?.familyId ||
     namespace === context?.targetId ||
-    CURATED_NAMESPACES.has(namespace) ||
+    hasRegisteredFieldNamespace(context?.authoringContributions, namespace) ||
     composedExtensions.has(namespace)
   ) {
     return undefined;
@@ -252,7 +251,7 @@ export function resolvePslTypeConstructorDescriptor(input: {
     namespace !== 'db' &&
     namespace !== input.familyId &&
     namespace !== input.targetId &&
-    !CURATED_NAMESPACES.has(namespace) &&
+    !hasRegisteredFieldNamespace(input.authoringContributions, namespace) &&
     !input.composedExtensions.has(namespace)
   ) {
     reportUncomposedNamespace({
@@ -416,16 +415,18 @@ export function resolveFieldTypeDescriptor(input: {
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
     }
 
-    // Field-preset walker missed. If the namespace is a curated framework
-    // namespace (`temporal.*`, etc.), curated namespaces are reserved for
-    // field presets — a miss is a typo, not a request to look elsewhere.
+    // Field-preset walker missed. If the namespace is registered as a field
+    // preset namespace, a miss is a typo, not a request to look elsewhere.
     // Emit PSL_UNKNOWN_FIELD_PRESET with a span on the preset name and bail
     // before the type-constructor fallback. Compose-time collision checks
-    // already prevent a curated path from also being a type constructor.
+    // already prevent the path from also being a type constructor.
     const helperPath = input.field.typeConstructor.path.join('.');
     const namespacePrefix =
       input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
-    if (namespacePrefix && CURATED_NAMESPACES.has(namespacePrefix)) {
+    if (
+      namespacePrefix &&
+      hasRegisteredFieldNamespace(input.authoringContributions, namespacePrefix)
+    ) {
       input.diagnostics.push({
         code: 'PSL_UNKNOWN_FIELD_PRESET',
         message: `${input.entityLabel} references unknown field preset "${helperPath}". Check the spelling against the available presets in the "${namespacePrefix}" namespace.`,

@@ -219,6 +219,7 @@ function validateNamedTypeAttributes(input: {
   readonly sourceId: string;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly composedExtensions: ReadonlySet<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly allowDbNativeType: boolean;
   readonly familyId: string;
   readonly targetId: string;
@@ -250,6 +251,7 @@ function validateNamedTypeAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -289,6 +291,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         sourceId: input.sourceId,
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
+        authoringContributions: input.authoringContributions,
         allowDbNativeType: false,
         familyId: input.familyId,
         targetId: input.targetId,
@@ -367,6 +370,7 @@ function resolveNamedTypeDeclarations(input: ResolveNamedTypeDeclarationsInput):
         sourceId: input.sourceId,
         diagnostics: input.diagnostics,
         composedExtensions: input.composedExtensions,
+        authoringContributions: input.authoringContributions,
         allowDbNativeType: true,
         familyId: input.familyId,
         targetId: input.targetId,
@@ -483,6 +487,7 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
       field,
       sourceId,
       composedExtensions: input.composedExtensions,
+      authoringContributions: input.authoringContributions,
       diagnostics,
       familyId: input.familyId,
       targetId: input.targetId,
@@ -604,7 +609,11 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     const uncomposedNamespace = checkUncomposedNamespace(
       modelAttribute.name,
       input.composedExtensions,
-      { familyId: input.familyId, targetId: input.targetId },
+      {
+        familyId: input.familyId,
+        targetId: input.targetId,
+        authoringContributions: input.authoringContributions,
+      },
     );
     if (uncomposedNamespace) {
       reportUncomposedNamespace({

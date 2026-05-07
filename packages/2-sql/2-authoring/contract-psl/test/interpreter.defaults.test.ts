@@ -568,10 +568,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       );
     });
 
-    it('rejects an unknown preset name in a curated namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
-      // `temporal.foo()` is a curated namespace (no extension composition
-      // needed) but the preset name is not registered. Should produce
-      // PSL_UNKNOWN_FIELD_PRESET, NOT fall through to PSL_UNSUPPORTED_FIELD_TYPE.
+    it('rejects an unknown preset name in a registered temporal namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
       const document = parsePslDocument({
         schema: `model Bad {
   id Int @id
@@ -595,6 +592,34 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
             code: 'PSL_UNKNOWN_FIELD_PRESET',
             sourceId: 'schema.prisma',
             message: expect.stringContaining('temporal.foo'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects an unknown preset name in a registered field namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example audit.foo()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: { field: { audit: {} }, type: {} },
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_UNKNOWN_FIELD_PRESET',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('audit.foo'),
           }),
         ]),
       );

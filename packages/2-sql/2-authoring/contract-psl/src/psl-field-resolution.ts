@@ -95,6 +95,7 @@ function validateFieldAttributes(input: {
   readonly model: PslModel;
   readonly field: PslField;
   readonly composedExtensions: ReadonlySet<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly familyId: string;
@@ -108,6 +109,7 @@ function validateFieldAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -199,6 +201,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       model,
       field,
       composedExtensions,
+      authoringContributions,
       diagnostics,
       sourceId,
       familyId,
