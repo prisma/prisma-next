@@ -160,6 +160,17 @@ export function errorInvalidSpaceId(spaceId: string): MigrationToolsError {
   );
 }
 
+export function errorPinnedArtefactsAppSpace(): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.PINNED_ARTEFACTS_APP_SPACE',
+    'Pinned per-space artefacts do not apply to the app space',
+    {
+      why: "Pinned `contract.json`/`contract.d.ts`/`refs/head.json` files only exist for extension spaces under `migrations/<space-id>/`. The app space's canonical contract lives at the project root (`contract.json`) — `emitPinnedSpaceArtefacts` is the wrong helper for it.",
+      fix: 'Pass an extension space id, or use the app-space contract emit pipeline for the project-root `contract.json` / `contract.d.ts`.',
+    },
+  );
+}
+
 export function errorDuplicateSpaceId(spaceId: string): MigrationToolsError {
   return new MigrationToolsError(
     'MIGRATION.DUPLICATE_SPACE_ID',
