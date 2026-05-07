@@ -19,6 +19,7 @@ export {
   isAuthoringArgRef,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
+  mergeAuthoringNamespaces,
   resolveAuthoringTemplateValue,
   validateAuthoringHelperArguments,
 } from '../shared/framework-authoring';

@@ -622,6 +622,33 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       );
     });
 
+    it('rejects an unknown extension namespace in field-position with PSL_EXTENSION_NAMESPACE_NOT_COMPOSED (AC5c)', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  ts weather.updatedAt()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_EXTENSION_NAMESPACE_NOT_COMPOSED',
+            sourceId: 'schema.prisma',
+            data: { namespace: 'weather', suggestedPack: 'weather' },
+          }),
+        ]),
+      );
+    });
+
     it('rejects extra positional argument to a zero-arg preset (AC5a)', () => {
       const document = parsePslDocument({
         schema: `model Bad {

@@ -191,6 +191,34 @@ describe('assembleAuthoringContributions', () => {
     ).toThrow(/Duplicate authoring field helper "dup"/);
   });
 
+  it('rejects malformed descriptor values during merge instead of recursing into primitives', () => {
+    // A descriptor missing `output` fails the canonical leaf guard but is
+    // a plain object, so the walker would historically recurse INTO it
+    // and, on the second registration of the same path, try to walk
+    // through the inner `'fieldPreset'` string of the `kind` property —
+    // either silently mangling state or infinite-looping. The walker
+    // now rejects the malformed value with a clear path-aware error.
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            field: {
+              malformed: { kind: 'fieldPreset' } as unknown as never,
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            field: {
+              malformed: { kind: 'fieldPreset' } as unknown as never,
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Invalid authoring field helper "malformed\.kind"/);
+  });
+
   it('rejects field preset and type constructor path collisions', () => {
     expect(() =>
       assembleAuthoringContributions([
