@@ -133,25 +133,39 @@ const pgTextCodec = mkCodec({
   },
 });
 
-const pgCharCodec: Codec<typeof PG_CHAR_CODEC_ID> = {
-  ...sqlCharCodec,
-  id: PG_CHAR_CODEC_ID,
-};
+// Prototype-preserving codec aliasing: derive a codec instance whose
+// `id` is the alias `codecId` while inheriting the base codec's behavior
+// (own properties via `Object.assign`, prototype methods via the shared
+// prototype). Works for both plain-object base codecs (today's
+// `defineCodec` output) and class-instance base codecs (post-Phase B,
+// when SQL bases migrate to `CodecImpl` subclasses with methods on the
+// prototype). A naive `{ ...base, id }` spread would silently strip
+// prototype methods at first encode/decode call.
+function aliasCodec<C extends { readonly id: string }, AliasId extends string>(
+  baseCodec: C,
+  codecId: AliasId,
+): Omit<C, 'id'> & { readonly id: AliasId } {
+  const proto = Object.getPrototypeOf(baseCodec) as object | null;
+  const aliased = Object.create(proto ?? Object.prototype) as Omit<C, 'id'> & {
+    readonly id: AliasId;
+  };
+  Object.assign(aliased, baseCodec);
+  Object.defineProperty(aliased, 'id', {
+    value: codecId,
+    writable: false,
+    enumerable: true,
+    configurable: true,
+  });
+  return aliased;
+}
 
-const pgVarcharCodec: Codec<typeof PG_VARCHAR_CODEC_ID> = {
-  ...sqlVarcharCodec,
-  id: PG_VARCHAR_CODEC_ID,
-};
-
-const pgIntCodec: Codec<typeof PG_INT_CODEC_ID> = {
-  ...sqlIntCodec,
-  id: PG_INT_CODEC_ID,
-};
-
-const pgFloatCodec: Codec<typeof PG_FLOAT_CODEC_ID> = {
-  ...sqlFloatCodec,
-  id: PG_FLOAT_CODEC_ID,
-};
+const pgCharCodec: Codec<typeof PG_CHAR_CODEC_ID> = aliasCodec(sqlCharCodec, PG_CHAR_CODEC_ID);
+const pgVarcharCodec: Codec<typeof PG_VARCHAR_CODEC_ID> = aliasCodec(
+  sqlVarcharCodec,
+  PG_VARCHAR_CODEC_ID,
+);
+const pgIntCodec: Codec<typeof PG_INT_CODEC_ID> = aliasCodec(sqlIntCodec, PG_INT_CODEC_ID);
+const pgFloatCodec: Codec<typeof PG_FLOAT_CODEC_ID> = aliasCodec(sqlFloatCodec, PG_FLOAT_CODEC_ID);
 
 const pgInt4Codec = mkCodec({
   typeId: PG_INT4_CODEC_ID,
@@ -598,27 +612,6 @@ const pgTextDescriptor = defineCodec<
   decode: (wire) => wire,
   meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
 });
-
-// Prototype-preserving codec aliasing: derive a codec instance whose
-// `id` is the alias `codecId` while inheriting the base codec's behavior
-// (own properties via `Object.assign`, prototype methods via the shared
-// prototype). Works for both plain-object base codecs (today's
-// `defineCodec` output) and class-instance base codecs (post-Phase B,
-// when SQL bases migrate to `CodecImpl` subclasses with methods on the
-// prototype). A naive `{ ...base, id }` spread would silently strip
-// prototype methods at first encode/decode call.
-function aliasCodec<C extends { readonly id: string }>(baseCodec: C, codecId: string): C {
-  const proto = Object.getPrototypeOf(baseCodec) as object | null;
-  const aliased = Object.create(proto ?? Object.prototype) as C;
-  Object.assign(aliased, baseCodec);
-  Object.defineProperty(aliased, 'id', {
-    value: codecId,
-    writable: false,
-    enumerable: true,
-    configurable: true,
-  });
-  return aliased;
-}
 
 class PgCharDescriptor extends CodecDescriptorImpl<{ readonly length?: number }> {
   override readonly codecId = PG_CHAR_CODEC_ID;
