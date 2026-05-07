@@ -17,6 +17,8 @@ import type {
   OperationContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
+import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
+import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
@@ -124,10 +126,59 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
   resolveIdentityValue?: (input: ResolveIdentityValueInput) => string | null | undefined;
 }
 
+/**
+ * Pinned head ref for a contract space — the `(hash, invariants)` tuple a
+ * runner targets when applying that space's migration graph. Identical in
+ * shape to the on-disk `migrations/<space-id>/refs/head.json` the framework
+ * writes per loaded extension.
+ *
+ * Project: extension contract spaces (TML-2397). See
+ * `projects/extension-contract-spaces/specs/framework-mechanism.spec.md` § 1.
+ */
+export interface ExtensionContractRef {
+  readonly hash: string;
+  readonly invariants: readonly string[];
+}
+
+/**
+ * In-memory authored migration package as published by an extension's
+ * descriptor module. Mirrors the on-disk
+ * {@link import('@prisma-next/migration-tools/package').MigrationPackage}
+ * shape minus `dirPath` — at descriptor construction time the package has
+ * not yet been emitted to the user's repo, so there is no path to record.
+ *
+ * The framework's pinned-artefact emission step (T1.7 / T1.8) materialises
+ * each package into `migrations/<space-id>/<dirName>/`.
+ */
+export interface ExtensionMigrationPackage {
+  readonly dirName: string;
+  readonly metadata: MigrationMetadata;
+  readonly ops: MigrationOps;
+}
+
+/**
+ * In-memory contract-space view an extension publishes through its
+ * descriptor module: the canonical contract value, the migration graph
+ * authored against it, and the pinned head ref. The framework reads this
+ * value only at authoring time (during `migrate`); apply / verify paths
+ * read the user's repo (`migrations/<space-id>/...`) instead.
+ */
+export interface ExtensionContractSpace {
+  readonly contractJson: Contract<SqlStorage>;
+  readonly migrations: readonly ExtensionMigrationPackage[];
+  readonly headRef: ExtensionContractRef;
+}
+
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
   readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  /**
+   * Schema-contributing extensions opt into the per-space planner / runner /
+   * verifier by setting this field. Extensions without it are codec-only or
+   * query-ops-only — today's behaviour preserved.
+   */
+  readonly contractSpace?: ExtensionContractSpace;
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
