@@ -15,11 +15,9 @@ Introduce **contract spaces** — disjoint `(contract.json, migration-graph)` un
 | Role         | Person/Team                          | Context                                                           |
 | ------------ | ------------------------------------ | ----------------------------------------------------------------- |
 | Maker        | William Madden                       | Drives execution                                                  |
-| Reviewer     | _TBD (framework team)_               | Architectural review across planner / runner / verifier           |
+| Reviewer     | William Madden                       | Architectural review across planner / runner / verifier           |
 | Collaborator | Cipherstash project (TML-2373)       | Immediate consumer; needs the unblock                             |
 | Collaborator | pgvector maintainers                 | pgvector is migrated to a contract space under M4                 |
-
-(Confirm collaborators during refinement.)
 
 ## Shipping Strategy
 
@@ -207,7 +205,6 @@ Carrying forward from `spec.md` § Open Questions:
 Plan-derived items needing resolution during execution:
 
 3. **Marker schema migration safety.** T1.1 changes the marker table's primary key from `id` to `space`. This is a one-shot framework-internal migration; needs careful handling for deployments that may have multiple running processes. Verify via shadow-DB preflight (per ADR 029).
-4. **Reviewer assignment.** No specific reviewer named yet; resolve before M1 starts.
 
 Resolved during plan finalisation:
 
@@ -215,3 +212,4 @@ Resolved during plan finalisation:
 - ~~**Synthetic test extension package location.**~~ Locked: `packages/3-extensions/test-contract-space/` as a private workspace package (mirrors pgvector's shape; exercises real descriptor-import path).
 - ~~**Linear project elevation.**~~ Decision: keep TML-2397 as a single tracking issue (no Linear project / per-deliverable issues).
 - ~~**Sub-spec timing.**~~ Decision: drafted now (alongside this plan). See `specs/framework-mechanism.spec.md` and `specs/cipherstash-migration.spec.md`.
+- ~~**Reviewer assignment.**~~ William Madden (self-review on architectural decisions across planner / runner / verifier).
