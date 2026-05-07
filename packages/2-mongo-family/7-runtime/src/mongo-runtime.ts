@@ -11,6 +11,7 @@ import type { MongoAdapter, MongoDriver } from '@prisma-next/mongo-lowering';
 import type { MongoQueryPlan } from '@prisma-next/mongo-query-ast/execution';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeMongoRow } from './codecs/decoding';
+import { computeMongoContentHash } from './content-hash';
 import type { MongoExecutionPlan } from './mongo-execution-plan';
 import type { MongoCodecLookup, MongoExecutionContext } from './mongo-execution-stack';
 import type { MongoMiddleware, MongoMiddlewareContext } from './mongo-middleware';
@@ -84,6 +85,9 @@ class MongoRuntimeImpl
       mode: options.mode ?? 'strict',
       now: () => Date.now(),
       log: { info: noop, warn: noop, error: noop },
+      // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
+      // the framework parameter type is the cross-family base.
+      contentHash: (exec) => computeMongoContentHash(exec as MongoExecutionPlan),
     };
 
     super({ middleware, ctx });

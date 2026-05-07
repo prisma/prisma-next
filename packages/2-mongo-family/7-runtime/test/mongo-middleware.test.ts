@@ -324,6 +324,34 @@ describe('MongoRuntime middleware lifecycle', () => {
 
     expect(logWorks).toBe(true);
   });
+
+  it('exposes a working contentHash on the middleware context', async () => {
+    const observedKeys: string[] = [];
+    const middleware: MongoMiddleware = {
+      name: 'content-hash-tester',
+      async beforeExecute(plan, ctx) {
+        observedKeys.push(await ctx.contentHash(plan));
+      },
+    };
+
+    const adapter = createMockAdapter();
+    const runtime = createMongoRuntime({
+      context: makeContext(adapter),
+      driver: createMockDriver([{ _id: '1' }, { _id: '2' }, { _id: '3' }]),
+      middleware: [middleware],
+    });
+
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+    for await (const _row of runtime.execute(createPlan())) {
+      void _row;
+    }
+
+    expect(observedKeys).toHaveLength(2);
+    expect(observedKeys[0]).toMatch(/^sha512:[0-9a-f]{128}$/);
+    expect(observedKeys[0]).toBe(observedKeys[1]);
+  });
 });
 
 describe('MongoRuntime middleware compatibility validation', () => {

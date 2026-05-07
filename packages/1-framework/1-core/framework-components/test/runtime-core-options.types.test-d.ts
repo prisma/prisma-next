@@ -37,6 +37,7 @@ test('execute accepts an optional second argument carrying { signal }', () => {
       mode: 'strict',
       now: () => 0,
       log: { info: () => {}, warn: () => {}, error: () => {} },
+      contentHash: async () => 'mock-hash',
     },
   });
   const plan: FixturePlan = { draftId: 'd', meta };

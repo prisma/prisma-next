@@ -25,6 +25,7 @@ const mockCtx: RuntimeMiddlewareContext = {
   mode: 'strict',
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
+  contentHash: async () => 'mock-hash',
 };
 
 async function* yieldRows<R>(rows: ReadonlyArray<R>): AsyncGenerator<R, void, unknown> {
@@ -79,7 +80,7 @@ describe('runWithMiddleware', () => {
 
     expect(out).toEqual(rows);
     expect(events).toEqual(['beforeExecute', 'onRow:1', 'onRow:2', 'afterExecute']);
-    expect(observedResult).toMatchObject({ rowCount: 2, completed: true });
+    expect(observedResult).toMatchObject({ rowCount: 2, completed: true, source: 'driver' });
     expect(observedResult?.latencyMs).toBeGreaterThanOrEqual(0);
   });
 
