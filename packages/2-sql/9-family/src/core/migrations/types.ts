@@ -18,7 +18,12 @@ import type {
   OperationContext,
   SchemaIssue,
 } from '@prisma-next/framework-components/control';
-import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
+import type {
+  SqlStorage,
+  StorageColumn,
+  StorageTable,
+  StorageTypeInstance,
+} from '@prisma-next/sql-contract/types';
 import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
@@ -83,6 +88,43 @@ export interface ResolveIdentityValueInput {
   readonly typeParams?: Record<string, unknown>;
 }
 
+/**
+ * Per-field lifecycle event a codec hook can react to.
+ *
+ * Fired during app-space migration emission as the SQL family diffs the
+ * prior contract against the new contract. See
+ * `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`
+ * § 5 for the wiring contract.
+ *
+ * - `'added'`     — the field is present in the new contract but not the prior.
+ * - `'dropped'`   — the field is present in the prior contract but not the new.
+ * - `'altered'`   — the field is present in both and any property other than
+ *                   `codecId` differs. Codec-id changes are a v1 non-goal:
+ *                   when only `codecId` differs, no `'altered'` event fires.
+ */
+export type FieldEvent = 'added' | 'dropped' | 'altered';
+
+/**
+ * Context passed to {@link CodecControlHooks.onFieldEvent}.
+ *
+ * `tableName` and `fieldName` are always populated; `priorTable` /
+ * `priorField` carry the prior contract's view of the table and column
+ * (present for `'dropped'` and `'altered'`); `newTable` / `newField`
+ * carry the new contract's view (present for `'added'` and `'altered'`).
+ *
+ * The hook only ever receives app-space contract IR — extension-space
+ * fields are scoped out by the API: the sub-spec wires the hook at the
+ * application emitter only.
+ */
+export interface FieldEventContext {
+  readonly tableName: string;
+  readonly fieldName: string;
+  readonly priorTable?: StorageTable;
+  readonly newTable?: StorageTable;
+  readonly priorField?: StorageColumn;
+  readonly newField?: StorageColumn;
+}
+
 export interface CodecControlHooks<TTargetDetails = unknown> {
   planTypeOperations?: (options: {
     readonly typeName: string;
@@ -123,6 +165,24 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
    * - undefined: no opinion; planner may use built-in fallbacks
    */
   resolveIdentityValue?: (input: ResolveIdentityValueInput) => string | null | undefined;
+  /**
+   * Reacts to per-field added / dropped / altered events as the app-space
+   * emitter diffs the prior contract against the new contract. Returned
+   * ops are inlined into the app-space migration's `ops.json` alongside
+   * the user's structural ops.
+   *
+   * Synchronous. Each returned op must carry its own `invariantId`. Hooks
+   * are dispatched per `(table, field)` based on the field's `codecId`
+   * (the new field's codec for `'added'` / `'altered'`; the prior field's
+   * codec for `'dropped'`).
+   *
+   * See `projects/extension-contract-spaces/specs/framework-mechanism.spec.md`
+   * § 5 for the wiring contract and the deterministic ordering rule.
+   */
+  onFieldEvent?: (
+    event: FieldEvent,
+    ctx: FieldEventContext,
+  ) => readonly SqlMigrationPlanOperation<TTargetDetails>[];
 }
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
