@@ -33,19 +33,8 @@ import type { MongoExecutionPlan } from './mongo-execution-plan';
  * of the same characters.
  *
  * The canonical string is then piped through `hashContent` to produce a
- * bounded, opaque digest (see `@prisma-next/utils/hash-content` for the
- * rationale). The two key reasons for hashing rather than using the
- * canonical string directly:
- *
- * - **Bounded memory.** A command embedding a large document (binary blob,
- *   large nested payload) would otherwise produce a proportionally large
- *   cache key; hashing pins per-key cost at a fixed digest length
- *   regardless of input size.
- * - **Sensitive-data isolation.** Document and filter values appear
- *   verbatim in the canonical string; cache keys flow into debug logs,
- *   Redis `KEYS` output, monitoring tools, and user-supplied `CacheStore`
- *   implementations. Hashing prevents PII / credentials / tokens that
- *   appear in command payloads from showing up in those surfaces.
+ * bounded, opaque digest. See `@prisma-next/utils/hash-content` for the
+ * rationale.
  *
  * @internal
  */
