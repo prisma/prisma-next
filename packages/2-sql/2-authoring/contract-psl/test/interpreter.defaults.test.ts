@@ -413,8 +413,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     // Registers a synthetic preset under `temporal.exampleField` to confirm
     // that PSL's field-preset dispatch is generic — it walks
     // `authoringContributions.field` for any registered preset, not just the
-    // real `temporal.{createdAt,updatedAt}` pair. AC6 / TC7 from
-    // projects/created-updated-at-authoring/spec.md.
+    // real `temporal.{createdAt,updatedAt}` pair.
     const document = parsePslDocument({
       schema: `model Synthetic {
   id Int @id
