@@ -2157,6 +2157,9 @@ importers:
       '@prisma-next/tsdown':
         specifier: workspace:*
         version: link:../../../0-config/tsdown
+      arktype:
+        specifier: ^2.1.25
+        version: 2.1.29
       tsdown:
         specifier: 'catalog:'
         version: 0.22.0(tsx@4.20.6)(typescript@5.9.3)(unrun@0.2.22)

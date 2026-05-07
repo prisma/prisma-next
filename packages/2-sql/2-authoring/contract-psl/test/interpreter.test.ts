@@ -1,5 +1,7 @@
 import { parsePslDocument } from '@prisma-next/psl-parser';
+import { defineIndexTypes } from '@prisma-next/sql-contract/index-types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
 import {
   type InterpretPslDocumentToSqlContractInput,
@@ -10,6 +12,15 @@ import {
   postgresScalarTypeDescriptors,
   postgresTarget,
 } from './fixtures';
+
+const testIndexPack = {
+  kind: 'extension',
+  id: 'test-index-pack',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  indexTypes: defineIndexTypes().add('bm25', { options: type('object') }),
+} as const;
 
 describe('interpretPslDocumentToSqlContract', () => {
   const builtinControlMutationDefaults = createBuiltinLikeControlMutationDefaults();
@@ -571,6 +582,8 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        composedExtensionPacks: [testIndexPack.id],
+        composedExtensionPackRefs: [testIndexPack],
       });
 
       expect(result.ok).toBe(true);
@@ -605,6 +618,8 @@ model OrderItem {
       const result = interpretPslDocumentToSqlContract({
         document,
         controlMutationDefaults: builtinControlMutationDefaults,
+        composedExtensionPacks: [testIndexPack.id],
+        composedExtensionPackRefs: [testIndexPack],
       });
       expect(result.ok).toBe(true);
       if (!result.ok) return;

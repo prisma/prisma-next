@@ -18,13 +18,18 @@ import {
 } from '@prisma-next/contract/types';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import {
+  createIndexTypeRegistry,
+  type IndexTypeMap,
+  type IndexTypeRegistration,
+} from '@prisma-next/sql-contract/index-types';
+import {
   applyFkDefaults,
   type SqlStorage,
   type StorageColumn,
   type StorageTable,
   type StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import { validateStorageSemantics } from '@prisma-next/sql-contract/validators';
+import { validateIndexTypes, validateStorageSemantics } from '@prisma-next/sql-contract/validators';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type {
   ContractDefinition,
@@ -63,11 +68,25 @@ function encodeColumnDefault(
   };
 }
 
-function assertStorageSemantics(storage: SqlStorage): void {
-  const semanticErrors = validateStorageSemantics(storage);
+function assertStorageSemantics(
+  definition: ContractDefinition,
+  contract: Contract<SqlStorage>,
+): void {
+  const semanticErrors = validateStorageSemantics(contract.storage);
   if (semanticErrors.length > 0) {
     throw new Error(`Contract semantic validation failed: ${semanticErrors.join('; ')}`);
   }
+
+  const indexTypeRegistry = createIndexTypeRegistry();
+  for (const pack of [definition.target, ...Object.values(definition.extensionPacks ?? {})]) {
+    const registration = (pack as { readonly indexTypes?: IndexTypeRegistration<IndexTypeMap> })
+      .indexTypes;
+    if (!registration) continue;
+    for (const entry of registration.entries) {
+      indexTypeRegistry.register(entry);
+    }
+  }
+  validateIndexTypes(contract, indexTypeRegistry);
 }
 
 function assertKnownTargetModel(
@@ -447,7 +466,7 @@ export function buildSqlContractFromDefinition(
     meta: {},
   };
 
-  assertStorageSemantics(contract.storage);
+  assertStorageSemantics(definition, contract);
 
   return contract;
 }

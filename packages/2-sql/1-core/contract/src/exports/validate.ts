@@ -1,1 +1,1 @@
-export { type ValidateContractOptions, validateContract } from '../validate';
+export { validateContract } from '../validate';

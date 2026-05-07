@@ -6,6 +6,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import { createIndexTypeRegistry } from '../src/index-types';
 import type { SqlStorage } from '../src/types';
 import { validateContract } from '../src/validate';
+import { validateIndexTypes } from '../src/validators';
 
 const baseContract = {
   target: 'postgres',
@@ -895,7 +896,7 @@ describe('validateContract', () => {
     });
   });
 
-  describe('index-type registry validation', () => {
+  describe('validateIndexTypes', () => {
     function makeContractWithIndex(index: Record<string, unknown>) {
       return makeContract({
         User: {
@@ -908,7 +909,7 @@ describe('validateContract', () => {
           indexes: [index],
           foreignKeys: [],
         },
-      });
+      }) as Contract<SqlStorage>;
     }
 
     it('accepts a contract whose index references a registered type with valid options', () => {
@@ -922,21 +923,13 @@ describe('validateContract', () => {
         type: 'demo',
         options: { fillfactor: 70 },
       });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).not.toThrow();
+      expect(() => validateIndexTypes(contract, registry)).not.toThrow();
     });
 
     it('rejects an index whose type is not registered', () => {
       const registry = createIndexTypeRegistry();
       const contract = makeContractWithIndex({ columns: ['body'], type: 'made-up' });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).toThrow(/made-up/);
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/made-up/);
     });
 
     it('rejects an index whose options fail the registered validator', () => {
@@ -950,11 +943,7 @@ describe('validateContract', () => {
         type: 'demo',
         options: { fillfactor: 'not-a-number' },
       });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).toThrow(/fillfactor/);
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/fillfactor/);
     });
 
     it('rejects extra option keys in strict mode', () => {
@@ -968,11 +957,7 @@ describe('validateContract', () => {
         type: 'demo',
         options: { fillfactor: 70, unknown: 1 },
       });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).toThrow(/unknown/);
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/unknown/);
     });
 
     it('rejects an index that has options without a type', () => {
@@ -981,48 +966,21 @@ describe('validateContract', () => {
         columns: ['body'],
         options: { fillfactor: 70 },
       });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).toThrow(/options/);
+      expect(() => validateIndexTypes(contract, registry)).toThrow(/options/);
     });
 
     it('accepts an index without type or options', () => {
       const registry = createIndexTypeRegistry();
       const contract = makeContractWithIndex({ columns: ['body'] });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).not.toThrow();
+      expect(() => validateIndexTypes(contract, registry)).not.toThrow();
     });
 
-    it('rejects a typed index when no registry is provided (defaults to empty)', () => {
-      const contract = makeContractWithIndex({ columns: ['body'], type: 'anything' });
-      expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
-        /unregistered index type "anything"/,
-      );
-    });
-
-    it('still rejects options-without-type when no registry is provided', () => {
-      const contract = makeContractWithIndex({
-        columns: ['body'],
-        options: { fillfactor: 70 },
-      });
-      expect(() => validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup)).toThrow(
-        /options/,
-      );
-    });
-
-    it('rejects a typed index when an empty registry is supplied explicitly', () => {
+    it('rejects a typed index against an empty registry', () => {
       const registry = createIndexTypeRegistry();
       const contract = makeContractWithIndex({ columns: ['body'], type: 'made-up' });
-      expect(() =>
-        validateContract<Contract<SqlStorage>>(contract, emptyCodecLookup, {
-          indexTypeRegistry: registry,
-        }),
-      ).toThrow(/unregistered index type "made-up"/);
+      expect(() => validateIndexTypes(contract, registry)).toThrow(
+        /unregistered index type "made-up"/,
+      );
     });
   });
 });

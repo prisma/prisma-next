@@ -34,9 +34,11 @@ Each pack stores its registered index types in a single field whose value is the
 
 No global `declare module` augmentation is used; the merged set is purely a function of the packs attached to a given contract. This avoids cross-contract coupling — two contracts with different pack lists in the same workspace see different valid `type` sets, as they should.
 
-### 4. Validation seam at the SQL-family boundary
+### 4. Validation seam at the ContractIR → Contract boundary
 
-Registry-aware validation runs from `validateSqlStorage`, the SQL family's storage validator that the framework's `validateContract` dispatches into. Framework core stays family-agnostic: it does not know about indexes, let alone index types. When an `IndexDef` carries a `type`, `validateSqlStorage` looks up the entry and validates `options` against the entry's arktype validator. An unregistered `type`, an `options` payload that fails the validator, or `options` set without `type` are all rejected with errors that name the offending index type or key.
+Registry-aware validation runs at the single point where both authoring surfaces converge: the lowering function that turns a `ContractDefinition` (the in-memory IR) into a final `Contract<SqlStorage>`. The TS authoring chain (`defineContract({...})` → `buildContractFromDsl` → `buildSqlContractFromDefinition`) and the PSL interpreter (`interpretPslDocumentToSqlContract`, which constructs a `ContractDefinition` from the PSL AST and calls the same lowering) hit the same seam. The lowering function builds a per-contract registry from the definition's attached packs, walks every index in the storage IR, and rejects unregistered `type` values, options that fail the registered validator, and `options` set without `type`. Errors fire at authoring time — at the line that wrote the offending model — not when a downstream consumer loads the emitted `contract.json`.
+
+Validating at the lowering boundary keeps the runtime path simple. The framework's `validateContract` (consumed by runtime drivers like `postgres({contractJson})`) still does structural and referential validation, but it does not need a registry: by the time a contract reaches a driver, the lowering already validated index types against the packs in scope.
 
 Strictness — whether unknown keys in `options` are rejected — is a property of the validator each registrant constructs, not something the framework imposes on top. arktype is loose-by-default; a registrant who wants extra-key rejection opts in when building their option-shape validator. The recommendation is to do so: an entry's option shape is a contract between the registrant and the renderer, and an unrecognised key is much more likely to be a typo than a genuine extension point. Silently dropping it at validate time would mask it from authors and produce surprising DDL.
 
@@ -54,9 +56,9 @@ When an extension pack declares its index types, the factory call site is the si
 
 When a contract is defined, two things happen — strictly per-contract, with no global state. On the type side, the contract-definition pipeline walks the attached packs, reads each pack's registration, and intersects the per-pack maps. The merged map is what narrows `options` per-`type` for `constraints.index(...)`. Every contract sees only the packs it asked for. On the runtime side, contract assembly creates a fresh per-contract registry and calls `register` for each entry the attached packs contribute. A duplicate `type` across packs surfaces as a registration-time error naming the conflict; this is contract-level, not workspace-level.
 
-When a contract is validated at runtime, `validateSqlStorage` consults that contract's registry. Lookup is by `type` literal; validation of `options` is one arktype invocation per index, against whichever shape the registrant constructed (loose or strict). The framework owns the Postgres-shaped renderer for `options`; per-entry validators have no rendering responsibility and no rendering surface area.
+When the lowering builds the contract, it consults that contract's freshly-built registry. Lookup is by `type` literal; validation of `options` is one arktype invocation per index, against whichever shape the registrant constructed (loose or strict). The framework owns the Postgres-shaped renderer for `options`; per-entry validators have no rendering responsibility and no rendering surface area.
 
-When the Postgres adapter renders DDL, it consults only the validated IR. The renderer never re-invokes the registry: by the time a node reaches the adapter, its `options` is already canonical. This keeps the adapter's surface narrow and means the registry's correctness needs to hold only at validate time.
+When the Postgres adapter renders DDL, it consults only the validated IR. The renderer never re-invokes the registry: by the time a node reaches the adapter, its `options` is already canonical. This keeps the adapter's surface narrow and means the registry's correctness needs to hold only at lowering time.
 
 ## Alternatives considered
 

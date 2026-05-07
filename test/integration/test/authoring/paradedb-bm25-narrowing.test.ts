@@ -53,114 +53,122 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
   });
 
   it('rejects a bm25 index with an unknown options key at compile time', () => {
-    defineContract(
-      {
-        family: sqlFamily,
-        target: postgresPack,
-        extensionPacks: { paradedb: paradedbPack },
-      },
-      ({ model: helperModel, field: helperField }) => {
-        const Doc = helperModel('Doc', {
-          fields: {
-            id: helperField.column(int4Column).id(),
-            body: helperField.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'doc',
-          indexes: [
-            constraints.index([cols.body], {
-              type: 'bm25',
-              // @ts-expect-error — bm25 options is { key_field: string } in strict mode; unknown_key is rejected
-              options: { key_field: 'id', unknown_key: 'x' },
-            }),
-          ],
-        }));
-        return { models: { Doc } };
-      },
-    );
+    expect(() =>
+      defineContract(
+        {
+          family: sqlFamily,
+          target: postgresPack,
+          extensionPacks: { paradedb: paradedbPack },
+        },
+        ({ model: helperModel, field: helperField }) => {
+          const Doc = helperModel('Doc', {
+            fields: {
+              id: helperField.column(int4Column).id(),
+              body: helperField.column(textColumn),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'doc',
+            indexes: [
+              constraints.index([cols.body], {
+                type: 'bm25',
+                // @ts-expect-error — bm25 options is { key_field: string } in strict mode; unknown_key is rejected
+                options: { key_field: 'id', unknown_key: 'x' },
+              }),
+            ],
+          }));
+          return { models: { Doc } };
+        },
+      ),
+    ).toThrow(/unknown_key/);
   });
 
   it('rejects a bm25 index missing the required key_field at compile time', () => {
-    defineContract(
-      {
-        family: sqlFamily,
-        target: postgresPack,
-        extensionPacks: { paradedb: paradedbPack },
-      },
-      ({ model: helperModel, field: helperField }) => {
-        const Doc = helperModel('Doc', {
-          fields: {
-            id: helperField.column(int4Column).id(),
-            body: helperField.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'doc',
-          indexes: [
-            constraints.index([cols.body], {
-              type: 'bm25',
-              // @ts-expect-error — bm25 options requires key_field
-              options: {},
-            }),
-          ],
-        }));
-        return { models: { Doc } };
-      },
-    );
+    expect(() =>
+      defineContract(
+        {
+          family: sqlFamily,
+          target: postgresPack,
+          extensionPacks: { paradedb: paradedbPack },
+        },
+        ({ model: helperModel, field: helperField }) => {
+          const Doc = helperModel('Doc', {
+            fields: {
+              id: helperField.column(int4Column).id(),
+              body: helperField.column(textColumn),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'doc',
+            indexes: [
+              constraints.index([cols.body], {
+                type: 'bm25',
+                // @ts-expect-error — bm25 options requires key_field
+                options: {},
+              }),
+            ],
+          }));
+          return { models: { Doc } };
+        },
+      ),
+    ).toThrow(/key_field/);
   });
 
   it('rejects an unregistered index type at compile time', () => {
-    defineContract(
-      {
-        family: sqlFamily,
-        target: postgresPack,
-        extensionPacks: { paradedb: paradedbPack },
-      },
-      ({ model: helperModel, field: helperField }) => {
-        const Doc = helperModel('Doc', {
-          fields: {
-            id: helperField.column(int4Column).id(),
-            body: helperField.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'doc',
-          indexes: [
-            constraints.index([cols.body], {
-              // @ts-expect-error — only 'bm25' is registered when paradedb is attached; 'made-up' is not
-              type: 'made-up',
-              options: { key_field: 'id' },
-            }),
-          ],
-        }));
-        return { models: { Doc } };
-      },
-    );
+    expect(() =>
+      defineContract(
+        {
+          family: sqlFamily,
+          target: postgresPack,
+          extensionPacks: { paradedb: paradedbPack },
+        },
+        ({ model: helperModel, field: helperField }) => {
+          const Doc = helperModel('Doc', {
+            fields: {
+              id: helperField.column(int4Column).id(),
+              body: helperField.column(textColumn),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'doc',
+            indexes: [
+              constraints.index([cols.body], {
+                // @ts-expect-error — only 'bm25' is registered when paradedb is attached; 'made-up' is not
+                type: 'made-up',
+                options: { key_field: 'id' },
+              }),
+            ],
+          }));
+          return { models: { Doc } };
+        },
+      ),
+    ).toThrow(/unregistered index type "made-up"/);
   });
 
   it('rejects options without a type at compile time', () => {
-    defineContract(
-      {
-        family: sqlFamily,
-        target: postgresPack,
-        extensionPacks: { paradedb: paradedbPack },
-      },
-      ({ model: helperModel, field: helperField }) => {
-        const Doc = helperModel('Doc', {
-          fields: {
-            id: helperField.column(int4Column).id(),
-            body: helperField.column(textColumn),
-          },
-        }).sql(({ cols, constraints }) => ({
-          table: 'doc',
-          indexes: [
-            // @ts-expect-error — providing options without a type is a compile error when packs contribute index types
-            constraints.index([cols.body], {
-              options: { key_field: 'id' },
-            }),
-          ],
-        }));
-        return { models: { Doc } };
-      },
-    );
+    expect(() =>
+      defineContract(
+        {
+          family: sqlFamily,
+          target: postgresPack,
+          extensionPacks: { paradedb: paradedbPack },
+        },
+        ({ model: helperModel, field: helperField }) => {
+          const Doc = helperModel('Doc', {
+            fields: {
+              id: helperField.column(int4Column).id(),
+              body: helperField.column(textColumn),
+            },
+          }).sql(({ cols, constraints }) => ({
+            table: 'doc',
+            indexes: [
+              // @ts-expect-error — providing options without a type is a compile error when packs contribute index types
+              constraints.index([cols.body], {
+                options: { key_field: 'id' },
+              }),
+            ],
+          }));
+          return { models: { Doc } };
+        },
+      ),
+    ).toThrow(/options without a type/);
   });
 
   it('imported bare model() rejects any type/options — strict by default', () => {
@@ -178,11 +186,13 @@ describe('paradedb bm25 narrowing in TS authoring DSL', () => {
       ],
     }));
 
-    defineContract({
-      family: sqlFamily,
-      target: postgresPack,
-      models: { Doc },
-    });
+    expect(() =>
+      defineContract({
+        family: sqlFamily,
+        target: postgresPack,
+        models: { Doc },
+      }),
+    ).toThrow(/unregistered index type "made-up"/);
   });
 
   it('imported bare model() still accepts a default index with no type/options', () => {

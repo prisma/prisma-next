@@ -2,6 +2,7 @@ import type { FamilyPackRef, TargetPackRef } from '@prisma-next/framework-compon
 import { describe, expect, it } from 'vitest';
 import { type ContractInput, defineContract, field, model, rel } from '../src/contract-builder';
 import { columnDescriptor } from './helpers/column-descriptor';
+import { testIndexPack } from './helpers/test-index-pack';
 
 const int4Column = columnDescriptor('pg/int4@1');
 const textColumn = columnDescriptor('pg/text@1');
@@ -235,6 +236,37 @@ describe('contract definition constraint support', () => {
         },
       }),
     ).toThrow(/Contract semantic validation failed:.*user_pkey/);
+  });
+
+  it('throws at authoring time when an index uses an unregistered type', () => {
+    expect(() =>
+      defineContract(
+        {
+          family: bareFamilyPack,
+          target: postgresTargetPack,
+          extensionPacks: { testIndexes: testIndexPack },
+        },
+        ({ model: helperModel, field: helperField }) => ({
+          models: {
+            Doc: helperModel('Doc', {
+              fields: {
+                id: helperField.column(int4Column).id(),
+                body: helperField.column(textColumn),
+              },
+            }).sql(({ cols, constraints }) => ({
+              table: 'doc',
+              indexes: [
+                constraints.index([cols.body], {
+                  // @ts-expect-error - exercise the authoring-time runtime validator on an unregistered type literal.
+                  type: 'made-up',
+                  options: {},
+                }),
+              ],
+            })),
+          },
+        }),
+      ),
+    ).toThrow(/unregistered index type "made-up"/);
   });
 
   it('supports multiple constraints on the same table', () => {
