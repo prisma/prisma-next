@@ -57,6 +57,7 @@
   "exports": {
     "./config": "./dist/config.mjs",
     "./runtime": "./dist/runtime.mjs",
+    "./serverless": "./dist/serverless.mjs",
     "./package.json": "./package.json"
   },
   "main": "./dist/runtime.mjs",

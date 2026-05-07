@@ -4,7 +4,6 @@ import type {
   ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
-  DataTransformOperation,
   MigratableTargetDescriptor,
   MigrationOperationPolicy,
   MigrationPlan,
@@ -139,6 +138,15 @@ export interface SqlControlAdapterDescriptor<TTargetId extends string>
 export interface SqlMigrationPlanOperationStep {
   readonly description: string;
   readonly sql: string;
+  /**
+   * Optional parameter values bound at execution time. The runner forwards
+   * these to `driver.query(sql, params ?? [])`, so step authors can use
+   * placeholder syntax (`$1`, `$2`, …) instead of inlining literals into
+   * the SQL string. Reuses the driver's parameter binder rather than
+   * rolling per-target literal serialization for every type the planner
+   * may emit.
+   */
+  readonly params?: readonly unknown[];
   readonly meta?: AnyRecord;
 }
 
@@ -167,19 +175,6 @@ export interface SqlMigrationPlanOperation<TTargetDetails> extends MigrationPlan
   readonly postcheck: readonly SqlMigrationPlanOperationStep[];
   readonly meta?: AnyRecord;
 }
-
-/**
- * Union of all operation shapes a SQL-family migration may emit: schema-facing
- * `SqlMigrationPlanOperation`s and family-agnostic `DataTransformOperation`s.
- *
- * Mirrors `AnyMongoMigrationOperation` in shape — the runner already handles
- * both branches via `isDataTransformOperation`, and authored `migration.ts`
- * files must be able to intermix `dataTransform(endContract, …)` calls with
- * DDL factory calls (e.g. `setNotNull(…)`) in a single `operations` array.
- */
-export type AnySqlMigrationOperation<TTargetDetails> =
-  | SqlMigrationPlanOperation<TTargetDetails>
-  | DataTransformOperation;
 
 export interface SqlMigrationPlanContractInfo {
   readonly storageHash: string;

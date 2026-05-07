@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { jsonbColumn, jsonColumn } from '../src/exports/column-types';
+import { byteaColumn, jsonbColumn, jsonColumn } from '../src/exports/column-types';
 
 // Phase C of the codec-registry-unification project retired the schema-
 // typed `json(schema)` / `jsonb(schema)` overloads from the postgres
@@ -22,6 +22,15 @@ describe('adapter-postgres column-types', () => {
       expect(jsonbColumn).toMatchObject({
         codecId: 'pg/jsonb@1',
         nativeType: 'jsonb',
+      });
+    });
+  });
+
+  describe('byteaColumn', () => {
+    it('has expected codec and native type', () => {
+      expect(byteaColumn).toMatchObject({
+        codecId: 'pg/bytea@1',
+        nativeType: 'bytea',
       });
     });
   });

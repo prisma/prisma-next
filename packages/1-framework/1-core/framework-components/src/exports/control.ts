@@ -25,7 +25,6 @@ export type {
   ControlTargetInstance,
 } from '../control/control-instances';
 export type {
-  DataTransformOperation,
   MigrationOperationClass,
   MigrationOperationPolicy,
   MigrationPlan,

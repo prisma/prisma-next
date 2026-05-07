@@ -10,6 +10,7 @@ import {
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
+  PG_BYTEA_CODEC_ID,
   PG_CHAR_CODEC_ID,
   PG_ENUM_CODEC_ID,
   PG_FLOAT_CODEC_ID,
@@ -220,6 +221,7 @@ export const postgresAdapterDescriptorMeta = {
         [PG_ENUM_CODEC_ID]: pgEnumControlHooks,
         [PG_JSON_CODEC_ID]: identityHooks,
         [PG_JSONB_CODEC_ID]: identityHooks,
+        [PG_BYTEA_CODEC_ID]: identityHooks,
       },
     },
     storage: [
@@ -285,6 +287,7 @@ export const postgresAdapterDescriptorMeta = {
       },
       { typeId: PG_JSON_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'json' },
       { typeId: PG_JSONB_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'jsonb' },
+      { typeId: PG_BYTEA_CODEC_ID, familyId: 'sql', targetId: 'postgres', nativeType: 'bytea' },
     ],
     queryOperationTypes: {
       import: {

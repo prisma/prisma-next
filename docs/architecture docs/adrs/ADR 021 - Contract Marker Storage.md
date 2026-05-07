@@ -24,6 +24,7 @@ create table if not exists prisma_contract.marker (
   profile_hash text not null,
   contract_json jsonb,
   canonical_version int,
+  invariants text[] not null default '{}',
   updated_at timestamptz not null default now(),
   app_tag text,
   meta jsonb not null default '{}'
@@ -36,20 +37,22 @@ create table if not exists prisma_contract.marker (
 - profile_hash mirrors the contract-pinned capability profile and is used to enforce equality at verification time
 - contract_json is optional complete contract JSON for drift analysis and PPg features
 - canonical_version tracks the canonicalization version used for the contract_json
+- invariants is the set-semantic, monotonic record of `invariantId`s that have been applied to this database at least once in its history. Populated by server-side union on every successful `migration apply`; never shrinks. The reading is "applied-at-least-once," not "currently true of the data" — the data transform's `check` is the authority for the latter. See [ADR 208 — Invariant-aware migration routing](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the full semantics.
 - app_tag is optional human context (service or deployment name)
 - meta is reserved for forward-compatible fields the platform may add later
 
 ### Other targets
 - **MySQL**: same table in prisma_contract database or current schema
-- **SQLite**: prisma_contract_marker table with the same columns
-- **Mongo**: prisma_contract.marker collection with a single document keyed by _id: 1
+- **SQLite**: prisma_contract_marker table with the same columns; the runner merges the `invariants` set inside `BEGIN EXCLUSIVE` (no native text-array merge in SQL)
+- **Mongo**: prisma_contract.marker collection with a single document keyed by _id: 1; `invariants` is read as `doc.invariants ?? []` so older docs without the field transparently report the empty set (natural schemaless behaviour, not a compat shim)
 - Adapters must provide DDL for creating and reading the marker consistently
 
 ## Ownership and lifecycle
 - The migration runner is the only component that updates the marker
-- It writes core_hash and profile_hash at the end of a successful edge apply, in the same transaction when transactional DDL is available
+- It writes `core_hash`, `profile_hash`, and the `invariants` union at the end of a successful edge apply, in the same transaction when transactional DDL is available
 - It also writes an entry to the migration ledger for audit
 - For profile-only updates (no DDL), the runner updates `profile_hash` after a successful verification that the database satisfies the contract-declared capabilities (core_hash remains unchanged)
+- The `invariants` field is merged server-side, atomically. Postgres uses a self-referential expression `invariants = array(select distinct unnest(invariants || $N::text[]) order by 1)`; Mongo uses an aggregation pipeline (`$setUnion + $sortArray`); SQLite merges the set inside `BEGIN EXCLUSIVE` together with marker read/write paths. The server-side path means a single statement (or document operation, or exclusive transaction) reads the existing set, unions in the incoming ids, dedupes, and writes — eliminating the read-then-write race that two concurrent runners would otherwise expose if they each unioned client-side and wrote back. `invariants: []` is a no-op merge (preserves existing set), not a clobber. See [ADR 208 §"Server-side merge for invariants"](ADR%20208%20-%20Invariant-aware%20migration%20routing.md) for the rationale.
 - The runtime reads but never mutates the marker
 - Reads are cheap, cached per process, and invalidated by configurable TTLs or explicit cache busting
 - If the marker is missing, the runtime reports contract/marker-missing and refuses to execute in strict mode

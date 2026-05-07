@@ -1,14 +1,11 @@
 import type { Contract } from '@prisma-next/contract/types';
+import type { SqlMigrationPlanOperation } from '@prisma-next/family-sql/control';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { Migration as SqlMigration } from '@prisma-next/family-sql/migration';
 import type { ControlStack } from '@prisma-next/framework-components/control';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { errorPostgresMigrationStackMissing } from '../errors';
-import {
-  type DataTransformOptions,
-  dataTransform,
-  type PostgresDataTransformOperation,
-} from './operations/data-transform';
+import { type DataTransformOptions, dataTransform } from './operations/data-transform';
 import type { PostgresPlanTargetDetails } from './planner-target-details';
 
 /**
@@ -64,7 +61,7 @@ export abstract class PostgresMigration extends SqlMigration<
     contract: TContract,
     name: string,
     options: DataTransformOptions,
-  ): PostgresDataTransformOperation {
+  ): SqlMigrationPlanOperation<PostgresPlanTargetDetails> {
     if (!this.controlAdapter) {
       throw errorPostgresMigrationStackMissing();
     }

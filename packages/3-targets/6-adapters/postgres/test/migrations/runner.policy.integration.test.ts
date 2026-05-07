@@ -101,6 +101,77 @@ describe.sequential('PostgresMigrationRunner - Policy Violations', () => {
     );
 
     it(
+      'fails with POLICY_VIOLATION on a data-class operation under INIT_ADDITIVE_POLICY',
+      { timeout: testTimeout },
+      async () => {
+        const runner = postgresTargetDescriptor.createRunner(familyInstance);
+
+        // Lowered data-transform op shape (matches what `createDataTransform`
+        // emits post-unification): precheck/execute/postcheck wrap the user's
+        // check + run plans. The policy gate runs before any step executes,
+        // so the SQL bodies are arbitrary.
+        const planWithDataOp = createMigrationPlan<PostgresPlanTargetDetails>({
+          targetId: 'postgres',
+          origin: null,
+          destination: toPlanContractInfo(contract),
+          providedInvariants: [],
+          operations: [
+            {
+              id: 'data_migration.backfill-emails',
+              label: 'Data transform: backfill-emails',
+              operationClass: 'data', // Not allowed by INIT_ADDITIVE_POLICY
+              target: { id: 'postgres' },
+              precheck: [
+                {
+                  description: 'Check backfill-emails has work to do',
+                  sql: `SELECT EXISTS (SELECT 1 FROM "user" WHERE "email" IS NULL) AS ok`,
+                  params: [],
+                },
+              ],
+              execute: [
+                {
+                  description: 'Run backfill-emails',
+                  sql: `UPDATE "user" SET "email" = $1 WHERE "email" IS NULL`,
+                  params: ['n/a'],
+                },
+              ],
+              postcheck: [
+                {
+                  description: 'Verify backfill-emails resolved all violations',
+                  sql: `SELECT NOT EXISTS (SELECT 1 FROM "user" WHERE "email" IS NULL) AS ok`,
+                  params: [],
+                },
+              ],
+            },
+          ],
+        });
+
+        const result = await runner.execute({
+          plan: planWithDataOp,
+          driver: driver!,
+          destinationContract: contract,
+          policy: INIT_ADDITIVE_POLICY, // Only allows 'additive'
+          frameworkComponents,
+        });
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+          expect(result.failure.code).toBe('POLICY_VIOLATION');
+          expect(result.failure.summary).toMatch(/data/i);
+          expect(result.failure.why).toMatch(/additive/i);
+          expect(result.failure.meta).toMatchObject({
+            operationId: 'data_migration.backfill-emails',
+            operationClass: 'data',
+          });
+        }
+
+        // Policy gate runs before any DB write, so neither marker nor
+        // ledger should have been touched.
+        await expectNoMarkerOrLedgerWrites(driver!);
+      },
+    );
+
+    it(
       'succeeds with a policy that allows destructive operations',
       { timeout: testTimeout },
       async () => {

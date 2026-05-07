@@ -151,8 +151,9 @@ withTempDir(({ createTempDir }) => {
         );
         expect(dataTransformOp, 'dataTransform op exists').toBeDefined();
         expect(dataTransformOp.operationClass).toBe('data');
-        expect(dataTransformOp.check).not.toBeNull();
-        expect(dataTransformOp.run).toHaveLength(1);
+        expect(dataTransformOp.precheck).toHaveLength(1);
+        expect(dataTransformOp.execute).toHaveLength(1);
+        expect(dataTransformOp.postcheck).toHaveLength(1);
 
         const alterOp = opsAfterEmit.find((op: { id: string }) =>
           op.id.startsWith('alterType.user.score'),
