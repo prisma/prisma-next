@@ -777,6 +777,21 @@ export function lowerDefaultForField(input: {
     return {};
   }
 
+  // Preset-only generators (e.g. `timestampNow`) co-register their codec
+  // through the preset descriptor, so they don't carry an
+  // `applicableCodecIds` list. Such a generator surfacing on the
+  // `@default(...)` lowering path is itself the bug — emit a diagnostic
+  // pointing the user at the correct authoring surface.
+  if (generatorDescriptor.applicableCodecIds === undefined) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_DEFAULT_APPLICABILITY',
+      message: `Default generator "${generatorDescriptor.id}" is not applicable to "@default(...)" lowering. Use the corresponding field preset (e.g. \`temporal.${generatorDescriptor.id === 'timestampNow' ? 'updatedAt' : generatorDescriptor.id}()\`) instead.`,
+      sourceId: input.sourceId,
+      span: expressionEntry.span,
+    });
+    return {};
+  }
+
   if (!generatorDescriptor.applicableCodecIds.includes(input.columnDescriptor.codecId)) {
     input.diagnostics.push({
       code: 'PSL_INVALID_DEFAULT_APPLICABILITY',

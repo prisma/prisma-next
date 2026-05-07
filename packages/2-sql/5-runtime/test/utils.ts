@@ -36,6 +36,7 @@ function createTestMutationDefaultGenerators() {
   return builtinGeneratorIds.map((id) => ({
     id,
     generate: (params?: Record<string, unknown>) => generateId(params ? { id, params } : { id }),
+    stability: 'field' as const,
   }));
 }
 

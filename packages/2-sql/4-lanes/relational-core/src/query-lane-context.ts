@@ -91,15 +91,16 @@ export type MutationDefaultsOptions = {
   readonly table: string;
   readonly values: Record<string, unknown>;
   /**
-   * Per-bulk-operation cache. When the caller passes the same `Map`
-   * across several `applyMutationDefaults` invocations (one per row of a
-   * bulk insert), generators marked `stableAcrossRows: true` reuse a single
-   * generated value across every row in the bulk instead of recomputing
-   * (and drifting) per row. Keys are the column the generator produced a
-   * value for. Omit (or pass a fresh map per row) to keep behavior
-   * row-independent.
+   * Per-ORM-operation cache for generators that declare
+   * `stability: 'query'`. The caller passes the same `Map` across every
+   * `applyMutationDefaults` invocation in one bulk operation; the
+   * framework keys by `generatorId` so the same value is reused across
+   * all rows and columns. Generators with `stability: 'row'` use a
+   * fresh per-call cache the framework manages internally; generators
+   * with `stability: 'field'` skip caching entirely. Omit to make every
+   * call independent (degrades `'query'` to per-call behavior).
    */
-  readonly acrossRowsCache?: Map<string, unknown>;
+  readonly defaultValueCache?: Map<string, unknown>;
 };
 
 /**

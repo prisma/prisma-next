@@ -29,6 +29,7 @@ function createSqliteMutationDefaultGenerators() {
         const spec: GeneratedValueSpec = params ? { id, params } : { id };
         return generateId(spec);
       },
+      stability: 'field' as const,
     })),
     timestampNowRuntimeGenerator(),
   ];

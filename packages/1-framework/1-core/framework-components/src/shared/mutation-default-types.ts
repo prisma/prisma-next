@@ -73,7 +73,16 @@ export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionRegistr
 
 export interface MutationDefaultGeneratorDescriptor {
   readonly id: string;
-  readonly applicableCodecIds: readonly string[];
+  /**
+   * Codec ids the generator is compatible with on the `@default(...)`
+   * lowering path. Required for generators that are reachable via PSL
+   * `@default(generatorName())` syntax (entries in
+   * `defaultFunctionRegistry`); absent for preset-only generators where
+   * the codec is co-registered with the preset descriptor and no
+   * separate user choice exists to validate against. `lowerDefaultForField`
+   * is the lone consumer.
+   */
+  readonly applicableCodecIds?: readonly string[];
   readonly resolveGeneratedColumnDescriptor?: (input: {
     readonly generated: ExecutionMutationDefaultValue;
   }) =>

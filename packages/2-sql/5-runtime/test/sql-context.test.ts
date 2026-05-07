@@ -511,7 +511,7 @@ describe('applyMutationDefaults', () => {
     expect(applied).toEqual([]);
   });
 
-  it('reuses one stableAcrossRows generator value across rows when acrossRowsCache is shared', () => {
+  it('shares one query-stable generator value across rows when defaultValueCache is shared', () => {
     const counterMarker = { invocations: 0 };
     const counterGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
       kind: 'extension' as const,
@@ -525,7 +525,7 @@ describe('applyMutationDefaults', () => {
         {
           id: 'counter',
           generate: () => ++counterMarker.invocations,
-          stableAcrossRows: true,
+          stability: 'query',
         },
       ],
       create() {
@@ -567,24 +567,24 @@ describe('applyMutationDefaults', () => {
       stack: createStack({ extensionPacks: [counterGeneratorExtension] }),
     });
 
-    const acrossRowsCache = new Map<string, unknown>();
+    const defaultValueCache = new Map<string, unknown>();
     const row1 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
       values: { id: 'a' },
-      acrossRowsCache,
+      defaultValueCache,
     });
     const row2 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
       values: { id: 'b' },
-      acrossRowsCache,
+      defaultValueCache,
     });
     const row3 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
       values: { id: 'c' },
-      acrossRowsCache,
+      defaultValueCache,
     });
 
     expect(counterMarker.invocations).toBe(1);
@@ -602,11 +602,11 @@ describe('applyMutationDefaults', () => {
     expect(row4).toEqual([{ column: 'touchedAt', value: 2 }]);
   });
 
-  it('does not consult acrossRowsCache for generators without stableAcrossRows', () => {
+  it('shares a row-stable generator value across columns of one call but not across calls', () => {
     const counterMarker = { invocations: 0 };
-    const perRowGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+    const rowGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
       kind: 'extension' as const,
-      id: 'per-row-generator-extension',
+      id: 'row-generator-extension',
       version: '0.0.1',
       familyId: 'sql' as const,
       targetId: 'postgres' as const,
@@ -614,8 +614,92 @@ describe('applyMutationDefaults', () => {
       parameterizedCodecs: () => [],
       mutationDefaultGenerators: () => [
         {
-          id: 'perRowCounter',
+          id: 'correlationId',
           generate: () => ++counterMarker.invocations,
+          stability: 'row',
+        },
+      ],
+      create() {
+        return { familyId: 'sql' as const, targetId: 'postgres' as const };
+      },
+    };
+
+    const contractWithCorrelationId: Contract<SqlStorage> = {
+      ...testContract,
+      storage: {
+        storageHash: coreHash('sha256:test'),
+        tables: {
+          event: {
+            columns: {
+              id: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              causation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+              correlation: { nativeType: 'int4', codecId: 'pg/int4@1', nullable: false },
+            },
+            uniques: [],
+            indexes: [],
+            foreignKeys: [],
+          },
+        },
+      },
+      execution: {
+        executionHash: executionHash('sha256:test'),
+        mutations: {
+          defaults: [
+            {
+              ref: { table: 'event', column: 'causation' },
+              onCreate: { kind: 'generator', id: 'correlationId' },
+            },
+            {
+              ref: { table: 'event', column: 'correlation' },
+              onCreate: { kind: 'generator', id: 'correlationId' },
+            },
+          ],
+        },
+      },
+    };
+
+    const context = createExecutionContext({
+      contract: contractWithCorrelationId,
+      stack: createStack({ extensionPacks: [rowGeneratorExtension] }),
+    });
+
+    const row1 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'event',
+      values: { id: 1 },
+    });
+    const row2 = context.applyMutationDefaults({
+      op: 'create',
+      table: 'event',
+      values: { id: 2 },
+    });
+
+    expect(counterMarker.invocations).toBe(2);
+    expect(row1).toEqual([
+      { column: 'causation', value: 1 },
+      { column: 'correlation', value: 1 },
+    ]);
+    expect(row2).toEqual([
+      { column: 'causation', value: 2 },
+      { column: 'correlation', value: 2 },
+    ]);
+  });
+
+  it('does not consult defaultValueCache for field-stable generators', () => {
+    const counterMarker = { invocations: 0 };
+    const perFieldGeneratorExtension: SqlRuntimeExtensionDescriptor<'postgres'> = {
+      kind: 'extension' as const,
+      id: 'per-field-generator-extension',
+      version: '0.0.1',
+      familyId: 'sql' as const,
+      targetId: 'postgres' as const,
+      codecs: () => createCodecRegistry(),
+      parameterizedCodecs: () => [],
+      mutationDefaultGenerators: () => [
+        {
+          id: 'perFieldCounter',
+          generate: () => ++counterMarker.invocations,
+          stability: 'field',
         },
       ],
       create() {
@@ -644,7 +728,7 @@ describe('applyMutationDefaults', () => {
           defaults: [
             {
               ref: { table: 'user', column: 'id' },
-              onCreate: { kind: 'generator', id: 'perRowCounter' },
+              onCreate: { kind: 'generator', id: 'perFieldCounter' },
             },
           ],
         },
@@ -653,21 +737,21 @@ describe('applyMutationDefaults', () => {
 
     const context = createExecutionContext({
       contract: contractWithCounter,
-      stack: createStack({ extensionPacks: [perRowGeneratorExtension] }),
+      stack: createStack({ extensionPacks: [perFieldGeneratorExtension] }),
     });
 
-    const acrossRowsCache = new Map<string, unknown>();
+    const defaultValueCache = new Map<string, unknown>();
     const row1 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
       values: {},
-      acrossRowsCache,
+      defaultValueCache,
     });
     const row2 = context.applyMutationDefaults({
       op: 'create',
       table: 'user',
       values: {},
-      acrossRowsCache,
+      defaultValueCache,
     });
 
     expect(counterMarker.invocations).toBe(2);

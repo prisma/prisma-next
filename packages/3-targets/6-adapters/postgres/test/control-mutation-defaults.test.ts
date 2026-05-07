@@ -358,10 +358,14 @@ describe('createPostgresMutationDefaultGeneratorDescriptors', () => {
     );
   });
 
-  it('restricts timestampNow to Postgres timestamp codecs', () => {
+  it('omits applicableCodecIds for timestampNow (preset-only generator)', () => {
     const descriptor = descriptors.find((d) => d.id === 'timestampNow')!;
 
-    expect(descriptor.applicableCodecIds).toEqual(['pg/timestamp@1', 'pg/timestamptz@1']);
+    // timestampNow is reachable only via temporal.{createdAt,updatedAt}()
+    // preset descriptors that co-register the codec — the @default(...)
+    // lowering compatibility check has no role to play here, so the
+    // field is intentionally absent. F04 / spec NFR3 (corrected).
+    expect(descriptor.applicableCodecIds).toBeUndefined();
   });
 
   it('resolves column descriptor for matching generator', () => {

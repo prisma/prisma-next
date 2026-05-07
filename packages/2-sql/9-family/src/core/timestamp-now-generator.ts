@@ -6,17 +6,18 @@ import {
 
 /**
  * Builds the canonical control-plane descriptor for the wall-clock-now
- * mutation default generator. Targets contribute only their applicable
- * codec ids; the descriptor's `id`, `buildPhases`, and any future shared
- * behavior live here so PSL `temporal.updatedAt()` and TS `field.temporal.updatedAt()`
- * lower to byte-identical contracts across targets.
+ * mutation default generator. The descriptor's `id` and `buildPhases`
+ * are target-agnostic so PSL `temporal.updatedAt()` and TS
+ * `field.temporal.updatedAt()` lower to byte-identical contracts.
+ *
+ * `applicableCodecIds` is omitted: `timestampNow` is preset-only (not
+ * reachable via `@default(timestampNow())` lowering), and the codec is
+ * co-registered by the preset descriptor itself, so the
+ * `@default(...)` compatibility check has no role to play here.
  */
-export function timestampNowControlDescriptor(
-  applicableCodecIds: readonly string[],
-): MutationDefaultGeneratorDescriptor {
+export function timestampNowControlDescriptor(): MutationDefaultGeneratorDescriptor {
   return {
     id: TIMESTAMP_NOW_GENERATOR_ID,
-    applicableCodecIds,
     buildPhases: () => ({
       onCreate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },
       onUpdate: { kind: 'generator', id: TIMESTAMP_NOW_GENERATOR_ID },

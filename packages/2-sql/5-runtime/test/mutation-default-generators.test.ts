@@ -61,6 +61,7 @@ describe('composed runtime mutation default generators', () => {
         {
           id: 'slugid',
           generate: () => 'slug-from-pack',
+          stability: 'field',
         },
       ],
       create() {
@@ -103,6 +104,7 @@ describe('composed runtime mutation default generators', () => {
         {
           id: 'slugid',
           generate: () => 'slug-from-pack',
+          stability: 'field',
         },
       ],
       create() {
@@ -145,7 +147,9 @@ describe('composed runtime mutation default generators', () => {
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
       parameterizedCodecs: () => [],
-      mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'first' }],
+      mutationDefaultGenerators: () => [
+        { id: 'duplicate', generate: () => 'first', stability: 'field' },
+      ],
       create() {
         return { familyId: 'sql', targetId: 'postgres' };
       },
@@ -158,7 +162,9 @@ describe('composed runtime mutation default generators', () => {
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
       parameterizedCodecs: () => [],
-      mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'second' }],
+      mutationDefaultGenerators: () => [
+        { id: 'duplicate', generate: () => 'second', stability: 'field' },
+      ],
       create() {
         return { familyId: 'sql', targetId: 'postgres' };
       },

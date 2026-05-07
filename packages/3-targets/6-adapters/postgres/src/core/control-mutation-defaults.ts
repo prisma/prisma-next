@@ -11,10 +11,6 @@ import {
   builtinGeneratorRegistryMetadata,
   resolveBuiltinGeneratedColumnDescriptor,
 } from '@prisma-next/ids';
-import {
-  PG_TIMESTAMP_CODEC_ID,
-  PG_TIMESTAMPTZ_CODEC_ID,
-} from '@prisma-next/target-postgres/codec-ids';
 
 function invalidArgumentDiagnostic(input: {
   readonly context: DefaultFunctionLoweringContext;
@@ -328,7 +324,7 @@ export function createPostgresMutationDefaultGeneratorDescriptors(): readonly Mu
         },
       }),
     ),
-    timestampNowControlDescriptor([PG_TIMESTAMP_CODEC_ID, PG_TIMESTAMPTZ_CODEC_ID]),
+    timestampNowControlDescriptor(),
   ];
 }
 
