@@ -100,6 +100,52 @@ You may **not** unilaterally defer or descope any task in your scope. If a task 
 
 The single exception is **task-description ambiguity**: if a task's wording is genuinely ambiguous and you have to pick between two reasonable interpretations, pick the one most consistent with the spec, document the choice in your final report, and continue.
 
+## User-facing surface boundary
+
+You are **not authorized** to change user-facing behavior — even when it appears to be the smallest possible fix to land an in-scope task. User-facing surfaces include:
+
+- **CLI command behavior** — the success/failure split, exit codes, what input gets accepted vs rejected, error message text users may match against.
+- **Public APIs** exported from packages users consume, including their type signatures.
+- **Default values** of flags, options, or config keys that ship to users.
+- **Safety properties** — error conditions, validation checks, rejection paths the user relies on. Loosening a check is just as much a user-facing change as tightening one.
+- **Tolerance for unexpected input / schema / state** — broadening or narrowing.
+- **New CLI options, environment variables, or config keys.**
+- **Renames, rebindings, or removals** of any of the above.
+- **Log or error message text** that may be matched by user automation.
+
+The bar for "user-facing": **if a user could observe the change without reading the diff** — different exit code, different error text, different success/failure split for the same input, different output shape, different log content — it's user-facing.
+
+This applies even when the change is small, internally-motivated, or feels like a routing detail. A one-line `strictVerification: false` in a CLI runner is a user-facing semantic change. A "harmless" relaxation of a validation check is a user-facing semantic change. **The size of the diff is irrelevant.**
+
+### What to do when in-scope work appears to require a user-facing change
+
+1. **Stop. Do not commit the change.**
+2. Identify the concrete surface (which command, which API, which flag, which check) and the concrete behavior delta (what input now produces a different observable outcome).
+3. Explain why the in-scope task cannot land without the change — be specific about what fails and why.
+4. Propose alternatives. Examples: scope down the test, introduce a private/test-only opt-in instead of changing the user-facing default, refactor the surface to be more granular, change something the spec already explicitly authorizes, declare the task a deferral request rather than landing the change.
+5. Surface to the orchestrator as a deferral / scope-expansion request. **Do not proceed until the orchestrator (or the user via the orchestrator) explicitly authorizes a path.**
+
+### What counts as authorization
+
+Authorization must be **explicit and surface-specific**. The following are **not** authorization:
+
+- Generic "do whatever you need to" / "use your best judgement" / "make the test pass" instructions.
+- A milestone goal that implies the change.
+- The orchestrator restating the task without naming the surface change.
+- Self-authorization based on "this is the smallest possible fix" reasoning.
+
+Authorization looks like the orchestrator naming both **(a) the user-facing surface affected** and **(b) the specific change permitted**. Example: *"You may flip `strictVerification` from `true` to `false` in `db-init.ts`'s `runner.execute` call. This loosens the rejection path for extra columns in the database."* Anything less requires you to surface and wait.
+
+### Why this is enforced
+
+User-facing behavior changes are a category of harm distinct from bugs:
+
+- Bugs are caught by validation gates; behavior changes can pass every gate and still surprise the user.
+- Bugs surface in the round that introduces them; behavior changes can sit dormant until a downstream user runs the surface differently.
+- Bugs are local; behavior changes ripple — every user of the surface inherits the new semantics, often without realizing it.
+
+The surface boundary is non-negotiable. Implementers who land user-facing changes without authorization break the trust contract that lets the orchestrator delegate work without re-reading every diff.
+
 ## Side-quest policy
 
 If the orchestrator's prompt explicitly authorizes a side-quest (e.g. "fix this flaky test while you're here"), execute it as follows:
@@ -140,6 +186,7 @@ Your final message to the orchestrator should be a structured report. Recommende
 6. **Anything surprising** — pre-existing issues you uncovered, infrastructure gaps, escapees from prior milestones, divergences from the plan's expectations.
 7. **Deferral requests** — surface to the orchestrator; do not silently skip.
 8. **Pushback** — if any reviewer finding from a prior round conflicts with evidence, present here.
+9. **User-facing surface changes** — if the round included any pre-authorized user-facing changes (per § User-facing surface boundary), list each one explicitly: the surface affected, the specific change, and the orchestrator authorization quote. If none, say "None." If you encountered a task that *appeared* to require a user-facing change and surfaced a deferral, name the surface and the proposed change here too. This section makes the boundary auditable from the report alone.
 
 ## Read-only constraints
 
