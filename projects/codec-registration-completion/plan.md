@@ -1,20 +1,28 @@
 # Plan — Codec registration completion (TML-2357)
 
-> Milestones for the [spec](spec.md). Each milestone is one cohesive change that ends in a green-gates checkpoint and a pause-for-review with the user. If milestone diffs grow large enough, milestone boundaries become PR boundaries.
+> Milestones for the [spec](spec.md). Each milestone is one cohesive change that ends in a green-gates checkpoint and a pause-for-review with the user. If milestone diffs grow large enough, milestone boundaries (or Phase boundaries inside a milestone) become PR boundaries.
 
-## Milestone summary
+## Status
 
-| # | Milestone | Spec ACs | Depends on |
-|---|---|---|---|
-| **M0** | Typed `Codec` flow through `CodecDescriptor` (precondition fix) — see [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md) | AC-0 | none |
-| **M1** | Narrow runtime `Codec` instance + migrate consumers + route emit through `descriptorFor.renderOutputType` (LANDED — see [code-review.md](reviews/code-review.md) M1) | AC-3 (m1 portion) | M0 (status: LANDED before M0 was diagnosed; revisit if M0's typed flow fix surfaces a regression here) |
-| **M2** | Migrate every codec to native descriptor + delete synthesis bridge + delete `parameterizedCodecs:` slot + delete `CodecParamsDescriptor` + `aliasDescriptor` + delete `arktypeJsonEmitCodec` + retire legacy `mkCodec` / `defineCodecGroup` / `defineCodecBundle` public surface | AC-1, AC-2, AC-3 (m2 portion), AC-4 | M0, M1 |
-| **M3** | `ParamRef.refs` plumbing + encode-side `forColumn` + retire `forCodecId` fallback for parameterized codec ids | AC-5 | M2 |
-| **M4** | Delete `JsonSchemaValidatorRegistry` + retire `'json-validator'` trait | AC-6 | M2 |
+| Milestone | State |
+|---|---|
+| **M0** — Pattern E migration (per-codec helpers + class-based descriptors + Strength 3 deletion) | **Active.** Spike validated on `spike/class-based-codecs` (commits `58176f372`..`0eb45c145`). Phase A starts next. |
+| **M1** — Narrow runtime `Codec` instance + descriptor-keyed metadata reads | **LANDED** (commits `3c9338fef`, `1be7564c4`). Re-verify post-M0. |
+| **M2** — Native descriptor migration (interface form), bridge deletion, `aliasDescriptor`, `arktypeJsonEmitCodec` deletion | **Mostly LANDED** (R1–R3, T2.1–T2.6, Phase A, Phase B). M2 R4 (legacy-API deletion) was rolled back — its intent is absorbed into M0 Phase C. The remaining M2 surface (R4 retry) is **subsumed** by M0; no separate M2 R4 retry milestone. |
+| **M3** — `ParamRef.refs` plumbing + encode-side `forColumn` + `forCodecId` retirement | Pending; runs after M0. |
+| **M4** — `JsonSchemaValidatorRegistry` deletion + `'json-validator'` trait retirement | Pending; runs after M0. |
 
 `AC-7` (validation gates) is checked at the end of every milestone.
 
-**Current branch state**: M1 is landed. M2 is partially landed (R1, R2, R3 on branch); R4 was rolled back at `fb1277438` per [`wip/unattended-decisions.md` Decision #11](../../wip/unattended-decisions.md). M0 lands first against current HEAD; M2 R4 retry follows once M0 unblocks the typed-instance deletion.
+### Why M0 was redesigned (Pattern E)
+
+M2 R4 attempted to delete the parallel typed-instance carriers (`mkCodec`-produced instances kept alive solely to drive `CodecTypes`/`TypeMaps` derivation). It rolled back because the typed-flow chain through the existing interface-form `CodecDescriptor` couldn't preserve the codec generics through TypeScript's variance rules. Three design iterations followed:
+
+1. **Shape A vs Shape B spike** (interface form, parameterized `CodecDescriptor` vs intersection at `defineCodec`'s return) — partially solved the deletion problem but landed in a place that conflicted with the goal "the descriptor's factory IS the type-level source of truth." Documented in `wip/m0-shape-spike.md`.
+2. **Mode C goal spec** — `factory-defined-codec-types.spec.md` framed the design goal independent of the implementation: the descriptor's factory is the single type-level source of truth for codec types; column helpers are derivative.
+3. **Class-based design + Pattern E spike** — `class-based-codec-design.spec.md` proposed an abstract-class hierarchy. A TypeScript playground proof (`wip/m0-class-variance-proof.md`) falsified the polymorphic-column-helper approach and surfaced **Pattern E** (per-codec helpers + `satisfies`). The spike on `spike/class-based-codecs` validated all six AC-CB-* end-to-end.
+
+Pattern E is the locked design. M0 below describes how to migrate the codebase to it, which absorbs both the M2 R4 deletion intent and the typed-flow precondition `typed-codec-flow.spec.md` was authored around. **`typed-codec-flow.spec.md` is superseded** by `class-based-codec-design.spec.md` + `factory-defined-codec-types.spec.md`; it survives in the project as historical context for the rollback.
 
 ## Validation gates (every milestone)
 
@@ -25,146 +33,184 @@ All must be green before declaring a milestone done:
 - `pnpm test:packages`
 - `pnpm test:e2e` (postgres real-DB)
 - `pnpm build`
-- `pnpm fixtures:check` (all fixture pairs byte-identical against `origin/main` baseline; supersedes the previous narrower `git diff -- examples/prisma-next-demo/contract.{json,d.ts}` gate per [Decision #8 in `wip/unattended-decisions.md`](../../wip/unattended-decisions.md))
+- `pnpm fixtures:check` (all fixture pairs byte-identical against `origin/main` baseline)
 
-## Milestone M0 — Typed `Codec` flow through `CodecDescriptor`
+## Milestone M0 — Pattern E migration
 
-**Goal**: Fix `defineCodec`'s declared return so it preserves the codec generics (`Id`, `TTraits`, `TWire`, `TInput`) inferred from its `spec` argument. Delete every parallel typed-instance carrier as the forcing function: `mkCodec` public, `CodecDefBuilder`, `ExtractCodecTypes` (instance-keyed), `byScalar` maps, dual-shape parallel exports. Migrate adapters and tests to consume codecs through descriptors. Restore the typed flow `defineCodec → descriptor record → defineContract → field.X() → sqlBuilder<typeof contract>` end-to-end with no parallel structures left.
+**Goal**: Replace the interface-form `Codec`/`CodecDescriptor` with the class-based hierarchy + per-codec helper functions. Migrate every codec in the SQL families. Delete every legacy carrier (`mkCodec`, `defineCodec`, `defineCodecGroup`, `defineCodecBundle`, `CodecDefBuilder*`, `byScalar` maps, `ExtractCodecTypes` instance-keyed, `aliasDescriptor` function form if replaced by class extension, etc.). Add negative type tests proving the typed `Codec` flow runs end-to-end through descriptor classes.
 
-**Spec ACs addressed**: AC-0 (sub-spec [`specs/typed-codec-flow.spec.md`](specs/typed-codec-flow.spec.md)). Absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393).
+**Spec ACs addressed**: AC-0 (typed flow), AC-1 (every codec ships as a `CodecDescriptor`), AC-4 (alias by descriptor extension), and partial AC-3 (instance narrowed — already landed in M1; M0 confirms the class form preserves the narrow shape).
 
-### Tasks
+**Specs**: [`specs/class-based-codec-design.spec.md`](specs/class-based-codec-design.spec.md) (implementation-approach), [`specs/factory-defined-codec-types.spec.md`](specs/factory-defined-codec-types.spec.md) (goal). Absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393).
 
-#### Phase A — Fix the typed return (AC-0.1, AC-0.2)
+### Phase A — Framework class hierarchy + per-codec helper machinery
 
-1. **T0.1 — Pick the implementation shape.** Two equivalent options:
-   - **Shape A**: parameterize `CodecDescriptor` with `<Id, TTraits, TWire, TInput, TParams>`. `AnyCodecDescriptor = CodecDescriptor<string, readonly CodecTrait[], unknown, unknown, any>`.
-   - **Shape B**: keep `CodecDescriptor<P>` one-arg; have `defineCodec` return `CodecDescriptor<TParams> & { codecId: Id; traits: TTraits; factory: typed-factory }` (intersection).
+PR boundary candidate. Pure-additive on the framework layer; existing interface-form `CodecDescriptor`/`Codec`/`defineCodec` continue to work alongside.
 
-   Decide based on: (a) ergonomics at heterogeneous-storage sites (registration boundary), (b) clarity at consumer extraction sites, (c) impact on `aliasDescriptor` composition. Both honour AC-0.1.
+1. **T0.A.1 — Land the abstract hierarchy.** From the spike, lift to the project branch (without the `*CB` suffix scaffolding):
+   - `packages/1-framework/1-core/framework-components/src/shared/class-based/codec.ts` — abstract `Codec<Id, TTraits, TWire, TInput>` class. Constructor takes `descriptor: CodecDescriptor<any>` (variance-erased per Q-3c). Getters for `id` / `traits` proxy through descriptor. Abstract `encode` / `decode`; optional `encodeJson` / `decodeJson`.
+   - `packages/1-framework/1-core/framework-components/src/shared/class-based/codec-descriptor.ts` — abstract `CodecDescriptor<TParams>` class + `AnyCodecDescriptor` alias.
+   - `packages/1-framework/1-core/framework-components/src/shared/class-based/column-spec.ts` — trivial `column(codecFactory, codecId, typeParams)` packager + `ColumnSpec<R, P>` type + `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` shape exports + structural `ColumnTypeDescriptorShape` mirror (per Q-2 resolution).
+   - `packages/1-framework/1-core/framework-components/src/exports/class-based-codec.ts` — barrel; new exports entry `@prisma-next/framework-components/class-based-codec`.
 
-2. **T0.2 — Update `defineCodec`'s signature** in `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts:587-593` per the chosen shape. Internal helper (rename `mkCodec` → `buildSqlCodec`) keeps its typed return; only the wrapping descriptor's exposed type changes.
+2. **T0.A.2 — Reconcile `voidParamsSchema`.** The existing `voidParamsSchema` in `framework-components/src/shared/codec-types.ts` is reused as-is by class-based descriptors. Verify import path; the class-based descriptors import from the existing module.
 
-3. **T0.3 — Update `CodecDescriptor` (Shape A only)** in `packages/1-framework/1-core/framework-components/src/shared/codec-types.ts`. Four extra type parameters with sensible defaults. Update `AnyCodecDescriptor` alias.
+3. **T0.A.3 — Phase A type tests.** Assert framework-level invariants:
+   - `pgVectorDescriptor.factory({ length: 1536 })` returns `(ctx) => VectorCodec<1536>` (baseline TS, in-place fixture).
+   - `column(...)` packages typeParams + codec factory + codecId without losing types.
+   - `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` reject malformed helpers (with `// @ts-expect-error`).
 
-4. **T0.4 — Update derivation helpers.** `DescriptorResolvedCodec`, `DescriptorCodecId`, `DescriptorCodecTraits`, `DescriptorCodecInput`, `ExtractDescriptorCodecTypes` extract directly from the descriptor type. No `D extends CodecDescriptor<infer P>` widening; positional (Shape A) or structural (Shape B) extraction.
+   File: `packages/1-framework/1-core/framework-components/test/class-based-codec.types.test-d.ts`. Uses inline fixture descriptors; no cross-package deps.
 
-5. **T0.5 — Verify per-target descriptor records.** `PgDescriptors`, `SqliteDescriptors`, `PgvectorDescriptors`, `SqlDescriptors`, `ArktypeJsonDescriptors`. Each `{[K]: defineCodec(...)-result}` typed by inference; no `: CodecDescriptor<...>` annotations widening entries.
+4. **T0.A.4 — Phase A validation checkpoint.** `pnpm typecheck`, `pnpm lint:deps` for `framework-components`. Pause for review.
 
-#### Phase B — Forcing-function deletion (AC-0.5)
+### Phase B — Per-codec migration
 
-6. **T0.6 — Rename `mkCodec` → `buildSqlCodec` and demote to internal.** Delete public export from `@prisma-next/sql-relational-core/ast`. Migrate any external production callers (≈5 sites in postgres/sqlite/pgvector/arktype-json target codec modules) to wrap inside `defineCodec({factory: () => () => buildSqlCodec({...})})`.
+PR boundaries by package. Each sub-phase ends with a green checkpoint.
 
-7. **T0.7 — Delete `CodecDefBuilder` / `CodecDefBuilderImpl`** from `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`. Delete `defineCodecGroup()` factory function. Migrate every callsite to `CodecDescriptorBuilder` / `defineCodecBundle()` (which itself gets reduced — see T0.10).
+#### B1. sql-relational-core base codecs
 
-8. **T0.8 — Delete `ExtractCodecTypes` (instance-keyed, line 292)**. Rename `ExtractDescriptorCodecTypes` (line 688) → `ExtractCodecTypes`. Confirm the contract-level `ExtractCodecTypes<T>` in `packages/2-sql/1-core/contract/src/types.ts:239` is untouched (different file, different role).
+5. **T0.B1.1 — Audit base codecs.** ~6 codecs in `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts` (char, varchar, int, float, text, timestamp). Each has:
+   - Today: `defineCodec({...})` producing an interface-form descriptor.
+   - Pattern E target: `class XCodec extends Codec<...>` + `class XDescriptor extends CodecDescriptor<...>` + `xColumn = (...) => column(xDescriptor.factory(...), xDescriptor.codecId, ...)` + `xColumn satisfies ColumnHelperFor<XDescriptor>` (or `ColumnHelperForStrict`).
 
-9. **T0.9 — Delete `byScalar` and `dataTypes` from target/extension packages.** Sites: `packages/3-targets/3-targets/postgres/src/core/codecs.ts:570`, `packages/3-targets/3-targets/sqlite/src/core/codecs.ts:120`, `packages/3-extensions/pgvector/src/core/codecs.ts:73`, `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts:198` (`sqlCodecDefinitions`). Delete the dual-shape parallel exports `codecDescriptorDefinitions` (postgres/sqlite/pgvector). Delete `byScalar` getter from `CodecDescriptorBuilder` if it has no other consumers.
+6. **T0.B1.2 — Reshape one codec end-to-end (text).** Confirms the migration pattern works against real consumers (sql-relational-core has internal callers). Type tests + runtime tests + green gates.
 
-10. **T0.10 — Migrate adapter consumers.** `packages/3-targets/6-adapters/postgres/src/core/adapter.ts:11,42` and `packages/3-targets/6-adapters/sqlite/src/core/adapter.ts:31,53` consume codecs through the unified `codecs:` contributor protocol slot, not by importing `byScalar` from the target package. Each adapter's `Object.values(byScalar)` registration loop becomes a contributor-protocol-driven registration over `descriptor.factory(undefined)(syntheticCtx)`.
+7. **T0.B1.3 — Reshape the remaining base codecs.** char, varchar, int, float, timestamp. Each gets the same triple (codec class, descriptor class, helper + satisfies). Existing `defineCodec(...)` exports stay until Phase C.
 
-11. **T0.11 — Migrate test consumers.** Sites that call `byScalar.timestamp.codec.encode(...)` migrate to `pgTimestampDescriptor.factory(undefined)({}).encode(...)` or use a small per-test helper. Affected fixtures: `packages/3-targets/3-targets/postgres/test/codecs.test.ts` (~30 callsites), `packages/3-targets/3-targets/sqlite/test/codecs.test.ts` (~10), `packages/3-extensions/pgvector/test/codecs.test.ts` (~5), `packages/3-targets/6-adapters/sqlite/test/codecs.test.ts` (~10), `packages/3-targets/3-targets/postgres/test/codec-render-output-type.test.ts`.
+8. **T0.B1.4 — B1 validation checkpoint.**
 
-12. **T0.12 — Reduce `defineCodecBundle` to a single canonical builder factory** if Phase B leaves it as the sole survivor. If `CodecDescriptorBuilder` is the only builder, consider renaming `defineCodecBundle` → `defineCodecBuilder` or similar (decision deferred to implementation; rename only if it improves clarity).
+#### B2. postgres target codecs
 
-#### Phase C — Constructive type tests (AC-0.3)
+9. **T0.B2.1 — Audit postgres codecs.** ~22 codecs in `packages/3-targets/3-targets/postgres/src/core/codecs.ts` (text, int4, int2, int8, float4, float8, numeric, bool, enum, json, jsonb, uuid, bytea, timestamptz, timestamp, date, time, char, varchar, alias chains). Each has:
+   - Today: `mkCodec({...})` instance + `defineCodec({...})` descriptor in parallel; `byScalar` and `dataTypes` parallel exports keyed by scalar.
+   - Pattern E target: class-form codec + descriptor + helper. Aliases (`aliasCodec` → `aliasDescriptor` already migrated in M2; under Pattern E, **alias by class extension** — `class PgCharDescriptor extends SqlCharDescriptor { codecId = 'pg/char@1' as const; ... }`).
 
-13. **T0.13 — Negative type tests at the `defineCodec` round-trip layer**: `packages/2-sql/4-lanes/relational-core/test/typed-codec-flow.test-d.ts`. `expectTypeOf<DescriptorCodec<typeof someTypedDescriptor>>().toEqualTypeOf<Codec<'pg/int4@1', readonly [], Buffer, number>>()`.
+10. **T0.B2.2 — Reshape one postgres codec end-to-end (int4).** Same pattern as B1.2.
 
-14. **T0.14 — Negative type tests at the per-target descriptor record layer**: `packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts` — `PgDescriptors['uuidv4']` extraction matches `Codec<'pg/uuid@1', ..., Buffer, string>`. Analogous tests in sqlite/pgvector.
+11. **T0.B2.3 — Reshape the remaining postgres codecs.** Batched into reasonable commit chunks (numeric/scalar codecs together, JSON together, alias chains together, etc.).
 
-15. **T0.15 — Negative type tests at the no-emit authoring chain**: `examples/prisma-next-demo/test/no-emit-typed-flow.test-d.ts` (new file). `field.uuidv4()` returns typed field spec; positive query expression typechecks; negative ones (`f.id` against `1234: number`) fail.
+12. **T0.B2.4 — B2 validation checkpoint.**
 
-#### Phase D — Validation (AC-0.4, AC-0.6)
+#### B3. sqlite target codecs
 
-16. **T0.16 — Closing-grep verification.** Zero hits across `packages/ test/ examples/ docs/` (excluding `projects/**` and `wip/**`) for: `mkCodec`, `defineCodecGroup`, `defineCodecBundle` (if renamed in T0.12), `CodecDefBuilder`, `CodecDefBuilderImpl`, `ExtractDescriptorCodecTypes`, `byScalar`, `dataTypes` (the target-codec export — disambiguate by context), `sqlCodecDefinitions`, `codecDescriptorDefinitions`.
+13. **T0.B3.1 — Reshape sqlite codecs.** ~10 codecs in `packages/3-targets/3-targets/sqlite/src/core/codecs.ts`. Same pattern as B2.
 
-17. **T0.17 — `pnpm fixtures:check`.** Confirm zero drift across all fixture pairs.
+14. **T0.B3.2 — B3 validation checkpoint.**
 
-18. **T0.18 — Validation checkpoint** (`pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:e2e`, `pnpm build`, `pnpm fixtures:check`) and **pause for review**.
+#### B4. Extension codecs
+
+15. **T0.B4.1 — Reshape pgvector.** `packages/3-extensions/pgvector/src/core/codecs.ts`. Already has the class form on `spike/class-based-codecs`; lift the pattern (without the `*CB` suffix).
+
+16. **T0.B4.2 — Reshape arktype-json.** `packages/3-extensions/arktype-json/src/core/arktype-json-codec.ts`. Method-level generic over `S extends Type<unknown>` per the spec § Case 3.
+
+17. **T0.B4.3 — Reshape any other extension codecs** (cipherstash etc., as they exist).
+
+18. **T0.B4.4 — B4 validation checkpoint.**
+
+#### B5. Adapter / contributor wiring
+
+19. **T0.B5.1 — Update postgres adapter** `packages/3-targets/6-adapters/postgres/src/core/adapter.ts`. Today consumes `Object.values(byScalar)` to register codecs. Migrate to consume the new descriptor classes through the unified `codecs:` slot. The descriptors-by-codec-id map gets populated from the class-form descriptor list.
+
+20. **T0.B5.2 — Update sqlite adapter** analogously.
+
+21. **T0.B5.3 — Update extension contributor wiring.** pgvector / arktype-json contributor packs ship the class-form descriptors through the unified `codecs:` slot.
+
+22. **T0.B5.4 — B5 validation checkpoint.**
+
+### Phase C — Strength 3 forcing-function deletion
+
+PR boundary. The deletion is the proof that the Pattern E migration is complete: zero legacy callers remain.
+
+23. **T0.C.1 — Delete `mkCodec` (and rename to `buildSqlCodec` if any internal carryover survives).** Audit grep `mkCodec`; sites should be zero in production after Phase B.
+
+24. **T0.C.2 — Delete `defineCodec`** (`packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts:587-693`). Zero callers after Phase B.
+
+25. **T0.C.3 — Delete `defineCodecGroup`** factory function and its export.
+
+26. **T0.C.4 — Delete `defineCodecBundle`** factory function and its export. (If renamed during Phase B, delete the renamed form.)
+
+27. **T0.C.5 — Delete `CodecDefBuilder` / `CodecDefBuilderImpl`**.
+
+28. **T0.C.6 — Delete `ExtractCodecTypes` (instance-keyed, line 292)**. Rename `ExtractDescriptorCodecTypes` → `ExtractCodecTypes` (canonical now). Confirm the contract-level `ExtractCodecTypes<T>` in `packages/2-sql/1-core/contract/src/types.ts:239` is untouched (different file, different role; preserved).
+
+29. **T0.C.7 — Delete `byScalar` and `dataTypes` from target / extension packages.** Sites:
+   - `packages/3-targets/3-targets/postgres/src/core/codecs.ts:570`
+   - `packages/3-targets/3-targets/sqlite/src/core/codecs.ts:120`
+   - `packages/3-extensions/pgvector/src/core/codecs.ts:73`
+   - `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts:198` (`sqlCodecDefinitions`)
+   - Delete the dual-shape parallel exports `codecDescriptorDefinitions` (postgres/sqlite/pgvector).
+   - Delete `byScalar` getter from `CodecDescriptorBuilder` if no other consumers.
+
+30. **T0.C.8 — Delete the function-form `aliasDescriptor`** from `framework-components/src/shared/codec-types.ts` if Phase B replaces it with class extension everywhere. If retained, simplify per the goal spec § Non-goals (deletable / trivial spread + override).
+
+31. **T0.C.9 — Migrate any remaining test consumers** of legacy carriers. Sites that call `byScalar.timestamp.codec.encode(...)` migrate to `pgTimestampDescriptor.factory(undefined)({}).encode(...)` or use a small per-test helper. Already audited under M2 R4: ~50 test sites across postgres/sqlite/pgvector test fixtures + adapter test fixtures.
+
+32. **T0.C.10 — Delete the interface-form `Codec` / `CodecDescriptor`** (`framework-components/src/shared/codec-types.ts`). Zero callers should remain after Phase B + earlier C tasks. The class-based form (`class-based-codec` exports) becomes canonical.
+
+33. **T0.C.11 — Reconcile barrel exports.** Move the class-based hierarchy from `class-based-codec` barrel to the package's main exports. Ensure `@prisma-next/framework-components` re-exports the class form as the canonical `Codec` / `CodecDescriptor`.
+
+34. **T0.C.12 — Mark `typed-codec-flow.spec.md` as superseded** (if not already). Add a "Status: superseded" header pointing to the class-based + factory-defined goal specs.
+
+### Phase D — Constructive type tests + closing-grep + validation
+
+PR boundary with Phase C if diff is small enough; otherwise its own.
+
+35. **T0.D.1 — Negative type tests at the descriptor round-trip layer.** `packages/2-sql/4-lanes/relational-core/test/typed-codec-flow.test-d.ts` — assertions like `expectTypeOf<ResolvedCodec<typeof pgInt4Descriptor>>().toEqualTypeOf<Codec<'pg/int4@1', readonly ['equality', 'order', 'numeric'], number, number>>()`.
+
+36. **T0.D.2 — Negative type tests at the per-target descriptor record layer.** `packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts` (and analogous in sqlite/pgvector). Assert each descriptor record entry's full type.
+
+37. **T0.D.3 — Negative type tests at the no-emit authoring chain.** `examples/prisma-next-demo/test/no-emit-typed-flow.test-d.ts`. `field.uuidv4()` returns typed field spec; query expression typechecks; `fns.eq(f.id, 1234: number)` fails.
+
+38. **T0.D.4 — Closing-grep verification.** Zero hits across `packages/ test/ examples/ docs/` (excluding `projects/**` and `wip/**`) for: `mkCodec`, `defineCodec\(`, `defineCodecGroup`, `defineCodecBundle`, `CodecDefBuilder`, `CodecDefBuilderImpl`, `ExtractDescriptorCodecTypes`, `byScalar`, `dataTypes` (the target-codec export — disambiguate by context), `sqlCodecDefinitions`, `codecDescriptorDefinitions`. The deletion is the forcing function.
+
+39. **T0.D.5 — `pnpm fixtures:check`.** Confirm zero drift across all fixture pairs.
+
+40. **T0.D.6 — Full validation checkpoint** (`pnpm typecheck`, `pnpm lint:deps`, `pnpm test:packages`, `pnpm test:e2e`, `pnpm build`, `pnpm fixtures:check`) and **pause for review**.
 
 ### Risks
 
-- **Shape A's ergonomic cost.** 5-arg `CodecDescriptor` verbose at heterogeneous-storage sites. Mitigated by `AnyCodecDescriptor` alias; fallback to Shape B if verbosity bites unexpectedly.
-- **`aliasDescriptor` composition.** Currently `aliasDescriptor<P>(base: CodecDescriptor<P>, ...): CodecDescriptor<P>`. Under Shape A, generics need to thread through. Walk callsites in postgres/codecs.ts before committing.
-- **Adapter ↔ contributor-protocol migration.** T0.10 changes the adapter-postgres/sqlite registration loop. The contributor protocol's unified `codecs:` slot needs to expose what `byScalar` did (typeId + scalar + factory). Verify the slot's shape is sufficient before deletion; if not, extend it (still in scope for AC-2 of the parent spec).
-- **Test fixture diff volume.** ~50 test sites migrating from `byScalar.X.codec.encode(...)` to `XDescriptor.factory(undefined)({}).encode(...)`. Mechanical; bounded.
-- **TML-2393 absorption.** TML-2393 stated the same scope as T0.9 + T0.10 + T0.11. Once M0 lands, TML-2393 is closed as completed-by-TML-2357.
-- **Commit boundary discipline.** Phase A → Phase B → Phase C is a natural commit-boundary ordering. Phase A alone should typecheck (legacy `mkCodec`/`CodecDefBuilder` still work; the new typed return doesn't break them). Phase B is the deletion that exposes any latent dependencies. If Phase B reveals a load-bearing consumer that isn't on the audit list, surface a deferral.
+- **Per-codec helper boilerplate.** ~40 helpers across the codebase. Mitigated by `defineSimpleCodec` shorthand per spec § Risks for cases that don't need class state.
+- **Aliasing via class extension vs function form.** The spec offers two routes (delete `aliasDescriptor` and use class extension; or keep it as a trivial spread + override). Phase B picks one based on first encounter (postgres alias chains). Document in the implementation commit message.
+- **Adapter-level descriptor consumption.** Phase B5 changes the adapter registration loops. The contributor protocol's unified `codecs:` slot must accept class-form descriptors; verify the slot's shape on first attempt; if a friction surfaces, lift the change into the contributor protocol.
+- **Test fixture diff volume.** ~50 test sites migrating from `byScalar.X.codec.encode(...)` to typed factory calls. Mechanical but bounded.
+- **Layering violations.** `column()` lives at layer 1; structural compatibility with `ColumnTypeDescriptor` (layer 2) is via mirror (per Q-2). Do not import `ColumnTypeDescriptor` into `framework-components`.
+- **`override` keyword discipline.** `noImplicitOverride` requires `override` on every concrete-subclass member touching an inherited member; codec authors must remember (per Q-5b). Mechanical but catches mistakes.
+- **Phase ordering.** Phase A → B1 → B2 → B3 → B4 → B5 → C → D. Phase A alone keeps the build green (purely additive). Each Phase B sub-phase keeps the build green (legacy interface form survives alongside until Phase C). Phase C is the deletion sweep that exposes any latent dependency.
 
 ### Estimated diff
 
-- **Phase A**: ~3 production files (codec-types.ts signature + descriptor type + helper renames). Pure-additive on the type layer.
-- **Phase B**: ~10 production files (codec-types.ts deletions + per-target codecs.ts cleanup + adapter consumers) + ~50 test fixture sites. Subsumes TML-2393.
-- **Phase C**: ~3 new test-d files.
+| Phase | Production files | Test files | LoC scope |
+|---|---|---|---|
+| A | ~5 (framework class hierarchy + barrel) | ~1 | ~400 |
+| B1 | ~3 | ~3 | ~400 |
+| B2 | ~3 | ~5 | ~1500 |
+| B3 | ~3 | ~3 | ~600 |
+| B4 | ~4 | ~4 | ~500 |
+| B5 | ~5 (adapters + contributor wiring) | ~5 | ~400 |
+| C | ~15 (deletions + barrel reconciliation) | ~50 (test migration) | ~1500 |
+| D | ~3 new test-d files | ~5 | ~500 |
+| **Total** | **~40 production files** | **~75 test files** | **~5800 LoC** |
 
-Total: ~15 production files + ~50 test sites + 3 new test-d files. Comparable in volume to the original M2 R4 attempt; the difference is that M0 fixes `defineCodec` first so the deletion actually compiles.
+Comparable to (or larger than) the original combined M0+M2 estimate. Six PR boundaries (A, B1, B2, B3, B4, B5+C, D) keep individual reviews tractable.
 
-## Milestone M1 — Narrow runtime `Codec` instance + emit through descriptor
+## Milestone M1 — Narrow runtime `Codec` instance + descriptor-keyed metadata reads
 
-**Goal**: The `Codec` interface in `framework-components` declares only `id` + the four conversion methods (`encode`, `decode`, `encodeJson`, `decodeJson`). Every consumer that read `traits` / `targetTypes` / `meta` / `renderOutputType` off a resolved codec migrates to read from `descriptorFor(codecId)`.
+**Status: LANDED** (commits `3c9338fef`, `1be7564c4`).
 
-**Spec ACs addressed**: AC-3.
+Re-verify post-M0:
 
-### Tasks
+- The class-based `Codec` abstract class declares only `id` getter (proxied through descriptor) + the four conversion methods.
+- No instance-level `traits` / `targetTypes` / `meta` / `renderOutputType` slots.
+- All consumer sites read static metadata from descriptors.
 
-1. **T1.1 — Inventory consumer sites.** Run `grep -rn "codec\.\(traits\|targetTypes\|meta\|renderOutputType\)" packages --include="*.ts"` plus a TypeScript-level search for property accesses on `Codec` typed expressions. Record every production site (test sites can lag; they migrate too but don't block production-site migration). Cross-check against the spec's enumerated list.
-2. **T1.2 — Narrow the base `Codec` interface** in `packages/1-framework/1-core/framework-components/src/shared/codec-types.ts`. Remove `traits`, `targetTypes`, `renderOutputType?`. Keep `id`, `encode`, `decode`, `encodeJson`, `decodeJson` — the async surface (Promise-returning encode/decode + `CodecCallContext`) is preserved per ADR 204 / ADR 207. Land alongside family-specific extension narrowing so the build doesn't break in two phases.
-3. **T1.3 — Narrow family-specific `Codec` extensions.** SQL `Codec` in `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts` loses `meta`-on-instance; `meta` consultation routes through descriptors. Mongo `MongoCodec` analogous narrowing — but only for the field set, no behavior change to Mongo dispatch (TML-2324's scope).
-4. **T1.4 — Migrate emit-path `renderOutputType` consultation** to `descriptorFor(codecId).renderOutputType`. The only production read site on `origin/main` is `packages/1-framework/3-tooling/emitter/src/domain-type-generation.ts:259`; the audit grep should re-confirm but the prior task list's `emit.ts` / `emit-types.ts` / `generate-contract-dts.ts` enumeration was aspirational, not actual. After this, any `forCodecId(codecId).renderOutputType` lookup retires.
-5. **T1.5 — Migrate other static-metadata read sites.** For each site found in T1.1:
-   - `framework-components/control/control-stack.ts` — `codec.id` reads stay (id is on the instance); any `targetTypes` reads route through descriptors.
-   - `contract-psl/provider.ts` — `descriptorFor(codecId).targetTypes[0]`.
-   - `mongo-contract-psl/derive-json-schema.ts` — analogous.
-   - `relational-core/ast/codec-types.ts` — `CodecRegistryImpl` (`register`, `hasTrait`, `traitsOf`) — these are part of the legacy `codecs:` slot path and may delete entirely in M2; for M1, keep them working by routing reads through descriptors-by-codec-id, with a TODO note pointing at M2.
-   - `defineCodecs` builder — reads `codec.id` to populate `dataTypes`. Keep working; `id` stays on the instance.
-   - `sql-runtime/codecs/decoding.ts` — `codec.id` reads stay; if any read of `codec.traits` / `codec.targetTypes` exists, route through descriptor.
-   - `postgres/3-targets/core/codecs.ts` — `aliasCodec` continues to work in M1 (still produces a `Codec`); the helper itself migrates to `aliasDescriptor` in M2.
-   - `postgres/6-adapters/core/{adapter,descriptor-meta}.ts` — `Object.values(codecDefinitions)` mappings: read static metadata through descriptor map.
-   - `mongo-codec/codec-registry.ts` — registry stays (Mongo registration migration is TML-2324); `codec.id` reads stay.
-6. **T1.6 — Update `synthesizeNonParameterizedDescriptor`.** Today it reads `codec.traits` / `codec.targetTypes` / `codec.meta` from the codec instance. After M1 narrows the instance, the bridge takes those fields explicitly via an arg bag from the call site (`sql-context.ts`'s `registerInIndices(synthesizeNonParameterizedDescriptor(codec))` becomes `synthesizeNonParameterizedDescriptor(codec, { traits, targetTypes, meta })`, where the extra args come from the contributor's surrounding context). Decision: take the explicit-arg shape so contributor code keeps compiling; bridge dies in M2.
-7. **T1.7 — Tests.** Update unit tests that constructed `Codec` instances with `traits` / `targetTypes` / `renderOutputType` to construct descriptors instead (or update test helpers that wrap the construction). Negative type tests in `framework-components/test/codec-types.types.test-d.ts` to assert the narrowed shape.
-8. **T1.8 — Validation checkpoint** (gates above) and **pause for review**.
+If post-M0 any regressions surface, file a follow-up. No re-implementation expected.
 
-### Risks
+## Milestone M2 — Native descriptor migration
 
-- **Test fixtures.** Many tests construct codecs inline; the migration will surface in a wide test diff. Acceptable cost; tests follow production.
-- **`renderOutputType` consultation surface.** The emitter has multiple call sites that consult the renderer; each must route through the descriptor map. If any call site doesn't have descriptor-map access today, lift it through the call signature instead of reaching for a cast.
-- **Cast surfacing.** Removing fields may force a few sites that were reading them to introduce casts if the descriptor isn't available. Each such site is a real bug — the descriptor IS available at every legitimate read site. Lift the descriptor reference into the call site instead of casting.
+**Status: ABSORBED into M0.**
 
-### Estimated diff
-
-~15–20 production files touched + ~10 test files. No new packages.
-
-## Milestone M2 — Native descriptor migration + bridge deletion + `aliasDescriptor` + emit-shim deletion
-
-**Goal**: Every codec contributor ships native `CodecDescriptor`s. The synthesis bridge, `parameterizedCodecs:` slot, `CodecParamsDescriptor`, `aliasCodec` helper, and `arktypeJsonEmitCodec` all delete. Contributors expose a single `codecs: () => ReadonlyArray<CodecDescriptor>` slot.
-
-**Spec ACs addressed**: AC-1, AC-2, AC-4.
-
-### Tasks
-
-1. **T2.1 — Introduce `aliasDescriptor`** in `packages/3-targets/3-targets/postgres/src/core/codecs.ts` (or in framework-components if shared). Signature: `aliasDescriptor<P>(base: CodecDescriptor<P>, overrides: { codecId, targetTypes, meta? }): CodecDescriptor<P>`. The alias's `factory` delegates to `base.factory` and rewrites `id` on the resolved codec.
-2. **T2.2 — Migrate sql-relational-core base codecs to descriptors.** ~6 codecs (char, varchar, int, float, text, timestamp). Each gains a sibling `*Descriptor` export. `defineCodecs` builder may need a parallel `defineCodecDescriptors` shape, or absorb descriptors directly. Decision deferred to implementation start: prefer absorbing into `defineCodecs` if structurally clean.
-3. **T2.3 — Migrate postgres target codecs to descriptors.** ~22 codecs across `packages/3-targets/3-targets/postgres/src/core/codecs.ts`. Each `pg*Codec` becomes a `pg*Descriptor`; `aliasCodec` calls become `aliasDescriptor`. The target/adapter's `codecs:` contributor slot returns the descriptor list. The `parameterizedCodecs:` slots (currently `[]` everywhere except the postgres/sqlite adapters and pgvector/arktype-json runtime descriptors) all delete.
-4. **T2.4 — Migrate sqlite target codecs to descriptors.** ~7 codecs (text, integer, real, blob, boolean, datetime, json, bigint). Same pattern as postgres.
-5. **T2.5 — Migrate pgvector to descriptor-only.** `pgVectorCodec` is already a descriptor. Move it through the unified `codecs:` slot; the parent project already deleted `pgVectorRepresentativeCodec`.
-6. **T2.6 — Migrate arktype-json to descriptor-only.** `arktypeJsonCodec` already a descriptor; move it from `parameterizedCodecs:` to `codecs:`. Delete `arktypeJsonEmitCodec` from `arktype-json-codec.ts:341` and from `pack-meta.ts:38`'s `codecInstances: [arktypeJsonEmitCodec]`. Emit consults `descriptorFor('arktype/json@1').renderOutputType` per M1's T1.4. (The `JsonSchemaValidatorRegistry` consumption stays until M4; arktype-json already validates inline so this isn't a regression.)
-7. **T2.7 — Delete `synthesizeNonParameterizedDescriptor`** from `framework-components/src/shared/codec-types.ts` and its export. Update any test that imported it (`sql-orm-client/test/model-accessor.test.ts` is a known site) to construct descriptors directly.
-8. **T2.8 — Delete `parameterizedCodecs:` slot.** Remove from `SqlStaticContributions`, `Adapter`, `RuntimeAdapter`, `RuntimeTarget`, `ControlAdapter`, every contributor's runtime/control descriptor, and `cli/src/control-api/contract-enrichment.ts`'s destructure (currently `parameterizedCodecs: _pc`).
-9. **T2.9 — Delete `CodecParamsDescriptor`** from `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`. The adapter-level `parameterizedCodecs():` collapses into the unified `codecs():` slot; runtime materialization continues through the unified `CodecDescriptor<P>` map.
-10. **T2.10 — Tests.** Per-package codec descriptor tests already cover the new shape (parent project added them); update test fixtures that constructed codecs through the legacy slot. Add an explicit test that the synthesis bridge can no longer be reached (constructive check on the descriptor map population).
-11. **T2.11 — Validation checkpoint** and **pause for review**.
-
-### Risks
-
-- **`defineCodecs` reshape.** The builder currently keys off `codec.id` and `codec.targetTypes` to construct `dataTypes` and `CodecTypes`. After narrowing, those reads route through descriptors. The builder may need to take descriptors directly. This may surface a real type-design choice; resolve at implementation time.
-- **Contributor protocol breakage.** Removing `parameterizedCodecs:` from `SqlStaticContributions` is a typed-protocol change; every implementor must update. Mongo's analogous slot stays for now (out of scope per non-goals).
-- **Adapter-level `CodecParamsDescriptor` migration.** The postgres and sqlite adapters consume `CodecParamsDescriptor` shape internally for parameterized codec metadata. Migrating to consume `CodecDescriptor` directly may require lifting the read sites. Audit at implementation start.
-
-### Estimated diff
-
-~30 production files touched (per-codec migrations + slot deletions + cli enrichment + adapter reshape) + ~20 test files. The single biggest milestone by diff size.
+M2 R1–R3 landed (interface-form descriptor migration, synthesis bridge deletion, `aliasCodec` retirement, `arktypeJsonEmitCodec` deletion, narrowed `Codec` shape). M2 R4 (legacy-API deletion) was rolled back. M0's Phase B + Phase C absorb M2 R4's intent — the migration to the class form IS the native descriptor migration; the deletion of `mkCodec` / `defineCodec` / `byScalar` IS what M2 R4 was attempting. There is no separate M2 R4 retry milestone.
 
 ## Milestone M3 — `ParamRef.refs` plumbing + encode-side `forColumn` + `forCodecId` retirement
 
@@ -174,73 +220,67 @@ Total: ~15 production files + ~50 test sites + 3 new test-d files. Comparable in
 
 ### Tasks
 
-1. **T3.1 — Audit refs-less encode-side call sites.** Grep for every `ParamRef.of(...)` and `new ParamRef(...)` in production. For each, determine: is the call site column-bound (refs available)? If yes → must populate refs in T3.4. If no → does it ever target a parameterized codec id today? If yes → bug; either populate refs (best) or document the constraint. If no → fine; the new validator-pass invariant won't fire here. Production sites identified on `origin/main` (verify before implementation):
+1. **T3.1 — Audit refs-less encode-side call sites.** Grep for every `ParamRef.of(...)` and `new ParamRef(...)` in production. For each, determine: column-bound (refs available)? targets a parameterized codec id today? Sites identified on `origin/main`:
    - `packages/2-sql/4-lanes/relational-core/src/expression.ts:75`
    - `packages/2-sql/4-lanes/sql-builder/src/runtime/mutation-impl.ts:43,47`
    - `packages/3-extensions/sql-orm-client/src/query-plan-mutations.ts:50,96`
    - `packages/3-extensions/sql-orm-client/src/where-binding.ts:125`
    - `packages/3-extensions/sql-orm-client/src/types.ts:293`
-2. **T3.2 — Extend `ParamRef` AST node.** Add `refs?: { table: string; column: string }` to `ParamRef` in `packages/2-sql/4-lanes/relational-core/src/ast/types.ts`. Update the constructor and `ParamRef.of` factory to accept refs in their options bag. Verify `Expression.fold` / `rewrite` / `accept` thread refs through any rewriter that constructs new `ParamRef` instances.
-3. **T3.3 — Add a builder-pipeline validator pass.** A new `validateParamRefRefs(plan, descriptorMap)` pass that walks the plan's expression tree, identifies every `ParamRef` whose `codecId` is parameterized (i.e. `descriptorFor(codecId).paramsSchema` validates a non-`void` shape), and asserts `refs !== undefined`. Refs-less parameterized-codec-id `ParamRef`s throw a clear diagnostic naming the codec id and the binding site.
-   - **Decision**: validator pass (option b from the design discussion), not constructor-time enforcement (option a). Keeps AST construction context-free; the builder pipeline already runs typed validation passes and this fits naturally. Document the call site that runs the pass.
-4. **T3.4 — Populate refs at every column-bound site.** For each site in T3.1 that has the column ref available at construction time, thread it through.
-5. **T3.5 — Encode-side dispatch via `forColumn`.** `encodeParam` in `packages/2-sql/5-runtime/src/codecs/encoding.ts` consults `paramRef.refs` and resolves through `contractCodecs.forColumn(refs.table, refs.column)` when present. Falls back to `descriptorFor(codecId).factory(undefined)(syntheticInstanceCtx)` for non-parameterized codec ids without refs. The `forCodecId` path retires for parameterized codec ids (the validator-pass invariant guarantees we never hit it for them).
-6. **T3.6 — Tests.**
-   - Validator pass: a unit test that constructs a `ParamRef` for `pg/vector@1` without refs and asserts the validator throws.
-   - Encode-side dispatch: an integration test that sends a vector value through the SQL builder and asserts encode goes through `forColumn`, not `forCodecId`.
-   - Refs propagation: tests for each migrated builder/orm site that the constructed `ParamRef` carries refs.
+2. **T3.2 — Extend `ParamRef` AST node.** Add `refs?: { table: string; column: string }`.
+3. **T3.3 — Add a builder-pipeline validator pass.** `validateParamRefRefs(plan, descriptorMap)` walks expressions, identifies `ParamRef`s whose `codecId` is parameterized (`descriptorFor(codecId).paramsSchema` validates non-`void`), asserts `refs !== undefined`. Refs-less parameterized-codec-id `ParamRef`s throw a clear diagnostic naming the codec id and the binding site.
+4. **T3.4 — Populate refs at every column-bound site** identified in T3.1.
+5. **T3.5 — Encode-side dispatch via `forColumn`.** `encodeParam` in `packages/2-sql/5-runtime/src/codecs/encoding.ts` consults `paramRef.refs` and resolves through `contractCodecs.forColumn(refs.table, refs.column)` when present. Falls back to `descriptorFor(codecId).factory(undefined)(syntheticInstanceCtx)` for non-parameterized codec ids without refs. The `forCodecId` path retires for parameterized codec ids.
+6. **T3.6 — Tests.** Validator-pass unit test (refs-less parameterized codec ParamRef → throw). Encode-side dispatch integration test (vector encode goes through `forColumn`, not `forCodecId`). Refs propagation tests for each migrated site.
 7. **T3.7 — Validation checkpoint** and **pause for review**.
 
 ### Risks
 
-- **Refs propagation surface area.** The 5 enumerated sites in T3.1 may not be exhaustive; the audit must surface any others. The grep is the surface-area check.
-- **Validator-pass ergonomics.** Refs-less parameterized-codec-id `ParamRef`s exist transiently in the AST. The validator must run before encode. Document this clearly; add a CI-style assertion in builder-pipeline tests.
-- **Refs and rewriters.** AST rewriters (`Expression.rewrite`) construct new `ParamRef` instances; need to preserve refs across rewrites. Verify by exhaustive search of `new ParamRef(...)` and `ParamRef.of(...)` inside rewriter implementations.
+- Refs propagation surface area: the 5 enumerated sites may not be exhaustive; the audit catches more.
+- AST rewriters (`Expression.rewrite`) construct new `ParamRef` instances; preserve refs across rewrites.
+- Validator-pass ergonomics: refs-less parameterized-codec-id `ParamRef`s exist transiently in the AST; the pass must run before encode.
 
 ### Estimated diff
 
-~10 production files (AST + 5 binding sites + validator + encode site) + ~5 test files. Smaller than M2 but more cross-cutting.
+~10 production files + ~5 test files.
 
 ## Milestone M4 — `JsonSchemaValidatorRegistry` deletion + trait retirement
 
-**Goal**: JSON-Schema validation lives in the resolved codec's `decode` body (already the case for `arktypeJsonCodec` per parent's Phase C). The `JsonSchemaValidatorRegistry`, `buildJsonSchemaValidatorRegistry`, the `jsonSchemaValidators?` slot on `ExecutionContext`, and `packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts` all delete. The `'json-validator'` `CodecTrait` retires if no consumer remains.
+**Goal**: JSON-Schema validation lives in the resolved codec's `decode` body (already the case for `arktypeJsonCodec`). The `JsonSchemaValidatorRegistry`, `buildJsonSchemaValidatorRegistry`, the `jsonSchemaValidators?` slot on `ExecutionContext`, and `packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts` all delete. The `'json-validator'` `CodecTrait` retires if no consumer remains.
 
 **Spec ACs addressed**: AC-6.
 
 ### Tasks
 
-1. **T4.1 — Audit `'json-validator'` trait consumers.** Grep `'json-validator'` and `extractValidator` (or analogous helpers). Record every read; verify each can either route through inline validation or delete entirely.
-2. **T4.2 — Verify arktype-json's inline validation path is the only producer of validator state.** Parent's Phase C ships this; confirm no other production codec writes to `JsonSchemaValidatorRegistry` today.
-3. **T4.3 — Delete `JsonSchemaValidatorRegistry`** from `packages/2-sql/4-lanes/relational-core/src/query-lane-context.ts`. Delete `buildJsonSchemaValidatorRegistry` from wherever it lives (probably `sql-runtime`).
-4. **T4.4 — Delete the `jsonSchemaValidators?` slot** on `ExecutionContext`. Update every site that constructed or threaded the slot.
-5. **T4.5 — Delete `packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts`** and any callers of its exports.
-6. **T4.6 — Retire the `'json-validator'` `CodecTrait`.** If T4.1 found no consumers, delete from `framework-components/src/shared/codec-types.ts`. If a consumer remains as a structural marker, update the trait's docstring to reflect the inline-validation reality and keep it; delete in a follow-up ticket.
-7. **T4.7 — Tests.**
-   - Replace or update `packages/2-sql/5-runtime/test/json-schema-validation.test.ts` — its tests will need to assert against the inline-validator path. Most likely the file deletes; arktype-json's own tests already cover the inline path.
-   - Real-DB e2e: arktype-json roundtrip (encode + decode + validation rejection on malformed payload).
+1. **T4.1 — Audit `'json-validator'` trait consumers.** Grep `'json-validator'` and `extractValidator`.
+2. **T4.2 — Verify arktype-json's inline validation path is the only producer of validator state.**
+3. **T4.3 — Delete `JsonSchemaValidatorRegistry`** from `packages/2-sql/4-lanes/relational-core/src/query-lane-context.ts`. Delete `buildJsonSchemaValidatorRegistry`.
+4. **T4.4 — Delete the `jsonSchemaValidators?` slot** on `ExecutionContext`.
+5. **T4.5 — Delete `packages/2-sql/5-runtime/src/codecs/json-schema-validation.ts`** and any callers.
+6. **T4.6 — Retire the `'json-validator'` `CodecTrait`** if T4.1 found no consumers.
+7. **T4.7 — Tests.** Update / delete `packages/2-sql/5-runtime/test/json-schema-validation.test.ts`. Real-DB e2e: arktype-json roundtrip.
 8. **T4.8 — Validation checkpoint** and **pause for review**.
 
 ### Risks
 
-- **Hidden consumers of the validator registry.** The grep audit is the safety net; if a non-arktype-json consumer surfaces, evaluate whether to migrate it inline or retain the registry as a structural marker. Likely outcome: no other consumers (the registry was built for the `pg/json@1` schema-typed factory, which deleted in parent's Phase C).
-- **Decode-error diagnostic regression.** The validator registry's diagnostics may be richer than the inline path; verify the inline error envelope (`RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` per parent's verification) carries equivalent information (column name, expected schema, actual value).
+- Hidden consumers of the validator registry; the grep audit is the safety net.
+- Decode-error diagnostic regression — verify the inline path's error envelope (`RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`) carries equivalent information.
 
 ### Estimated diff
 
-~5 production files (registry deletion + slot deletion + json-schema-validation.ts deletion) + ~5 test files (mostly the validator-registry test deleting).
+~5 production files + ~5 test files.
 
 ## Project-wide close-out
 
-Done after M4 lands cleanly. Per the [drive-project-workflow](../../.cursor/rules/drive-project-workflow.mdc) close-out steps:
+Done after M4 lands cleanly. Per [drive-project-workflow](../../.cursor/rules/drive-project-workflow.mdc):
 
-1. **Migrate long-lived docs into `docs/`.** ADR 208 was authored by the parent project to describe the unified model; verify it accurately reflects the post-TML-2357 state (no synthesis bridge mentioned, no `forCodecId` fallback for parameterized codec ids, no emit-shim, no `CodecParamsDescriptor`, runtime `Codec` shape narrow). If updates are needed, land them as part of M4 or a follow-up close-out commit.
-2. **Strip repo-wide references to `projects/codec-registration-completion/**`** (replace with ADR 208 links or remove).
+1. **Migrate long-lived docs into `docs/`.** ADR 208 was authored by the parent project to describe the unified model; verify it accurately reflects the post-TML-2357 state under Pattern E (class-based descriptors, per-codec helpers, no `defineCodec`, no `forCodecId` fallback for parameterized codec ids, no emit-shim, no `CodecParamsDescriptor`, narrow runtime `Codec`). Update if needed.
+2. **Strip repo-wide references to `projects/codec-registration-completion/**`** (replace with ADR 208 / canonical `docs/` links or remove).
 3. **Delete `projects/codec-registration-completion/`** in the close-out commit.
 4. **Linear**: TML-2357 auto-closes when the PR(s) merge (issue id in branch name + PR title).
 
 ## Open items (deferred)
 
-- **`pgEnumCodec` factory audit** — its factory is a placeholder; documented in ADR 208 § Future work; separate ticket.
+- **`pgEnumCodec` factory audit** — placeholder factory; documented in ADR 208 § Future work; separate ticket.
 - **Mongo registration migration + Mongo runtime `forColumn`** — TML-2324.
 - **Mongo control-plane `parameterizedCodecs:` slot** — separate ticket; Mongo demos don't use parameterized codecs, so the gap is authoring-time only.
 - **Future per-library JSON extensions (zod, valibot)** — not blocked by this work.

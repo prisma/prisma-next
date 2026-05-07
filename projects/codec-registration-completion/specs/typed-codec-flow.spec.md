@@ -1,5 +1,7 @@
 # Spec — Typed `Codec` flow through `CodecDescriptor` (TML-2357 prerequisite)
 
+> **Status: SUPERSEDED.** This spec was authored around the interface-form `defineCodec` redesign (Shape A vs Shape B). The Pattern E spike on `spike/class-based-codecs` proved a different design — class-based descriptors + per-codec helpers — better satisfies the same problem. The current source of truth is [`class-based-codec-design.spec.md`](class-based-codec-design.spec.md) (implementation) and [`factory-defined-codec-types.spec.md`](factory-defined-codec-types.spec.md) (goal). This file survives as historical context for the M2 R4 rollback and the design iteration that followed; do not implement against it.
+
 > **Pivotal precondition for the rest of TML-2357.** Surfaced during M2 R4 (see [`wip/unattended-decisions.md` Decision #11](../../../wip/unattended-decisions.md)) when deleting the legacy `mkCodec`-call-result typed instances broke `<Contract, TypeMaps>` derivation downstream. The bug is a TML-2229 regression that should have been caught before merge. **No part of TML-2357's downstream codec migration (AC-1, AC-2, AC-3, AC-7) can land cleanly without this fix first.**
 
 ## Decision
