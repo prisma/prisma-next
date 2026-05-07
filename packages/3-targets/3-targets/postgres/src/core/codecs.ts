@@ -669,7 +669,7 @@ class PgCharDescriptor extends CodecDescriptorImpl<{ readonly length?: number }>
     return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
   }
 }
-const pgCharDescriptor = new PgCharDescriptor();
+export const pgCharDescriptor = new PgCharDescriptor();
 
 class PgVarcharDescriptor extends CodecDescriptorImpl<{ readonly length?: number }> {
   override readonly codecId = PG_VARCHAR_CODEC_ID;
@@ -686,7 +686,7 @@ class PgVarcharDescriptor extends CodecDescriptorImpl<{ readonly length?: number
     return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
   }
 }
-const pgVarcharDescriptor = new PgVarcharDescriptor();
+export const pgVarcharDescriptor = new PgVarcharDescriptor();
 
 class PgIntDescriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = PG_INT_CODEC_ID;
@@ -700,7 +700,7 @@ class PgIntDescriptor extends CodecDescriptorImpl<void> {
     return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
   }
 }
-const pgIntDescriptor = new PgIntDescriptor();
+export const pgIntDescriptor = new PgIntDescriptor();
 
 class PgFloatDescriptor extends CodecDescriptorImpl<void> {
   override readonly codecId = PG_FLOAT_CODEC_ID;
@@ -714,7 +714,7 @@ class PgFloatDescriptor extends CodecDescriptorImpl<void> {
     return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
   }
 }
-const pgFloatDescriptor = new PgFloatDescriptor();
+export const pgFloatDescriptor = new PgFloatDescriptor();
 
 const pgInt4Descriptor = defineCodec<
   typeof PG_INT4_CODEC_ID,

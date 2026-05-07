@@ -38,7 +38,7 @@ import {
   SQL_TIMESTAMP_CODEC_ID,
   SQL_VARCHAR_CODEC_ID,
 } from '@prisma-next/target-postgres/codec-ids';
-import { codecDescriptorList } from '@prisma-next/target-postgres/codecs';
+import { codecDescriptorClassList } from '@prisma-next/target-postgres/codecs';
 import { pgEnumControlHooks } from './enum-control-hooks';
 
 // ============================================================================
@@ -181,7 +181,7 @@ export const postgresAdapterDescriptorMeta = {
   },
   types: {
     codecTypes: {
-      codecDescriptors: codecDescriptorList,
+      codecDescriptors: codecDescriptorClassList,
       import: {
         package: '@prisma-next/target-postgres/codec-types',
         named: 'CodecTypes',

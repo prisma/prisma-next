@@ -1,4 +1,8 @@
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type {
+  AnyCodecDescriptor,
+  CodecInstanceContext,
+  CodecLookup,
+} from '@prisma-next/framework-components/codec';
 import type {
   Adapter,
   AdapterProfile,
@@ -8,7 +12,7 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { byScalar } from '@prisma-next/target-postgres/codecs';
+import { codecDescriptorClassList } from '@prisma-next/target-postgres/codecs';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
 import { renderLoweredSql } from './sql-renderer';
 import type { PostgresAdapterOptions, PostgresContract, PostgresLoweredStatement } from './types';
@@ -39,8 +43,21 @@ class PostgresAdapterImpl
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry: CodecRegistry = (() => {
     const byId = new Map<string, Codec<string>>();
-    for (const definition of Object.values(byScalar)) {
-      byId.set(definition.codec.id, definition.codec);
+    // Materialize a canonical codec instance per class-form descriptor.
+    // Parameterized postgres codecs are parameter-stateless at runtime
+    // (params only inform emit-path metadata + renderOutputType), so a
+    // single instance per codec id is sufficient for the adapter's runtime
+    // encode/decode path. The B5 swap reads from the unified
+    // `codecs:` slot's class-form descriptor list.
+    const synthCtx: CodecInstanceContext = { name: 'postgres-builtin-adapter' };
+    for (const descriptor of codecDescriptorClassList) {
+      const factory = (
+        descriptor as AnyCodecDescriptor & {
+          factory: (params: unknown) => (ctx: CodecInstanceContext) => Codec<string>;
+        }
+      ).factory(undefined);
+      const codec = factory(synthCtx);
+      byId.set(codec.id, codec);
     }
     return {
       get: (id) => byId.get(id),

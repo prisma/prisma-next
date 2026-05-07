@@ -36,6 +36,7 @@
 
 import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
   CodecImpl,
@@ -45,6 +46,14 @@ import {
   column,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import {
+  sqlCharDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlTextDescriptorClass,
+  sqlTimestampDescriptorClass,
+  sqlVarcharDescriptorClass,
+} from '@prisma-next/sql-relational-core/ast';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import {
@@ -68,7 +77,10 @@ import {
   PG_VARBIT_CODEC_ID,
 } from './codec-ids';
 import {
+  pgCharDescriptor,
   pgEnumRenderOutputType,
+  pgFloatDescriptor,
+  pgIntDescriptor,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -80,6 +92,7 @@ import {
   pgTimestampEncodeJson,
   pgTimestamptzDecodeJson,
   pgTimestamptzEncodeJson,
+  pgVarcharDescriptor,
   renderLength,
   renderPrecision,
 } from './codecs';
@@ -979,3 +992,48 @@ export const pgJsonbColumn = () =>
 
 pgJsonbColumn satisfies ColumnHelperFor<PgJsonbDescriptor>;
 pgJsonbColumn satisfies ColumnHelperForStrict<PgJsonbDescriptor>;
+
+// ---------------------------------------------------------------------------
+// Class-form descriptor list (TML-2357 M0 Phase B5). The ordering mirrors the
+// legacy `codecDescriptorList` in `codecs.ts` so the descriptor sequence the
+// emitter consumes stays stable. Each entry is a class-form descriptor
+// (instance of `CodecDescriptorImpl<P>`) that carries the same
+// `targetTypes`/`meta`/`traits`/`renderOutputType` shape as its legacy
+// `defineCodec()` counterpart, preserving fixture byte-identity.
+//
+// The 4 pg-aliases (`pgCharDescriptor`, `pgVarcharDescriptor`,
+// `pgIntDescriptor`, `pgFloatDescriptor`) live in `codecs.ts` for now; they
+// are class-based already but co-located with the legacy carriers. Phase C
+// can relocate them into this file as part of the legacy-carrier removal.
+// ---------------------------------------------------------------------------
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
+  sqlCharDescriptorClass,
+  sqlVarcharDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlTextDescriptorClass,
+  sqlTimestampDescriptorClass,
+  pgTextDescriptorClass,
+  pgCharDescriptor,
+  pgVarcharDescriptor,
+  pgIntDescriptor,
+  pgFloatDescriptor,
+  pgInt4DescriptorClass,
+  pgInt2DescriptorClass,
+  pgInt8DescriptorClass,
+  pgFloat4DescriptorClass,
+  pgFloat8DescriptorClass,
+  pgNumericDescriptorClass,
+  pgTimestampDescriptorClass,
+  pgTimestamptzDescriptorClass,
+  pgTimeDescriptorClass,
+  pgTimetzDescriptorClass,
+  pgBoolDescriptorClass,
+  pgBitDescriptorClass,
+  pgVarbitDescriptorClass,
+  pgIntervalDescriptorClass,
+  pgEnumDescriptorClass,
+  pgJsonDescriptorClass,
+  pgJsonbDescriptorClass,
+];

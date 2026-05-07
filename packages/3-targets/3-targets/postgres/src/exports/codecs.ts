@@ -4,5 +4,9 @@ export {
   codecDescriptorDefinitions,
   codecDescriptorList,
   dataTypes,
+  pgCharDescriptor,
+  pgFloatDescriptor,
+  pgIntDescriptor,
+  pgVarcharDescriptor,
 } from '../core/codecs';
 export * from '../core/codecs-class';
