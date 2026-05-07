@@ -20,18 +20,28 @@ Implementation order follows the plan's task ordering ([T1.1…T1.10, T2.1…T2.
 
 ## 1. Extension descriptor: `contractSpace` field
 
-Add an optional `contractSpace` field to `SqlControlExtensionDescriptor`:
+Add an optional `contractSpace` field to `SqlControlExtensionDescriptor`. The shape that landed in T1.2 (`5733d8e18`):
 
 ```ts
 // packages/2-sql/9-family/src/core/migrations/types.ts
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
+import type { MigrationMetadata, MigrationOps } from '@prisma-next/migration-tools/package';
+
 export interface ExtensionContractRef {
   readonly hash: string;
   readonly invariants: readonly string[];
 }
 
+export interface ExtensionMigrationPackage {
+  readonly dirName: string;            // emit-time directory name; preserved from the extension author
+  readonly metadata: MigrationMetadata; // ADR 197 metadata; carries `toContract` snapshot
+  readonly ops: MigrationOps;
+}
+
 export interface ExtensionContractSpace {
-  readonly contractJson: ContractJson;                     // canonical JSON value, in-memory
-  readonly migrations: readonly MigrationPackage<unknown>[]; // each = manifest + ops + contract.json snapshot
+  readonly contractJson: Contract<SqlStorage>;                  // typed in-memory contract
+  readonly migrations: readonly ExtensionMigrationPackage[];
   readonly headRef: ExtensionContractRef;
 }
 
@@ -46,7 +56,12 @@ Behaviour:
 
 - An extension descriptor without `contractSpace` is treated as a non-schema extension (codec-only, query-ops-only). Today's behaviour preserved.
 - A descriptor with `contractSpace` is loaded into the per-space pipeline at authoring time only (see § 3).
-- `MigrationPackage` is the existing shape from `@prisma-next/framework-components/control` (`{ manifest, ops, contractSnapshot }`). Reused as-is.
+
+Notes on the resolved shape (resolved during T1.2 implementation; supersedes earlier draft text in this section):
+
+- **`ExtensionMigrationPackage` is a new in-memory type**, distinct from `@prisma-next/migration-tools/package`'s on-disk `MigrationPackage` (`{ dirName, dirPath, metadata, ops }`). The on-disk type carries `dirPath` because it is post-emission; the in-memory descriptor type omits `dirPath` because at descriptor-construction time the package has not been emitted to a user repo yet. The framework's emitter (T1.7) materializes `ExtensionMigrationPackage` to disk and constructs the corresponding on-disk `MigrationPackage` lazily.
+- **`contractJson` is typed as `Contract<SqlStorage>`**, not a loose JSON value. The descriptor lives in the SQL family and the typed shape is more useful at composition time. Serialization to JSON for hashing / on-disk emission is the framework's job (already implemented for app-space contracts), not the descriptor author's.
+- **No `contractSnapshot` field on `ExtensionContractSpace`.** Per ADR 197, each migration package's `metadata.toContract` *is* the snapshot; there's no separate snapshot field.
 
 ## 2. Marker schema migration (T1.1)
 
@@ -86,26 +101,47 @@ Open implementation question: where does this run? Two options:
 
 Recommendation: **(A)** — keeps the marker promotion outside of any user-initiated transaction; runs deterministically on every framework start. The per-space verifier (§ 4) can then assume the new shape unconditionally.
 
-Validation: shadow-DB preflight per ADR 029. Multi-process concurrency: rely on Postgres's transactional DDL — concurrent runs serialize on the table lock.
+Validation: dedicated three-state idempotency tests (fresh / legacy single-row / already-migrated) for both Postgres and SQLite drivers. ADR 029's shadow-DB preflight covers user-DDL paths via the migration runner; the marker promotion runs in `ensureControlTables`, which has always been outside that scope (the original `ensureMarkerTableStatement` and `ensureLedgerTableStatement` were applied directly pre-T1.1). Idempotency tests are stronger evidence than shadow-on-empty would be — they exercise the actual transition states. Multi-process concurrency: rely on Postgres's transactional DDL — concurrent runs serialize on the table lock; SQLite uses `BEGIN EXCLUSIVE`.
 
 ## 3. Per-space planner (T1.3) and emitter wiring (T1.6, T1.7, T1.8)
 
-The planner gains a per-space loop:
+**Helper location.** The producer-side helpers — `planAllSpaces`, the layout convention, and `writeExtensionMigrationPackage` — live in `@prisma-next/migration-tools` (`1-framework`), not in the SQL family. The contract-space concept is target-agnostic per project spec FRs 3-6; placing the helpers in the framework layer lets Mongo (and any future target) reuse them. `pnpm lint:deps` validates that the framework layer carries no target-* references. The SQL family wires them into its CLI / emitter at the consumption site.
+
+The planner gains a per-space loop. The shipped `planAllSpaces` shape is **generic over contract and package types**:
 
 ```ts
-interface SpacePlanInput {
+// @prisma-next/migration-tools/exports/spaces
+interface SpacePlanInput<TContract, TPackage> {
   readonly spaceId: string;             // 'app' | extension space id
-  readonly priorContract: ContractJson | null;  // null = first emit for this space
-  readonly newContract: ContractJson;
+  readonly priorContract: TContract | null;  // null = first emit for this space
+  readonly newContract: TContract;
+  // … plus whatever per-space context the family planner needs
 }
 
-interface SpacePlanOutput {
+interface SpacePlanOutput<TPackage> {
   readonly spaceId: string;
-  readonly migrationPackages: readonly MigrationPackage<unknown>[];  // 0 or more
+  readonly migrationPackages: readonly TPackage[];  // 0 or more
 }
 
-function planAllSpaces(inputs: readonly SpacePlanInput[]): readonly SpacePlanOutput[];
+function planAllSpaces<TContract, TPackage>(
+  inputs: readonly SpacePlanInput<TContract, TPackage>[],
+  planSpace: (input: SpacePlanInput<TContract, TPackage>) => SpacePlanOutput<TPackage>,
+): readonly SpacePlanOutput<TPackage>[];
 ```
+
+`planAllSpaces` itself never inspects either type — it sorts inputs alphabetically by `spaceId` (deterministic ordering, AM3), rejects duplicate ids with `MIGRATION.DUPLICATE_SPACE_ID` *before* any callback runs (atomicity), and delegates the per-space planning decision to the family.
+
+The SQL family's call site is the canonical instantiation:
+
+```ts
+// somewhere in @prisma-next/family-sql (consumption site, lands in a later round)
+planAllSpaces<ContractJson, MigrationPackage<unknown>>(
+  inputs,
+  (input) => sqlPlanSpace(input),
+);
+```
+
+A Mongo-family call site would instantiate with `<MongoContractJson, MongoMigrationPackage<unknown>>` against `mongoPlanSpace`; the helper does not need to change.
 
 For app-space: `priorContract` comes from `<projectRoot>/migrations/<latest>/contract.json` (today's behaviour); `newContract` comes from the just-emitted root `<projectRoot>/contract.json`.
 
@@ -124,50 +160,90 @@ For each loaded extension space: `priorContract` comes from `<projectRoot>/migra
 
 Migration names inside a per-extension subdirectory **preserve the names the extension author chose** — no renaming. The per-extension subdirectory must be a valid filesystem name; space identifiers are constrained to `[a-z][a-z0-9_-]{0,63}`.
 
-**Emission helper (T1.7).** A shared helper takes an in-memory `MigrationPackage` and writes `manifest.json`, `ops.json`, and `contract.json` to a target directory. Already exists for app-space; extend (or wrap) to accept an arbitrary target directory.
+**Emission helper (T1.7).** Shipped as `writeExtensionMigrationPackage(targetDir, pkg)` in `@prisma-next/migration-tools/exports/io`. Takes an in-memory `ExtensionMigrationPackage` (per § 1's resolved shape: `{ dirName, metadata, ops }`) and writes `migration.json`, `ops.json`, and a canonical-JSON `contract.json` snapshot under `<targetDir>/<pkg.dirName>/`. The `migration.json` + `ops.json` writes delegate to the existing app-space `writeMigrationPackage` for byte-parity; the `contract.json` snapshot reuses the existing `canonicalizeJson` helper. Re-emitting the same package across runs / machines produces byte-identical files.
 
-**Pinned artefact emission (T1.8).** A new helper invoked once per loaded extension space at the end of `migrate`:
+**Layout helper (T1.6).** Shipped as `spaceMigrationDirectory(projectMigrationsDir, spaceId)` in `@prisma-next/migration-tools/exports/spaces`. App-space passes through unchanged (no subdirectory); extension spaces resolve to `<projectMigrationsDir>/<spaceId>`. Validates `spaceId` against `[a-z][a-z0-9_-]{0,63}` and throws `MIGRATION.INVALID_SPACE_ID` for filesystem-unsafe names.
+
+**Pinned artefact emission (T1.8).** Shipped as `emitPinnedSpaceArtefacts(projectMigrationsDir, spaceId, inputs)` in `@prisma-next/migration-tools/exports/spaces`. Framework-neutral primitives signature (same target-agnosticism rationale as R3's generic `planAllSpaces`):
 
 ```ts
+// @prisma-next/migration-tools/exports/spaces
 function emitPinnedSpaceArtefacts(
+  projectMigrationsDir: string,
   spaceId: string,
-  contractSpace: ExtensionContractSpace,
-  projectRoot: string,
+  inputs: {
+    readonly contract: unknown;        // any JSON-serialisable value
+    readonly contractDts: string;      // pre-rendered; caller's responsibility
+    readonly headRef: { readonly hash: string; readonly invariants: readonly string[] };
+  },
 ): Promise<void>;
 ```
 
-Writes `contract.json`, `contract.d.ts`, `refs/head.json` under `<projectRoot>/migrations/<spaceId>/`. Always-overwrite (the framework owns these files). Canonicalization rules:
+Writes `contract.json`, `contract.d.ts`, `refs/head.json` under `<projectMigrationsDir>/<spaceId>/`. Always-overwrite (the framework owns these files). Rejects app-space and invalid space ids. Canonicalisation rules:
 
-- `contract.json`: reuse the existing canonical-JSON serializer used for hashing (so byte-equivalence with the descriptor's `contractJson` holds across runs).
-- `contract.d.ts`: reuse the existing `.d.ts` emitter from the contract package.
-- `refs/head.json`: canonical JSON of `{ "hash": ref.hash, "invariants": [...sorted] }` — invariants sorted alphabetically for determinism.
+- `contract.json`: passes `inputs.contract` through `canonicalizeJson` so byte-equivalence holds across runs / machines.
+- `contract.d.ts`: writes `inputs.contractDts` verbatim. The framework helper does **not** render `.d.ts`; rendering is target / typemap-aware and lives at the consumption site.
+- `refs/head.json`: canonical JSON of `{ "hash": headRef.hash, "invariants": [...sorted] }` — invariants sorted alphabetically for determinism.
 
-**Drift detection (T1.9).** Before computing `priorContract` for a space:
+The SQL family's call site renders `contractDts` via its existing `generateContractDts` helper (which knows the target's typemaps) before invoking the framework helper:
 
-- Read pinned `<projectRoot>/migrations/<space-id>/contract.json` (if exists) → call this `pinnedContract`.
-- Compute `descriptorHash = hash(descriptor.contractSpace.contractJson)` and `pinnedHash = hash(pinnedContract)`.
-- If `descriptorHash !== pinnedHash` and the user did not bump (i.e. they ran `migrate` without intending to advance the extension): surface a non-fatal warning naming the extension and the diff direction. The migration emit proceeds normally — the warning is informational. (`migrate` is the canonical way to materialise extension bumps; the warning just confirms the bump is being captured this run.)
+```ts
+// somewhere in @prisma-next/family-sql (consumption site, lands in M2)
+emitPinnedSpaceArtefacts(projectMigrationsDir, spaceId, {
+  contract: contractSpace.contractJson,
+  contractDts: generateContractDts(contractSpace.contractJson, /* target typemaps */),
+  headRef: contractSpace.headRef,
+});
+```
+
+A Mongo-family call site would compose its own typemap-aware `.d.ts` renderer the same way.
+
+**Drift detection (T1.9).** Shipped as `detectSpaceContractDrift(spaceId, { descriptorHash, pinnedHash })` (pure 3-discriminant primitive) plus `readPinnedContractHash(projectMigrationsDir, spaceId)` (I/O wrapper) in `@prisma-next/migration-tools/exports/spaces`.
+
+Before computing `priorContract` for a space:
+
+- Read pinned hash via `readPinnedContractHash(...)`. The wrapper reads `<projectMigrationsDir>/<spaceId>/refs/head.json.hash` rather than re-hashing the pinned `contract.json` content. This is operationally equivalent under descriptor self-consistency (T1.8 writes `inputs.headRef.hash` verbatim into `refs/head.json`, and `headRef.hash` is the same hash the descriptor's pipeline produces) and slightly more robust — immune to canonical-JSON pipeline evolution between framework versions. Returns `null` on ENOENT (no pinned file yet — first emit case).
+- Compute `descriptorHash = hash(descriptor.contractSpace.contractJson)` from the in-memory descriptor side using the same canonical-JSON pipeline.
+- Pass both to `detectSpaceContractDrift(spaceId, { descriptorHash, pinnedHash })`. The helper returns `{ kind: 'noDrift' | 'firstEmit' | 'drift'; spaceId; descriptorHash; pinnedHash }` — pure, no I/O, no warning surface (the SQL-family consumption site formats the warning).
+- On `kind === 'drift'`: SQL-family consumption site surfaces a non-fatal warning naming the extension and the diff direction. The migration emit proceeds normally — the warning is informational. (`migrate` is the canonical way to materialise extension bumps; the warning just confirms the bump is being captured this run.)
+- On `kind === 'firstEmit'` or `kind === 'noDrift'`: no warning.
+
+**Note for M2 R1 wiring:** at descriptor load time, the SQL family should also verify descriptor self-consistency by recomputing `hash(canonicalize(descriptor.contractSpace.contractJson))` and asserting equality with `descriptor.contractSpace.headRef.hash`. Mismatch indicates the extension author published an inconsistent descriptor (e.g. `headRef.hash` not regenerated after `contractJson` changed); fail fast with a clear error (suggested code: `MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`).
 
 ## 4. Per-space runner (T1.4) and verifier (T1.5)
 
-**Runner.** Reads only the user's repo. For each loaded space:
+**Helper location.** Both runner-ordering and verifier helpers ship in `@prisma-next/migration-tools/exports/spaces` as **pure target-agnostic primitives** — same convention as R3's producer-side helpers. The transaction wrapping, marker row writes, and live-DB schema compare belong at the SQL-family consumption site (lands in M2 R1). `pnpm lint:deps` validates that `packages/1-framework` carries no target-* references.
+
+**Runner ordering helper (T1.4).** Shipped as `concatenateSpaceApplyInputs<TOp>(inputs)` in `@prisma-next/migration-tools/exports/spaces`. Pure, generic over per-target op type:
 
 ```ts
-interface SpaceApplyInput {
+// @prisma-next/migration-tools/exports/spaces
+interface SpaceApplyInput<TOp> {
   readonly spaceId: string;
   readonly migrationDirectory: string;            // either projectRoot/migrations or .../<space-id>
-  readonly currentMarkerHash: string | null;      // null = no marker row yet
+  readonly currentMarkerHash: string | null;
   readonly currentMarkerInvariants: readonly string[];
-  readonly path: readonly MigrationPlanOperation<unknown>[];   // from per-space planner / findPathWithDecision
+  readonly path: readonly TOp[];                  // from per-space planner / findPathWithDecision
 }
+
+function concatenateSpaceApplyInputs<TOp>(
+  inputs: readonly SpaceApplyInput<TOp>[],
+): readonly SpaceApplyInput<TOp>[];
 ```
 
-Cross-space ordering: all extension-space inputs concatenated first (in alphabetical-by-spaceId order), app-space input last. Single transaction wraps the entire concatenation. After successful apply:
+Cross-space ordering: extensions alphabetical-by-spaceId first, app-space last. Rejects duplicate `spaceId` with `MIGRATION.DUPLICATE_SPACE_ID`. Returns inputs unchanged in identity (referential pass-through) where ordering already matches. The SQL-family consumption site wraps the resulting concatenation in a single transaction and writes per-space marker rows after apply (using the optional `space` parameter on `WriteMarkerInput` landed in T1.1).
 
-- Each space's marker row is created (if absent) or updated (if present) with the new `(hash, invariants)`.
-- The `space` column carries the space id.
+**Verifier (T1.5).** Shipped as `verifyContractSpaces(inputs)` + `listPinnedSpaceDirectories(projectMigrationsDir)` in `@prisma-next/migration-tools/exports/spaces`. Pure structural verifier — caller supplies the loaded spaces, the pinned per-space contracts, and the marker rows; the helper returns a deterministic list of violations with actionable remediation strings. Five violation kinds:
 
-**Verifier.** Reads only the user's repo. Algorithm:
+- `declaredButUnmigrated`: extension declared in `extensionPacks` but no pinned `contract.json` on disk.
+- `orphanMarker`: marker row for a space not in `extensionPacks`.
+- `orphanPinnedDir`: pinned directory on disk for a space not in `extensionPacks`.
+- `hashMismatch`: marker row's hash differs from pinned contract's hash.
+- `invariantsMismatch`: pinned contract's required invariants are not all in the marker row's applied invariants set.
+
+`listPinnedSpaceDirectories` filters dot-prefixed and timestamp-prefixed (`/^\d{8}T\d{4}_/`) directories so it correctly distinguishes pinned space directories from app-space migration directories. The SQL-family verifier wires `verifyContractSpaces` into its existing `verify` / `dbInit` paths and decides fail-vs-warn semantics per violation kind (M2).
+
+**Verifier algorithm** (the conceptual flow the consumption site wires together):
 
 1. Discover loaded spaces from `extensionPacks` + `'app'`. Result: `loadedSpaces: ReadonlySet<string>`.
 2. Read app-space `contract.json` from `<projectRoot>/contract.json`.
@@ -276,7 +352,7 @@ The extension is private (not published); existence in the workspace is solely t
 Implementation-level acceptance criteria for the framework mechanism:
 
 - [ ] **AM1.** `SqlControlExtensionDescriptor.contractSpace` field present and typed per § 1. `pgvector` and `arktype-json` continue to typecheck (their descriptors don't set the field).
-- [ ] **AM2.** Marker schema migration SQL applies idempotently against (a) a fresh `prisma_contract.marker` table, (b) a pre-migration single-row marker, (c) an already-migrated marker. Shadow-DB preflight passes.
+- [ ] **AM2.** Marker schema migration SQL applies idempotently against (a) a fresh `prisma_contract.marker` table, (b) a pre-migration single-row marker, (c) an already-migrated marker. Verified by dedicated integration tests on both Postgres and SQLite drivers.
 - [ ] **AM3.** Per-space planner (`planAllSpaces`) returns the same shape regardless of `extensionPacks` declaration order (deterministic alphabetical sort).
 - [ ] **AM4.** Per-space runner concatenates inputs as extensions-first-then-app-space and applies all in a single transaction. Mid-apply failure rolls back all spaces.
 - [ ] **AM5.** Per-space verifier rejects all three orphan / missing cases (orphan marker, declared-but-unmigrated, orphan pinned dir) with the error messages specified in § 4.
@@ -311,7 +387,7 @@ Track B's marker migration (T1.1) blocks all integration tests; T1.1 first.
 - ADR 197 — Migration packages snapshot their own contract.
 - ADR 208 — Invariant-aware migration routing.
 - ADR 021 — Contract Marker Storage (modified by T1.1).
-- ADR 029 — Shadow-DB preflight (used by T1.1).
+- ADR 029 — Shadow-DB preflight (covers user-DDL only; T1.1 runs inside `ensureControlTables` which is outside that scope, validated by idempotency tests instead).
 - `packages/3-extensions/pgvector/` — reference shape for `packages/3-extensions/test-contract-space/`.
 
 # Open Questions
