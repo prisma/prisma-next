@@ -277,9 +277,10 @@ describe('cross-family middleware proof', () => {
     const sqlRuntime = new MockSqlRuntime([intercepted, telemetry], sqlCtx, sqlDriverRows);
 
     const mongoAdapter = createMockMongoAdapter();
+    const mongoDriver = createMockMongoDriver([{ _id: 'should-not-appear' }]);
     const mongoRuntime = createMongoRuntime({
       context: makeMongoContext(mongoAdapter),
-      driver: createMockMongoDriver([{ _id: 'should-not-appear' }]),
+      driver: mongoDriver,
       middleware: [intercepted, telemetry],
     });
 
@@ -320,7 +321,7 @@ describe('cross-family middleware proof', () => {
     // Neither underlying driver was invoked: `intercept` short-circuited
     // execution before lowering on both sides.
     expect(sqlRuntime.driverSpy).not.toHaveBeenCalled();
-    expect(createMockMongoDriver([{ _id: 'should-not-appear' }]).execute).not.toHaveBeenCalled();
+    expect(mongoDriver.execute).not.toHaveBeenCalled();
 
     // Telemetry observed only afterExecute for each run (beforeExecute is
     // suppressed on the intercepted hit path) and saw source: 'middleware'
