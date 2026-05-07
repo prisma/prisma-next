@@ -1,12 +1,11 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { byScalar, codecDescriptorDefinitions } from '../src/core/codecs';
+import { pgVectorDescriptorClass } from '../src/core/codecs-class';
 
-// The pgvector codec authors `encode`/`decode` synchronously, but the
-// `mkCodec()` factory in `relational-core` lifts both methods to
-// `Promise`-returning at the boundary. The tests below cast through the
-// Promise-returning shape and `await` every call so unit-level coverage
-// stays aligned with the codec contract:
+// The pgvector codec authors `encode`/`decode` synchronously; class-form
+// codecs route through `Promise`-returning methods at the boundary. The
+// tests below cast through the Promise-returning shape and `await` every
+// call so unit-level coverage stays aligned with the codec contract:
 //   `Codec<Id, TTraits, TWire, TInput>` — encode/decode return Promise.
 type AsyncVectorCodec = {
   readonly encode: (value: number[]) => Promise<string>;
@@ -14,17 +13,21 @@ type AsyncVectorCodec = {
 };
 
 function asAsyncCodec(): AsyncVectorCodec {
-  return byScalar.vector.codec as unknown as AsyncVectorCodec;
+  // pgvector's runtime `encode`/`decode` are parameter-stateless — the
+  // descriptor's `factory(params)` returns the same closure regardless
+  // of `params`; supply a representative shape so the type-side
+  // `VectorParams` constraint is honoured.
+  return pgVectorDescriptorClass.factory({ length: 4 })({
+    name: 'test',
+  }) as unknown as AsyncVectorCodec;
 }
 
 describe('pgvector codecs', () => {
   it(
     'has vector codec registered',
     () => {
-      const vectorDef = byScalar.vector;
-      expect(vectorDef).toBeDefined();
-      expect(vectorDef.typeId).toBe('pg/vector@1');
-      expect(codecDescriptorDefinitions.vector.descriptor.targetTypes).toEqual(['vector']);
+      expect(pgVectorDescriptorClass.codecId).toBe('pg/vector@1');
+      expect(pgVectorDescriptorClass.targetTypes).toEqual(['vector']);
     },
     timeouts.default,
   );

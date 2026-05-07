@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { codecDescriptorDefinitions } from '../src/core/codecs';
+import { pgVectorDescriptorClass } from '../src/core/codecs-class';
 
 describe('pgvector codec renderOutputType', () => {
-  const renderOutputType = codecDescriptorDefinitions['vector'].descriptor.renderOutputType as
+  const renderOutputType = pgVectorDescriptorClass.renderOutputType as
     | ((typeParams: Record<string, unknown>) => string | undefined)
     | undefined;
 
