@@ -12,7 +12,10 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import { aliasDescriptor } from '@prisma-next/framework-components/codec';
+import {
+  CodecDescriptorImpl,
+  type CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
 import type { Codec } from '@prisma-next/sql-relational-core/ast';
 import {
   defineCodec,
@@ -596,29 +599,88 @@ const pgTextDescriptor = defineCodec<
   meta: { db: { sql: { postgres: { nativeType: 'text' } } } },
 });
 
-const pgCharDescriptor = aliasDescriptor(sqlCharDescriptor, {
-  codecId: PG_CHAR_CODEC_ID,
-  targetTypes: ['character'],
-  meta: { db: { sql: { postgres: { nativeType: 'character' } } } },
-});
+// Prototype-preserving codec aliasing: derive a codec instance whose
+// `id` is the alias `codecId` while inheriting the base codec's behavior
+// (own properties via `Object.assign`, prototype methods via the shared
+// prototype). Works for both plain-object base codecs (today's
+// `defineCodec` output) and class-instance base codecs (post-Phase B,
+// when SQL bases migrate to `CodecImpl` subclasses with methods on the
+// prototype). A naive `{ ...base, id }` spread would silently strip
+// prototype methods at first encode/decode call.
+function aliasCodec<C extends { readonly id: string }>(baseCodec: C, codecId: string): C {
+  const proto = Object.getPrototypeOf(baseCodec) as object | null;
+  const aliased = Object.create(proto ?? Object.prototype) as C;
+  Object.assign(aliased, baseCodec);
+  Object.defineProperty(aliased, 'id', {
+    value: codecId,
+    writable: false,
+    enumerable: true,
+    configurable: true,
+  });
+  return aliased;
+}
 
-const pgVarcharDescriptor = aliasDescriptor(sqlVarcharDescriptor, {
-  codecId: PG_VARCHAR_CODEC_ID,
-  targetTypes: ['character varying'],
-  meta: { db: { sql: { postgres: { nativeType: 'character varying' } } } },
-});
+class PgCharDescriptor extends CodecDescriptorImpl<{ readonly length?: number }> {
+  override readonly codecId = PG_CHAR_CODEC_ID;
+  override readonly targetTypes: readonly string[] = ['character'];
+  override readonly meta = { db: { sql: { postgres: { nativeType: 'character' } } } };
+  override readonly traits = sqlCharDescriptor.traits;
+  override readonly paramsSchema = sqlCharDescriptor.paramsSchema;
+  override renderOutputType(params: { readonly length?: number }): string | undefined {
+    return sqlCharDescriptor.renderOutputType?.(params);
+  }
+  override factory(params: { readonly length?: number }): (ctx: CodecInstanceContext) => Codec {
+    const baseFactory = sqlCharDescriptor.factory(params);
+    const codecId = this.codecId;
+    return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
+  }
+}
+const pgCharDescriptor = new PgCharDescriptor();
 
-const pgIntDescriptor = aliasDescriptor(sqlIntDescriptor, {
-  codecId: PG_INT_CODEC_ID,
-  targetTypes: ['int4'],
-  meta: { db: { sql: { postgres: { nativeType: 'integer' } } } },
-});
+class PgVarcharDescriptor extends CodecDescriptorImpl<{ readonly length?: number }> {
+  override readonly codecId = PG_VARCHAR_CODEC_ID;
+  override readonly targetTypes: readonly string[] = ['character varying'];
+  override readonly meta = { db: { sql: { postgres: { nativeType: 'character varying' } } } };
+  override readonly traits = sqlVarcharDescriptor.traits;
+  override readonly paramsSchema = sqlVarcharDescriptor.paramsSchema;
+  override renderOutputType(params: { readonly length?: number }): string | undefined {
+    return sqlVarcharDescriptor.renderOutputType?.(params);
+  }
+  override factory(params: { readonly length?: number }): (ctx: CodecInstanceContext) => Codec {
+    const baseFactory = sqlVarcharDescriptor.factory(params);
+    const codecId = this.codecId;
+    return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
+  }
+}
+const pgVarcharDescriptor = new PgVarcharDescriptor();
 
-const pgFloatDescriptor = aliasDescriptor(sqlFloatDescriptor, {
-  codecId: PG_FLOAT_CODEC_ID,
-  targetTypes: ['float8'],
-  meta: { db: { sql: { postgres: { nativeType: 'double precision' } } } },
-});
+class PgIntDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_INT_CODEC_ID;
+  override readonly targetTypes: readonly string[] = ['int4'];
+  override readonly meta = { db: { sql: { postgres: { nativeType: 'integer' } } } };
+  override readonly traits = sqlIntDescriptor.traits;
+  override readonly paramsSchema = sqlIntDescriptor.paramsSchema;
+  override factory(): (ctx: CodecInstanceContext) => Codec {
+    const baseFactory = sqlIntDescriptor.factory();
+    const codecId = this.codecId;
+    return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
+  }
+}
+const pgIntDescriptor = new PgIntDescriptor();
+
+class PgFloatDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_FLOAT_CODEC_ID;
+  override readonly targetTypes: readonly string[] = ['float8'];
+  override readonly meta = { db: { sql: { postgres: { nativeType: 'double precision' } } } };
+  override readonly traits = sqlFloatDescriptor.traits;
+  override readonly paramsSchema = sqlFloatDescriptor.paramsSchema;
+  override factory(): (ctx: CodecInstanceContext) => Codec {
+    const baseFactory = sqlFloatDescriptor.factory();
+    const codecId = this.codecId;
+    return (ctx) => aliasCodec(baseFactory(ctx) as Codec, codecId);
+  }
+}
+const pgFloatDescriptor = new PgFloatDescriptor();
 
 const pgInt4Descriptor = defineCodec<
   typeof PG_INT4_CODEC_ID,

@@ -16,7 +16,7 @@
 export type { Codec } from '../shared/codec';
 export { CodecImpl } from '../shared/codec';
 export type { AnyCodecDescriptor, CodecDescriptor } from '../shared/codec-descriptor';
-export { aliasDescriptor, CodecDescriptorImpl } from '../shared/codec-descriptor';
+export { CodecDescriptorImpl } from '../shared/codec-descriptor';
 export type {
   CodecCallContext,
   CodecInstanceContext,
