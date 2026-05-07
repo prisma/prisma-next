@@ -16,7 +16,6 @@ import type { Interval } from '@prisma-next/target-postgres/codec-types';
 import type { CodecTypes as PgVectorTypes } from '@prisma-next/extension-pgvector/codec-types';
 import type { Vector } from '@prisma-next/extension-pgvector/codec-types';
 import type { CodecTypes as ArktypeJsonTypes } from '@prisma-next/extension-arktype-json/codec-types';
-import type { OperationTypes as PgVectorOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 import type { QueryOperationTypes as PgAdapterQueryOps } from '@prisma-next/adapter-postgres/operation-types';
 import type { QueryOperationTypes as PgVectorQueryOperationTypes } from '@prisma-next/extension-pgvector/operation-types';
 
@@ -39,7 +38,6 @@ export type ProfileHash =
   ProfileHashBase<'sha256:29a17a141f69a59f39e6e5ce56adda9719ab0899a8af17bc6e4db2c4e866a182'>;
 
 export type CodecTypes = PgTypes & PgVectorTypes & ArktypeJsonTypes;
-export type OperationTypes = PgVectorOperationTypes;
 export type LaneCodecTypes = CodecTypes;
 export type QueryOperationTypes = PgAdapterQueryOps<CodecTypes> &
   PgVectorQueryOperationTypes<CodecTypes>;
@@ -165,7 +163,6 @@ export type FieldInputTypes = {
 };
 export type TypeMaps = TypeMapsType<
   CodecTypes,
-  OperationTypes,
   QueryOperationTypes,
   FieldOutputTypes,
   FieldInputTypes
@@ -963,13 +960,6 @@ type ContractBase = ContractType<
               readonly package: '@prisma-next/extension-pgvector/codec-types';
             },
           ];
-        };
-        readonly operationTypes: {
-          readonly import: {
-            readonly alias: 'PgVectorOperationTypes';
-            readonly named: 'OperationTypes';
-            readonly package: '@prisma-next/extension-pgvector/operation-types';
-          };
         };
         readonly queryOperationTypes: {
           readonly import: {

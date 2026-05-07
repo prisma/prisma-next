@@ -74,12 +74,11 @@ function createStubExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postgre
     }),
   ];
 
-  const operations = [
-    {
-      method: 'example',
+  const operations = {
+    example: {
       impl: () => undefined as never,
     },
-  ];
+  };
 
   return {
     kind: 'extension',

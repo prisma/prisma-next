@@ -103,7 +103,6 @@ export {
   extractCodecLookup,
   extractCodecTypeImports,
   extractComponentIds,
-  extractOperationTypeImports,
   extractQueryOperationTypeImports,
 } from '../control/control-stack';
 export type {

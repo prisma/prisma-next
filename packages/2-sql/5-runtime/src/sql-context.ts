@@ -18,7 +18,7 @@ import { runtimeError } from '@prisma-next/framework-components/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   createSqlOperationRegistry,
-  type SqlOperationDescriptor,
+  type SqlOperationDescriptors,
 } from '@prisma-next/sql-operations';
 import type {
   Adapter,
@@ -52,7 +52,7 @@ export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> = C
  */
 export interface SqlStaticContributions {
   readonly codecs: () => ReadonlyArray<AnyCodecDescriptor>;
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   readonly mutationDefaultGenerators?: () => ReadonlyArray<RuntimeMutationDefaultGenerator>;
 }
 
@@ -678,8 +678,9 @@ export function createExecutionContext<
 
   const queryOperationRegistry = createSqlOperationRegistry();
   for (const contributor of contributors) {
-    for (const op of contributor.queryOperations?.() ?? []) {
-      queryOperationRegistry.register(op);
+    const ops = contributor.queryOperations?.() ?? {};
+    for (const [name, op] of Object.entries(ops)) {
+      queryOperationRegistry.register(name, op);
     }
   }
 

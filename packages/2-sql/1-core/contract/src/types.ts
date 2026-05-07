@@ -131,13 +131,11 @@ export function applyFkDefaults(
 
 export type TypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, never>,
-  TOperationTypes extends Record<string, unknown> = Record<string, never>,
   TQueryOperationTypes extends Record<string, unknown> = Record<string, never>,
   TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
   TFieldInputTypes extends Record<string, Record<string, unknown>> = Record<string, never>,
 > = {
   readonly codecTypes: TCodecTypes;
-  readonly operationTypes: TOperationTypes;
   readonly queryOperationTypes: TQueryOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
   readonly fieldInputTypes: TFieldInputTypes;
@@ -148,14 +146,6 @@ export type CodecTypesOf<T> = [T] extends [never]
   : T extends { readonly codecTypes: infer C }
     ? C extends Record<string, { output: unknown }>
       ? C
-      : Record<string, never>
-    : Record<string, never>;
-
-export type OperationTypesOf<T> = [T] extends [never]
-  ? Record<string, never>
-  : T extends { readonly operationTypes: infer O }
-    ? O extends Record<string, unknown>
-      ? O
       : Record<string, never>
     : Record<string, never>;
 
@@ -236,5 +226,3 @@ export type ExtractFieldInputTypes<T> = FieldInputTypesOf<ExtractTypeMapsFromCon
 export type ResolveCodecTypes<TContract, TTypeMaps> = [TTypeMaps] extends [never]
   ? ExtractCodecTypes<TContract>
   : CodecTypesOf<TTypeMaps>;
-
-export type ResolveOperationTypes<_TContract, TTypeMaps> = OperationTypesOf<TTypeMaps>;

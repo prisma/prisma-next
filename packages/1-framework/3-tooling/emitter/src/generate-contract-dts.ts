@@ -23,7 +23,6 @@ export function generateContractDts(
   contract: Contract,
   emitter: EmissionSpi,
   codecTypeImports: ReadonlyArray<TypesImportSpec>,
-  operationTypeImports: ReadonlyArray<TypesImportSpec>,
   hashes: {
     readonly storageHash: string;
     readonly executionHash?: string;
@@ -32,7 +31,7 @@ export function generateContractDts(
   options?: GenerateContractTypesOptions,
   codecLookup?: CodecLookup,
 ): string {
-  const allImports: TypesImportSpec[] = [...codecTypeImports, ...operationTypeImports];
+  const allImports: TypesImportSpec[] = [...codecTypeImports];
   if (options?.queryOperationTypeImports) {
     allImports.push(...options.queryOperationTypeImports);
   }
@@ -44,7 +43,6 @@ export function generateContractDts(
   const hashAliases = generateHashTypeAliases(hashes);
 
   const codecTypes = generateCodecTypeIntersection(codecTypeImports, 'CodecTypes');
-  const operationTypes = generateCodecTypeIntersection(operationTypeImports, 'OperationTypes');
 
   const familyTypeAliases = emitter.getFamilyTypeAliases(options);
 
@@ -100,7 +98,6 @@ import type {
 ${hashAliases}
 
 export type CodecTypes = ${codecTypes};
-export type OperationTypes = ${operationTypes};
 ${familyTypeAliases}
 ${valueObjectTypeAliases}
 export type FieldOutputTypes = ${fieldTypesMaps.output};

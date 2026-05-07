@@ -52,11 +52,9 @@ describe('emitter integration', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -125,11 +123,9 @@ describe('emitter integration', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 
@@ -186,11 +182,9 @@ describe('emitter integration', () => {
       });
 
       const codecTypeImports: TypesImportSpec[] = [];
-      const operationTypeImports: TypesImportSpec[] = [];
       const extensionIds = ['postgres', 'pg'];
       const options: EmitStackInput = {
         codecTypeImports,
-        operationTypeImports,
         extensionIds,
       };
 

@@ -1,8 +1,5 @@
 import pgvector from '@prisma-next/extension-pgvector/runtime';
-import {
-  extractCodecTypeImports,
-  extractOperationTypeImports,
-} from '@prisma-next/family-sql/test-utils';
+import { extractCodecTypeImports } from '@prisma-next/family-sql/test-utils';
 import { describe, expect, it } from 'vitest';
 import { getSqlDescriptorBundle, pgvectorExtensionDescriptor } from '../utils/framework-components';
 
@@ -37,20 +34,6 @@ describe('pgvector extension pack integration', () => {
     });
   });
 
-  it('extracts operation type imports from descriptors', () => {
-    const { target, adapter, extensions } = getSqlDescriptorBundle({
-      extensions: [pgvectorExtensionDescriptor],
-    });
-
-    const operationTypeImports = extractOperationTypeImports([target, adapter, ...extensions]);
-    expect(operationTypeImports.length).toBe(1);
-    expect(operationTypeImports[0]).toEqual({
-      package: '@prisma-next/extension-pgvector/operation-types',
-      named: 'OperationTypes',
-      alias: 'PgVectorOperationTypes',
-    });
-  });
-
   it('descriptor contributes the pg/vector@1 codec descriptor', () => {
     const descriptors = pgvector.codecs();
     expect(descriptors).toBeDefined();
@@ -64,13 +47,9 @@ describe('pgvector extension pack integration', () => {
   it('descriptor provides query operations', () => {
     const operations = pgvector.queryOperations!();
     expect(operations).toBeDefined();
-    expect(operations.length).toBe(2);
-
-    const cosineDistanceOp = operations.find((op) => op.method === 'cosineDistance');
-    expect(cosineDistanceOp).toBeDefined();
-
-    const cosineSimilarityOp = operations.find((op) => op.method === 'cosineSimilarity');
-    expect(cosineSimilarityOp).toBeDefined();
+    expect(Object.keys(operations).sort()).toEqual(['cosineDistance', 'cosineSimilarity']);
+    expect(operations['cosineDistance']).toBeDefined();
+    expect(operations['cosineSimilarity']).toBeDefined();
   });
 
   it('descriptor materializes a runtime codec when factory is called', { timeout: 1_000 }, () => {

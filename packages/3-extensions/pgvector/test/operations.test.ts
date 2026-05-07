@@ -25,9 +25,9 @@ describe('pgvector operations', () => {
   it('descriptor provides query operations whose impls build AST with lowering', () => {
     const operations = pgvectorDescriptor.queryOperations!();
     expect(operations).toBeDefined();
-    expect(operations.length).toBe(2);
+    expect(Object.keys(operations).sort()).toEqual(['cosineDistance', 'cosineSimilarity']);
 
-    const cosineDistanceOp = operations.find((op) => op.method === 'cosineDistance');
+    const cosineDistanceOp = operations['cosineDistance'];
     expect(cosineDistanceOp).toBeDefined();
     const distExpr = cosineDistanceOp?.impl(
       ParamRef.of([1, 2], { codecId: 'pg/vector@1' }) as never,
@@ -41,7 +41,7 @@ describe('pgvector operations', () => {
       template: '{{self}} <=> {{arg0}}',
     });
 
-    const cosineSimilarityOp = operations.find((op) => op.method === 'cosineSimilarity');
+    const cosineSimilarityOp = operations['cosineSimilarity'];
     expect(cosineSimilarityOp).toBeDefined();
     const simExpr = cosineSimilarityOp?.impl(
       ParamRef.of([1, 2], { codecId: 'pg/vector@1' }) as never,
@@ -60,8 +60,8 @@ describe('pgvector operations', () => {
     const operations = pgvectorDescriptor.queryOperations!();
 
     const registry = createSqlOperationRegistry();
-    for (const op of operations) {
-      registry.register(op);
+    for (const [name, op] of Object.entries(operations)) {
+      registry.register(name, op);
     }
 
     const entries = registry.entries();

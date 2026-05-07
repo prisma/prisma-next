@@ -16,7 +16,7 @@ import contractJson from '../src/prisma/contract.json' with { type: 'json' };
 test('contract.d.ts exports Contract and TypeMaps separately', () => {
   expectTypeOf<Contract>().toHaveProperty('models');
   expectTypeOf<TypeMaps>().toHaveProperty('codecTypes');
-  expectTypeOf<TypeMaps>().toHaveProperty('operationTypes');
+  expectTypeOf<TypeMaps>().toHaveProperty('queryOperationTypes');
 });
 
 test('validateContract<Contract> output is assignable to visualization shape', () => {

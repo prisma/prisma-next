@@ -1245,7 +1245,7 @@ See `.cursor/rules/config-validation-and-normalization.mdc` for detailed pattern
     - **`capabilities`**: Feature flags the component contributes (e.g., adapter/runtime lowering requirements). Typically namespaced by target (e.g., `{ postgres: { returning: true } }`) so contracts can be validated against the active target.
     - **`types`**: Type import specs and type IDs contributed by the component. Common examples:
       - `types.codecTypes.import`: Where to import codec type mappings for `contract.d.ts`.
-      - `types.operationTypes.import`: Where to import operation type mappings for `contract.d.ts` (extensions).
+      - `types.queryOperationTypes.import`: Where to import flat query-builder operation type signatures for `contract.d.ts` (adapters/extensions).
       - `types.storage`: Storage type bindings (`typeId`, `nativeType`, etc.) used in authoring/emission.
     - **`operations`**: Operation signatures the component contributes (extensions), used for type generation and (optionally) validation/lowering.
     - **Component-specific metadata**:
@@ -1268,11 +1268,11 @@ const exampleExtension: SqlControlExtensionDescriptor<'postgres'> = {
   targetId: 'postgres',
   capabilities: { postgres: { 'example/feature': true } },
   types: {
-    operationTypes: {
+    queryOperationTypes: {
       import: {
         package: '@prisma-next/extension-example/operation-types',
-        named: 'OperationTypes',
-        alias: 'ExampleOperationTypes',
+        named: 'QueryOperationTypes',
+        alias: 'ExampleQueryOperationTypes',
       },
     },
   },

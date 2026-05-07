@@ -21,19 +21,13 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates complete contract.d.ts from blog contract', () => {
-    const types = generateContractDts(
-      blogContract,
-      mongoEmission,
-      mongoCodecImports,
-      [],
-      testHashes,
-    );
+    const types = generateContractDts(blogContract, mongoEmission, mongoCodecImports, testHashes);
 
     expect(types).toContain(
       'export type Contract = MongoContractWithTypeMaps<ContractBase, TypeMaps>',
     );
     expect(types).toContain(
-      'export type TypeMaps = MongoTypeMaps<CodecTypes, OperationTypes, FieldOutputTypes, FieldInputTypes>',
+      'export type TypeMaps = MongoTypeMaps<CodecTypes, FieldOutputTypes, FieldInputTypes>',
     );
     expect(types).toContain('export type CodecTypes = MongoCodecTypes');
 
@@ -72,7 +66,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates storage section with collections', () => {
-    const types = generateContractDts(blogContract, mongoEmission, [], [], testHashes);
+    const types = generateContractDts(blogContract, mongoEmission, [], testHashes);
 
     expect(types).toContain('readonly collections:');
     expect(types).toContain('readonly users: Record<string, never>');
@@ -80,7 +74,7 @@ describe('Mongo emitter hook end-to-end (blog fixture)', () => {
   });
 
   it('generates Comment model with owner and empty storage', () => {
-    const types = generateContractDts(blogContract, mongoEmission, [], [], testHashes);
+    const types = generateContractDts(blogContract, mongoEmission, [], testHashes);
 
     expect(types).toContain(
       "readonly text: { readonly nullable: false; readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/string@1' } }",

@@ -7,7 +7,6 @@ export interface GenerateContractTypesOptions {
 
 export interface ValidationContext {
   readonly codecTypeImports?: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports?: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds?: ReadonlyArray<string>;
 }
 

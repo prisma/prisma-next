@@ -93,12 +93,7 @@ type TestModels = {
   readonly Vectors: VectorsModel;
 };
 
-type TestTypeMaps = TypeMaps<
-  TestCodecTypes,
-  Record<string, never>,
-  Record<string, never>,
-  TestFieldOutputTypes
->;
+type TestTypeMaps = TypeMaps<TestCodecTypes, Record<string, never>, TestFieldOutputTypes>;
 
 type ContractInlineTypeParams = Contract<TestStorage, TestModels> & {
   readonly target: 'postgres';
@@ -199,7 +194,6 @@ type ContractNullable = Contract<
 } & {
   readonly [K in TypeMapsPhantomKey]?: TypeMaps<
     TestCodecTypes,
-    Record<string, never>,
     Record<string, never>,
     NullableFieldOutputTypes
   >;

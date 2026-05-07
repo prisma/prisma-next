@@ -588,8 +588,7 @@ describe('createModelAccessor', () => {
 
     it('attaches trait-targeted op only when codec traits are a superset of required traits', () => {
       const queryOperations = createSqlOperationRegistry();
-      queryOperations.register({
-        method: 'synthetic',
+      queryOperations.register('synthetic', {
         self: { traits: ['equality', 'textual'] },
         impl: () => undefined as never,
       });

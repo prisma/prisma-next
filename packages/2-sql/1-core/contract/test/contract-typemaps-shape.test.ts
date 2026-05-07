@@ -1,37 +1,22 @@
 import { describe, it } from 'vitest';
-import type {
-  CodecTypesOf,
-  FieldInputTypesOf,
-  FieldOutputTypesOf,
-  OperationTypesOf,
-  TypeMaps,
-} from '../src/types';
+import type { CodecTypesOf, FieldInputTypesOf, FieldOutputTypesOf, TypeMaps } from '../src/types';
 
 describe('Contract and TypeMaps shape', () => {
   describe('TypeMaps shape', () => {
-    it('TypeMaps has locked shape with codecTypes and operationTypes', () => {
-      type TM = TypeMaps<{ 'pg/text@1': { output: string } }, Record<string, never>>;
+    it('TypeMaps has locked shape with codecTypes', () => {
+      type TM = TypeMaps<{ 'pg/text@1': { output: string } }>;
       type HasCodecTypes = TM extends { readonly codecTypes: unknown } ? true : false;
-      type HasOperationTypes = TM extends { readonly operationTypes: unknown } ? true : false;
       const _codec: HasCodecTypes = true;
-      const _op: HasOperationTypes = true;
     });
 
     it('CodecTypesOf extracts codecTypes from TypeMaps', () => {
-      type TM = TypeMaps<{ foo: { output: number } }, Record<string, never>>;
+      type TM = TypeMaps<{ foo: { output: number } }>;
       type CT = CodecTypesOf<TM>;
       const _ct: CT = { foo: { output: 0 } };
     });
 
-    it('OperationTypesOf extracts operationTypes from TypeMaps', () => {
-      type TM = TypeMaps<Record<string, never>, { bar: Record<string, unknown> }>;
-      type OT = OperationTypesOf<TM>;
-      const _ot: OT = { bar: {} };
-    });
-
-    it('TypeMaps accepts 5th TFieldInputTypes parameter', () => {
+    it('TypeMaps accepts 4th TFieldInputTypes parameter', () => {
       type TM = TypeMaps<
-        Record<string, never>,
         Record<string, never>,
         Record<string, never>,
         Record<string, never>,
@@ -48,12 +33,7 @@ describe('Contract and TypeMaps shape', () => {
     });
 
     it('FieldOutputTypesOf extracts fieldOutputTypes from TypeMaps', () => {
-      type TM = TypeMaps<
-        Record<string, never>,
-        Record<string, never>,
-        Record<string, never>,
-        { User: { name: string } }
-      >;
+      type TM = TypeMaps<Record<string, never>, Record<string, never>, { User: { name: string } }>;
       type FOT = FieldOutputTypesOf<TM>;
       const _fot: FOT = { User: { name: 'test' } };
     });
@@ -63,17 +43,10 @@ describe('Contract and TypeMaps shape', () => {
         Record<string, never>,
         Record<string, never>,
         Record<string, never>,
-        Record<string, never>,
         { User: { name: string } }
       >;
       type FIT = FieldInputTypesOf<TM>;
       const _fit: FIT = { User: { name: 'test' } };
-    });
-
-    it('backward compat: 2-param TypeMaps compiles', () => {
-      type TM = TypeMaps<{ 'pg/text@1': { output: string } }, Record<string, never>>;
-      type CT = CodecTypesOf<TM>;
-      const _ct: CT = { 'pg/text@1': { output: '' } };
     });
   });
 });

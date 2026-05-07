@@ -166,7 +166,6 @@ export type MongoContract<
 
 export type MongoTypeMaps<
   TCodecTypes extends Record<string, { output: unknown }> = Record<string, { output: unknown }>,
-  TOperationTypes extends Record<string, unknown> = Record<string, never>,
   TFieldOutputTypes extends Record<string, Record<string, unknown>> = Record<
     string,
     Record<string, unknown>
@@ -177,7 +176,6 @@ export type MongoTypeMaps<
   >,
 > = {
   readonly codecTypes: TCodecTypes;
-  readonly operationTypes: TOperationTypes;
   readonly fieldOutputTypes: TFieldOutputTypes;
   readonly fieldInputTypes: TFieldInputTypes;
 };

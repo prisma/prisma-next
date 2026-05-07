@@ -10,17 +10,6 @@ type CodecTypesBase = Record<string, { readonly input: unknown; readonly output:
  * These types are imported by contract.d.ts files for compile-time type inference.
  */
 
-export type OperationTypes = {
-  readonly 'pg/vector@1': {
-    readonly cosineDistance: {
-      readonly self: { readonly codecId: 'pg/vector@1' };
-    };
-    readonly cosineSimilarity: {
-      readonly self: { readonly codecId: 'pg/vector@1' };
-    };
-  };
-};
-
 /** Flat operation signatures for the query builder. */
 export type QueryOperationTypes<CT extends CodecTypesBase> = SqlQueryOperationTypes<
   CT,

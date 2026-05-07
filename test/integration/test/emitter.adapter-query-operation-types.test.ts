@@ -25,7 +25,6 @@ describe('emitter + postgres adapter descriptor', () => {
       ir,
       sqlEmission,
       [],
-      [],
       { storageHash: 'h', profileHash: 'p' },
       { queryOperationTypeImports },
     );

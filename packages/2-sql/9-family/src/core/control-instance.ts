@@ -171,7 +171,6 @@ type SqlTypeMetadataRegistry = Map<string, SqlTypeMetadata>;
 
 interface SqlFamilyInstanceState {
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly typeMetadataRegistry: SqlTypeMetadataRegistry;
 }
@@ -343,7 +342,7 @@ export function createSqlFamilyInstance<TTargetId extends string>(
     }
   }
 
-  const { codecTypeImports, operationTypeImports, extensionIds } = stack;
+  const { codecTypeImports, extensionIds } = stack;
 
   const typeMetadataRegistry = buildSqlTypeMetadataRegistry({
     target,
@@ -368,7 +367,6 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   return {
     familyId: 'sql',
     codecTypeImports,
-    operationTypeImports,
     extensionIds,
     typeMetadataRegistry,
 

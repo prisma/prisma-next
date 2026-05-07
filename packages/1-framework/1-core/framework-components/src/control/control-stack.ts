@@ -42,7 +42,6 @@ export interface ControlStack<
   readonly extensionPacks: readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[];
 
   readonly codecTypeImports: ReadonlyArray<TypesImportSpec>;
-  readonly operationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly queryOperationTypeImports: ReadonlyArray<TypesImportSpec>;
   readonly extensionIds: ReadonlyArray<string>;
   readonly codecLookup: CodecLookup;
@@ -100,21 +99,6 @@ export function extractCodecTypeImports(
     }
     if (codecTypes?.typeImports) {
       imports.push(...codecTypes.typeImports);
-    }
-  }
-
-  return imports;
-}
-
-export function extractOperationTypeImports(
-  descriptors: ReadonlyArray<Pick<ComponentMetadata, 'types'>>,
-): ReadonlyArray<TypesImportSpec> {
-  const imports: TypesImportSpec[] = [];
-
-  for (const descriptor of descriptors) {
-    const operationTypes = descriptor.types?.operationTypes;
-    if (operationTypes?.import) {
-      imports.push(operationTypes.import);
     }
   }
 
@@ -365,7 +349,6 @@ export function createControlStack<TFamilyId extends string, TTargetId extends s
     extensionPacks: extensionPacks as readonly ControlExtensionDescriptor<TFamilyId, TTargetId>[],
 
     codecTypeImports: extractCodecTypeImports(allDescriptors),
-    operationTypeImports: extractOperationTypeImports(allDescriptors),
     queryOperationTypeImports: extractQueryOperationTypeImports(allDescriptors),
     extensionIds: extractComponentIds(family, target, adapter, extensionPacks),
     codecLookup,

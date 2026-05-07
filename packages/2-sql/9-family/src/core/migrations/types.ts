@@ -25,7 +25,7 @@ import type {
   StorageTable,
   StorageTypeInstance,
 } from '@prisma-next/sql-contract/types';
-import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import type { SqlOperationDescriptors } from '@prisma-next/sql-operations';
 import type { SqlSchemaIR } from '@prisma-next/sql-schema-ir/types';
 import type { Result } from '@prisma-next/utils/result';
 import type { SqlControlFamilyInstance } from '../control-instance';
@@ -181,7 +181,7 @@ export interface CodecControlHooks<TTargetDetails = unknown> {
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
   readonly databaseDependencies?: ComponentDatabaseDependencies<unknown>;
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   /**
    * Schema-contributing extensions opt into the per-space planner / runner /
    * verifier by setting this field. Extensions without it are codec-only or
@@ -200,7 +200,7 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>
   extends ControlAdapterDescriptor<'sql', TTargetId> {
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
 }
 
 export interface SqlMigrationPlanOperationStep {
@@ -492,7 +492,7 @@ export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiS
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
   extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
-  readonly queryOperations?: () => ReadonlyArray<SqlOperationDescriptor>;
+  readonly queryOperations?: () => SqlOperationDescriptors;
   createPlanner(family: SqlControlFamilyInstance): SqlMigrationPlanner<TTargetDetails>;
   createRunner(family: SqlControlFamilyInstance): SqlMigrationRunner<TTargetDetails>;
 }

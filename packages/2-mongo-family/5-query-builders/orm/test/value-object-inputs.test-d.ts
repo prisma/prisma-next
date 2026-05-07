@@ -145,7 +145,6 @@ type FieldInputTypesForUser = {
 
 type TypeMapsWithFieldTypes = MongoTypeMaps<
   TestCodecTypes,
-  Record<string, never>,
   FieldOutputTypesForUser,
   FieldInputTypesForUser
 >;
@@ -259,12 +258,7 @@ type ExtFieldInputTypes = {
   readonly Comment: { readonly _id: string; readonly text: string };
 };
 
-type ExtTypeMaps = MongoTypeMaps<
-  ExtCodecTypes,
-  Record<string, never>,
-  ExtFieldOutputTypes,
-  ExtFieldInputTypes
->;
+type ExtTypeMaps = MongoTypeMaps<ExtCodecTypes, ExtFieldOutputTypes, ExtFieldInputTypes>;
 
 type ExtContract = MongoContractWithTypeMaps<
   {

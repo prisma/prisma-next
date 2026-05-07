@@ -10,7 +10,7 @@ export function createMockSpi(overrides: Partial<EmissionSpi> = {}): EmissionSpi
       "import type { ContractWithTypeMaps, TypeMaps as TypeMapsType } from '@prisma-next/sql-contract/types';",
     ],
     getFamilyTypeAliases: () => 'export type LaneCodecTypes = CodecTypes;',
-    getTypeMapsExpression: () => 'TypeMapsType<CodecTypes, OperationTypes>',
+    getTypeMapsExpression: () => 'TypeMapsType<CodecTypes>',
     getContractWrapper: (base, tm) =>
       `export type Contract = ContractWithTypeMaps<${base}, ${tm}>;`,
     ...overrides,
