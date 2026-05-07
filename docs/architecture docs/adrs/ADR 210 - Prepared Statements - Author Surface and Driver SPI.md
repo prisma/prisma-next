@@ -10,7 +10,9 @@ Executing a SQL DSL query end to end has three costs: lowering the relational AS
 
 Two of those costs are amortizable. Lowering depends only on the AST, so the result can be cached. Most SQL servers can keep a parsed plan keyed by a name in the connection's session and reuse it on subsequent executions; the client sends `EXECUTE` once the plan is registered, skipping the parse.
 
-The SQL DSL exposes one primitive that opts into both kinds of reuse: a *prepared statement*. The user calls `db.sql.$prepare(declaration, callback)` once and gets back a `PreparedStatement<Params, Row>` object. The DSL invokes the callback to obtain a plan, lowers it once, and freezes the lowered SQL onto the object. On first `.execute()` against a connection, the driver allocates whatever per-target handle it needs — a name, a statement reference, an integer, anything — and stores it back on the `PreparedStatement` through a slot wrapper. Subsequent executes reuse the lowered SQL and the handle until the connection ends.
+The SQL DSL exposes one primitive that opts into both kinds of reuse: a *prepared statement*. The user calls `db.prepare(declaration, callback)` once and gets back a `PreparedStatement<Params, Row>` object. The runtime invokes the callback to obtain a plan, runs the `beforeCompile` middleware chain on it, lowers the result once, and freezes the lowered SQL onto the object. On first `.execute()` against a connection, the driver allocates whatever per-target handle it needs — a name, a statement reference, an integer, anything — and stores it back on the `PreparedStatement` through a slot wrapper. Subsequent executes reuse the lowered SQL and the handle until the connection ends.
+
+The primitive lives on the runtime: the underlying call is `runtime.prepare(declaration, callback)`. It lives there because the `beforeCompile` middleware chain is owned and invoked by the runtime, and `prepare` has to run that chain so AST rewrites are baked into the lowered SQL. Each DB-specific facade (the Postgres client, the SQLite client, etc.) re-exposes `prepare(declaration, callback)` as a top-level convenience method that delegates to the runtime. The `db.sql` proxy itself is unchanged — it still maps top-level keys to user-defined tables and exposes nothing else.
 
 There is no global cache. The lowered SQL lives on the user's `PreparedStatement` reference; the per-connection server-side state lives on the connection. When either ends, that state ends with it.
 
@@ -19,8 +21,8 @@ This ADR is family-level: it pins the author surface, the driver SPI shape, the 
 ## Grounding example
 
 ```ts
-const ps = await db.sql.$prepare(
-  { userId: 'int4@1', email: 'text@1' },
+const ps = await db.prepare(
+  { userId: 'pg/int4@1', email: 'pg/text@1' },
   (sql, params) =>
     sql.user
       .update({ email: params.email })
@@ -34,16 +36,17 @@ await ps.execute({ userId: 125, email: 'dee@example.com'  });
 
 A few things to notice:
 
+- **`db.prepare(...)` is a top-level method on the DB facade.** It delegates to `db.runtime().prepare(...)`, the underlying primitive. The two surfaces have identical signatures and return the same object; the facade method exists so that simple call sites don't have to reach for the runtime explicitly.
 - **The first argument declares the parameter shape.** Names mapped to codec ids drawn from the codec registry. The editor autocompletes the codec id strings; the type system rejects unknown ones.
 - **The callback receives a `params` object whose values are bind-site references.** `params.userId` flowing into `eq(f.id, …)` slots in like any other expression — the type at that position is the same arm of `CodecExpression` that the DSL accepts wherever a literal would normally go (`eq`, `update`, `where` predicates, and so on). Slot reuse is implicit by reference equality: referring to `params.userId` twice is one slot used twice.
 - **`.execute(params)` is typed end to end.** `Params` comes from the declaration via each codec's `TInput` mapping; `Row` comes from the plan returned by the callback.
 - **The first execute allocates a server-side handle; the second reuses it.** Subsequent executes against the same connection skip both lowering and parsing.
 
-Without `$prepare`, ad-hoc `db.sql.from(…).execute()` runs as before: lowered every time, parsed by the server every time, and the framework keeps no state about it.
+Without `prepare`, ad-hoc `db.sql.from(…).execute()` runs as before: lowered every time, parsed by the server every time, and the framework keeps no state about it.
 
 ## Design principles
 
-1. **Reuse is opt-in and explicit.** Two `$prepare` calls with identical SQL produce two independent `PreparedStatement` handles. The framework does not deduplicate, does not maintain a global shape-keyed cache, and does not infer reuse from call patterns. Users hold the reference; users decide when to reuse.
+1. **Reuse is opt-in and explicit.** Two `prepare` calls with identical SQL produce two independent `PreparedStatement` handles. The framework does not deduplicate, does not maintain a global shape-keyed cache, and does not infer reuse from call patterns. Users hold the reference; users decide when to reuse.
 
 2. **Cache lifetime equals the user's reference, bounded by connection lifetime.** The lowered SQL lives on the `PreparedStatement` object — when it goes out of scope, so does the cache. Server-side prepared-plan state lives on the connection — when the connection ends, the plan ends with it. There is no dispose path, because there is nothing for one to do beyond what these two natural boundaries already do.
 
@@ -55,31 +58,35 @@ The rest of the document elaborates each principle.
 
 ## Author surface
 
-### `db.sql.$prepare(declaration, callback)`
+### Where `prepare` lives
+
+The primitive is `runtime.prepare(declaration, callback)`. It lives on the runtime because that is where the `beforeCompile` middleware chain is owned and run. `prepare` has to invoke that chain so any AST rewrites a middleware applies are baked into the lowered SQL — placing `prepare` anywhere else would mean either splitting the middleware chain across two homes or punting middleware work into the I/O path on first execute.
+
+Each DB-specific facade re-exposes `prepare(declaration, callback)` as a top-level method that delegates to `this.runtime().prepare(...)`. The two surfaces have identical signatures and return the same object; the facade method exists so that everyday call sites can write `db.prepare(...)` without reaching for the runtime explicitly.
+
+The `db.sql` proxy is unchanged. It still maps top-level keys to user-defined tables and exposes nothing else; there is no `db.sql.prepare`. Anchoring `prepare` to the facade rather than the proxy keeps the proxy's namespace pristine for user-defined names.
+
+### `prepare(declaration, callback)`
 
 `declaration` is a name-keyed object whose values are codec-id strings drawn from the codec registry. The long form `{ codecId, nullable: true }` is used when nullability differs from the default. The codec-id position is statically typed against the registry, so the editor autocompletes it and unknown ids fail to compile.
 
 `Params` for `.execute(params)` is derived by looking each declared entry's codec up in the registry and using its `TInput` mapping, threading nullability through.
 
-The callback receives `(sql, params)`. `sql` is the same DSL root the user sees outside `$prepare`. Each `params.<name>` is a bind-site reference whose static type is `Expression<{ codecId; nullable }>` — the same arm of `CodecExpression` that the DSL accepts wherever a literal would go. Slot reuse is implicit by reference equality: if the callback refers to `params.userId` twice, that's one slot used twice. Literals not threaded through `params` get baked into the lowered SQL at lower time.
+The callback receives `(sql, params)`. `sql` is the same DSL root that the rest of the system uses. Each `params.<name>` is a bind-site reference whose static type is `Expression<{ codecId; nullable }>` — the same arm of `CodecExpression` that the DSL accepts wherever a literal would go. Slot reuse is implicit by reference equality: if the callback refers to `params.userId` twice, that's one slot used twice. Literals not threaded through `params` get baked into the lowered SQL at lower time.
 
 The callback MUST end with `.build()`, returning a plan. `Row` is derived from that plan's row type.
 
-If a name in `declaration` isn't referenced by the callback's plan, `$prepare` throws a stable error code under the `RUNTIME` namespace. (Type-level detection of unused declared params isn't achievable across the chained-builder type machinery; runtime detection is the contract.)
+If a name in `declaration` isn't referenced by the callback's plan, `prepare` throws a stable error code under the `RUNTIME` namespace. (Type-level detection of unused declared params isn't achievable across the chained-builder type machinery; runtime detection is the contract.)
 
-### Why the `$` prefix
+### Why `prepare` is async with no driver I/O
 
-`db.sql` is a proxy whose top-level keys map to user-defined tables. PSL identifiers cannot start with `$`, so `$prepare` cannot collide with any user-defined table name in any current or future contract. The same prefix is reserved for any future framework-level method that has to live on the same proxy.
+`prepare` performs no driver I/O. Internally it invokes the callback, awaits the async `beforeCompile` middleware chain on the resulting plan's AST so AST rewrites are baked into the lowered SQL, calls the adapter's `lower()`, and freezes the lowered SQL plus the parameter slot order onto the `PreparedStatement`. The handle slot starts unset.
 
-### Why `$prepare` is async with no driver I/O
-
-`$prepare` performs no driver I/O. Internally it invokes the callback, awaits the existing async `beforeCompile` middleware chain on the resulting plan's AST so AST rewrites are baked into the lowered SQL, calls the adapter's `lower()`, and freezes the lowered SQL plus the parameter slot order onto the `PreparedStatement`. The handle slot starts unset.
-
-The async return reflects an existing constraint, not a new one. `beforeCompile` is async-typed across the rest of the system, which means running it inside a sync `$prepare` would force one of two compromises: split the chain into sync and async variants (inflating the hook surface), or defer the chain to first execute (defeating the "no I/O at prepare time" property by pushing middleware work into the I/O path). Returning `Promise<PreparedStatement<Params, Row>>` keeps the chain intact and costs one `await` at call sites. Driver I/O still happens only on `.execute()`.
+The async return reflects an existing constraint, not a new one. `beforeCompile` is async-typed across the rest of the system. A sync `prepare` would force one of two compromises: split the chain into sync and async variants (inflating the hook surface), or defer the chain to first execute (defeating the "no I/O at prepare time" property by pushing middleware work into the I/O path). Returning `Promise<PreparedStatement<Params, Row>>` keeps the chain intact and costs one `await` at call sites. Driver I/O still happens only on `.execute()`.
 
 ### Capability gating
 
-`$prepare` is available on every SQL target with no contract capability flag. Lowering reuse is universal — every adapter's `lower()` is pure work that can be cached. The server-side reuse benefit is opportunistic: the driver may or may not deliver it, and may be told not to via the per-driver opt-out described below. Gating `$prepare` on a capability would force users to inspect the contract before deciding whether to call a method whose API is identical regardless. The call is exposed unconditionally; the driver decides what to do underneath.
+`prepare` is available on every SQL target with no contract capability flag. Lowering reuse is universal — every adapter's `lower()` is pure work that can be cached. The server-side reuse benefit is opportunistic: the driver may or may not deliver it, and may be told not to via the per-driver opt-out described below. Gating `prepare` on a capability would force users to inspect the contract before deciding whether to call a method whose API is identical regardless. The call is exposed unconditionally; the driver decides what to do underneath.
 
 ## Driver SPI
 
@@ -138,7 +145,7 @@ The runtime never re-lowers on retry. The lowered SQL on the `PreparedStatement`
 
 ## Reuse opt-out: `preparedStatements: boolean`
 
-Some deployment topologies cannot rely on server-side prepared-plan persistence. The most common case is a transaction-mode connection multiplexer or pooling proxy that may switch the underlying physical connection between calls — a plan registered on one physical connection isn't visible on the next, and the cached handle silently breaks. Whether server-side reuse is safe is a topology question, not a target-version question, so neither the contract nor the driver tries to auto-detect it.
+Some deployment topologies cannot rely on server-side prepared-plan persistence. The most common case is a connection multiplexer or pooling proxy that may switch the underlying physical connection between calls — a plan registered on one physical connection isn't visible on the next, and the cached handle silently breaks. Whether server-side reuse is safe is a topology question, not a target-version question, so neither the contract nor the driver tries to auto-detect it.
 
 The supported escape hatch is an explicit driver option: `preparedStatements: boolean`, default `true`. When `false`, `executePrepared` runs a one-shot parameterized query and leaves the handle slot unset. The lowered SQL on the `PreparedStatement` is still reused — that is the universal half of the benefit, independent of server-side preparation. Users keep the lowering reuse and lose the parse-skip; the tradeoff is explicit.
 
@@ -148,7 +155,7 @@ The driver does not auto-detect topology. Auto-detection is unreliable (greeting
 
 Three of the four SQL middleware hooks fire on the prepared path; one fires earlier than on the ad-hoc path:
 
-- `beforeCompile` runs **once at `$prepare` time**. AST rewrites change the lowered SQL, so they have to be baked in before the SQL is frozen on the `PreparedStatement`. Re-running per execute would defeat the cache — every execute would have to re-lower.
+- `beforeCompile` runs **once at `prepare` time**. AST rewrites change the lowered SQL, so they have to be baked in before the SQL is frozen on the `PreparedStatement`. Re-running per execute would defeat the cache — every execute would have to re-lower.
 - `beforeExecute`, `onRow`, `afterExecute` run **per `.execute()` call**. They observe params and rows, which differ per execute, and never see the lowered SQL changing.
 
 Ad-hoc `.execute()` is unchanged: all four hooks run as today. The single asymmetry — `beforeCompile` running at prepare time versus execute time — is the irreducible consequence of caching the lowered SQL.
@@ -157,30 +164,30 @@ Ad-hoc `.execute()` is unchanged: all four hooks run as today. The single asymme
 
 The following are deliberate exclusions, not omissions:
 
-- **Global shape cache.** Two `$prepare` calls with identical SQL produce two handles. Deduplication is the user's responsibility — they hold the reference, they decide whether to reuse it. A global cache would invert ownership and force lifetime decisions onto the framework (see [design principle #1](#design-principles)).
+- **Global shape cache.** Two `prepare` calls with identical SQL produce two handles. Deduplication is the user's responsibility — they hold the reference, they decide whether to reuse it. A global cache would invert ownership and force lifetime decisions onto the framework (see [design principle #1](#design-principles)).
 - **Cross-process or persistent caches.** All state is in-process and tied to live connections.
-- **Cross-adapter reuse.** A `PreparedStatement` is bound to the SQL DSL it was created from. The surface is SQL-only; non-SQL families do not have a `$prepare` semantic.
+- **Cross-adapter reuse.** A `PreparedStatement` is bound to the runtime it was created from. The surface is SQL-only; non-SQL families do not have a `prepare` semantic.
 - **Explicit dispose.** No `.dispose()` method. The leak is bounded and self-heals on connection recycle. A dispose method would require tracking which connections have seen which handles, which is the cache the system explicitly avoids.
 - **Pre-warming server-side preparation at pool init.** First `.execute()` per connection pays the preparation cost. Pre-warming would require the framework to know the full set of `PreparedStatement`s ahead of time; the user-owned-handle model puts that knowledge on the user.
 - **Observability surface for prepared-statement execution.** Tracing, metrics, counters, structured logs — drivers may add their own; the framework does not standardise one.
-- **List/array parameter slots.** The codec registry has no list codecs; `$prepare` accepts only scalar slots. The design accommodates list codecs without further changes — adding a list codec extends `$prepare` to array-typed slots automatically.
+- **List/array parameter slots.** The codec registry has no list codecs; `prepare` accepts only scalar slots. The design accommodates list codecs without further changes — adding a list codec extends `prepare` to array-typed slots automatically.
 
 ## Alternatives considered
 
 **A. Implicit / shape-keyed global cache.** Lowering happens automatically the first time a given AST is executed; subsequent identical ASTs reuse the lowered SQL. Rejected. Cache invalidation becomes a framework problem (how big? what eviction policy? what about middleware that mutates the AST per call?), and the win is opaque to users — they cannot tell whether a given call is hot or cold without instrumentation. The user-owned handle keeps lifetime where it can be reasoned about: at the call site.
 
-**B. `$prepare` returns synchronously.** Considered. Would require either splitting `beforeCompile` into sync and async variants or running middleware lazily on first execute. The first inflates the hook surface; the second defeats the "no I/O at prepare time" property by deferring middleware work into the I/O path. Async return matches the existing chain and costs one `await`.
+**B. `prepare` returns synchronously.** Considered. Would require either splitting `beforeCompile` into sync and async variants or running middleware lazily on first execute. The first inflates the hook surface; the second defeats the "no I/O at prepare time" property by deferring middleware work into the I/O path. Async return matches the existing chain and costs one `await`.
 
 **C. Driver receives the `PreparedStatement` directly.** Rejected. Pins the driver's contact surface to the entire object, which carries declarations, callback closure references, AST metadata, and middleware state. The slot-wrapper SPI keeps the surface to three fields and lets the runtime evolve the rest of the object freely. It also means a driver that does not implement server-side reuse can route through the same SPI by ignoring the slot — the same shape that the `preparedStatements: false` opt-out produces.
 
 **D. Auto-detect topologies that do not support server-side reuse.** Rejected. Detection is unreliable across deployment topologies. Misdetecting in either direction is worse than asking users to flip a flag once: a false positive disables a real optimisation; a false negative causes runtime errors deep inside hot loops. The explicit option puts the decision where the deployment topology is known.
 
-**E. Allocate the driver handle at `$prepare` time.** Rejected. Forces driver I/O into a method whose contract is "no I/O", and mints handles for connections the statement may never reach. Lazy allocation on first execute matches the lifetime of the underlying server-side state and keeps `$prepare` cheap, I/O-free, and idempotent.
+**E. Allocate the driver handle at `prepare` time.** Rejected. Forces driver I/O into a method whose contract is "no I/O", and mints handles for connections the statement may never reach. Lazy allocation on first execute matches the lifetime of the underlying server-side state and keeps `prepare` cheap, I/O-free, and idempotent.
 
 **F. Mandate a single stale-detection policy across drivers.** Rejected. The detection signal is target-specific; the framework's job is to pin the contract (clear, allocate, retry once, surface), not to legislate a detection mechanism a target may not be able to provide. Symmetric policy at the contract level, asymmetric policy at the trigger level (see [design principle #4](#design-principles)).
 
 ## References
 
-- [ADR 016 — Adapter SPI for Lowering](./ADR%20016%20-%20Adapter%20SPI%20for%20Lowering.md) defines the adapter SPI that `executePrepared` extends. Lowering runs once at `$prepare` time and is bypassed on the prepared execute path.
+- [ADR 016 — Adapter SPI for Lowering](./ADR%20016%20-%20Adapter%20SPI%20for%20Lowering.md) defines the adapter SPI that `executePrepared` extends. Lowering runs once at `prepare` time and is bypassed on the prepared execute path.
 - [ADR 027 — Error Envelope Stable Codes](./ADR%20027%20-%20Error%20Envelope%20Stable%20Codes.md) defines the `ADAPTER.PREPARE_FAILED` envelope returned when stale-handle retry fails.
 - [ADR 205 — SQL cast emission is adapter policy](./ADR%20205%20-%20SQL%20cast%20emission%20is%20adapter%20policy.md) describes when adapters emit explicit type casts on parameter sites. A cached prepared plan keeps parameter types stable across executes, so unconditional casts are not required for correctness on the prepared path.
