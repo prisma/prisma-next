@@ -13,20 +13,17 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
-  pgCharDescriptor,
-  pgFloatDescriptor,
-  pgIntDescriptor,
-  pgVarcharDescriptor,
-} from '../src/core/codecs';
-import {
   pgBitDescriptorClass,
   pgBoolDescriptorClass,
+  pgCharDescriptor,
   pgEnumDescriptorClass,
   pgFloat4DescriptorClass,
   pgFloat8DescriptorClass,
+  pgFloatDescriptor,
   pgInt2DescriptorClass,
   pgInt4DescriptorClass,
   pgInt8DescriptorClass,
+  pgIntDescriptor,
   pgIntervalDescriptorClass,
   pgJsonbDescriptorClass,
   pgJsonDescriptorClass,
@@ -37,6 +34,7 @@ import {
   pgTimestamptzDescriptorClass,
   pgTimetzDescriptorClass,
   pgVarbitDescriptorClass,
+  pgVarcharDescriptor,
 } from '../src/core/codecs-class';
 
 const SYNTH_CTX: CodecInstanceContext = { name: 'test' };

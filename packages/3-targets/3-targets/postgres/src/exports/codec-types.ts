@@ -15,12 +15,11 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
+import type { CodecTypes as CoreCodecTypes } from '../core/codecs-class';
 
 export type CodecTypes = CoreCodecTypes;
 
 export type { JsonValue };
-export { dataTypes } from '../core/codecs';
 
 type Branded<T, Shape extends Record<string, unknown>> = T & {
   readonly [K in keyof Shape]: Shape[K];

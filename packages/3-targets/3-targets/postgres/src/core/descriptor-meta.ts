@@ -1,5 +1,5 @@
 import { postgresAuthoringFieldPresets, postgresAuthoringTypes } from './authoring';
-import type { CodecTypes } from './codecs';
+import type { CodecTypes } from './codecs-class';
 
 const postgresTargetDescriptorMetaBase = {
   kind: 'target',

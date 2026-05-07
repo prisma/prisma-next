@@ -47,6 +47,11 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
+  type ExtractDescriptorCodecTypes,
+  SqlCharCodec,
+  SqlFloatCodec,
+  SqlIntCodec,
+  SqlVarcharCodec,
   sqlCharDescriptorClass,
   sqlFloatDescriptorClass,
   sqlIntDescriptorClass,
@@ -59,9 +64,13 @@ import { type as arktype } from 'arktype';
 import {
   PG_BIT_CODEC_ID,
   PG_BOOL_CODEC_ID,
+  PG_BYTEA_CODEC_ID,
+  PG_CHAR_CODEC_ID,
   PG_ENUM_CODEC_ID,
+  PG_FLOAT_CODEC_ID,
   PG_FLOAT4_CODEC_ID,
   PG_FLOAT8_CODEC_ID,
+  PG_INT_CODEC_ID,
   PG_INT2_CODEC_ID,
   PG_INT4_CODEC_ID,
   PG_INT8_CODEC_ID,
@@ -75,12 +84,10 @@ import {
   PG_TIMESTAMPTZ_CODEC_ID,
   PG_TIMETZ_CODEC_ID,
   PG_VARBIT_CODEC_ID,
+  PG_VARCHAR_CODEC_ID,
 } from './codec-ids';
 import {
-  pgCharDescriptor,
   pgEnumRenderOutputType,
-  pgFloatDescriptor,
-  pgIntDescriptor,
   pgIntervalDecode,
   pgJsonbDecode,
   pgJsonbEncode,
@@ -92,7 +99,6 @@ import {
   pgTimestampEncodeJson,
   pgTimestamptzDecodeJson,
   pgTimestamptzEncodeJson,
-  pgVarcharDescriptor,
   renderLength,
   renderPrecision,
 } from './codecs';
@@ -139,6 +145,7 @@ const PG_TIMETZ_META = { db: { sql: { postgres: { nativeType: 'timetz' } } } } a
 const PG_BOOL_META = { db: { sql: { postgres: { nativeType: 'boolean' } } } } as const;
 const PG_BIT_META = { db: { sql: { postgres: { nativeType: 'bit' } } } } as const;
 const PG_VARBIT_META = { db: { sql: { postgres: { nativeType: 'bit varying' } } } } as const;
+const PG_BYTEA_META = { db: { sql: { postgres: { nativeType: 'bytea' } } } } as const;
 const PG_INTERVAL_META = { db: { sql: { postgres: { nativeType: 'interval' } } } } as const;
 const PG_JSON_META = { db: { sql: { postgres: { nativeType: 'json' } } } } as const;
 const PG_JSONB_META = { db: { sql: { postgres: { nativeType: 'jsonb' } } } } as const;
@@ -799,6 +806,61 @@ pgVarbitColumn satisfies ColumnHelperFor<PgVarbitDescriptor>;
 pgVarbitColumn satisfies ColumnHelperForStrict<PgVarbitDescriptor>;
 
 // ---------------------------------------------------------------------------
+// pg/bytea@1 — non-parameterized, JSON-safe via base64 round-trip.
+// ---------------------------------------------------------------------------
+
+export class PgByteaCodec extends CodecImpl<
+  typeof PG_BYTEA_CODEC_ID,
+  readonly ['equality'],
+  Uint8Array,
+  Uint8Array
+> {
+  async encode(value: Uint8Array, _ctx: CodecCallContext): Promise<Uint8Array> {
+    return value;
+  }
+  async decode(wire: Uint8Array, _ctx: CodecCallContext): Promise<Uint8Array> {
+    // Postgres node drivers commonly return Buffer instances (which extend
+    // Uint8Array) — normalize to a plain Uint8Array view so engine-agnostic
+    // consumers don't accidentally observe Buffer-specific APIs.
+    return wire instanceof Uint8Array && wire.constructor === Uint8Array
+      ? wire
+      : new Uint8Array(wire.buffer, wire.byteOffset, wire.byteLength);
+  }
+  encodeJson(value: Uint8Array): JsonValue {
+    return Buffer.from(value).toString('base64');
+  }
+  decodeJson(json: JsonValue): Uint8Array {
+    if (typeof json !== 'string') {
+      throw new Error(`Expected base64 string for pg/bytea@1, got ${typeof json}`);
+    }
+    const decoded = Buffer.from(json, 'base64');
+    if (decoded.toString('base64') !== json) {
+      throw new Error(`Invalid base64 string for pg/bytea@1 (length: ${json.length})`);
+    }
+    return new Uint8Array(decoded);
+  }
+}
+
+export class PgByteaDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_BYTEA_CODEC_ID;
+  override readonly traits = ['equality'] as const;
+  override readonly targetTypes = ['bytea'] as const;
+  override readonly meta = PG_BYTEA_META;
+  override readonly paramsSchema: StandardSchemaV1<void> = voidParamsSchema;
+  override factory(): (ctx: CodecInstanceContext) => PgByteaCodec {
+    return () => new PgByteaCodec(this);
+  }
+}
+
+export const pgByteaDescriptorClass = new PgByteaDescriptor();
+
+export const pgByteaColumn = () =>
+  column(pgByteaDescriptorClass.factory(), pgByteaDescriptorClass.codecId, undefined, 'bytea');
+
+pgByteaColumn satisfies ColumnHelperFor<PgByteaDescriptor>;
+pgByteaColumn satisfies ColumnHelperForStrict<PgByteaDescriptor>;
+
+// ---------------------------------------------------------------------------
 // pg/interval@1 — precision-parameterized, JSON-safe (string). Wire
 // accepts string|object form; decode normalizes object to JSON string.
 // ---------------------------------------------------------------------------
@@ -994,46 +1056,149 @@ pgJsonbColumn satisfies ColumnHelperFor<PgJsonbDescriptor>;
 pgJsonbColumn satisfies ColumnHelperForStrict<PgJsonbDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor list (TML-2357 M0 Phase B5). The ordering mirrors the
-// legacy `codecDescriptorList` in `codecs.ts` so the descriptor sequence the
-// emitter consumes stays stable. Each entry is a class-form descriptor
-// (instance of `CodecDescriptorImpl<P>`) that carries the same
-// `targetTypes`/`meta`/`traits`/`renderOutputType` shape as its legacy
-// `defineCodec()` counterpart, preserving fixture byte-identity.
-//
-// The 4 pg-aliases (`pgCharDescriptor`, `pgVarcharDescriptor`,
-// `pgIntDescriptor`, `pgFloatDescriptor`) live in `codecs.ts` for now; they
-// are class-based already but co-located with the legacy carriers. Phase C
-// can relocate them into this file as part of the legacy-carrier removal.
+// pg-alias descriptors. These four codec ids (`pg/char@1`, `pg/varchar@1`,
+// `pg/int@1`, `pg/float@1`) are pure aliases over the matching SQL base
+// codec (`sql/char@1`, `sql/varchar@1`, `sql/int@1`, `sql/float@1`) — they
+// reuse the base encode/decode/render behaviour but expose a postgres-
+// scoped codec id, distinct `targetTypes`, and per-target `meta`. The
+// factories instantiate the SQL-base codec class (`SqlCharCodec` etc.)
+// passing `this` (the pg-alias descriptor) so `codec.id` resolves to the
+// pg-alias codec id via `CodecImpl`'s `descriptor.codecId` proxy.
 // ---------------------------------------------------------------------------
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
-  sqlCharDescriptorClass,
-  sqlVarcharDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlTextDescriptorClass,
-  sqlTimestampDescriptorClass,
-  pgTextDescriptorClass,
-  pgCharDescriptor,
-  pgVarcharDescriptor,
-  pgIntDescriptor,
-  pgFloatDescriptor,
-  pgInt4DescriptorClass,
-  pgInt2DescriptorClass,
-  pgInt8DescriptorClass,
-  pgFloat4DescriptorClass,
-  pgFloat8DescriptorClass,
-  pgNumericDescriptorClass,
-  pgTimestampDescriptorClass,
-  pgTimestamptzDescriptorClass,
-  pgTimeDescriptorClass,
-  pgTimetzDescriptorClass,
-  pgBoolDescriptorClass,
-  pgBitDescriptorClass,
-  pgVarbitDescriptorClass,
-  pgIntervalDescriptorClass,
-  pgEnumDescriptorClass,
-  pgJsonDescriptorClass,
-  pgJsonbDescriptorClass,
-];
+const PG_CHAR_META = { db: { sql: { postgres: { nativeType: 'character' } } } } as const;
+const PG_VARCHAR_META = {
+  db: { sql: { postgres: { nativeType: 'character varying' } } },
+} as const;
+const PG_INT_META = { db: { sql: { postgres: { nativeType: 'integer' } } } } as const;
+const PG_FLOAT_META = { db: { sql: { postgres: { nativeType: 'double precision' } } } } as const;
+
+export class PgCharDescriptor extends CodecDescriptorImpl<LengthParams> {
+  override readonly codecId = PG_CHAR_CODEC_ID;
+  override readonly targetTypes = ['character'] as const;
+  override readonly meta = PG_CHAR_META;
+  override readonly traits = sqlCharDescriptorClass.traits;
+  override readonly paramsSchema = sqlCharDescriptorClass.paramsSchema;
+  override renderOutputType(params: LengthParams): string | undefined {
+    return sqlCharDescriptorClass.renderOutputType(params);
+  }
+  override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlCharCodec {
+    return () => new SqlCharCodec(this);
+  }
+}
+
+export const pgCharDescriptor = new PgCharDescriptor();
+
+export const pgCharColumn = (params: LengthParams = {}) =>
+  column(pgCharDescriptor.factory(params), pgCharDescriptor.codecId, params, 'character');
+
+pgCharColumn satisfies ColumnHelperFor<PgCharDescriptor>;
+
+export class PgVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
+  override readonly codecId = PG_VARCHAR_CODEC_ID;
+  override readonly targetTypes = ['character varying'] as const;
+  override readonly meta = PG_VARCHAR_META;
+  override readonly traits = sqlVarcharDescriptorClass.traits;
+  override readonly paramsSchema = sqlVarcharDescriptorClass.paramsSchema;
+  override renderOutputType(params: LengthParams): string | undefined {
+    return sqlVarcharDescriptorClass.renderOutputType(params);
+  }
+  override factory(_params: LengthParams): (ctx: CodecInstanceContext) => SqlVarcharCodec {
+    return () => new SqlVarcharCodec(this);
+  }
+}
+
+export const pgVarcharDescriptor = new PgVarcharDescriptor();
+
+export const pgVarcharColumn = (params: LengthParams = {}) =>
+  column(
+    pgVarcharDescriptor.factory(params),
+    pgVarcharDescriptor.codecId,
+    params,
+    'character varying',
+  );
+
+pgVarcharColumn satisfies ColumnHelperFor<PgVarcharDescriptor>;
+
+export class PgIntDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_INT_CODEC_ID;
+  override readonly targetTypes = ['int4'] as const;
+  override readonly meta = PG_INT_META;
+  override readonly traits = sqlIntDescriptorClass.traits;
+  override readonly paramsSchema = sqlIntDescriptorClass.paramsSchema;
+  override factory(): (ctx: CodecInstanceContext) => SqlIntCodec {
+    return () => new SqlIntCodec(this);
+  }
+}
+
+export const pgIntDescriptor = new PgIntDescriptor();
+
+export const pgIntColumn = () =>
+  column(pgIntDescriptor.factory(), pgIntDescriptor.codecId, undefined, 'int4');
+
+pgIntColumn satisfies ColumnHelperFor<PgIntDescriptor>;
+
+export class PgFloatDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = PG_FLOAT_CODEC_ID;
+  override readonly targetTypes = ['float8'] as const;
+  override readonly meta = PG_FLOAT_META;
+  override readonly traits = sqlFloatDescriptorClass.traits;
+  override readonly paramsSchema = sqlFloatDescriptorClass.paramsSchema;
+  override factory(): (ctx: CodecInstanceContext) => SqlFloatCodec {
+    return () => new SqlFloatCodec(this);
+  }
+}
+
+export const pgFloatDescriptor = new PgFloatDescriptor();
+
+export const pgFloatColumn = () =>
+  column(pgFloatDescriptor.factory(), pgFloatDescriptor.codecId, undefined, 'float8');
+
+pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
+
+// ---------------------------------------------------------------------------
+// Class-form descriptor map (TML-2357 M0 Phase B5/C). Keyed by scalar name
+// so {@link CodecTypes} resolves through `ExtractDescriptorCodecTypes`,
+// preserving the input/output/traits shape downstream consumers
+// (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths
+// rely on. The list view (`codecDescriptorClassList`) iterates these in the
+// emit-stable order via `Object.values` — the runtime contributor pack
+// (`pack.ts` / `runtime.ts`) consumes the list shape.
+// ---------------------------------------------------------------------------
+
+const codecDescriptorMap = {
+  char: sqlCharDescriptorClass,
+  varchar: sqlVarcharDescriptorClass,
+  int: sqlIntDescriptorClass,
+  float: sqlFloatDescriptorClass,
+  'sql-text': sqlTextDescriptorClass,
+  'sql-timestamp': sqlTimestampDescriptorClass,
+  text: pgTextDescriptorClass,
+  character: pgCharDescriptor,
+  'character varying': pgVarcharDescriptor,
+  integer: pgIntDescriptor,
+  'double precision': pgFloatDescriptor,
+  int4: pgInt4DescriptorClass,
+  int2: pgInt2DescriptorClass,
+  int8: pgInt8DescriptorClass,
+  float4: pgFloat4DescriptorClass,
+  float8: pgFloat8DescriptorClass,
+  numeric: pgNumericDescriptorClass,
+  timestamp: pgTimestampDescriptorClass,
+  timestamptz: pgTimestamptzDescriptorClass,
+  time: pgTimeDescriptorClass,
+  timetz: pgTimetzDescriptorClass,
+  bool: pgBoolDescriptorClass,
+  bit: pgBitDescriptorClass,
+  'bit varying': pgVarbitDescriptorClass,
+  bytea: pgByteaDescriptorClass,
+  interval: pgIntervalDescriptorClass,
+  enum: pgEnumDescriptorClass,
+  json: pgJsonDescriptorClass,
+  jsonb: pgJsonbDescriptorClass,
+} as const;
+
+export type CodecTypes = ExtractDescriptorCodecTypes<typeof codecDescriptorMap>;
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
+  Object.values(codecDescriptorMap);

@@ -4,10 +4,10 @@ import {
   sqlVarcharDescriptorClass,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
-import { pgCharDescriptor, pgVarcharDescriptor } from '../src/core/codecs';
 import {
   pgBitDescriptorClass,
   pgBoolDescriptorClass,
+  pgCharDescriptor,
   pgEnumDescriptorClass,
   pgInt4DescriptorClass,
   pgIntervalDescriptorClass,
@@ -20,6 +20,7 @@ import {
   pgTimestamptzDescriptorClass,
   pgTimetzDescriptorClass,
   pgVarbitDescriptorClass,
+  pgVarcharDescriptor,
 } from '../src/core/codecs-class';
 
 // `renderOutputType` is a `CodecDescriptor`-side concern after the SQL
