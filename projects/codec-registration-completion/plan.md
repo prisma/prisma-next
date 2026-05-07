@@ -6,9 +6,9 @@
 
 | Milestone | State |
 |---|---|
-| **M0** — Pattern E migration (per-codec helpers + class-based descriptors + Strength 3 deletion) | **Active.** Spike validated on `spike/class-based-codecs` (commits `58176f372`..`0eb45c145`). Phase A starts next. |
+| **M0** — Class-based codec migration (per-codec helpers + `CodecImpl`/`CodecDescriptorImpl` + Strength 3 deletion) | **Active.** Phase A **LANDED** (commits `0515acd1f`, `625c59020`, `ea67cc5bc`, `588cf319e`, `89d27c25a`). Phase B1 starts next. |
 | **M1** — Narrow runtime `Codec` instance + descriptor-keyed metadata reads | **LANDED** (commits `3c9338fef`, `1be7564c4`). Re-verify post-M0. |
-| **M2** — Native descriptor migration (interface form), bridge deletion, `aliasDescriptor`, `arktypeJsonEmitCodec` deletion | **Mostly LANDED** (R1–R3, T2.1–T2.6, Phase A, Phase B). M2 R4 (legacy-API deletion) was rolled back — its intent is absorbed into M0 Phase C. The remaining M2 surface (R4 retry) is **subsumed** by M0; no separate M2 R4 retry milestone. |
+| **M2** — Native descriptor migration (interface form), bridge deletion, `aliasDescriptor`, `arktypeJsonEmitCodec` deletion | **Mostly LANDED** (R1–R3, T2.1–T2.6, Phase A, Phase B). M2 R4 (legacy-API deletion) was rolled back — its intent is absorbed into M0 Phase C. The remaining M2 surface (R4 retry) is **subsumed** by M0; no separate M2 R4 retry milestone. The function-form `aliasDescriptor` is **already deleted** (commit `89d27c25a`); class-based aliases are the only form going forward. |
 | **M3** — `ParamRef.refs` plumbing + encode-side `forColumn` + `forCodecId` retirement | Pending; runs after M0. |
 | **M4** — `JsonSchemaValidatorRegistry` deletion + `'json-validator'` trait retirement | Pending; runs after M0. |
 
@@ -43,54 +43,53 @@ All must be green before declaring a milestone done:
 
 **Specs**: [`specs/class-based-codec-design.spec.md`](specs/class-based-codec-design.spec.md) (implementation-approach), [`specs/factory-defined-codec-types.spec.md`](specs/factory-defined-codec-types.spec.md) (goal). Absorbs [TML-2393](https://linear.app/prisma-company/issue/TML-2393).
 
-### Phase A — Framework class hierarchy + per-codec helper machinery
+### Phase A — Framework class hierarchy + per-codec helper machinery — **LANDED**
 
-PR boundary candidate. Pure-additive on the framework layer; existing interface-form `CodecDescriptor`/`Codec`/`defineCodec` continue to work alongside.
+The framework-level scaffolding shipped across five commits. The shape that landed differs in important ways from the original spike sketch — review feedback drove a consolidation. Final state:
 
-1. **T0.A.1 — Land the abstract hierarchy.** From the spike, lift to the project branch (without the `*CB` suffix scaffolding):
-   - `packages/1-framework/1-core/framework-components/src/shared/class-based/codec.ts` — abstract `Codec<Id, TTraits, TWire, TInput>` class. Constructor takes `descriptor: CodecDescriptor<any>` (variance-erased per Q-3c). Getters for `id` / `traits` proxy through descriptor. Abstract `encode` / `decode`; optional `encodeJson` / `decodeJson`.
-   - `packages/1-framework/1-core/framework-components/src/shared/class-based/codec-descriptor.ts` — abstract `CodecDescriptor<TParams>` class + `AnyCodecDescriptor` alias.
-   - `packages/1-framework/1-core/framework-components/src/shared/class-based/column-spec.ts` — trivial `column(codecFactory, codecId, typeParams)` packager + `ColumnSpec<R, P>` type + `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` shape exports + structural `ColumnTypeDescriptorShape` mirror (per Q-2 resolution).
-   - `packages/1-framework/1-core/framework-components/src/exports/class-based-codec.ts` — barrel; new exports entry `@prisma-next/framework-components/class-based-codec`.
+- `packages/1-framework/1-core/framework-components/src/shared/codec.ts` — `interface Codec<Id, TTraits, TWire, TInput>` (canonical consumer surface) + `abstract class CodecImpl<...> implements Codec<...>` (codec-author base). Class constructor takes `descriptor: CodecDescriptor<any>` (variance-erased); `id` getter proxies through `descriptor.codecId`; `encode` / `decode` / `encodeJson` / `decodeJson` are abstract. Runtime instance does **not** carry `traits` (the `Codec` interface declares only a phantom `[codecTraitsPhantom]?: TTraits` carrier; consumers needing the runtime trait set read `codec.descriptor.traits`).
+- `packages/1-framework/1-core/framework-components/src/shared/codec-descriptor.ts` — `interface CodecDescriptor<TParams>` (canonical consumer surface) + `abstract class CodecDescriptorImpl<TParams> implements CodecDescriptor<TParams>` (codec-author base) + `AnyCodecDescriptor` variance-erased alias. The function-form `aliasDescriptor` is **deleted** (the spread had a prototype-stripping bug; aliases are now class-based).
+- `packages/1-framework/1-core/framework-components/src/shared/column-spec.ts` — `ColumnTypeDescriptor` (relocated from `@prisma-next/contract-authoring` to layer 1 alongside the codec types — codec base types are essential framework concepts and shouldn't sit at layer 2) + `interface ColumnSpec<R, P> extends ColumnTypeDescriptor` (real `extends`, no structural mirror) + the `column(codecFactory, codecId, typeParams)` packager + `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` shapes.
+- `packages/1-framework/1-core/framework-components/src/shared/codec-types.ts` — reduced to support types only: `CodecTrait`, `CodecCallContext`, `CodecInstanceContext`, `CodecMeta`, `CodecLookup`, `voidParamsSchema`, `emptyCodecLookup`.
+- `packages/1-framework/1-core/framework-components/src/exports/codec.ts` — single consolidated barrel. The `class-based-codec` subpath barrel is deleted.
+- `packages/1-framework/1-core/framework-components/test/codec.types.test-d.ts` — framework-level type tests using inline fixtures; covers literal preservation through direct `descriptor.factory(...)` calls, `column()` packaging, `ResolvedCodec` / `ColumnInputType` extraction, `ColumnHelperFor` / `ColumnHelperForStrict` `satisfies` discipline (positive + negative), and heterogeneous-storage variance erasure.
 
-2. **T0.A.2 — Reconcile `voidParamsSchema`.** The existing `voidParamsSchema` in `framework-components/src/shared/codec-types.ts` is reused as-is by class-based descriptors. Verify import path; the class-based descriptors import from the existing module.
-
-3. **T0.A.3 — Phase A type tests.** Assert framework-level invariants:
-   - `pgVectorDescriptor.factory({ length: 1536 })` returns `(ctx) => VectorCodec<1536>` (baseline TS, in-place fixture).
-   - `column(...)` packages typeParams + codec factory + codecId without losing types.
-   - `ColumnHelperFor<D>` / `ColumnHelperForStrict<D>` reject malformed helpers (with `// @ts-expect-error`).
-
-   File: `packages/1-framework/1-core/framework-components/test/class-based-codec.types.test-d.ts`. Uses inline fixture descriptors; no cross-package deps.
-
-4. **T0.A.4 — Phase A validation checkpoint.** `pnpm typecheck`, `pnpm lint:deps` for `framework-components`. Pause for review.
+The reviewer-driven changes from the spike sketch:
+- **Naming**: `Codec` and `CodecDescriptor` stayed as the interface names (consumer surface); the abstract classes use `Impl` suffix (`CodecImpl`, `CodecDescriptorImpl`) matching existing repo convention (`SelectQueryImpl`, `MongoDriverImpl`, etc.). No name collisions; consumers depend on the interface, authors extend the class.
+- **`ColumnTypeDescriptor` moved** from contract-authoring (layer 2) to framework-components (layer 1). All ten cross-package import sites updated (`contract-ts`, `contract-psl`, `pgvector`, `arktype-json`, `postgres` adapter, `ids`, `test/utils`, etc.). `ColumnSpec` now `extends ColumnTypeDescriptor` directly — no structural mirror.
+- **`aliasDescriptor` deleted** from the framework. Independent reviewer caught a prototype-stripping bug in the spread (`{ ...baseCodec, id }` strips inherited methods on class-based codecs). Postgres's four use sites (`pgCharDescriptor`, `pgVarcharDescriptor`, `pgIntDescriptor`, `pgFloatDescriptor`) were rewritten as inline `class extends CodecDescriptorImpl<P>` declarations using a small file-local `aliasCodec()` helper that derives codec instances via `Object.create(Object.getPrototypeOf(baseCodec))` + `Object.assign` + `Object.defineProperty(_, 'id', ...)` — works for both plain-object base codecs (today) and class-instance bases (post-Phase B).
 
 ### Phase B — Per-codec migration
 
 PR boundaries by package. Each sub-phase ends with a green checkpoint.
 
-#### B1. sql-relational-core base codecs
+#### B1. sql-relational-core base codecs (+ defensive Postgres legacy-alias rework)
+
+**Expanded scope**: B1 also rewrites the four legacy `pgXxxCodec` *codec instance* aliases at `packages/3-targets/3-targets/postgres/src/core/codecs.ts:135-153` (`{ ...sqlCharCodec, id: PG_CHAR_CODEC_ID }` etc.) so they survive the SQL base codec migration. Today's pattern works because base codecs are plain-object `mkCodec` outputs; once SQL bases produce `CodecImpl` subclass instances, the spread silently strips prototype methods. Eliminating the transitional bug window.
 
 5. **T0.B1.1 — Audit base codecs.** ~6 codecs in `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs.ts` (char, varchar, int, float, text, timestamp). Each has:
-   - Today: `defineCodec({...})` producing an interface-form descriptor.
-   - Pattern E target: `class XCodec extends Codec<...>` + `class XDescriptor extends CodecDescriptor<...>` + `xColumn = (...) => column(xDescriptor.factory(...), xDescriptor.codecId, ...)` + `xColumn satisfies ColumnHelperFor<XDescriptor>` (or `ColumnHelperForStrict`).
+   - Today: `defineCodec({...})` producing an interface-form descriptor + `mkCodec({...})` producing a plain-object `Codec` instance.
+   - Class-based target: `class XCodec extends CodecImpl<...>` (concrete codec class) + `class XDescriptor extends CodecDescriptorImpl<...>` (concrete descriptor class) + `xColumn = (...) => column(xDescriptor.factory(...), xDescriptor.codecId, typeParams)` (per-codec column helper) + `xColumn satisfies ColumnHelperFor<XDescriptor>` (or `ColumnHelperForStrict<XDescriptor>` when the codec's resolved type is well-defined).
 
 6. **T0.B1.2 — Reshape one codec end-to-end (text).** Confirms the migration pattern works against real consumers (sql-relational-core has internal callers). Type tests + runtime tests + green gates.
 
-7. **T0.B1.3 — Reshape the remaining base codecs.** char, varchar, int, float, timestamp. Each gets the same triple (codec class, descriptor class, helper + satisfies). Existing `defineCodec(...)` exports stay until Phase C.
+7. **T0.B1.3 — Reshape the remaining base codecs.** char, varchar, int, float, timestamp. Each gets the same quadruple (codec class, descriptor class, per-codec column helper, `satisfies` clause). Existing `defineCodec(...)` and `mkCodec(...)` exports stay until Phase C — coexistence keeps the build green.
 
-8. **T0.B1.4 — B1 validation checkpoint.**
+8. **T0.B1.4 — Defensive rework: Postgres legacy `pgXxxCodec` instances.** Replace the four `{ ...sqlXxxCodec, id }` patterns in `packages/3-targets/3-targets/postgres/src/core/codecs.ts:135-153` (`pgCharCodec`, `pgVarcharCodec`, `pgIntCodec`, `pgFloatCodec`) with calls to the existing file-local `aliasCodec()` helper (introduced for the descriptor-level aliases in commit `89d27c25a`). After this task, *no* code in the codebase relies on object-spread codec aliasing. Phase C deletes these legacy `Codec` instances entirely; in the interim, the prototype-preserving derivation keeps SQLite's direct `sqlCharCodec` consumers and Postgres's spread-aliased consumers both correct. SQLite's `sqlCharCodec` etc. usage in `packages/3-targets/3-targets/sqlite/src/core/codecs.ts` is direct (no spread); confirmed safe without changes for B1 — gets handled in Phase C alongside the SQL base codec deletions.
+
+9. **T0.B1.5 — B1 validation checkpoint.** Postgres + SQLite + relational-core pass `pnpm typecheck && pnpm test`; repo-wide `pnpm lint:deps` and `pnpm test:packages` green.
 
 #### B2. postgres target codecs
 
-9. **T0.B2.1 — Audit postgres codecs.** ~22 codecs in `packages/3-targets/3-targets/postgres/src/core/codecs.ts` (text, int4, int2, int8, float4, float8, numeric, bool, enum, json, jsonb, uuid, bytea, timestamptz, timestamp, date, time, char, varchar, alias chains). Each has:
+10. **T0.B2.1 — Audit postgres codecs.** ~18 remaining codecs in `packages/3-targets/3-targets/postgres/src/core/codecs.ts` (text, int4, int2, int8, float4, float8, numeric, bool, enum, json, jsonb, uuid, bytea, timestamptz, timestamp, date, time). The four char/varchar/int/float aliases already migrated to class form in B1's prerequisite (commit `89d27c25a`). Each remaining codec has:
    - Today: `mkCodec({...})` instance + `defineCodec({...})` descriptor in parallel; `byScalar` and `dataTypes` parallel exports keyed by scalar.
-   - Pattern E target: class-form codec + descriptor + helper. Aliases (`aliasCodec` → `aliasDescriptor` already migrated in M2; under Pattern E, **alias by class extension** — `class PgCharDescriptor extends SqlCharDescriptor { codecId = 'pg/char@1' as const; ... }`).
+   - Class-based target: `class PgXCodec extends CodecImpl<...>` + `class PgXDescriptor extends CodecDescriptorImpl<...>` + per-codec column helper + `satisfies ColumnHelperFor<PgXDescriptor>`.
 
-10. **T0.B2.2 — Reshape one postgres codec end-to-end (int4).** Same pattern as B1.2.
+11. **T0.B2.2 — Reshape one postgres codec end-to-end (int4).** Same pattern as B1.2.
 
-11. **T0.B2.3 — Reshape the remaining postgres codecs.** Batched into reasonable commit chunks (numeric/scalar codecs together, JSON together, alias chains together, etc.).
+12. **T0.B2.3 — Reshape the remaining postgres codecs.** Batched into reasonable commit chunks (numeric/scalar codecs together, JSON together, etc.).
 
-12. **T0.B2.4 — B2 validation checkpoint.**
+13. **T0.B2.4 — B2 validation checkpoint.**
 
 #### B3. sqlite target codecs
 
@@ -142,15 +141,11 @@ PR boundary. The deletion is the proof that the Pattern E migration is complete:
    - Delete the dual-shape parallel exports `codecDescriptorDefinitions` (postgres/sqlite/pgvector).
    - Delete `byScalar` getter from `CodecDescriptorBuilder` if no other consumers.
 
-30. **T0.C.8 — Delete the function-form `aliasDescriptor`** from `framework-components/src/shared/codec-types.ts` if Phase B replaces it with class extension everywhere. If retained, simplify per the goal spec § Non-goals (deletable / trivial spread + override).
+30. **T0.C.8 — Delete the legacy `pgXxxCodec` / `sqlXxxCodec` `Codec` instances.** After all consumers consume codecs through `descriptor.factory(...)(ctx)`, the legacy plain-object `Codec` instance exports (`sqlCharCodec`, `sqlIntCodec`, `pgCharCodec` (post-B1 prototype-preserving form), etc.) delete. SQLite's direct consumption pattern updates to consume through descriptors at this point. **Note**: the function-form `aliasDescriptor` was already deleted (commit `89d27c25a`); no separate task needed. The interface form of `Codec` / `CodecDescriptor` is preserved (it's the canonical consumer surface; the abstract classes implement it).
 
 31. **T0.C.9 — Migrate any remaining test consumers** of legacy carriers. Sites that call `byScalar.timestamp.codec.encode(...)` migrate to `pgTimestampDescriptor.factory(undefined)({}).encode(...)` or use a small per-test helper. Already audited under M2 R4: ~50 test sites across postgres/sqlite/pgvector test fixtures + adapter test fixtures.
 
-32. **T0.C.10 — Delete the interface-form `Codec` / `CodecDescriptor`** (`framework-components/src/shared/codec-types.ts`). Zero callers should remain after Phase B + earlier C tasks. The class-based form (`class-based-codec` exports) becomes canonical.
-
-33. **T0.C.11 — Reconcile barrel exports.** Move the class-based hierarchy from `class-based-codec` barrel to the package's main exports. Ensure `@prisma-next/framework-components` re-exports the class form as the canonical `Codec` / `CodecDescriptor`.
-
-34. **T0.C.12 — Mark `typed-codec-flow.spec.md` as superseded** (if not already). Add a "Status: superseded" header pointing to the class-based + factory-defined goal specs.
+32. **T0.C.10 — Mark `typed-codec-flow.spec.md` as superseded** (already done — links point to `class-based-codec-design.spec.md` + `factory-defined-codec-types.spec.md`).
 
 ### Phase D — Constructive type tests + closing-grep + validation
 
@@ -171,26 +166,25 @@ PR boundary with Phase C if diff is small enough; otherwise its own.
 ### Risks
 
 - **Per-codec helper boilerplate.** ~40 helpers across the codebase. Mitigated by `defineSimpleCodec` shorthand per spec § Risks for cases that don't need class state.
-- **Aliasing via class extension vs function form.** The spec offers two routes (delete `aliasDescriptor` and use class extension; or keep it as a trivial spread + override). Phase B picks one based on first encounter (postgres alias chains). Document in the implementation commit message.
 - **Adapter-level descriptor consumption.** Phase B5 changes the adapter registration loops. The contributor protocol's unified `codecs:` slot must accept class-form descriptors; verify the slot's shape on first attempt; if a friction surfaces, lift the change into the contributor protocol.
 - **Test fixture diff volume.** ~50 test sites migrating from `byScalar.X.codec.encode(...)` to typed factory calls. Mechanical but bounded.
-- **Layering violations.** `column()` lives at layer 1; structural compatibility with `ColumnTypeDescriptor` (layer 2) is via mirror (per Q-2). Do not import `ColumnTypeDescriptor` into `framework-components`.
-- **`override` keyword discipline.** `noImplicitOverride` requires `override` on every concrete-subclass member touching an inherited member; codec authors must remember (per Q-5b). Mechanical but catches mistakes.
-- **Phase ordering.** Phase A → B1 → B2 → B3 → B4 → B5 → C → D. Phase A alone keeps the build green (purely additive). Each Phase B sub-phase keeps the build green (legacy interface form survives alongside until Phase C). Phase C is the deletion sweep that exposes any latent dependency.
+- **`override` keyword discipline.** `noImplicitOverride` requires `override` on every concrete-subclass member touching an inherited member; codec authors must remember. Mechanical but catches mistakes.
+- **`CodecDescriptorImpl.factory` return-type widening.** The abstract base declares `factory` to return `(ctx) => Codec<string, readonly CodecTrait[], unknown, unknown>`. Concrete subclasses returning a typed `Codec<Id, TTraits, TWire, TInput>` are subtype-assignable, but consumer-side type extraction (`ReturnType<ReturnType<D['factory']>>`) reads the abstract base's widened return. Per-codec column helpers preserve precise types via *direct* invocation at the call site (the load-bearing variance discipline of Pattern E); the type-test fixtures verify this. Phase B may surface ergonomic friction worth revisiting; if so, an alternative is making the abstract `factory` generic over the concrete codec type. Defer until first encountered.
+- **Phase ordering.** Phase A → B1 → B2 → B3 → B4 → B5 → C → D. Phase A is purely additive (LANDED). Each Phase B sub-phase keeps the build green (legacy interface form survives alongside until Phase C). Phase C is the deletion sweep that exposes any latent dependency.
 
 ### Estimated diff
 
 | Phase | Production files | Test files | LoC scope |
 |---|---|---|---|
-| A | ~5 (framework class hierarchy + barrel) | ~1 | ~400 |
-| B1 | ~3 | ~3 | ~400 |
+| A | ~6 (framework class hierarchy + barrel + ColumnTypeDescriptor relocation + Postgres descriptor-level alias rework) | ~1 | ~600 (LANDED) |
+| B1 | ~3 (relational-core base codecs) + 1 (Postgres legacy `pgXxxCodec` defensive rework) | ~3 | ~500 |
 | B2 | ~3 | ~5 | ~1500 |
 | B3 | ~3 | ~3 | ~600 |
 | B4 | ~4 | ~4 | ~500 |
 | B5 | ~5 (adapters + contributor wiring) | ~5 | ~400 |
 | C | ~15 (deletions + barrel reconciliation) | ~50 (test migration) | ~1500 |
 | D | ~3 new test-d files | ~5 | ~500 |
-| **Total** | **~40 production files** | **~75 test files** | **~5800 LoC** |
+| **Total** | **~40 production files** | **~75 test files** | **~6100 LoC** |
 
 Comparable to (or larger than) the original combined M0+M2 estimate. Six PR boundaries (A, B1, B2, B3, B4, B5+C, D) keep individual reviews tractable.
 
