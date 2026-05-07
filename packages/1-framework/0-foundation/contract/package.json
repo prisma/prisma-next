@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/utils": "workspace:*",
+    "@standard-schema/spec": "^1.1.0",
     "arktype": "catalog:"
   },
   "devDependencies": {
