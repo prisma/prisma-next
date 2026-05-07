@@ -262,18 +262,19 @@ export function resolvePslTypeConstructorDescriptor(input: {
     return descriptor;
   }
 
-  const namespace = input.call.path.length > 1 ? input.call.path[0] : undefined;
-  if (
-    namespace &&
-    namespace !== 'db' &&
-    namespace !== input.familyId &&
-    namespace !== input.targetId &&
-    !hasRegisteredFieldNamespace(input.authoringContributions, namespace) &&
-    !input.composedExtensions.has(namespace)
-  ) {
+  const uncomposedNamespace = checkUncomposedNamespace(
+    input.call.path.join('.'),
+    input.composedExtensions,
+    {
+      familyId: input.familyId,
+      targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
+    },
+  );
+  if (uncomposedNamespace) {
     reportUncomposedNamespace({
       subjectLabel: `Type constructor "${input.call.path.join('.')}"`,
-      namespace,
+      namespace: uncomposedNamespace,
       sourceId: input.sourceId,
       span: input.call.span,
       diagnostics: input.diagnostics,

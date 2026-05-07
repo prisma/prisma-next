@@ -114,6 +114,7 @@ function starterSchemaPslPostgres(): string {
   name      String?
   posts     Post[]
   createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
 }
 
 model Post {
@@ -123,6 +124,7 @@ model Post {
   author    User     @relation(fields: [authorId], references: [id])
   authorId  Int
   createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
 }
 `;
 }
@@ -162,6 +164,7 @@ export const contract = defineContract(
           email: field.text().unique(),
           name: field.text().optional(),
           createdAt: field.temporal.createdAt(),
+          updatedAt: field.temporal.updatedAt(),
         },
         relations: {
           posts: rel.hasMany('Post', { by: 'authorId' }),
@@ -175,6 +178,7 @@ export const contract = defineContract(
           content: field.text().optional(),
           authorId: field.uuid(),
           createdAt: field.temporal.createdAt(),
+          updatedAt: field.temporal.updatedAt(),
         },
         relations: {
           author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),
