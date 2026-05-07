@@ -24,8 +24,8 @@ const testProfile: AdapterProfile = {
   target: 'postgres',
   capabilities: {},
   readMarkerStatement: () => ({
-    sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE id = $1',
-    params: [1],
+    sql: 'SELECT core_hash, profile_hash FROM prisma_contract.marker WHERE space = $1',
+    params: ['app'],
   }),
   parseMarkerRow: () => {
     throw new Error('not needed in test');
@@ -46,7 +46,7 @@ describe('SqlFamilyAdapter', () => {
     const stmt = adapter.markerReader.readMarkerStatement();
 
     expect(stmt.sql).toContain('prisma_contract.marker');
-    expect(stmt.params).toEqual([1]);
+    expect(stmt.params).toEqual(['app']);
   });
 
   it('validates plan with matching target and hash', () => {
