@@ -20,7 +20,7 @@
  * target shape; both coexist until Phase C collapses the legacy exports.
  */
 
-import type { JsonValue } from '@prisma-next/contract/types';
+import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   CodecDescriptorImpl,
@@ -232,7 +232,7 @@ export class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly codecId = SQL_CHAR_CODEC_ID;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['char'] as const;
-  override readonly paramsSchema = lengthParamsSchema as unknown as StandardSchemaV1<LengthParams>;
+  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlCharRenderOutputType(params);
   }
@@ -277,7 +277,7 @@ export class SqlVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly codecId = SQL_VARCHAR_CODEC_ID;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['varchar'] as const;
-  override readonly paramsSchema = lengthParamsSchema as unknown as StandardSchemaV1<LengthParams>;
+  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlVarcharRenderOutputType(params);
   }
@@ -323,8 +323,7 @@ export class SqlTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams>
   override readonly codecId = SQL_TIMESTAMP_CODEC_ID;
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['timestamp'] as const;
-  override readonly paramsSchema =
-    precisionParamsSchema as unknown as StandardSchemaV1<PrecisionParams>;
+  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
   override renderOutputType(params: PrecisionParams): string | undefined {
     return sqlTimestampRenderOutputType(params);
   }
