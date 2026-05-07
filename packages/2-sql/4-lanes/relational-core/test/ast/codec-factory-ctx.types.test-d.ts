@@ -1,7 +1,7 @@
 import type { CodecCallContext } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
 import type { Codec, SqlCodecCallContext, SqlColumnRef } from '../../src/ast/codec-types';
-import { mkCodec } from '../../src/ast/codec-types';
+import { defineTestCodec } from './test-codec';
 
 test('SqlColumnRef shape is `{ table, name }`', () => {
   expectTypeOf<SqlColumnRef>().toEqualTypeOf<{
@@ -30,7 +30,7 @@ test('SQL Codec.encode/decode narrow ctx to SqlCodecCallContext (non-optional at
 });
 
 test('factory accepts a `(value, ctx: SqlCodecCallContext)` encode author', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/ctx-encode@1',
     encode: (value: string, _ctx?: SqlCodecCallContext) => value,
     decode: (wire: string) => wire,
@@ -40,7 +40,7 @@ test('factory accepts a `(value, ctx: SqlCodecCallContext)` encode author', () =
 });
 
 test('factory accepts a `(value, ctx: SqlCodecCallContext)` decode author', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/ctx-decode@1',
     encode: (value: string) => value,
     decode: (wire: string, _ctx?: SqlCodecCallContext) => wire,
@@ -50,7 +50,7 @@ test('factory accepts a `(value, ctx: SqlCodecCallContext)` decode author', () =
 });
 
 test('factory accepts a single-arg `(value)` encode author and exposes a Promise method', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/single-encode@1',
     encode: (value: string) => value,
     decode: (wire: string) => wire,
@@ -59,7 +59,7 @@ test('factory accepts a single-arg `(value)` encode author and exposes a Promise
 });
 
 test('factory lifts an async ctx-bearing encode into a Promise method', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/async-ctx-encode@1',
     encode: async (value: string, _ctx?: SqlCodecCallContext) => value,
     decode: (wire: string) => wire,
@@ -68,7 +68,7 @@ test('factory lifts an async ctx-bearing encode into a Promise method', () => {
 });
 
 test('Codec.encode and Codec.decode require a ctx argument', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/require-ctx@1',
     encode: (value: string) => value,
     decode: (wire: string) => wire,

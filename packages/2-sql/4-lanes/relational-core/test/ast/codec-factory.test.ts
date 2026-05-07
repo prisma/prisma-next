@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { mkCodec } from '../../src/ast/codec-types';
+import { defineTestCodec } from './test-codec';
 
-describe('mkCodec() factory — query-time methods are Promise-returning', () => {
+describe('defineTestCodec — query-time methods are Promise-returning', () => {
   it('lifts a sync encode into a Promise-returning method', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/sync-encode@1',
       encode: (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
@@ -15,7 +15,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('lifts a sync decode into a Promise-returning method', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/sync-decode@1',
       encode: (value: string) => value,
       decode: (wire: string) => wire.toLowerCase(),
@@ -27,7 +27,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('accepts an async encode and produces a Promise-returning method', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/async-encode@1',
       encode: async (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
@@ -39,7 +39,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('accepts an async decode and produces a Promise-returning method', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/async-decode@1',
       encode: (value: string) => value,
       decode: async (wire: string) => wire.toLowerCase(),
@@ -51,7 +51,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('accepts a mix of sync encode + async decode', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/mixed-a@1',
       encode: (value: string) => value,
       decode: async (wire: string) => wire.toUpperCase(),
@@ -64,7 +64,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('accepts a mix of async encode + sync decode', async () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/mixed-b@1',
       encode: async (value: string) => value.toUpperCase(),
       decode: (wire: string) => wire,
@@ -77,7 +77,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   it('passes encodeJson and decodeJson through as synchronous methods', () => {
-    const c = mkCodec({
+    const c = defineTestCodec({
       typeId: 'demo/json-passthrough@1',
       encode: (value: string) => value,
       decode: (wire: string) => wire,
@@ -94,7 +94,7 @@ describe('mkCodec() factory — query-time methods are Promise-returning', () =>
   });
 
   // `renderOutputType` is a `CodecDescriptor`-side concern (TML-2357 M2
-  // Phase B) — the legacy `mkCodec()` factory accepts the field for
+  // Phase B) — the legacy `defineTestCodec()` factory accepts the field for
   // back-compat with existing call sites but the produced codec
   // instance no longer carries it. The descriptor side is exercised by
   // `sql-codecs.test.ts`.

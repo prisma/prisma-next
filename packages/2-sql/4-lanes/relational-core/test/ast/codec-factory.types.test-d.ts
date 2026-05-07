@@ -1,8 +1,8 @@
 import { expectTypeOf, test } from 'vitest';
-import { mkCodec } from '../../src/ast/codec-types';
+import { defineTestCodec } from './test-codec';
 
 test('factory accepts sync encode and decode and produces Promise-returning methods', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/sync@1',
     encode: (value: string) => value,
     decode: (wire: string) => wire,
@@ -15,7 +15,7 @@ test('factory accepts sync encode and decode and produces Promise-returning meth
 });
 
 test('factory accepts async encode and decode', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/async@1',
     encode: async (value: string) => value,
     decode: async (wire: string) => wire,
@@ -26,7 +26,7 @@ test('factory accepts async encode and decode', () => {
 });
 
 test('factory accepts mixed sync encode + async decode', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/mixed-a@1',
     encode: (value: string) => value,
     decode: async (wire: string) => wire,
@@ -37,7 +37,7 @@ test('factory accepts mixed sync encode + async decode', () => {
 });
 
 test('factory accepts mixed async encode + sync decode', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/mixed-b@1',
     encode: async (value: string) => value,
     decode: (wire: string) => wire,
@@ -48,12 +48,16 @@ test('factory accepts mixed async encode + sync decode', () => {
 });
 
 test('factory rejects an omitted encode — the property is required', () => {
-  // @ts-expect-error encode is required at the mkCodec() factory call site; the factory installs no identity fallback.
-  mkCodec({ typeId: 'demo/no-encode@1', targetTypes: ['text'], decode: (wire: string) => wire });
+  // @ts-expect-error encode is required at the defineTestCodec() factory call site; the factory installs no identity fallback.
+  defineTestCodec({
+    typeId: 'demo/no-encode@1',
+    targetTypes: ['text'],
+    decode: (wire: string) => wire,
+  });
 });
 
 test('factory passes encodeJson and decodeJson through as synchronous', () => {
-  const c = mkCodec({
+  const c = defineTestCodec({
     typeId: 'demo/json@1',
     encode: (value: string) => value,
     decode: (wire: string) => wire,
