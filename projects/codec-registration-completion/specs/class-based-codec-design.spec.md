@@ -456,18 +456,27 @@ The current design parameterizes `Codec<Id, TTraits, TWire, TInput>` positionall
 
 The spike picks one. Recommendation pending: probably the positional form (current design) for clarity; the descriptor-derived form may be useful as a convention.
 
-### Q-2. Where does `column()` and `ColumnHelperFor<D>` live?
+### Q-2. Where do `column()` and `ColumnHelperFor<D>` live?
 
-Candidates:
-- `@prisma-next/framework-components/codec` (alongside `CodecDescriptor`).
-- `@prisma-next/contract-authoring` (alongside `ColumnTypeDescriptor`).
-- A new package at the SQL family layer.
+**Resolved by spike** ([`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md) § Q-A): **layer 1 (`framework-components`), structurally compatible with `ColumnTypeDescriptor`**.
 
-Layering rule: both depend on `ColumnTypeDescriptor` and on `CodecDescriptor`; both are framework-components types. So `framework-components/codec` is the natural home unless a layering constraint surfaces.
+Importing `ColumnTypeDescriptor` from `@prisma-next/contract-authoring` (layer 2) into `framework-components` (layer 1) would violate layering and trip `pnpm lint:deps`. Resolution: inline a structural mirror (`ColumnTypeDescriptorShape`) inside `column-spec.ts` and expose a type-level sanity check (`_ColumnSpecIsColumnTypeDescriptorCompatible`) verifying `ColumnSpec<R, P>` remains assignable to `ColumnTypeDescriptor` at consumer sites without an explicit `extends`. If `column()` later moves to a layer-2+ package, this becomes a real `extends`.
 
 ### Q-3. `paramsSchema` in the abstract class — required or optional?
 
 The current declaration has it `abstract readonly paramsSchema: StandardSchemaV1<TParams>`. For non-parameterized codecs (`TParams = void`), authors write `readonly paramsSchema = voidParamsSchema`. Acceptable; the alternative is making it optional and providing a default. The spike picks one.
+
+### Q-3b. typeParams readonness convention
+
+**Resolved by spike** ([`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md) § Q-B): **non-readonly typeParams literal in helpers; readonly in the descriptor's factory params type.**
+
+The descriptor declares `factory<N>(params: { readonly length: N })`; the per-codec helper writes `column(... , { length })` (non-readonly literal). TS treats them as bidirectionally assignable in property-position matches, so the asymmetry is harmless. We do **not** force `Readonly<P>` at the `ColumnSpec<R, P>` boundary — leaving the helper's literal non-readonly keeps the consumer-facing type inspection (`embeddingColumn.typeParams.length`) from being needlessly ceremonious.
+
+### Q-3c. `Codec` constructor argument variance
+
+**Resolved by spike** ([`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md) § Q-C): **`CodecDescriptor<any>` (with biome-ignore) is canonical.**
+
+`CodecDescriptor<P>` is invariant in `P` (the `factory` and `renderOutputType` slots use `P` contravariantly), so concrete subclasses do not extend `CodecDescriptor<unknown>`. The codebase's prevailing convention is to type variance-erased descriptor parameters as `CodecDescriptor<any>` with a `// biome-ignore lint/suspicious/noExplicitAny: variance erasure …` comment (matches the existing `AnyCodecDescriptor` alias in `codec-types.ts`). The class-based design follows the same convention everywhere a heterogeneous-storage or variance-erased boundary surfaces (the abstract `Codec` constructor's descriptor parameter, `ColumnHelperFor<D extends CodecDescriptor<any>>`, registry storage type, etc.). Concrete codec subclasses retain typed access through their own state (the descriptor reference is typed at the subclass's `super(descriptor)` site).
 
 ### Q-4. Does aliasing keep its first-class form?
 
@@ -487,6 +496,18 @@ The spike includes one alias example to verify this works.
 ### Q-5. JSON validators registry retirement
 
 The goal spec preserves `paramsSchema`; today there's also a `JsonSchemaValidatorRegistry` (per ADR 208's per-library JSON design). The class-based design's natural shape: validation lives inside the codec instance's `decode` body (already the case for `arktypeJson` per ADR 208). The registry retirement is tracked under TML-2357 M4 and is independent of this spike.
+
+### Q-5b. `override` keyword discipline
+
+**Resolved by spike** ([`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md) § Q-D): authors must write `override` on every concrete-subclass member that overrides an abstract or default member of the base class.
+
+The workspace's `noImplicitOverride` setting requires this for `factory`, `meta`, `renderOutputType`, and any other inherited member touched in a subclass. TS catches missing-`override` mistakes, which is the point — but it's worth flagging in author docs that `override factory(...)` (not `factory(...)`) is the correct shape.
+
+### Q-5c. Where do cross-codec / heterogeneous-registry tests live?
+
+**Resolved by spike** ([`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md) § Q-E): **`packages/0-config/test-utils` (or a dedicated test fixture package), not the codec packages themselves.**
+
+The spike's heterogeneous-registry test wanted access to both `pgVectorDescriptor` (extension) and `pgInt4Descriptor` (target). Pulling cross-extension devDeps into pgvector or postgres tests felt heavy; the spike worked around it by defining a tiny inline non-parameterized codec inside the pgvector test. For full M0, the registry / cross-codec integration tests should live in a fixture package that has clean access to multiple descriptors without forcing each codec package to devDep its peers.
 
 ### Q-6. Async constructors for codec instances?
 
@@ -594,5 +615,6 @@ For parameterized codecs, the per-column instance is the design — each column 
 - [ADR 208 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The ADR partially superseded by the goal spec.
 - [`wip/m0-class-variance-proof.md`](../../../wip/m0-class-variance-proof.md). The TS playground proof that falsified the polymorphic-column-helper approach and informed the per-codec-helper design.
 - [`wip/codec-class-variance-proof/`](../../../wip/codec-class-variance-proof/). The proof's supporting playground files (gitignored).
+- [`wip/class-based-codec-spike.md`](../../../wip/class-based-codec-spike.md). The Pattern E spike report (six ACs validated end-to-end on the `spike/class-based-codecs` branch). Captured TS error messages from negative tests, friction items, and resolved spec questions (Q-A..E).
 - [`wip/unattended-decisions.md` Decision #11](../../../wip/unattended-decisions.md). The variance failure that surfaced this design space.
 - `wip/m0-shape-spike.md`. Shape A vs Shape B (functional Mode B) findings.
