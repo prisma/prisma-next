@@ -170,6 +170,8 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         warn: () => {},
         error: () => {},
       },
+      // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
+      // the framework parameter type is the cross-family base.
       contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
     };
 
