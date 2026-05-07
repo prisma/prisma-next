@@ -1,4 +1,8 @@
 import type {
+  AnyCodecDescriptor,
+  CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import type {
   Adapter,
   AdapterProfile,
   AggregateExpr,
@@ -28,7 +32,7 @@ import type {
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
-import { byScalar } from '@prisma-next/target-sqlite/codecs';
+import { codecDescriptorClassList } from '@prisma-next/target-sqlite/codecs';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
 import type { SqliteAdapterOptions, SqliteContract, SqliteLoweredStatement } from './types';
 
@@ -50,8 +54,20 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
   readonly profile: AdapterProfile<'sqlite'>;
   private readonly codecRegistry: CodecRegistry = (() => {
     const byId = new Map<string, Codec<string>>();
-    for (const definition of Object.values(byScalar)) {
-      byId.set(definition.codec.id, definition.codec);
+    // Materialize a canonical codec instance per class-form descriptor.
+    // SQLite codecs are all non-parameterized today (audit confirms
+    // `factory()` takes no params), so `factory(undefined)(synthCtx)`
+    // yields the runtime instance the encode/decode path needs. The B5
+    // swap reads from the unified `codecs:` slot's class-form list.
+    const synthCtx: CodecInstanceContext = { name: 'sqlite-builtin-adapter' };
+    for (const descriptor of codecDescriptorClassList) {
+      const factory = (
+        descriptor as AnyCodecDescriptor & {
+          factory: (params: unknown) => (ctx: CodecInstanceContext) => Codec<string>;
+        }
+      ).factory(undefined);
+      const codec = factory(synthCtx);
+      byId.set(codec.id, codec);
     }
     return {
       get: (id) => byId.get(id),

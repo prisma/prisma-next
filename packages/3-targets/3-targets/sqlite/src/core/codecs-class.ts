@@ -33,6 +33,7 @@
 
 import type { JsonValue } from '@prisma-next/contract/types';
 import {
+  type AnyCodecDescriptor,
   type CodecCallContext,
   CodecDescriptorImpl,
   CodecImpl,
@@ -42,6 +43,12 @@ import {
   column,
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
+import {
+  sqlCharDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlVarcharDescriptorClass,
+} from '@prisma-next/sql-relational-core/ast';
 import {
   SQLITE_BIGINT_CODEC_ID,
   SQLITE_BLOB_CODEC_ID,
@@ -376,3 +383,26 @@ export const sqliteBigintColumn = () =>
 
 sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
+
+// ---------------------------------------------------------------------------
+// Class-form descriptor list (TML-2357 M0 Phase B5). The ordering mirrors
+// the legacy `codecDescriptorList` in `codecs.ts` so the descriptor sequence
+// the emitter consumes stays stable. Each entry is a class-form descriptor
+// (instance of `CodecDescriptorImpl<P>`) carrying the same
+// `targetTypes`/`meta`/`traits`/`renderOutputType` shape as its legacy
+// `defineCodec()` counterpart, preserving fixture byte-identity.
+// ---------------------------------------------------------------------------
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
+  sqlCharDescriptorClass,
+  sqlVarcharDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqliteTextDescriptorClass,
+  sqliteIntegerDescriptorClass,
+  sqliteRealDescriptorClass,
+  sqliteBlobDescriptorClass,
+  sqliteDatetimeDescriptorClass,
+  sqliteJsonDescriptorClass,
+  sqliteBigintDescriptorClass,
+];

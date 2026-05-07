@@ -4,7 +4,7 @@ import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/e
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
-import { codecDescriptorList } from '@prisma-next/target-sqlite/codecs';
+import { codecDescriptorClassList } from '@prisma-next/target-sqlite/codecs';
 import { createSqliteAdapter } from './adapter';
 import { sqliteAdapterDescriptorMeta } from './descriptor-meta';
 
@@ -30,7 +30,7 @@ const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<
   SqliteRuntimeAdapterInstance
 > = {
   ...sqliteAdapterDescriptorMeta,
-  codecs: () => codecDescriptorList,
+  codecs: () => codecDescriptorClassList,
   mutationDefaultGenerators: createSqliteMutationDefaultGenerators,
   create(_stack): SqliteRuntimeAdapterInstance {
     return createSqliteAdapter();
