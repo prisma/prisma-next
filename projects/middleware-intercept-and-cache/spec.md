@@ -227,7 +227,7 @@ const c = await db.orm.User.all()  // always hits DB
 ## Intercept hook
 
 - [ ] `RuntimeMiddlewareContext.contentHash(exec)` is declared in `@prisma-next/framework-components/runtime` returning `Promise<string>` (resolving to a `sha512:HEX128` digest produced via `hashContent`).
-- [ ] `SqlRuntimeImpl` populates `contentHash` with `meta.storageHash` + `computeSqlFingerprint(exec.sql)` + canonicalized `exec.params`. Two executions of the same SQL with the same params produce the same string; different params produce different strings (unit test).
+- [ ] `SqlRuntimeImpl` populates `contentHash` with `meta.storageHash` + `exec.sql` + canonicalized `exec.params`. Two executions of the same SQL with the same params produce the same string; different params produce different strings (unit test).
 - [ ] `MongoRuntimeImpl` populates `contentHash` with `meta.storageHash` + canonicalized `exec.command` (unit test in mongo-runtime).
 - [ ] All in-repo `RuntimeMiddlewareContext` fixtures compile after the addition (regression — three test files in `framework-components/test/` plus any others surfaced by `pnpm typecheck`).
 - [ ] `RuntimeMiddleware.intercept` is declared in `@prisma-next/framework-components/runtime` with the signature above.
