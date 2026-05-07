@@ -12,6 +12,7 @@ export type {
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
 export {
+  assertNoCrossRegistryCollisions,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringArgRef,

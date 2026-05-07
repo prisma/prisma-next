@@ -6,6 +6,7 @@ import type {
   AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
+import { assertNoCrossRegistryCollisions } from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
 import type {
   ControlMutationDefaultEntry,
@@ -245,9 +246,13 @@ export function assembleAuthoringContributions(
     );
   }
 
+  const fieldNamespace = field as AuthoringFieldNamespace;
+  const typeNamespace = type as AuthoringTypeNamespace;
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+
   return {
-    field: field as AuthoringFieldNamespace,
-    type: type as AuthoringTypeNamespace,
+    field: fieldNamespace,
+    type: typeNamespace,
   };
 }
 

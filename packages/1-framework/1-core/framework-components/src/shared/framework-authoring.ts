@@ -146,6 +146,53 @@ export function isAuthoringFieldPresetDescriptor(
   );
 }
 
+function collectAuthoringLeafPaths(
+  namespace: Readonly<Record<string, unknown>>,
+  isLeaf: (value: unknown) => boolean,
+  path: readonly string[] = [],
+): string[] {
+  const paths: string[] = [];
+  for (const [key, value] of Object.entries(namespace)) {
+    const currentPath = [...path, key];
+    if (isLeaf(value)) {
+      paths.push(currentPath.join('.'));
+      continue;
+    }
+    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      paths.push(
+        ...collectAuthoringLeafPaths(
+          value as Readonly<Record<string, unknown>>,
+          isLeaf,
+          currentPath,
+        ),
+      );
+    }
+  }
+  return paths;
+}
+
+export function assertNoCrossRegistryCollisions(
+  typeNamespace: AuthoringTypeNamespace,
+  fieldNamespace: AuthoringFieldNamespace,
+): void {
+  const typePaths = new Set(
+    collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
+  );
+  if (typePaths.size === 0) {
+    return;
+  }
+  for (const fieldPath of collectAuthoringLeafPaths(
+    fieldNamespace,
+    isAuthoringFieldPresetDescriptor,
+  )) {
+    if (typePaths.has(fieldPath)) {
+      throw new Error(
+        `Ambiguous authoring registry path "${fieldPath}". The same path is registered as both a type constructor and a field preset; PSL resolution would be ambiguous. Register each path in only one of authoringContributions.field / authoringContributions.type.`,
+      );
+    }
+  }
+}
+
 export function resolveAuthoringTemplateValue(
   template: AuthoringTemplateValue,
   args: readonly unknown[],

@@ -190,6 +190,35 @@ describe('assembleAuthoringContributions', () => {
       ]),
     ).toThrow(/Duplicate authoring field helper "dup"/);
   });
+
+  it('rejects field preset and type constructor path collisions', () => {
+    expect(() =>
+      assembleAuthoringContributions([
+        createDescriptor({
+          authoring: {
+            field: {
+              custom: {
+                Json: { kind: 'fieldPreset', output: { codecId: 'a@1', nativeType: 'json' } },
+              },
+            },
+          },
+        }),
+        createDescriptor({
+          id: 'other',
+          authoring: {
+            type: {
+              custom: {
+                Json: {
+                  kind: 'typeConstructor',
+                  output: { codecId: 'b@1', nativeType: 'jsonb' },
+                },
+              },
+            },
+          },
+        }),
+      ]),
+    ).toThrow(/Ambiguous authoring registry path "custom.Json"/);
+  });
 });
 
 describe('extractCodecLookup', () => {
