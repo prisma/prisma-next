@@ -35,6 +35,7 @@ import {
   type ForeignKeyNode,
   type IndexNode,
   type ModelNode,
+  type PrimaryKeyNode,
   type UniqueConstraintNode,
 } from '@prisma-next/sql-contract-ts/contract-builder';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -431,6 +432,97 @@ interface BuildModelNodeInput {
   readonly diagnostics: ContractSourceDiagnostic[];
 }
 
+function resolveModelLevelPrimaryKey(input: {
+  readonly model: PslModel;
+  readonly attributes: readonly PslAttribute[];
+  readonly resolvedFields: readonly ResolvedField[];
+  readonly fieldPrimaryKeyFields: readonly ResolvedField[];
+  readonly sourceId: string;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): PrimaryKeyNode | undefined {
+  const [attribute, duplicateAttribute] = input.attributes;
+  if (!attribute) {
+    return undefined;
+  }
+
+  if (duplicateAttribute) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${input.model.name}" declares multiple @@id attributes`,
+      sourceId: input.sourceId,
+      span: duplicateAttribute.span,
+    });
+    return undefined;
+  }
+
+  if (input.fieldPrimaryKeyFields.length > 0) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${input.model.name}" cannot combine field-level @id with model-level @@id`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+    return undefined;
+  }
+
+  const fieldNames = parseAttributeFieldList({
+    attribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+    messagePrefix: `Model "${input.model.name}" @@id`,
+  });
+  if (!fieldNames) {
+    return undefined;
+  }
+
+  const resolvedFieldsByName = new Map(
+    input.resolvedFields.map((field) => [field.field.name, field]),
+  );
+  const fieldColumns = new Map(
+    input.resolvedFields.map((field) => [field.field.name, field.columnName]),
+  );
+  const columns = mapFieldNamesToColumns({
+    modelName: input.model.name,
+    fieldNames,
+    mapping: { fieldColumns },
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    span: attribute.span,
+    contextLabel: `Model "${input.model.name}" @@id`,
+  });
+  if (!columns) {
+    return undefined;
+  }
+
+  const nullableFieldName = fieldNames.find(
+    (fieldName) => resolvedFieldsByName.get(fieldName)?.field.optional,
+  );
+  if (nullableFieldName) {
+    input.diagnostics.push({
+      code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+      message: `Model "${input.model.name}" @@id cannot include nullable field "${input.model.name}.${nullableFieldName}"`,
+      sourceId: input.sourceId,
+      span: attribute.span,
+    });
+    return undefined;
+  }
+
+  const constraintName = parseConstraintMapArgument({
+    attribute,
+    sourceId: input.sourceId,
+    diagnostics: input.diagnostics,
+    entityLabel: `Model "${input.model.name}" @@id`,
+    span: attribute.span,
+    code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+  });
+
+  return {
+    columns,
+    ...ifDefined('name', constraintName),
+  };
+}
+
 interface BuildModelNodeResult {
   readonly modelNode: ModelNode;
   readonly fkRelationMetadata: FkRelationMetadata[];
@@ -460,14 +552,26 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
     scalarTypeDescriptors: input.scalarTypeDescriptors,
   });
 
-  const primaryKeyFields = resolvedFields.filter((field) => field.isId);
-  const primaryKeyColumns = primaryKeyFields.map((field) => field.columnName);
-  const primaryKeyName = primaryKeyFields.length === 1 ? primaryKeyFields[0]?.idName : undefined;
+  const fieldPrimaryKeyFields = resolvedFields.filter((field) => field.isId);
+  const fieldPrimaryKeyColumns = fieldPrimaryKeyFields.map((field) => field.columnName);
+  const fieldPrimaryKeyName =
+    fieldPrimaryKeyFields.length === 1 ? fieldPrimaryKeyFields[0]?.idName : undefined;
+  const modelPrimaryKeyAttributes = model.attributes.filter((attribute) => attribute.name === 'id');
+  const modelPrimaryKey = resolveModelLevelPrimaryKey({
+    model,
+    attributes: modelPrimaryKeyAttributes,
+    resolvedFields,
+    fieldPrimaryKeyFields,
+    sourceId,
+    diagnostics,
+  });
+  const primaryKeyColumns = modelPrimaryKey?.columns ?? fieldPrimaryKeyColumns;
+  const primaryKeyName = modelPrimaryKey?.name ?? fieldPrimaryKeyName;
   const isVariantModel = model.attributes.some((attr) => attr.name === 'base');
-  if (primaryKeyColumns.length === 0 && !isVariantModel) {
+  if (primaryKeyColumns.length === 0 && !isVariantModel && modelPrimaryKeyAttributes.length === 0) {
     diagnostics.push({
       code: 'PSL_MISSING_PRIMARY_KEY',
-      message: `Model "${model.name}" must declare at least one @id field for SQL provider`,
+      message: `Model "${model.name}" must declare at least one @id field or @@id attribute for SQL provider`,
       sourceId,
       span: model.span,
     });
@@ -552,6 +656,9 @@ function buildModelNodeFromPsl(input: BuildModelNodeInput): BuildModelNodeResult
 
   for (const modelAttribute of model.attributes) {
     if (modelAttribute.name === 'map') {
+      continue;
+    }
+    if (modelAttribute.name === 'id') {
       continue;
     }
     if (modelAttribute.name === 'discriminator' || modelAttribute.name === 'base') {

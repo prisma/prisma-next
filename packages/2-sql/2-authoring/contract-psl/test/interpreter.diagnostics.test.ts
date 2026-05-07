@@ -22,6 +22,24 @@ const testSpan: PslSpan = {
   end: { line: 1, column: 7, offset: 6 },
 };
 
+function expectDiagnosticForSchema(
+  schema: string,
+  diagnostic: { readonly code: string; readonly message: string },
+): void {
+  const document = parsePslDocument({ schema, sourceId: 'schema.prisma' });
+  const result = interpretPslDocumentToSqlContract({
+    ...baseInput,
+    document,
+    controlMutationDefaults: builtinControlMutationDefaults,
+  });
+
+  expect(result.ok).toBe(false);
+  if (result.ok) return;
+  expect(result.failure.diagnostics).toEqual(
+    expect.arrayContaining([expect.objectContaining(diagnostic)]),
+  );
+}
+
 describe('interpretPslDocumentToSqlContract diagnostics', () => {
   it('returns diagnostics when target context is missing', () => {
     const document = parsePslDocument({
@@ -191,6 +209,55 @@ model User {
           message: 'Model "Team" uses unsupported attribute "@@unsupported"',
         }),
       ]),
+    );
+  });
+
+  it('returns diagnostics for duplicate field and model primary keys', () => {
+    expectDiagnosticForSchema(
+      `model Membership {
+  id Int @id
+  orgId String
+  userId String
+
+  @@id([orgId, userId])
+}
+`,
+      {
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: 'Model "Membership" cannot combine field-level @id with model-level @@id',
+      },
+    );
+  });
+
+  it('returns diagnostics for nullable composite primary key fields', () => {
+    expectDiagnosticForSchema(
+      `model Membership {
+  orgId String
+  userId String?
+
+  @@id([orgId, userId])
+}
+`,
+      {
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: 'Model "Membership" @@id cannot include nullable field "Membership.userId"',
+      },
+    );
+  });
+
+  it('returns diagnostics for unknown composite primary key fields', () => {
+    expectDiagnosticForSchema(
+      `model Membership {
+  orgId String
+  userId String
+
+  @@id([orgId, missingId])
+}
+`,
+      {
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: 'Model "Membership" @@id references unknown field "Membership.missingId"',
+      },
     );
   });
 
