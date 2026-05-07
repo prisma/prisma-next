@@ -21,7 +21,7 @@ import type {
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { mkCodec } from '@prisma-next/sql-relational-core/ast';
+import { defineTestCodec } from './test-codec';
 
 function emptyCodecRegistry(): CodecRegistry {
   const byId = new Map<string, Codec<string>>();
@@ -277,7 +277,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
   // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)
   // but don't require importing from the postgres adapter package
   codecRegistry.register(
-    mkCodec({
+    defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (value: number) => value,
@@ -286,7 +286,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
   );
 
   codecRegistry.register(
-    mkCodec({
+    defineTestCodec({
       typeId: 'pg/text@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
@@ -295,7 +295,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
   );
 
   codecRegistry.register(
-    mkCodec({
+    defineTestCodec({
       typeId: 'pg/timestamptz@1',
       targetTypes: ['timestamptz'],
       encode: (value: Date) => value,

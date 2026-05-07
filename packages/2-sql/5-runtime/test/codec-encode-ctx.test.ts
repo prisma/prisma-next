@@ -4,7 +4,6 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
-  mkCodec,
   newCodecRegistry,
   ParamRef,
   SelectAst,
@@ -14,6 +13,7 @@ import {
 import type { SqlExecutionPlan } from '@prisma-next/sql-relational-core/plan';
 import { describe, expect, it } from 'vitest';
 import { encodeParam, encodeParams } from '../src/codecs/encoding';
+import { defineTestCodec } from './test-codec';
 
 const TEST_HASH = coreHash('sha256:test');
 
@@ -71,7 +71,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     const observed: (SqlCodecCallContext | undefined)[] = [];
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/observe@1',
         targetTypes: ['text'],
         encode: (value: string, ctx?: SqlCodecCallContext) => {
@@ -102,7 +102,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     let observed: SqlCodecCallContext | undefined;
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/observe-column@1',
         targetTypes: ['text'],
         encode: (value: string, ctx?: SqlCodecCallContext) => {
@@ -122,7 +122,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
   it('regression — omitting ctx is bit-for-bit identical to today (no-ctx case)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/passthrough@1',
         targetTypes: ['text'],
         encode: (value: string) => `wire:${value}`,
@@ -142,7 +142,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     let callCount = 0;
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/counter@1',
         targetTypes: ['text'],
         encode: (value: string) => {
@@ -189,7 +189,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     const release = deferred<string>();
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/blocking@1',
         targetTypes: ['text'],
         encode: (value: string) => release.promise.then((suffix) => `${value}:${suffix}`),
@@ -221,7 +221,7 @@ describe('encodeParams — SqlCodecCallContext threading', () => {
     const cause = new Error('codec specific failure');
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
         encode: () => {
@@ -247,7 +247,7 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
     let observedSignal: AbortSignal | undefined;
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/single-cell@1',
         targetTypes: ['text'],
         encode: (value: string, ctx?: SqlCodecCallContext) => {
@@ -269,7 +269,7 @@ describe('encodeParam — ctx forwarded to codec.encode', () => {
   it('null/undefined values still bypass the codec when ctx is provided', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/never@1',
         targetTypes: ['text'],
         encode: () => {

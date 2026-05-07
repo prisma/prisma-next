@@ -16,7 +16,6 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   ColumnRef,
-  mkCodec,
   newCodecRegistry,
   ProjectionItem,
   SelectAst,
@@ -32,6 +31,7 @@ import type {
 } from '../src/sql-context';
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime } from '../src/sql-runtime';
+import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecRegistry } from './utils';
 
 const testContract: Contract<SqlStorage> = {
@@ -307,7 +307,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
     const blockingDecodeStarted = deferred<void>();
     const codecAbortObserved = deferred<void>();
 
-    const observingCodec = mkCodec({
+    const observingCodec = defineTestCodec({
       typeId: 'test/observe-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,
@@ -361,7 +361,7 @@ describe('SqlRuntimeImpl.execute({ signal }) — abort semantics', () => {
   it('codec ignoring ctx.signal does not block runtime — RUNTIME.ABORTED still surfaces (cooperative cancellation)', async () => {
     const decodeStarted = deferred<void>();
     const release = deferred<string>();
-    const ignoringCodec = mkCodec({
+    const ignoringCodec = defineTestCodec({
       typeId: 'test/ignore-signal@1',
       targetTypes: ['text'],
       encode: (v: string) => v,

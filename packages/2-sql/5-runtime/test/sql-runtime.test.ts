@@ -17,7 +17,6 @@ import {
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
-  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -37,6 +36,7 @@ import type {
 import { createExecutionContext, createSqlExecutionStack } from '../src/sql-context';
 import { createRuntime, withTransaction } from '../src/sql-runtime';
 import { createAsyncSecretCodec, decryptSecret } from './seeded-secret-codec';
+import { defineTestCodec } from './test-codec';
 import { descriptorsFromCodecRegistry } from './utils';
 
 const runtimeSecretSeed = 'sql-runtime-secret';
@@ -69,7 +69,7 @@ type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
   const registry = newCodecRegistry();
   registry.register(
-    mkCodec({
+    defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
@@ -616,7 +616,7 @@ describe('createRuntime', () => {
   );
 
   it('wraps async parameter encoding failures before the driver runs', async () => {
-    const failingCodec = mkCodec({
+    const failingCodec = defineTestCodec({
       typeId: 'test/failing-secret@1',
       targetTypes: ['text'],
       encode: async (_value: string) => {

@@ -6,7 +6,6 @@ import {
   type AnyExpression,
   BinaryExpr,
   ColumnRef,
-  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -23,6 +22,7 @@ import { describe, expect, it } from 'vitest';
 import { decodeRow } from '../src/codecs/decoding';
 import { encodeParams } from '../src/codecs/encoding';
 import { createAsyncSecretCodec, decryptSecret, encryptSecret } from './seeded-secret-codec';
+import { defineTestCodec } from './test-codec';
 
 // =============================================================================
 // Shared helpers — AST-backed plans (ADR 205)
@@ -122,7 +122,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
 
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/async-a@1',
         targetTypes: ['text'],
         encode: (value: string) => {
@@ -133,7 +133,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/async-b@1',
         targetTypes: ['text'],
         encode: (value: string) => {
@@ -144,7 +144,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
       }),
     );
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/sync@1',
         targetTypes: ['int4'],
         encode: (value: number) => {
@@ -177,7 +177,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('always awaits codec.encode (no Promise leaks into the driver)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/async@1',
         targetTypes: ['text'],
         encode: async (value: string) => `wire:${value}`,
@@ -199,7 +199,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
     const cause = new Error('boom');
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
         encode: () => {
@@ -229,7 +229,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('uses param[<i>] label when ParamRef has no name', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
         encode: () => {
@@ -252,7 +252,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('returns null for null/undefined parameter values without invoking the codec', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/sync@1',
         targetTypes: ['text'],
         encode: () => {
@@ -285,7 +285,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('passes parameters through unchanged for raw plans (no AST, no codec encoding)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
         encode: () => {
@@ -303,7 +303,7 @@ describe('encodeParams — async, concurrent dispatch', () => {
   it('encodes a fully-typed AST-backed plan without throwing', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/passthrough@1',
         targetTypes: ['text'],
         encode: (value: string) => `wire:${value}`,
@@ -331,7 +331,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   function buildJsonbRegistry(): CodecRegistry {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec<'pg/jsonb@1', readonly [], string, JsonValue>({
+      defineTestCodec<'pg/jsonb@1', readonly [], string, JsonValue>({
         typeId: 'pg/jsonb@1',
         targetTypes: ['jsonb'],
         encode: (v: JsonValue) => JSON.stringify(v),
@@ -361,7 +361,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
 
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/slow-a@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -372,7 +372,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/slow-b@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -383,7 +383,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       }),
     );
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/sync@1',
         targetTypes: ['int4'],
         encode: (v: number) => v,
@@ -417,7 +417,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   it('always awaits codec.decode and yields plain values (no Promise leaks)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/async@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -483,7 +483,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
     const cause = new Error('boom');
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/explody@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -521,7 +521,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
   it('passes wire values through for raw plans (no AST, no codec decoding)', async () => {
     const registry = newCodecRegistry();
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -558,7 +558,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       projections: [{ alias: 'id', codecId: 'test/should-not-run@1' }],
     });
     registry.register(
-      mkCodec({
+      defineTestCodec({
         typeId: 'test/should-not-run@1',
         targetTypes: ['text'],
         encode: (v: string) => v,
@@ -579,7 +579,7 @@ describe('decodeRow — async, concurrent per-cell dispatch', () => {
       encode: (value: string) => string,
       decode: (wire: string) => string | Promise<string>,
     ): Codec<string> =>
-      mkCodec<string, readonly [], string, string>({
+      defineTestCodec<string, readonly [], string, string>({
         typeId: id,
         targetTypes: ['text'],
         encode,

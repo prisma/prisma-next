@@ -76,7 +76,7 @@ function wrapEncodeFailure(
 /**
  * Encodes a single parameter through its codec. Always awaits codec.encode so
  * a Promise can never leak into the driver, even if a sync-authored codec is
- * lifted to async by the mkCodec() factory. Failures are wrapped in
+ * lifted to async by the codec factory. Failures are wrapped in
  * `RUNTIME.ENCODE_FAILED` with `{ label, codec, paramIndex }` and the original
  * error attached on `cause`.
  *

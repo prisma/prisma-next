@@ -5,7 +5,6 @@ import {
   BinaryExpr,
   ColumnRef,
   LiteralExpr,
-  mkCodec,
   newCodecRegistry,
   ParamRef,
   ProjectionItem,
@@ -21,6 +20,7 @@ import type {
   SqlMiddleware,
   SqlMiddlewareContext,
 } from '../src/middleware/sql-middleware';
+import { defineTestCodec } from './test-codec';
 
 function createContext(): SqlMiddlewareContext & {
   log: { debug: ReturnType<typeof vi.fn> };
@@ -344,7 +344,7 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        mkCodec({
+        defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
@@ -397,7 +397,7 @@ describe('runBeforeCompileChain', () => {
 
       const decoderRegistry = newCodecRegistry();
       decoderRegistry.register(
-        mkCodec({
+        defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,

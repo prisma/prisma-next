@@ -14,7 +14,7 @@
 // Guard against accidental production use.
 // ============================================================================
 
-import { mkCodec } from '@prisma-next/sql-relational-core/ast';
+import { defineTestCodec } from './test-codec';
 
 if (typeof process !== 'undefined' && process.env?.['NODE_ENV'] === 'production') {
   throw new Error('seeded-secret-codec is a test fixture and must not be loaded in production');
@@ -80,7 +80,7 @@ export async function decryptSecret(wire: string, seed: string): Promise<string>
 /**
  * Build a `Codec` whose query-time `encode` / `decode` are async crypto
  * operations. Authors pass the underlying async functions directly to
- * `mkCodec({...})`; the single-path runtime always awaits them, so the
+ * `defineTestCodec({...})`; the single-path runtime always awaits them, so the
  * codec needs no async marker.
  */
 export function createAsyncSecretCodec({
@@ -92,7 +92,7 @@ export function createAsyncSecretCodec({
   typeId?: string;
   targetTypes?: readonly string[];
 }) {
-  return mkCodec({
+  return defineTestCodec({
     typeId,
     targetTypes,
     encode: (value: string) => encryptSecret(value, seed),
