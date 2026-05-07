@@ -62,6 +62,7 @@ If any gate fails, stop and surface to the orchestrator before declaring done.
 - **No push** without explicit authorization.
 - **Commit organization:** <one suggested split, e.g. "one commit per task; or, one commit covering tasks T<N.x>-T<N.y> as a unit and a separate commit for T<N.z>"> — use your judgment if a different split reads cleaner; surface the choice in your report.
 - **Side-quests:** <none authorized | "fix X if you encounter it; commit separately with scope-note" | etc.>
+- **User-facing surface boundary:** you may not change CLI command behavior, public APIs, default flag/option values, safety properties, validation checks, error conditions, error/log message text, or add new CLI options / environment variables / config keys without **explicit, surface-specific authorization** in this prompt. "Make the test pass" / "use your judgement" is not authorization. Pre-authorized user-facing changes for this round: <none | "you may flip `<flag>` from `<old>` to `<new>` in `<file>`; this loosens `<rejection path>`" | ...>. If you discover an in-scope task appears to require an unauthorized user-facing change, **stop, do not commit, and surface as a deferral request** per `<skill-dir>/agents/implementer.md § User-facing surface boundary`.
 - **Read-only constraints:** do not edit `code-review.md`, `system-design-review.md`, `walkthrough.md`, `spec.md`, or `plan.md`. Those are not yours.
 
 ## Heartbeats
@@ -140,6 +141,7 @@ Begin.
 
 - Explicit-staging commits, no amend, no push without authorization.
 - Side-quests: <none authorized | "fix X if you encounter it; commit separately with scope-note">.
+- **User-facing surface boundary still applies** (see your prior transcript / `<skill-dir>/agents/implementer.md § User-facing surface boundary`). Pre-authorized user-facing changes for this round: <none | "<surface>: <specific change>" | ...>. Anything else requires you to surface as a deferral.
 - Read-only on review artifacts and on `spec.md` / `plan.md`.
 - Heartbeats to `wip/heartbeats/implementer.txt` per `<skill-dir>/agents/implementer.md § Heartbeats` (at round start, before/after long shell calls, at commit boundaries, every ~5 min otherwise).
 
