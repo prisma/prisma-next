@@ -109,12 +109,13 @@ describe('planAllSpaces', () => {
     expect(result.find((r) => r.spaceId === 'pgvector')?.migrationPackages).toHaveLength(1);
   });
 
-  it('rejects duplicate spaceIds with MIGRATION.DUPLICATE_SPACE_ID', () => {
+  it('rejects duplicate spaceIds with MIGRATION.DUPLICATE_SPACE_ID before any planSpace call runs', () => {
+    const planSpaceSpy = vi.fn(planSpace);
     let captured: unknown;
     try {
       planAllSpaces(
         [makeInput('app', 'h1'), makeInput('cipherstash', 'h2'), makeInput('app', 'h3')],
-        planSpace,
+        planSpaceSpy,
       );
     } catch (error) {
       captured = error;
@@ -124,6 +125,7 @@ describe('planAllSpaces', () => {
     const err = captured as MigrationToolsError;
     expect(err.code).toBe('MIGRATION.DUPLICATE_SPACE_ID');
     expect(err.why).toContain('"app"');
+    expect(planSpaceSpy).not.toHaveBeenCalled();
   });
 
   it('does not mutate the input array', () => {
