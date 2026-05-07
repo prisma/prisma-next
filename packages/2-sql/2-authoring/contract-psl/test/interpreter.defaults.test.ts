@@ -623,6 +623,115 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       );
     });
 
+    it('rejects extra positional argument to a zero-arg preset (AC5a)', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField(123)
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('temporal.exampleField'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects list-of preset call with PSL_PRESET_NOT_LIST (AC5f)', () => {
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.exampleField()[]
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+        authoringContributions: syntheticPresetContributions,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_PRESET_NOT_LIST',
+            sourceId: 'schema.prisma',
+          }),
+        ]),
+      );
+    });
+
+    it('rejects @default(temporal.updatedAt()) with PSL_INVALID_DEFAULT_VALUE (AC5g)', () => {
+      // Namespaced calls inside @default(...) are not supported — the
+      // default-function parser only accepts bare identifiers. The honest
+      // rejection path is "this isn't a valid @default(...) value", not
+      // "this generator isn't applicable". Locks in which diagnostic fires.
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  ts DateTime @default(temporal.updatedAt())
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            code: 'PSL_INVALID_DEFAULT_VALUE',
+            sourceId: 'schema.prisma',
+            message: expect.stringContaining('temporal.updatedAt()'),
+          }),
+        ]),
+      );
+    });
+
+    it('rejects two type-constructor calls on the same field at parse time (AC5i)', () => {
+      // PSL grammar permits at most one type-constructor call per field; a
+      // second one is a parser-level reject. This test locks in the
+      // failure mode so a future parser refactor can't silently accept the
+      // ambiguous form and let the interpreter pick one.
+      const document = parsePslDocument({
+        schema: `model Bad {
+  id Int @id
+  example temporal.updatedAt() temporal.createdAt()
+}`,
+        sourceId: 'schema.prisma',
+      });
+
+      const result = interpretPslDocumentToSqlContract({
+        document,
+        controlMutationDefaults: builtinControlMutationDefaults,
+      });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) return;
+      expect(result.failure.diagnostics.length).toBeGreaterThan(0);
+    });
+
     it('rejects an unknown preset name in a registered field namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
       const document = parsePslDocument({
         schema: `model Bad {

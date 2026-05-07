@@ -95,6 +95,22 @@ const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new M
   ],
 ]);
 
+// `validateFieldAttributes` short-circuits on `BUILTIN_FIELD_ATTRIBUTE_NAMES`
+// before consulting `REMOVED_ATTRIBUTE_RULES`. A name appearing in both sets
+// would silently suppress its migration hint, defeating the purpose of the
+// hint table. Fail at module load with a clear message — the table is
+// designed to grow and this is the cheap insurance against future drift.
+{
+  const overlap = [...REMOVED_ATTRIBUTE_RULES.keys()].filter((name) =>
+    BUILTIN_FIELD_ATTRIBUTE_NAMES.has(name),
+  );
+  if (overlap.length > 0) {
+    throw new Error(
+      `BUILTIN_FIELD_ATTRIBUTE_NAMES and REMOVED_ATTRIBUTE_RULES must not overlap. Names in both: ${overlap.join(', ')}`,
+    );
+  }
+}
+
 function validateFieldAttributes(input: {
   readonly model: PslModel;
   readonly field: PslField;

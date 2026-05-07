@@ -196,6 +196,13 @@ export function assertNoCrossRegistryCollisions(
   const typePaths = new Set(
     collectAuthoringLeafPaths(typeNamespace, isAuthoringTypeConstructorDescriptor),
   );
+  // Within-registry duplicate detection is handled upstream by the merge
+  // walker (`mergeAuthoringNamespaces` in control-stack.ts and
+  // `mergeHelperNamespaces` in composed-authoring-helpers.ts), which throws
+  // on same-path registrations within either registry before this check
+  // runs. This function only handles the cross-registry case — and an
+  // empty type namespace makes a cross-registry collision structurally
+  // impossible, so the early-out is sound.
   if (typePaths.size === 0) {
     return;
   }

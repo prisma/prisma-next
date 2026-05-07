@@ -433,55 +433,56 @@ describe('TS and PSL authoring parity', () => {
     expect(tsLines).toBeLessThanOrEqual(Math.ceil(pslLines * 1.6));
   });
 
-  it('lowers SQLite timestamp helpers to the same contract as PSL timestamp attributes', () => {
-    const tsContract = buildSqliteTimestampTsContract();
-    const pslDocument = parsePslDocument({
-      schema: `model User {
+  // The shared timestamp parity schema both SQL targets exercise. Lives at
+  // module scope so the per-target tests below read as data + a single
+  // call into `expectTimestampParity`.
+  const timestampParityPslSchema = `model User {
   id Int @id
   email String
   createdAt DateTime @default(now())
   updatedAt temporal.updatedAt()
-}`,
+}`;
+
+  function expectTimestampParity(target: {
+    readonly buildTsContract: () => unknown;
+    readonly targetPack: TargetPackRef<'sql', string>;
+    readonly scalarTypeDescriptors: ReadonlyMap<string, ColumnTypeDescriptor>;
+    readonly authoringContributions: AuthoringContributions;
+  }): void {
+    const tsContract = target.buildTsContract();
+    const pslDocument = parsePslDocument({
+      schema: timestampParityPslSchema,
       sourceId: 'schema.prisma',
     });
 
     const interpreted = interpretPslDocumentToSqlContract({
       document: pslDocument,
-      target: sqliteTimestampTargetPack,
-      scalarTypeDescriptors: sqliteTimestampScalarTypeDescriptors,
+      target: target.targetPack,
+      scalarTypeDescriptors: target.scalarTypeDescriptors,
       controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
-      authoringContributions: sqliteTimestampAuthoringContributions,
+      authoringContributions: target.authoringContributions,
     });
 
     expect(interpreted.ok).toBe(true);
     if (!interpreted.ok) return;
-
     expect(interpreted.value).toEqual(tsContract);
+  }
+
+  it('lowers SQLite timestamp helpers to the same contract as PSL timestamp attributes', () => {
+    expectTimestampParity({
+      buildTsContract: buildSqliteTimestampTsContract,
+      targetPack: sqliteTimestampTargetPack,
+      scalarTypeDescriptors: sqliteTimestampScalarTypeDescriptors,
+      authoringContributions: sqliteTimestampAuthoringContributions,
+    });
   });
 
   it('lowers Postgres timestamp helpers to the same contract as PSL timestamp attributes', () => {
-    const tsContract = buildPostgresTimestampTsContract();
-    const pslDocument = parsePslDocument({
-      schema: `model User {
-  id Int @id
-  email String
-  createdAt DateTime @default(now())
-  updatedAt temporal.updatedAt()
-}`,
-      sourceId: 'schema.prisma',
-    });
-
-    const interpreted = interpretPslDocumentToSqlContract({
-      document: pslDocument,
-      target: postgresTimestampTargetPack,
+    expectTimestampParity({
+      buildTsContract: buildPostgresTimestampTsContract,
+      targetPack: postgresTimestampTargetPack,
       scalarTypeDescriptors: postgresTimestampScalarTypeDescriptors,
-      controlMutationDefaults: createBuiltinLikeControlMutationDefaults(),
       authoringContributions: postgresTimestampAuthoringContributions,
     });
-
-    expect(interpreted.ok).toBe(true);
-    if (!interpreted.ok) return;
-
-    expect(interpreted.value).toEqual(tsContract);
   });
 });
