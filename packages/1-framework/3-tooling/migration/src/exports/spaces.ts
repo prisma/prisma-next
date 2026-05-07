@@ -3,6 +3,11 @@ export {
   type SpaceApplyInput,
 } from '../concatenate-space-apply-inputs';
 export {
+  type DetectSpaceContractDriftInputs,
+  detectSpaceContractDrift,
+  type SpaceContractDriftResult,
+} from '../detect-space-contract-drift';
+export {
   emitPinnedSpaceArtefacts,
   type PinnedSpaceArtefactInputs,
   type PinnedSpaceHeadRef,
@@ -12,6 +17,7 @@ export {
   type SpacePlanInput,
   type SpacePlanOutput,
 } from '../plan-all-spaces';
+export { readPinnedContractHash } from '../read-pinned-contract-hash';
 export {
   APP_SPACE_ID,
   assertValidSpaceId,
