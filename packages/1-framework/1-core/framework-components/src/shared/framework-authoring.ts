@@ -1,10 +1,12 @@
 import type {
   ColumnDefault,
-  ColumnDefaultLiteralInputValue,
   ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
-import { isExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import {
+  isColumnDefaultLiteralInputValue,
+  isExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 import { ifDefined } from '@prisma-next/utils/defined';
 
 export type AuthoringArgRef = {
@@ -313,12 +315,14 @@ function resolveAuthoringColumnDefaultTemplate(
     if (value === undefined) {
       throw new Error('Resolved authoring literal default must not be undefined');
     }
-    // Resolved literal values originate from author-controlled templates and may
-    // be arbitrary JSON-compatible shapes; ColumnDefaultLiteralInputValue is the
-    // public surface for that union and cannot be narrowed structurally here.
+    if (!isColumnDefaultLiteralInputValue(value)) {
+      throw new Error(
+        `Resolved authoring literal default must be a JSON-serializable value or Date, received ${String(value)}`,
+      );
+    }
     return {
       kind: 'literal',
-      value: value as ColumnDefaultLiteralInputValue,
+      value,
     };
   }
 

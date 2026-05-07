@@ -47,6 +47,7 @@ export {
   coreHash,
   executionHash,
   isColumnDefault,
+  isColumnDefaultLiteralInputValue,
   isExecutionMutationDefaultValue,
   profileHash,
 } from '../types';
