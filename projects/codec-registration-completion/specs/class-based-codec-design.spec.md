@@ -2,20 +2,23 @@
 
 ## Status
 
-**Implementation-approach spec** for the [Mode C goal](factory-defined-codec-types.spec.md). Describes a specific implementation pattern where `CodecDescriptor` and `Codec` are abstract base classes that codec authors extend. The class hierarchy is the structural mechanism for "the descriptor's factory is the single type-level source of truth"; per-call type extraction works through the natural mechanics of TypeScript class methods + structural inference at the consumer (column helper) layer.
+**Implementation-approach spec** for the [Mode C goal](factory-defined-codec-types.spec.md). Describes a specific implementation pattern where `CodecDescriptor` and `Codec` are abstract base classes that codec authors extend, and the type-flow surface is a per-codec helper function tied to its descriptor by `satisfies`.
 
-This spec describes the **target design** of the spike. The spike itself is exploratory — small scratch-branch reshape of the pgvector + a representative postgres codec, demonstrating AC-1 through AC-6 from the goal spec without touching the rest of the codebase. Scope is in [Spike scope](#spike-scope) below.
+This spec describes the **target design** of the spike. The spike itself is exploratory — small scratch-branch reshape of pgvector + a representative postgres codec, demonstrating AC-1 through AC-6 from the goal spec without touching the rest of the codebase. Scope is in [Spike scope](#spike-scope) below.
+
+> **Empirical foundation.** An earlier draft of this spec proposed a polymorphic `column<P, R>(descriptor, params)` helper using structural matching (`{ factory(params: P): R }`) to preserve method-level generics. A TypeScript playground proof falsified that approach: TS instantiates method generics to their constraint at every form of structural extraction (structural match, indexed access, `Parameters`/`ReturnType`, etc.). The current design avoids that path entirely. See [`wip/m0-class-variance-proof.md`](../../../wip/m0-class-variance-proof.md) for the proof and the rejected alternatives.
 
 ## Decision
 
-A codec is two paired classes:
+A codec is **two paired classes plus one per-codec column helper function**, tied together by `satisfies`:
 
 - **`CodecDescriptor`** — abstract base class. Codec authors extend it to declare a codec's identity (`codecId`, `traits`, `targetTypes`), validate its parameters (`paramsSchema`), produce its codec instance from params (`factory()`), and render its TS output type for the emit path (`renderOutputType()`).
 - **`Codec`** — abstract base class. Codec authors extend it to implement `encode`/`decode` (and JSON variants where applicable). The instance retains a reference to its descriptor; metadata reads (`id`, `traits`) proxy through the descriptor for one source of truth.
+- **Per-codec column helper** — a hand-written function (e.g. `vector(length)`, `arktypeJson(schema)`) generic over the same shape as its descriptor's `factory`. The helper invokes `descriptor.factory(...)` **directly** (not via structural extraction). The direct invocation is what preserves method-level generics — TS binds `<N>` to the literal at the call site because the call is a direct method call, not a function-type extraction. A `satisfies ColumnHelperFor<D>` clause ties the helper to its descriptor at compile time, catching wiring mistakes (wrong `codecId`, wrong factory wired in, mismatched typeParams shape).
 
-The descriptor's `factory()` is a method whose typed return is the concrete codec class. TypeScript captures the typed factory return at consumer sites (column helper, no-emit `FieldOutputType`, etc.) by structural inference at call sites — applying the factory's signature with column-specific params yields the typed `Codec` instance class. At heterogeneous-storage boundaries (the runtime registry), the type widens to the abstract base; this is correct, and the runtime needs no type information.
+The framework provides a trivial `column()` packager that constructs the column-spec record from `(codec, codecId, typeParams)`. It is **not** generic over descriptors — that path was the variance trap. Per-codec helpers absorb the descriptor relationship instead, with `satisfies` enforcing it.
 
-This is the implementation pattern the goal spec ([`factory-defined-codec-types.spec.md`](factory-defined-codec-types.spec.md)) calls for: factory-as-source-of-truth, expressed through the class hierarchy.
+This is the implementation pattern the goal spec ([`factory-defined-codec-types.spec.md`](factory-defined-codec-types.spec.md)) calls for — factory-as-source-of-truth, expressed through the class hierarchy plus per-codec helpers.
 
 ## Class hierarchy
 
@@ -53,11 +56,15 @@ export abstract class CodecDescriptor<TParams = void> {
   /**
    * Materialize a runtime codec instance for the given params. The
    * factory's TS-level typed return determines the codec instance type
-   * for type-level consumers (no-emit `FieldOutputType`, etc.).
+   * for type-level consumers — but only at *direct* call sites
+   * (per-codec helpers, framework runtime). It does NOT survive
+   * structural extraction; that's why the column-helper surface is
+   * per-codec, not polymorphic.
    *
    * Concrete subclasses override this method with a typed return type
    * (e.g. `factory<N>(params: { length: N }): (ctx) => VectorCodec<N>`).
-   * The override's typed return is what consumers read at the type level.
+   * Direct callers (per-codec helpers) read the typed return; the
+   * runtime registry sees only the abstract base's signature.
    */
   abstract factory(params: TParams): (ctx: CodecInstanceContext) => Codec<string, readonly CodecTrait[], unknown, unknown>;
 }
@@ -100,7 +107,7 @@ The codec instance retaining a reference to its descriptor solves the aliasing c
 
 ### Concrete codec author pattern
 
-Authoring a codec is two class declarations: the descriptor and its codec instance. Three illustrative examples spanning the case spectrum.
+Authoring a codec is **three artifacts**: the descriptor class, the codec instance class, and the per-codec column helper function. Three illustrative examples spanning the case spectrum.
 
 #### Non-parameterized codec (Case 1)
 
@@ -126,9 +133,16 @@ class PgInt4Descriptor extends CodecDescriptor<void> {
 }
 
 export const pgInt4Descriptor = new PgInt4Descriptor();
+
+export const int4 = () => column(
+  pgInt4Descriptor.factory(),
+  pgInt4Descriptor.codecId,
+  undefined,
+);
+int4 satisfies ColumnHelperFor<PgInt4Descriptor>;
 ```
 
-The factory has no method-level generic — non-parameterized codecs return the same `PgInt4Codec` for every call. Consumers reading `descriptor.factory()(ctx)`'s return type get `PgInt4Codec` directly.
+The factory has no method-level generic — non-parameterized codecs return the same `PgInt4Codec` for every call. The `int4()` helper is a thin wrapper packaging the codec factory + metadata into a column spec.
 
 #### Parameterized codec with literal preservation (Case 2)
 
@@ -141,7 +155,6 @@ class VectorCodec<N extends number> extends Codec<'pg/vector@1', readonly ['equa
     return `[${value.join(',')}]`;
   }
   async decode(wire: string): Promise<Vector<N>> {
-    // ... parse and validate; throws if dimension mismatches
     return parsed as Vector<N>;
   }
 }
@@ -164,11 +177,18 @@ class PgVectorDescriptor extends CodecDescriptor<{ readonly length: number }> {
 }
 
 export const pgVectorDescriptor = new PgVectorDescriptor();
+
+export const vector = <N extends number>(length: N) => column(
+  pgVectorDescriptor.factory({ length }),
+  pgVectorDescriptor.codecId,
+  { length },
+);
+vector satisfies ColumnHelperFor<PgVectorDescriptor>;
 ```
 
-The class-level params type is `{ readonly length: number }` (widest bound). The **method-level generic** `<N extends number>` is what preserves the literal at call sites: `pgVectorDescriptor.factory({ length: 1536 })` types as `(ctx) => VectorCodec<1536>` because TypeScript infers `N=1536` from the method-generic at the call site.
+The class-level params type is `{ readonly length: number }` (widest bound). The **method-level generic** `<N extends number>` on `factory` is what preserves the literal at call sites: when `vector(1536)` calls `pgVectorDescriptor.factory({ length: 1536 })` *directly*, TS binds `N=1536` from the call site. The `vector` helper's own generic `<N extends number>(length: N)` captures the literal one level further out, and the literal flows through the column spec into the contract type.
 
-This is the core variance pattern of the class-based design: class generics widen to the bound for storage; method generics specialize per call. Both work in concert.
+This is the core variance pattern of the class-based design: method generics on the descriptor's factory are preserved by **direct invocation inside the per-codec helper**, not by extraction at a polymorphic helper.
 
 #### Parameterized codec with arktype schema (Case 3)
 
@@ -216,87 +236,124 @@ class ArktypeJsonDescriptor extends CodecDescriptor<{ readonly schema: Type<unkn
 }
 
 export const arktypeJsonDescriptor = new ArktypeJsonDescriptor();
+
+export const arktypeJson = <S extends Type<unknown>>(schema: S) => column(
+  arktypeJsonDescriptor.factory({ schema }),
+  arktypeJsonDescriptor.codecId,
+  { schema },
+);
+arktypeJson satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 ```
 
-Same pattern as `PgVectorDescriptor`: class-level widest-bound params; method-level generic preserving the schema's specific type at call sites. The codec instance carries the schema as runtime state and uses it in `decode`.
+Same pattern as `vector`: method-level generic on the descriptor's factory; the per-codec helper's own generic captures the schema's specific type and threads it through the direct call.
 
-## Column helper and type-level extraction
+## Column type-flow surface
 
-The column helper bridges the descriptor's typed factory to the contract type. It is **the only place in framework code** where the typed factory call happens; everywhere else reads the typed result from the column spec.
+The framework exposes one trivial `column()` packager. Per-codec helpers compose with it.
 
-### Helper signature
+### Framework `column()` packager
+
+Lives in `@prisma-next/framework-components/codec` (or alongside `ColumnTypeDescriptor`).
 
 ```typescript
-function column<P, R>(
-  descriptor: { factory(params: P): (ctx: CodecInstanceContext) => R } & {
-    readonly codecId: string;
-    readonly targetTypes: readonly string[];
-  },
-  params: P,
-): ColumnTypeDescriptor & {
+type ColumnSpec<R, P> = ColumnTypeDescriptor & {
+  readonly codecFactory: (ctx: CodecInstanceContext) => R;
   readonly codecId: string;
   readonly typeParams: P;
-  readonly codecFactory: (ctx: CodecInstanceContext) => R;
 };
+
+export function column<R, P>(
+  codecFactory: (ctx: CodecInstanceContext) => R,
+  codecId: string,
+  typeParams: P,
+): ColumnSpec<R, P> {
+  return { codecFactory, codecId, typeParams /* + ColumnTypeDescriptor fields */ };
+}
 ```
 
-The structural type on `descriptor`'s parameter is the load-bearing piece. By describing the descriptor structurally as `{ factory(params: P): (ctx) => R }` rather than nominally as `CodecDescriptor<P>`, TypeScript infers `P` and `R` per call site — and method-level generics on the concrete descriptor's `factory` participate in that inference.
+Generic over `R` (the codec instance type) and `P` (the typeParams object). The framework does **not** try to infer `R` and `P` from a descriptor — that's the per-codec helper's job. This is intentional: the polymorphic version was the variance trap.
 
-### Type extraction at call sites
+### Per-codec helper pattern
+
+Each codec ships its own column helper. The helper:
+1. Is generic over the same shape as its descriptor's `factory` method generic.
+2. Calls `descriptor.factory({...})` **directly** — not via structural extraction.
+3. Packages the result with `column(codecFactory, codecId, typeParams)`.
+4. Asserts conformance with `satisfies ColumnHelperFor<D>`.
 
 ```typescript
-const embeddingColumn = column(pgVectorDescriptor, { length: 1536 });
-//    ^? ColumnTypeDescriptor & {
-//         codecId: string;
-//         typeParams: { readonly length: 1536 };
-//         codecFactory: (ctx: CodecInstanceContext) => VectorCodec<1536>;
-//       }
+export const vector = <N extends number>(length: N) => column(
+  pgVectorDescriptor.factory({ length }),
+  pgVectorDescriptor.codecId,
+  { length },
+);
+vector satisfies ColumnHelperFor<PgVectorDescriptor>;
 ```
 
-TypeScript walks:
-1. `pgVectorDescriptor: PgVectorDescriptor` — a value with the concrete class type.
-2. Match against `{ factory(params: P): (ctx) => R }`: TS instantiates `factory`'s method generic `<N>` to the inferred params shape.
-3. From `params: { length: 1536 }`, P resolves to `{ readonly length: 1536 }`.
-4. With P fixed, the factory's `<N>` resolves to `1536`. R resolves to `VectorCodec<1536>`.
-5. Return type stamps P and R into the column spec.
+Direct invocation `pgVectorDescriptor.factory({ length })` is the load-bearing piece. TypeScript binds `<N>` to the literal from the call site at this point — the same way `vectorDescriptor.factory({ length: 1536 })` binds `N=1536` in any direct method call. The literal flows through `column(...)`'s `R` and `P` generics into the column spec.
 
-Consumers read `column.codecFactory` and project the codec type:
+### `satisfies ColumnHelperFor<D>` discipline
+
+The framework exports two `ColumnHelperFor` shapes; codec authors pick the one appropriate to their helper.
+
+#### Coarse — checks typeParams shape only
 
 ```typescript
-type ResolvedCodec<C> = C extends { codecFactory: (ctx: any) => infer R } ? R : never;
+export type ColumnHelperFor<D extends CodecDescriptor<any>> = (
+  ...args: any[]
+) => ColumnSpec<unknown, Parameters<D['factory']>[0]>;
+```
+
+Catches:
+- Wrong typeParams shape (e.g. helper packaging `{ wrongKey: ... }` when descriptor's factory takes `{ length: ... }`).
+
+Does **not** catch:
+- Wrong codec instance type (the helper could wire in a different descriptor's factory and pass the coarse check).
+
+Use when the codec doesn't have a stable `ReturnType<factory>` that's worth checking (e.g. heavily overloaded factories).
+
+#### Strict — also checks codec base type
+
+```typescript
+export type ColumnHelperForStrict<D extends CodecDescriptor<any>> = (
+  ...args: any[]
+) => ColumnSpec<ReturnType<D['factory']>, Parameters<D['factory']>[0]>;
+```
+
+Catches:
+- Coarse case + wrong codec instance type (e.g. helper invoking `arktypeJsonDescriptor.factory(...)` while declaring as `ColumnHelperForStrict<PgVectorDescriptor>`).
+
+Does **not** catch:
+- Literal-level mismatches between helper's promised codec type and descriptor's factory's typed return. This is fine — `ReturnType<D['factory']>` widens method generics to their constraint; the satisfies check is for sanity, and literal preservation comes from the direct invocation, not the satisfies clause.
+
+Use as the default. The widened `ReturnType` is sufficient because it catches the most common wiring mistake (wrong descriptor) without false positives on literal preservation.
+
+### Type extraction at consumer sites
+
+Consumers of a column spec project the codec type via simple type-level extraction:
+
+```typescript
+const embeddingColumn = vector(1536);
+//    ^? ColumnSpec<VectorCodec<1536>, { length: 1536 }>
+
+type ResolvedCodec<C> = C extends ColumnSpec<infer R, any> ? R : never;
 type EmbeddingCodec = ResolvedCodec<typeof embeddingColumn>;
 //   ^? VectorCodec<1536>
 ```
 
-For `FieldOutputType`'s purposes, the further projection reads the codec's `decode` return type or `TInput`:
+Because the literal was bound at the per-codec helper's call site (not extracted from the descriptor), `R` flows through `column(...)`'s `R` generic carrying the literal. `ResolvedCodec` extracts it cleanly via `infer R` — no method generic to widen.
+
+For `FieldOutputType` (consumed by `contract.d.ts` no-emit definitions):
 
 ```typescript
 type ColumnInputType<C> = ResolvedCodec<C> extends Codec<any, any, any, infer T> ? T : never;
 type EmbeddingInput = ColumnInputType<typeof embeddingColumn>;
 //   ^? Vector<1536>
-```
 
-Same path for `arktypeJson(productSchema)`:
-
-```typescript
-const settingsColumn = column(arktypeJsonDescriptor, { schema: productSchema });
+const settingsColumn = arktypeJson(productSchema);
 type SettingsInput = ColumnInputType<typeof settingsColumn>;
 //   ^? typeof productSchema['infer']
 ```
-
-### Per-codec wrappers (optional)
-
-Per-codec helpers can persist as one-line wrappers if pretty authoring is desired:
-
-```typescript
-export const vector = <N extends number>(length: N) =>
-  column(pgVectorDescriptor, { length });
-
-export const arktypeJson = <S extends Type<unknown>>(schema: S) =>
-  column(arktypeJsonDescriptor, { schema });
-```
-
-These add no type information beyond what the descriptor already provides — they are pure-syntactic sugar. The framework itself doesn't need them; they live in extension packs as ergonomic shortcuts. AC-4 of the goal spec is satisfied either way: column helpers either collapse into `column(descriptor, params)` or persist as trivial wrappers contributing no type-level information.
 
 ## Heterogeneous storage at the runtime layer
 
@@ -316,25 +373,27 @@ class CodecDescriptorRegistry {
 }
 ```
 
-The registry's signature uses `CodecDescriptor<unknown>` — variance erasure at the boundary, correctly so. Runtime consumers of the registry call `descriptor.factory(validatedParams)(ctx)` to materialize codec instances; the abstract `factory()` signature is sufficient (returns `Codec<string, readonly CodecTrait[], unknown, unknown>`). No type information is needed at the runtime layer.
+The registry's signature uses `CodecDescriptor<unknown>` — variance erasure at the boundary, correctly so. Runtime consumers of the registry call `descriptor.factory(validatedParams)(ctx)` to materialize codec instances; the abstract `factory()` signature (returning `Codec<string, readonly CodecTrait[], unknown, unknown>`) is sufficient. No type information is needed at the runtime layer.
 
-The class hierarchy makes this variance erasure cleaner than the function-based approach: assigning `PgVectorDescriptor` to `CodecDescriptor<unknown>` is a class-subtype assignment, which TS handles uniformly. The override's method-level generic stays *available* to anyone who reads the concrete class type, but is not exposed through the abstract storage signature.
+Per-codec helpers don't pass through the registry — they're imported directly by extension authors and column-defining sites. The registry exists for runtime lookup (by `codecId` string), where types are already erased.
 
-## Why classes work better than functions for this
+## Why classes work for this design
 
-The user's intuition was right: enclosing class generics are easier to thread through TypeScript's variance rules than function-return inference. Two specific reasons.
+The class hierarchy isn't load-bearing for variance preservation (per-codec helpers' direct calls do that work). It's load-bearing for **structure**: declaring the descriptor + codec pair with one inheritable identity, holding the descriptor reference in the codec instance, and giving aliases a natural extension shape.
 
-### 1. Method-level generics survive structural matching at call sites
+Two specific reasons the class form is preferable to a record-based descriptor:
 
-When `column<P, R>(descriptor: { factory(params: P): (ctx) => R }, params: P)` matches a class instance whose `factory` method is generic `<N extends number>`, TS instantiates the method generic during the structural-match step. This pattern works because the generic's bound is a method-level parameter, and structural matching on a method's signature respects method generics.
+### 1. Codec instance ↔ descriptor reference is structural
 
-The function-based equivalent — `defineCodec(spec)` returning a record with a `factory: (params: P) => (ctx) => R` *field* — does not get this treatment. A function-valued field is not a method; method-level generics on a field's value type don't survive the indexed-access reduction `D['factory']`. This is exactly the variance failure that M2 R4 hit (see `wip/unattended-decisions.md` Decision #11).
+The abstract `Codec` constructor takes a `descriptor: CodecDescriptor<unknown>`; concrete codec subclasses pass it via `super(descriptor)`. `codec.id` and `codec.traits` proxy through this reference. Aliases work for free: an alias descriptor produces a codec instance whose `descriptor` points to the alias, so `codec.id` reports the alias's `codecId` automatically.
 
-### 2. Inheritance and `this`-typing make the descriptor + codec relationship explicit
+The record-based equivalent requires every codec author to thread the descriptor reference through an object-literal constructor parameter. Workable, but error-prone — and identical structure has to be repeated at every codec definition site.
 
-The `Codec` instance class can hold a `descriptor` reference and `super()`-call into the abstract base from the concrete codec. Today's interface-based codecs are plain object literals, and capturing the descriptor reference requires explicit threading through every codec author's site. The class form makes this structural — every codec instance gets `descriptor` for free via the abstract base's constructor.
+### 2. Subclass-based authoring is uniform across the codec spectrum
 
-This matters for the aliasing case (codec id proxied through the descriptor) and for any future codec that needs to read its own metadata (e.g. for telemetry, decode-error envelopes, or cross-codec composition).
+Non-parameterized, parameterized, schema-typed, alias — all four shapes are expressed as `class X extends CodecDescriptor<...>` with overrides on the abstract members. The variance behavior is identical across all four: the per-codec helper handles literal preservation via direct calls; the descriptor class declares the shape.
+
+The record-based equivalent has subtly different mechanics for each case (records vs records-of-functions vs branded literal types vs spread-and-override aliases). Authoring overhead scales worse.
 
 ## Acceptance criteria
 
@@ -345,38 +404,47 @@ The goal spec's AC-1 through AC-7 apply unchanged. This implementation spec adds
 - `CodecDescriptor` is an exported abstract base class from `@prisma-next/framework-components/codec`.
 - `Codec` is an exported abstract base class from the same package.
 - Both replace today's interface-shaped declarations.
-- The legacy interfaces (if they survive at all) are kept only as deprecated aliases for type-only consumption during the transition; deletion is acceptable per AC-7 (validation gates green).
+- Legacy interfaces (if they survive at all) are kept only as deprecated aliases for type-only consumption during the transition; deletion is acceptable per AC-7 (validation gates green).
 
-### AC-CB-2. Method-level generic preservation through column helper
+### AC-CB-2. Per-codec helper preserves method generics through direct invocation
 
 For each parameterized codec demonstrated in the spike:
-- `descriptor.factory(specificParams)` types as `(ctx) => SpecificCodec<literalParams>`.
-- `column(descriptor, specificParams)` types as `ColumnTypeDescriptor & { codecFactory: (ctx) => SpecificCodec<literalParams> }`.
-- `ResolvedCodec<typeof column(...)>` projects to `SpecificCodec<literalParams>` with literals preserved.
+- `descriptor.factory(specificParams)` types as `(ctx) => SpecificCodec<literalParams>` at any direct call site (verified at HEAD; this is baseline TS behavior, not novel).
+- The per-codec helper (e.g. `vector(1536)`) returns a column spec whose `codecFactory` types as `(ctx) => SpecificCodec<literalParams>` with literals preserved.
+- `ResolvedCodec<typeof helper(...)>` projects to `SpecificCodec<literalParams>` with literals preserved.
 
 **Verification.** Negative type tests in `*.test-d.ts` files for at least:
-- `pgVectorDescriptor.factory({ length: 1536 })` → `(ctx) => VectorCodec<1536>`.
-- `arktypeJsonDescriptor.factory({ schema: testSchema })` → `(ctx) => ArktypeJsonCodec<typeof testSchema>`.
+- `pgVectorDescriptor.factory({ length: 1536 })` → `(ctx) => VectorCodec<1536>` (baseline confirmation).
+- `vector(1536)` → `ColumnSpec<VectorCodec<1536>, { length: 1536 }>`.
+- `arktypeJsonDescriptor.factory({ schema: testSchema })` → `(ctx) => ArktypeJsonCodec<typeof testSchema>` (baseline).
+- `arktypeJson(testSchema)` → `ColumnSpec<ArktypeJsonCodec<typeof testSchema>, ...>`.
+- Negative test: `ResolvedCodec<typeof vector(1536)>` is NOT assignable to `VectorCodec<999>`.
 
-### AC-CB-3. Codec instance descriptor reference
+### AC-CB-3. Per-codec helper conforms via `satisfies`
+
+For each per-codec helper in the spike:
+- The helper has a `satisfies ColumnHelperFor<D>` (or `ColumnHelperForStrict<D>`) clause referencing its descriptor's class.
+- A negative type test demonstrates that a malformed helper (wrong typeParams shape, or wrong descriptor's factory wired in for the strict form) fails to satisfy the clause — verified via `// @ts-expect-error` directive.
+
+### AC-CB-4. Codec instance descriptor reference
 
 - Every concrete `Codec` subclass in the spike receives a `descriptor` constructor argument and passes it to the abstract base's constructor.
 - `codec.id` and `codec.traits` proxy through `this.descriptor.codecId` / `this.descriptor.traits` (no instance-level fields).
 - A round-trip test confirms: `pgVectorDescriptor.factory(params)(ctx).id === pgVectorDescriptor.codecId`.
 
-### AC-CB-4. Heterogeneous registry stores type-erased descriptors
+### AC-CB-5. Heterogeneous registry stores type-erased descriptors
 
 - The registry signature uses `CodecDescriptor<unknown>` (or equivalent type-erased form).
 - A test demonstrates: registering concrete descriptors, retrieving by codec id, calling `descriptor.factory(params)(ctx)` to materialize codec instances. No `as` casts at the registry's storage / retrieval boundary.
 
-### AC-CB-5. Spike scope demonstrated end-to-end
+### AC-CB-6. Spike scope demonstrated end-to-end
 
 - The spike scratch branch demonstrates the full data flow for at least one parameterized codec:
-  1. Codec author writes `PgVectorDescriptor` and `VectorCodec` classes.
-  2. Column author calls `column(pgVectorDescriptor, { length: 1536 })` (or `vector(1536)` wrapper).
+  1. Codec author writes `PgVectorDescriptor`, `VectorCodec`, and `vector(N)` helper.
+  2. Column author calls `vector(1536)` and gets back `ColumnSpec<VectorCodec<1536>, { length: 1536 }>`.
   3. Contract definition aggregates the column spec; `typeof contract` carries the typed codec.
   4. A no-emit consumer (test fixture mimicking `FieldOutputType`) projects the typed codec from the contract type and resolves to `Vector<1536>`.
-- The spike does **not** reshape the runtime contributor protocol, the contributor-pack registration flow, or the contract-load-time materialization machinery beyond what's needed for the demo. Those are scoped to the post-spike implementation milestone.
+- The spike does **not** reshape the runtime contributor protocol, the contributor-pack registration flow, or the contract-load-time materialization machinery beyond what's needed for the demo.
 
 ## Open questions to resolve in the spike
 
@@ -388,14 +456,14 @@ The current design parameterizes `Codec<Id, TTraits, TWire, TInput>` positionall
 
 The spike picks one. Recommendation pending: probably the positional form (current design) for clarity; the descriptor-derived form may be useful as a convention.
 
-### Q-2. Where does `column()` live?
+### Q-2. Where does `column()` and `ColumnHelperFor<D>` live?
 
 Candidates:
 - `@prisma-next/framework-components/codec` (alongside `CodecDescriptor`).
 - `@prisma-next/contract-authoring` (alongside `ColumnTypeDescriptor`).
 - A new package at the SQL family layer.
 
-Layering rule: the column helper depends on `ColumnTypeDescriptor` and on the structural shape of `CodecDescriptor`'s factory; both are framework-components types. So `framework-components/codec` is the natural home unless a layering constraint surfaces.
+Layering rule: both depend on `ColumnTypeDescriptor` and on `CodecDescriptor`; both are framework-components types. So `framework-components/codec` is the natural home unless a layering constraint surfaces.
 
 ### Q-3. `paramsSchema` in the abstract class — required or optional?
 
@@ -409,11 +477,10 @@ Per the goal spec's non-goals, deletion is acceptable. If kept, the natural clas
 class PgCharDescriptor extends SqlCharDescriptor {
   readonly codecId = 'pg/char@1' as const;
   readonly targetTypes = ['character'];
-  // factory inherits from SqlCharDescriptor; the alias is just a metadata override.
 }
 ```
 
-The codec instance produced by `pgCharDescriptor.factory()` returns a `SqlCharCodec` whose `descriptor` reference points to the `pgCharDescriptor` instance — `codec.id` reports `'pg/char@1'` automatically.
+The codec instance produced by `pgCharDescriptor.factory()` returns a `SqlCharCodec` whose `descriptor` reference points to the `pgCharDescriptor` instance — `codec.id` reports `'pg/char@1'` automatically. The per-codec helper is similarly aliased: `pgChar = (length) => column(pgCharDescriptor.factory({length}), pgCharDescriptor.codecId, {length})`.
 
 The spike includes one alias example to verify this works.
 
@@ -429,7 +496,7 @@ Out of scope for the spike; the spike codecs are all sync-constructible.
 
 ## Spike scope
 
-The spike's deliverable is a scratch branch (off the current project branch's `efc0a988c` or its successor), demonstrating the class-based design end-to-end for **one parameterized codec** plus **one non-parameterized codec** plus **one column-helper usage**.
+The spike's deliverable is a scratch branch (off the current project branch's `efc0a988c` or its successor), demonstrating the class-based design end-to-end for **one parameterized codec** plus **one non-parameterized codec** plus **per-codec helpers + `satisfies` clauses**.
 
 ### What the spike implements
 
@@ -437,11 +504,15 @@ In a scratch branch, no production-quality migration:
 
 1. **`framework-components/src/shared/codec-descriptor.ts`** — new. Abstract `CodecDescriptor` class.
 2. **`framework-components/src/shared/codec.ts`** — new. Abstract `Codec` class.
-3. **`framework-components/src/shared/column.ts`** — new (or in another package as Q-2 decides). Generic `column(descriptor, params)` helper.
-4. **`extension-pgvector/src/core/codecs.ts`** — reshape pgvector's `PgVectorDescriptor` and `VectorCodec` into class form. Keep one example of the legacy descriptor form alongside if helpful for diffing.
-5. **`target-postgres/src/core/codecs.ts`** — reshape one non-parameterized codec (e.g. `pgInt4`) into class form. Don't touch the rest.
-6. **`extension-pgvector/test/spike-class-based.types.test-d.ts`** (new) — negative type tests covering AC-CB-2: `pgVectorDescriptor.factory({ length: 1536 })`, `column(pgVectorDescriptor, { length: 1536 })`, `ResolvedCodec<typeof embeddingColumn>` resolves to `VectorCodec<1536>` etc.
-7. **`extension-pgvector/test/spike-class-based.test.ts`** (new) — runtime test covering AC-CB-3: codec instance's `descriptor` reference; codecId proxying; encode/decode round-trip on a sample vector.
+3. **`framework-components/src/shared/column.ts`** — new (or in another package as Q-2 decides). Trivial `column(codecFactory, codecId, typeParams)` packager. `ColumnHelperFor<D>` and `ColumnHelperForStrict<D>` shape exports.
+4. **`extension-pgvector/src/core/codecs.ts`** — reshape pgvector's `PgVectorDescriptor` and `VectorCodec` into class form. Add the `vector(N)` per-codec helper with `satisfies ColumnHelperForStrict<PgVectorDescriptor>`. Keep one example of the legacy descriptor form alongside if helpful for diffing.
+5. **`target-postgres/src/core/codecs.ts`** — reshape one non-parameterized codec (e.g. `pgInt4`) into class form. Add the `int4()` per-codec helper.
+6. **`extension-pgvector/test/spike-class-based.types.test-d.ts`** (new) — negative type tests covering AC-CB-2 and AC-CB-3:
+   - `vector(1536)` → `ColumnSpec<VectorCodec<1536>, { length: 1536 }>`
+   - `ResolvedCodec<typeof vector(1536)>` → `VectorCodec<1536>` (and NOT `VectorCodec<999>`)
+   - `vector satisfies ColumnHelperForStrict<PgVectorDescriptor>` ✅
+   - Malformed helper variants fail `satisfies` (with `// @ts-expect-error` directives)
+7. **`extension-pgvector/test/spike-class-based.test.ts`** (new) — runtime test covering AC-CB-4: codec instance's `descriptor` reference; codecId proxying; encode/decode round-trip on a sample vector.
 8. **A fixture demo** under `examples/` or in tests showing the full flow for one column.
 
 ### What the spike does NOT do
@@ -449,38 +520,40 @@ In a scratch branch, no production-quality migration:
 - Migrate other codecs (postgres, sqlite, sql-family, mongo). These are post-spike implementation work.
 - Touch the contributor protocol or the contributor-pack registration flow.
 - Change `contract.d.ts` emission. The spike demonstrates the no-emit type derivation; emit-path verification is a post-spike concern.
-- Update consumers (sql-builder, sql-orm-client, contract-ts). The spike only proves the class-hierarchy shape works.
+- Update consumers (sql-builder, sql-orm-client, contract-ts). The spike only proves the class-hierarchy + per-codec helper shape works.
 - Resolve TML-2393's `byScalar` cleanup. That's part of M0 of the parent project's existing scope.
 
 ### Spike deliverables
 
 - Scratch branch `spike/class-based-codecs` (off the project branch).
 - Spike report at `wip/class-based-codec-spike.md` summarizing findings, including:
-  - Did AC-CB-1 through AC-CB-5 pass?
-  - Did the variance behavior work as predicted (method generics survive structural matching at column helper)?
+  - Did AC-CB-1 through AC-CB-6 pass?
+  - Did the per-codec helper + `satisfies` discipline preserve literals end-to-end as the playground proof predicted?
   - What unexpected friction surfaced?
-  - What's the projected diff cost of full M0 implementation under this design (compared to functional Approach 1's ~150–200 LoC estimate)?
-  - Recommendation: proceed with class-based or fall back to functional?
+  - What's the projected diff cost of full M0 implementation under this design (per-codec helper authoring overhead, satisfies discipline, etc.)?
+  - Recommendation: proceed with class-based + per-codec-helper or fall back to functional?
 
 The spike's report informs the next decision: whether to commit to the class-based approach for the project or refine further.
 
 ## Risks
 
-### Class generics + method generics interaction at structural type match
+### Per-codec helper boilerplate
 
-The variance behavior `(descriptor: { factory(params: P): (ctx) => R }, params: P)` matching a concrete class with a method-generic factory **should** work — TS is documented to instantiate method generics during structural matching. But there are corner cases (e.g. higher-order params types, conditional types in the method generic's bound) where the behavior degrades. The spike's positive type tests are the verification.
+Each parameterized codec ships a small per-codec helper function (~5 lines). For ~22 codecs in postgres + ~10 in sqlite + a few in extensions, that's ~40 helpers. Modest but real. Mitigation: codec authors who don't need ergonomic surface tweaks can use a single-line passthrough form; only authors needing custom surfaces (defaults, derived params, positional vs object-arg) write more.
 
-If the structural match doesn't preserve method generics in TS's current implementation, the column helper needs an explicit method-generic forwarding shape — invasive but solvable. Worst-case fallback: pass the descriptor's factory directly to the helper (`column(pgVectorDescriptor.factory, { length: 1536 })`) which captures the method generic at the function-call boundary unambiguously.
+### `satisfies` not catching literal-level mismatches
+
+`ColumnHelperForStrict<D>` checks the helper's return is `ColumnSpec<ReturnType<D['factory']>, ...>`. `ReturnType` widens method generics, so a helper that accidentally widens its own generic (e.g. `<N extends number>(length: N)` becoming `(length: number)`) still satisfies the clause — but the column spec loses the literal. Mitigation: the `*.test-d.ts` negative tests in AC-CB-2 cover this; a helper that widens fails the literal-preservation test.
 
 ### Codec instance class proliferation
 
-Today's codecs are object literals; the class form requires a class declaration per codec. For the postgres pack alone, that's ~22 codec class declarations + ~22 descriptor class declarations = ~44 classes. Not technically problematic but visually heavier than today's object-literal codecs.
+Today's codecs are object literals; the class form requires a class declaration per codec. For postgres alone, ~22 codec class declarations + ~22 descriptor class declarations + ~22 helper functions = ~66 codec-related artifacts. Not technically problematic but visually heavier than today's object-literal codecs.
 
 Mitigation: a `defineSimpleCodec` helper that produces a concrete codec class from `{ encode, decode }` functions. Authors who don't need class-level state (the common case) write the helper-based form; only stateful codecs (e.g. arktype-json with its schema) write full class declarations.
 
 ### `super()` discipline in the codec abstract base
 
-Codec subclasses must call `super(descriptor)` in their constructors. If an author forgets, TypeScript catches it (the abstract `Codec`'s constructor parameter is required). But it's one more thing to remember. Mitigation: the `defineSimpleCodec` helper handles the super() call; only authors who write full class declarations need to think about it.
+Codec subclasses must call `super(descriptor)` in their constructors. If an author forgets, TypeScript catches it (the abstract `Codec`'s constructor parameter is required). But it's one more thing to remember. Mitigation: `defineSimpleCodec` handles the `super()` call.
 
 ### Async / sync codec divergence
 
@@ -502,18 +575,15 @@ class PgInt4Descriptor extends CodecDescriptor<void> {
 }
 ```
 
-For parameterized codecs, the per-column instance is the design — each column gets a codec instance closing over its specific params (e.g. `dimension: N` on `VectorCodec`). No regression vs. today.
+For parameterized codecs, the per-column instance is the design — each column gets a codec instance closing over its specific params. No regression vs. today.
 
 ## Non-goals
 
+- **Polymorphic column helper.** Falsified by the playground proof. Out of scope.
 - **Functional approach (Approach 1).** Out of scope. If the class-based spike fails, the functional fallback re-enters consideration.
-
 - **Full codec migration across the codebase.** The spike reshapes one or two codecs only; full migration is post-spike implementation work.
-
 - **Contributor protocol changes.** The spike doesn't touch how codecs register with the framework; it only shows that the class form satisfies the existing protocol's shape requirements.
-
 - **`Codec.id` field elimination across the codebase.** The codec instance's `id` field becomes a getter proxying to the descriptor; consumers that today read `codec.id` continue to work without change. Whether to delete the field entirely (forcing all consumers through `codec.descriptor.codecId`) is a separate cleanup.
-
 - **`paramsSchema`'s relationship to the factory's TS input type.** Could in principle be derived (the schema's parsed output type assignable to factory's input type); the spike treats them as separate artifacts that authors keep aligned, with a separate ticket / cleanup if mechanical derivation is desirable later.
 
 ## References
@@ -522,5 +592,7 @@ For parameterized codecs, the per-column instance is the design — each column 
 - [`typed-codec-flow.spec.md`](typed-codec-flow.spec.md). The M0 sub-spec under the parent project; subsumed by the goal spec.
 - [Parent spec `spec.md`](../spec.md). The `codec-registration-completion` canonical project spec.
 - [ADR 208 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The ADR partially superseded by the goal spec.
+- [`wip/m0-class-variance-proof.md`](../../../wip/m0-class-variance-proof.md). The TS playground proof that falsified the polymorphic-column-helper approach and informed the per-codec-helper design.
+- [`wip/codec-class-variance-proof/`](../../../wip/codec-class-variance-proof/). The proof's supporting playground files (gitignored).
 - [`wip/unattended-decisions.md` Decision #11](../../../wip/unattended-decisions.md). The variance failure that surfaced this design space.
-- `wip/m0-shape-spike.md`. Shape A vs Shape B (functional Mode B) findings; informs the variance considerations for Approach 1.
+- `wip/m0-shape-spike.md`. Shape A vs Shape B (functional Mode B) findings.
