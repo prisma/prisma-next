@@ -6,6 +6,7 @@ import type {
   AuthoringTypeConstructorDescriptor,
 } from '@prisma-next/framework-components/authoring';
 import {
+  hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringFieldPresetDescriptor,
@@ -98,13 +99,6 @@ export function getAuthoringFieldPreset(
   return isAuthoringFieldPresetDescriptor(current) ? current : undefined;
 }
 
-function hasRegisteredFieldNamespace(
-  contributions: AuthoringContributions | undefined,
-  namespace: string,
-): boolean {
-  return contributions?.field !== undefined && Object.hasOwn(contributions.field, namespace);
-}
-
 /**
  * Returns the namespace prefix of `attributeName` if it references an
  * unrecognized extension namespace, otherwise `undefined`. A namespace is
@@ -168,6 +162,29 @@ export function reportUncomposedNamespace(input: {
     sourceId: input.sourceId,
     span: input.span,
     data: { namespace: input.namespace, suggestedPack: input.namespace },
+  });
+}
+
+/**
+ * Pushes the canonical `PSL_UNKNOWN_FIELD_PRESET` diagnostic when a typoed
+ * preset name is referenced inside a registered field-preset namespace. The
+ * `data` payload exposes the namespace and full helper path so machine
+ * consumers (agents, IDE extensions) don't have to parse the prose.
+ */
+export function reportUnknownFieldPreset(input: {
+  readonly entityLabel: string;
+  readonly namespace: string;
+  readonly helperPath: string;
+  readonly sourceId: string;
+  readonly span: PslSpan;
+  readonly diagnostics: ContractSourceDiagnostic[];
+}): void {
+  input.diagnostics.push({
+    code: 'PSL_UNKNOWN_FIELD_PRESET',
+    message: `${input.entityLabel} references unknown field preset "${input.helperPath}". Check the spelling against the available presets in the "${input.namespace}" namespace.`,
+    sourceId: input.sourceId,
+    span: input.span,
+    data: { namespace: input.namespace, helperPath: input.helperPath },
   });
 }
 
@@ -420,26 +437,22 @@ export function resolveFieldTypeDescriptor(input: {
       input.field.typeConstructor.path,
     );
 
-    // Field-preset walker missed. If the namespace is registered as a field
-    // preset namespace and the full path is not a type constructor, the miss
-    // is a typo rather than an uncomposed extension pack.
     if (
       !typeDescriptor &&
       namespacePrefix &&
       hasRegisteredFieldNamespace(input.authoringContributions, namespacePrefix)
     ) {
-      input.diagnostics.push({
-        code: 'PSL_UNKNOWN_FIELD_PRESET',
-        message: `${input.entityLabel} references unknown field preset "${helperPath}". Check the spelling against the available presets in the "${namespacePrefix}" namespace.`,
+      reportUnknownFieldPreset({
+        entityLabel: input.entityLabel,
+        namespace: namespacePrefix,
+        helperPath,
         sourceId: input.sourceId,
         span: input.field.typeConstructor.span,
+        diagnostics: input.diagnostics,
       });
       return { ok: false, alreadyReported: true };
     }
 
-    // Fall through to type-constructor resolution. `resolvePslTypeConstructorDescriptor`
-    // emits the appropriate diagnostic (uncomposed namespace, unsupported field
-    // type) when no descriptor is found in either registry.
     const descriptor =
       typeDescriptor ??
       resolvePslTypeConstructorDescriptor({

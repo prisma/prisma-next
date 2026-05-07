@@ -2,11 +2,13 @@ import type { CodecLookup } from '../shared/codec-types';
 import type {
   AuthoringContributions,
   AuthoringFieldNamespace,
-  AuthoringFieldPresetDescriptor,
-  AuthoringTypeConstructorDescriptor,
   AuthoringTypeNamespace,
 } from '../shared/framework-authoring';
-import { assertNoCrossRegistryCollisions } from '../shared/framework-authoring';
+import {
+  assertNoCrossRegistryCollisions,
+  isAuthoringFieldPresetDescriptor,
+  isAuthoringTypeConstructorDescriptor,
+} from '../shared/framework-authoring';
 import type { ComponentMetadata } from '../shared/framework-components';
 import type {
   ControlMutationDefaultEntry,
@@ -154,22 +156,6 @@ export function extractComponentIds(
   return ids;
 }
 
-function isTypeConstructorDescriptor(value: unknown): value is AuthoringTypeConstructorDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'typeConstructor'
-  );
-}
-
-function isFieldPresetDescriptor(value: unknown): value is AuthoringFieldPresetDescriptor {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as { kind?: unknown }).kind === 'fieldPreset'
-  );
-}
-
 function mergeAuthoringNamespaces(
   target: Record<string, unknown>,
   source: Record<string, unknown>,
@@ -230,7 +216,7 @@ export function assembleAuthoringContributions(
         field,
         descriptor.authoring.field,
         [],
-        isFieldPresetDescriptor,
+        isAuthoringFieldPresetDescriptor,
         'field',
       );
     }
@@ -241,7 +227,7 @@ export function assembleAuthoringContributions(
       type,
       descriptor.authoring.type,
       [],
-      isTypeConstructorDescriptor,
+      isAuthoringTypeConstructorDescriptor,
       'type',
     );
   }

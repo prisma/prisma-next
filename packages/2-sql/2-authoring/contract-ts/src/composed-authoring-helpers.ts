@@ -250,6 +250,8 @@ export function createComposedAuthoringHelpers<
 
   const typeNamespace = composeTypeNamespace(components);
   const fieldNamespace = composeFieldNamespace(components);
+  // Mirrors the call in `assembleAuthoringContributions`: PSL composes via
+  // `createControlStack`, the TS DSL composes here. Both seams need the guard.
   assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
 
   return {

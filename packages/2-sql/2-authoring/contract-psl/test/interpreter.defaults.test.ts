@@ -623,35 +623,6 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
       );
     });
 
-    it('rejects an unknown preset name in a registered temporal namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
-      const document = parsePslDocument({
-        schema: `model Bad {
-  id Int @id
-  example temporal.foo()
-}`,
-        sourceId: 'schema.prisma',
-      });
-
-      const result = interpretPslDocumentToSqlContract({
-        document,
-        controlMutationDefaults: builtinControlMutationDefaults,
-        // No temporal.foo registered.
-        authoringContributions: { field: { temporal: {} }, type: {} },
-      });
-
-      expect(result.ok).toBe(false);
-      if (result.ok) return;
-      expect(result.failure.diagnostics).toEqual(
-        expect.arrayContaining([
-          expect.objectContaining({
-            code: 'PSL_UNKNOWN_FIELD_PRESET',
-            sourceId: 'schema.prisma',
-            message: expect.stringContaining('temporal.foo'),
-          }),
-        ]),
-      );
-    });
-
     it('rejects an unknown preset name in a registered field namespace with PSL_UNKNOWN_FIELD_PRESET', () => {
       const document = parsePslDocument({
         schema: `model Bad {
@@ -675,6 +646,7 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
             code: 'PSL_UNKNOWN_FIELD_PRESET',
             sourceId: 'schema.prisma',
             message: expect.stringContaining('audit.foo'),
+            data: { namespace: 'audit', helperPath: 'audit.foo' },
           }),
         ]),
       );

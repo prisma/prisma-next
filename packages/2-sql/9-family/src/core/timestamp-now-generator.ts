@@ -59,8 +59,5 @@ export function temporalAuthoringPresets<
         },
       },
     },
-  } as const satisfies {
-    readonly createdAt: AuthoringFieldPresetDescriptor;
-    readonly updatedAt: AuthoringFieldPresetDescriptor;
-  };
+  } as const satisfies Record<string, AuthoringFieldPresetDescriptor>;
 }

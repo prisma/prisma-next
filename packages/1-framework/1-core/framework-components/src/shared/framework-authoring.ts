@@ -146,6 +146,24 @@ export function isAuthoringFieldPresetDescriptor(
   );
 }
 
+/**
+ * Returns true when `namespace` is a non-leaf key in `contributions.field`.
+ *
+ * `AuthoringFieldNamespace` permits a leaf descriptor at any depth — including
+ * the root — so a top-level `field: { Foo: { kind: 'fieldPreset', ... } }`
+ * registration must NOT be treated as a "namespace" with sub-paths. Callers
+ * use this predicate to gate dot-namespaced lookups (e.g. PSL `@Foo.bar`).
+ */
+export function hasRegisteredFieldNamespace(
+  contributions: AuthoringContributions | undefined,
+  namespace: string,
+): boolean {
+  if (contributions?.field === undefined || !Object.hasOwn(contributions.field, namespace)) {
+    return false;
+  }
+  return !isAuthoringFieldPresetDescriptor(contributions.field[namespace]);
+}
+
 function collectAuthoringLeafPaths(
   namespace: Readonly<Record<string, unknown>>,
   isLeaf: (value: unknown) => boolean,

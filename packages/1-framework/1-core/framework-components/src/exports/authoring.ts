@@ -13,6 +13,7 @@ export type {
 } from '../shared/framework-authoring';
 export {
   assertNoCrossRegistryCollisions,
+  hasRegisteredFieldNamespace,
   instantiateAuthoringFieldPreset,
   instantiateAuthoringTypeConstructor,
   isAuthoringArgRef,
