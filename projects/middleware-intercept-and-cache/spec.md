@@ -146,7 +146,7 @@ const c = await db.orm.User.all()  // always hits DB
 
 7. **Family-agnostic.** The hook lives on `RuntimeMiddleware` in `framework-components`, not on `SqlMiddleware` or `MongoMiddleware`. Because both family runtimes inherit `RuntimeCore.execute` → `runWithMiddleware`, no family-specific wiring is required. The first-party cache middleware is SQL-focused for April but should work unchanged against Mongo.
 
-8. **Error propagation.** A middleware that throws inside `intercept` surfaces via the standard `runtimeError` envelope. `afterExecute` still fires with `completed: false`, mirroring `runWithMiddleware`'s existing error-path semantics. Errors thrown by `afterExecute` during the error path remain swallowed (existing behavior, unchanged).
+8. **Error propagation.** Errors thrown by a middleware inside `intercept` propagate as raw `Error`s like `beforeExecute` errors do. `afterExecute` still fires with `completed: false`, mirroring `runWithMiddleware`'s existing error-path semantics. Errors thrown by `afterExecute` during the error path remain swallowed (existing behavior, unchanged).
 
 9. **Raw-SQL lanes.** Raw-SQL plans arrive as fully-lowered `SqlExecutionPlan` and skip `runBeforeCompile`/`lower` via the early-return in `executeAgainstQueryable`. They still reach `runWithMiddleware` and are therefore eligible for interception like any other plan; the cache middleware's own policy decides whether to cache them.
 
