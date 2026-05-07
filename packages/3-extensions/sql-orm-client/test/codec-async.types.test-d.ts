@@ -35,13 +35,15 @@ import type { Contract } from './fixtures/generated/contract';
 
 // `User.address` is jsonb-backed (a value object whose fields and the field
 // itself flow through the `pg/jsonb@1` codec); `User.invitedById` is int4 and
-// nullable. Both codecs are lifted to async dispatch by `mkCodec()` regardless
-// of whether the author wrote sync or async functions, so these columns are
-// representative of "async codec columns" at the runtime boundary.
+// nullable. Both codecs are lifted to async dispatch at the class-form codec
+// boundary regardless of whether the author wrote sync or async functions, so
+// these columns are representative of "async codec columns" at the runtime
+// boundary.
 //
-// See `packages/2-sql/4-lanes/relational-core/src/ast/codec-types.ts`
-// (`mkCodec()` factory) — every author function is wrapped in `async (x) =>
-// fn(x)`, which means every column is an "async codec" at the runtime layer.
+// See `packages/1-framework/1-core/framework-components/src/shared/codec.ts`
+// (`Codec` interface — `encode`/`decode` return `Promise<…>`) — every author
+// function is wrapped at the class boundary, which means every column is an
+// "async codec" at the runtime layer.
 
 type AddressShape = {
   readonly street: string;

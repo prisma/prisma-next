@@ -7,7 +7,6 @@ import {
   ColumnRef,
   ExistsExpr,
   ListExpression,
-  mkCodec,
   NotExpr,
   NullCheckExpr,
   newCodecRegistry,
@@ -21,6 +20,7 @@ import {
 import { describe, expect, it } from 'vitest';
 import { createModelAccessor } from '../src/model-accessor';
 import { getTestContext, getTestContract } from './helpers';
+import { defineTestCodec } from './test-codec';
 
 describe('createModelAccessor', () => {
   const context = getTestContext();
@@ -50,7 +50,7 @@ describe('createModelAccessor', () => {
     const registry = newCodecRegistry();
     for (const [id, traits] of Object.entries(entries)) {
       registry.register(
-        mkCodec({
+        defineTestCodec({
           typeId: id,
           targetTypes: [],
           traits,

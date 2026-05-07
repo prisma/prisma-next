@@ -1,21 +1,23 @@
 import { newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { mkCodec, newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../../../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value';
+import { defineTestCodec } from './test-codec';
 
 // T4.1 — cross-family codec parity proof
 //
-// A single `mkCodec({...})` value (the unified factory entry point in
-// relational-core, mirrored by `mongoCodec` post-m4) is registered in both a
-// SQL `CodecRegistry` and a Mongo `MongoCodecRegistry`. Encoding the same
-// input value through each registry must produce identical wire output. For
-// the SQL fixture the same codec also round-trips via `decode`, demonstrating
-// that one codec definition can serve both directional boundaries.
+// A single codec instance (constructed via the test-only `defineTestCodec`
+// helper, which mirrors the shape of an author-side codec definition) is
+// registered in both a SQL `CodecRegistry` and a Mongo `MongoCodecRegistry`.
+// Encoding the same input value through each registry must produce identical
+// wire output. For the SQL fixture the same codec also round-trips via
+// `decode`, demonstrating that one codec definition can serve both directional
+// boundaries.
 
 describe('cross-family codec parity (T4.1)', () => {
   // A single codec instance — registered in both SQL and Mongo registries.
-  const objectIdLikeCodec = mkCodec({
+  const objectIdLikeCodec = defineTestCodec({
     typeId: 'shared/object-id-like@1',
     targetTypes: ['objectIdLike'],
     encode: (value: string) => `wire:${value}`,
