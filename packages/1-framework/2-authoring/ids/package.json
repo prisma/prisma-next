@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@prisma-next/contract": "workspace:*",
-    "@prisma-next/contract-authoring": "workspace:*",
+    "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/utils": "workspace:*",
     "uniku": "^0.0.12"
   },

@@ -10,10 +10,11 @@ This package holds the small, target-neutral descriptor vocabulary shared by Pri
 
 ## Responsibilities
 
-- **Column descriptors**: `ColumnTypeDescriptor` captures a codec ID, native type, and optional `typeParams` / `typeRef`
 - **Index descriptors**: `IndexDef` captures index column lists plus optional `name`, `using`, and `config`
 - **Foreign key defaults**: `ForeignKeyDefaultsState` captures default FK materialization choices shared by authoring surfaces
 - **Shared authoring vocabulary**: Gives target-family packages such as `@prisma-next/sql-contract-ts` a target-neutral descriptor layer
+
+`ColumnTypeDescriptor` lives in `@prisma-next/framework-components/codec` alongside the codec types.
 
 ## Package Status
 
@@ -31,7 +32,6 @@ This package is the extracted shared descriptor layer from the contract authorin
 
 ## Exports
 
-- `ColumnTypeDescriptor`
 - `IndexDef`
 - `ForeignKeyDefaultsState`
 

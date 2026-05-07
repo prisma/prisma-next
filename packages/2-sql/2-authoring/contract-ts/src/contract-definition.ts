@@ -1,8 +1,6 @@
 import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
-import type {
-  ColumnTypeDescriptor,
-  ForeignKeyDefaultsState,
-} from '@prisma-next/contract-authoring';
+import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { ExtensionPackRef, TargetPackRef } from '@prisma-next/framework-components/components';
 import type { ReferentialAction, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 

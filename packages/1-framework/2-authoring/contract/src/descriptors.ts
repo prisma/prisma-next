@@ -1,10 +1,3 @@
-export type ColumnTypeDescriptor<TCodecId extends string = string> = {
-  readonly codecId: TCodecId;
-  readonly nativeType: string;
-  readonly typeParams?: Record<string, unknown>;
-  readonly typeRef?: string;
-};
-
 export interface IndexDef {
   readonly columns: readonly string[];
   readonly name?: string;

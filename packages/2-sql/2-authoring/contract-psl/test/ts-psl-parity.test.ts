@@ -1,5 +1,5 @@
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,

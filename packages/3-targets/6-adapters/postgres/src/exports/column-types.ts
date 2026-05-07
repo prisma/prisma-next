@@ -5,7 +5,7 @@
  * They are derived from the same source of truth as codec definitions and manifests.
  */
 
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
+import type { ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type { StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import {
   PG_BIT_CODEC_ID,

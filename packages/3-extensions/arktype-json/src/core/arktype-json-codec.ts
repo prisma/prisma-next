@@ -28,10 +28,10 @@
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { ColumnTypeDescriptor } from '@prisma-next/contract-authoring';
 import type {
   CodecDescriptor,
   CodecInstanceContext,
+  ColumnTypeDescriptor,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { type Codec, mkCodec } from '@prisma-next/sql-relational-core/ast';

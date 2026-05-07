@@ -1,6 +1,25 @@
 import type { JsonValue } from '@prisma-next/contract/types';
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 
+/**
+ * Authored column-type descriptor — the data shape an authoring site
+ * (PSL or TypeScript builders) attaches to a column to identify its
+ * codec and its native database type.
+ *
+ * Lives at the framework-components layer alongside the codec types so
+ * codec-author packages (e.g. column-spec / `column()` packagers) can
+ * extend it directly without crossing layer boundaries.
+ *
+ * @template TCodecId Narrowed codec id literal for sites that thread a
+ *   specific codec id through the type system.
+ */
+export type ColumnTypeDescriptor<TCodecId extends string = string> = {
+  readonly codecId: TCodecId;
+  readonly nativeType: string;
+  readonly typeParams?: Record<string, unknown>;
+  readonly typeRef?: string;
+};
+
 export type CodecTrait =
   | 'equality'
   | 'order'

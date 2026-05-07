@@ -5,13 +5,10 @@ import type {
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
 import { isColumnDefault } from '@prisma-next/contract/types';
-import type {
-  ColumnTypeDescriptor,
-  ForeignKeyDefaultsState,
-} from '@prisma-next/contract-authoring';
+import type { ForeignKeyDefaultsState } from '@prisma-next/contract-authoring';
 import type { AuthoringFieldPresetDescriptor } from '@prisma-next/framework-components/authoring';
 import { instantiateAuthoringFieldPreset } from '@prisma-next/framework-components/authoring';
-import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import type { CodecLookup, ColumnTypeDescriptor } from '@prisma-next/framework-components/codec';
 import type {
   ExtensionPackRef,
   FamilyPackRef,
