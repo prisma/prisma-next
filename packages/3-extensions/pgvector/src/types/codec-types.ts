@@ -7,7 +7,7 @@
  * Runtime codec implementations are provided by the extension's codec registry.
  */
 
-import type { CodecTypes as CoreCodecTypes } from '../core/codecs';
+import type { CodecTypes as CoreCodecTypes } from '../core/codecs-class';
 
 /**
  * Type-level branded vector.
