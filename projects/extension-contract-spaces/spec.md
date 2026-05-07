@@ -21,18 +21,28 @@ Application's DB
 
 Extensions own one space per extension package. Codecs (referenced by every column via `codecId`) gain a plan-time lifecycle hook, fired on field-added/dropped/altered events, that emits migration ops captured into the *consuming application's* migration JSON. Schema-driven extension behaviour (e.g. `addSearchConfig` for each searchable encrypted column) flows through codec hooks; static extension scaffolding (the EQL bundle, the `eql_v2_configuration` table) flows through the extension's own contract space.
 
-The user's `migrations/` directory grows a subdirectory per loaded extension space; app-space migrations stay at the root:
+The user's `migrations/` directory grows a subdirectory per loaded extension space; app-space migrations stay at the root. Each extension space's subdirectory carries the extension's **current contract pinned on disk** alongside the migrations themselves — the user's repo is a complete, WYSIWYG record of every space the database depends on:
 
 ```
 migrations/
 ├── 20260507T1530_add_user/                  ← app-space, flat at root
 ├── 20260507T1545_add_post/                  ← app-space
 ├── cipherstash/
+│   ├── contract.json                        ← cipherstash-space CURRENT contract (pinned)
+│   ├── contract.d.ts                        ← cipherstash-space CURRENT typings (pinned)
+│   ├── refs/
+│   │   └── head.json                        ← cipherstash-space head ref (pinned)
 │   ├── 20250101T0000_install_eql_bundle/    ← cipherstash-space, name preserved
 │   └── 20250215T1000_add_config_column/
 └── pgvector/
+    ├── contract.json
+    ├── contract.d.ts
+    ├── refs/
+    │   └── head.json
     └── 20240601T0000_install_vector/
 ```
+
+App-space's current `contract.json` continues to live at the project root (today's convention preserved); extension-space contracts live under `migrations/<space-id>/`. The asymmetry is deliberate: app-space is the user's authoring surface (its contract sits next to the PSL/TS schema), whereas extension-space contracts are *pinned mirrors* of state owned by the extension package.
 
 ## Problem
 
@@ -57,7 +67,7 @@ The framework operates per space:
 - **Runner**: applies each space's migrations against the live database. Each space's marker-table row tracks its own applied hash + applied invariants.
 - **Verifier**: runs per space, but constructs an in-memory aggregate union of all spaces before checking expected schema against live schema. The aggregate exists only at verification time; it is never serialized.
 
-Spaces are disjoint at the artefact level (separate `contract.json`, separate migration graph) and integrate only via the live database. There is no "merged contract" data structure on disk; the database itself is what guarantees that all spaces are simultaneously satisfied.
+Spaces are disjoint at the artefact level (separate `contract.json`, separate migration graph) and integrate only via the live database. There is no "merged contract" data structure on disk; the database itself is what guarantees that all spaces are simultaneously satisfied. Each space's contract is materialised on disk in the user's repo (app-space at the project root; extension-space under `migrations/<space-id>/`), so the repo alone fully describes every space the database depends on — no `node_modules` access is required to read, hash, review, or verify the expected schema.
 
 A user's `prisma-next.config.ts` declares an extension by importing its descriptor module and adding it to `extensionPacks`. The framework consumes the descriptor at composition time — there is no `node_modules` filesystem-walking, which means the design works under Yarn PnP, Deno, pnpm symlinks, and bundlers without exception cases. An extension descriptor exposes its contract space as in-memory JSON values via the module dependency graph:
 
@@ -75,6 +85,10 @@ A user's `prisma-next.config.ts` declares an extension by importing its descript
 > ```
 
 Extension authors use the same emit pipeline as application authors: PSL or TS schema → emitter → `contract.json` + per-migration directories. The descriptor module wires up those JSON artifacts via `import` declarations so they flow through the bundler / module resolver of the consuming application without filesystem assumptions.
+
+**Pinned per-space artefacts on disk.** The descriptor is the *extension's view of itself* (its current contract, migration graph, and head ref, in-memory at authoring time). The user's repo holds a *pinned mirror* of that view: for each loaded extension space, the framework writes `migrations/<space-id>/contract.json`, `migrations/<space-id>/contract.d.ts`, and `migrations/<space-id>/refs/head.json` into the user's repo on every emit. Bumping an extension shows up in the user's PR diff as: (a) updated pinned `contract.json` / `contract.d.ts` / `refs/head.json`, plus (b) one or more new migration directories under `migrations/<space-id>/`. Both halves are reviewable, hashable, and version-controlled. The mental model is "vendored extension contract + lockfile-equivalent head ref" — the user's repo never delegates "what schema does my database need" to a `node_modules` import at apply or verify time.
+
+Drift detection follows naturally: at every `migrate` invocation, the framework compares the descriptor's current `contractJson` against the on-disk pinned version; mismatch means "you've bumped this extension in `node_modules` but haven't run `migrate` yet" and prompts for emit.
 
 ### Marker table
 
@@ -135,12 +149,12 @@ The same boundary applies to other extensions: pgvector's `vector` type is in it
 
 ### Migration JSON shape and on-disk layout
 
-A single user emit produces one migration JSON directory per space whose contract changed in this emit. Each migration directory is the ADR 197 shape (`{manifest, ops, contract.json snapshot}`); the framework writes them into the user's repo using the **per-space subdirectory convention**:
+A single user emit produces one migration JSON directory per space whose contract changed in this emit, plus pinned per-space `contract.json` / `contract.d.ts` / `refs/head.json` files for every loaded extension space. Each migration directory is the ADR 197 shape (`{manifest, ops, contract.json snapshot}`); the framework writes everything into the user's repo using the **per-space subdirectory convention**:
 
-- App-space migrations live under `migrations/<migration-name>/`.
-- Each loaded extension space's migrations live under `migrations/<space-id>/<migration-name>/`.
+- App-space migrations live under `migrations/<migration-name>/`. App-space's current `contract.json` lives at the project root (today's convention).
+- Each loaded extension space's migrations live under `migrations/<space-id>/<migration-name>/`. Each extension space's *current* `contract.json` (and its `contract.d.ts` and `refs/head.json`) lives at `migrations/<space-id>/`.
 
-For extension spaces, the framework reads the extension's migrations from the extension descriptor's in-memory values (loaded via the module dependency graph) and **emits** them as JSON files into the user's `migrations/<space-id>/`. Byte-equivalence with the extension's own canonical form is guaranteed by the canonicalization rules already used for hashing — same data in, same JSON out, regardless of bundler / package-manager / runtime context.
+For extension spaces, the framework reads the extension's `contractJson`, `migrations`, and `headRef` from the extension descriptor's in-memory values (loaded via the module dependency graph at authoring time) and **emits** them as JSON files into the user's `migrations/<space-id>/`. Byte-equivalence with the extension's own canonical form is guaranteed by the canonicalization rules already used for hashing — same data in, same JSON out, regardless of bundler / package-manager / runtime context.
 
 ```
 migrations/
@@ -149,6 +163,10 @@ migrations/
 │   ├── ops.json                       ← carries app structural ops + codec-emitted ops
 │   └── contract.json                  ← app-space contract snapshot at the time of emit
 ├── cipherstash/
+│   ├── contract.json                  ← cipherstash-space CURRENT contract (pinned)
+│   ├── contract.d.ts                  ← cipherstash-space CURRENT typings (pinned)
+│   ├── refs/
+│   │   └── head.json                  ← cipherstash-space head ref (pinned)
 │   ├── 20250101T0000_install_eql_bundle/
 │   │   ├── manifest.json
 │   │   ├── ops.json                   ← carries the EQL bundle SQL as the body of one op
@@ -156,6 +174,10 @@ migrations/
 │   └── 20250215T1000_add_config_column/
 │       └── …
 └── pgvector/
+    ├── contract.json
+    ├── contract.d.ts
+    ├── refs/
+    │   └── head.json
     └── 20240601T0000_install_vector/
         └── …
 ```
@@ -190,7 +212,7 @@ Each migration's `ops.json` is space-scoped: it contains only ops belonging to t
 > }
 > ```
 
-WYSIWYG-the-runnable is preserved per space: the runner reads only the JSON files under the user's `migrations/` directory, never the extension descriptor, at apply time. The extension descriptor module is consumed only at **authoring time** (`migration plan`, run by a dev locally) and at **verifier time** (runtime contract aggregation). At apply time in CD, no extension package access is required.
+WYSIWYG-the-runnable is preserved per space, and now extends to verification: every consumer of "expected schema" — runner, verifier, `dbInit`, `db update` — reads only the JSON files under the user's repo (root-level app-space `contract.json` + per-space `migrations/<space-id>/contract.json` + migration directories). The extension descriptor module is consumed only at **authoring time** (`migration plan`, run by a dev locally) — to know the extension's current state for diffing against the pinned on-disk version. At apply time and at verify time in CD, no extension package import is required: the user's repo alone is sufficient.
 
 ### Apply-time atomicity and ordering
 
@@ -200,13 +222,15 @@ A user emit may produce migrations in multiple spaces (e.g. user bumped cipherst
 
 ### Verification flow
 
-`dbInit` (and any other verifier path) constructs an in-memory aggregate of all loaded contract spaces:
+`dbInit` (and any other verifier path) constructs an in-memory aggregate of all loaded contract spaces by reading the user's repo:
 
-1. Read the application's `contract.json`.
-2. For each `extensionPacks` entry, read the extension descriptor's `contractJson` (loaded via the module graph, no filesystem walking).
+1. Read the application's `contract.json` from the project root.
+2. For each `extensionPacks` entry, read the pinned `migrations/<space-id>/contract.json` from the user's repo. The descriptor module is *not* imported during verification — pinned files are authoritative.
 3. Aggregate to a single in-memory `expected schema` representation. Aggregation is deterministic and order-independent across `extensionPacks` declaration order (NFR6); v1 implementation: alphabetical sort by space identifier before aggregation.
 4. Compare against the live database; reject if any space's marker-row hash mismatches its expected hash.
 5. Reject if any marker row exists for a space not present in `extensionPacks` (orphan marker rows; see Marker table).
+6. Reject if any `extensionPacks` entry has no pinned `migrations/<space-id>/contract.json` on disk (the user has declared an extension but never run `migrate`); remediation: run `prisma-next migrate`.
+7. Reject if any `migrations/<space-id>/` directory exists on disk for a space not present in `extensionPacks` (orphan pinned directory); remediation: remove the directory or re-add the extension to `extensionPacks`.
 
 The single canonical "merged hash" question goes away: each space's hash is checked individually against the marker-table row for that space. Strict mode is preserved per space; the IR vocabulary boundary (which objects are verifiable structurally) is the same as today, just applied across all loaded spaces' IRs.
 
@@ -214,48 +238,52 @@ The single canonical "merged hash" question goes away: each space's hash is chec
 
 `db init` (greenfield) and `db update` (advance to head) become **per-space** applications of ADR 208's invariant-aware path-finding primitive:
 
-- For each loaded space (app + each extension), look up the space's current target ref → `(hash, invariants)`. The application's target ref comes from the user's emitted contract; an extension's target ref comes from the extension descriptor's `headRef`.
+- For each loaded space (app + each extension), look up the space's current target ref → `(hash, invariants)` from the user's repo. The application's target ref comes from the user's emitted contract; an extension's target ref comes from the pinned `migrations/<space-id>/refs/head.json`.
 - Compute `effectiveRequired = ref.invariants − marker.invariants` for each space.
 - Run `findPathWithDecision(currentMarkerHash, ref.hash, effectiveRequired)` per space.
 - Concatenate the returned per-space paths in the cross-space ordering convention (extensions first, app-space second). Apply in a single transaction.
 
 For app-space, the existing `db init` synthetic-edge model is preserved: when no migration exists on disk for app-space, the framework synthesizes a `∅ → head` edge derived directly from the contract IR (today's behaviour). For extension-space, synthesis from the contract alone is impossible — the IR vocabulary boundary excludes the bundle-SQL bodies — so the runner walks the extension's migration graph as emitted into the user's repo.
 
+Like the verifier, `db init` / `db update` runtime paths consult only the user's repo (pinned head refs, pinned migration directories). Descriptor access is required only at authoring time (`migration plan`).
+
 This gives extension authors the same authoring expressivity as application authors: multiple paths, multiple baselines, squash, and invariant-aware routing all extend to extension-space without special-casing. The per-space planner is *exactly* `findPathWithDecision`; no new graph algorithm is needed.
 
 ### What this design does not do
 
-- It does not merge `contract.json` files on disk. They stay separate per space.
+- It does not merge `contract.json` files into a single combined contract. Each space's pinned `contract.json` stays its own file (app-space at the project root; extension-space at `migrations/<space-id>/contract.json`). The verifier aggregates them in memory only, never on disk.
 - It does not introduce cross-space dependencies as a first-class concept. Conventions and the single-transaction property cover the v1 cases.
 - It does not change the authoring surface of `prisma-next.config.ts` beyond what `extensionPacks` already provides; an extension being listed there continues to mean "use this extension" — what changes is the framework's interpretation of that listing.
 - It does not introduce a new authoring tool for extension authors. They use the same emit pipeline as application authors against their extension's own PSL/TS schema.
+- It does not require the user to hand-edit pinned per-space artefacts. The framework owns those files and overwrites them on every `migrate`. The user's role is to declare extensions in `extensionPacks` and to run `migrate` after upgrading; the pinned files are framework-managed records, not authoring surfaces.
 
 # Requirements
 
 ## Functional Requirements
 
 - **FR1.** Extensions ship a contract space (a `contract.json` + a migration graph + a head ref) exposed as in-memory JSON values via the extension descriptor module. The descriptor module imports the JSON artifacts so they flow through the consuming application's bundler / module resolver — no `node_modules` filesystem walking from the framework.
-- **FR2.** The framework loads each `extensionPacks` entry's descriptor at emit time and at verify time alongside the application's contract space.
+- **FR2.** The framework loads each `extensionPacks` entry's descriptor only at **authoring time** (during `migration plan` / `migrate`). At apply time and verify time, the framework reads the user's repo only — no descriptor import is required.
 - **FR3.** The marker table tracks per-space applied state: one row per `(space-identifier, applied-content-hash, applied-invariants)`. The marker schema gains a `space` column (text, not null) and primary keys by `space`.
 - **FR4.** The migration planner runs per space, producing one migration JSON directory per space whose contract changed in this emit. Extension-space migration directories are emitted from the extension descriptor's in-memory values into the user's `migrations/<space-id>/<migration-name>/`. App-space migration directories are written at `migrations/<migration-name>/`.
 - **FR5.** The migration runner applies each space's migrations in order, updating the corresponding marker-table row. Cross-space ordering: all extension-space migrations apply first, app-space migrations apply second. All applied migrations across all changed spaces in a single emit are committed in a single transaction.
-- **FR6.** The verifier constructs an in-memory aggregate of all loaded spaces' contracts and checks the live database against the aggregate. Each space's marker-row hash is checked against its own contract's content hash; strict mode rejects mismatches per space. Marker rows for spaces not present in `extensionPacks` are rejected as orphans with a clear remediation hint.
+- **FR6.** The verifier constructs an in-memory aggregate of all loaded spaces' contracts by reading the user's repo (app-space `contract.json` at the project root + each loaded extension's pinned `migrations/<space-id>/contract.json`). It then checks the live database against the aggregate. Each space's marker-row hash is checked against its pinned contract's content hash; strict mode rejects mismatches per space. The verifier rejects: (a) marker rows for spaces not present in `extensionPacks` (orphan markers), (b) `extensionPacks` entries with no pinned `migrations/<space-id>/contract.json` on disk (declared-but-unmigrated), and (c) `migrations/<space-id>/` directories on disk for spaces not present in `extensionPacks` (orphan pinned directories). Each rejection carries a clear remediation hint.
 - **FR7.** Codecs may declare a plan-time lifecycle hook fired on field-added / field-dropped / field-altered events (where 'altered' = any field property changed except `codecId`). The hook is synchronous; receives the prior + new IR for the table containing the changed field (app-space scope only); returns `MigrationOp[]`, each with its own `invariantId`. Returned ops are inlined into the consuming application's migration JSON — the hook cannot return ops targeting other spaces.
 - **FR8.** Codec-emitted migration ops are captured into the consuming application's migration JSON (application space), not into the extension's space. The application's emitter runs the hook for each event in the application contract diff.
 - **FR9.** The contract IR vocabulary admits anything a column / field can name as `nativeType`: tables, enums, composite types, domains. Persistence structures not in this set (schemas, functions, operators, casts, op classes/families) are carried inside migration ops as opaque steps with `invariantId`s; they are not modelled in the IR.
-- **FR10.** A space's migration JSON is self-contained at apply time: the runner reads only the JSON files under the user's `migrations/` directory and does not access any extension descriptor at apply time. Extension descriptors are consumed only at authoring time (`migration plan`) and at verifier time (runtime contract aggregation).
+- **FR10.** Per-space artefacts are self-contained at apply time and verify time: the runner and the verifier read only the JSON files under the user's repo (root-level app-space `contract.json` + each loaded extension's pinned `migrations/<space-id>/contract.json`, `contract.d.ts`, `refs/head.json`, and `<migration-name>/` directories). No extension descriptor is imported during apply or verify. Extension descriptors are consumed only at authoring time (`migration plan` / `migrate`).
 - **FR11.** Extension `invariantId`s, once published in a release, are immutable. Renaming or removing a published `invariantId` is a breaking change for downstream consumers.
 - **FR12.** The aggregate construction in FR6 is in-memory only; no merged contract is persisted on disk. Each space's `contract.json` remains the single source of truth for that space.
 - **FR13.** The existing `databaseDependencies.init` mechanism is removed at the end of this project. The in-tree extensions that use it today (cipherstash, pgvector, arktype-json) are migrated to contract spaces in scope of this project. The framework has a single mechanism for schema-contributing extensions after this project lands.
-- **FR14.** `db init` and `db update` are per-space applications of `findPathWithDecision(currentMarker, ref.hash, ref.invariants − marker.invariants)`. Per-space results are concatenated using the cross-space ordering convention (extensions first, app-space second) and applied in a single transaction. App-space's existing synthetic-edge behaviour for greenfield is preserved when no app-space migration is on disk; extension-space always walks the migration graph.
+- **FR14.** `db init` and `db update` are per-space applications of `findPathWithDecision(currentMarker, ref.hash, ref.invariants − marker.invariants)`. Per-space results are concatenated using the cross-space ordering convention (extensions first, app-space second) and applied in a single transaction. App-space's existing synthetic-edge behaviour for greenfield is preserved when no app-space migration is on disk; extension-space always walks the migration graph. Head refs are read from the user's repo: app-space ref from the project-root contract, extension-space refs from the pinned `migrations/<space-id>/refs/head.json`.
 - **FR15.** Extensions ship at least one ref (the head ref) declaring their current target hash and required invariants. Multiple refs are permitted with the same semantics as application-space refs.
-- **FR16.** User-repo on-disk layout: app-space migrations live at `migrations/<migration-name>/`; each loaded extension's migrations live at `migrations/<space-id>/<migration-name>/`. Discovery is convention-based: no manifest or registry file is required.
+- **FR16.** User-repo on-disk layout: app-space's current `contract.json` lives at the project root (today's convention). App-space migrations live at `migrations/<migration-name>/`. Each loaded extension's pinned current `contract.json`, `contract.d.ts`, and `refs/head.json` live at `migrations/<space-id>/`; that extension's migrations live at `migrations/<space-id>/<migration-name>/`. Discovery is convention-based: no manifest or registry file is required.
+- **FR17.** On every `migrate` invocation, the framework writes (or overwrites) each loaded extension space's pinned `contract.json`, `contract.d.ts`, and `refs/head.json` from the descriptor's current values, alongside any new migration directories. Bumping an extension produces a reviewable PR diff that includes the pinned contract change and any new migration directories. Drift detection: at every `migrate`, the framework compares the descriptor's current `contractJson` against the on-disk pinned version and surfaces mismatches as "extension bumped — run `migrate` to materialise the change."
 
 ## Non-Functional Requirements
 
 - **NFR1.** No user-facing semantic change to `dbInit` strict mode. The `strictVerification: false` workaround introduced under cipherstash project execution is reverted as part of this work.
-- **NFR2.** Migration JSON files on disk remain WYSIWYG-runnable: a reader of the JSON can predict the SQL the runner will execute without consulting any extension package. Extension descriptors are consumed only at authoring + verifier time, never at apply time.
-- **NFR3.** Extensions declared in `extensionPacks` must be importable at the application's authoring time and runtime: at authoring time so the planner can read the descriptor; at runtime so the verifier can aggregate spaces. This matches today's constraint — extensions referenced by `codecId` already need to be present — and is not a new requirement. At apply time (CD) only the user's repo files are required.
+- **NFR2.** The user's repo is **WYSIWYG-complete**: every artefact required to predict, hash, verify, or apply the database's expected schema lives on disk in the user's repo, version-controlled and reviewable. This applies per space — the app-space `contract.json` at the project root and each extension space's pinned `migrations/<space-id>/contract.json`, `contract.d.ts`, `refs/head.json`, and migration directories. A reader of the repo (or a CI pipeline, or an auditor) can answer "what does this database need to look like" without importing any extension package.
+- **NFR3.** The framework's planner / runner / verifier consume extension descriptors only at **authoring time** (during `migration plan` / `migrate`), to emit pinned per-space contracts + migrations into the user's repo. At apply time and verify time (CD), the framework reads only the user's repo files — no descriptor-driven contract or migration data is required. (Application code at query-execution time may continue to import extension packages for codec runtime behaviour; that is unchanged and orthogonal to schema verification.)
 - **NFR4.** The cipherstash team's vendored EQL bundle SQL remains valid as-is. The bundle SQL becomes the body of one migration op in cipherstash's contract space; no fork or split of the bundle is required of the cipherstash team.
 - **NFR5.** Performance: extension-space planning and verifier aggregation must not measurably regress emit-time or `dbInit` performance for applications with no extensions. Target: < 5% wall-clock overhead on a representative no-extension emit + dbInit.
 - **NFR6.** The aggregation pass for verification is deterministic and order-independent across `extensionPacks` declaration order: two applications with the same set of installed extensions produce the same aggregate regardless of declaration order. v1 implementation: sort by space identifier alphabetically before aggregating.
@@ -272,15 +300,16 @@ This gives extension authors the same authoring expressivity as application auth
 # Acceptance Criteria
 
 - [ ] **AC1** (covers FR2, FR6, NFR1). A fresh Postgres database has the cipherstash extension installed via the new mechanism. `dbInit` runs in strict mode (no `strictVerification: false` flag, no per-extension allowlist) and succeeds. The verifier sees `eql_v2_configuration`, `eql_v2_configuration_state`, `eql_v2_encrypted`, the various `ore_*` composites, and the domains, and recognises them as expected (because cipherstash's contract space declared them). An additional unexpected column added by hand to `eql_v2_configuration` causes `dbInit` to fail with a strict-mode error, proving strict mode is preserved per space.
-- [ ] **AC2** (covers FR1, FR4, FR5, FR7, FR8, FR10, FR16). A user adds `cipherstash` to `extensionPacks` and adds an `Encrypted<string>` column with `searchable: true` to a fresh `User` table in their PSL. `prisma-next migrate` produces:
+- [ ] **AC2** (covers FR1, FR4, FR5, FR7, FR8, FR10, FR16, FR17). A user adds `cipherstash` to `extensionPacks` and adds an `Encrypted<string>` column with `searchable: true` to a fresh `User` table in their PSL. `prisma-next migrate` produces:
     - One app-space migration directory at `migrations/<timestamp>_add_user/` containing the user's `CREATE TABLE` op and a codec-emitted `add_search_config` op (with invariantId namespaced `cipherstash-codec:*`), both in the same `ops.json`.
-    - One cipherstash-space migration directory at `migrations/cipherstash/<original-name>/` containing cipherstash scaffolding ops (with invariantId namespaced `cipherstash:*`).
+    - Pinned cipherstash artefacts: `migrations/cipherstash/contract.json`, `migrations/cipherstash/contract.d.ts`, `migrations/cipherstash/refs/head.json` — byte-equivalent to the descriptor's current values.
+    - One or more cipherstash-space migration directories at `migrations/cipherstash/<original-name>/` containing cipherstash scaffolding ops (with invariantId namespaced `cipherstash:*`).
 
     `prisma-next db apply` runs both migrations in a single transaction (extension-space first); the marker table afterwards has two rows (`app`, `cipherstash`), each with the expected hash.
-- [ ] **AC3** (covers FR4, FR11, FR15). The cipherstash team publishes a new package version that adds one new migration to its shipped graph (e.g. adding a column to `eql_v2_configuration`) and bumps its `headRef`. A user upgrades the package and runs `prisma-next migrate`. The resulting cipherstash-space migration directory contains only the new op (the prior cipherstash invariantIds are already in the user's applied set per the marker). `db apply` advances the cipherstash space's marker row.
+- [ ] **AC3** (covers FR4, FR11, FR15, FR17). The cipherstash team publishes a new package version that adds one new migration to its shipped graph (e.g. adding a column to `eql_v2_configuration`) and bumps its `headRef`. A user upgrades the package and runs `prisma-next migrate`. The pinned `migrations/cipherstash/contract.json`, `contract.d.ts`, and `refs/head.json` are updated in place; one new cipherstash-space migration directory is created containing only the new op. `db apply` advances the cipherstash space's marker row.
 - [ ] **AC4** (covers FR1-FR6). A monorepo with two internal packages each declaring its own contract space, plus an aggregating package that depends on both, builds successfully, emits per-space migrations on changes, and applies them. The mechanism for monorepo composition is the same as for extensions; no monorepo-specific framework code is required.
 - [ ] **AC5** (covers FR3, FR6, NFR6). After applying any combination of multi-space migrations, an integration test reads the marker table and asserts (a) one row per loaded space, (b) each row's hash equals the corresponding `contract.json`'s content hash, (c) the row set is the same regardless of `extensionPacks` declaration order.
-- [ ] **AC6** (covers NFR2, FR10). The runner applies a migration without loading any extension descriptor (the descriptor module is not imported during the apply path). Verification afterwards still requires the descriptor to be importable; application of an existing migration does not.
+- [ ] **AC6** (covers NFR2, NFR3, FR10). Both the runner (apply path) and the verifier (`dbInit` / `db update` verify path) operate without importing any extension descriptor module — they read only the user's repo (root-level app-space `contract.json` + per-space `migrations/<space-id>/contract.json` and migration directories). Authoring (`migration plan` / `migrate`) is the only flow that needs descriptor access.
 - [ ] **AC7** (covers NFR4, FR13). The cipherstash extension's existing vendored EQL bundle SQL is the body of exactly one migration op in cipherstash's contract space (the `installEqlBundle` op). Bundle content is unchanged from what is shipped today.
 - [ ] **AC8** (covers FR9). The contract IR includes `eql_v2_encrypted` (composite type), `eql_v2_configuration_state` (enum), and the `eql_v2` domains used as column types. The contract IR does **not** include the EQL bundle's functions, operators, casts, or operator classes/families — those live inside the body of the `installEqlBundle` migration op only.
 - [ ] **AC9** (covers FR8, codec ownership of schema-driven ops). When a `searchable: true` `Encrypted<string>` column is dropped from a user table, the codec lifecycle hook emits the corresponding `remove_search_config` op into the application-space migration. No change to cipherstash's contract space's marker row results from this.
@@ -288,6 +317,9 @@ This gives extension authors the same authoring expressivity as application auth
 - [ ] **AC11** (covers FR13). The arktype-json extension is migrated to a contract space using the same pattern as cipherstash and pgvector. `databaseDependencies.init` is removed from the framework; no in-tree extension references it.
 - [ ] **AC12** (covers FR14). On a fresh database with cipherstash in `extensionPacks`, `db init` walks cipherstash-space's migration graph (applying the bundle install + scaffolding) and synthesizes the app-space delta edge from the user's contract, applying both in a single transaction. Marker rows for both spaces are created with the expected hashes.
 - [ ] **AC13** (covers FR6, orphan marker handling). A user removes an extension from `extensionPacks` while a marker row for that extension still exists in the database. `dbInit` fails with a clear error identifying the orphan row and the recommended remediation (manual cleanup).
+- [ ] **AC14** (covers FR17, NFR2). A user bumps cipherstash from `vX` to `vY` (descriptor's `contractJson` content changes) and runs `prisma-next migrate`. The user's PR diff includes: (a) updated `migrations/cipherstash/contract.json`, `contract.d.ts`, `refs/head.json`; (b) one new migration directory under `migrations/cipherstash/<new-migration-name>/`. No file outside `migrations/` (and the project root contract for any incidental app-space changes) is touched.
+- [ ] **AC15** (covers NFR2, NFR3, FR2, FR10). The verifier and the runner are exercised in a context where extension descriptor modules are *not* importable (e.g. `node_modules` for those extensions deleted prior to the test). `dbInit` and `db apply` succeed, reading per-space contracts and migrations from the user's repo only. (`migrate` / `migration plan` is *not* required to work in this context — it needs the descriptor.)
+- [ ] **AC16** (covers FR6, declared-but-unmigrated). A user adds an extension to `extensionPacks` but never runs `migrate` (no `migrations/<space-id>/` directory exists yet). `dbInit` fails with a clear error: "extension `<id>` is declared but has not been emitted; run `prisma-next migrate`." Conversely, a `migrations/<space-id>/` directory present on disk for an extension *not* in `extensionPacks` causes `dbInit` to fail with an orphan-pinned-directory error and remediation hint.
 
 # Other Considerations
 
