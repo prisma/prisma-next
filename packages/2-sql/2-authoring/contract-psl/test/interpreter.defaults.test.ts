@@ -468,6 +468,61 @@ describe('interpretPslDocumentToSqlContract default lowering', () => {
     expect(defaults.find((entry) => entry.ref.column === 'example')).toBeUndefined();
   });
 
+  it('resolves a type constructor sharing a field-preset namespace', () => {
+    const document = parsePslDocument({
+      schema: `model Synthetic {
+  id Int @id
+  example audit.Custom()
+}`,
+      sourceId: 'schema.prisma',
+    });
+
+    const result = interpretPslDocumentToSqlContract({
+      document,
+      controlMutationDefaults: builtinControlMutationDefaults,
+      authoringContributions: {
+        field: {
+          audit: {
+            createdAt: {
+              kind: 'fieldPreset',
+              output: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+              },
+            },
+          },
+        },
+        type: {
+          audit: {
+            Custom: {
+              kind: 'typeConstructor',
+              output: {
+                codecId: 'pg/text@1',
+                nativeType: 'text',
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.value.storage).toMatchObject({
+      tables: {
+        synthetic: {
+          columns: {
+            example: {
+              codecId: 'pg/text@1',
+              nativeType: 'text',
+            },
+          },
+        },
+      },
+    });
+  });
+
   // Field-preset misuse cases. The preset is a complete field declaration —
   // optional (?), list ([]), @default(...), @id, @updatedAt all contradict
   // that and produce hard errors per spec FR7.

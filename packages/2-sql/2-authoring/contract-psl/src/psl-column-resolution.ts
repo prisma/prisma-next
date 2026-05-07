@@ -382,12 +382,9 @@ export function resolveFieldTypeDescriptor(input: {
   readonly entityLabel: string;
 }): ResolveFieldTypeResult {
   if (input.field.typeConstructor) {
-    // Field-preset dispatch runs first. Field presets carry richer semantics
-    // (storage default + execution defaults + id/unique flags + native type)
-    // than type constructors, so when a path is registered as a field preset
-    // it is the more complete answer. Compose-time collision checks make
-    // double-registration structurally impossible — see
-    // `composed-authoring-helpers.ts`.
+    // Field presets carry richer semantics than type constructors, so a field
+    // preset match is the complete answer. Shared composition rejects exact
+    // cross-registry collisions before PSL resolution can observe them.
     const presetDescriptor = getAuthoringFieldPreset(
       input.authoringContributions,
       input.field.typeConstructor.path,
@@ -415,15 +412,19 @@ export function resolveFieldTypeDescriptor(input: {
       return { ok: true, descriptor: instantiated.descriptor, presetContributions };
     }
 
-    // Field-preset walker missed. If the namespace is registered as a field
-    // preset namespace, a miss is a typo, not a request to look elsewhere.
-    // Emit PSL_UNKNOWN_FIELD_PRESET with a span on the preset name and bail
-    // before the type-constructor fallback. Compose-time collision checks
-    // already prevent the path from also being a type constructor.
     const helperPath = input.field.typeConstructor.path.join('.');
     const namespacePrefix =
       input.field.typeConstructor.path.length > 1 ? input.field.typeConstructor.path[0] : undefined;
+    const typeDescriptor = getAuthoringTypeConstructor(
+      input.authoringContributions,
+      input.field.typeConstructor.path,
+    );
+
+    // Field-preset walker missed. If the namespace is registered as a field
+    // preset namespace and the full path is not a type constructor, the miss
+    // is a typo rather than an uncomposed extension pack.
     if (
+      !typeDescriptor &&
       namespacePrefix &&
       hasRegisteredFieldNamespace(input.authoringContributions, namespacePrefix)
     ) {
@@ -439,17 +440,19 @@ export function resolveFieldTypeDescriptor(input: {
     // Fall through to type-constructor resolution. `resolvePslTypeConstructorDescriptor`
     // emits the appropriate diagnostic (uncomposed namespace, unsupported field
     // type) when no descriptor is found in either registry.
-    const descriptor = resolvePslTypeConstructorDescriptor({
-      call: input.field.typeConstructor,
-      authoringContributions: input.authoringContributions,
-      composedExtensions: input.composedExtensions,
-      familyId: input.familyId,
-      targetId: input.targetId,
-      diagnostics: input.diagnostics,
-      sourceId: input.sourceId,
-      unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
-      unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
-    });
+    const descriptor =
+      typeDescriptor ??
+      resolvePslTypeConstructorDescriptor({
+        call: input.field.typeConstructor,
+        authoringContributions: input.authoringContributions,
+        composedExtensions: input.composedExtensions,
+        familyId: input.familyId,
+        targetId: input.targetId,
+        diagnostics: input.diagnostics,
+        sourceId: input.sourceId,
+        unsupportedCode: 'PSL_UNSUPPORTED_FIELD_TYPE',
+        unsupportedMessage: `${input.entityLabel} type constructor "${helperPath}" is not supported in SQL PSL provider v1`,
+      });
     if (!descriptor) {
       return { ok: false, alreadyReported: true };
     }
