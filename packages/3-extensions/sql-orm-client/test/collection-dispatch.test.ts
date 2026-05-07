@@ -288,13 +288,18 @@ describe('collection-dispatch', () => {
   });
 
   it('dispatchCollectionRows() multi-query path handles empty parent result sets', async () => {
-    const { collection, runtime } = createCollectionFor('User');
+    // Force multi-query strategy so the empty-parent early return inside
+    // `dispatchWithMultiQueryIncludes` is actually exercised. The base
+    // contract's postgres.lateral / postgres.jsonAgg would otherwise
+    // route to single-query lateral.
+    const contract = withCapabilities(getTestContract(), {});
+    const { collection, runtime } = createCollectionFor('User', contract);
     const scoped = collection.include('posts');
 
     runtime.setNextResults([[]]);
 
     const rows = await dispatchCollectionRows<Record<string, unknown>>({
-      contract: collection.ctx.context.contract,
+      contract,
       runtime,
       state: scoped.state,
       tableName: scoped.tableName,
