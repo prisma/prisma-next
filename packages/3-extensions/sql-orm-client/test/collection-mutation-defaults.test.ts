@@ -155,10 +155,12 @@ describe('@updatedAt mutation defaults via Collection', () => {
       const dateParams = params.filter((p) => p instanceof Date) as Date[];
       expect(dateParams).toHaveLength(3);
       // All three rows must observe the same Date instance — stableAcrossRows.
+      // Identity (===) rather than .getTime() equality, so the assertion fails
+      // if three distinct Dates happen to be allocated within the same ms.
       const first = dateParams[0];
       expect(first).toBeInstanceOf(Date);
-      expect(dateParams[1]?.getTime()).toBe(first?.getTime());
-      expect(dateParams[2]?.getTime()).toBe(first?.getTime());
+      expect(dateParams[1]).toBe(first);
+      expect(dateParams[2]).toBe(first);
     });
 
     it('keeps per-row variability for non-stableAcrossRows generators (id stays distinct)', async () => {
