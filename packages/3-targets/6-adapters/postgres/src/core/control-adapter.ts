@@ -114,8 +114,8 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          meta,
          invariants
        from prisma_contract.marker
-       where id = $1`,
-      [1],
+       where space = $1`,
+      ['app'],
     );
 
     const row = result.rows[0];

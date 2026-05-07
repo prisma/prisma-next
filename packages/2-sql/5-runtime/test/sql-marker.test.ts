@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { writeContractMarker } from '../src/sql-marker';
+import { APP_SPACE_ID, readContractMarker, writeContractMarker } from '../src/sql-marker';
 
 describe('writeContractMarker', () => {
   describe('without invariants (sign-side)', () => {
@@ -19,6 +19,13 @@ describe('writeContractMarker', () => {
     it('does not include the invariants param in baseParams', () => {
       expect(sample.insert.params).toHaveLength(7);
       expect(sample.update.params).toHaveLength(7);
+    });
+
+    it("keys the upsert by space (defaulting to 'app')", () => {
+      expect(sample.insert.sql).toMatch(/\(\s*space\b/);
+      expect(sample.update.sql).toMatch(/where space = \$1/i);
+      expect(sample.insert.params[0]).toBe(APP_SPACE_ID);
+      expect(sample.update.params[0]).toBe(APP_SPACE_ID);
     });
   });
 
@@ -54,5 +61,37 @@ describe('writeContractMarker', () => {
       expect(sample.update.sql).toMatch(/invariants = \$\d+::text\[\]/);
       expect(sample.update.params).toContainEqual([]);
     });
+  });
+
+  describe('with explicit space (per-space callers)', () => {
+    const sample = writeContractMarker({
+      space: 'cipherstash',
+      storageHash: 'sha256:hash',
+      profileHash: 'sha256:profile',
+      invariants: ['cipherstash:install-eql-v1'],
+    });
+
+    it('binds the caller-supplied space as the first param', () => {
+      expect(sample.insert.params[0]).toBe('cipherstash');
+      expect(sample.update.params[0]).toBe('cipherstash');
+    });
+
+    it('keys both INSERT and UPDATE by space, never by id', () => {
+      expect(sample.insert.sql).not.toMatch(/\bid\b/);
+      expect(sample.update.sql).toMatch(/where space = \$1/i);
+    });
+  });
+});
+
+describe('readContractMarker', () => {
+  it("defaults to selecting space = 'app' when no space is supplied", () => {
+    const stmt = readContractMarker();
+    expect(stmt.sql).toMatch(/where space = \$1/i);
+    expect(stmt.params).toEqual([APP_SPACE_ID]);
+  });
+
+  it('binds a caller-supplied space id as the parameter', () => {
+    const stmt = readContractMarker('cipherstash');
+    expect(stmt.params).toEqual(['cipherstash']);
   });
 });

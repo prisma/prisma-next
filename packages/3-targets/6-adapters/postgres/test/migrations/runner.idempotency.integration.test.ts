@@ -110,8 +110,8 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
         }
 
         const markerCount = await driver!.query<{ count: string }>(
-          'select count(*)::text as count from prisma_contract.marker where id = $1',
-          [1],
+          'select count(*)::text as count from prisma_contract.marker where space = $1',
+          ['app'],
         );
         expect(markerCount.rows[0]?.count).toBe('1');
 
@@ -263,7 +263,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
           'select count(*)::text as count from prisma_contract.ledger',
         );
         const initialUpdatedAt = await driver!.query<{ updated_at: Date }>(
-          'select updated_at from prisma_contract.marker where id = 1',
+          `select updated_at from prisma_contract.marker where space = 'app'`,
         );
 
         // Self-edge plan with no operations and no new invariants. This is a
@@ -299,7 +299,7 @@ describe.sequential('PostgresMigrationRunner - Idempotency', () => {
 
         // Marker updated_at unchanged: no churn from the no-op.
         const updatedAtAfter = await driver!.query<{ updated_at: Date }>(
-          'select updated_at from prisma_contract.marker where id = 1',
+          `select updated_at from prisma_contract.marker where space = 'app'`,
         );
         expect(updatedAtAfter.rows[0]?.updated_at?.toISOString()).toBe(
           initialUpdatedAt.rows[0]?.updated_at?.toISOString(),

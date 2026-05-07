@@ -298,7 +298,8 @@ describe('Postgres adapter', () => {
 
     const marker = adapter.profile.readMarkerStatement();
     expect(marker.sql).toContain('from prisma_contract.marker');
-    expect(marker.params).toEqual([1]);
+    expect(marker.sql).toMatch(/where space = \$1/i);
+    expect(marker.params).toEqual(['app']);
   });
 
   it('honours an overridden profile id from PostgresAdapterOptions', () => {

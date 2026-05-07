@@ -246,7 +246,7 @@ describe('family instance sign', () => {
 
         await withClient(connectionString, async (client) => {
           await client.query(
-            'update prisma_contract.marker set invariants = $1::text[] where id = 1',
+            `update prisma_contract.marker set invariants = $1::text[] where space = 'app'`,
             [['email-verified', 'phone-backfill']],
           );
         });

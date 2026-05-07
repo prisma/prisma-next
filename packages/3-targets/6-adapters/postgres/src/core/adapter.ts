@@ -71,8 +71,8 @@ class PostgresAdapterImpl
       capabilities: defaultCapabilities,
       codecs: () => this.codecRegistry,
       readMarkerStatement: () => ({
-        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
-        params: [1],
+        sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
+        params: ['app'],
       }),
       // Postgres' driver hydrates `text[]` columns as native JS arrays, so
       // the row is already in the shape the shared parser expects.

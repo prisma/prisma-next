@@ -3,14 +3,32 @@ export interface SqlStatement {
   readonly params: readonly unknown[];
 }
 
+/**
+ * Logical space identifier for the application's own contract space.
+ * Used as the default key on the marker table when callers don't pass an
+ * explicit space (the framework's existing single-app code paths).
+ *
+ * @see specs/framework-mechanism.spec.md § 2 — Marker schema migration.
+ */
+export const APP_SPACE_ID = 'app' as const;
+
 export const ensurePrismaContractSchemaStatement: SqlStatement = {
   sql: 'create schema if not exists prisma_contract',
   params: [],
 };
 
+/**
+ * Schema for `prisma_contract.marker` after the contract-spaces migration:
+ * the single-row `id smallint` key is replaced with a `space text` primary
+ * key, allowing one row per loaded contract space (`'app'`,
+ * `'<extension-id>'`, …). On a brand-new database `CREATE TABLE IF NOT
+ * EXISTS` produces this shape directly; on an upgrading database
+ * `migrateMarkerSchemaStatements` below promotes the legacy single-row
+ * shape idempotently.
+ */
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.marker (
-    id smallint primary key default 1,
+    space text not null primary key default 'app',
     core_hash text not null,
     profile_hash text not null,
     contract_json jsonb,
@@ -22,6 +40,95 @@ export const ensureMarkerTableStatement: SqlStatement = {
   )`,
   params: [],
 };
+
+/**
+ * Idempotent migration that promotes a legacy single-row marker table to
+ * the per-space shape defined by `ensureMarkerTableStatement`.
+ *
+ * Designed to be applied unconditionally on every framework boot
+ * (mechanism (A) in `specs/framework-mechanism.spec.md § 2`):
+ *
+ * - On a fresh database (table just created in the new shape) every
+ *   statement is a no-op.
+ * - On an already-migrated database (boot N+1) every statement is a
+ *   no-op.
+ * - On a legacy single-row database (`id smallint primary key default 1`)
+ *   the sequence (a) adds the `space` column with `'app'` as the
+ *   per-row default, (b) repoints the primary key from `id` to `space`,
+ *   (c) drops the obsolete `id` column.
+ *
+ * Concurrency: each ALTER TABLE acquires Postgres' transactional DDL
+ * lock on `prisma_contract.marker`, so concurrent framework boots
+ * serialize on the table lock.
+ */
+export const migrateMarkerSchemaStatements: readonly SqlStatement[] = [
+  {
+    sql: `alter table prisma_contract.marker
+      add column if not exists space text`,
+    params: [],
+  },
+  {
+    sql: `update prisma_contract.marker
+      set space = 'app'
+      where space is null`,
+    params: [],
+  },
+  {
+    sql: `alter table prisma_contract.marker
+      alter column space set not null`,
+    params: [],
+  },
+  {
+    sql: `alter table prisma_contract.marker
+      alter column space set default 'app'`,
+    params: [],
+  },
+  // Repoint the primary key to (space) when the table is still keyed by
+  // legacy `id`. `pg_constraint.conkey` is an array of column attnums;
+  // we compare it to the attnum of `space` to decide whether the swap is
+  // already done. The DO block keeps the operation idempotent without
+  // needing CASE-by-CASE logic in TypeScript.
+  {
+    sql: `do $$
+      declare
+        space_attnum smallint;
+        space_only_pk boolean;
+      begin
+        select attnum into space_attnum
+        from pg_attribute
+        where attrelid = 'prisma_contract.marker'::regclass
+          and attname = 'space'
+          and not attisdropped;
+
+        if space_attnum is null then
+          return; -- column not present yet; earlier statements are responsible.
+        end if;
+
+        select coalesce(
+          (
+            select c.conkey = array[space_attnum]::int2[]
+            from pg_constraint c
+            where c.conrelid = 'prisma_contract.marker'::regclass
+              and c.contype = 'p'
+          ),
+          false
+        ) into space_only_pk;
+
+        if not space_only_pk then
+          alter table prisma_contract.marker
+            drop constraint if exists marker_pkey;
+          alter table prisma_contract.marker
+            add constraint marker_pkey primary key (space);
+        end if;
+      end$$;`,
+    params: [],
+  },
+  {
+    sql: `alter table prisma_contract.marker
+      drop column if exists id`,
+    params: [],
+  },
+];
 
 export const ensureLedgerTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.ledger (
@@ -39,6 +146,14 @@ export const ensureLedgerTableStatement: SqlStatement = {
 };
 
 export interface MergeMarkerInput {
+  /**
+   * Logical space identifier for this marker row. Defaults to
+   * {@link APP_SPACE_ID} (`'app'`) so existing single-app callers keep
+   * working without modification; per-space callers (planner / runner /
+   * verifier extensions over contract spaces) pass their space id
+   * explicitly.
+   */
+  readonly space?: string;
   readonly storageHash: string;
   readonly profileHash: string;
   readonly contractJson?: unknown;
@@ -59,7 +174,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   readonly update: SqlStatement;
 } {
   const params: readonly unknown[] = [
-    1,
+    input.space ?? APP_SPACE_ID,
     input.storageHash,
     input.profileHash,
     jsonParam(input.contractJson),
@@ -72,7 +187,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
   return {
     insert: {
       sql: `insert into prisma_contract.marker (
-        id,
+        space,
         core_hash,
         profile_hash,
         contract_json,
@@ -108,7 +223,7 @@ export function buildMergeMarkerStatements(input: MergeMarkerInput): {
         app_tag = $6,
         meta = $7::jsonb,
         invariants = array(select distinct unnest(invariants || $8::text[]) order by 1)
-      where id = $1`,
+      where space = $1`,
       params,
     },
   };

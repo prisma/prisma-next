@@ -78,8 +78,8 @@ function createStubAdapter(codecs: CodecRegistry) {
       },
       readMarkerStatement() {
         return {
-          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where id = $1',
-          params: [1],
+          sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
+          params: ['app'],
         };
       },
       parseMarkerRow: parseContractMarkerRow,

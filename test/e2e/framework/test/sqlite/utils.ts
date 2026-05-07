@@ -81,7 +81,7 @@ function createSchema<TContract extends Contract<SqlStorage>>(
 ): void {
   db.exec(`
     CREATE TABLE _prisma_marker (
-      id INTEGER PRIMARY KEY CHECK (id = 1),
+      space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
       core_hash TEXT NOT NULL,
       profile_hash TEXT NOT NULL,
       contract_json TEXT,
@@ -92,8 +92,8 @@ function createSchema<TContract extends Contract<SqlStorage>>(
       invariants TEXT NOT NULL DEFAULT '[]'
     )
   `);
-  db.prepare('INSERT INTO _prisma_marker (id, core_hash, profile_hash) VALUES (?, ?, ?)').run(
-    1,
+  db.prepare('INSERT INTO _prisma_marker (space, core_hash, profile_hash) VALUES (?, ?, ?)').run(
+    'app',
     contract.storage.storageHash,
     contract.profileHash ?? contract.storage.storageHash,
   );

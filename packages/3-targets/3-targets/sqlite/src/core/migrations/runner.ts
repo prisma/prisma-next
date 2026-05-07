@@ -24,6 +24,7 @@ import {
   buildWriteMarkerStatements,
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
+  migrateMarkerSchemaSqlite,
   readMarkerStatement,
   type SqlStatement,
 } from './statement-builders';
@@ -265,6 +266,12 @@ class SqliteMigrationRunner implements SqlMigrationRunner<SqlitePlanTargetDetail
     driver: SqlMigrationRunnerExecuteOptions<SqlitePlanTargetDetails>['driver'],
   ): Promise<void> {
     await this.executeStatement(driver, ensureMarkerTableStatement);
+    // Idempotent promotion of legacy single-row markers to per-space
+    // shape; no-op on fresh or already-migrated databases. SQLite
+    // requires PRAGMA-driven detection + rebuild-table for the PK
+    // change, so the migration is imperative rather than a static SQL
+    // statement list. See `specs/framework-mechanism.spec.md § 2`.
+    await migrateMarkerSchemaSqlite(driver);
     await this.executeStatement(driver, ensureLedgerTableStatement);
   }
 
