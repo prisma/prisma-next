@@ -32,7 +32,7 @@ import type {
   SqlMigrationPlanOperation,
 } from './types';
 
-export interface PlanFieldEventOperationsOptions<TTargetDetails> {
+export interface PlanFieldEventOperationsOptions {
   /**
    * Prior contract the planner is diffing against. `null` for first emits
    * (every field is treated as added).
@@ -44,9 +44,14 @@ export interface PlanFieldEventOperationsOptions<TTargetDetails> {
   readonly newContract: Contract<SqlStorage>;
   /**
    * Codec-id keyed map of control hooks, as produced by
-   * {@link import('./assembly').extractCodecControlHooks}.
+   * {@link import('./assembly').extractCodecControlHooks}. Hooks carry
+   * `unknown` target details after extraction; the caller casts the
+   * helper's returned ops to its target's `SqlMigrationPlanOperation`
+   * specialisation at the integration boundary, mirroring how
+   * `storageTypePlanCallStrategy` lifts `planTypeOperations` results into
+   * `RawSqlCall`.
    */
-  readonly codecHooks: ReadonlyMap<string, CodecControlHooks<TTargetDetails>>;
+  readonly codecHooks: ReadonlyMap<string, CodecControlHooks>;
 }
 
 interface FieldEntry {
@@ -58,9 +63,9 @@ interface FieldEntry {
   readonly newField: StorageColumn | undefined;
 }
 
-export function planFieldEventOperations<TTargetDetails>(
-  options: PlanFieldEventOperationsOptions<TTargetDetails>,
-): readonly SqlMigrationPlanOperation<TTargetDetails>[] {
+export function planFieldEventOperations(
+  options: PlanFieldEventOperationsOptions,
+): readonly SqlMigrationPlanOperation<unknown>[] {
   const priorTables = options.priorContract?.storage.tables ?? {};
   const newTables = options.newContract.storage.tables;
 
@@ -97,18 +102,18 @@ export function planFieldEventOperations<TTargetDetails>(
     }
   }
 
-  const ops: SqlMigrationPlanOperation<TTargetDetails>[] = [];
+  const ops: SqlMigrationPlanOperation<unknown>[] = [];
   appendOps('added', added, options.codecHooks, ops, (e) => e.newField?.codecId);
   appendOps('dropped', dropped, options.codecHooks, ops, (e) => e.priorField?.codecId);
   appendOps('altered', altered, options.codecHooks, ops, (e) => e.newField?.codecId);
   return ops;
 }
 
-function appendOps<TTargetDetails>(
+function appendOps(
   event: FieldEvent,
   entries: readonly FieldEntry[],
-  codecHooks: ReadonlyMap<string, CodecControlHooks<TTargetDetails>>,
-  ops: SqlMigrationPlanOperation<TTargetDetails>[],
+  codecHooks: ReadonlyMap<string, CodecControlHooks>,
+  ops: SqlMigrationPlanOperation<unknown>[],
   pickCodecId: (entry: FieldEntry) => string | undefined,
 ): void {
   for (const entry of entries) {
