@@ -5,3 +5,4 @@ export {
   codecDescriptorList,
   dataTypes,
 } from '../core/codecs';
+export * from '../core/codecs-class';

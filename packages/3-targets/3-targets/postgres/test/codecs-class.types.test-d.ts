@@ -1,0 +1,130 @@
+/**
+ * Type tests for the class-based Postgres target codecs (TML-2357 M0
+ * Phase B2).
+ *
+ * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs-class.types.test-d.ts`.
+ *
+ * Coverage selection per the M0 brief: representative codecs only,
+ * since the framework-level type discipline is exercised in Phase A
+ * tests at framework-components/test/codec.types.test-d.ts. Per-target
+ * coverage focuses on:
+ *
+ * - one void-param codec (`pgInt4`)
+ * - one length-param codec (`pgBit`)
+ * - one precision-param codec (`pgTimestamptz`)
+ * - one composite-param codec (`pgNumeric` precision + scale)
+ * - positive `satisfies ColumnHelperFor` and `ColumnHelperForStrict`
+ *   on each
+ * - one negative `// @ts-expect-error` for a wrong-shape malformed
+ *   helper
+ */
+
+import {
+  type CodecInstanceContext,
+  type ColumnHelperFor,
+  type ColumnHelperForStrict,
+  column,
+} from '@prisma-next/framework-components/codec';
+import { expectTypeOf, test } from 'vitest';
+import {
+  type PgBitCodec,
+  type PgBitDescriptor,
+  type PgInt4Codec,
+  type PgInt4Descriptor,
+  type PgNumericCodec,
+  type PgNumericDescriptor,
+  type PgTimestamptzCodec,
+  type PgTimestamptzDescriptor,
+  pgBitColumn,
+  pgBitDescriptorClass,
+  pgInt4Column,
+  pgInt4DescriptorClass,
+  pgNumericColumn,
+  pgNumericDescriptorClass,
+  pgTimestamptzColumn,
+  pgTimestamptzDescriptorClass,
+} from '../src/core/codecs-class';
+
+// ---------------------------------------------------------------------------
+// Literal preservation through direct invocation.
+// ---------------------------------------------------------------------------
+
+test('pgInt4: descriptor.factory() returns typed (ctx) => PgInt4Codec', () => {
+  const factory = pgInt4DescriptorClass.factory();
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgInt4Codec>();
+});
+
+test('pgInt4: column helper preserves typed codecFactory + undefined typeParams', () => {
+  const col = pgInt4Column();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgInt4Codec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<undefined>();
+});
+
+test('pgBit: descriptor.factory(params) returns typed (ctx) => PgBitCodec', () => {
+  const factory = pgBitDescriptorClass.factory({ length: 8 });
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgBitCodec>();
+});
+
+test('pgBit: column helper preserves typed codecFactory + length params', () => {
+  const col = pgBitColumn({ length: 8 });
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgBitCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<{ readonly length?: number }>();
+});
+
+test('pgBit: column helper accepts no-args call (default params)', () => {
+  const col = pgBitColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgBitCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<{ readonly length?: number }>();
+});
+
+test('pgTimestamptz: descriptor.factory(params) returns typed (ctx) => PgTimestamptzCodec', () => {
+  const factory = pgTimestamptzDescriptorClass.factory({ precision: 3 });
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgTimestamptzCodec>();
+});
+
+test('pgTimestamptz: column helper preserves typed codecFactory + precision params', () => {
+  const col = pgTimestamptzColumn({ precision: 3 });
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgTimestamptzCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<{ readonly precision?: number }>();
+});
+
+test('pgNumeric: descriptor.factory(params) returns typed (ctx) => PgNumericCodec', () => {
+  const factory = pgNumericDescriptorClass.factory({ precision: 10, scale: 2 });
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgNumericCodec>();
+});
+
+test('pgNumeric: column helper preserves typed codecFactory + composite params', () => {
+  const col = pgNumericColumn({ precision: 10, scale: 2 });
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgNumericCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<{
+    readonly precision: number;
+    readonly scale?: number;
+  }>();
+});
+
+// ---------------------------------------------------------------------------
+// satisfies discipline catches wiring mistakes.
+// ---------------------------------------------------------------------------
+
+pgInt4Column satisfies ColumnHelperFor<PgInt4Descriptor>;
+pgInt4Column satisfies ColumnHelperForStrict<PgInt4Descriptor>;
+
+pgBitColumn satisfies ColumnHelperFor<PgBitDescriptor>;
+pgBitColumn satisfies ColumnHelperForStrict<PgBitDescriptor>;
+
+pgTimestamptzColumn satisfies ColumnHelperFor<PgTimestamptzDescriptor>;
+pgTimestamptzColumn satisfies ColumnHelperForStrict<PgTimestamptzDescriptor>;
+
+pgNumericColumn satisfies ColumnHelperFor<PgNumericDescriptor>;
+pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
+
+test('coarse satisfies catches wrong typeParams shape on pgBitColumn', () => {
+  const brokenHelper = (length: number) =>
+    column(pgBitDescriptorClass.factory({ length }), pgBitDescriptorClass.codecId, {
+      wrongKey: length,
+    });
+  // @ts-expect-error -- typeParams shape doesn't satisfy ColumnHelperFor<PgBitDescriptor>
+  brokenHelper satisfies ColumnHelperFor<PgBitDescriptor>;
+  // @ts-expect-error -- strict shape catches the same mismatch
+  brokenHelper satisfies ColumnHelperForStrict<PgBitDescriptor>;
+});

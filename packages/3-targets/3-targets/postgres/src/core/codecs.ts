@@ -70,7 +70,19 @@ const precisionParamsSchema = arktype({
   'precision?': 'number.integer >= 0 & number.integer <= 6',
 });
 
-function renderLength(typeName: string, typeParams: Record<string, unknown>): string | undefined {
+// ---------------------------------------------------------------------------
+// Shared encode/decode/render constants. The legacy `mkCodec`/`defineCodec`
+// forms below and the class form in `codecs-class.ts` (TML-2357 M0 Phase
+// B2) both consume these so both paths share a single source of truth for
+// runtime behaviour. Trivial identity passthroughs (e.g. `pgInt4Encode`)
+// stay inline in both forms — a `(v) => v` body cannot diverge from
+// itself.
+// ---------------------------------------------------------------------------
+
+export function renderLength(
+  typeName: string,
+  typeParams: Record<string, unknown>,
+): string | undefined {
   const length = typeParams['length'];
   if (length === undefined) {
     return undefined;
@@ -83,7 +95,7 @@ function renderLength(typeName: string, typeParams: Record<string, unknown>): st
   return `${typeName}<${length}>`;
 }
 
-function renderPrecision(typeName: string, typeParams: Record<string, unknown>): string {
+export function renderPrecision(typeName: string, typeParams: Record<string, unknown>): string {
   const precision = typeParams['precision'];
   if (precision === undefined) {
     return typeName;
@@ -99,6 +111,81 @@ function renderPrecision(typeName: string, typeParams: Record<string, unknown>):
   }
   return `${typeName}<${precision}>`;
 }
+
+export const pgNumericDecode = (wire: string | number): string => {
+  if (typeof wire === 'number') return String(wire);
+  return wire;
+};
+
+export const pgNumericRenderOutputType = (typeParams: {
+  readonly precision: number;
+  readonly scale?: number;
+}): string | undefined => {
+  const precision = typeParams.precision;
+  if (precision === undefined) return undefined;
+  if (
+    typeof precision !== 'number' ||
+    !Number.isFinite(precision) ||
+    !Number.isInteger(precision)
+  ) {
+    throw new Error(
+      `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
+    );
+  }
+  const scale = typeParams.scale;
+  return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
+};
+
+export const pgTimestampEncodeJson = (value: Date): JsonValue => value.toISOString();
+export const pgTimestampDecodeJson = (json: JsonValue): Date => {
+  if (typeof json !== 'string') {
+    throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
+  }
+  const date = new Date(json);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
+  }
+  return date;
+};
+
+export const pgTimestamptzEncodeJson = (value: Date): JsonValue => value.toISOString();
+export const pgTimestamptzDecodeJson = (json: JsonValue): Date => {
+  if (typeof json !== 'string') {
+    throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
+  }
+  const date = new Date(json);
+  if (Number.isNaN(date.getTime())) {
+    throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
+  }
+  return date;
+};
+
+export const pgIntervalDecode = (wire: string | Record<string, unknown>): string => {
+  if (typeof wire === 'string') return wire;
+  return JSON.stringify(wire);
+};
+
+export const pgEnumRenderOutputType = (typeParams: {
+  readonly values?: readonly unknown[];
+}): string => {
+  const values = typeParams.values;
+  if (!Array.isArray(values)) {
+    throw new Error(
+      `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
+    );
+  }
+  return values
+    .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
+    .join(' | ');
+};
+
+export const pgJsonEncode = (value: string | JsonValue): string => JSON.stringify(value);
+export const pgJsonDecode = (wire: string | JsonValue): JsonValue =>
+  typeof wire === 'string' ? JSON.parse(wire) : wire;
+
+export const pgJsonbEncode = (value: string | JsonValue): string => JSON.stringify(value);
+export const pgJsonbDecode = (wire: string | JsonValue): JsonValue =>
+  typeof wire === 'string' ? JSON.parse(wire) : wire;
 
 // Phase C: postgres' raw json/jsonb codecs no longer carry a
 // `renderOutputType` slot — the schema-typed JSON surface that drove
@@ -194,26 +281,12 @@ const pgNumericCodec = mkCodec<
   targetTypes: ['numeric', 'decimal'],
   traits: ['equality', 'order', 'numeric'],
   encode: (value: string): string => value,
-  decode: (wire: string | number): string => {
-    if (typeof wire === 'number') return String(wire);
-    return wire;
-  },
+  decode: pgNumericDecode,
   paramsSchema: numericParamsSchema,
-  renderOutputType: (typeParams) => {
-    const precision = typeParams['precision'];
-    if (precision === undefined) return undefined;
-    if (
-      typeof precision !== 'number' ||
-      !Number.isFinite(precision) ||
-      !Number.isInteger(precision)
-    ) {
-      throw new Error(
-        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
-      );
-    }
-    const scale = typeParams['scale'];
-    return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
-  },
+  renderOutputType: (typeParams) =>
+    pgNumericRenderOutputType(
+      typeParams as { readonly precision: number; readonly scale?: number },
+    ),
   meta: {
     db: {
       sql: {
@@ -304,17 +377,8 @@ const pgTimestampCodec = mkCodec<
   traits: ['equality', 'order'],
   encode: (value: Date): Date => value,
   decode: (wire: Date): Date => wire,
-  encodeJson: (value: Date) => value.toISOString(),
-  decodeJson: (json) => {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
-    }
-    const date = new Date(json);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
-    }
-    return date;
-  },
+  encodeJson: pgTimestampEncodeJson,
+  decodeJson: pgTimestampDecodeJson,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Timestamp', typeParams),
   meta: {
@@ -339,17 +403,8 @@ const pgTimestamptzCodec = mkCodec<
   traits: ['equality', 'order'],
   encode: (value: Date): Date => value,
   decode: (wire: Date): Date => wire,
-  encodeJson: (value: Date) => value.toISOString(),
-  decodeJson: (json) => {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
-    }
-    const date = new Date(json);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
-    }
-    return date;
-  },
+  encodeJson: pgTimestamptzEncodeJson,
+  decodeJson: pgTimestamptzDecodeJson,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Timestamptz', typeParams),
   meta: {
@@ -477,17 +532,8 @@ const pgEnumCodec = mkCodec({
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
   decode: (wire: string): string => wire,
-  renderOutputType: (typeParams) => {
-    const values = typeParams['values'];
-    if (!Array.isArray(values)) {
-      throw new Error(
-        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
-      );
-    }
-    return values
-      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
-      .join(' | ');
-  },
+  renderOutputType: (typeParams) =>
+    pgEnumRenderOutputType(typeParams as { readonly values?: readonly unknown[] }),
 });
 
 const pgIntervalCodec = mkCodec<
@@ -500,10 +546,7 @@ const pgIntervalCodec = mkCodec<
   targetTypes: ['interval'],
   traits: ['equality', 'order'],
   encode: (value: string): string => value,
-  decode: (wire: string | Record<string, unknown>): string => {
-    if (typeof wire === 'string') return wire;
-    return JSON.stringify(wire);
-  },
+  decode: pgIntervalDecode,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) => renderPrecision('Interval', typeParams),
   meta: {
@@ -521,9 +564,8 @@ const pgJsonCodec = mkCodec({
   typeId: PG_JSON_CODEC_ID,
   targetTypes: ['json'],
   traits: [],
-  encode: (value: string | JsonValue): string => JSON.stringify(value),
-  decode: (wire: string | JsonValue): JsonValue =>
-    typeof wire === 'string' ? JSON.parse(wire) : wire,
+  encode: pgJsonEncode,
+  decode: pgJsonDecode,
   meta: {
     db: {
       sql: {
@@ -539,9 +581,8 @@ const pgJsonbCodec = mkCodec({
   typeId: PG_JSONB_CODEC_ID,
   targetTypes: ['jsonb'],
   traits: ['equality'],
-  encode: (value: string | JsonValue): string => JSON.stringify(value),
-  decode: (wire: string | JsonValue): JsonValue =>
-    typeof wire === 'string' ? JSON.parse(wire) : wire,
+  encode: pgJsonbEncode,
+  decode: pgJsonbDecode,
   meta: {
     db: {
       sql: {
@@ -756,23 +797,9 @@ const pgNumericDescriptor = defineCodec<
   targetTypes: ['numeric', 'decimal'],
   traits: ['equality', 'order', 'numeric'],
   encode: (value) => value,
-  decode: (wire) => (typeof wire === 'number' ? String(wire) : wire),
+  decode: pgNumericDecode,
   paramsSchema: numericParamsSchema,
-  renderOutputType: (typeParams) => {
-    const precision = typeParams.precision;
-    if (precision === undefined) return undefined;
-    if (
-      typeof precision !== 'number' ||
-      !Number.isFinite(precision) ||
-      !Number.isInteger(precision)
-    ) {
-      throw new Error(
-        `renderOutputType: expected integer "precision" in typeParams for Numeric, got ${String(precision)}`,
-      );
-    }
-    const scale = typeParams.scale;
-    return typeof scale === 'number' ? `Numeric<${precision}, ${scale}>` : `Numeric<${precision}>`;
-  },
+  renderOutputType: pgNumericRenderOutputType,
   meta: { db: { sql: { postgres: { nativeType: 'numeric' } } } },
 });
 
@@ -788,17 +815,8 @@ const pgTimestampDescriptor = defineCodec<
   traits: ['equality', 'order'],
   encode: (value) => value,
   decode: (wire) => wire,
-  encodeJson: (value) => value.toISOString(),
-  decodeJson: (json) => {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected ISO date string for pg/timestamp@1, got ${typeof json}`);
-    }
-    const date = new Date(json);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ISO date string for pg/timestamp@1: ${json}`);
-    }
-    return date;
-  },
+  encodeJson: pgTimestampEncodeJson,
+  decodeJson: pgTimestampDecodeJson,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) =>
     renderPrecision('Timestamp', typeParams as Record<string, unknown>),
@@ -817,17 +835,8 @@ const pgTimestamptzDescriptor = defineCodec<
   traits: ['equality', 'order'],
   encode: (value) => value,
   decode: (wire) => wire,
-  encodeJson: (value) => value.toISOString(),
-  decodeJson: (json) => {
-    if (typeof json !== 'string') {
-      throw new Error(`Expected ISO date string for pg/timestamptz@1, got ${typeof json}`);
-    }
-    const date = new Date(json);
-    if (Number.isNaN(date.getTime())) {
-      throw new Error(`Invalid ISO date string for pg/timestamptz@1: ${json}`);
-    }
-    return date;
-  },
+  encodeJson: pgTimestamptzEncodeJson,
+  decodeJson: pgTimestamptzDecodeJson,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) =>
     renderPrecision('Timestamptz', typeParams as Record<string, unknown>),
@@ -960,17 +969,7 @@ const pgEnumDescriptor = defineCodec<
   traits: ['equality', 'order'],
   encode: (value) => value,
   decode: (wire) => wire,
-  renderOutputType: (typeParams) => {
-    const values = typeParams.values;
-    if (!Array.isArray(values)) {
-      throw new Error(
-        `renderOutputType: expected array "values" in typeParams for enum, got ${typeof values}`,
-      );
-    }
-    return values
-      .map((value) => `'${String(value).replace(/\\/g, '\\\\').replace(/'/g, "\\'")}'`)
-      .join(' | ');
-  },
+  renderOutputType: pgEnumRenderOutputType,
 });
 
 const pgIntervalDescriptor = defineCodec<
@@ -984,7 +983,7 @@ const pgIntervalDescriptor = defineCodec<
   targetTypes: ['interval'],
   traits: ['equality', 'order'],
   encode: (value) => value,
-  decode: (wire) => (typeof wire === 'string' ? wire : JSON.stringify(wire)),
+  decode: pgIntervalDecode,
   paramsSchema: precisionParamsSchema,
   renderOutputType: (typeParams) =>
     renderPrecision('Interval', typeParams as Record<string, unknown>),
@@ -1000,8 +999,8 @@ const pgJsonDescriptor = defineCodec<
   codecId: PG_JSON_CODEC_ID,
   targetTypes: ['json'],
   traits: [],
-  encode: (value) => JSON.stringify(value),
-  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  encode: pgJsonEncode,
+  decode: pgJsonDecode,
   meta: { db: { sql: { postgres: { nativeType: 'json' } } } },
 });
 
@@ -1014,8 +1013,8 @@ const pgJsonbDescriptor = defineCodec<
   codecId: PG_JSONB_CODEC_ID,
   targetTypes: ['jsonb'],
   traits: ['equality'],
-  encode: (value) => JSON.stringify(value),
-  decode: (wire) => (typeof wire === 'string' ? JSON.parse(wire) : wire),
+  encode: pgJsonbEncode,
+  decode: pgJsonbDecode,
   meta: { db: { sql: { postgres: { nativeType: 'jsonb' } } } },
 });
 
