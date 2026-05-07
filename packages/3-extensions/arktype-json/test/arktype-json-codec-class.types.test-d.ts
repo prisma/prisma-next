@@ -34,10 +34,10 @@ import {
 } from '@prisma-next/framework-components/codec';
 import { type } from 'arktype';
 import { expectTypeOf, test } from 'vitest';
-import type { ArktypeJsonTypeParams } from '../src/core/arktype-json-codec';
 import {
   type ArktypeJsonCodecClass,
   type ArktypeJsonDescriptor,
+  type ArktypeJsonTypeParams,
   arktypeJsonColumn,
   arktypeJsonDescriptorClass,
 } from '../src/core/arktype-json-codec-class';

@@ -1,25 +1,27 @@
 /**
- * Runtime smoke tests for the class-based arktype-json codec (TML-2357
- * M0 Phase B4).
+ * Runtime tests for the class-based arktype-json codec (TML-2357 M0
+ * Phase B4/C). After the Phase C deletion sweep, this is the canonical
+ * test suite for arktype-json codec behavior — the legacy
+ * `arktypeJson(schema)` form retired with the class-form swap.
  *
- * The encode/decode/encodeJson/decodeJson bodies share semantics with
- * the legacy `arktypeJson(schema)` form (see arktype-json-codec.test.ts
- * for the comprehensive suite). These tests cover:
+ * Coverage:
  *
  * - the column-author helper produces a working codec whose `id`
  *   proxies through the descriptor's `codecId`.
  * - the descriptor's factory rehydrates the schema and returns a
  *   working codec for runtime materialization paths.
- * - schema validation rejects malformed payloads at decode through
- *   the codec class.
+ * - encode/decode round-trip including encodeJson/decodeJson agreement
+ *   on the JSON-safe normalized payload.
+ * - schema validation rejects malformed payloads at decode and
+ *   non-JSON-safe runtime values at encode.
  */
 
 import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { type } from 'arktype';
 import { describe, expect, it } from 'vitest';
-import { ARKTYPE_JSON_CODEC_ID } from '../src/core/arktype-json-codec';
 import {
+  ARKTYPE_JSON_CODEC_ID,
   arktypeJsonColumn,
   arktypeJsonDescriptorClass,
 } from '../src/core/arktype-json-codec-class';
@@ -74,6 +76,49 @@ describe('arktypeJsonColumn(schema)', () => {
     const notASchema = { foo: 'bar' };
     // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed input for the call-site guard
     expect(() => arktypeJsonColumn(notASchema as any)).toThrow(/callable arktype Type/);
+  });
+});
+
+describe('arktypeJsonColumn encode/encodeJson agreement', () => {
+  it('encode and encodeJson agree on the normalized payload', async () => {
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    const original = { name: 'Widget', price: 10, description: 'desc' };
+    const wire = await codec.encode(original, CALL_CTX);
+    const json = codec.encodeJson(original);
+    expect(wire).toBe(JSON.stringify(json));
+  });
+
+  it('encode strips class prototypes via the JSON.stringify round-trip', async () => {
+    class Widget {
+      constructor(
+        public name: string,
+        public price: number,
+      ) {}
+      toString() {
+        return `${this.name}@${this.price}`;
+      }
+    }
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    const widget = new Widget('Widget', 10);
+    const wire = await codec.encode(widget, CALL_CTX);
+    expect(wire).toBe('{"name":"Widget","price":10}');
+  });
+
+  it('encode rejects values that are not representable as JSON', async () => {
+    const anySchema = type('object');
+    const codec = arktypeJsonColumn(anySchema).codecFactory(SYNTH_CTX);
+    await expect(codec.encode(undefined as never, CALL_CTX)).rejects.toThrow(
+      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+    );
+    expect(() => codec.encodeJson(undefined as never)).toThrow(
+      /not representable as JSON|JSON_SCHEMA_VALIDATION_FAILED/,
+    );
+  });
+
+  it('decode rejects payloads with type-mismatched fields', async () => {
+    const codec = arktypeJsonColumn(productSchema).codecFactory(SYNTH_CTX);
+    const wire = JSON.stringify({ name: 'Widget', price: 'not-a-number' });
+    await expect(codec.decode(wire, CALL_CTX)).rejects.toThrow(/price/);
   });
 });
 

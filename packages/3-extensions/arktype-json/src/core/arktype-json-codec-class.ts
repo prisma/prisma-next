@@ -1,5 +1,5 @@
 /**
- * Class-based form of the arktype-json codec (TML-2357 M0 Phase B4).
+ * Class-based form of the arktype-json codec (TML-2357 M0 Phase B4/C).
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
  * The schema's TypeScript-level inferred type `S['infer']` is only
@@ -27,8 +27,7 @@
  *    through `codecFactory`'s return into the column site's resolved
  *    output type. Eager serialization at this call site captures
  *    `expression` (for the emit-path renderer) and `jsonIr` (for
- *    runtime rehydration), matching the legacy `arktypeJson(schema)`
- *    factory.
+ *    runtime rehydration).
  *
  * `satisfies ColumnHelperFor<ArktypeJsonDescriptor>` (coarse) is
  * applied — the typeParams shape is verified. `ColumnHelperForStrict`
@@ -40,12 +39,6 @@
  * design; the explicit `expectTypeOf` tests in
  * `test/arktype-json-codec-class.types.test-d.ts` cover the literal-
  * preservation property the strict variant would otherwise enforce.
- *
- * The legacy `mkCodec` / `defineCodec`-shaped exports in
- * `arktype-json-codec.ts` (`arktypeJson(schema)` column factory and
- * the `arktypeJsonCodec` descriptor) remain during M0 Phase B for
- * compatibility with downstream consumers; both forms coexist until
- * Phase C.
  */
 
 import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
@@ -61,16 +54,45 @@ import {
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
 import { ArkErrors, ark, type Type, type } from 'arktype';
-import {
-  ARKTYPE_JSON_CODEC_ID,
-  ARKTYPE_JSON_NATIVE_TYPE,
-  type ArktypeJsonTypeParams,
-} from './arktype-json-codec';
 
 // ---------------------------------------------------------------------------
-// Schema-shape narrow + structural guard. Mirrors the private types in
-// arktype-json-codec.ts. Kept private (not re-exported) so the legacy
-// surface remains the single source of public arktype-shaped helpers.
+// Codec id + native-type constants. Public — re-exported through
+// `exports/codecs.ts` so contributor packs / runtime / control-stack
+// assembly modules import the canonical literal without duplicating it.
+// ---------------------------------------------------------------------------
+
+/** Codec id for arktype-backed JSON columns. Library-bound, not target-bound. */
+export const ARKTYPE_JSON_CODEC_ID = 'arktype/json@1' as const;
+
+/** Native storage type backing the codec. JSONB on Postgres; binary, indexable. */
+export const ARKTYPE_JSON_NATIVE_TYPE = 'jsonb' as const;
+
+/**
+ * Eagerly serialized typeParams for the arktype-json column. Carried in
+ * the contract IR; the runtime descriptor's factory rehydrates `jsonIr`
+ * and the emitter consumes `expression`.
+ */
+export type ArktypeJsonTypeParams = {
+  /**
+   * Arktype's TypeScript-source-like rendering of the schema. Read by
+   * `renderOutputType` to emit the column's TS type into `contract.d.ts`.
+   * Stable across the serialize/rehydrate cycle: the rehydrated schema's
+   * `expression` matches the source schema's.
+   */
+  readonly expression: string;
+  /**
+   * Arktype's internal IR for the schema. Lossless; the rehydration
+   * source. Schema-shape — `ark.schema(jsonIr)` reconstructs a callable
+   * `Type`-like structurally identical to the original `type(definition)`
+   * output.
+   */
+  readonly jsonIr: object;
+};
+
+// ---------------------------------------------------------------------------
+// Schema-shape narrow + structural guard for the column-author surface.
+// Kept private (not re-exported); callers receive arktype `Type<unknown>`
+// at the public boundary.
 // ---------------------------------------------------------------------------
 
 type ArktypeSchemaLike = ((value: unknown) => unknown) & {
@@ -84,10 +106,10 @@ function isArktypeSchemaLike(value: unknown): value is ArktypeSchemaLike {
 }
 
 // ---------------------------------------------------------------------------
-// Shared encode/decode pipeline. Identical semantics to the legacy
-// `arktypeJsonCodecForSchema` in `arktype-json-codec.ts` — pulled into
-// free functions so both class methods and the legacy mkCodec path can
-// converge on one implementation when Phase C consolidates.
+// Shared encode/decode pipeline. Free functions (rather than methods)
+// keep the validation / serialization helpers schema-locality-free so
+// both `ArktypeJsonCodecClass` methods and the descriptor factory can
+// converge on one implementation.
 // ---------------------------------------------------------------------------
 
 function validateSchema<TInferred>(schema: ArktypeSchemaLike, value: unknown): TInferred {
@@ -215,8 +237,7 @@ export const arktypeJsonDescriptorClass = new ArktypeJsonDescriptor();
  *
  * Eager serialization at this call site captures `expression` (for the
  * emit-path renderer) and `jsonIr` (for runtime rehydration via the
- * descriptor's factory), matching the legacy `arktypeJson(schema)`
- * factory's eager-extraction behaviour.
+ * descriptor's factory).
  *
  * @throws {Error} if the schema doesn't expose `expression` and `json`
  *   fields (i.e. is not an arktype `Type`). Validates the schema shape
@@ -255,12 +276,18 @@ arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 // `expectTypeOf` tests cover the literal-preservation property strict
 // satisfies would otherwise enforce.
 
+/**
+ * Codec instance returned by `arktypeJsonColumn(schema).codecFactory(ctx)`
+ * and by `arktypeJsonDescriptorClass.factory(typeParams)(ctx)`. The
+ * `TInferred` slot carries the arktype schema's inferred output type at
+ * the column-author site; descriptor-side factories erase to `unknown`.
+ */
+export type ArktypeJsonCodec<TInferred> = ArktypeJsonCodecClass<TInferred>;
+
 // ---------------------------------------------------------------------------
-// Class-form descriptor list (TML-2357 M0 Phase B5). Single entry today:
-// `arktype/json@1`. The arktype-json contributor pack's unified `codecs:`
-// slot consumption swaps from the legacy `arktypeJsonCodec`
-// `defineCodec()` carrier to the class-form descriptor without changing
-// the descriptor's `targetTypes`/`meta`/`renderOutputType` shape.
+// Class-form descriptor list. Single entry: `arktype/json@1`. The
+// arktype-json contributor pack's unified `codecs:` slot consumes this
+// list directly.
 // ---------------------------------------------------------------------------
 
 export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptorClass];

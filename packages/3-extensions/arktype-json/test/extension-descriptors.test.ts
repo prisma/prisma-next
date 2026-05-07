@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { ARKTYPE_JSON_CODEC_ID } from '../src/core/arktype-json-codec';
-import { arktypeJsonDescriptorClass } from '../src/core/arktype-json-codec-class';
+import {
+  ARKTYPE_JSON_CODEC_ID,
+  arktypeJsonDescriptorClass,
+} from '../src/core/arktype-json-codec-class';
 import { arktypeJsonExtensionDescriptor } from '../src/exports/control';
 import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
@@ -9,7 +11,7 @@ describe('arktypeJsonRuntimeDescriptor', () => {
   // arktype-json. M2 Phase A unified the contributor protocol: every
   // codec — parameterized or not — flows through the single `codecs:`
   // slot returning a `CodecDescriptor` list. arktype-json contributes
-  // exactly one descriptor: `arktypeJsonCodec`.
+  // exactly one descriptor: `arktypeJsonDescriptorClass`.
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonRuntimeDescriptor.familyId).toBe('sql');
     expect(arktypeJsonRuntimeDescriptor.targetId).toBe('postgres');

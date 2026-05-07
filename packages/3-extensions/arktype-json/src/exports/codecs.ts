@@ -1,6 +1,6 @@
-export type { ArktypeJsonCodec, ArktypeJsonTypeParams } from '../core/arktype-json-codec';
+export type { ArktypeJsonCodec, ArktypeJsonTypeParams } from '../core/arktype-json-codec-class';
 export {
   ARKTYPE_JSON_CODEC_ID,
   ARKTYPE_JSON_NATIVE_TYPE,
-  arktypeJsonCodec,
-} from '../core/arktype-json-codec';
+  arktypeJsonDescriptorClass,
+} from '../core/arktype-json-codec-class';
