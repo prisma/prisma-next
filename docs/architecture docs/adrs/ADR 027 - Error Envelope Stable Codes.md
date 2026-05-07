@@ -91,7 +91,7 @@ NAMESPACE.SUBCODE where NAMESPACE ∈ { PLAN, RUNTIME, ADAPTER, BUDGET, LINT, MI
 - **ADAPTER.TIMEOUT**: driver or server timeout distinct from runtime timeout
 - **ADAPTER.SYNTAX_ERROR**: target rejected payload as invalid
 - **ADAPTER.CAPABILITY_MISSING**: capability required not available
-- **ADAPTER.PREPARE_FAILED**: prepared statement error or reuse invalidation
+- **ADAPTER.PREPARE_FAILED**: prepared statement error or reuse invalidation (see [ADR 210](ADR%20210%20-%20Prepared%20Statements%20-%20Author%20Surface%20and%20Driver%20SPI.md) for the prepared-statement contract and retry semantics)
 
 #### BUDGET
 - **BUDGET.TIME_EXCEEDED**: elapsed time over budget
