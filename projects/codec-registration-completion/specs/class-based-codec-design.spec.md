@@ -357,23 +357,25 @@ type SettingsInput = ColumnInputType<typeof settingsColumn>;
 
 ## Heterogeneous storage at the runtime layer
 
-The framework's descriptor registry is keyed by `codecId: string` and stores type-erased descriptor instances:
+The framework's descriptor registry is keyed by `codecId: string` and stores type-erased descriptor instances. Per Q-3c (spike-resolved), the canonical erasure type is `AnyCodecDescriptor` (a `CodecDescriptor<any>` alias defined in `framework-components/shared/codec-descriptor.ts` with the `biome-ignore` comment naming the variance rationale):
 
 ```typescript
-class CodecDescriptorRegistry {
-  private readonly descriptors = new Map<string, CodecDescriptor<unknown>>();
+import type { AnyCodecDescriptor } from '@prisma-next/framework-components/codec';
 
-  register(descriptor: CodecDescriptor<unknown>): void {
+class CodecDescriptorRegistry {
+  private readonly descriptors = new Map<string, AnyCodecDescriptor>();
+
+  register(descriptor: AnyCodecDescriptor): void {
     this.descriptors.set(descriptor.codecId, descriptor);
   }
 
-  descriptorFor(codecId: string): CodecDescriptor<unknown> | undefined {
+  descriptorFor(codecId: string): AnyCodecDescriptor | undefined {
     return this.descriptors.get(codecId);
   }
 }
 ```
 
-The registry's signature uses `CodecDescriptor<unknown>` — variance erasure at the boundary, correctly so. Runtime consumers of the registry call `descriptor.factory(validatedParams)(ctx)` to materialize codec instances; the abstract `factory()` signature (returning `Codec<string, readonly CodecTrait[], unknown, unknown>`) is sufficient. No type information is needed at the runtime layer.
+`CodecDescriptor<P>` is invariant in `P` (per Q-3c: `factory` and `renderOutputType` use `P` contravariantly), so `CodecDescriptor<unknown>` is **not** assignable from concrete subclasses' `CodecDescriptor<SpecificParams>` — the `<unknown>` shape would force `as` casts at every register / retrieve boundary, violating AC-CB-5 below. `AnyCodecDescriptor` is the only erasure form that admits cast-free heterogeneous storage. Runtime consumers of the registry call `descriptor.factory(validatedParams)(ctx)` to materialize codec instances; the abstract `factory()` signature (returning `Codec<string, readonly CodecTrait[], unknown, unknown>`) is sufficient. No type information is needed at the runtime layer.
 
 Per-codec helpers don't pass through the registry — they're imported directly by extension authors and column-defining sites. The registry exists for runtime lookup (by `codecId` string), where types are already erased.
 
@@ -434,8 +436,8 @@ For each per-codec helper in the spike:
 
 ### AC-CB-5. Heterogeneous registry stores type-erased descriptors
 
-- The registry signature uses `CodecDescriptor<unknown>` (or equivalent type-erased form).
-- A test demonstrates: registering concrete descriptors, retrieving by codec id, calling `descriptor.factory(params)(ctx)` to materialize codec instances. No `as` casts at the registry's storage / retrieval boundary.
+- The registry signature uses `AnyCodecDescriptor` (the `CodecDescriptor<any>` alias defined in `framework-components/shared/codec-descriptor.ts`) per Q-3c. **Do not** use `CodecDescriptor<unknown>` — it is not assignable from concrete `CodecDescriptor<SpecificParams>` subclasses because `CodecDescriptor<P>` is invariant in `P`.
+- A test demonstrates: registering concrete descriptors, retrieving by codec id, calling `descriptor.factory(params)(ctx)` to materialize codec instances. **No `as` casts at the registry's storage / retrieval boundary.** If a test uses `as CodecDescriptor<unknown>` (or any equivalent), that's a violation of this AC and a signal that `AnyCodecDescriptor` should be used instead.
 
 ### AC-CB-6. Spike scope demonstrated end-to-end
 
