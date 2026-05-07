@@ -24,6 +24,8 @@ export {
   contractToSchemaIR,
   detectDestructiveChanges,
 } from '../core/migrations/contract-to-schema-ir';
+export type { PlanFieldEventOperationsOptions } from '../core/migrations/field-event-planner';
+export { planFieldEventOperations } from '../core/migrations/field-event-planner';
 export {
   createMigrationPlan,
   plannerFailure,
@@ -38,6 +40,8 @@ export type {
   ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
   ExpandNativeTypeInput,
+  FieldEvent,
+  FieldEventContext,
   ResolveIdentityValueInput,
   SqlControlAdapterDescriptor,
   SqlControlExtensionDescriptor,
