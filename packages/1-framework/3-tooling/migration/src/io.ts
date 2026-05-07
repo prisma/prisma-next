@@ -1,6 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
+import { canonicalizeJson } from './canonicalize-json';
 import {
   errorDirectoryExists,
   errorInvalidDestName,
@@ -72,6 +73,56 @@ export async function writeMigrationPackage(
     flag: 'wx',
   });
   await writeFile(join(dir, OPS_FILE), JSON.stringify(ops, null, 2), { flag: 'wx' });
+}
+
+/**
+ * Shape of an in-memory authored migration package — same as
+ * `MigrationPackage` minus `dirPath` (the package has not yet been
+ * emitted to disk so there is no path to record). Mirrors the
+ * `ExtensionMigrationPackage` type that ships from
+ * `@prisma-next/family-sql/control` for `SqlControlExtensionDescriptor`
+ * authors. Defined locally to keep `migration-tools` framework-neutral.
+ *
+ * @see specs/framework-mechanism.spec.md § 1, § 3.
+ */
+export interface MigrationPackageContents {
+  readonly dirName: string;
+  readonly metadata: MigrationMetadata;
+  readonly ops: MigrationOps;
+}
+
+/**
+ * Materialise an in-memory migration package to a per-space directory.
+ *
+ * Writes three files under `<targetDir>/<pkg.dirName>/`:
+ *
+ * - `migration.json` — the manifest (pretty-printed, matches
+ *   {@link writeMigrationPackage}'s output for byte-for-byte parity with
+ *   app-space migrations).
+ * - `ops.json` — the operation list (pretty-printed).
+ * - `contract.json` — the canonical-JSON serialisation of
+ *   `metadata.toContract`. This is the per-package post-state contract
+ *   snapshot; the canonicalisation pass guarantees byte-determinism so
+ *   re-emitting the same package across machines / runs produces an
+ *   identical file.
+ *
+ * The function fails (via `writeMigrationPackage`'s underlying check)
+ * if the target directory already exists, mirroring the strictness of
+ * the app-space emit path. Callers wanting "create-or-overwrite"
+ * semantics handle that at a higher level (e.g. T1.8's pinned-artefact
+ * emission, which lives outside the per-package writer).
+ *
+ * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
+ */
+export async function writeExtensionMigrationPackage(
+  targetDir: string,
+  pkg: MigrationPackageContents,
+): Promise<void> {
+  const dir = join(targetDir, pkg.dirName);
+  await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
+  await writeFile(join(dir, 'contract.json'), `${canonicalizeJson(pkg.metadata.toContract)}\n`, {
+    flag: 'wx',
+  });
 }
 
 /**

@@ -86,6 +86,10 @@
       "types": "./dist/exports/migration.d.mts",
       "import": "./dist/exports/migration.mjs"
     },
+    "./spaces": {
+      "types": "./dist/exports/spaces.d.mts",
+      "import": "./dist/exports/spaces.mjs"
+    },
     "./package.json": "./package.json"
   },
   "repository": {
