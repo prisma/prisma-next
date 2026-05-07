@@ -44,6 +44,7 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
+  type ExtractDescriptorCodecTypes,
   sqlCharDescriptorClass,
   sqlFloatDescriptorClass,
   sqlIntDescriptorClass,
@@ -385,24 +386,30 @@ sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor list (TML-2357 M0 Phase B5). The ordering mirrors
-// the legacy `codecDescriptorList` in `codecs.ts` so the descriptor sequence
-// the emitter consumes stays stable. Each entry is a class-form descriptor
-// (instance of `CodecDescriptorImpl<P>`) carrying the same
-// `targetTypes`/`meta`/`traits`/`renderOutputType` shape as its legacy
-// `defineCodec()` counterpart, preserving fixture byte-identity.
+// Class-form descriptor map (TML-2357 M0 Phase B5/C). Keyed by scalar name
+// so {@link CodecTypes} resolves through `ExtractDescriptorCodecTypes`,
+// preserving the input/output/traits shape downstream consumers
+// (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths
+// rely on. The list view (`codecDescriptorClassList`) iterates these in the
+// emit-stable order via `Object.values` — the runtime contributor pack
+// consumes the list shape.
 // ---------------------------------------------------------------------------
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
-  sqlCharDescriptorClass,
-  sqlVarcharDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqliteTextDescriptorClass,
-  sqliteIntegerDescriptorClass,
-  sqliteRealDescriptorClass,
-  sqliteBlobDescriptorClass,
-  sqliteDatetimeDescriptorClass,
-  sqliteJsonDescriptorClass,
-  sqliteBigintDescriptorClass,
-];
+const codecDescriptorMap = {
+  char: sqlCharDescriptorClass,
+  varchar: sqlVarcharDescriptorClass,
+  int: sqlIntDescriptorClass,
+  float: sqlFloatDescriptorClass,
+  text: sqliteTextDescriptorClass,
+  integer: sqliteIntegerDescriptorClass,
+  real: sqliteRealDescriptorClass,
+  blob: sqliteBlobDescriptorClass,
+  datetime: sqliteDatetimeDescriptorClass,
+  json: sqliteJsonDescriptorClass,
+  bigint: sqliteBigintDescriptorClass,
+} as const;
+
+export type CodecTypes = ExtractDescriptorCodecTypes<typeof codecDescriptorMap>;
+
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
+  Object.values(codecDescriptorMap);
