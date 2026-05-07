@@ -16,7 +16,9 @@ A codec is one artifact with two roles bundled together by its factory:
 
 Both roles are projections of the same function. The factory is not declarative metadata coordinated with separate type-level rendering machinery — it *is* the type-level rendering machinery.
 
-Consumers that need a codec's type for a specific column (no-emit `FieldOutputType`, `sql-builder`'s parameter-typing, the ORM's row-shape derivation) read it by applying the descriptor's factory at the type level with the column's `typeParams`. There is no parallel `CodecTypes` static-lookup, no parallel `OutputType` HKT field, and no parallel column-helper `type` slot.
+Consumers that need a codec's type for a specific column (no-emit `FieldOutputType`, `sql-builder`'s parameter-typing, the ORM's row-shape derivation) read it from **the column spec on the contract**, which the column helper populated at authoring time via descriptor-factory application. The descriptor itself is never queried by these consumers; the column spec carries the typed codec (or enough information to project it) from authoring time onward.
+
+Codec authors maintain exactly one type-level surface: the descriptor's factory function (or its class-based equivalent). No parallel `OutputType` HKT field. No hand-written codec-id-keyed type rows. No column-helper `type` slot maintained alongside the factory. The framework's emitted `contract.d.ts` carries codec type rows because emit serializes the type-level result into a static artifact — but those rows are *generated* from the descriptors, not maintained in parallel.
 
 ## Why
 
@@ -58,19 +60,19 @@ This is the case that fails today: `vector(1536)` resolves to `number[]`, not `V
 
 Applying with a specific schema yields a codec typed by that schema's inferred output. This is the load case for *non-numeric* literal preservation — the typed shape is a derived TypeScript type rather than a literal value.
 
-### Case 4 — Heterogeneous descriptor storage
+### Case 4 — Heterogeneous descriptor storage (runtime-only; type-erased)
 
-The framework stores all registered descriptors in a single map keyed by codec id (`descriptorFor(codecId)` and `forColumn(table, column)` are the read APIs per ADR 208). Storage cannot collapse the per-descriptor factory generics — a descriptor retrieved from the map must still apply its factory at the type level.
+The framework stores all registered descriptors in a runtime registry keyed by codec id (`descriptorFor(codecId): AnyCodecDescriptor`, `forColumn(table, column): Codec` per ADR 208). The registry's role is runtime materialization: encode/decode dispatch, contract-load-time codec instantiation, validation. **It needs no type information at all.** Consumers querying the registry receive variance-erased `AnyCodecDescriptor` and that is correct: the registry is a `Record<string, ...>` indexed by codec id, and TypeScript variance correctly erases the per-descriptor factory generics at this boundary.
 
-In practice, this means consumers either read descriptors by their *concrete* type at the call site (`typeof pgVectorDescriptor`) or via a typed map indexed by literal codec-id keys (`Descriptors['pg/vector@1']`). It does **not** mean every descriptor must be reachable via `Descriptors[string]` with full generic preservation — TS variance prevents that.
+Type-level access does not flow through the registry. It flows through the **column spec on the contract**, populated by column helpers at column-author time via descriptor-factory application. There is no `Descriptors<typeof contract>` projection, no per-pack typed map consulted at the type level, and no direct-reference-to-descriptor pattern in framework code (direct references are fine in tests; framework code cannot reach into specific codec implementations).
 
-The implementation must accommodate this: heterogeneous storage at the runtime layer (descriptor map indexed by `string`) plus typed access at the type layer (per-codec-id keyed maps that preserve descriptor types).
+The implementation accommodates this two-layer separation: heterogeneous, type-erased registry at the runtime layer; column-spec-on-contract carrying typed codec information at the type-level layer.
 
-### Case 5 — `FieldOutputType` derivation
+### Case 5 — `FieldOutputType` derivation (column-spec-driven)
 
-For a column declaring `{ codecId: 'pg/vector@1', typeParams: { length: 1536 } }`, the no-emit `FieldOutputType` resolver applies the descriptor's factory at the type level with the column's `typeParams` and projects the codec's `TInput` (or equivalently, the resolved codec's `decode` return type).
+For a column declared as `column(pgVectorDescriptor, { length: 1536 })` (or via a thin per-codec wrapper like `vector(1536)` that delegates to `column`), the column helper applies the descriptor's factory at the type level with the column's params and stores the result on the column spec. The no-emit `FieldOutputType` resolver reads the typed codec from the column spec and projects its `TInput` (or equivalently, the resolved codec's `decode` return type).
 
-This is the consumer site that today goes through the static `CodecTypesFromDefinition[codecId]['output']` lookup. Under this spec, it goes through factory-application instead.
+There is no descriptor lookup at the resolver site; the column has what it needs. This replaces the static `CodecTypesFromDefinition[codecId]['output']` lookup HEAD uses today.
 
 ### Case 6 — Column helper collapse
 
@@ -105,11 +107,15 @@ The `CodecDescriptor`'s factory function (or equivalent in the chosen implementa
 
 **Verification.** Constructive type test: a parameterized descriptor's `descriptor.factory<{ length: 1536 }>` resolves at the type level to a function returning `Codec<..., Vector<1536>>`.
 
-### AC-2. Codec instance type derived from factory application
+### AC-2. No parallel hand-maintained type mechanism
 
-Consumers extract the codec instance type for given params by applying the descriptor's factory at the type level. There is no parallel mechanism — no `OutputType` HKT field, no separate `Codec.output` static lookup populated at descriptor-definition time, no column-helper `type` slot consulted in parallel.
+Codec authors write exactly one type-level surface per codec: the descriptor's factory function (or its class-based equivalent). No parallel `OutputType` HKT field, no hand-written codec-id-keyed type rows alongside the descriptor, no column-helper `type` slot operating outside this flow.
 
-**Verification.** Negative type test: deleting the static `CodecTypesFromDefinition` lookup breaks no codec-type extraction (consumers route through factory-application).
+Type derivations needed by the framework compute *from* the descriptor's factory:
+- **No-emit path**: column helpers apply the factory at the type level at column-author time; the result lives on the column spec; consumers read it from there.
+- **Emit path**: the emitter walks descriptors at emit time, evaluates the factory at the type level, and serializes the result into `contract.d.ts`'s codec type rows (today's `CodecTypes` / `TypeMaps`). The emitted rows are not a parallel surface — they are the descriptor-derived serialization. AC-6 covers byte-equivalence with the no-emit type.
+
+**Verification.** Audit: every parameterized codec author writes one type-level artifact (the factory). Removing the source-level `CodecTypesFromDefinition` (or successor) does not break the no-emit type derivation — that path runs through column specs.
 
 ### AC-3. Literal preservation in the no-emit path
 
@@ -127,16 +133,18 @@ The codec descriptor's authoring site is the only place where per-codec type-lev
 
 **Verification.** No production column helper declares its return type via hand-rolled typed factory return. All column helpers are either trivial calls into a generic helper or eliminated entirely.
 
-### AC-5. Heterogeneous storage doesn't collapse type derivation
+### AC-5. Type-level access via column spec, not via descriptor map
 
-Descriptors registered through the unified `codecs:` slot (per ADR 208) are stored in a `Record<string, AnyCodecDescriptor>`-shaped map at runtime. Type-level consumers access typed descriptors via per-codec-id literal-keyed maps (`Descriptors['pg/vector@1']`) or by direct reference (`typeof pgVectorDescriptor`).
+The type-level entry point for a codec's type is the **column spec on the contract**. The column helper, at column-author time, applies the descriptor's factory at the type level with the column's params and stores the result on the column spec. Consumers (no-emit `FieldOutputType`, sql-builder parameter typing, ORM row derivation) read the typed codec from the column spec; they do not consult any descriptor map at the type level.
 
-The implementation must demonstrate that no consumer is forced through the variance-collapse path of `descriptorFor(codecId): AnyCodecDescriptor` for typed access — that path remains for *runtime* dispatch, not for *type-level* extraction.
+Runtime descriptor storage remains heterogeneous (registered through the unified `codecs:` slot, indexed by `codecId: string`, returns `AnyCodecDescriptor`). The runtime path is variance-erased and consumes the descriptor for materialization (`descriptor.factory(params)(ctx)`); no type information is required at the runtime layer.
 
-**Verification.** Constructive type tests at three layers:
-- Direct descriptor access: `typeof pgVectorDescriptor` carries full factory generic.
-- Per-target descriptor record access: `PgDescriptors['vector']` carries full factory generic.
-- Contract-level access: `Descriptors<typeof contract>['pg/vector@1']` carries full factory generic.
+There is no `Descriptors<typeof contract>` projection, no per-pack typed map consulted at the type level, and no direct-reference-to-descriptor pattern in framework code. The column spec is the only type-level path; it carries everything consumers need.
+
+**Verification.** Constructive type tests:
+- At the column-author site: `column(pgVectorDescriptor, { length: 1536 })`'s return type carries the typed codec instance (or equivalent typed surface — a factory thunk whose return type resolves to the typed codec also satisfies the AC).
+- At the contract-type level: walking from `typeof contract` through `models[name].fields[name]` to the column spec recovers the typed codec for that field.
+- At the consumer level: `FieldOutputType<typeof contract, 'Document', 'embedding'>` resolves to `Vector<1536>` for a column declared as `column(pgVectorDescriptor, { length: 1536 })`.
 
 ### AC-6. Emit-path renderer agrees with no-emit type
 
@@ -156,7 +164,13 @@ For every parameterized codec and every distinct param shape, the emitted `contr
 
 - **Mode A retrofit.** Wiring up the column-`type`-slot mechanism per ADR 208's intent. This spec supersedes that direction.
 
-- **`renderOutputType` removal.** It stays as the descriptor's emit-path renderer because emit operates without TS type information. Its role is acknowledged as the one legitimate runtime/type-level parallel and is verified for agreement.
+- **`renderOutputType` removal / TS-compiler-API emit.** Eliminating the descriptor's emit-path renderer (e.g. by using TypeScript's compiler API to generate `contract.d.ts` from descriptor types) is not in scope. The renderer stays as one acknowledged runtime-side artifact; codec authors writing it is overhead, not damage. AC-6's byte-equivalence verification covers the practical risk.
+
+- **Codec reuse via descriptor inheritance / aliasing / sharing across targets.** Codecs are thin and re-declared at each authoring site. Shared logic lives in utility functions (`encodeVectorWire(value)`, `decodeVectorWire(wire)`); shared *descriptors* are pointless. The class-based implementation approach (next spike) may use class inheritance internally as an organizational pattern, but this is not load-bearing for the design — every codec id has exactly one descriptor declared at one site.
+
+- **`aliasDescriptor` as a first-class abstraction.** If kept at all, the implementation is a trivial runtime spread + `codecId` rewrite (or, under a class-based approach, a class-inheritance pattern that proxies `codecId` through a descriptor reference on the codec instance). Either way, aliasing is not a load-bearing case for this spec; deletion is acceptable.
+
+- **`paramsSchema` relocation or removal.** Stays on the descriptor as the runtime params validator (also consumed by PSL for incoming codec parameter validation per ADR 208). Its role is unchanged under this spec.
 
 - **Renaming.** Whether `CodecDescriptor` becomes `Codec`, `defineCodec` becomes `defineCodecDescriptor`, etc. — orthogonal naming concerns, decided per implementation approach.
 
