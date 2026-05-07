@@ -148,6 +148,30 @@ export function errorInvalidDestName(destName: string): MigrationToolsError {
   });
 }
 
+export function errorInvalidSpaceId(spaceId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.INVALID_SPACE_ID',
+    'Invalid contract space identifier',
+    {
+      why: `The space id "${spaceId}" does not match the required pattern /^[a-z][a-z0-9_-]{0,63}$/. Space ids are used as filesystem directory names under \`migrations/\`, so the pattern is conservative on purpose.`,
+      fix: 'Pick a lowercase identifier that begins with a letter and contains only lowercase letters, digits, hyphens, or underscores; max 64 characters total.',
+      details: { spaceId },
+    },
+  );
+}
+
+export function errorDuplicateSpaceId(spaceId: string): MigrationToolsError {
+  return new MigrationToolsError(
+    'MIGRATION.DUPLICATE_SPACE_ID',
+    'Duplicate contract space identifier',
+    {
+      why: `The space id "${spaceId}" appears more than once in the per-space planner input. Each space id must be unique across the inputs (the per-space planner emits one output entry per id).`,
+      fix: 'Deduplicate the inputs before passing them to `planAllSpaces` — typically by checking your `extensionPacks` declaration for repeated entries.',
+      details: { spaceId },
+    },
+  );
+}
+
 export function errorSameSourceAndTarget(dir: string, hash: string): MigrationToolsError {
   const dirName = basename(dir);
   return new MigrationToolsError(
