@@ -1,0 +1,112 @@
+/**
+ * Type tests for the class-based SQLite target codecs (TML-2357 M0
+ * Phase B3).
+ *
+ * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
+ *
+ * Coverage selection: every SQLite codec is non-parameterized, so the
+ * tests focus on representative codecs that exercise distinct
+ * input/wire types — a numeric (`integer`), a typed `Date` mapping
+ * (`datetime`, wire `string` ≠ input `Date`), a binary mapping
+ * (`blob`, wire `Uint8Array`), and a bigint mapping (`bigint`, wire
+ * `number | bigint` ≠ input `bigint`). The framework-level type
+ * discipline is exercised in Phase A's
+ * `framework-components/test/codec.types.test-d.ts`.
+ */
+
+import {
+  type CodecInstanceContext,
+  type ColumnHelperFor,
+  type ColumnHelperForStrict,
+  column,
+} from '@prisma-next/framework-components/codec';
+import { expectTypeOf, test } from 'vitest';
+import {
+  type SqliteBigintCodec,
+  type SqliteBigintDescriptor,
+  type SqliteBlobCodec,
+  type SqliteBlobDescriptor,
+  type SqliteDatetimeCodec,
+  type SqliteDatetimeDescriptor,
+  type SqliteIntegerCodec,
+  type SqliteIntegerDescriptor,
+  sqliteBigintColumn,
+  sqliteBigintDescriptorClass,
+  sqliteBlobColumn,
+  sqliteBlobDescriptorClass,
+  sqliteDatetimeColumn,
+  sqliteDatetimeDescriptorClass,
+  sqliteIntegerColumn,
+  sqliteIntegerDescriptorClass,
+} from '../src/core/codecs-class';
+
+// ---------------------------------------------------------------------------
+// Literal preservation through direct invocation.
+// ---------------------------------------------------------------------------
+
+test('sqliteInteger: descriptor.factory() returns typed (ctx) => SqliteIntegerCodec', () => {
+  const factory = sqliteIntegerDescriptorClass.factory();
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteIntegerCodec>();
+});
+
+test('sqliteInteger: column helper preserves typed codecFactory + undefined typeParams', () => {
+  const col = sqliteIntegerColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteIntegerCodec>();
+  expectTypeOf(col.typeParams).toEqualTypeOf<undefined>();
+});
+
+test('sqliteDatetime: column preserves the wire-string / input-Date split', () => {
+  const factory = sqliteDatetimeDescriptorClass.factory();
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteDatetimeCodec>();
+  const col = sqliteDatetimeColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<
+    (ctx: CodecInstanceContext) => SqliteDatetimeCodec
+  >();
+});
+
+test('sqliteBlob: column preserves Uint8Array codec type', () => {
+  const factory = sqliteBlobDescriptorClass.factory();
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBlobCodec>();
+  const col = sqliteBlobColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBlobCodec>();
+});
+
+test('sqliteBigint: column preserves the (number|bigint) wire / bigint input split', () => {
+  const factory = sqliteBigintDescriptorClass.factory();
+  expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
+  const col = sqliteBigintColumn();
+  expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
+});
+
+// ---------------------------------------------------------------------------
+// satisfies discipline catches wiring mistakes.
+// ---------------------------------------------------------------------------
+
+sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
+sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
+
+sqliteDatetimeColumn satisfies ColumnHelperFor<SqliteDatetimeDescriptor>;
+sqliteDatetimeColumn satisfies ColumnHelperForStrict<SqliteDatetimeDescriptor>;
+
+sqliteBlobColumn satisfies ColumnHelperFor<SqliteBlobDescriptor>;
+sqliteBlobColumn satisfies ColumnHelperForStrict<SqliteBlobDescriptor>;
+
+sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
+sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
+
+test('strict satisfies catches wrong codec wired in', () => {
+  // Wire the integer descriptor's factory into the bigint descriptor's
+  // slot. Coarse satisfies passes (both have `void` typeParams); strict
+  // satisfies fails because the codec types differ
+  // (SqliteIntegerCodec ≠ SqliteBigintCodec).
+  const wrongCodecHelper = () =>
+    column(
+      sqliteIntegerDescriptorClass.factory(),
+      sqliteBigintDescriptorClass.codecId,
+      undefined,
+      'integer',
+    );
+  wrongCodecHelper satisfies ColumnHelperFor<SqliteBigintDescriptor>;
+  // @ts-expect-error -- codec is SqliteIntegerCodec, not SqliteBigintCodec
+  wrongCodecHelper satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
+});
