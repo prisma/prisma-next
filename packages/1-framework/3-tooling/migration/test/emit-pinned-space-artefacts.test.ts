@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -208,8 +208,6 @@ describe('emitPinnedSpaceArtefacts', () => {
     const dir = join(migrationsDir, 'cipherstash');
     const userMigration = join(dir, '20260101T0000_baseline');
     await writeFile(`${dir}-marker`, 'noop'); // ensure mkdir creates dir
-    // Pre-create a user-authored migration package directory with a stub manifest.
-    const { mkdir } = await import('node:fs/promises');
     await mkdir(userMigration, { recursive: true });
     await writeFile(join(userMigration, 'migration.json'), '{}');
 
