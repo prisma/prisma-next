@@ -181,7 +181,23 @@ function onFieldEvent(
   return [];
 }
 
-export const cipherstashStringCodecHooks: CodecControlHooks = { onFieldEvent };
+/**
+ * The DDL type for an `Encrypted<string>` column is always
+ * `eql_v2_encrypted` regardless of any `searchable` typeParams: the
+ * search-config wiring is delivered by the codec hook's
+ * `add_search_config` op (a separate row in `eql_v2_configuration`),
+ * not by the column type itself. Returning `nativeType` unchanged
+ * tells the planner "no expansion required" — see
+ * `expandParameterizedTypeSql` in
+ * `packages/3-targets/3-targets/postgres/src/core/migrations/planner-ddl-builders.ts`,
+ * which only requires this hook to *exist* for any column carrying
+ * `typeParams`. Without it, the planner refuses to render the column
+ * (the existing arktype-json extension wires the same identity hook).
+ */
+const expandNativeType: NonNullable<CodecControlHooks['expandNativeType']> = ({ nativeType }) =>
+  nativeType;
+
+export const cipherstashStringCodecHooks: CodecControlHooks = { onFieldEvent, expandNativeType };
 
 /** Re-export the codec id alongside the hooks so wiring sites import them together. */
 export { CIPHERSTASH_STRING_CODEC_ID };
