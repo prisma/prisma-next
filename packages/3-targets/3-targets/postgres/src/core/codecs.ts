@@ -113,7 +113,7 @@ import {
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
 type NumericParams = { readonly precision: number; readonly scale?: number };
-type EnumParams = { readonly values?: readonly unknown[] };
+type EnumParams = { readonly values?: readonly string[] };
 
 const lengthParamsSchema = arktype({
   'length?': 'number.integer > 0',
@@ -902,7 +902,7 @@ pgIntervalColumn satisfies ColumnHelperForStrict<PgIntervalDescriptor>;
 // ---------------------------------------------------------------------------
 
 const enumParamsSchema = arktype({
-  'values?': 'unknown[]',
+  'values?': 'string[]',
 });
 
 export class PgEnumCodec extends CodecImpl<
