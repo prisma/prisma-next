@@ -107,6 +107,19 @@ This is a documented departure from the framework-mechanism sub-spec's first-cut
 
 Within a single migration, structural ops come first, then codec-emitted ops grouped by triggering event (added → dropped → altered). Within a group, ordering is deterministic by `(tableName, fieldName)` then by hook-returned op index. This ordering is contract — a codec author can rely on the structural `CREATE COLUMN` running before their hook-emitted `INSERT INTO eql_v2_configuration`.
 
+### When the ops appear on disk
+
+The hook fires inside the planner. The planner runs in two distinct flows, and the hook participates in both — but with very different observable behaviour:
+
+| Flow                          | Hook fires? | What happens to the returned ops                                                                                       |
+| ----------------------------- | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `prisma-next migrate`         | yes         | Inlined into the app-space migration's `ops.json` and rendered into the user's `migrations/<timestamp>/migration.ts` alongside their `addColumn` / `dropColumn` calls. The user reviews them in the same PR. |
+| `prisma-next db init`         | yes         | Applied immediately against the live database; never written to disk. (Greenfield synthesis: the planner runs from `∅` to the current contract every time.)                                  |
+| `prisma-next db update`       | yes         | Applied immediately against the live database; never written to disk. (Reconciliation synthesis from the live schema.)                                                                       |
+| `prisma-next db apply`        | no          | The ops in `migration.ts` are already pinned; apply replays them.                                                       |
+
+This mirrors the broader `migrate` (persist) vs `db init`/`db update` (apply-and-forget) asymmetry that holds for *all* planner output, not just codec hooks. Codec-emitted ops are not special — they flow through the same `TypeScriptRenderablePostgresMigration` (and SQLite mirror) pipeline as structural ops, and are indistinguishable from user-authored ops in `migration.ts`. A reviewer reading a PR cannot tell from the file alone which calls came from a codec hook and which were emitted by a structural diff — by design.
+
 ### Worked example: cipherstash
 
 ```ts
