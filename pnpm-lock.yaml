@@ -112,6 +112,9 @@ importers:
       '@prisma-next/mongo-query-builder':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/5-query-builders/query-builder
+      '@prisma-next/utils':
+        specifier: workspace:*
+        version: link:../../packages/1-framework/0-foundation/utils
       mongodb:
         specifier: 'catalog:'
         version: 6.21.0

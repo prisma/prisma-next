@@ -19,6 +19,7 @@
     "@prisma-next/mongo": "workspace:*",
     "@prisma-next/mongo-contract": "workspace:*",
     "@prisma-next/mongo-query-builder": "workspace:*",
+    "@prisma-next/utils": "workspace:*",
     "mongodb": "catalog:"
   },
   "devDependencies": {
