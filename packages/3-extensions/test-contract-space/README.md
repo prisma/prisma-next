@@ -1,8 +1,8 @@
 # @prisma-next/extension-test-contract-space
 
-Private workspace fixture for the **contract-space mechanism** introduced in
-[`projects/extension-contract-spaces`](../../../projects/extension-contract-spaces/).
-Not published.
+Private workspace fixture for the **contract-space mechanism** implemented in
+`@prisma-next/migration` (see its `spaces` export, e.g.
+`packages/1-framework/3-tooling/migration/src/exports/spaces.ts`). Not published.
 
 ## What this exists for
 
