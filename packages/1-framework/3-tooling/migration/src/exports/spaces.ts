@@ -3,6 +3,11 @@ export {
   type DescriptorSelfConsistencyInputs,
 } from '../assert-descriptor-self-consistency';
 export {
+  type ComputeExtensionSpaceApplyPathInputs,
+  computeExtensionSpaceApplyPath,
+  type ExtensionSpaceApplyPathOutcome,
+} from '../compute-extension-space-apply-path';
+export {
   concatenateSpaceApplyInputs,
   type SpaceApplyInput,
 } from '../concatenate-space-apply-inputs';
@@ -27,6 +32,7 @@ export {
 } from '../plan-all-spaces';
 export { readPinnedContractHash } from '../read-pinned-contract-hash';
 export { type PinnedHeadRef, readPinnedHeadRef } from '../read-pinned-head-ref';
+export { readPinnedSpaceContract } from '../read-pinned-space-contract';
 export {
   APP_SPACE_ID,
   assertValidSpaceId,

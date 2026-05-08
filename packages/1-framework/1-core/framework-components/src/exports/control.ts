@@ -6,6 +6,7 @@ export type {
 } from '../control/control-capabilities';
 export {
   hasMigrations,
+  hasMultiSpaceRunner,
   hasOperationPreview,
   hasPslContractInfer,
   hasSchemaView,
@@ -41,6 +42,11 @@ export type {
   MigrationRunnerResult,
   MigrationRunnerSuccessValue,
   MigrationScaffoldContext,
+  MultiSpaceCapableRunner,
+  MultiSpaceRunnerFailure,
+  MultiSpaceRunnerPerSpaceOptions,
+  MultiSpaceRunnerResult,
+  MultiSpaceRunnerSuccessValue,
   OpFactoryCall,
   SerializedQueryPlan,
   TargetMigrationsCapability,

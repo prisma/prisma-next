@@ -137,6 +137,7 @@ async function executeDbInitCommand(
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
       connection: dbConnection,
+      migrationsDir,
       onProgress,
     });
 

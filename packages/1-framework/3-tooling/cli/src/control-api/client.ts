@@ -25,9 +25,11 @@ import { notOk, ok } from '@prisma-next/utils/result';
 import { assertFrameworkComponentsCompatible } from '../utils/framework-components';
 import { enrichContract } from './contract-enrichment';
 import { ContractValidationError } from './errors';
+import type { PerSpaceExtensionInput } from './operations/db-apply-per-space';
 import { executeDbInit } from './operations/db-init';
 import { executeDbUpdate } from './operations/db-update';
 import { executeMigrationApply } from './operations/migration-apply';
+
 import type {
   ControlActionName,
   ControlClient,
@@ -46,6 +48,27 @@ import type {
   SignOptions,
   VerifyOptions,
 } from './types';
+
+/**
+ * Collect extension descriptors that publish a `contractSpace` (project
+ * spec § Approach — extensions opt into a schema contribution by exposing
+ * `contractSpace` on their descriptor). The CLI passes the resulting list
+ * into the per-space `db init` / `db update` flow so each extension's
+ * pinned migration graph is walked alongside the app-space synthesis.
+ *
+ * Extensions without a `contractSpace` (codec-only, runtime-only, etc.)
+ * are silently dropped — they still influence the app-space contract via
+ * codec hooks and execution behaviours, but they do not own a marker row
+ * or a per-space migration graph.
+ */
+function collectExtensionContractSpaceInputs(
+  extensionPacks: ReadonlyArray<{ readonly id: string }> | undefined,
+): readonly PerSpaceExtensionInput[] {
+  if (!extensionPacks) return [];
+  return extensionPacks
+    .filter((pack) => (pack as { readonly contractSpace?: unknown }).contractSpace !== undefined)
+    .map((pack) => ({ id: pack.id }));
+}
 
 /**
  * Creates a programmatic control client for Prisma Next operations.
@@ -360,6 +383,10 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
+    const extensionContractSpaces = collectExtensionContractSpaceInputs(
+      this.options.extensionPacks,
+    );
+
     return executeDbInit({
       driver,
       familyInstance,
@@ -367,6 +394,8 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      ...ifDefined('migrationsDir', options.migrationsDir),
+      ...(extensionContractSpaces.length > 0 ? { extensionContractSpaces } : {}),
       ...ifDefined('onProgress', onProgress),
     });
   }
@@ -388,6 +417,10 @@ class ControlClientImpl implements ControlClient {
       throw new ContractValidationError(message, error);
     }
 
+    const extensionContractSpaces = collectExtensionContractSpaceInputs(
+      this.options.extensionPacks,
+    );
+
     return executeDbUpdate({
       driver,
       familyInstance,
@@ -395,6 +428,8 @@ class ControlClientImpl implements ControlClient {
       mode: options.mode,
       migrations: this.options.target.migrations,
       frameworkComponents,
+      ...ifDefined('migrationsDir', options.migrationsDir),
+      ...(extensionContractSpaces.length > 0 ? { extensionContractSpaces } : {}),
       ...ifDefined('acceptDataLoss', options.acceptDataLoss),
       ...ifDefined('onProgress', onProgress),
     });

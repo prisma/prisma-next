@@ -1,6 +1,11 @@
 import type { ControlTargetDescriptor } from './control-descriptors';
 import type { ControlFamilyInstance } from './control-instances';
-import type { MigrationPlanOperation, TargetMigrationsCapability } from './control-migration-types';
+import type {
+  MigrationPlanOperation,
+  MigrationRunner,
+  MultiSpaceCapableRunner,
+  TargetMigrationsCapability,
+} from './control-migration-types';
 import type { OperationPreview } from './control-operation-preview';
 import type { CoreSchemaView } from './control-schema-view';
 import type { PslDocumentAst } from './psl-ast';
@@ -67,5 +72,24 @@ export function hasOperationPreview<TFamilyId extends string, TSchemaIR>(
   return (
     'toOperationPreview' in instance &&
     typeof (instance as Record<string, unknown>)['toOperationPreview'] === 'function'
+  );
+}
+
+/**
+ * Capability declaring that a runner can apply per-space plans inside a
+ * single outer transaction. Today's only implementer is the SQL family
+ * (`SqlMigrationRunner`); Mongo per-space is a non-goal per the project
+ * spec for extension contract spaces (TML-2397).
+ *
+ * The CLI uses this guard to route `db init` / `db update` through a
+ * per-space wiring when extensions expose a `contractSpace`, falling back
+ * to the single-space path when no multi-space capability is present.
+ */
+export function hasMultiSpaceRunner<TFamilyId extends string, TTargetId extends string>(
+  runner: MigrationRunner<TFamilyId, TTargetId>,
+): runner is MigrationRunner<TFamilyId, TTargetId> & MultiSpaceCapableRunner<TFamilyId, TTargetId> {
+  return (
+    'executeAcrossSpaces' in runner &&
+    typeof (runner as Record<string, unknown>)['executeAcrossSpaces'] === 'function'
   );
 }

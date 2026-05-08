@@ -11,6 +11,7 @@ import { hasOperationPreview } from '@prisma-next/framework-components/control';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
 import type { DbUpdateResult, DbUpdateSuccess, OnControlProgress } from '../types';
+import { executePerSpaceDbApply, type PerSpaceExtensionInput } from './db-apply-per-space';
 import { createOperationCallbacks, stripOperations } from './migration-helpers';
 
 // F12: db update allows additive, widening, and destructive operations.
@@ -34,6 +35,22 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
   >;
   readonly frameworkComponents: ReadonlyArray<TargetBoundComponentDescriptor<TFamilyId, TTargetId>>;
   readonly acceptDataLoss?: boolean;
+  /**
+   * On-disk migrations directory the per-space wiring reads pinned
+   * artefacts from. Required when {@link extensionContractSpaces} is
+   * non-empty; ignored otherwise.
+   *
+   * @see specs/framework-mechanism.spec.md § 6 — `db update` per-space.
+   */
+  readonly migrationsDir?: string;
+  /**
+   * Declared extension contract spaces. When non-empty, `db update`
+   * routes through the per-space flow (extension graphs walked from
+   * `currentMarker → pinnedHeadRef.hash`, app-space synthesised from
+   * contract IR, all applied in a single transaction). When empty,
+   * today's single-space flow is preserved unchanged.
+   */
+  readonly extensionContractSpaces?: ReadonlyArray<PerSpaceExtensionInput>;
   /** Optional progress callback for observing operation progress. */
   readonly onProgress?: OnControlProgress;
 }
@@ -49,8 +66,76 @@ export interface ExecuteDbUpdateOptions<TFamilyId extends string, TTargetId exte
 export async function executeDbUpdate<TFamilyId extends string, TTargetId extends string>(
   options: ExecuteDbUpdateOptions<TFamilyId, TTargetId>,
 ): Promise<DbUpdateResult> {
-  const { driver, familyInstance, contract, mode, migrations, frameworkComponents, onProgress } =
-    options;
+  const {
+    driver,
+    familyInstance,
+    contract,
+    mode,
+    migrations,
+    frameworkComponents,
+    migrationsDir,
+    extensionContractSpaces,
+    onProgress,
+  } = options;
+
+  // Per-space `db update` (sub-spec § 6): when at least one extension
+  // declares a `contractSpace`, fan out across (extensions
+  // alphabetically + app-space) inside a single transaction. Fresh
+  // databases initialise every space; already-initialised databases
+  // advance only the marker rows whose `pinnedHeadRef.hash` has moved.
+  if (extensionContractSpaces && extensionContractSpaces.length > 0) {
+    if (!migrationsDir) {
+      throw new Error(
+        'executeDbUpdate: `migrationsDir` is required when `extensionContractSpaces` is non-empty.',
+      );
+    }
+    if (mode === 'apply' && !options.acceptDataLoss) {
+      // Plan once with the per-space flow and surface destructive ops
+      // so the user can re-run with `-y`. Single-space `db update`
+      // performs this gate after planning; we mirror the contract by
+      // running plan-mode first and inspecting the aggregate.
+      const planResult = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
+        driver,
+        familyInstance,
+        contract,
+        mode: 'plan',
+        migrations,
+        frameworkComponents,
+        migrationsDir,
+        extensionContractSpaces,
+        policy: DB_UPDATE_POLICY,
+        action: 'dbUpdate',
+        ...ifDefined('onProgress', onProgress),
+      })) as DbUpdateResult;
+      if (!planResult.ok) return planResult;
+      const destructiveOps = planResult.value.plan.operations
+        .filter((op) => op.operationClass === 'destructive')
+        .map((op) => ({ id: op.id, label: op.label }));
+      if (destructiveOps.length > 0) {
+        return notOk({
+          code: 'DESTRUCTIVE_CHANGES',
+          summary: `Planned ${destructiveOps.length} destructive operation(s) that require confirmation`,
+          why: 'Destructive operations require confirmation — re-run with -y to accept',
+          conflicts: undefined,
+          meta: { destructiveOperations: destructiveOps },
+        });
+      }
+    }
+    const result = (await executePerSpaceDbApply<TFamilyId, TTargetId>({
+      driver,
+      familyInstance,
+      contract,
+      mode,
+      migrations,
+      frameworkComponents,
+      migrationsDir,
+      extensionContractSpaces,
+      policy: DB_UPDATE_POLICY,
+      action: 'dbUpdate',
+      ...ifDefined('onProgress', onProgress),
+    })) as DbUpdateResult;
+    return result;
+  }
 
   const planner = migrations.createPlanner(familyInstance);
   const runner = migrations.createRunner(familyInstance);
