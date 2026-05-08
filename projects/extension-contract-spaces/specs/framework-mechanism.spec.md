@@ -350,6 +350,12 @@ For each extension space: `targetRef` is read from the pinned `<projectRoot>/mig
 
 Concatenate all `SpaceApplyInput`s in the cross-space ordering convention and pass to the runner (§ 4).
 
+**Schema prune for app-space planning (M2 R5).** The app-space planner is invoked against the *full* introspected live schema, but it owns only the app-space slice — extension-owned tables (declared in extension-space pinned `contract.json`s) are not in the app-space contract IR and would otherwise be flagged as "extras" and emitted as `DROP TABLE` ops by `db update`. To prevent this, the consumer site (`@prisma-next/cli`'s `executePerSpaceDbApply`) prunes the introspected `Schema.storage.tables` of any tables owned by other spaces' contracts (read from on-disk pinned artefacts — no descriptor imports) before passing it to the app-space planner.
+
+This is the planner-side mirror of `strictVerification: false` on the runner-side per-space verifier (§ 4): both layers enforce **disjoint per-space ownership** at different pipeline stages. Implementation duck-types on `Schema.storage.tables` — checks each shape boundary and falls through gracefully (returns input unchanged) on mismatch, so future SQL conventions are not broken silently.
+
+Strict-mode correctness preserved: genuine app-space orphans (tables in the live schema that no contract owns) are not in `ownedByOthers` and survive the prune, so the planner still flags them as extras in the app-space slice.
+
 ## 7. Synthetic test extension (T1.10)
 
 Location: `packages/3-extensions/test-contract-space/`. Mirrors `packages/3-extensions/pgvector/`'s package shape (`package.json`, `tsdown.config.ts`, `vitest.config.ts`, `tsconfig.json`, `src/`, `test/`, `README.md`).
