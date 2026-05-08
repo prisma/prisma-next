@@ -1,0 +1,9 @@
+model User {
+  id                  Int @id @default(autoincrement())
+  storageOnly         cipherstash.EncryptedString({})
+  equality            cipherstash.EncryptedString({ equality: true })
+  full                cipherstash.EncryptedString({ equality: true, freeTextSearch: true })
+  optionalStorageOnly cipherstash.EncryptedString({})?
+  optionalEquality    cipherstash.EncryptedString({ equality: true })?
+  optionalFull        cipherstash.EncryptedString({ equality: true, freeTextSearch: true })?
+}
