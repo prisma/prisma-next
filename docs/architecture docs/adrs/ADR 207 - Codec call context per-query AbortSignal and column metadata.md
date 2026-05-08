@@ -11,26 +11,49 @@ Codec query-time methods (`encode`, `decode`) gain an optional second argument: 
 A codec author shipping an encrypted-JSON column type with cancellation and column-aware envelopes:
 
 ```ts
-import { codec } from '@prisma-next/sql-relational-core/ast';
+import {
+  CodecDescriptorImpl,
+  CodecImpl,
+  voidParamsSchema,
+  type CodecInstanceContext,
+} from '@prisma-next/framework-components/codec';
+import type { JsonValue } from '@prisma-next/contract/types';
+import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
 import { encryptClient } from './encrypt-client';
 
-const encryptedJson = defineCodec({
-  typeId: 'encrypted/json@1',
-  targetTypes: ['jsonb'],
+class EncryptedJsonCodec extends CodecImpl<
+  'encrypted/json@1',
+  readonly [],
+  string,
+  { readonly value: JsonValue; readonly column?: { table: string; name: string } }
+> {
+  override readonly id = 'encrypted/json@1';
+  override readonly traits = [] as const;
 
-  // Single-arg authors continue to compile and run unchanged.
-  // Two-arg authors observe the per-call context.
-  encode: async (value: JsonValue, ctx) => {
-    return encryptClient.encrypt(value, { signal: ctx?.signal });
-  },
-  decode: async (wire: string, ctx) => {
-    const plain = await encryptClient.decrypt(wire, { signal: ctx?.signal });
+  override async encode(value: { value: JsonValue }, ctx: SqlCodecCallContext): Promise<string> {
+    return encryptClient.encrypt(value.value, { signal: ctx.signal });
+  }
+  override async decode(
+    wire: string,
+    ctx: SqlCodecCallContext,
+  ): Promise<{ value: JsonValue; column?: { table: string; name: string } }> {
+    const plain = await encryptClient.decrypt(wire, { signal: ctx.signal });
     // SQL family ctx: column is { table, name } when the cell resolves to
     // a single underlying column, undefined for aggregates / computed
     // expressions / include aliases.
-    return { value: plain, column: ctx?.column };
-  },
-});
+    return { value: plain, column: ctx.column };
+  }
+  encodeJson(v: { value: JsonValue }): JsonValue { return v.value; }
+  decodeJson(j: JsonValue): { value: JsonValue } { return { value: j }; }
+}
+
+class EncryptedJsonDescriptor extends CodecDescriptorImpl<void> {
+  override readonly codecId = 'encrypted/json@1';
+  override readonly traits = [] as const;
+  override readonly targetTypes = ['jsonb'] as const;
+  override readonly paramsSchema = voidParamsSchema;
+  override readonly factory = () => (_ctx: CodecInstanceContext) => new EncryptedJsonCodec();
+}
 ```
 
 The call site supplies the signal once; the runtime forwards the same `AbortSignal` reference to every codec call inside that one query:
