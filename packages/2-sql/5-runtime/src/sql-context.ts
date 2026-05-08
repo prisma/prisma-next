@@ -31,6 +31,7 @@ import type {
   SqlCodecInstanceContext,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
+import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type {
   AppliedMutationDefault,
   CodecDescriptorRegistry,
@@ -308,56 +309,6 @@ function collectCodecDescriptors(contributors: ReadonlyArray<SqlStaticContributi
   }
 
   return { all, parameterized };
-}
-
-/**
- * Build the unified descriptor map. Every codec contributor ships
- * native {@link CodecDescriptor}s through the unified `codecs:` slot,
- * so the registry construction is a pure indexing pass — no synthesis,
- * no parameterized-vs-not branching.
- *
- * Codec-registry-unification spec § Decision: every codec resolves
- * through one descriptor map; reads are non-branching.
- */
-function buildCodecDescriptorRegistry(
-  allDescriptors: ReadonlyArray<AnyCodecDescriptor>,
-): CodecDescriptorRegistry {
-  type AnyDescriptor = CodecDescriptor<unknown>;
-  const byId = new Map<string, AnyDescriptor>();
-  const byTargetType = new Map<string, Array<AnyDescriptor>>();
-
-  // The descriptor map is heterogeneous in `P` — each codec id has its
-  // own params shape. The public `CodecDescriptorRegistry` interface
-  // widens to `CodecDescriptor<unknown>` and consumers narrow per codec
-  // id at the call site (the descriptor's `paramsSchema` validates
-  // JSON-sourced params before the factory ever sees them, so the
-  // runtime narrow is safe). The cast at registration goes through
-  // `unknown` because `CodecDescriptor<P>` is invariant in `P` (the
-  // `factory` and `renderOutputType` slots use `P` contravariantly).
-  for (const descriptor of allDescriptors) {
-    const widened = descriptor as unknown as AnyDescriptor;
-    byId.set(descriptor.codecId, widened);
-    for (const targetType of descriptor.targetTypes) {
-      const list = byTargetType.get(targetType);
-      if (list) {
-        list.push(widened);
-      } else {
-        byTargetType.set(targetType, [widened]);
-      }
-    }
-  }
-
-  return {
-    descriptorFor(codecId: string): AnyDescriptor | undefined {
-      return byId.get(codecId);
-    },
-    *values(): IterableIterator<AnyDescriptor> {
-      yield* byId.values();
-    },
-    byTargetType(targetType: string): readonly AnyDescriptor[] {
-      return byTargetType.get(targetType) ?? Object.freeze([]);
-    },
-  };
 }
 
 function collectTypeRefSites(
