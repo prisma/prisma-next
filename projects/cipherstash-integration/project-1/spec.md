@@ -79,12 +79,20 @@ Provided by the TML-2397 foundation:
 - Decryption is **always explicit** — never lazy on field access, never streamed mid-iteration.
 - Implementation rides on the post-#402 `RuntimeParameterizedCodecDescriptor<P>` machinery (the same shape pgvector uses — `paramsSchema` declared via arktype, separate from the codec body itself which keeps the existing `codec({ typeId, targetTypes, encode, decode, ... })` shape).
 
-### Search operators: `eq` and `ilike`
+### Search operators: cipherstash-namespaced (`cipherstashEq`, `cipherstashIlike`)
 
-- Lowering for `eq` on encrypted columns: `WHERE email = $1` lowers to `WHERE eql_v2.eq(email, eql_v2.encrypt($1, ...))` (or the EQL canonical form — confirm against EQL operator templates in the first-attempt repo's `operation-templates.ts`).
-- Lowering for `ilike` on encrypted columns: similarly via `eql_v2.ilike(...)`.
-- Both operators are integration-tested against live Postgres + EQL: a `findMany({ where: { email: { equals: 'x' } } })` and `findMany({ where: { email: { contains: 'foo' } } })` round-trip from authored contract → encoded query → real database execution → decoded result.
-- Operators are wired through the existing `queryOperations` mechanism that pgvector uses for distance operators — no new framework surface.
+> **Decision (2026-05-08).** Cipherstash columns expose their search operators under a **cipherstash-namespaced** API — not by extending or overriding the framework's built-in `eq` / `ilike`. Two reasons:
+>
+> 1. The framework's built-in `eq` lowers to `"col" = $1`, which is wrong on `eql_v2_encrypted` columns (EQL ciphers carry randomized nonces; two encryptions of the same plaintext don't byte-equal). Trait-based dispatch onto the built-in `eq` would silently produce wrong-SQL.
+> 2. The codec exposes its own EQL operators (`eql_v2.eq`, `eql_v2.ilike`), which are semantically distinct from the relational `=` / `LIKE`. Surfacing them under cipherstash-namespaced names makes the difference explicit at the call site rather than hiding it behind a transparent-overload that would surprise users when behavior diverged.
+>
+> Concretely: the cipherstash codec declares **no traits** at registration time. The framework's built-in trait-gated operators (`eq`, `neq`, `in`, `notIn`, `like`, `ilike`) are therefore **not reachable** on cipherstash columns — calling `email.eq(...)` is a type error. Equality and free-text search go through `email.cipherstashEq(...)` and `email.cipherstashIlike(...)` respectively.
+
+- Lowering for `cipherstashEq` on encrypted columns: `email.cipherstashEq($1)` lowers to `eql_v2.eq("email", $1::eql_v2_encrypted)` (the EQL canonical form). The middleware bulk-encrypts `$1`'s plaintext into ciphertext before encode runs.
+- Lowering for `cipherstashIlike` on encrypted columns: `email.cipherstashIlike($1)` lowers to `eql_v2.ilike("email", $1::eql_v2_encrypted)` similarly.
+- Null check: `email.isNull()` and `email.isNotNull()` lower to `IS [NOT] NULL` directly via the framework's `NullCheckExpr` — the operator registry is not consulted, so the cipherstash namespacing has no effect on null handling.
+- Both operators are integration-tested against live Postgres + EQL: a query `db.from(User).where(({ email }) => email.cipherstashEq('alice@example.com'))` and a parallel `cipherstashIlike(...)` round-trip from authored contract → encoded query → real database execution → decoded result.
+- Operators register through the existing `queryOperations` mechanism that pgvector uses for distance operators — same SPI, no new framework surface, no method-name collisions.
 
 ### Per-column search config: emitted automatically by the codec lifecycle hook
 
@@ -142,10 +150,10 @@ The Project 1/Project 2 cleavage is on two axes:
 
 The umbrella's acceptance criteria are the union of the (still-active) task specs' criteria — see each task spec for fine-grained criteria. The umbrella-level integration tests are:
 
-- [ ] **AC-UMB1**: Round-trip integration test against live Postgres + EQL: contract authored in **PSL** declares a `User` model with an `EncryptedString({ equality: true, freeTextSearch: true })` column. `prisma-next migrate` produces app-space + cipherstash-space migrations (codec hook emits `add_search_config` for both `unique` and `match` index modes). `db apply` runs both spaces in a single transaction. Insert via `db.insert(User, { email: EncryptedString.from('alice@example.com') })`. `findMany({ where: { email: { equals: 'alice@example.com' } } })` returns the row. `findMany({ where: { email: { contains: 'alice' } } })` returns the row. `decryptAll(rows)` materializes plaintext.
+- [ ] **AC-UMB1**: Round-trip integration test against live Postgres + EQL: contract authored in **PSL** declares a `User` model with an `EncryptedString({ equality: true, freeTextSearch: true })` column. `prisma-next migrate` produces app-space + cipherstash-space migrations (codec hook emits `add_search_config` for both `unique` and `match` index modes). `db apply` runs both spaces in a single transaction. Insert via `db.insert(User, { email: EncryptedString.from('alice@example.com') })`. A query using `email.cipherstashEq('alice@example.com')` returns the row. A parallel query using `email.cipherstashIlike('%alice%')` returns the row. `decryptAll(rows)` materializes plaintext. **Note on the unrelated `equality: true` author-time flag**: this remains the user-facing flag for declaring an encrypted column supports equality search at the contract / DDL level (drives the `add_search_config` op for the `unique` index). It is *not* the same as the framework's `equality` *trait*, which the cipherstash codec deliberately does not declare (see § Search operators).
 - [ ] **AC-UMB2**: The same scenario authored via the **TypeScript contract** (`encryptedString({...})`) produces a `contract.json` byte-identical to the PSL version (parity test).
 - [ ] **AC-UMB3**: Bulk amortization verified: inserting 10 rows × 1 encrypted column issues exactly **one** `bulkEncrypt` mock-SDK call. `decryptAll` over a 10-row result set issues exactly **one** `bulkDecrypt` mock-SDK call.
-- [ ] **AC-UMB4**: Nullable variant: `email: EncryptedString({ equality: true })?` round-trips correctly with a mix of null and non-null rows. `findMany({ where: { email: null } })` lowers to `WHERE email IS NULL` (not an `eql_v2.eq` call).
+- [ ] **AC-UMB4**: Nullable variant: `email: EncryptedString({ equality: true })?` round-trips correctly with a mix of null and non-null rows. A query using `email.isNull()` lowers to `WHERE email IS NULL` directly via `NullCheckExpr` (not an `eql_v2.eq` call); the operator registry is not consulted.
 - [ ] **AC-UMB5**: Cancellation: an aborted `signal` at any phase (`beforeExecute`, codec encode, codec decode, single-cell `decrypt`, `decryptAll`) surfaces `RUNTIME.ABORTED { phase }` promptly per ADR 207 / 208.
 - [ ] **AC-UMB6**: `pnpm lint:deps` passes for `packages/3-extensions/cipherstash/`.
 - [ ] **AC-UMB7**: An example app under `examples/` demonstrates the pattern with realistic shapes (PSL schema + a few queries + a `decryptAll` site).
