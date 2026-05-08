@@ -43,6 +43,10 @@ import {
   setCommandExamples,
 } from '../utils/command-helpers';
 import {
+  type ExtensionMigrationsExtensionInput,
+  runContractSpaceExtensionMigrationsPass,
+} from '../utils/contract-space-extension-migrations-pass';
+import {
   formatContractSpaceDriftWarning,
   type MigrateExtensionInput,
   runContractSpaceMigratePass,
@@ -247,6 +251,31 @@ async function executeMigrationPlanCommand(
       if (drift.kind === 'drift') {
         ui.stderr(formatContractSpaceDriftWarning(drift));
       }
+    }
+  }
+
+  // Materialise descriptor-shipped migration packages onto disk under
+  // `migrations/<spaceId>/<dirName>/` for any package not yet present.
+  // Idempotent (existing dirs are left untouched). Locks AC-7.
+  // Uses `planAllSpaces` for deterministic ordering + duplicate-spaceId
+  // detection. See specs/framework-mechanism.spec.md § 3.
+  const extensionMigrationsInputs: readonly ExtensionMigrationsExtensionInput[] = (
+    config.extensionPacks ?? []
+  ).map((pack) => {
+    const cs = (
+      pack as {
+        readonly contractSpace?: ExtensionMigrationsExtensionInput['contractSpace'];
+      }
+    ).contractSpace;
+    return cs !== undefined ? { id: pack.id, contractSpace: cs } : { id: pack.id };
+  });
+  const extensionMigrationsResult = await runContractSpaceExtensionMigrationsPass({
+    migrationsDir,
+    extensionPacks: extensionMigrationsInputs,
+  });
+  if (!flags.json && !flags.quiet) {
+    for (const entry of extensionMigrationsResult.emitted) {
+      ui.step(`Emitted ${entry.spaceId}/${entry.dirName}`);
     }
   }
 
