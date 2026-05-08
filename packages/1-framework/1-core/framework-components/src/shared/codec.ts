@@ -25,14 +25,19 @@ import type { CodecDescriptor } from './codec-descriptor';
 import type { CodecCallContext, CodecTrait } from './codec-types';
 
 /**
- * Phantom marker symbol for the {@link Codec} `TTraits` generic. The
+ * Phantom property name for the {@link Codec} `TTraits` generic. The
  * trait set is type-encoded on the codec generic so downstream helpers
  * (`CodecTraits<C>`, trait-gated operator surfaces, family extensions)
  * can thread it without the instance carrying a runtime `traits` field.
  * Runtime source of truth is {@link CodecDescriptor.traits}; the slot
  * here is `undefined` and exists only as a type-level carrier.
+ *
+ * Implemented as a string-key phantom property rather than a `unique
+ * symbol`: `unique symbol` identity is tied to its declaring module,
+ * which makes consumer-side `pack.d.mts` reference chunk-private paths
+ * for the symbol identity under bundlers that split declaration files
+ * (the same `TS2742` family that drove the F8 `Resolve<T>` materialisation).
  */
-declare const codecTraitsPhantom: unique symbol;
 
 /**
  * A codec is the contract between an application value and its on-wire and
@@ -78,8 +83,8 @@ export interface Codec<
 > {
   /** Unique codec identifier in `namespace/name@version` format (e.g. `pg/timestamptz@1`). The factory sets this to the descriptor's `codecId`; consumers use it as a back-reference for descriptor lookups and for decode-error diagnostics. */
   readonly id: Id;
-  /** Phantom carrier for the `TTraits` generic; see {@link codecTraitsPhantom}. */
-  readonly [codecTraitsPhantom]?: TTraits;
+  /** Phantom carrier for the `TTraits` generic; type-only, undefined at runtime. */
+  readonly __codecTraits?: TTraits;
   /** Converts a JS value to the wire format expected by the database driver. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(value) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */
   encode(value: TInput, ctx: CodecCallContext): Promise<TWire>;
   /** Converts a wire value from the database driver into the JS application type. Always Promise-returning at the boundary. The {@link CodecCallContext} is supplied by the runtime on every call (allocated once per `runtime.execute()`); family layers may narrow the ctx to extend it (e.g. SQL adds `column`). Author-side single-arg `(wire) => …` functions remain legal via TypeScript's bivariance for trailing parameters. */

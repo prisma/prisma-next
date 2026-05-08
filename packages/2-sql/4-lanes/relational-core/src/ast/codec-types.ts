@@ -215,7 +215,7 @@ export type DescriptorCodecInput<D> =
  * literal trait tuple at the descriptor type. Reading from the resolved
  * codec instance (`CodecImpl<…, TTraits, …>`) would lose the literal
  * because `Codec` carries `TTraits` only on its optional phantom slot
- * (`readonly [codecTraitsPhantom]?: TTraits`); codecs
+ * (`readonly __codecTraits?: TTraits`); codecs
  * extending `CodecImpl` have no required structural site that pins
  * `TTraits`, so a descriptor-keyed extractor reading from the codec
  * instance would widen to the broad `CodecTrait` union.

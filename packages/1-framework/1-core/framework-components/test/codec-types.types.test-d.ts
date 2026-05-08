@@ -32,14 +32,22 @@ test('decodeJson is required and synchronous', () => {
   expectTypeOf<DecodeJsonReturn>().not.toExtend<Promise<unknown>>();
 });
 
-test('Codec instance carries only id + the four conversion methods', () => {
+test('Codec instance carries only id + the four conversion methods (plus phantom)', () => {
   // The runtime instance is narrowed to id + behavior (TML-2357);
   // codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`,
   // `renderOutputType`) lives on `CodecDescriptor` keyed by codecId.
-  // The phantom `TTraits` carrier is keyed by a non-public unique
-  // symbol so it stays out of `keyof Codec` for string keys.
+  // The `__codecTraits` slot is a type-only phantom carrier (always
+  // `undefined` at runtime) and double-underscored to signal that it is
+  // not part of the consumer-facing API surface.
   type CodecStringKeys = Extract<keyof Codec, string>;
-  const expectedKeys = ['id', 'encode', 'decode', 'encodeJson', 'decodeJson'] as const;
+  const expectedKeys = [
+    'id',
+    'encode',
+    'decode',
+    'encodeJson',
+    'decodeJson',
+    '__codecTraits',
+  ] as const;
   type ExpectedKeys = (typeof expectedKeys)[number];
   expectTypeOf<CodecStringKeys>().toEqualTypeOf<ExpectedKeys>();
 });
