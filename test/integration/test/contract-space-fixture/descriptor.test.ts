@@ -6,10 +6,10 @@ import {
   TEST_BOX_TABLE,
   TEST_HEAD_HASH,
   TEST_SPACE_ID,
-} from '../src/core/constants';
-import testContractSpaceExtensionDescriptor from '../src/exports/control';
+} from './constants';
+import testContractSpaceExtensionDescriptor from './control';
 
-describe('test-contract-space descriptor', () => {
+describe('test-contract-space fixture descriptor', () => {
   it('identifies as a SQL extension targeted at postgres', () => {
     expect(testContractSpaceExtensionDescriptor).toMatchObject({
       kind: 'extension',
