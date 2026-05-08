@@ -1,4 +1,5 @@
 export {
+  errorDescriptorHeadHashMismatch,
   errorInvalidJson,
   errorNoInvariantPath,
   errorUnknownInvariant,
