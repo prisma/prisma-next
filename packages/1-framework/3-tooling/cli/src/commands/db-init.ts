@@ -18,6 +18,7 @@ import {
   setCommandDescriptions,
   setCommandExamples,
 } from '../utils/command-helpers';
+import { runContractSpaceVerifierMarkerCheck } from '../utils/contract-space-verifier-marker-check';
 import { runContractSpaceVerifierPrecheck } from '../utils/contract-space-verifier-precheck';
 import {
   formatMigrationApplyOutput,
@@ -118,9 +119,7 @@ async function executeDbInitCommand(
 
   // Per-space layout precheck (sub-spec § 4): catches the
   // `declaredButUnmigrated` / `orphanPinnedDir` cases at the CLI surface
-  // before any database connection. Marker-row checks (`orphanMarker`,
-  // `hashMismatch`, `invariantsMismatch`) are decidable only after the
-  // runner reads markers per-space — deferred to the M2 R3 wiring slice.
+  // before any database connection.
   const { migrationsDir } = resolveMigrationPaths(options.config, config);
   const precheckResult = await runContractSpaceVerifierPrecheck({
     migrationsDir,
@@ -132,11 +131,29 @@ async function executeDbInitCommand(
   }
 
   try {
-    // Call dbInit with connection and progress callback
+    // Marker-aware verifier (sub-spec § 4): connect explicitly so we
+    // can read marker rows before any apply work runs. Locks AC-13 +
+    // AM11 at the `db init` integration surface — `orphanMarker`,
+    // marker-vs-pinned `hashMismatch`, and `invariantsMismatch` — that
+    // the layout-only precheck cannot detect on its own. Mirrors the
+    // wiring already in place in `db verify`.
+    await client.connect(dbConnection);
+
+    const markerRowsBySpace = await client.readAllMarkers();
+    const markerCheckResult = await runContractSpaceVerifierMarkerCheck({
+      migrationsDir,
+      extensionPacks: config.extensionPacks ?? [],
+      markerRowsBySpace,
+    });
+    if (!markerCheckResult.ok) {
+      return notOk(markerCheckResult.failure);
+    }
+
+    // Call dbInit on the already-connected client (omit `connection` —
+    // `client.connect()` throws if already connected).
     const result = await client.dbInit({
       contract: contractJson,
       mode: options.dryRun ? 'plan' : 'apply',
-      connection: dbConnection,
       migrationsDir,
       onProgress,
     });

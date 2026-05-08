@@ -3694,6 +3694,9 @@ importers:
       '@prisma-next/driver-postgres':
         specifier: workspace:*
         version: link:../../../../../../packages/3-targets/7-drivers/postgres
+      '@prisma-next/extension-test-contract-space':
+        specifier: workspace:*
+        version: link:../../../../../../packages/3-extensions/test-contract-space
       '@prisma-next/family-mongo':
         specifier: workspace:*
         version: link:../../../../../../packages/2-mongo-family/9-family
