@@ -2,7 +2,10 @@ import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  type ControlDriverInstance,
+} from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -115,7 +118,7 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          invariants
        from prisma_contract.marker
        where space = $1`,
-      ['app'],
+      [APP_SPACE_ID],
     );
 
     const row = result.rows[0];

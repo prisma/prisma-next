@@ -1,7 +1,10 @@
 import type { ContractMarkerRecord } from '@prisma-next/contract/types';
 import type { SqlControlAdapter } from '@prisma-next/family-sql/control-adapter';
 import { parseContractMarkerRow } from '@prisma-next/family-sql/verify';
-import type { ControlDriverInstance } from '@prisma-next/framework-components/control';
+import {
+  APP_SPACE_ID,
+  type ControlDriverInstance,
+} from '@prisma-next/framework-components/control';
 import type {
   AnyQueryAst,
   LoweredStatement,
@@ -121,7 +124,7 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
          invariants
        FROM _prisma_marker
        WHERE space = ?`,
-      ['app'],
+      [APP_SPACE_ID],
     );
 
     const row = result.rows[0];

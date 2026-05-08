@@ -1,21 +1,12 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type { MarkerStatement } from '@prisma-next/sql-relational-core/ast';
+
+export { APP_SPACE_ID };
 
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
 }
-
-/**
- * Logical space identifier for the application's own contract space.
- * The marker table is keyed by `space`; callers that don't pass an
- * explicit space (the framework's existing single-app code paths) write
- * and read against `'app'`. Per-space callers (planner / runner /
- * verifier extensions over contract spaces) supply their space id
- * explicitly.
- *
- * @see specs/framework-mechanism.spec.md § 2 — Marker schema migration.
- */
-export const APP_SPACE_ID = 'app' as const;
 
 export interface WriteMarkerInput {
   /**
@@ -59,7 +50,7 @@ export const ensureSchemaStatement: SqlStatement = {
  */
 export const ensureTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.marker (
-    space text not null primary key default 'app',
+    space text not null primary key default '${APP_SPACE_ID}',
     core_hash text not null,
     profile_hash text not null,
     contract_json jsonb,

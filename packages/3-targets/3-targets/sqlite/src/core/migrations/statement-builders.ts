@@ -1,3 +1,7 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+
+export { APP_SPACE_ID };
+
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
@@ -5,18 +9,6 @@ export interface SqlStatement {
 
 export const MARKER_TABLE_NAME = '_prisma_marker';
 export const LEDGER_TABLE_NAME = '_prisma_ledger';
-
-/**
- * Logical space identifier for the application's own contract space.
- * The marker table is keyed by `space`; callers that don't pass an
- * explicit space (the framework's existing single-app code paths) write
- * and read against `'app'`. Per-space callers (planner / runner /
- * verifier extensions over contract spaces) supply their space id
- * explicitly.
- *
- * @see specs/framework-mechanism.spec.md § 2 — Marker schema migration.
- */
-export const APP_SPACE_ID = 'app' as const;
 
 /**
  * Control tables the runner creates/manages. The planner must not drop these
@@ -37,7 +29,7 @@ export const CONTROL_TABLE_NAMES: ReadonlySet<string> = new Set([
  */
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `CREATE TABLE IF NOT EXISTS _prisma_marker (
-    space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
+    space TEXT NOT NULL PRIMARY KEY DEFAULT '${APP_SPACE_ID}',
     core_hash TEXT NOT NULL,
     profile_hash TEXT NOT NULL,
     contract_json TEXT,
@@ -124,7 +116,7 @@ export async function migrateMarkerSchemaSqlite(driver: SqliteMigrateDriver): Pr
   // of the dance makes the steady state clean.
   await driver.query(
     `CREATE TABLE IF NOT EXISTS _prisma_marker_new (
-      space TEXT NOT NULL PRIMARY KEY DEFAULT 'app',
+      space TEXT NOT NULL PRIMARY KEY DEFAULT '${APP_SPACE_ID}',
       core_hash TEXT NOT NULL,
       profile_hash TEXT NOT NULL,
       contract_json TEXT,
@@ -148,7 +140,7 @@ export async function migrateMarkerSchemaSqlite(driver: SqliteMigrateDriver): Pr
       invariants
     )
     SELECT
-      'app',
+      '${APP_SPACE_ID}',
       core_hash,
       profile_hash,
       contract_json,

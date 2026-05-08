@@ -1,4 +1,5 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import type {
   Adapter,
   AdapterProfile,
@@ -43,7 +44,7 @@ class PostgresAdapterImpl
       capabilities: defaultCapabilities,
       readMarkerStatement: () => ({
         sql: 'select core_hash, profile_hash, contract_json, canonical_version, updated_at, app_tag, meta, invariants from prisma_contract.marker where space = $1',
-        params: ['app'],
+        params: [APP_SPACE_ID],
       }),
       // Postgres' driver hydrates `text[]` columns as native JS arrays, so the row is already in the shape the shared parser expects.
       parseMarkerRow: (row: unknown) => parseContractMarkerRow(row),

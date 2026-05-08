@@ -1,16 +1,11 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
+
+export { APP_SPACE_ID };
+
 export interface SqlStatement {
   readonly sql: string;
   readonly params: readonly unknown[];
 }
-
-/**
- * Logical space identifier for the application's own contract space.
- * Used as the default key on the marker table when callers don't pass an
- * explicit space (the framework's existing single-app code paths).
- *
- * @see specs/framework-mechanism.spec.md § 2 — Marker schema migration.
- */
-export const APP_SPACE_ID = 'app' as const;
 
 export const ensurePrismaContractSchemaStatement: SqlStatement = {
   sql: 'create schema if not exists prisma_contract',
@@ -28,7 +23,7 @@ export const ensurePrismaContractSchemaStatement: SqlStatement = {
  */
 export const ensureMarkerTableStatement: SqlStatement = {
   sql: `create table if not exists prisma_contract.marker (
-    space text not null primary key default 'app',
+    space text not null primary key default '${APP_SPACE_ID}',
     core_hash text not null,
     profile_hash text not null,
     contract_json jsonb,
@@ -69,7 +64,7 @@ export const migrateMarkerSchemaStatements: readonly SqlStatement[] = [
   },
   {
     sql: `update prisma_contract.marker
-      set space = 'app'
+      set space = '${APP_SPACE_ID}'
       where space is null`,
     params: [],
   },
@@ -80,7 +75,7 @@ export const migrateMarkerSchemaStatements: readonly SqlStatement[] = [
   },
   {
     sql: `alter table prisma_contract.marker
-      alter column space set default 'app'`,
+      alter column space set default '${APP_SPACE_ID}'`,
     params: [],
   },
   // Repoint the primary key to (space) when the table is still keyed by

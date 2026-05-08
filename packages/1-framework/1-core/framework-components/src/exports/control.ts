@@ -74,6 +74,7 @@ export type {
   SchemaTreeVisitor,
 } from '../control/control-schema-view';
 export { SchemaTreeNode } from '../control/control-schema-view';
+export { APP_SPACE_ID } from '../control/control-spaces';
 export type {
   AssembledAuthoringContributions,
   ControlStack,

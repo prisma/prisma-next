@@ -1,16 +1,8 @@
+import { APP_SPACE_ID } from '@prisma-next/framework-components/control';
 import { join } from 'pathe';
 import { errorInvalidSpaceId } from './errors';
 
-/**
- * Logical identifier of the application's contract space. Matches the
- * default value of `prisma_contract.marker.space` introduced in T1.1
- * (`packages/2-sql/5-runtime/src/sql-marker.ts`); duplicated here so the
- * authoring layer (`migration-tools`) can reason about per-space layout
- * without depending on a target-runtime package.
- *
- * @see specs/framework-mechanism.spec.md § 3 — Layout convention (γ).
- */
-export const APP_SPACE_ID = 'app' as const;
+export { APP_SPACE_ID };
 
 /**
  * Branded string carrying a compile-time guarantee that the value has
