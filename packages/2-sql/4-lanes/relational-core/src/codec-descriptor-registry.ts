@@ -29,6 +29,12 @@ export function buildCodecDescriptorRegistry(
   const byTargetType = new Map<string, Array<AnyDescriptor>>();
 
   for (const descriptor of allDescriptors) {
+    if (byId.has(descriptor.codecId)) {
+      throw new Error(
+        `Duplicate codec descriptor id: '${descriptor.codecId}' — registered twice during registry construction. ` +
+          'Each codecId must be contributed by exactly one component (target / adapter / extension pack).',
+      );
+    }
     const widened = descriptor as unknown as AnyDescriptor;
     byId.set(descriptor.codecId, widened);
     for (const targetType of descriptor.targetTypes) {
