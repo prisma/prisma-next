@@ -44,6 +44,29 @@ export function withCapabilities<TCaps extends Record<string, Record<string, boo
   return { ...contract, capabilities };
 }
 
+/**
+ * Strip `storage.tables.<table>.primaryKey` to simulate an id-less SQL model
+ * for tests. The fixture's `TestContract` pins `primaryKey` to a literal shape
+ * for every table; this helper widens it to undefined and centralises the
+ * `as unknown as TestContract` cast that would otherwise recur at every test
+ * call site.
+ */
+export function withoutPrimaryKey<TTable extends keyof TestContract['storage']['tables'] & string>(
+  contract: TestContract,
+  table: TTable,
+): TestContract {
+  return {
+    ...contract,
+    storage: {
+      ...contract.storage,
+      tables: {
+        ...contract.storage.tables,
+        [table]: { ...contract.storage.tables[table], primaryKey: undefined },
+      },
+    },
+  } as unknown as TestContract;
+}
+
 const testContext: ExecutionContext<TestContract> = createExecutionContext({
   contract: baseTestContract,
   stack: createSqlExecutionStack({

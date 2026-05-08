@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: 7
 tags: [code-review, correctness, sqlite, sql, orm]
@@ -40,7 +40,7 @@ Evidence:
 
 ## Recommended Action
 
-(filled during triage)
+**C** — accept JSDoc in `mutation-executor.ts:132-137` and the doc paragraph in `Query Lanes.md` § "Id-less tables". Decision is documented; no runtime guard is added until the SQLite adapter actually exercises id-less + AFTER-trigger contracts. Revisit then.
 
 ## Acceptance Criteria
 

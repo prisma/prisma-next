@@ -11,6 +11,7 @@ import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import {
   getColumnToFieldMap,
   getFieldToColumnMap,
+  getPrimaryKeyColumns,
   resolveFieldToColumn,
   resolveModelRelations,
   resolveModelTableName,
@@ -112,7 +113,7 @@ export function buildRowIdentityCriterion(
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumns = contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+  const primaryKeyColumns = getPrimaryKeyColumns(contract, tableName);
 
   if (primaryKeyColumns.length > 0) {
     const criterion: Record<string, unknown> = {};
@@ -129,14 +130,11 @@ export function buildRowIdentityCriterion(
     return criterion;
   }
 
-  // Id-less path: build a criterion from the row's mapped non-null column
-  // values. The row was just produced by RETURNING in the open mutation
-  // transaction, so the criterion matches the row by construction. Tables
-  // without a primary key and without unique constraints may have duplicate
-  // tuples, in which case the criterion can match additional rows; declare
-  // at least one unique constraint for single-row identity. SQLite caveat:
-  // RETURNING does not reflect AFTER-trigger column rewrites on SQLite, so
-  // a criterion built from RETURNING values may fail to match if AFTER
+  // The criterion matches by construction: the row was produced by RETURNING
+  // in the open mutation transaction. Duplicate-tuple rows can broaden the
+  // match — declare at least one unique constraint for single-row identity.
+  // SQLite caveat: RETURNING does not reflect AFTER-trigger column rewrites,
+  // so a criterion built from RETURNING values can fail to match when AFTER
   // triggers rewrote columns present in the criterion.
   const criterion: Record<string, unknown> = {};
   const fieldToColumn = getFieldToColumnMap(contract, modelName);
@@ -274,7 +272,7 @@ async function updateFirstGraph(
     // Without either, the criterion's full-tuple AND match can broaden the
     // UPDATE to every duplicate-tuple row, silently violating the single-row API.
     const table = contract.storage.tables[tableName];
-    const hasPrimaryKey = (table?.primaryKey?.columns?.length ?? 0) > 0;
+    const hasPrimaryKey = getPrimaryKeyColumns(contract, tableName).length > 0;
     const hasUnique = (table?.uniques?.length ?? 0) > 0;
     if (!hasPrimaryKey && !hasUnique) {
       throw new Error(
@@ -713,6 +711,12 @@ async function findFirstByFilters(
   return mapStorageRowToModelFields(contract, modelName, firstRow);
 }
 
+// FK-rewrite cleanup (disconnect / setNull) is the one ORM mutation path that
+// does not require the `returning` capability: no row data is read back, only
+// the side-effect on FK columns matters. Surface-level updateCount/deleteCount
+// in collection.ts gate on assertReturningCapability; this internal helper
+// stays ungated to keep nested-mutation cleanup compatible with adapters that
+// may not expose RETURNING.
 async function executeUpdateCount(
   scope: RuntimeScope,
   contract: Contract<SqlStorage>,

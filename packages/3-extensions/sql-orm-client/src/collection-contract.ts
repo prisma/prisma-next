@@ -318,19 +318,21 @@ export function resolveModelTableName(contract: Contract<SqlStorage>, modelName:
   throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
 }
 
+export function getPrimaryKeyColumns(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+): readonly string[] {
+  return contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+}
+
 export function resolvePrimaryKeyColumn(
   contract: Contract<SqlStorage>,
   tableName: string,
   operation: string,
 ): string {
-  const pkColumn = contract.storage.tables[tableName]?.primaryKey?.columns[0];
+  const pkColumn = getPrimaryKeyColumns(contract, tableName)[0];
   if (pkColumn === undefined) {
-    throw new Error(
-      `${operation} requires table "${tableName}" to declare a primary key. ` +
-        'Id-less tables can be queried via the SQL DSL or predicate-based ORM operations ' +
-        '(e.g. where(...).updateAll(), where(...).deleteAll()), but ORM helpers that fall ' +
-        'back to a primary key are unsupported on id-less models.',
-    );
+    throw new Error(`${operation} requires table "${tableName}" to declare a primary key.`);
   }
   return pkColumn;
 }
@@ -347,8 +349,7 @@ export function pickCountReturningColumn(
   if (!table) {
     throw new Error(`Unknown table "${tableName}"`);
   }
-  const pkColumn = table.primaryKey?.columns[0];
-  const firstColumn = pkColumn ?? Object.keys(table.columns)[0];
+  const firstColumn = getPrimaryKeyColumns(contract, tableName)[0] ?? Object.keys(table.columns)[0];
   if (firstColumn === undefined) {
     throw new Error(`Cannot pick a returning column for table "${tableName}": no columns.`);
   }

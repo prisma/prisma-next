@@ -12,7 +12,7 @@ import {
   hasNestedMutationCallbacks,
 } from '../src/mutation-executor';
 import type { MockRuntime, TestContract } from './helpers';
-import { createMockRuntime, getTestContext, getTestContract } from './helpers';
+import { createMockRuntime, getTestContext, getTestContract, withoutPrimaryKey } from './helpers';
 
 function withTransaction(runtime: MockRuntime) {
   const commit = vi.fn(async () => undefined);
@@ -169,21 +169,7 @@ describe('mutation-executor', () => {
   });
 
   it('buildRowIdentityCriterion() id-less path: builds non-null mapped column criterion', () => {
-    const contract = getTestContract();
-
-    const idlessUsers = {
-      ...contract,
-      storage: {
-        ...contract.storage,
-        tables: {
-          ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: undefined,
-          },
-        },
-      },
-    } as unknown as TestContract;
+    const idlessUsers = withoutPrimaryKey(getTestContract(), 'users');
 
     expect(
       buildRowIdentityCriterion(idlessUsers, 'User', {
@@ -195,21 +181,7 @@ describe('mutation-executor', () => {
   });
 
   it('buildRowIdentityCriterion() id-less path: throws when the row has no non-null mapped fields', () => {
-    const contract = getTestContract();
-
-    const idlessUsers = {
-      ...contract,
-      storage: {
-        ...contract.storage,
-        tables: {
-          ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: undefined,
-          },
-        },
-      },
-    } as unknown as TestContract;
+    const idlessUsers = withoutPrimaryKey(getTestContract(), 'users');
 
     expect(() => buildRowIdentityCriterion(idlessUsers, 'User', { id: null, email: null })).toThrow(
       /no non-null mapped fields/,
@@ -556,18 +528,14 @@ describe('mutation-executor', () => {
   });
 
   it('executeNestedUpdateMutation() rejects nested update on id-less tables without unique constraints', async () => {
-    const contract = getTestContract();
+    const idless = withoutPrimaryKey(getTestContract(), 'users');
     const idlessNoUnique = {
-      ...contract,
+      ...idless,
       storage: {
-        ...contract.storage,
+        ...idless.storage,
         tables: {
-          ...contract.storage.tables,
-          users: {
-            ...contract.storage.tables.users,
-            primaryKey: undefined,
-            uniques: [],
-          },
+          ...idless.storage.tables,
+          users: { ...idless.storage.tables.users, uniques: [] },
         },
       },
     } as unknown as TestContract;

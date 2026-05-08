@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p3
 issue_id: 12
 tags: [code-review, architecture, sql, orm]

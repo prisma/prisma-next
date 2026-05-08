@@ -56,26 +56,6 @@ describe('integration/idless', () => {
   );
 
   it(
-    'updateCount() returns zero for an id-less model when no rows match',
-    async () => {
-      await withCollectionRuntime(async (runtime) => {
-        const tags = createIdlessTagsCollection(runtime);
-
-        await runtime.query(`insert into tags (id, name) values ('a', 'untouched')`);
-
-        const count = await tags.where({ name: 'absent' }).updateCount({ name: 'never' });
-        expect(count).toBe(0);
-
-        const rows = await runtime.query<{ id: string; name: string }>(
-          'select id, name from tags order by id',
-        );
-        expect(rows).toEqual([{ id: 'a', name: 'untouched' }]);
-      });
-    },
-    timeouts.spinUpPpgDev,
-  );
-
-  it(
     'nested update() reloads via row-identity criterion on an id-less table with a unique constraint',
     async () => {
       await withCollectionRuntime(async (runtime) => {

@@ -2,7 +2,7 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import { timeouts, withDevDatabase } from '@prisma-next/test-utils';
 import { Collection } from '../../src/collection';
 import { withReturningCapability } from '../collection-fixtures';
-import { getTestContext, getTestContract, type TestContract } from '../helpers';
+import { getTestContext, getTestContract, type TestContract, withoutPrimaryKey } from '../helpers';
 import {
   createPgIntegrationRuntime,
   type PgIntegrationRuntime,
@@ -51,21 +51,7 @@ export function createReturningTagsCollection(runtime: PgIntegrationRuntime) {
 // the orm-client's source of truth for PK presence, so the lane behaves as
 // though the table had none. Use this for id-less ORM end-to-end coverage.
 export function createIdlessTagsCollection(runtime: PgIntegrationRuntime) {
-  const base = withReturningCapability(getTestContract());
-  const tagsTable = base.storage.tables.tags;
-  const idlessContract = {
-    ...base,
-    storage: {
-      ...base.storage,
-      tables: {
-        ...base.storage.tables,
-        tags: { ...tagsTable, primaryKey: undefined },
-      },
-    },
-    // Cast through `unknown` because TestContract pins `tags.primaryKey` to
-    // the literal shape generated for the fixture; widening it to undefined
-    // is intentional for this id-less test scenario.
-  } as unknown as TestContract;
+  const idlessContract = withoutPrimaryKey(withReturningCapability(getTestContract()), 'tags');
   const context = {
     ...getTestContext(),
     contract: idlessContract,
@@ -79,18 +65,7 @@ export function createIdlessTagsCollection(runtime: PgIntegrationRuntime) {
 // `buildRowIdentityCriterion` while keeping single-row identity guaranteed
 // by the unique index.
 export function createIdlessUsersCollection(runtime: PgIntegrationRuntime) {
-  const base = withReturningCapability(getTestContract());
-  const usersTable = base.storage.tables.users;
-  const idlessContract = {
-    ...base,
-    storage: {
-      ...base.storage,
-      tables: {
-        ...base.storage.tables,
-        users: { ...usersTable, primaryKey: undefined },
-      },
-    },
-  } as unknown as TestContract;
+  const idlessContract = withoutPrimaryKey(withReturningCapability(getTestContract()), 'users');
   const context = {
     ...getTestContext(),
     contract: idlessContract,

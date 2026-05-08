@@ -57,7 +57,7 @@ Three milestones, in dependency order. Each is independently shippable and can b
 
 ### M2 — Mutation reload uses row identity instead of PK
 
-**Today** (`mutation-executor.ts:109-131`): `buildPrimaryKeyFilterFromRow` reads `row[pkFieldName]` and returns a single-key WHERE. Used at:
+**Today** (`mutation-executor.ts:109-131`): `buildRowIdentityCriterion` reads `row[pkFieldName]` and returns a single-key WHERE. Used at:
 - `mutation-executor.ts:252` — inner update reload
 - `collection.ts:714, 1065` — nested `create()` / `update()` reload for hydration
 
@@ -98,7 +98,7 @@ Rewrite [`docs/architecture docs/subsystems/3. Query Lanes.md` § "Id-less table
 - **`returning` capability gate** (M1): `assertReturningCapability` already exists. M1 makes `updateCount`/`deleteCount` formally require it. No in-tree adapter is affected (Postgres + SQLite both support it).
 - **SQLite AFTER triggers** (M2): see § "M2" above. Documented as a known divergence, not blocking.
 - **Layering**: all changes are inside `packages/3-extensions/sql-orm-client`. No `@prisma-next/sql-contract` schema changes. `pnpm lint:deps` should remain at zero violations.
-- **Breaking change surface**: external. `resolvePrimaryKeyColumn` and `buildPrimaryKeyFilterFromRow` are not in `exports/` (verified — `sql-orm-client` has no `exports/` dir; only the package's own `src/` consumes them). Renames are internal-only.
+- **Breaking change surface**: external. `resolvePrimaryKeyColumn` and `buildRowIdentityCriterion` are not in `exports/` (verified — `sql-orm-client` has no `exports/` dir; only the package's own `src/` consumes them). Renames are internal-only.
 
 ## Acceptance Criteria
 
