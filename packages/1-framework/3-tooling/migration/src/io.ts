@@ -125,6 +125,52 @@ export async function materialiseMigrationPackage(
 }
 
 /**
+ * Idempotent variant of {@link writeExtensionMigrationPackage}: writes the
+ * package only if `<targetDir>/<pkg.dirName>/` does not already exist on
+ * disk; returns `{ written: false }` when the package directory is
+ * present (no rewrite, no comparison — by-existence skip is the
+ * canonical AC-7 / AM12 semantic per `framework-mechanism.spec.md`
+ * § "Materialisation idempotency").
+ *
+ * Concretely:
+ *   - existing dir → skip silently, return `{ written: false }`.
+ *   - missing dir → write three files via {@link writeExtensionMigrationPackage},
+ *     return `{ written: true }`.
+ *   - any other I/O error from `stat` → propagated unchanged (callers
+ *     expect ENOENT to be the only "not present" signal).
+ *
+ * Used by the CLI's `runContractSpaceExtensionMigrationsPass` to
+ * materialise extension migration packages into a project's
+ * `migrations/<spaceId>/` directory, and by extension-package tests
+ * that mirror the same idempotent-rematerialise property locally
+ * without taking a CLI dependency.
+ *
+ * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7),
+ *   AC-7 idempotency clause.
+ */
+export async function materialiseExtensionMigrationPackageIfMissing(
+  targetDir: string,
+  pkg: MigrationPackageContents,
+): Promise<{ readonly written: boolean }> {
+  const pkgDir = join(targetDir, pkg.dirName);
+  if (await pathExists(pkgDir)) {
+    return { written: false };
+  }
+  await writeExtensionMigrationPackage(targetDir, pkg);
+  return { written: true };
+}
+
+async function pathExists(p: string): Promise<boolean> {
+  try {
+    await stat(p);
+    return true;
+  } catch (error) {
+    if (hasErrnoCode(error, 'ENOENT')) return false;
+    throw error;
+  }
+}
+
+/**
  * Copy a list of files into `destDir`, optionally renaming each one.
  *
  * The destination directory is created (with `recursive: true`) if it
