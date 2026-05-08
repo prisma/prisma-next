@@ -154,8 +154,11 @@ framework's built-in operator handlers live in operations whose
 `required-trait` set the codec opts into; extensions whose codec
 output cannot back the trait's wire semantics must (i) declare zero
 traits, and (ii) ship namespaced replacement operators — which
-should NOT shadow the framework's built-in name. See `core/operators.ts`
-for the `cipherstashEq` / `cipherstashIlike` handler shape.
+should NOT shadow the framework's built-in name. The canonical
+write-up of the pattern is [ADR 211 — Extension operator surface:
+namespaced replacement operators](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md);
+this package is the worked example. See `core/operators.ts` for the
+`cipherstashEq` / `cipherstashIlike` handler shape.
 
 ### Control vs runtime tree-shaking architecture
 
@@ -185,6 +188,13 @@ the shared `constants-*.mjs` chunk.
 The shared `constants-*.mjs` chunk is structurally permitted to live
 in both planes — it carries pure literal constants (codec id, native
 types, invariant ids) and no executable behavior.
+
+The cross-package convention (source-level discipline + bundling-
+isolation test, with rationale and assertion strategies) is documented
+in the extension-packs reference doc at
+[Extension-Packs-Naming-and-Layout § Tree-shakability between control
+and runtime planes](../../../docs/reference/Extension-Packs-Naming-and-Layout.md);
+this package is the worked example for that section.
 
 ### `decryptAll(rows, opts?)` is opt-in read-side amortization
 

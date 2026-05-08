@@ -140,10 +140,62 @@ Extension packs require multiple entries in `architecture.config.json` to map ea
 - Domain boundaries remain enforced via `architecture.config.json`
 - Control plane code cannot import from runtime plane (enforced by dependency cruiser)
 
+## Tree-shakability between control and runtime planes
+
+The control / runtime / (optional) middleware split exists so that consumers can import only the planes they need without dragging in the others. A migration tool that reads contract-space artefacts from `./control` should not pay for the runtime envelope, codec runtime, or any per-query SDK glue. A query-time consumer pulling `./runtime` should not pay for migration-op SQL, contract-space artefacts, or the codec lifecycle hook. The split must hold at the **bundled output** level, not just at the source level — a transitive import inside `src/exports/control.ts` that reaches a runtime-only file (e.g., the codec encode/decode body, the SDK interface, the bulk-encrypt middleware) will pull that file's bytes into the control bundle even if dependency-cruiser permits the source import.
+
+### Source-level discipline
+
+The naming-and-layout convention above already separates sources by plane. The discipline that backs tree-shakability at the source level:
+
+- `src/exports/control.ts` imports only from control-plane sources (`src/core/{contract, migrations, descriptor-meta, lifecycle-hook, …}.ts`) and shared constants. It does NOT import from `src/exports/runtime.ts`, `src/exports/middleware.ts`, or any runtime-only `src/core/` file.
+- `src/exports/runtime.ts` imports only from runtime-plane sources (`src/core/{envelope, codec-runtime, sdk, decrypt-all, …}.ts`) and shared constants. It does NOT import contract-space artefacts (`contract.ts`, `migrations.ts`) or lifecycle hooks.
+- Optional `src/exports/middleware.ts` imports only the runtime-plane sources its middleware needs — it should not pull contract-space artefacts.
+- Shared constants live in a single `src/core/constants.ts` (or equivalent) carrying pure literals (codec ids, native types, invariant ids). This file is structurally permitted in both planes' transitive sets — bundlers chunk it as `constants-*.mjs` and both bundles re-import the same chunk.
+
+### Enforcement: bundling-isolation guard tests
+
+Source-level discipline is necessary but not sufficient — a dynamic import, a re-export of a runtime-only symbol, or an over-broad barrel file can leak bytes across the plane boundary. Extension packs that ship multi-plane entrypoints SHOULD include a permanent test that verifies the bundled `.mjs` outputs are plane-disjoint at byte level. Two assertion strategies, both useful:
+
+1. **Forbidden-substring check on entry bodies.** For each entry's bundled `.mjs`, assert that a curated set of plane-foreign symbols / strings does not appear in the file body. The `control.mjs` bundle should not contain the runtime envelope class name, the codec encode/decode bodies, the SDK interface symbol, or the middleware factory; the `runtime.mjs` bundle should not contain the contract-space artefact names, the lifecycle-hook symbol, or any migration-op SQL string. The test reads the dist `.mjs` files (depend on the package's own `build` so dist is fresh) and asserts forbidden-substring absence.
+2. **Chunk-graph disjointness check.** Reading each entry's `.mjs` and recursively following `import`/`from` references (parsed structurally, not via the JS module loader), collect the set of chunk files transitively reached. Assert that the control entry's set and the runtime entry's set are disjoint, modulo the shared `constants-*.mjs` chunk (or whichever shared-constants chunk(s) the bundler emits — these carry pure literals and are structurally permitted in both bundles).
+
+The chunk-graph check is the **stronger** of the two — it catches transitive leaks the entry-body check would miss (e.g., an entry that imports a chunk only to re-export a forbidden symbol). Most extension packs ship both checks.
+
+The cipherstash extension's `packages/3-extensions/cipherstash/test/bundling-isolation.test.ts` is the canonical worked example of both strategies. It asserts:
+
+- `control.mjs` does not contain runtime envelope class names, the SDK interface symbol, the codec runtime factory, or the bulk-encrypt middleware factory.
+- `runtime.mjs` and `middleware.mjs` do not contain contract-space artefact names, the lifecycle-hook symbol, or migration-op SQL terms (e.g., `add_search_config`, `remove_search_config`).
+- The transitively-reached chunk-file sets for control vs runtime, and control vs middleware, are disjoint modulo the shared `constants-*.mjs` chunk.
+
+### Wiring the test into Turbo
+
+The bundling-isolation test reads the package's own `dist/` outputs and so must run after `build`. Wire via the package's `turbo.json` `dependsOn`:
+
+```jsonc
+{
+  "tasks": {
+    "<package-name>#test": {
+      "dependsOn": ["build"],
+      "inputs": ["src/**", "test/**", "dist/**"]
+    }
+  }
+}
+```
+
+The `dependsOn: ["build"]` (own-package build, not `^build`) is what's needed: the test reads `dist/**` of the same package, not transitive dependencies'.
+
+### Architectural rationale
+
+The tree-shakability invariant is an enforcement mechanism, not just a convention. It backs an extension's bundle-size budget — if the runtime bundle accidentally pulls in the migration SQL bundle, query-time consumers pay 100s of KB of migration text they will never execute. It also prevents subtle plane leakage, e.g., a future change that has the runtime envelope decode call a control-plane lifecycle hook would represent a real architectural regression that the bundling-isolation test catches at PR time rather than in production.
+
+The pattern composes with the trait-and-namespaced-operator pattern of [ADR 211](../architecture%20docs/adrs/ADR%20211%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md): both are type-/byte-level enforcement mechanisms for invariants the source code expresses but the build pipeline must preserve.
+
 ## Rationale
 This convention keeps imports clear and consistent, keeps the repo navigable, and scales across domains. The `extension-` prefix is preferred over shorter alternatives (like `ext-`) for clarity and discoverability. The numbered directory prefix (`3-extensions/`) indicates that extensions are in domain 3, which can import from domains 1 (framework) and 2 (sql/document). Metadata enables automated loading and validation.
 
 ## Related Documentation
 - [Package Naming Conventions](./Package%20Naming%20Conventions.md)
 - [ADR 112 - Target Extension Packs](../architecture%20docs/adrs/ADR%20112%20-%20Target%20Extension%20Packs.md)
+- [ADR 211 - Extension operator surface: namespaced replacement operators](../architecture%20docs/adrs/ADR%20211%20-%20Extension%20operator%20surface%20namespaced%20replacement%20operators.md) — required reading for extensions whose codec output cannot back the wire semantics of a built-in trait-gated operator.
 - `.cursor/rules/multi-plane-packages.mdc` - Multi-plane package patterns
