@@ -18,7 +18,7 @@ import type { MigrationMetadata } from './metadata';
 import { MigrationOpsSchema } from './op-schema';
 import type { MigrationOps, MigrationPackage } from './package';
 
-const MANIFEST_FILE = 'migration.json';
+export const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
 const MAX_SLUG_LENGTH = 64;
 
