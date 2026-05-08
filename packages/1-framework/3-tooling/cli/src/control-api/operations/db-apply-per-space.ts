@@ -38,6 +38,19 @@ import type {
 import { stripOperations } from './migration-helpers';
 
 /**
+ * Span IDs emitted via `onProgress` for the per-space apply flow. The
+ * orchestrator opens / closes spans by id; consumers (notably the
+ * structured-output renderer in `output.test.ts`) match against these
+ * literal strings, so a single source of truth keeps the literals in
+ * step.
+ */
+const SPAN_IDS = {
+  introspect: 'introspect',
+  plan: 'plan',
+  apply: 'apply',
+} as const;
+
+/**
  * Information about an extension contract space that the CLI threads
  * through to the per-space `db init` / `db update` flow. Only the
  * `id` is mandatory — the rest is read from on-disk pinned artefacts
@@ -189,15 +202,14 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     extensionDestinationContracts.push(await readPinnedSpaceContract(migrationsDir, ext.id));
   }
 
-  const introspectSpanId = 'introspect';
   onProgress?.({
     action,
     kind: 'spanStart',
-    spanId: introspectSpanId,
+    spanId: SPAN_IDS.introspect,
     label: 'Introspecting database schema',
   });
   const schemaIR = await familyInstance.introspect({ driver });
-  onProgress?.({ action, kind: 'spanEnd', spanId: introspectSpanId, outcome: 'ok' });
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.introspect, outcome: 'ok' });
 
   const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(schemaIR, extensionDestinationContracts);
 
@@ -232,8 +244,12 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     }),
   ];
 
-  const planSpanId = 'plan';
-  onProgress?.({ action, kind: 'spanStart', spanId: planSpanId, label: 'Planning migration' });
+  onProgress?.({
+    action,
+    kind: 'spanStart',
+    spanId: SPAN_IDS.plan,
+    label: 'Planning migration',
+  });
 
   const resolutions: Array<{
     readonly spaceId: string;
@@ -248,14 +264,14 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
       marker?.invariants ?? [],
     );
     if (resolution.kind === 'extension-path-failure') {
-      onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
+      onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });
       return buildExtensionPathFailure(action, {
         spaceId: resolver.spaceId,
         why: resolution.why,
       });
     }
     if (resolution.kind === 'planning-failure') {
-      onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
+      onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });
       return buildPlanningFailure(action, resolution.conflicts);
     }
     resolutions.push({
@@ -265,7 +281,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
       displayOps: resolution.displayOps,
     });
   }
-  onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'ok' });
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'ok' });
 
   // Patch each extension plan's targetId to match the app plan's now
   // that we know it (extension paths walk operations rendered against
@@ -335,11 +351,10 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     });
   }
 
-  const applySpanId = 'apply';
   onProgress?.({
     action,
     kind: 'spanStart',
-    spanId: applySpanId,
+    spanId: SPAN_IDS.apply,
     label: 'Applying migration plan across spaces',
   });
 
@@ -369,7 +384,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   ).executeAcrossSpaces({ driver, perSpaceOptions });
 
   if (!runnerResult.ok) {
-    onProgress?.({ action, kind: 'spanEnd', spanId: applySpanId, outcome: 'error' });
+    onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'error' });
     return buildRunnerFailure(action, {
       summary: runnerResult.failure.summary,
       ...ifDefined('why', runnerResult.failure.why),
@@ -380,7 +395,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     });
   }
 
-  onProgress?.({ action, kind: 'spanEnd', spanId: applySpanId, outcome: 'ok' });
+  onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'ok' });
 
   const totalOpsPlanned = runnerResult.value.perSpaceResults.reduce(
     (sum, r) => sum + r.value.operationsPlanned,
