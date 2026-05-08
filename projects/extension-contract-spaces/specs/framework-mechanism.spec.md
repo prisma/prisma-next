@@ -109,7 +109,7 @@ Validation: dedicated three-state idempotency tests (fresh / legacy single-row /
 
 ## 3. Per-space planner (T1.3) and emitter wiring (T1.6, T1.7, T1.8)
 
-**Helper location.** The producer-side helpers — `planAllSpaces`, the layout convention, and `writeExtensionMigrationPackage` — live in `@prisma-next/migration-tools` (`1-framework`), not in the SQL family. The contract-space concept is target-agnostic per project spec FRs 3-6; placing the helpers in the framework layer lets Mongo (and any future target) reuse them. `pnpm lint:deps` validates that the framework layer carries no target-* references. The SQL family wires them into its CLI / emitter at the consumption site.
+**Helper location.** The producer-side helpers — `planAllSpaces`, the layout convention, and `writeAuthoredMigrationPackage` (renamed from `writeExtensionMigrationPackage` under M1-cleanup F4) — live in `@prisma-next/migration-tools` (`1-framework`), not in the SQL family. The contract-space concept is target-agnostic per project spec FRs 3-6; placing the helpers in the framework layer lets Mongo (and any future target) reuse them. `pnpm lint:deps` validates that the framework layer carries no target-* references. The SQL family wires them into its CLI / emitter at the consumption site.
 
 The planner gains a per-space loop. The shipped `planAllSpaces` shape is **generic over contract and package types**:
 
@@ -164,7 +164,7 @@ For each loaded extension space: `priorContract` comes from `<projectRoot>/migra
 
 Migration names inside a per-extension subdirectory **preserve the names the extension author chose** — no renaming. The per-extension subdirectory must be a valid filesystem name; space identifiers are constrained to `[a-z][a-z0-9_-]{0,63}`.
 
-**Emission helper (T1.7).** Shipped as `writeExtensionMigrationPackage(targetDir, pkg)` in `@prisma-next/migration-tools/exports/io`. Takes an in-memory `ExtensionMigrationPackage` (per § 1's resolved shape: `{ dirName, metadata, ops }`) and writes `migration.json`, `ops.json`, and a canonical-JSON `contract.json` snapshot under `<targetDir>/<pkg.dirName>/`. The `migration.json` + `ops.json` writes delegate to the existing app-space `writeMigrationPackage` for byte-parity; the `contract.json` snapshot reuses the existing `canonicalizeJson` helper. Re-emitting the same package across runs / machines produces byte-identical files.
+**Emission helper (T1.7).** Shipped as `writeAuthoredMigrationPackage(targetDir, pkg)` in `@prisma-next/migration-tools/exports/io` (renamed from `writeExtensionMigrationPackage` under M1-cleanup F4). Takes an in-memory `AuthoredMigrationPackage` (per § 1's resolved shape: `{ dirName, metadata, ops }`; renamed from `ExtensionMigrationPackage` under F4) and writes `migration.json`, `ops.json`, and a canonical-JSON `contract.json` snapshot under `<targetDir>/<pkg.dirName>/`. The `migration.json` + `ops.json` writes delegate to the existing app-space `writeMigrationPackage` for byte-parity; the `contract.json` snapshot reuses the existing `canonicalizeJson` helper. Re-emitting the same package across runs / machines produces byte-identical files.
 
 **Layout helper (T1.6).** Shipped as `spaceMigrationDirectory(projectMigrationsDir, spaceId)` in `@prisma-next/migration-tools/exports/spaces`. App-space passes through unchanged (no subdirectory); extension spaces resolve to `<projectMigrationsDir>/<spaceId>`. Validates `spaceId` against `[a-z][a-z0-9_-]{0,63}` and throws `MIGRATION.INVALID_SPACE_ID` for filesystem-unsafe names.
 
@@ -310,7 +310,7 @@ interface SpacePathInput {
   readonly spaceId: string;
   readonly currentMarkerHash: string | null;
   readonly currentMarkerInvariants: readonly string[];
-  readonly targetRef: ExtensionContractRef;   // for app-space: read from projectRoot
+  readonly targetRef: ContractSpaceHeadRef;   // for app-space: read from projectRoot (renamed from ExtensionContractRef under M1-cleanup F4)
   readonly migrationGraph: MigrationGraph;     // for app-space: synthesized from contract IR if no migrations on disk
 }
 
