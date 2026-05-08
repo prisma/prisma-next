@@ -1,3 +1,5 @@
+// use prisma-next
+
 type Address {
   street  String
   city    String

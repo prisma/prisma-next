@@ -296,7 +296,9 @@ If this project lives inside a pnpm workspace, a few things are worth knowing:
 `;
 
 exports[`templates > per-cell snapshots (FR5.4) > mongo + psl > starterSchema is stable 1`] = `
-"model User {
+"// use prisma-next
+
+model User {
   id    ObjectId @id @map("_id")
   email String   @unique
   name  String?
@@ -901,7 +903,9 @@ If this project lives inside a pnpm workspace, a few things are worth knowing:
 `;
 
 exports[`templates > per-cell snapshots (FR5.4) > postgres + psl > starterSchema is stable 1`] = `
-"model User {
+"// use prisma-next
+
+model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String?

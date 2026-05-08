@@ -1,3 +1,5 @@
+// use prisma-next
+
 model Team {
   id Int @id @map("team_id")
   @@map("org_team")

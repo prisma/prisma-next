@@ -1,3 +1,5 @@
+// use prisma-next
+
 model User {
   id    ObjectId @id @map("_id")
   name  String
