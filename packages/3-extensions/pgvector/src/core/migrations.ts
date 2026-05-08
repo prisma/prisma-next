@@ -12,7 +12,7 @@
  * {@link installVectorExtensionOp} — it carries the
  * `CREATE EXTENSION IF NOT EXISTS vector` DDL plus a postcondition that
  * confirms the extension landed. Mirrors the legacy
- * `pgvectorDatabaseDependencies.init[0]` shape (precheck / execute /
+ * legacy `databaseDependencies.init[0]` shape (precheck / execute /
  * postcheck) but as an `ExtensionMigrationPackage` op so the framework's
  * per-space runner / verifier (M1+M2) can manage it the same way it
  * manages an application's own migrations.

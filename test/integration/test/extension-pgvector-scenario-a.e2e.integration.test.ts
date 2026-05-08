@@ -2,58 +2,50 @@
  * Scenario A end-to-end against PGlite — pgvector contract-space
  * (project: extension-contract-spaces, M4 / T4.3).
  *
+ * This test was relocated from
+ * `packages/3-extensions/pgvector/test/scenario-a.e2e.integration.test.ts`
+ * to `test/integration/` so that pgvector's package can stop declaring
+ * adapter-postgres / cli / driver-postgres / target-postgres as
+ * `devDependencies`. Those declarations created a turbo dep-graph
+ * cycle (adapter-postgres already declares pgvector as a `devDependency`
+ * for cast-policy / planner-storage-types tests; the new pgvector e2e
+ * test added a back-edge through pgvector → adapter-postgres). The
+ * cycle blocks `pnpm test:packages` workspace-wide. `test/integration`
+ * already declares all four of those packages, so it is the
+ * conventional home for this kind of cross-package e2e suite (matches
+ * the precedent in commit `8efd264c7 refactor(target-postgres): break
+ * Turbo dep cycle by relocating runtime-dep tests`).
+ *
+ * Public-export-only consumption: this file imports pgvector solely
+ * via `@prisma-next/extension-pgvector/control` (the published
+ * descriptor). The few `pgvector:*` string constants we need are
+ * inlined here with comments tying them to their source-of-truth
+ * locations.
+ *
  * Drives the CLI per-space `db init` flow (`executePerSpaceDbApply`,
  * sub-spec § 6) against a real Postgres (PGlite via
  * `createDevDatabase`) with pgvector wired as an extension space and a
- * user `Doc` table that carries a `vector(N)` column. Mirrors the
- * cipherstash Scenario A pattern at
- * `packages/3-extensions/cipherstash/test/scenario-a.e2e.integration.test.ts`,
- * with two pgvector-specific simplifications: there is no codec
- * lifecycle hook (pgvector'"'s codec is purely runtime), and the
- * baseline migration is a single op (the `CREATE EXTENSION` step).
+ * user `Doc` table that carries a `vector(N)` column. Three layers of
+ * coverage:
  *
- * Three layers of coverage:
+ *   1. **Pinned `ops.json` byte-equivalence (disk).** Closes project
+ *      AC10 / TC-15 at the on-disk shape level — the `CREATE EXTENSION
+ *      IF NOT EXISTS vector` SQL flows through
+ *      `installVectorExtension.execute[0].sql` and is serialised
+ *      byte-for-byte.
  *
- *   1. **Pinned `ops.json` byte-equivalence (disk).** The
- *      `migrations/pgvector/<dirName>/ops.json` carries the
- *      `CREATE EXTENSION IF NOT EXISTS vector` execute SQL byte-for-byte.
- *      Closes project AC10 / TC-15 at the on-disk shape level.
+ *   2. **Multi-space planning (real DDL).** `executePerSpaceDbApply`
+ *      with `mode: 'plan'` against the real descriptor produces a plan
+ *      that includes the pgvector baseline op AND the app-space
+ *      `CREATE TABLE Doc` op, ordered first per
+ *      `concatenateSpaceApplyInputs` cross-space ordering.
  *
- *   2. **Multi-space planning (real CREATE EXTENSION).** Calling
- *      `executePerSpaceDbApply` with `mode: 'plan'` on the *real*
- *      pgvector descriptor produces a plan that includes:
- *
- *        - the pgvector baseline op (`installVectorExtension`), and
- *        - the app-space `CREATE TABLE Doc` op,
- *        - in cross-space alphabetical order (extensions first).
- *
- *      This locks the planning half of multi-space ordering through
- *      `concatenateSpaceApplyInputs` and the AC10 / TC-16 directory
- *      shape on disk.
- *
- *   3. **Multi-space apply (synthetic vector stub).** Same wiring as
- *      test (2), but with a synthetic baseline whose `installVector
- *      Extension` op is replaced by a PGlite-compatible
- *      `CREATE DOMAIN vector AS text` stub. This exercises:
- *
- *        - the runner'"'s `executeAcrossSpaces` single-tx path,
- *        - marker rows for both `app` and `pgvector` spaces (project
- *          AC5 / AC10 / TC-16),
- *        - the `User`-equivalent `Doc` table created with a
- *          `vector(N)` column that resolves through the codec'"'s
- *          `expandNativeType` hook,
- *        - an insert + select round-trip through the (synthetic)
- *          vector type.
- *
- * **Why split into two apply paths?** PGlite does not ship the
- * `vector` extension (verified by enumerating
- * `node_modules/.pnpm/@electric-sql+pglite@0.3.14/.../contrib/`).
- * Trying to apply the real `CREATE EXTENSION IF NOT EXISTS vector`
- * fails inside PGlite with "extension 'vector' is not available".
- * The synthetic-bundle apply path here verifies the framework + codec
- * wiring against a real database; the real-extension apply against a
- * pgvector-equipped Postgres is deferred to e2e infra (consistent
- * with cipherstash'"'s synthetic-bundle approach for `pgcrypto`).
+ *   3. **Multi-space apply (synthetic vector stub).** PGlite does not
+ *      ship the `vector` extension; the synthetic-stub variant
+ *      replaces the install op's SQL with a `CREATE DOMAIN vector AS
+ *      text` stub so the framework + per-space wiring runs against a
+ *      real DB. Asserts marker rows for both `app` and `pgvector`
+ *      (project AC5 / AC10 / TC-16).
  */
 
 import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
@@ -63,6 +55,7 @@ import postgresAdapterDescriptor from '@prisma-next/adapter-postgres/control';
 import { executePerSpaceDbApply } from '@prisma-next/cli/control-api';
 import { type Contract, coreHash, profileHash } from '@prisma-next/contract/types';
 import postgresDriverDescriptor from '@prisma-next/driver-postgres/control';
+import pgvectorExtensionDescriptor from '@prisma-next/extension-pgvector/control';
 import sqlFamilyDescriptor, {
   type ExtensionMigrationPackage,
   INIT_ADDITIVE_POLICY,
@@ -76,15 +69,42 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import postgresTargetDescriptor from '@prisma-next/target-postgres/control';
 import { createDevDatabase, timeouts } from '@prisma-next/test-utils';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { VECTOR_CODEC_ID } from '../src/core/constants';
-import { PGVECTOR_STORAGE_HASH, pgvectorContract } from '../src/core/contract';
-import {
-  PGVECTOR_INVARIANTS,
-  PGVECTOR_NATIVE_TYPE,
-  PGVECTOR_SPACE_ID,
-} from '../src/core/contract-space-constants';
-import { pgvectorBaselineMigration, pgvectorHeadRef } from '../src/core/migrations';
-import pgvectorExtensionDescriptor from '../src/exports/control';
+
+// String constants pinned by source of truth in
+// `packages/3-extensions/pgvector/src/core/constants.ts` and
+// `contract-space-constants.ts`. Inlined here so this test can consume
+// pgvector through its public `/control` export without a relative
+// path back into the package's `src/`. If the package ever changes
+// these values (FR11 makes the invariantId immutable, but the others
+// are not), the descriptor self-consistency assertion in
+// `packages/3-extensions/pgvector/test/descriptor.test.ts` will fail
+// first and lead the implementer here.
+const VECTOR_CODEC_ID = 'pg/vector@1' as const;
+const PGVECTOR_NATIVE_TYPE = 'vector' as const;
+const PGVECTOR_SPACE_ID = 'pgvector' as const;
+const PGVECTOR_INSTALL_INVARIANT_ID = 'pgvector:install-vector-v1' as const;
+
+function getPgvectorContractSpace(): NonNullable<typeof pgvectorExtensionDescriptor.contractSpace> {
+  const space = pgvectorExtensionDescriptor.contractSpace;
+  if (!space) {
+    throw new Error('pgvectorExtensionDescriptor must declare a contractSpace');
+  }
+  return space;
+}
+
+function getPgvectorBaselineMigration(): ExtensionMigrationPackage {
+  const migrations = getPgvectorContractSpace().migrations;
+  const baseline = migrations[0];
+  if (!baseline) {
+    throw new Error('pgvector contract-space must ship at least one baseline migration');
+  }
+  return baseline;
+}
+
+const pgvectorContract = getPgvectorContractSpace().contractJson;
+const pgvectorHeadRef = getPgvectorContractSpace().headRef;
+const pgvectorBaselineMigration = getPgvectorBaselineMigration();
+const PGVECTOR_STORAGE_HASH = pgvectorContract.storage.storageHash;
 
 const APP_CONTRACT_HASH = coreHash('sha256:pgvector-e2e-app-v1');
 const APP_PROFILE_HASH = profileHash('sha256:pgvector-e2e-app-profile-v1');
@@ -92,16 +112,6 @@ const APP_TABLE = 'Doc';
 const APP_FIELD = 'embedding';
 const VECTOR_LENGTH = 3;
 
-/**
- * Build the application contract used by the planning + apply tests.
- *
- * `withLength` controls whether the `embedding` column carries
- * `typeParams.length` — present in the planning test (validates that
- * the codec'"'s `expandNativeType` hook lifts to `vector(N)` in the
- * emitted DDL), absent in the apply test (the synthetic vector stub is
- * a text-domain that does not accept type modifiers; see
- * {@link buildSyntheticVectorInstallSql}'s rationale).
- */
 function buildAppContract(opts: { readonly withLength: boolean }): Contract<SqlStorage> {
   const embeddingColumn: {
     readonly codecId: string;
@@ -168,16 +178,10 @@ const frameworkComponents = [
 /**
  * Synthetic stand-in for `CREATE EXTENSION IF NOT EXISTS vector`.
  * PGlite does not ship the `vector` extension; this stub creates a
- * `vector` text-domain so the codec'"'s `expandNativeType` hook
- * resolves `vector(N)` (which then degrades to `vector` here, ignoring
- * the parenthesised length — `text` accepts any string content). Keeps
- * the framework + per-space wiring under test against a real database
- * while the real `CREATE EXTENSION` apply is deferred to a
- * vector-equipped Postgres.
+ * `vector` text-domain so the codec's `expandNativeType` hook resolves
+ * `vector(N)` (which then degrades to `vector` here, ignoring the
+ * parenthesised length — `text` accepts any string content).
  */
-const SYNTHETIC_VECTOR_RATIONALE =
-  'See block comment above buildSyntheticVectorInstallSql for the rationale.';
-
 function buildSyntheticVectorInstallSql(): string {
   return [
     `DO $$ BEGIN
@@ -192,7 +196,7 @@ function buildSyntheticVectorInstallSql(): string {
  * Build a synthetic-vector variant of `pgvectorBaselineMigration`.
  * Identical structure to the real package — same dirName, same
  * structural shape, same headRef hash semantics — but with the
- * `installVectorExtension` op'"'s `execute[]` SQL replaced by
+ * `installVectorExtension` op's `execute[]` SQL replaced by
  * {@link buildSyntheticVectorInstallSql}. The migrationHash is
  * recomputed because the on-disk representation differs.
  */
@@ -200,7 +204,7 @@ function buildSyntheticBaselineMigration(): ExtensionMigrationPackage {
   const realOps = pgvectorBaselineMigration.ops;
   const syntheticOps = realOps.map((op) => {
     const sqlOp = op as unknown as SqlMigrationPlanOperation<unknown>;
-    if (sqlOp.invariantId !== PGVECTOR_INVARIANTS.installVector) {
+    if (sqlOp.invariantId !== PGVECTOR_INSTALL_INVARIANT_ID) {
       return op;
     }
     return {
@@ -300,12 +304,6 @@ describe.sequential(
       }
     });
 
-    /**
-     * Pinned `ops.json` byte-equivalence — the real
-     * `installVectorExtension` SQL flowed through `execute[0].sql` and
-     * was serialised to disk byte-for-byte. Project AC10 / TC-15 at
-     * the on-disk shape level.
-     */
     it('pinned ops.json carries the CREATE EXTENSION SQL byte-for-byte (TC-15)', async () => {
       project = await setupTestProject({ migration: pgvectorBaselineMigration });
       const opsPath = join(project.pgvectorBaselineDir, 'ops.json');
@@ -314,23 +312,11 @@ describe.sequential(
         readonly invariantId?: string;
         readonly execute?: ReadonlyArray<{ readonly sql: string }>;
       }>;
-      const installOp = ops.find((op) => op.invariantId === PGVECTOR_INVARIANTS.installVector);
+      const installOp = ops.find((op) => op.invariantId === PGVECTOR_INSTALL_INVARIANT_ID);
       expect(installOp).toBeDefined();
       expect(installOp?.execute?.[0]?.sql).toBe('CREATE EXTENSION IF NOT EXISTS vector');
     });
 
-    /**
-     * Plan-only against the real pgvector descriptor.
-     *
-     * `executePerSpaceDbApply` runs the planner against the live
-     * (empty) database, including extension-space scaffolding
-     * (no codec hooks for pgvector — its codec only contributes
-     * runtime + render-output behaviour). Validates:
-     *
-     *   - both spaces are present in the plan output;
-     *   - pgvector ops are ordered before app-space ops (per
-     *     `concatenateSpaceApplyInputs`).
-     */
     it('mode=plan against the real install op produces a multi-space plan', async () => {
       project = await setupTestProject({ migration: pgvectorBaselineMigration });
 
@@ -365,19 +351,6 @@ describe.sequential(
       expect(appDocIdx).toBeGreaterThan(installIdx);
     });
 
-    /**
-     * Multi-space apply against the synthetic `vector` domain stub.
-     *
-     * Asserts:
-     *   - both spaces' marker rows present with correct hashes and
-     *     `applied_invariants` matching the pinned head ref (project
-     *     AC5 / AC10 / TC-16);
-     *   - the `Doc` table exists with the `embedding` column whose
-     *     declared type renders as `vector(3)` via the codec'"'s
-     *     `expandNativeType` hook;
-     *   - an insert + select round-trip through the column works
-     *     against a real database.
-     */
     it('synthetic vector stub: applies pgvector + app-space atomically; markers + round-trip OK', async () => {
       project = await setupTestProject({ migration: buildSyntheticBaselineMigration() });
 
@@ -422,9 +395,6 @@ describe.sequential(
       );
       expect(docTable.rows[0]?.exists).toBe(true);
 
-      // Round-trip a synthetic vector value through the column. The
-      // synthetic `vector` is a text-domain so we round-trip via the
-      // codec'"'s `[a,b,c]` text encoding.
       await driver!.query(
         `insert into public."${APP_TABLE}" ("id", "${APP_FIELD}") values ($1, $2)`,
         ['doc-1', '[1,2,3]'],
@@ -438,5 +408,3 @@ describe.sequential(
     });
   },
 );
-
-void SYNTHETIC_VECTOR_RATIONALE;
