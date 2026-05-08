@@ -149,6 +149,10 @@ export function createLookupFrom<
       modelName,
       foreignCollection,
     });
+    // The runtime callable accepts a single `string` and returns a
+    // generic `LookupBuilder`; the literal `RootName` / `ModelName`
+    // generics on `LookupFrom` are erased at runtime and re-asserted
+    // here so the surface contract is what the consumer actually sees.
   }) as LookupFrom<TContract, Shape, Nested>;
   return callable;
 }
@@ -199,6 +203,10 @@ function createLookupBuilderWithKey<RootName extends string, ModelName extends s
     as<As extends string>(name: As): LookupResult<RootName, ModelName, As> {
       return {
         _brand: 'mongo-query-builder/lookup-result@1',
+        // The `RootName` / `ModelName` literal generics are erased at
+        // runtime; the runtime state holds the same strings as plain
+        // `string`. Re-brand so consumers (the lookup-stage builder)
+        // can read the literals back without a downstream cast.
         _root: state.rootName as RootName,
         _model: state.modelName as ModelName,
         _localField: state.localField,
