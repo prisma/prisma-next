@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: timeouts.spinUpMongoMemoryServer,
     hookTimeout: timeouts.spinUpMongoMemoryServer,
     fileParallelism: false,
+    sequence: { groupOrder: 6 },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

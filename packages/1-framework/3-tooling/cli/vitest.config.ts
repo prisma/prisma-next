@@ -11,6 +11,7 @@ export default defineConfig({
     maxWorkers: 1,
     isolate: false,
     fileParallelism: false,
+    sequence: { groupOrder: 1 },
     testTimeout: timeouts.vitestPackageDefault,
     hookTimeout: timeouts.vitestPackageDefault,
     setupFiles: ['./test/setup.ts'],

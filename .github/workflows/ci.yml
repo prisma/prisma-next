@@ -118,7 +118,7 @@ jobs:
       - uses: pnpm/action-setup@91ab88e2619ed1f46221f0ba42d1492c02baf788 # v6.0.6
       - name: Install dependencies (skip bin linking)
         run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Build packages (including CLI)
+      - name: Build packages (needed for bin linking)
         run: pnpm build
       - name: Link bins
         run: pnpm install --frozen-lockfile

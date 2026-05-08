@@ -8,6 +8,7 @@ export default defineConfig({
     testTimeout: timeouts.spinUpMongoMemoryServer,
     hookTimeout: timeouts.spinUpMongoMemoryServer,
     fileParallelism: false,
+    sequence: { groupOrder: 3 },
     typecheck: {
       enabled: true,
       include: ['test/**/*.test-d.ts'],
