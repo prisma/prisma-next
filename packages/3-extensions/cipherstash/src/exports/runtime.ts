@@ -14,8 +14,19 @@
  * planes).
  */
 
+export type { CipherstashStringCodec } from '../core/codec-runtime';
+export {
+  CIPHERSTASH_STRING_CODEC_ID,
+  createCipherstashStringCodec,
+} from '../core/codec-runtime';
 export type { EncryptedStringFromInternalArgs } from '../core/envelope';
 export { EncryptedString } from '../core/envelope';
+export type { CipherstashStringParams } from '../core/parameterized';
+export {
+  createParameterizedCodecDescriptors,
+  encryptedStringParamsSchema,
+  renderEncryptedStringOutputType,
+} from '../core/parameterized';
 export type {
   CipherstashBulkDecryptArgs,
   CipherstashBulkEncryptArgs,

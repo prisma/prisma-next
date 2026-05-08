@@ -1,0 +1,198 @@
+/**
+ * Behavioural tests for the cipherstash storage codec runtime + the
+ * parameterized codec descriptor. Covers AC-CODEC1..CODEC5 from
+ * `envelope-codec-extension.spec.md` (M2 R1, project-1).
+ *
+ * The codec runtime is constructed via `codec({ ... })` from
+ * `@prisma-next/sql-relational-core/ast`. Author-side `encode`/`decode`
+ * are sync; the factory lifts them to Promise-returning at the boundary
+ * (same pattern pgvector follows).
+ */
+
+import type { SqlCodecCallContext } from '@prisma-next/sql-relational-core/ast';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  CIPHERSTASH_STRING_CODEC_ID,
+  createCipherstashStringCodec,
+} from '../src/core/codec-runtime';
+import { EncryptedString, getInternalHandle, setHandleCiphertext } from '../src/core/envelope';
+import {
+  createParameterizedCodecDescriptors,
+  encryptedStringParamsSchema,
+} from '../src/core/parameterized';
+import type { CipherstashSdk } from '../src/core/sdk';
+
+function emptySdk(): CipherstashSdk {
+  return {
+    decrypt: vi.fn(),
+    bulkEncrypt: vi.fn(),
+    bulkDecrypt: vi.fn(),
+  };
+}
+
+function ctxWithColumn(table: string, name: string): SqlCodecCallContext {
+  return { column: { table, name } };
+}
+
+const ctxWithoutColumn: SqlCodecCallContext = {};
+
+describe('createCipherstashStringCodec — registration shape — AC-CODEC1', () => {
+  it('uses cipherstash/string@1 as the codec id', () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    expect(codec.id).toBe(CIPHERSTASH_STRING_CODEC_ID);
+    expect(CIPHERSTASH_STRING_CODEC_ID).toBe('cipherstash/string@1');
+  });
+
+  it('targets the eql_v2_encrypted Postgres native type', () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    expect(codec.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe('eql_v2_encrypted');
+  });
+
+  it('declares the equality trait', () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    expect(codec.traits).toEqual(['equality']);
+  });
+});
+
+describe('codec.decode(wire, ctx) — AC-CODEC2', () => {
+  it('constructs an envelope carrying the column identity from ctx.column', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashStringCodec(sdk);
+    const wire = `("${JSON.stringify({ c: 'cipher' }).replaceAll('"', '""')}")`;
+    const envelope = await codec.decode(wire, ctxWithColumn('user', 'email'));
+    expect(envelope).toBeInstanceOf(EncryptedString);
+    const handle = getInternalHandle(envelope);
+    expect(handle.table).toBe('user');
+    expect(handle.column).toBe('email');
+    expect(handle.sdk).toBe(sdk);
+  });
+
+  it('throws a clear error when ctx.column is absent', async () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    const wire = `("${JSON.stringify({}).replaceAll('"', '""')}")`;
+    await expect(codec.decode(wire, ctxWithoutColumn)).rejects.toThrow(/ctx\.column/);
+  });
+});
+
+describe('codec.encode(envelope, ctx) — AC-CODEC3', () => {
+  it('extracts the ciphertext from the envelope handle', async () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    const envelope = EncryptedString.from('alice@example.com');
+    const ciphertextPayload = { c: 'cipher', i: { t: 'user', c: 'email' } };
+    setHandleCiphertext(envelope, ciphertextPayload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    expect(typeof wire).toBe('string');
+    expect(wire).toBe(`("${JSON.stringify(ciphertextPayload).replaceAll('"', '""')}")`);
+  });
+
+  it('throws when the envelope handle has no ciphertext (middleware did not run)', async () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    const envelope = EncryptedString.from('alice@example.com');
+    await expect(codec.encode(envelope, ctxWithoutColumn)).rejects.toThrow(
+      /bulk-encrypt middleware/,
+    );
+  });
+});
+
+describe('codec.renderOutputType — AC-CODEC4', () => {
+  it('returns "EncryptedString"', () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    expect(codec.renderOutputType?.({})).toBe('EncryptedString');
+  });
+});
+
+describe('eql_v2_encrypted wire-format round-trip — wire-format fix', () => {
+  it('encode then decode preserves the ciphertext payload through composite text format', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashStringCodec(sdk);
+    const payload = {
+      c: 'mBbLh1eMyM/Iq/M=',
+      i: { t: 'user', c: 'email' },
+      v: 2,
+    };
+    const envelope = EncryptedString.from('alice@example.com');
+    setHandleCiphertext(envelope, payload);
+
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    expect(typeof wire).toBe('string');
+    const wireString = wire as string;
+    expect(wireString.startsWith('("')).toBe(true);
+    expect(wireString.endsWith('")')).toBe(true);
+
+    const decoded = await codec.decode(wireString, ctxWithColumn('user', 'email'));
+    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+  });
+
+  it('decode accepts a pre-parsed { data: ... } row from the pg driver', async () => {
+    const sdk = emptySdk();
+    const codec = createCipherstashStringCodec(sdk);
+    const payload = { c: 'cipher', i: { t: 'user', c: 'email' } };
+    const decoded = await codec.decode(
+      { data: payload } as unknown as string,
+      ctxWithColumn('user', 'email'),
+    );
+    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+  });
+
+  it('decode passes through null/undefined unchanged', async () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    const decoded = await codec.decode(null as unknown as string, ctxWithColumn('user', 'email'));
+    expect(getInternalHandle(decoded).ciphertext).toBeNull();
+  });
+
+  it('encode then decode preserves embedded double quotes via the composite text-format escape', async () => {
+    const codec = createCipherstashStringCodec(emptySdk());
+    const payload = { c: 'has "quotes" inside' };
+    const envelope = EncryptedString.from('plain');
+    setHandleCiphertext(envelope, payload);
+    const wire = await codec.encode(envelope, ctxWithoutColumn);
+    const wireString = wire as string;
+    expect(wireString.includes('""')).toBe(true);
+    const decoded = await codec.decode(wireString, ctxWithColumn('user', 'email'));
+    expect(getInternalHandle(decoded).ciphertext).toEqual(payload);
+  });
+});
+
+describe('createParameterizedCodecDescriptors — AC-CODEC5', () => {
+  it('exposes a single descriptor for cipherstash/string@1', () => {
+    const descriptors = createParameterizedCodecDescriptors(emptySdk());
+    expect(descriptors).toHaveLength(1);
+    const [descriptor] = descriptors;
+    expect(descriptor?.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
+    expect(descriptor?.targetTypes).toEqual(['eql_v2_encrypted']);
+    expect(descriptor?.traits).toEqual(['equality']);
+    expect(descriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
+      'EncryptedString',
+    );
+  });
+
+  it('paramsSchema accepts { equality, freeTextSearch } booleans via Standard Schema', () => {
+    const result = encryptedStringParamsSchema['~standard'].validate({
+      equality: true,
+      freeTextSearch: false,
+    });
+    if (result instanceof Promise) throw new Error('expected synchronous validation');
+    if (result.issues)
+      throw new Error(`expected success, got issues: ${JSON.stringify(result.issues)}`);
+    expect(result.value).toEqual({ equality: true, freeTextSearch: false });
+  });
+
+  it('paramsSchema rejects non-boolean fields via Standard Schema', () => {
+    const result = encryptedStringParamsSchema['~standard'].validate({
+      equality: 'yes',
+      freeTextSearch: false,
+    });
+    if (result instanceof Promise) throw new Error('expected synchronous validation');
+    expect(result.issues?.length).toBeGreaterThan(0);
+  });
+
+  it('factory(params)(ctx) yields the codec instance', () => {
+    const sdk = emptySdk();
+    const [descriptor] = createParameterizedCodecDescriptors(sdk);
+    const codecForInstance = descriptor!.factory({ equality: true, freeTextSearch: false })({
+      name: 'User.email',
+    });
+    expect(codecForInstance.id).toBe(CIPHERSTASH_STRING_CODEC_ID);
+  });
+});
