@@ -323,18 +323,14 @@ Concatenate all `SpaceApplyInput`s in the cross-space ordering convention and pa
 
 ## 7. Synthetic test extension (T1.10)
 
-Location: `packages/3-extensions/test-contract-space/`. Mirrors `packages/3-extensions/pgvector/`'s package shape (`package.json`, `tsdown.config.ts`, `vitest.config.ts`, `tsconfig.json`, `src/`, `test/`, `README.md`).
+Location: `test/integration/test/contract-space-fixture/`. Hosted inside the `@prisma-next/integration-tests` workspace as a non-package fixture (no `package.json` of its own; it leverages integration-tests' existing config). Relocated under M1-cleanup T-cleanup.1 (commit `db33795e3`); originally lived as a private workspace package at `packages/3-extensions/test-contract-space/` mirroring `packages/3-extensions/pgvector/`'s shape — that shape was dropped because the fixture had no external consumers and "package under `packages/3-extensions/`" implied "real extension," which it is not.
 
-`package.json`:
+The fixture exposes the same descriptor surface that a real extension would (`contractSpace.contractJson`, `migrations`, `headRef`) and is consumed by integration tests in `test/integration/test/contract-space-fixture/descriptor.test.ts`.
 
-- `"name": "@prisma-next/extension-test-contract-space"`
-- `"private": true`
-- Same dependencies stanza as pgvector.
-
-`src/exports/control.ts`: a descriptor exposing `contractSpace`:
+`control.ts`: a descriptor exposing `contractSpace`:
 
 - One composite type (e.g. `test_box` with two int fields) declared in `contract.json`.
-- One baseline migration (op: `CREATE TYPE test_box AS (x int, y int)`; invariantId `test-contract-space:create-test_box-v1`).
+- One baseline migration (op: `CREATE TABLE test_box (x int, y int)`; invariantId `test-contract-space:create-test_box-v1`). M1 R1 substituted a table for a composite type because composite-type IR support is M3-or-later work; the per-space mechanism is type-agnostic so the substitution is design-equivalent.
 - `headRef = { hash: <hash of contract.json>, invariants: ['test-contract-space:create-test_box-v1'] }`.
 
 The test extension is consumed by integration tests in M1 to exercise:
@@ -361,7 +357,7 @@ Implementation-level acceptance criteria for the framework mechanism:
 - [ ] **AM8.** Codec hook fires for `'added'`, `'dropped'`, `'altered'` events with the contract specified in § 5. `'altered'` does *not* fire when only `codecId` changes.
 - [ ] **AM9.** `db init` per-space: on a fresh database with the synthetic test extension, both spaces are initialised in a single transaction; marker rows for `app` and `test-contract-space` exist with expected hashes.
 - [ ] **AM10.** `db update` per-space: bumping the synthetic test extension's `headRef` advances only its space's marker, leaving app-space untouched.
-- [ ] **AM11.** With the synthetic test extension's package directory removed (`rm -rf packages/3-extensions/test-contract-space/dist`), `dbInit` and `db apply` succeed reading only the user's repo. `migrate` fails (descriptor not importable) — that's expected and informative.
+- [ ] **AM11.** With the synthetic test fixture's source removed from the test tree, `dbInit` and `db apply` succeed reading only the user's repo (the same property that `packages/1-framework/3-tooling/migration/test/deletable-node-modules.test.ts` locks in inline by inventing the space id rather than importing the fixture). `migrate` would fail because the descriptor is the source of pinned-artefact emission — that's expected and informative.
 
 # Other Considerations
 
@@ -388,7 +384,7 @@ Track B's marker migration (T1.1) blocks all integration tests; T1.1 first.
 - ADR 208 — Invariant-aware migration routing.
 - ADR 021 — Contract Marker Storage (modified by T1.1).
 - ADR 029 — Shadow-DB preflight (covers user-DDL only; T1.1 runs inside `ensureControlTables` which is outside that scope, validated by idempotency tests instead).
-- `packages/3-extensions/pgvector/` — reference shape for `packages/3-extensions/test-contract-space/`.
+- `test/integration/test/contract-space-fixture/` — synthetic test extension fixture, M1-cleanup-relocated home (commit `db33795e3`).
 
 # Open Questions
 
