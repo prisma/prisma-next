@@ -39,12 +39,13 @@ export const ensureSchemaStatement: SqlStatement = {
 };
 
 /**
- * Schema for `prisma_contract.marker` after the contract-spaces
- * migration: the legacy single-row `id smallint` key is replaced with a
- * `space text` primary key, allowing one row per loaded contract space
- * (`'app'`, `'<extension-id>'`, …). The promotion of pre-existing
- * single-row markers is performed by the target-specific runner via the
- * idempotent `migrateMarkerSchemaStatements` helpers.
+ * Schema for `prisma_contract.marker`. The `space text` primary key
+ * supports one row per loaded contract space (`'app'`,
+ * `'<extension-id>'`, …); brand-new databases create this shape
+ * directly. Pre-1.0 single-row markers (no `space` column) are not
+ * auto-migrated — the target-specific migration runner detects the
+ * legacy shape at boot and surfaces a structured `LEGACY_MARKER_SHAPE`
+ * failure pointing the operator at re-running `dbInit`.
  *
  * @see specs/framework-mechanism.spec.md § 2.
  */

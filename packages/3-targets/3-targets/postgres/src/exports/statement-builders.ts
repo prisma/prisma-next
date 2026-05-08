@@ -5,5 +5,4 @@ export {
   ensureLedgerTableStatement,
   ensureMarkerTableStatement,
   ensurePrismaContractSchemaStatement,
-  migrateMarkerSchemaStatements,
 } from '../core/migrations/statement-builders';
