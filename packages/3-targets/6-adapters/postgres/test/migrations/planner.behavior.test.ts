@@ -33,7 +33,6 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({
@@ -64,7 +63,6 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({
@@ -104,7 +102,6 @@ describe('PostgresMigrationPlanner - subset/superset/conflict handling', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({
@@ -663,7 +660,6 @@ function planUserTableOperations(
       ...(options?.extraSchemaTables ?? {}),
       user: schemaUserTable,
     },
-    dependencies: [],
   };
   const result = planner.plan({
     contract,

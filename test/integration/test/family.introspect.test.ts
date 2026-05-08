@@ -91,8 +91,6 @@ describe('family instance introspect', () => {
         await withIntrospection(connectionString!, (schemaIR) => {
           expect(schemaIR).toBeDefined();
           expect(schemaIR.tables).toBeDefined();
-          expect(schemaIR.dependencies).toBeDefined();
-          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
         });
       },
       timeouts.spinUpPpgDev,
@@ -231,35 +229,6 @@ describe('family instance introspect', () => {
             driver: mockDriver,
           }),
         ).rejects.toThrow();
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
-
-  describe('for a schema with dependencies', () => {
-    beforeEach(async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-      // Setup schema first, then close the connection
-      await withClient(connectionString, async (client) => {
-        // Create a table (required for schema to exist)
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS "test" (
-            id SERIAL PRIMARY KEY
-          )
-        `);
-      }); // Connection closed here
-    }, timeouts.spinUpPpgDev);
-
-    it(
-      'returns dependencies array',
-      async () => {
-        await withIntrospection(connectionString!, (schemaIR) => {
-          expect(schemaIR.dependencies).toBeDefined();
-          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
-          expect(schemaIR.dependencies.length).toBeGreaterThanOrEqual(0);
-        });
       },
       timeouts.spinUpPpgDev,
     );

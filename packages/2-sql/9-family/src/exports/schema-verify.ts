@@ -10,7 +10,6 @@ export {
   arraysEqual,
   isIndexSatisfied,
   isUniqueConstraintSatisfied,
-  verifyDatabaseDependencies,
 } from '../core/schema-verify/verify-helpers';
 export type {
   NativeTypeNormalizer,

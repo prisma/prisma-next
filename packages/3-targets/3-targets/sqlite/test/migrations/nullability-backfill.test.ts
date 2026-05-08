@@ -42,7 +42,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
 
 // Live schema where "users.email" is nullable. Contract below will tighten
 // it to NOT NULL.
-function nullableEmailSchema(): { tables: Record<string, SqlTableIR>; dependencies: [] } {
+function nullableEmailSchema(): { tables: Record<string, SqlTableIR> } {
   return {
     tables: {
       users: {
@@ -65,7 +65,6 @@ function nullableEmailSchema(): { tables: Record<string, SqlTableIR>; dependenci
         indexes: [],
       },
     },
-    dependencies: [],
   };
 }
 
@@ -155,7 +154,6 @@ describe('nullability-tightening backfill', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const contract = makeContract({
       users: makeTable({

@@ -24,12 +24,11 @@ export function createTestContract(storage: Partial<SqlStorage> = {}): Contract<
  */
 export function createTestSchema(storageTypes?: Record<string, StorageTypeInstance>): SqlSchemaIR {
   if (!storageTypes) {
-    return { tables: {}, dependencies: [] };
+    return { tables: {} };
   }
 
   return {
     tables: {},
-    dependencies: [],
     annotations: {
       pg: {
         storageTypes,

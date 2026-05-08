@@ -5,7 +5,6 @@ import { sqlSchemaIrToPslAst } from '../../src/core/psl-contract-infer/sql-schem
 
 function ir(partial: Partial<SqlSchemaIR> & Pick<SqlSchemaIR, 'tables'>): SqlSchemaIR {
   return {
-    dependencies: [],
     ...partial,
   };
 }

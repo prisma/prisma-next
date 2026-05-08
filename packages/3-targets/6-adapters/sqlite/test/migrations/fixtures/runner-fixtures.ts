@@ -44,7 +44,6 @@ export const contract: Contract<SqlStorage> = {
 
 export const emptySchema: SqlSchemaIR = {
   tables: {},
-  dependencies: [],
 };
 
 export const familyInstance = sqlFamilyDescriptor.create(

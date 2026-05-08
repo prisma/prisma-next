@@ -79,8 +79,6 @@ describe('family instance introspect', () => {
 
           expect(schemaIR).toBeDefined();
           expect(schemaIR.tables).toBeDefined();
-          expect(schemaIR.dependencies).toBeDefined();
-          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
         } finally {
           await driver.close();
         }
@@ -411,56 +409,6 @@ describe('family instance introspect', () => {
         ).rejects.toThrow();
       },
       timeouts.databaseOperation,
-    );
-  });
-
-  describe('for a schema with dependencies', () => {
-    beforeEach(async () => {
-      if (!connectionString) {
-        throw new Error('Connection string not set');
-      }
-      // Setup schema first, then close the connection
-      await withClient(connectionString, async (client) => {
-        // Create a table (required for schema to exist)
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS "test" (
-            id SERIAL PRIMARY KEY
-          )
-        `);
-      }); // Connection closed here
-    }, timeouts.spinUpPpgDev);
-
-    it(
-      'returns dependencies array',
-      async () => {
-        if (!connectionString) {
-          throw new Error('Connection string not set');
-        }
-
-        const driver = await postgresDriver.create(connectionString);
-        try {
-          const familyInstance = sql.create(
-            createControlStack({
-              family: sql,
-              target: postgres,
-              adapter: postgresAdapter,
-              driver: postgresDriver,
-              extensionPacks: [],
-            }),
-          );
-
-          const schemaIR = await familyInstance.introspect({
-            driver,
-          });
-
-          expect(schemaIR.dependencies).toBeDefined();
-          expect(Array.isArray(schemaIR.dependencies)).toBe(true);
-          expect(schemaIR.dependencies.length).toBeGreaterThanOrEqual(0);
-        } finally {
-          await driver.close();
-        }
-      },
-      timeouts.spinUpPpgDev,
     );
   });
 });

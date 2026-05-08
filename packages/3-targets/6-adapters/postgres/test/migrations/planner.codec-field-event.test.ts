@@ -8,7 +8,7 @@ import { createPostgresMigrationPlanner } from '@prisma-next/target-postgres/pla
 import { expectNarrowedType } from '@prisma-next/test-utils/typed-expectations';
 import { describe, expect, it } from 'vitest';
 
-const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
+const emptySchema: SqlSchemaIR = { tables: {} };
 
 const PG_TEXT_CODEC = 'pg/text@1';
 const HOOKED_CODEC = 'cs/string@1';

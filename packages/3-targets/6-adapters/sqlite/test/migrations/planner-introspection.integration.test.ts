@@ -68,7 +68,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
   };
 }
 
-const emptySchema = { tables: {}, dependencies: [] };
+const emptySchema = { tables: {} };
 
 async function runPlannedSteps(
   driver: { query: (sql: string) => Promise<unknown> },

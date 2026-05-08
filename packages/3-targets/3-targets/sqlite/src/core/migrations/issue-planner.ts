@@ -275,7 +275,7 @@ const DEFAULT_POLICY: MigrationOperationPolicy = {
 };
 
 function emptySchemaIR(): SqlSchemaIR {
-  return { tables: {}, dependencies: [] };
+  return { tables: {} };
 }
 
 // ============================================================================

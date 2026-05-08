@@ -9,7 +9,6 @@ import type {
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
 import type {
-  DependencyIR,
   PrimaryKey,
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -192,39 +191,32 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
     _contract?: unknown,
     schema = 'public',
   ): Promise<SqlSchemaIR> {
-    // Execute all queries in parallel for efficiency (7 queries instead of 5T+3)
-    const [
-      tablesResult,
-      columnsResult,
-      pkResult,
-      fkResult,
-      uniqueResult,
-      indexResult,
-      extensionsResult,
-    ] = await Promise.all([
-      // Query all tables
-      driver.query<{ table_name: string }>(
-        `SELECT table_name
+    // Execute all queries in parallel for efficiency (6 queries instead of 5T+1)
+    const [tablesResult, columnsResult, pkResult, fkResult, uniqueResult, indexResult] =
+      await Promise.all([
+        // Query all tables
+        driver.query<{ table_name: string }>(
+          `SELECT table_name
          FROM information_schema.tables
          WHERE table_schema = $1
            AND table_type = 'BASE TABLE'
          ORDER BY table_name`,
-        [schema],
-      ),
-      // Query all columns for all tables in schema
-      driver.query<{
-        table_name: string;
-        column_name: string;
-        data_type: string;
-        udt_name: string;
-        is_nullable: string;
-        character_maximum_length: number | null;
-        numeric_precision: number | null;
-        numeric_scale: number | null;
-        column_default: string | null;
-        formatted_type: string | null;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all columns for all tables in schema
+        driver.query<{
+          table_name: string;
+          column_name: string;
+          data_type: string;
+          udt_name: string;
+          is_nullable: string;
+          character_maximum_length: number | null;
+          numeric_precision: number | null;
+          numeric_scale: number | null;
+          column_default: string | null;
+          formatted_type: string | null;
+        }>(
+          `SELECT
            c.table_name,
            column_name,
            data_type,
@@ -248,16 +240,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
            AND NOT a.attisdropped
          WHERE c.table_schema = $1
          ORDER BY c.table_name, c.ordinal_position`,
-        [schema],
-      ),
-      // Query all primary keys for all tables in schema
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all primary keys for all tables in schema
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -270,24 +262,24 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'PRIMARY KEY'
          ORDER BY tc.table_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all foreign keys for all tables in schema, including referential actions.
-      // Uses pg_catalog for correct positional pairing of composite FK columns
-      // (information_schema.constraint_column_usage lacks ordinal_position,
-      // which causes Cartesian products for multi-column FKs).
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-        referenced_table_schema: string;
-        referenced_table_name: string;
-        referenced_column_name: string;
-        delete_rule: string;
-        update_rule: string;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all foreign keys for all tables in schema, including referential actions.
+        // Uses pg_catalog for correct positional pairing of composite FK columns
+        // (information_schema.constraint_column_usage lacks ordinal_position,
+        // which causes Cartesian products for multi-column FKs).
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+          referenced_table_schema: string;
+          referenced_table_name: string;
+          referenced_column_name: string;
+          delete_rule: string;
+          update_rule: string;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -320,16 +312,16 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'FOREIGN KEY'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all unique constraints for all tables in schema (excluding PKs)
-      driver.query<{
-        table_name: string;
-        constraint_name: string;
-        column_name: string;
-        ordinal_position: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all unique constraints for all tables in schema (excluding PKs)
+        driver.query<{
+          table_name: string;
+          constraint_name: string;
+          column_name: string;
+          ordinal_position: number;
+        }>(
+          `SELECT
            tc.table_name,
            tc.constraint_name,
            kcu.column_name,
@@ -342,17 +334,17 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
          WHERE tc.table_schema = $1
            AND tc.constraint_type = 'UNIQUE'
          ORDER BY tc.table_name, tc.constraint_name, kcu.ordinal_position`,
-        [schema],
-      ),
-      // Query all indexes for all tables in schema (excluding constraints)
-      driver.query<{
-        tablename: string;
-        indexname: string;
-        indisunique: boolean;
-        attname: string;
-        attnum: number;
-      }>(
-        `SELECT
+          [schema],
+        ),
+        // Query all indexes for all tables in schema (excluding constraints)
+        driver.query<{
+          tablename: string;
+          indexname: string;
+          indisunique: boolean;
+          attname: string;
+          attnum: number;
+        }>(
+          `SELECT
            i.tablename,
            i.indexname,
            ix.indisunique,
@@ -374,16 +366,9 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
                AND tc.constraint_name = i.indexname
            )
          ORDER BY i.tablename, i.indexname, a.attnum`,
-        [schema],
-      ),
-      // Query extensions
-      driver.query<{ extname: string }>(
-        `SELECT extname
-         FROM pg_extension
-         ORDER BY extname`,
-        [],
-      ),
-    ]);
+          [schema],
+        ),
+      ]);
 
     // Group results by table name for efficient lookup
     const columnsByTable = groupBy(columnsResult.rows, 'table_name');
@@ -551,10 +536,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
       };
     }
 
-    const dependencies: readonly DependencyIR[] = extensionsResult.rows.map((row) => ({
-      id: `postgres.extension.${row.extname}`,
-    }));
-
     const storageTypes =
       (await pgEnumControlHooks.introspectTypes?.({ driver, schemaName: schema })) ?? {};
 
@@ -571,7 +552,6 @@ export class PostgresControlAdapter implements SqlControlAdapter<'postgres'> {
 
     return {
       tables,
-      dependencies,
       annotations,
     };
   }

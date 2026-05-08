@@ -14,19 +14,16 @@
  *   nullability tightening, unsafe type changes, enum shrink/rebuild) emit
  *   `DataTransformCall` placeholders that the user fills in.
  * - When `'data'` is excluded, those strategies short-circuit so the
- *   downstream walk-schema strategies (codec-hook type ops, dependency
- *   installs, temp-default backfill) and `mapIssueToCall` defaults emit
- *   direct DDL instead.
+ *   downstream walk-schema strategies (codec-hook type ops and temp-default
+ *   backfill) and `mapIssueToCall` defaults emit direct DDL instead.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
 import type {
   CodecControlHooks,
-  ComponentDatabaseDependency,
   MigrationOperationPolicy,
   SqlMigrationPlanOperation,
 } from '@prisma-next/family-sql/control';
-import { collectInitDependencies } from '@prisma-next/family-sql/control';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { SchemaIssue } from '@prisma-next/framework-components/control';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
@@ -429,47 +426,6 @@ export const storageTypePlanCallStrategy: CallMigrationStrategy = (issues, ctx) 
 };
 
 /**
- * Dispatches component-declared database dependencies. Replaces the
- * walk-schema `buildDatabaseDependencyOperations` path. Rather than consuming
- * `dependency_missing` issues (which only carry the id), this strategy
- * re-invokes `collectInitDependencies(frameworkComponents)` at plan time so
- * the handler has access to the structured `install` ops each component
- * declared — including arbitrary SQL launders — and dedupes by dependency id
- * plus per-op id.
- */
-export const dependencyInstallCallStrategy: CallMigrationStrategy = (issues, ctx) => {
-  const installedIds = new Set(ctx.schema.dependencies.map((d) => d.id));
-  const dependencies = sortDependencies(
-    collectInitDependencies(ctx.frameworkComponents).filter(isPostgresPlannerDependency),
-  );
-
-  const calls: PostgresOpFactoryCall[] = [];
-  const handledDependencyIds = new Set<string>();
-  const seenOperationIds = new Set<string>();
-
-  for (const dep of dependencies) {
-    handledDependencyIds.add(dep.id);
-    if (installedIds.has(dep.id)) continue;
-    for (const installOp of dep.install) {
-      if (seenOperationIds.has(installOp.id)) continue;
-      seenOperationIds.add(installOp.id);
-      calls.push(liftInstallOpToCall(installOp));
-    }
-  }
-
-  // Consume ALL `dependency_missing` issues — even non-postgres ones. The
-  // walk-schema predecessor silently skipped non-postgres deps; leaving those
-  // issues in the stream would let `mapIssueToCall` reject them as
-  // "Unknown dependency type".
-  const remaining = issues.filter((issue) => issue.kind !== 'dependency_missing');
-
-  if (calls.length === 0 && remaining.length === issues.length) {
-    return { kind: 'no_match' };
-  }
-  return { kind: 'match', issues: remaining, calls };
-};
-
-/**
  * Handles `missing_column` issues for NOT NULL columns without a contract
  * default. Replaces the walk-schema `buildAddColumnItem` non-default branches.
  *
@@ -633,43 +589,6 @@ function canUseSharedTemporaryDefaultStrategy(options: {
   return true;
 }
 
-type PlannerDatabaseDependency = ComponentDatabaseDependency<unknown> & {
-  readonly install: readonly SqlMigrationPlanOperation<PostgresPlanTargetDetails>[];
-};
-
-function isPostgresPlannerDependency(
-  dependency: ComponentDatabaseDependency<unknown>,
-): dependency is PlannerDatabaseDependency {
-  return dependency.install.every((operation) => operation.target.id === 'postgres');
-}
-
-function sortDependencies(
-  dependencies: ReadonlyArray<PlannerDatabaseDependency>,
-): ReadonlyArray<PlannerDatabaseDependency> {
-  return [...dependencies].sort((a, b) => a.id.localeCompare(b.id));
-}
-
-/**
- * Lift a component install op into migration IR. Structured shapes — extension
- * and schema installs with predictable SQL — collapse to typed `*Call`
- * subclasses so the scaffolded migration authoring surface stays readable.
- * Everything else (arbitrary SQL) falls through to `RawSqlCall` as an escape
- * hatch.
- */
-/**
- * Component-declared install ops are wrapped as `RawSqlCall` so the
- * component's original `label`, `precheck`, `execute`, `postcheck`, and op
- * id are preserved verbatim. Structured conversion (to e.g.
- * `CreateExtensionCall`) would drop the precheck/postcheck pair and
- * change the DDL label, breaking walk-schema output parity. Classification
- * as `'dep'` happens in `classifyCall` via the underlying op's id prefix.
- */
-function liftInstallOpToCall(
-  op: SqlMigrationPlanOperation<PostgresPlanTargetDetails>,
-): PostgresOpFactoryCall {
-  return new RawSqlCall(op);
-}
-
 /**
  * Ordered list of Postgres planner strategies, shared by `migration plan`
  * and `db update` / `db init`. The issue planner runs each strategy in
@@ -685,8 +604,8 @@ function liftInstallOpToCall(
  * - When `'data'` is not allowed (`db update` / `db init`), each data-safe
  *   strategy short-circuits to `no_match`, leaving the issue for the
  *   downstream walk-schema strategies (`storageTypePlanCallStrategy`,
- *   `dependencyInstallCallStrategy`, `notNullAddColumnCallStrategy`) or the
- *   `mapIssueToCall` default to handle with direct DDL.
+ *   `notNullAddColumnCallStrategy`) or the `mapIssueToCall` default to handle
+ *   with direct DDL.
  *
  * Order matters: data-safe strategies must run before the walk-schema
  * strategies on overlapping issue kinds (e.g. `enum_values_changed`,
@@ -698,6 +617,5 @@ export const postgresPlannerStrategies: readonly CallMigrationStrategy[] = [
   typeChangeCallStrategy,
   nullableTighteningCallStrategy,
   storageTypePlanCallStrategy,
-  dependencyInstallCallStrategy,
   notNullAddColumnCallStrategy,
 ];

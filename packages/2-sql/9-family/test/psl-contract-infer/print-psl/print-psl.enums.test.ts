@@ -34,7 +34,6 @@ describe('printPsl', () => {
           },
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -90,7 +89,6 @@ describe('printPsl', () => {
           },
         },
       },
-      dependencies: [],
     };
 
     const result = printPslFromSql(schemaIR);
@@ -149,7 +147,6 @@ describe('printPsl', () => {
           },
         },
       },
-      dependencies: [],
     };
 
     const result = printPslFromSql(schemaIR);

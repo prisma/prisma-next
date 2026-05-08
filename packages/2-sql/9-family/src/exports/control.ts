@@ -36,8 +36,6 @@ export {
 export { INIT_ADDITIVE_POLICY } from '../core/migrations/policies';
 export type {
   CodecControlHooks,
-  ComponentDatabaseDependencies,
-  ComponentDatabaseDependency,
   CreateSqlMigrationPlanOptions,
   ExpandNativeTypeInput,
   ExtensionContractRef,
@@ -75,7 +73,6 @@ export type {
   SqlPlanTargetDetails,
   StorageTypePlanResult,
 } from '../core/migrations/types';
-export { collectInitDependencies, isDatabaseDependencyProvider } from '../core/migrations/types';
 export {
   temporalAuthoringPresets,
   timestampNowControlDescriptor,

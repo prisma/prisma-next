@@ -42,7 +42,7 @@ function createMockFamilyInstance(overrides?: {
   return {
     familyId: 'sql',
     readAllMarkers: overrides?.readAllMarkers ?? (async () => new Map()),
-    introspect: overrides?.introspect ?? (async () => ({ tables: {}, dependencies: [] })),
+    introspect: overrides?.introspect ?? (async () => ({ tables: {} })),
     validateContract: (ir: unknown) => ir as Contract,
     // Stub `OperationPreviewCapable` so the plan path produces an empty
     // preview when no operations carry SQL execute steps.

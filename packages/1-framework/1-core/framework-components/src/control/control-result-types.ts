@@ -55,7 +55,6 @@ export interface BaseSchemaIssue {
     | 'foreign_key_mismatch'
     | 'unique_constraint_mismatch'
     | 'index_mismatch'
-    | 'dependency_missing'
     | 'default_missing'
     | 'default_mismatch'
     | 'extra_default';
@@ -63,7 +62,6 @@ export interface BaseSchemaIssue {
   readonly column?: string;
   readonly indexOrConstraint?: string;
   readonly typeName?: string;
-  readonly dependencyId?: string;
   readonly expected?: string;
   readonly actual?: string;
   readonly message: string;

@@ -1,5 +1,4 @@
 export type {
-  DependencyIR,
   PrimaryKey,
   SqlAnnotations,
   SqlColumnIR,

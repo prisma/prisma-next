@@ -73,7 +73,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
         },
         'sha256:to',
       ),
-      schema: { tables: {}, dependencies: [] },
+      schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: makeFrameworkComponents(hooks),
@@ -131,7 +131,6 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
             email: col({ codecId: HOOKED_CODEC }),
           }),
         },
-        dependencies: [],
       },
       policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
       fromContract,
@@ -153,7 +152,7 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
         },
         'sha256:to',
       ),
-      schema: { tables: {}, dependencies: [] },
+      schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: [],
@@ -194,14 +193,14 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
 
     const a = planner.plan({
       contract: c,
-      schema: { tables: {}, dependencies: [] },
+      schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: fc,
     });
     const b = planner.plan({
       contract: c,
-      schema: { tables: {}, dependencies: [] },
+      schema: { tables: {} },
       policy: { allowedOperationClasses: ['additive'] },
       fromContract: null,
       frameworkComponents: fc,

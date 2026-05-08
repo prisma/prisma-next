@@ -11,7 +11,6 @@ describe('printPsl', () => {
   it('empty schema', () => {
     const schemaIR: SqlSchemaIR = {
       tables: {},
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -36,7 +35,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -71,7 +69,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -108,7 +105,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result = printPslFromSql(schemaIR);
     expect(result).toMatchInlineSnapshot(`
@@ -150,7 +146,6 @@ describe('printPsl', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
     const result1 = printPslFromSql(schemaIR);
     const result2 = printPslFromSql(schemaIR);

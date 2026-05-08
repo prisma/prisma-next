@@ -13,13 +13,7 @@ import type {
   PrimaryKey,
   UniqueConstraint,
 } from '@prisma-next/sql-contract/types';
-import type {
-  SqlForeignKeyIR,
-  SqlIndexIR,
-  SqlSchemaIR,
-  SqlUniqueIR,
-} from '@prisma-next/sql-schema-ir/types';
-import type { ComponentDatabaseDependency } from '../migrations/types';
+import type { SqlForeignKeyIR, SqlIndexIR, SqlUniqueIR } from '@prisma-next/sql-schema-ir/types';
 
 /**
  * Compares two arrays of strings for equality (order-sensitive).
@@ -465,63 +459,6 @@ export function verifyIndexes(
           children: [],
         });
       }
-    }
-  }
-
-  return nodes;
-}
-
-/**
- * Verifies database dependencies are installed using component-owned verification hooks.
- * Checks whether each dependency is satisfied by verifying its id is present in
- * schema.dependencies (populated from introspection).
- *
- * Returns verification nodes for the tree.
- */
-export function verifyDatabaseDependencies(
-  dependencies: ReadonlyArray<ComponentDatabaseDependency<unknown>>,
-  schema: SqlSchemaIR,
-  issues: SchemaIssue[],
-): SchemaVerificationNode[] {
-  const nodes: SchemaVerificationNode[] = [];
-  const installedIds = new Set(schema.dependencies.map((d) => d.id));
-
-  for (const dependency of dependencies) {
-    const isSatisfied = installedIds.has(dependency.id);
-    const depPath = `dependencies.${dependency.id}`;
-
-    if (!isSatisfied) {
-      const depIssue: SchemaIssue = {
-        kind: 'dependency_missing',
-        dependencyId: dependency.id,
-        message: `Dependency "${dependency.id}" is missing from database`,
-      };
-      issues.push(depIssue);
-      const nodeMessage = depIssue.message;
-      nodes.push({
-        status: 'fail',
-        kind: 'databaseDependency',
-        name: dependency.label,
-        contractPath: depPath,
-        code: 'dependency_missing',
-        message: nodeMessage,
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
-    } else {
-      // Dependency is satisfied
-      nodes.push({
-        status: 'pass',
-        kind: 'databaseDependency',
-        name: dependency.label,
-        contractPath: depPath,
-        code: '',
-        message: '',
-        expected: undefined,
-        actual: undefined,
-        children: [],
-      });
     }
   }
 

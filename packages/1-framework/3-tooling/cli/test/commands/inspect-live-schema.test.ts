@@ -55,7 +55,6 @@ const baseConfig = {
 
 const schemaIR = {
   tables: {},
-  dependencies: [],
 } as const;
 
 const context = {

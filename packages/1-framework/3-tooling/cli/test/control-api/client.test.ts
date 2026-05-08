@@ -659,7 +659,7 @@ describe('ControlClient progress emission', () => {
 
       // Override family instance to return a marker (db update works with or without one)
       const mockFamilyInstance = {
-        introspect: async () => ({ tables: {}, dependencies: [] }),
+        introspect: async () => ({ tables: {} }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => ({ storageHash: 'sha256:origin' }),
         readAllMarkers: async () => new Map(),
@@ -777,7 +777,7 @@ describe('ControlClient progress emission', () => {
 
       // Override to return null marker — db update no longer requires a marker
       const noMarkerFamilyInstance = {
-        introspect: async () => ({ tables: {}, dependencies: [] }),
+        introspect: async () => ({ tables: {} }),
         validateContract: (ir: unknown) => ir as Contract,
         readMarker: async () => null,
         readAllMarkers: async () => new Map(),

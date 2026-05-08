@@ -18,7 +18,7 @@ function createMockFamilyInstance() {
   return {
     familyId: 'sql',
     readAllMarkers: async () => new Map(),
-    introspect: async () => ({ tables: {}, dependencies: [] }),
+    introspect: async () => ({ tables: {} }),
     validateContract: (ir: unknown) => ir as Contract,
     toOperationPreview: () => ({ statements: [] }),
   } as unknown as ControlFamilyInstance<'sql', unknown>;

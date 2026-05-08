@@ -39,7 +39,7 @@ function makeContract(tables: Record<string, StorageTable>): Contract<SqlStorage
   };
 }
 
-const emptySchema = { tables: {}, dependencies: [] };
+const emptySchema = { tables: {} };
 
 describe('SQLite migration planner', () => {
   const planner = createSqliteMigrationPlanner();
@@ -99,7 +99,6 @@ describe('SQLite migration planner', () => {
           indexes: [],
         },
       },
-      dependencies: [],
     };
 
     const result = planner.plan({

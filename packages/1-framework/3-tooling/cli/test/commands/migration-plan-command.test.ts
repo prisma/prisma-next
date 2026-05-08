@@ -241,7 +241,7 @@ describe('migration plan command', () => {
         },
       });
       const createPlannerMock = vi.fn().mockReturnValue({ plan: planMock });
-      const contractToSchemaMock = vi.fn().mockReturnValue({ tables: {}, dependencies: [] });
+      const contractToSchemaMock = vi.fn().mockReturnValue({ tables: {} });
 
       mocks.loadConfig.mockResolvedValue({
         family: {
