@@ -3,14 +3,14 @@ import { tmpdir } from 'node:os';
 import { join } from 'pathe';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { canonicalizeJson } from '../src/canonicalize-json';
-import { writeExtensionMigrationPackage } from '../src/io';
+import { writeAuthoredMigrationPackage } from '../src/io';
 import { createTestMetadata, createTestOps } from './fixtures';
 
-describe('writeExtensionMigrationPackage', () => {
+describe('writeAuthoredMigrationPackage', () => {
   let tmpDir: string;
 
   beforeEach(async () => {
-    tmpDir = await mkdtemp(join(tmpdir(), 'ext-mig-pkg-'));
+    tmpDir = await mkdtemp(join(tmpdir(), 'authored-mig-pkg-'));
   });
 
   afterEach(async () => {
@@ -22,7 +22,7 @@ describe('writeExtensionMigrationPackage', () => {
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: '20260507T1100_install', metadata, ops };
 
-    await writeExtensionMigrationPackage(tmpDir, pkg);
+    await writeAuthoredMigrationPackage(tmpDir, pkg);
 
     const dir = join(tmpDir, pkg.dirName);
     const entries = (await readdir(dir)).sort();
@@ -34,7 +34,7 @@ describe('writeExtensionMigrationPackage', () => {
     const metadata = createTestMetadata({}, ops);
     const pkg = { dirName: 'baseline', metadata, ops };
 
-    await writeExtensionMigrationPackage(tmpDir, pkg);
+    await writeAuthoredMigrationPackage(tmpDir, pkg);
 
     const dir = join(tmpDir, pkg.dirName);
     const contractRaw = await readFile(join(dir, 'contract.json'), 'utf-8');
@@ -48,8 +48,8 @@ describe('writeExtensionMigrationPackage', () => {
 
     const dirA = join(tmpDir, 'a');
     const dirB = join(tmpDir, 'b');
-    await writeExtensionMigrationPackage(dirA, pkg);
-    await writeExtensionMigrationPackage(dirB, pkg);
+    await writeAuthoredMigrationPackage(dirA, pkg);
+    await writeAuthoredMigrationPackage(dirB, pkg);
 
     const aManifest = await readFile(join(dirA, pkg.dirName, 'migration.json'), 'utf-8');
     const bManifest = await readFile(join(dirB, pkg.dirName, 'migration.json'), 'utf-8');
@@ -72,7 +72,7 @@ describe('writeExtensionMigrationPackage', () => {
       ops: [],
     };
 
-    await writeExtensionMigrationPackage(nested, pkg);
+    await writeAuthoredMigrationPackage(nested, pkg);
 
     const dirStat = await stat(join(nested, 'baseline'));
     expect(dirStat.isDirectory()).toBe(true);

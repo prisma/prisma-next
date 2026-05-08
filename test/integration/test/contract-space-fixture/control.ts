@@ -14,15 +14,15 @@
  * review F1).
  */
 
-import type {
-  ExtensionContractSpace,
-  SqlControlExtensionDescriptor,
-} from '@prisma-next/family-sql/control';
+import type { Contract } from '@prisma-next/contract/types';
+import type { SqlControlExtensionDescriptor } from '@prisma-next/family-sql/control';
+import type { AuthoredContractSpace } from '@prisma-next/framework-components/control';
+import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { TEST_SPACE_ID } from './constants';
 import { testContractSpaceContract } from './contract';
 import { testContractSpaceBaselineMigration, testContractSpaceHeadRef } from './migrations';
 
-const testContractSpace: ExtensionContractSpace = {
+const testContractSpace: AuthoredContractSpace<Contract<SqlStorage>> = {
   contractJson: testContractSpaceContract,
   migrations: [testContractSpaceBaselineMigration],
   headRef: testContractSpaceHeadRef,

@@ -1,7 +1,7 @@
 import type {
-  ExtensionContractRef,
-  ExtensionMigrationPackage,
-} from '@prisma-next/family-sql/control';
+  AuthoredMigrationPackage,
+  ContractSpaceHeadRef,
+} from '@prisma-next/framework-components/control';
 import {
   TEST_BASELINE_INVARIANT_ID,
   TEST_BASELINE_MIGRATION_NAME,
@@ -20,7 +20,7 @@ const baselineMetadata = {
   labels: [],
   providedInvariants: [TEST_BASELINE_INVARIANT_ID],
   createdAt: '2026-01-01T00:00:00.000Z',
-} as const satisfies ExtensionMigrationPackage['metadata'];
+} as const satisfies AuthoredMigrationPackage['metadata'];
 
 /**
  * Single baseline migration: creates the `test_box` table from the empty
@@ -28,7 +28,7 @@ const baselineMetadata = {
  * so a runner that walks this migration graph from a fresh marker reaches
  * the head ref in one step.
  */
-export const testContractSpaceBaselineMigration: ExtensionMigrationPackage = {
+export const testContractSpaceBaselineMigration: AuthoredMigrationPackage = {
   dirName: TEST_BASELINE_MIGRATION_NAME,
   metadata: baselineMetadata,
   ops: [
@@ -41,7 +41,7 @@ export const testContractSpaceBaselineMigration: ExtensionMigrationPackage = {
   ],
 };
 
-export const testContractSpaceHeadRef: ExtensionContractRef = {
+export const testContractSpaceHeadRef: ContractSpaceHeadRef = {
   hash: TEST_HEAD_HASH,
   invariants: [TEST_BASELINE_INVARIANT_ID],
 };

@@ -1,10 +1,9 @@
 export {
   copyFilesWithRename,
   formatMigrationDirName,
-  type MigrationPackageContents,
   readMigrationPackage,
   readMigrationsDir,
-  writeExtensionMigrationPackage,
+  writeAuthoredMigrationPackage,
   writeMigrationMetadata,
   writeMigrationOps,
   writeMigrationPackage,
