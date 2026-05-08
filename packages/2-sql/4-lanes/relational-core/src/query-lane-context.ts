@@ -7,10 +7,9 @@ import type { CodecRegistry, ContractCodecRegistry } from './ast/codec-types';
 /**
  * Codec-id-keyed accessor for descriptor metadata. The unified read API
  * for codec-id-keyed metadata (`traits`, `targetTypes`, `meta`) — non-
- * branching for parameterized vs. non-parameterized codecs since every
- * codec ships as (or is synthesized into) a `CodecDescriptor`.
- *
- * See codec-registry-unification spec § Decision and AC-3.
+ * branching for parameterized vs. non-parameterized codecs. Every codec
+ * ships natively as a `CodecDescriptor` through the unified `codecs:`
+ * contributor slot (see ADR 208).
  */
 export interface CodecDescriptorRegistry {
   /**
@@ -33,9 +32,11 @@ export interface CodecDescriptorRegistry {
 
 /**
  * Registry of initialized type helpers from storage.types.
- * Each key is a type name from storage.types, and the value is:
- * - The result of the codec's init hook (if provided), or
- * - The full StorageTypeInstance metadata (codecId, nativeType, typeParams) if no init hook
+ * Each key is a type name from storage.types, and the value is the
+ * resolved codec materialized once for that named instance via
+ * `descriptor.factory(typeParams)(ctx)` (or the raw
+ * `StorageTypeInstance` metadata for codec ids whose descriptor isn't
+ * registered).
  */
 export type TypeHelperRegistry = Record<string, unknown>;
 
@@ -73,27 +74,28 @@ export type MutationDefaultsOptions = {
 export interface ExecutionContext<TContract extends Contract<SqlStorage> = Contract<SqlStorage>> {
   readonly contract: TContract;
   /**
-   * Codec registry indexed by codec id. Source of shared, non-parameterized
-   * codec instances; also used as the codec-id-only fallback at the
-   * `forCodecId` boundary while AC-5's `ParamRef.refs` plumbing remains
-   * deferred (TML-2357).
+   * Codec registry indexed by codec id. Source of shared, non-
+   * parameterized codec instances; consulted by the `forCodecId`
+   * fallback for refs-less call sites whose codec id is non-
+   * parameterized (parameterized codec ids always go through
+   * `forColumn` after refs validation).
    */
   readonly codecs: CodecRegistry;
   /**
-   * Contract-bound codec registry built once at context-construction time
-   * by walking the contract's columns and resolving each to its per-
-   * instance codec (parameterized columns) or the shared codec from the
-   * legacy registry (non-parameterized columns). The dispatch path
-   * (`encodeParam` / `decodeRow`) consults `forColumn(table, column)`
-   * when the call site has the ref, falling back to `forCodecId(codecId)`
-   * otherwise. Codec-registry-unification spec § AC-4.
+   * Contract-bound codec registry built once at context-construction
+   * time by walking the contract's columns and resolving each through
+   * its descriptor's factory. The dispatch path (`encodeParam` /
+   * `decodeRow`) consults `forColumn(table, column)` for column-bound
+   * call sites; `forCodecId(codecId)` is the refs-less fallback,
+   * permitted only for non-parameterized codec ids (the builder-
+   * pipeline validator pass enforces refs on every parameterized
+   * `ParamRef`).
    */
   readonly contractCodecs: ContractCodecRegistry;
   /**
-   * Codec-id-keyed descriptor map. Single source of truth for codec-id-
-   * keyed metadata (`traits`, `targetTypes`, `meta`) — every codec,
+   * Codec-id-keyed descriptor map. Single source of truth for codec-
+   * id-keyed metadata (`traits`, `targetTypes`, `meta`) — every codec,
    * parameterized or not, resolves through this map without branching.
-   * Codec-registry-unification spec § AC-3.
    */
   readonly codecDescriptors: CodecDescriptorRegistry;
   readonly queryOperations: SqlOperationRegistry;

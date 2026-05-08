@@ -1,5 +1,19 @@
 # ADR 186 — Codec-dispatched type rendering
 
+> **Retrospective note (TML-2357 close-out).** This ADR introduced the
+> `renderOutputType` slot on the codec record (and shows
+> `defineCodec({...})` examples). Both the codec authoring shape and
+> the home of `renderOutputType` have since moved on:
+> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
+> relocated `renderOutputType` to the unified `CodecDescriptor`, and
+> TML-2357 retired the `defineCodec({...})` factory in favor of the
+> class-form Pattern E
+> (`class extends CodecDescriptorImpl<P>`). The decision this ADR
+> records — that the codec is the dispatch authority for type
+> rendering — is unchanged; only the slot's home and the authoring
+> syntax have moved. See
+> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## At a glance
 
 A `vector(1536)` column should produce `Vector<1536>` as its output type. A `jsonb(schema)` column should produce `{ name: string }`. Today, resolving a field's output type requires dispatching through `CodecTypes[codecId]['output']` or `parameterizedOutput` — a hoop that varies depending on whether the codec is parameterized. After this change, every field's output type is resolved once and stamped into a dedicated map in `contract.d.ts`:

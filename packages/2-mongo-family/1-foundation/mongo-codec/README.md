@@ -4,10 +4,10 @@ Codec interface and registry for MongoDB value serialization.
 
 ## Responsibilities
 
-- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput>` — declares how a JS value translates to and from the BSON-shaped wire format the Mongo driver exchanges, plus the JSON-safe form stored in contract artifacts. Same four generics as the framework `Codec` base; the codec instance carries only `id` plus the four conversion methods. Trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`) for operator gating live on the unified `CodecDescriptor` (TML-2357 M2 Phase B).
+- **Codec interface**: `MongoCodec<Id, TTraits, TWire, TInput>` — declares how a JS value translates to and from the BSON-shaped wire format the Mongo driver exchanges, plus the JSON-safe form stored in contract artifacts. Same four generics as the framework `Codec` base; the codec instance carries only `id` plus the four conversion methods. Trait annotations (`equality`, `order`, `boolean`, `numeric`, `textual`, `vector`) for operator gating live on the unified `CodecDescriptor` (see [ADR 208](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)).
 - **Codec factory**: `mongoCodec()` — creates frozen codec instances from a config object. Both `encode` and `decode` are required so `TInput` and `TWire` are always covered by an explicit author function — the factory installs no identity fallback. `encode` and `decode` may be authored as sync or async functions and are lifted to Promise-returning query-time methods automatically. Build-time methods (`encodeJson`, `decodeJson`) are synchronous and default to identity when omitted.
 - **Codec registry**: `MongoCodecRegistry` and `newMongoCodecRegistry()` — a map-based container that stores and retrieves codecs by ID, with duplicate-ID protection
-- **Type-level helper**: `MongoCodecInput<T>` for extracting the JS application type from a codec type. Trait metadata lives on the unified `CodecDescriptor` (TML-2357 M2 Phase B).
+- **Type-level helper**: `MongoCodecInput<T>` for extracting the JS application type from a codec type. Trait metadata lives on the unified `CodecDescriptor` (see [ADR 208](../../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)).
 
 ## Examples
 

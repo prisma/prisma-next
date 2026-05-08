@@ -84,10 +84,10 @@ const stack = createSqlExecutionStack({
   schema libraries ship as parallel extensions (`zod/json@1`,
   `valibot/json@1`) when their serialize/rehydrate stories materialize.
 - `decode` validates internally and throws on rejection. JSON-Schema
-  validation lives uniformly inside the resolved codec's `decode` body
-  (TML-2357 M4); the framework no longer maintains a parallel validator
-  registry. Validation rejections surface as `RUNTIME.DECODE_FAILED`
-  envelopes with the original `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED`
-  attached on `cause`.
+  validation lives uniformly inside the resolved codec's `decode` body;
+  the framework no longer maintains a parallel validator registry.
+  Validation rejections surface as `RUNTIME.DECODE_FAILED` envelopes
+  with the original `RUNTIME.JSON_SCHEMA_VALIDATION_FAILED` attached on
+  `cause`.
 - For untyped raw JSON columns, use `jsonColumn` / `jsonbColumn` from
   `@prisma-next/adapter-postgres/column-types` instead.

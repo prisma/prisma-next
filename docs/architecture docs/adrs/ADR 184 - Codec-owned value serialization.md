@@ -1,5 +1,19 @@
 # ADR 184 — Codec-owned value serialization
 
+> **Retrospective note (TML-2357 close-out).** This ADR's examples use
+> the `defineCodec({...})` factory. That factory was the canonical
+> codec-author surface at the time; under TML-2357 it was retired in
+> favor of the class-form Pattern E
+> (`class extends CodecImpl<...>` + `class extends CodecDescriptorImpl<P>`
+> + per-codec column helper). The ADR's *decision* — that codecs own
+> both wire and JSON-safe representations through `encode` / `decode`
+> + `encodeJson` / `decodeJson` — is unchanged; only the authoring
+> shape has moved on. See
+> [ADR 208 — Higher-order codecs for parameterized types](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
+> and the
+> [Codec authoring guide](../../reference/codec-authoring-guide.md)
+> for the current shape.
+
 ## At a glance
 
 A column with `codecId: "pg/timestamptz@1"` has a default value of `new Date('2024-01-15')` — a JavaScript `Date`. This value has to survive a round-trip through `contract.json`, but `Date` has no JSON representation. The codec handles it:

@@ -1,5 +1,20 @@
 # ADR 202 — Codec trait system
 
+> **Retrospective note (TML-2357 close-out).** This ADR's examples
+> show codec definitions via `defineCodec({...})`. The factory was
+> retired under TML-2357 in favor of the class-form Pattern E
+> (`class extends CodecDescriptorImpl<P>`); traits are now declared as
+> `override readonly traits = [...] as const` on the descriptor class.
+> The `'json-validator'` trait this ADR introduced was also retired
+> under TML-2357 — JSON-Schema validation now lives uniformly inside
+> the resolved codec's `decode` body rather than behind a parallel
+> `JsonSchemaValidatorRegistry`. The trait system itself, the
+> operator-gating semantics, and the canonical traits set are all
+> unchanged. See
+> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
+> and the
+> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## Context
 
 Data types in the system are identified by codec IDs (e.g., `pg/int4@1`, `pg/text@1`, `pg/vector@1`). Query surfaces need to know which operators and functions are valid for a given data type — for example, ordering a `jsonb` column with `lt` or applying `sum` to a `text` column are not meaningful SQL. Today there is no generic mechanism to express these semantic constraints.

@@ -1,5 +1,21 @@
 # ADR 204 — Single-Path Async Codec Runtime
 
+> **Retrospective note (TML-2357 close-out).** This ADR documents the
+> single-path async codec runtime through the `defineCodec({...})` /
+> `mongoCodec({...})` factories of the time. Under TML-2357 the
+> `defineCodec({...})` factory was retired in favor of the class-form
+> Pattern E (`class extends CodecImpl<...>` with `async encode` /
+> `async decode` methods). The decision this ADR records — that
+> `encode` and `decode` are uniformly Promise-returning at the public
+> boundary, and the runtime always awaits — is unchanged. The
+> sync-lifting that the factory used to perform is now a property of
+> the abstract base class's method signatures: subclasses author
+> `async` methods directly, and synchronous bodies are returned as
+> resolved promises by the engine without an explicit lift step. See
+> [ADR 208](ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md)
+> and the
+> [Codec authoring guide](../../reference/codec-authoring-guide.md).
+
 ## Context
 
 Codecs are pure value transformers that bridge contract-typed JS values and a target's wire types: SQL parameter bytes, Postgres OID-tagged literals, MongoDB BSON shapes, and so on. Until this ADR, every codec method ran on the call stack of the query that invoked it. Rows were assembled from plain values; `encodeParams` and `decodeRow` were synchronous loops; build-time helpers (`encodeJson`, `decodeJson`, `renderOutputType`) were synchronous as well. This was a clean, fast shape for the common case (in-process scalar transforms) but blocked a small but real class of codecs that need asynchronous work: KMS-resolved encryption keys, externally-resolved secrets, deferred reference lookups, secret rotation.
