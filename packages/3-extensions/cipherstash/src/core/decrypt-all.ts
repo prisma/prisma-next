@@ -50,12 +50,17 @@
  * **Cancellation**. `opts.signal` is forwarded by identity to every
  * `bulkDecrypt` call via `ifDefined` — the same shape the bulk-encrypt
  * middleware (AC-MW4) and `EncryptedString.decrypt({ signal? })` use.
- * RUNTIME.ABORTED phase-tag wrapping is M3 R3 cancellation umbrella
- * scope — callers observing aborts during `decryptAll` see the SDK`s
- * native error shape until that round lands.
+ * As of M3 R3 T3.8 the awaiting walker also races each SDK promise
+ * against `opts.signal` via `raceCipherstashAbort` so an abort
+ * surfaces `RUNTIME.ABORTED { phase: 'decrypt-all' }` promptly even
+ * when the SDK body itself ignores the signal (AC-UMB5). A pre-check
+ * before the first SDK round-trip short-circuits when the signal is
+ * already aborted at entry; the no-envelopes-reachable fast path
+ * returns immediately without observing the signal.
  */
 
 import { ifDefined } from '@prisma-next/utils/defined';
+import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
 import {
   EncryptedString,
   getInternalHandle,
@@ -95,11 +100,16 @@ export async function decryptAll(rows: unknown, opts?: DecryptAllOptions): Promi
     const first = group[0];
     if (!first) continue;
     const ciphertexts = group.map((t) => t.ciphertext);
-    const plaintexts = await first.sdk.bulkDecrypt({
-      routingKey: first.routingKey,
-      ciphertexts,
-      ...ifDefined('signal', opts?.signal),
-    });
+    checkCipherstashAborted(opts?.signal, 'decrypt-all');
+    const plaintexts = await raceCipherstashAbort(
+      first.sdk.bulkDecrypt({
+        routingKey: first.routingKey,
+        ciphertexts,
+        ...ifDefined('signal', opts?.signal),
+      }),
+      opts?.signal,
+      'decrypt-all',
+    );
     if (plaintexts.length !== group.length) {
       throw new Error(
         `cipherstash decryptAll: SDK returned ${plaintexts.length} plaintexts ` +

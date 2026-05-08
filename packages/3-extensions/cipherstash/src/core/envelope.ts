@@ -23,6 +23,7 @@
  */
 
 import { ifDefined } from '@prisma-next/utils/defined';
+import { checkCipherstashAborted, raceCipherstashAbort } from './abort';
 import type { CipherstashSdk } from './sdk';
 
 interface EncryptedStringHandle {
@@ -159,7 +160,12 @@ export class EncryptedString {
    * - Otherwise (read-side handle without a cached plaintext), invokes
    *   the SDK's single-cell `decrypt` with the handle's routing context.
    *   The caller-supplied `signal` is forwarded to the SDK by identity
-   *   per the umbrella cancellation contract.
+   *   per the umbrella cancellation contract; the SDK promise is also
+   *   raced against the signal so an abort surfaces a `RUNTIME.ABORTED
+   *   { phase: 'decrypt' }` envelope promptly even if the SDK body
+   *   ignores the signal (M3 R3 T3.8 / AC-UMB5). The cached-plaintext
+   *   fast path returns synchronously without consulting the signal —
+   *   no IO, no abort observation point.
    */
   async decrypt(opts?: { signal?: AbortSignal }): Promise<string> {
     const handle = getInternalHandle(this);
@@ -172,12 +178,17 @@ export class EncryptedString {
           'This typically means the bulk-encrypt middleware did not run before the encode site.',
       );
     }
-    const plaintext = await handle.sdk.decrypt({
-      ciphertext: handle.ciphertext,
-      table: handle.table,
-      column: handle.column,
-      ...ifDefined('signal', opts?.signal),
-    });
+    checkCipherstashAborted(opts?.signal, 'decrypt');
+    const plaintext = await raceCipherstashAbort(
+      handle.sdk.decrypt({
+        ciphertext: handle.ciphertext,
+        table: handle.table,
+        column: handle.column,
+        ...ifDefined('signal', opts?.signal),
+      }),
+      opts?.signal,
+      'decrypt',
+    );
     handle.plaintext = plaintext;
     return plaintext;
   }

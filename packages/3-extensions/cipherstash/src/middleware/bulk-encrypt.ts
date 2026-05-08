@@ -26,7 +26,13 @@
  *
  * Cancellation: `ctx.signal` is forwarded by identity to every
  * `bulkEncrypt` call (AC-MW4) via `ifDefined`; the SDK is responsible
- * for honoring it.
+ * for honoring it. As of M3 R3 T3.8, the awaiting middleware also
+ * races the SDK promise against `ctx.signal` via `raceCipherstashAbort`
+ * so a caller-side abort surfaces a `RUNTIME.ABORTED { phase:
+ * 'bulk-encrypt' }` envelope promptly even when the SDK body itself
+ * ignores the signal (AC-UMB5). A pre-flight `checkCipherstashAborted`
+ * short-circuits before any SDK round-trip is scheduled when the
+ * signal is already aborted at entry.
  */
 
 import type {
@@ -43,6 +49,7 @@ import type {
 } from '@prisma-next/sql-relational-core/middleware';
 import type { SqlMiddleware } from '@prisma-next/sql-runtime';
 import { ifDefined } from '@prisma-next/utils/defined';
+import { checkCipherstashAborted, raceCipherstashAbort } from '../core/abort';
 import { CIPHERSTASH_STRING_CODEC_ID } from '../core/constants';
 import {
   EncryptedString,
@@ -80,11 +87,16 @@ export function bulkEncryptMiddleware(sdk: CipherstashSdk): SqlMiddleware {
         if (!first) continue;
         const routingKey = first.routingKey;
 
-        const ciphertexts = await sdk.bulkEncrypt({
-          routingKey,
-          values: group.map((t) => t.plaintext),
-          ...ifDefined('signal', ctx.signal),
-        });
+        checkCipherstashAborted(ctx.signal, 'bulk-encrypt');
+        const ciphertexts = await raceCipherstashAbort(
+          sdk.bulkEncrypt({
+            routingKey,
+            values: group.map((t) => t.plaintext),
+            ...ifDefined('signal', ctx.signal),
+          }),
+          ctx.signal,
+          'bulk-encrypt',
+        );
 
         if (ciphertexts.length !== group.length) {
           throw new Error(
