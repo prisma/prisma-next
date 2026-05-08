@@ -304,17 +304,43 @@ export function extractCodecLookup(
       }
       // Materialize a representative `Codec` instance for `byId.get()` so
       // consumers reading the lookup's instance side (e.g. SQL renderer's
-      // cast-policy lookup) keep finding the codec. Parameterized
-      // descriptors are skipped here — their factories require concrete
-      // params and `buildContractCodecRegistry` materializes per-column
-      // instances at runtime. Skipping by descriptor flag (rather than
-      // try/catch on the factory call) means a genuine factory bug does
-      // not silently disappear from `byId`.
-      if (!byId.has(codecDescriptor.codecId) && !codecDescriptor.isParameterized) {
-        const representative = codecDescriptor.factory(undefined as never)({
-          name: `<lookup:${codecDescriptor.codecId}>`,
-        } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
-        byId.set(codecDescriptor.codecId, representative);
+      // cast-policy lookup, or the contract emitter's literal-default
+      // `encodeJson` resolver) keep finding the codec.
+      //
+      // Two cohorts:
+      // - Non-parameterized descriptors: factory must succeed; any throw
+      //   is a real bug and we let it propagate (no try/catch — the
+      //   silent-catch concern F19 closed).
+      // - Parameterized descriptors: try with empty params. Many
+      //   parameterized codecs treat params as advisory (e.g.
+      //   `pg/timestamptz@1` whose precision is rendered into the
+      //   `nativeType` only and never read by the runtime codec), so an
+      //   empty-params construction yields a usable representative for
+      //   id-keyed lookups (e.g. emit-time literal-default encoding).
+      //   Codecs whose factory genuinely requires params (e.g.
+      //   `pg/vector@1` after F29 threading `length` into the runtime
+      //   codec) will throw; for those, per-column instances are
+      //   materialized at runtime by `buildContractCodecRegistry` and
+      //   the id-keyed lookup miss is correct (the column-aware path
+      //   resolves them).
+      if (!byId.has(codecDescriptor.codecId)) {
+        if (codecDescriptor.isParameterized) {
+          try {
+            const representative = codecDescriptor.factory({} as never)({
+              name: `<lookup:${codecDescriptor.codecId}>`,
+            } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+            byId.set(codecDescriptor.codecId, representative);
+          } catch {
+            // Factory requires concrete params; skip representative
+            // materialization. Per-column instances are built at
+            // runtime; id-keyed lookup miss is the correct outcome here.
+          }
+        } else {
+          const representative = codecDescriptor.factory(undefined as never)({
+            name: `<lookup:${codecDescriptor.codecId}>`,
+          } as Parameters<ReturnType<typeof codecDescriptor.factory>>[0]);
+          byId.set(codecDescriptor.codecId, representative);
+        }
       }
     }
   }
