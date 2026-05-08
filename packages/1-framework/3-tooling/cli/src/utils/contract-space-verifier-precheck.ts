@@ -21,15 +21,23 @@ export interface ContractSpaceVerifierPrecheckInputs {
 }
 
 /**
- * Run the structural per-space verifier (sub-spec § 4) at the CLI surface
- * before invoking any database-touching operation.
+ * Run the layout-only half of the per-space verifier (sub-spec § 4) at
+ * the CLI surface before invoking any database-touching operation.
  *
- * The check covers the three orphan / missing kinds that are decidable
- * without a database connection: `declaredButUnmigrated`,
- * `orphanPinnedDir`, plus the future hash / invariant comparisons once
- * marker rows are threaded through (deferred to R3 alongside the
- * single-tx runner work — `verifyContractSpaces` accepts an empty marker
- * map and simply does not surface those kinds).
+ * This pass is composed alongside its marker-aware sibling
+ * {@link import('./contract-space-verifier-marker-check').runContractSpaceVerifierMarkerCheck}
+ * by `db init`, `db update`, and `db verify` — all three commands wire
+ * both passes uniformly after the M2 orchestrator consolidation.
+ *
+ * Division of labour:
+ *
+ * - **This pass (precheck)** — the kinds decidable without a database
+ *   connection: `declaredButUnmigrated` and `orphanPinnedDir`.
+ * - **Marker-check sibling** — the kinds that require the live marker
+ *   rows: `orphanMarker`, hash drift, invariants drift.
+ *
+ * `verifyContractSpaces` accepts an empty marker map here; the
+ * marker-dependent kinds simply do not surface from this pass.
  *
  * Surfaces violations as a structured CLI error whose envelope lists
  * every offence at once (so users see the full picture rather than
