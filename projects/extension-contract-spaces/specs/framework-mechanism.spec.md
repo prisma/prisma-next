@@ -222,6 +222,16 @@ Before computing `priorContract` for a space:
 
 **Helper location.** Both runner-ordering and verifier helpers ship in `@prisma-next/migration-tools/exports/spaces` as **pure target-agnostic primitives** — same convention as R3's producer-side helpers. The transaction wrapping, marker row writes, and live-DB schema compare belong at the SQL-family consumption site (lands in M2 R1). `pnpm lint:deps` validates that `packages/1-framework` carries no target-* references.
 
+**SQL-family runner protocol (M2 R4).** Shipped on `SqlMigrationRunner` (per-target — both Postgres and SQLite implement the same interface). Externally-managed-transaction design (orchestrator decision 11):
+
+- `execute(options)` — single-space entry point. Opens an outer transaction, calls `executeOnConnection`, commits on success / rolls back on failure. **Existing single-space callers see no behaviour change.**
+- `executeOnConnection(options)` — runner body without `BEGIN`/`COMMIT`/`ROLLBACK`. Caller owns the transaction lifecycle. Idempotent control-table setup; per-space marker writes via the optional `space?: string` parameter (defaults to `'app'`).
+- `executeAcrossSpaces({ driver, perSpaceOptions })` — multi-space entry point. Opens **one** outer transaction and fans out to `executeOnConnection` per space. Failure on any space rolls back every space's writes. Returns `MultiSpaceRunnerResult` with `MultiSpaceRunnerSuccessValue` / `MultiSpaceRunnerFailure` envelope; failure carries `failingSpace` for clean error attribution. **Locks AM4-rollback at runner level.**
+
+**Driver-as-connection convention.** `ControlDriverInstance<'sql', T>` exposes only `driver.query(sql, params)` — there is no separate `connection` object today. The driver IS the connection; this convention pre-dates the contract-spaces project. If a future architectural pass introduces a real connection abstraction, the runner can grow a `runWithinConnection(conn, fn)` lower-level entry point at that time without breaking `executeAcrossSpaces`.
+
+**Schema-verification scope.** `introspect` + `verifySqlSchema` restricted to the `'app'` space only. Extension contract spaces don't own user-facing tables in the live schema; calling `verifySqlSchema` against an extension contract would flag every app-space table as "extra". Per-space verifier integrity (the orphan-marker / hash-mismatch / invariants-mismatch kinds) is covered by `verifyContractSpaces` independently — see § 4 § Verifier.
+
 **Runner ordering helper (T1.4).** Shipped as `concatenateSpaceApplyInputs<TOp>(inputs)` in `@prisma-next/migration-tools/exports/spaces`. Pure, generic over per-target op type:
 
 ```ts
