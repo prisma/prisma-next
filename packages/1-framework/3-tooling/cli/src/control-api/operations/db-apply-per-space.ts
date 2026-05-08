@@ -122,38 +122,12 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   const markerRows = await familyInstance.readAllMarkers({ driver });
 
   // ---------------------------------------------------------------------------
-  // App-space planning (today's single-space `db init` / `db update` flow).
-  // ---------------------------------------------------------------------------
-  const introspectSpanId = 'introspect';
-  onProgress?.({
-    action,
-    kind: 'spanStart',
-    spanId: introspectSpanId,
-    label: 'Introspecting database schema',
-  });
-  const schemaIR = await familyInstance.introspect({ driver });
-  onProgress?.({ action, kind: 'spanEnd', spanId: introspectSpanId, outcome: 'ok' });
-
-  const planSpanId = 'plan';
-  onProgress?.({ action, kind: 'spanStart', spanId: planSpanId, label: 'Planning migration' });
-  const plannerResult: MigrationPlannerResult = await planner.plan({
-    contract,
-    schema: schemaIR,
-    policy,
-    fromContract: null,
-    frameworkComponents,
-  });
-  if (plannerResult.kind === 'failure') {
-    onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
-    return buildPlanningFailure(action, plannerResult.conflicts);
-  }
-  onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'ok' });
-
-  const appPlan: MigrationPlan = plannerResult.plan;
-
-  // ---------------------------------------------------------------------------
   // Extension-space path resolution: walk each space's pinned migration
-  // graph from `currentMarker → pinnedHeadRef.hash`.
+  // graph from `currentMarker → pinnedHeadRef.hash`. Done BEFORE
+  // app-space planning so the extensions' destination contracts are
+  // available to filter the introspected schema (otherwise the
+  // app-space planner would treat extension-owned tables as extras and
+  // emit destructive ops to drop them).
   // ---------------------------------------------------------------------------
   interface PerSpaceContext {
     readonly spaceId: string;
@@ -162,16 +136,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     readonly displayOps: readonly MigrationPlanOperation[];
   }
 
-  const perSpaceContexts: PerSpaceContext[] = [];
-
-  // App-space context first; it goes last in the apply order but is
-  // useful to inspect alongside the others when computing the result.
-  const appSpaceContext: PerSpaceContext = {
-    spaceId: APP_SPACE_ID,
-    destinationContract: contract,
-    plan: appPlan,
-    displayOps: appPlan.operations,
-  };
+  const extensionContexts: PerSpaceContext[] = [];
 
   for (const ext of extensionContractSpaces) {
     const spaceId = ext.id;
@@ -211,20 +176,75 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     const destinationContract = await readPinnedSpaceContract(migrationsDir, spaceId);
 
     const extPlan: MigrationPlan = {
-      targetId: appPlan.targetId,
+      targetId: '' as unknown as MigrationPlan['targetId'], // patched below once app-space plan is known
       origin: currentMarkerHash === null ? null : { storageHash: currentMarkerHash },
       destination: { storageHash: outcome.pinnedHeadRef.hash },
       operations: outcome.pathOps,
       providedInvariants: outcome.providedInvariants,
     };
 
-    perSpaceContexts.push({
+    extensionContexts.push({
       spaceId,
       destinationContract,
       plan: extPlan,
       displayOps: outcome.pathOps,
     });
   }
+
+  // ---------------------------------------------------------------------------
+  // App-space planning (today's single-space `db init` / `db update` flow).
+  // The introspected schema is pruned to exclude tables owned by other
+  // (extension) spaces so the planner does not emit destructive ops to
+  // drop them as "extras". This mirrors the runner's
+  // `strictVerification: false` setting at apply time — each space owns
+  // a disjoint slice of the live schema (sub-spec § 1).
+  // ---------------------------------------------------------------------------
+  const introspectSpanId = 'introspect';
+  onProgress?.({
+    action,
+    kind: 'spanStart',
+    spanId: introspectSpanId,
+    label: 'Introspecting database schema',
+  });
+  const schemaIR = await familyInstance.introspect({ driver });
+  onProgress?.({ action, kind: 'spanEnd', spanId: introspectSpanId, outcome: 'ok' });
+
+  const prunedSchemaIR = pruneSchemaByOtherSpaceContracts(
+    schemaIR,
+    extensionContexts.map((ctx) => ctx.destinationContract),
+  );
+
+  const planSpanId = 'plan';
+  onProgress?.({ action, kind: 'spanStart', spanId: planSpanId, label: 'Planning migration' });
+  const plannerResult: MigrationPlannerResult = await planner.plan({
+    contract,
+    schema: prunedSchemaIR,
+    policy,
+    fromContract: null,
+    frameworkComponents,
+  });
+  if (plannerResult.kind === 'failure') {
+    onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'error' });
+    return buildPlanningFailure(action, plannerResult.conflicts);
+  }
+  onProgress?.({ action, kind: 'spanEnd', spanId: planSpanId, outcome: 'ok' });
+
+  const appPlan: MigrationPlan = plannerResult.plan;
+
+  // Patch each extension plan's targetId to match the app plan's now
+  // that we know it (extension paths walk operations rendered against
+  // the same target as the app contract).
+  const perSpaceContexts: PerSpaceContext[] = extensionContexts.map((ctx) => ({
+    ...ctx,
+    plan: { ...ctx.plan, targetId: appPlan.targetId },
+  }));
+
+  const appSpaceContext: PerSpaceContext = {
+    spaceId: APP_SPACE_ID,
+    destinationContract: contract,
+    plan: appPlan,
+    displayOps: appPlan.operations,
+  };
 
   perSpaceContexts.push(appSpaceContext);
 
@@ -301,7 +321,16 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
       policy,
       executionChecks: { prechecks: false, postchecks: false, idempotencyChecks: false },
       frameworkComponents,
-    }));
+      // Multi-space post-apply verification is intentionally non-strict
+      // per-space: each space's `destinationContract` describes only its
+      // own tables, so without this every space's verifier would treat
+      // every other space's tables as "extras". The tolerant mode still
+      // catches missing tables / columns / wrong types — only the
+      // "extras" gate is disabled. SQL-family runners read this via
+      // structural typing on `MultiSpaceRunnerPerSpaceOptions`
+      // (sub-spec § 4 — Runner protocol).
+      strictVerification: false,
+    })) as MultiSpaceRunnerPerSpaceOptions<TFamilyId, TTargetId>[];
 
   const runnerResult = await (
     runner as MultiSpaceCapableRunner<TFamilyId, TTargetId>
@@ -449,4 +478,52 @@ function buildExtensionPathFailure(
     conflicts: undefined,
   };
   return action === 'dbInit' ? notOk(failure as DbInitFailure) : notOk(failure as DbUpdateFailure);
+}
+
+/**
+ * Remove tables (and other top-level storage entries) owned by other
+ * spaces' contracts from the introspected schema before planning the
+ * app-space migration.
+ *
+ * This is a structural duck-typed helper: every family today exposes
+ * `storage.tables: Record<string, ...>`, and the introspected schema
+ * mirrors the same shape. When a future family has a different shape,
+ * the helper falls through and returns the schema unchanged.
+ *
+ * Without this prune, the app-space planner would treat
+ * extension-owned tables as "extras" and emit destructive ops to drop
+ * them — defeating the whole point of disjoint per-space ownership
+ * (sub-spec § 1, AM2).
+ */
+function pruneSchemaByOtherSpaceContracts(
+  schema: unknown,
+  otherSpaceContracts: ReadonlyArray<unknown>,
+): unknown {
+  if (typeof schema !== 'object' || schema === null) return schema;
+  const schemaObj = schema as { readonly tables?: unknown };
+  if (typeof schemaObj.tables !== 'object' || schemaObj.tables === null) return schema;
+  const schemaTables = schemaObj.tables as Record<string, unknown>;
+
+  const ownedByOthers = new Set<string>();
+  for (const ext of otherSpaceContracts) {
+    if (typeof ext !== 'object' || ext === null) continue;
+    const storage = (ext as { readonly storage?: unknown }).storage;
+    if (typeof storage !== 'object' || storage === null) continue;
+    const tables = (storage as { readonly tables?: unknown }).tables;
+    if (typeof tables !== 'object' || tables === null) continue;
+    for (const tableName of Object.keys(tables as Record<string, unknown>)) {
+      ownedByOthers.add(tableName);
+    }
+  }
+
+  if (ownedByOthers.size === 0) return schema;
+
+  const prunedTables: Record<string, unknown> = {};
+  for (const [name, table] of Object.entries(schemaTables)) {
+    if (!ownedByOthers.has(name)) {
+      prunedTables[name] = table;
+    }
+  }
+
+  return { ...schemaObj, tables: prunedTables };
 }
