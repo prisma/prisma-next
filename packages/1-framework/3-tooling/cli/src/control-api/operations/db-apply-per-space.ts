@@ -265,14 +265,14 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
     );
     if (resolution.kind === 'extension-path-failure') {
       onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });
-      return buildExtensionPathFailure(action, {
+      return buildExtensionPathFailure({
         spaceId: resolver.spaceId,
         why: resolution.why,
       });
     }
     if (resolution.kind === 'planning-failure') {
       onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.plan, outcome: 'error' });
-      return buildPlanningFailure(action, resolution.conflicts);
+      return buildPlanningFailure(resolution.conflicts);
     }
     resolutions.push({
       spaceId: resolver.spaceId,
@@ -331,7 +331,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
       ? familyInstance.toOperationPreview(aggregateOps)
       : undefined;
     const summary = `Planned ${aggregateOps.length} operation(s) across ${orderedResolutions.length} space(s)`;
-    return wrapPlanResult(action, {
+    return wrapPlanResult({
       operations: aggregateOps,
       destination: appPlan.destination,
       preview,
@@ -345,7 +345,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
   // case calls `executeAcrossSpaces` with a single per-space input),
   // so the capability check fires unconditionally.
   if (!hasMultiSpaceRunner(runner)) {
-    return buildExtensionPathFailure(action, {
+    return buildExtensionPathFailure({
       spaceId: '<runner>',
       why: `Runner for target "${appPlan.targetId}" does not implement \`executeAcrossSpaces\`. \`${action === 'dbInit' ? 'db init' : 'db update'}\` requires multi-space-capable runners (today: every SQL family runner).`,
     });
@@ -385,7 +385,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
 
   if (!runnerResult.ok) {
     onProgress?.({ action, kind: 'spanEnd', spanId: SPAN_IDS.apply, outcome: 'error' });
-    return buildRunnerFailure(action, {
+    return buildRunnerFailure({
       summary: runnerResult.failure.summary,
       ...ifDefined('why', runnerResult.failure.why),
       meta: {
@@ -414,7 +414,7 @@ export async function executePerSpaceDbApply<TFamilyId extends string, TTargetId
         ? `Database already matches contract across ${orderedResolutions.length} space(s), signature updated`
         : `Applied ${totalOpsExecuted} operation(s) across ${orderedResolutions.length} space(s), signature updated`;
 
-  return wrapApplyResult(action, {
+  return wrapApplyResult({
     operations: aggregateOps,
     destination: appPlan.destination,
     operationsPlanned: totalOpsPlanned,
@@ -535,15 +535,12 @@ function makeAppResolver<TFamilyId extends string, TTargetId extends string>(
 // at the boundary so the apply / plan paths above stay readable.
 // ============================================================================
 
-function wrapPlanResult(
-  action: 'dbInit' | 'dbUpdate',
-  args: {
-    readonly operations: readonly MigrationPlanOperation[];
-    readonly destination: { readonly storageHash: string; readonly profileHash?: string };
-    readonly preview: OperationPreview | undefined;
-    readonly summary: string;
-  },
-): DbInitResult | DbUpdateResult {
+function wrapPlanResult(args: {
+  readonly operations: readonly MigrationPlanOperation[];
+  readonly destination: { readonly storageHash: string; readonly profileHash?: string };
+  readonly preview: OperationPreview | undefined;
+  readonly summary: string;
+}): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
     mode: 'plan',
     plan: {
@@ -556,19 +553,16 @@ function wrapPlanResult(
     },
     summary: args.summary,
   };
-  return action === 'dbInit' ? ok(success) : ok(success);
+  return ok(success);
 }
 
-function wrapApplyResult(
-  action: 'dbInit' | 'dbUpdate',
-  args: {
-    readonly operations: readonly MigrationPlanOperation[];
-    readonly destination: { readonly storageHash: string; readonly profileHash?: string };
-    readonly operationsPlanned: number;
-    readonly operationsExecuted: number;
-    readonly summary: string;
-  },
-): DbInitResult | DbUpdateResult {
+function wrapApplyResult(args: {
+  readonly operations: readonly MigrationPlanOperation[];
+  readonly destination: { readonly storageHash: string; readonly profileHash?: string };
+  readonly operationsPlanned: number;
+  readonly operationsExecuted: number;
+  readonly summary: string;
+}): DbInitResult | DbUpdateResult {
   const success: DbInitSuccess | DbUpdateSuccess = {
     mode: 'apply',
     plan: { operations: stripOperations(args.operations) },
@@ -585,11 +579,10 @@ function wrapApplyResult(
       : { storageHash: args.destination.storageHash },
     summary: args.summary,
   };
-  return action === 'dbInit' ? ok(success) : ok(success);
+  return ok(success);
 }
 
 function buildPlanningFailure(
-  action: 'dbInit' | 'dbUpdate',
   conflicts: DbInitFailure['conflicts'],
 ): DbInitResult | DbUpdateResult {
   const failure: DbInitFailure | DbUpdateFailure = {
@@ -599,17 +592,21 @@ function buildPlanningFailure(
     why: undefined,
     meta: undefined,
   };
-  return action === 'dbInit' ? notOk(failure as DbInitFailure) : notOk(failure as DbUpdateFailure);
+  // Single cast at the return boundary: the constructed failure value
+  // sits in the runtime intersection of `DbInitFailure` and
+  // `DbUpdateFailure`, but TS cannot collapse the union-of-records vs
+  // record-of-unions gap (`DbUpdateFailure.code` carries
+  // `'DESTRUCTIVE_CHANGES'`, which is not a member of
+  // `DbInitFailure.code`). The caller dispatches on the action it
+  // kicked off and reads only the narrowed branch.
+  return notOk(failure) as DbInitResult | DbUpdateResult;
 }
 
-function buildRunnerFailure(
-  action: 'dbInit' | 'dbUpdate',
-  args: {
-    readonly summary: string;
-    readonly why?: string;
-    readonly meta: Record<string, unknown>;
-  },
-): DbInitResult | DbUpdateResult {
+function buildRunnerFailure(args: {
+  readonly summary: string;
+  readonly why?: string;
+  readonly meta: Record<string, unknown>;
+}): DbInitResult | DbUpdateResult {
   const failure: DbInitFailure | DbUpdateFailure = {
     code: 'RUNNER_FAILED',
     summary: args.summary,
@@ -617,13 +614,16 @@ function buildRunnerFailure(
     meta: args.meta,
     conflicts: undefined,
   };
-  return action === 'dbInit' ? notOk(failure as DbInitFailure) : notOk(failure as DbUpdateFailure);
+  // See `buildPlanningFailure` for the cast rationale — the runtime
+  // value is in the intersection of both failure shapes; TS cannot
+  // collapse the union of failure-code literal types across actions.
+  return notOk(failure) as DbInitResult | DbUpdateResult;
 }
 
-function buildExtensionPathFailure(
-  action: 'dbInit' | 'dbUpdate',
-  args: { readonly spaceId: string; readonly why: string },
-): DbInitResult | DbUpdateResult {
+function buildExtensionPathFailure(args: {
+  readonly spaceId: string;
+  readonly why: string;
+}): DbInitResult | DbUpdateResult {
   const failure: DbInitFailure | DbUpdateFailure = {
     code: 'RUNNER_FAILED',
     summary: `Cannot resolve apply path for extension space "${args.spaceId}"`,
@@ -631,7 +631,8 @@ function buildExtensionPathFailure(
     meta: { spaceId: args.spaceId },
     conflicts: undefined,
   };
-  return action === 'dbInit' ? notOk(failure as DbInitFailure) : notOk(failure as DbUpdateFailure);
+  // See `buildPlanningFailure` for the cast rationale.
+  return notOk(failure) as DbInitResult | DbUpdateResult;
 }
 
 /**
