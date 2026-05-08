@@ -10,8 +10,8 @@ import {
   codecDescriptorClassList,
   type SqliteDatetimeDescriptor,
   type SqliteIntegerDescriptor,
-  sqliteDatetimeDescriptorClass,
-  sqliteIntegerDescriptorClass,
+  sqliteDatetimeDescriptor,
+  sqliteIntegerDescriptor,
 } from '../src/core/codecs-class';
 import type { CodecTypes } from '../src/exports/codec-types';
 
@@ -43,11 +43,11 @@ test('sqliteDatetimeDescriptor.traits preserves its literal tuple', () => {
 });
 
 test('sqliteIntegerDescriptor.codecId is the literal `sqlite/integer@1`', () => {
-  expectTypeOf(sqliteIntegerDescriptorClass.codecId).toEqualTypeOf<'sqlite/integer@1'>();
+  expectTypeOf(sqliteIntegerDescriptor.codecId).toEqualTypeOf<'sqlite/integer@1'>();
 });
 
 test('sqliteDatetimeDescriptor.codecId is the literal `sqlite/datetime@1`', () => {
-  expectTypeOf(sqliteDatetimeDescriptorClass.codecId).toEqualTypeOf<'sqlite/datetime@1'>();
+  expectTypeOf(sqliteDatetimeDescriptor.codecId).toEqualTypeOf<'sqlite/datetime@1'>();
 });
 
 // ---------------------------------------------------------------------------

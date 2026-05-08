@@ -24,8 +24,8 @@ import {
   codecDescriptorClassList,
   type PgInt4Descriptor,
   type PgNumericDescriptor,
-  pgInt4DescriptorClass,
-  pgNumericDescriptorClass,
+  pgInt4Descriptor,
+  pgNumericDescriptor,
 } from '../src/core/codecs-class';
 import type { CodecTypes } from '../src/exports/codec-types';
 
@@ -57,11 +57,11 @@ test('pgNumericDescriptor.traits preserves the same literal tuple', () => {
 });
 
 test('pgInt4Descriptor.codecId is the literal `pg/int4@1`', () => {
-  expectTypeOf(pgInt4DescriptorClass.codecId).toEqualTypeOf<'pg/int4@1'>();
+  expectTypeOf(pgInt4Descriptor.codecId).toEqualTypeOf<'pg/int4@1'>();
 });
 
 test('pgNumericDescriptor.codecId is the literal `pg/numeric@1`', () => {
-  expectTypeOf(pgNumericDescriptorClass.codecId).toEqualTypeOf<'pg/numeric@1'>();
+  expectTypeOf(pgNumericDescriptor.codecId).toEqualTypeOf<'pg/numeric@1'>();
 });
 
 // ---------------------------------------------------------------------------

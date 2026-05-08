@@ -1,8 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ARKTYPE_JSON_CODEC_ID,
-  arktypeJsonDescriptorClass,
-} from '../src/core/arktype-json-codec-class';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonDescriptor } from '../src/core/arktype-json-codec-class';
 import { arktypeJsonExtensionDescriptor } from '../src/exports/control';
 import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
@@ -11,7 +8,7 @@ describe('arktypeJsonRuntimeDescriptor', () => {
   // arktype-json. The contributor protocol is unified: every codec —
   // parameterized or not — flows through the single `codecs:` slot
   // returning a `CodecDescriptor` list. arktype-json contributes
-  // exactly one descriptor: `arktypeJsonDescriptorClass`.
+  // exactly one descriptor: `arktypeJsonDescriptor`.
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonRuntimeDescriptor.familyId).toBe('sql');
     expect(arktypeJsonRuntimeDescriptor.targetId).toBe('postgres');
@@ -21,9 +18,9 @@ describe('arktypeJsonRuntimeDescriptor', () => {
 
   it('contributes the arktype-json descriptor through the unified codecs slot', () => {
     // The contributor reads from the class-form descriptor list. The
-    // single entry is the canonical `arktypeJsonDescriptorClass`.
+    // single entry is the canonical `arktypeJsonDescriptor`.
     const descriptors = arktypeJsonRuntimeDescriptor.codecs();
-    expect(descriptors).toEqual([arktypeJsonDescriptorClass]);
+    expect(descriptors).toEqual([arktypeJsonDescriptor]);
     expect(descriptors[0]?.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
   });
 

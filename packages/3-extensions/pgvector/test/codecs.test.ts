@@ -1,6 +1,6 @@
 import { timeouts } from '@prisma-next/test-utils';
 import { describe, expect, it } from 'vitest';
-import { pgVectorDescriptorClass } from '../src/core/codecs-class';
+import { pgVectorDescriptor } from '../src/core/codecs-class';
 
 // The pgvector codec authors `encode`/`decode` synchronously; class-form
 // codecs route through `Promise`-returning methods at the boundary. The
@@ -17,7 +17,7 @@ function asAsyncCodec(): AsyncVectorCodec {
   // descriptor's `factory(params)` returns the same closure regardless
   // of `params`; supply a representative shape so the type-side
   // `VectorParams` constraint is honoured.
-  return pgVectorDescriptorClass.factory({ length: 4 })({
+  return pgVectorDescriptor.factory({ length: 4 })({
     name: 'test',
   }) as unknown as AsyncVectorCodec;
 }
@@ -26,8 +26,8 @@ describe('pgvector codecs', () => {
   it(
     'has vector codec registered',
     () => {
-      expect(pgVectorDescriptorClass.codecId).toBe('pg/vector@1');
-      expect(pgVectorDescriptorClass.targetTypes).toEqual(['vector']);
+      expect(pgVectorDescriptor.codecId).toBe('pg/vector@1');
+      expect(pgVectorDescriptor.targetTypes).toEqual(['vector']);
     },
     timeouts.default,
   );

@@ -225,7 +225,7 @@ export class ArktypeJsonDescriptor extends CodecDescriptorImpl<ArktypeJsonTypePa
   }
 }
 
-export const arktypeJsonDescriptorClass = new ArktypeJsonDescriptor();
+export const arktypeJsonDescriptor = new ArktypeJsonDescriptor();
 
 /**
  * Per-codec column helper for `arktype/json@1`. Method-level generic
@@ -261,8 +261,8 @@ export function arktypeJsonColumn<S extends Type<unknown>>(
   const params: ArktypeJsonTypeParams = { expression: schema.expression, jsonIr };
   return column(
     (_ctx: CodecInstanceContext) =>
-      new ArktypeJsonCodecClass<S['infer']>(arktypeJsonDescriptorClass, schema),
-    arktypeJsonDescriptorClass.codecId,
+      new ArktypeJsonCodecClass<S['infer']>(arktypeJsonDescriptor, schema),
+    arktypeJsonDescriptor.codecId,
     params,
     ARKTYPE_JSON_NATIVE_TYPE,
   );
@@ -278,7 +278,7 @@ arktypeJsonColumn satisfies ColumnHelperFor<ArktypeJsonDescriptor>;
 
 /**
  * Codec instance returned by `arktypeJsonColumn(schema).codecFactory(ctx)`
- * and by `arktypeJsonDescriptorClass.factory(typeParams)(ctx)`. The
+ * and by `arktypeJsonDescriptor.factory(typeParams)(ctx)`. The
  * `TInferred` slot carries the arktype schema's inferred output type at
  * the column-author site; descriptor-side factories erase to `unknown`.
  */
@@ -290,4 +290,4 @@ export type ArktypeJsonCodec<TInferred> = ArktypeJsonCodecClass<TInferred>;
 // list directly.
 // ---------------------------------------------------------------------------
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptorClass];
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [arktypeJsonDescriptor];

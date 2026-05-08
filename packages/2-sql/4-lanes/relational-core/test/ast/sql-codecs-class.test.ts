@@ -8,12 +8,12 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '../../src/ast/sql-codecs';
 import {
-  sqlCharDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlTextDescriptorClass,
-  sqlTimestampDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlCharDescriptor,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlTextDescriptor,
+  sqlTimestampDescriptor,
+  sqlVarcharDescriptor,
 } from '../../src/ast/sql-codecs-class';
 
 const instanceCtx = { name: '<test>' };
@@ -21,7 +21,7 @@ const callCtx = {};
 
 describe('sql-codecs-class', () => {
   describe('sql/text@1', () => {
-    const codec = sqlTextDescriptorClass.factory()(instanceCtx);
+    const codec = sqlTextDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(SQL_TEXT_CODEC_ID);
@@ -39,7 +39,7 @@ describe('sql-codecs-class', () => {
   });
 
   describe('sql/int@1', () => {
-    const codec = sqlIntDescriptorClass.factory()(instanceCtx);
+    const codec = sqlIntDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(SQL_INT_CODEC_ID);
@@ -52,7 +52,7 @@ describe('sql-codecs-class', () => {
   });
 
   describe('sql/float@1', () => {
-    const codec = sqlFloatDescriptorClass.factory()(instanceCtx);
+    const codec = sqlFloatDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(SQL_FLOAT_CODEC_ID);
@@ -65,7 +65,7 @@ describe('sql-codecs-class', () => {
   });
 
   describe('sql/char@1', () => {
-    const codec = sqlCharDescriptorClass.factory({ length: 8 })(instanceCtx);
+    const codec = sqlCharDescriptor.factory({ length: 8 })(instanceCtx);
 
     it('id proxies through the descriptor (independent of params)', () => {
       expect(codec.id).toBe(SQL_CHAR_CODEC_ID);
@@ -81,16 +81,16 @@ describe('sql-codecs-class', () => {
     });
 
     it('renderOutputType returns Char<length>', () => {
-      expect(sqlCharDescriptorClass.renderOutputType?.({ length: 36 })).toBe('Char<36>');
+      expect(sqlCharDescriptor.renderOutputType?.({ length: 36 })).toBe('Char<36>');
     });
 
     it('renderOutputType returns undefined when length absent', () => {
-      expect(sqlCharDescriptorClass.renderOutputType?.({})).toBeUndefined();
+      expect(sqlCharDescriptor.renderOutputType?.({})).toBeUndefined();
     });
   });
 
   describe('sql/varchar@1', () => {
-    const codec = sqlVarcharDescriptorClass.factory({ length: 255 })(instanceCtx);
+    const codec = sqlVarcharDescriptor.factory({ length: 255 })(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(SQL_VARCHAR_CODEC_ID);
@@ -102,12 +102,12 @@ describe('sql-codecs-class', () => {
     });
 
     it('renderOutputType returns Varchar<length>', () => {
-      expect(sqlVarcharDescriptorClass.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
+      expect(sqlVarcharDescriptor.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
     });
   });
 
   describe('sql/timestamp@1', () => {
-    const codec = sqlTimestampDescriptorClass.factory({ precision: 3 })(instanceCtx);
+    const codec = sqlTimestampDescriptor.factory({ precision: 3 })(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(SQL_TIMESTAMP_CODEC_ID);
@@ -131,37 +131,37 @@ describe('sql-codecs-class', () => {
     });
 
     it('renderOutputType returns Timestamp<precision>', () => {
-      expect(sqlTimestampDescriptorClass.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
+      expect(sqlTimestampDescriptor.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
     });
 
     it('renderOutputType returns bare Timestamp when precision absent', () => {
-      expect(sqlTimestampDescriptorClass.renderOutputType?.({})).toBe('Timestamp');
+      expect(sqlTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
     });
   });
 
   describe('descriptor metadata', () => {
     it('codec ids match the SQL_*_CODEC_ID constants', () => {
-      expect(sqlTextDescriptorClass.codecId).toBe(SQL_TEXT_CODEC_ID);
-      expect(sqlIntDescriptorClass.codecId).toBe(SQL_INT_CODEC_ID);
-      expect(sqlFloatDescriptorClass.codecId).toBe(SQL_FLOAT_CODEC_ID);
-      expect(sqlCharDescriptorClass.codecId).toBe(SQL_CHAR_CODEC_ID);
-      expect(sqlVarcharDescriptorClass.codecId).toBe(SQL_VARCHAR_CODEC_ID);
-      expect(sqlTimestampDescriptorClass.codecId).toBe(SQL_TIMESTAMP_CODEC_ID);
+      expect(sqlTextDescriptor.codecId).toBe(SQL_TEXT_CODEC_ID);
+      expect(sqlIntDescriptor.codecId).toBe(SQL_INT_CODEC_ID);
+      expect(sqlFloatDescriptor.codecId).toBe(SQL_FLOAT_CODEC_ID);
+      expect(sqlCharDescriptor.codecId).toBe(SQL_CHAR_CODEC_ID);
+      expect(sqlVarcharDescriptor.codecId).toBe(SQL_VARCHAR_CODEC_ID);
+      expect(sqlTimestampDescriptor.codecId).toBe(SQL_TIMESTAMP_CODEC_ID);
     });
 
     it('exposes traits and targetTypes for each codec', () => {
-      expect(sqlTextDescriptorClass.traits).toEqual(['equality', 'order', 'textual']);
-      expect(sqlTextDescriptorClass.targetTypes).toEqual(['text']);
+      expect(sqlTextDescriptor.traits).toEqual(['equality', 'order', 'textual']);
+      expect(sqlTextDescriptor.targetTypes).toEqual(['text']);
 
-      expect(sqlIntDescriptorClass.traits).toEqual(['equality', 'order', 'numeric']);
-      expect(sqlIntDescriptorClass.targetTypes).toEqual(['int']);
+      expect(sqlIntDescriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(sqlIntDescriptor.targetTypes).toEqual(['int']);
 
-      expect(sqlFloatDescriptorClass.traits).toEqual(['equality', 'order', 'numeric']);
-      expect(sqlFloatDescriptorClass.targetTypes).toEqual(['float']);
+      expect(sqlFloatDescriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(sqlFloatDescriptor.targetTypes).toEqual(['float']);
 
-      expect(sqlCharDescriptorClass.targetTypes).toEqual(['char']);
-      expect(sqlVarcharDescriptorClass.targetTypes).toEqual(['varchar']);
-      expect(sqlTimestampDescriptorClass.targetTypes).toEqual(['timestamp']);
+      expect(sqlCharDescriptor.targetTypes).toEqual(['char']);
+      expect(sqlVarcharDescriptor.targetTypes).toEqual(['varchar']);
+      expect(sqlTimestampDescriptor.targetTypes).toEqual(['timestamp']);
     });
   });
 });

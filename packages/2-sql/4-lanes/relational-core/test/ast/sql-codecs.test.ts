@@ -9,21 +9,21 @@ import {
   SQL_VARCHAR_CODEC_ID,
 } from '../../src/ast/sql-codecs';
 import {
-  sqlCharDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlTextDescriptorClass,
-  sqlTimestampDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlCharDescriptor,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlTextDescriptor,
+  sqlTimestampDescriptor,
+  sqlVarcharDescriptor,
 } from '../../src/ast/sql-codecs-class';
 
 const descriptorsByScalar = {
-  char: sqlCharDescriptorClass,
-  varchar: sqlVarcharDescriptorClass,
-  int: sqlIntDescriptorClass,
-  float: sqlFloatDescriptorClass,
-  text: sqlTextDescriptorClass,
-  timestamp: sqlTimestampDescriptorClass,
+  char: sqlCharDescriptor,
+  varchar: sqlVarcharDescriptor,
+  int: sqlIntDescriptor,
+  float: sqlFloatDescriptor,
+  text: sqlTextDescriptor,
+  timestamp: sqlTimestampDescriptor,
 } as const satisfies Record<string, AnyCodecDescriptor>;
 
 describe('sql-codecs', () => {
@@ -112,86 +112,86 @@ describe('sql-codecs', () => {
   });
 
   it('trims trailing spaces when decoding char values', async () => {
-    const codec = sqlCharDescriptorClass.factory({})({ name: 'test' });
+    const codec = sqlCharDescriptor.factory({})({ name: 'test' });
     expect(await codec.decode('user_001                            ', {})).toBe('user_001');
     expect(await codec.decode('user_001', {})).toBe('user_001');
   });
 
   it('round-trips Date values for timestamp codecs', async () => {
-    const codec = sqlTimestampDescriptorClass.factory({})({ name: 'test' });
+    const codec = sqlTimestampDescriptor.factory({})({ name: 'test' });
     const instant = new Date('2024-01-15T10:30:00Z');
     expect(await codec.encode(instant, {})).toBe(instant);
     expect(await codec.decode(instant, {})).toBe(instant);
   });
 
   it('serializes timestamps to ISO strings for the JSON contract', () => {
-    const codec = sqlTimestampDescriptorClass.factory({})({ name: 'test' });
+    const codec = sqlTimestampDescriptor.factory({})({ name: 'test' });
     const instant = new Date('2024-01-15T10:30:00Z');
     expect(codec.encodeJson(instant)).toBe('2024-01-15T10:30:00.000Z');
     expect(codec.decodeJson('2024-01-15T10:30:00.000Z')).toEqual(instant);
   });
 
   it('throws on invalid JSON input for timestamp codecs', () => {
-    const codec = sqlTimestampDescriptorClass.factory({})({ name: 'test' });
+    const codec = sqlTimestampDescriptor.factory({})({ name: 'test' });
     expect(() => codec.decodeJson(42)).toThrow(/Expected ISO date string/);
     expect(() => codec.decodeJson('not-a-date')).toThrow(/Invalid ISO date string/);
   });
 
   describe('renderOutputType', () => {
     it('sql/char@1 renders Char<length>', () => {
-      expect(sqlCharDescriptorClass.renderOutputType?.({ length: 36 })).toBe('Char<36>');
+      expect(sqlCharDescriptor.renderOutputType?.({ length: 36 })).toBe('Char<36>');
     });
 
     it('sql/char@1 returns undefined when length absent', () => {
-      expect(sqlCharDescriptorClass.renderOutputType?.({})).toBeUndefined();
+      expect(sqlCharDescriptor.renderOutputType?.({})).toBeUndefined();
     });
 
     it('sql/char@1 throws on invalid length type', () => {
       expect(() =>
-        sqlCharDescriptorClass.renderOutputType?.({ length: 'bad' as unknown as number }),
+        sqlCharDescriptor.renderOutputType?.({ length: 'bad' as unknown as number }),
       ).toThrow(/expected integer "length"/);
     });
 
     it('sql/varchar@1 renders Varchar<length>', () => {
-      expect(sqlVarcharDescriptorClass.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
+      expect(sqlVarcharDescriptor.renderOutputType?.({ length: 255 })).toBe('Varchar<255>');
     });
 
     it('sql/varchar@1 returns undefined when length absent', () => {
-      expect(sqlVarcharDescriptorClass.renderOutputType?.({})).toBeUndefined();
+      expect(sqlVarcharDescriptor.renderOutputType?.({})).toBeUndefined();
     });
 
     it('sql/varchar@1 throws on invalid length type', () => {
       expect(() =>
-        sqlVarcharDescriptorClass.renderOutputType?.({ length: 'bad' as unknown as number }),
+        sqlVarcharDescriptor.renderOutputType?.({ length: 'bad' as unknown as number }),
       ).toThrow(/expected integer "length"/);
     });
 
     it('sql/timestamp@1 renders Timestamp<P> with precision', () => {
-      expect(sqlTimestampDescriptorClass.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
+      expect(sqlTimestampDescriptor.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
     });
 
     it('sql/timestamp@1 renders bare Timestamp when precision absent', () => {
-      expect(sqlTimestampDescriptorClass.renderOutputType?.({})).toBe('Timestamp');
+      expect(sqlTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
     });
 
     it('sql/timestamp@1 throws on invalid precision type', () => {
       expect(() =>
-        sqlTimestampDescriptorClass.renderOutputType?.({
+        sqlTimestampDescriptor.renderOutputType?.({
           precision: 'bad' as unknown as number,
         }),
       ).toThrow(/expected integer "precision"/);
     });
 
     it('sql/int@1 has no renderOutputType', () => {
-      expect(sqlIntDescriptorClass.renderOutputType).toBeUndefined();
+      expect(sqlIntDescriptor.renderOutputType).toBeUndefined();
     });
 
     it('sql/float@1 has no renderOutputType', () => {
-      expect(sqlFloatDescriptorClass.renderOutputType).toBeUndefined();
+      expect(sqlFloatDescriptor.renderOutputType).toBeUndefined();
     });
 
     it('sql/text@1 has no renderOutputType', () => {
-      expect(sqlTextDescriptorClass.renderOutputType).toBeUndefined();
+      expect(sqlTextDescriptor.renderOutputType).toBeUndefined();
     });
   });
 });

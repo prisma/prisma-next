@@ -1,9 +1,9 @@
 import type { CodecInstanceContext } from '@prisma-next/framework-components/codec';
 import {
-  sqlCharDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlCharDescriptor,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   SQLITE_BIGINT_CODEC_ID,
@@ -15,31 +15,31 @@ import {
   SQLITE_TEXT_CODEC_ID,
 } from '@prisma-next/target-sqlite/codec-ids';
 import {
-  sqliteBigintDescriptorClass,
-  sqliteBlobDescriptorClass,
-  sqliteDatetimeDescriptorClass,
-  sqliteIntegerDescriptorClass,
-  sqliteJsonDescriptorClass,
-  sqliteRealDescriptorClass,
-  sqliteTextDescriptorClass,
+  sqliteBigintDescriptor,
+  sqliteBlobDescriptor,
+  sqliteDatetimeDescriptor,
+  sqliteIntegerDescriptor,
+  sqliteJsonDescriptor,
+  sqliteRealDescriptor,
+  sqliteTextDescriptor,
 } from '@prisma-next/target-sqlite/codecs';
 import { describe, expect, it } from 'vitest';
 
 const SYNTH_CTX: CodecInstanceContext = { name: 'test' };
 
 const descriptorByScalar = {
-  text: sqliteTextDescriptorClass,
-  integer: sqliteIntegerDescriptorClass,
-  real: sqliteRealDescriptorClass,
-  blob: sqliteBlobDescriptorClass,
-  datetime: sqliteDatetimeDescriptorClass,
-  json: sqliteJsonDescriptorClass,
-  bigint: sqliteBigintDescriptorClass,
+  text: sqliteTextDescriptor,
+  integer: sqliteIntegerDescriptor,
+  real: sqliteRealDescriptor,
+  blob: sqliteBlobDescriptor,
+  datetime: sqliteDatetimeDescriptor,
+  json: sqliteJsonDescriptor,
+  bigint: sqliteBigintDescriptor,
   // SQL base codecs (inherited via the contributor's `codecs:` slot)
-  char: sqlCharDescriptorClass,
-  varchar: sqlVarcharDescriptorClass,
-  int: sqlIntDescriptorClass,
-  float: sqlFloatDescriptorClass,
+  char: sqlCharDescriptor,
+  varchar: sqlVarcharDescriptor,
+  int: sqlIntDescriptor,
+  float: sqlFloatDescriptor,
 } as const;
 
 type ScalarName = keyof typeof descriptorByScalar;

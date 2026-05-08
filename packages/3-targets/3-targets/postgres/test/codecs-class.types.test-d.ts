@@ -35,13 +35,13 @@ import {
   type PgTimestamptzCodec,
   type PgTimestamptzDescriptor,
   pgBitColumn,
-  pgBitDescriptorClass,
+  pgBitDescriptor,
   pgInt4Column,
-  pgInt4DescriptorClass,
+  pgInt4Descriptor,
   pgNumericColumn,
-  pgNumericDescriptorClass,
+  pgNumericDescriptor,
   pgTimestamptzColumn,
-  pgTimestamptzDescriptorClass,
+  pgTimestamptzDescriptor,
 } from '../src/core/codecs-class';
 
 // ---------------------------------------------------------------------------
@@ -49,7 +49,7 @@ import {
 // ---------------------------------------------------------------------------
 
 test('pgInt4: descriptor.factory() returns typed (ctx) => PgInt4Codec', () => {
-  const factory = pgInt4DescriptorClass.factory();
+  const factory = pgInt4Descriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgInt4Codec>();
 });
 
@@ -60,7 +60,7 @@ test('pgInt4: column helper preserves typed codecFactory + undefined typeParams'
 });
 
 test('pgBit: descriptor.factory(params) returns typed (ctx) => PgBitCodec', () => {
-  const factory = pgBitDescriptorClass.factory({ length: 8 });
+  const factory = pgBitDescriptor.factory({ length: 8 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgBitCodec>();
 });
 
@@ -77,7 +77,7 @@ test('pgBit: column helper accepts no-args call (default params)', () => {
 });
 
 test('pgTimestamptz: descriptor.factory(params) returns typed (ctx) => PgTimestamptzCodec', () => {
-  const factory = pgTimestamptzDescriptorClass.factory({ precision: 3 });
+  const factory = pgTimestamptzDescriptor.factory({ precision: 3 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgTimestamptzCodec>();
 });
 
@@ -88,7 +88,7 @@ test('pgTimestamptz: column helper preserves typed codecFactory + precision para
 });
 
 test('pgNumeric: descriptor.factory(params) returns typed (ctx) => PgNumericCodec', () => {
-  const factory = pgNumericDescriptorClass.factory({ precision: 10, scale: 2 });
+  const factory = pgNumericDescriptor.factory({ precision: 10, scale: 2 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgNumericCodec>();
 });
 
@@ -120,8 +120,8 @@ pgNumericColumn satisfies ColumnHelperForStrict<PgNumericDescriptor>;
 test('coarse satisfies catches wrong typeParams shape on pgBitColumn', () => {
   const brokenHelper = (length: number) =>
     column(
-      pgBitDescriptorClass.factory({ length }),
-      pgBitDescriptorClass.codecId,
+      pgBitDescriptor.factory({ length }),
+      pgBitDescriptor.codecId,
       { wrongKey: length },
       'bit',
     );

@@ -132,7 +132,7 @@ export class PgVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   }
 }
 
-export const pgVectorDescriptorClass = new PgVectorDescriptor();
+export const pgVectorDescriptor = new PgVectorDescriptor();
 
 /**
  * Per-codec column helper for `pg/vector@1`. Generic over `N extends number`
@@ -145,12 +145,7 @@ export const pgVectorDescriptorClass = new PgVectorDescriptor();
  * F5 convention validated by the reviewer's M0 R2 verdict.
  */
 export const pgVectorColumn = <N extends number>(length: N) =>
-  column(
-    pgVectorDescriptorClass.factory({ length }),
-    pgVectorDescriptorClass.codecId,
-    { length },
-    'vector',
-  );
+  column(pgVectorDescriptor.factory({ length }), pgVectorDescriptor.codecId, { length }, 'vector');
 
 pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
@@ -165,7 +160,7 @@ pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
 // ---------------------------------------------------------------------------
 
 const codecDescriptorMap = {
-  vector: pgVectorDescriptorClass,
+  vector: pgVectorDescriptor,
 } as const;
 
 export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;

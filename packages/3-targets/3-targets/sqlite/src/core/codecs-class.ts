@@ -43,10 +43,10 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
-  sqlCharDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlCharDescriptor,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
 import {
   SQLITE_BIGINT_CODEC_ID,
@@ -92,10 +92,10 @@ export class SqliteTextDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteTextDescriptorClass = new SqliteTextDescriptor();
+export const sqliteTextDescriptor = new SqliteTextDescriptor();
 
 export const sqliteTextColumn = () =>
-  column(sqliteTextDescriptorClass.factory(), sqliteTextDescriptorClass.codecId, undefined, 'text');
+  column(sqliteTextDescriptor.factory(), sqliteTextDescriptor.codecId, undefined, 'text');
 
 sqliteTextColumn satisfies ColumnHelperFor<SqliteTextDescriptor>;
 sqliteTextColumn satisfies ColumnHelperForStrict<SqliteTextDescriptor>;
@@ -134,15 +134,10 @@ export class SqliteIntegerDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteIntegerDescriptorClass = new SqliteIntegerDescriptor();
+export const sqliteIntegerDescriptor = new SqliteIntegerDescriptor();
 
 export const sqliteIntegerColumn = () =>
-  column(
-    sqliteIntegerDescriptorClass.factory(),
-    sqliteIntegerDescriptorClass.codecId,
-    undefined,
-    'integer',
-  );
+  column(sqliteIntegerDescriptor.factory(), sqliteIntegerDescriptor.codecId, undefined, 'integer');
 
 sqliteIntegerColumn satisfies ColumnHelperFor<SqliteIntegerDescriptor>;
 sqliteIntegerColumn satisfies ColumnHelperForStrict<SqliteIntegerDescriptor>;
@@ -181,10 +176,10 @@ export class SqliteRealDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteRealDescriptorClass = new SqliteRealDescriptor();
+export const sqliteRealDescriptor = new SqliteRealDescriptor();
 
 export const sqliteRealColumn = () =>
-  column(sqliteRealDescriptorClass.factory(), sqliteRealDescriptorClass.codecId, undefined, 'real');
+  column(sqliteRealDescriptor.factory(), sqliteRealDescriptor.codecId, undefined, 'real');
 
 sqliteRealColumn satisfies ColumnHelperFor<SqliteRealDescriptor>;
 sqliteRealColumn satisfies ColumnHelperForStrict<SqliteRealDescriptor>;
@@ -227,10 +222,10 @@ export class SqliteBlobDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteBlobDescriptorClass = new SqliteBlobDescriptor();
+export const sqliteBlobDescriptor = new SqliteBlobDescriptor();
 
 export const sqliteBlobColumn = () =>
-  column(sqliteBlobDescriptorClass.factory(), sqliteBlobDescriptorClass.codecId, undefined, 'blob');
+  column(sqliteBlobDescriptor.factory(), sqliteBlobDescriptor.codecId, undefined, 'blob');
 
 sqliteBlobColumn satisfies ColumnHelperFor<SqliteBlobDescriptor>;
 sqliteBlobColumn satisfies ColumnHelperForStrict<SqliteBlobDescriptor>;
@@ -274,15 +269,10 @@ export class SqliteDatetimeDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteDatetimeDescriptorClass = new SqliteDatetimeDescriptor();
+export const sqliteDatetimeDescriptor = new SqliteDatetimeDescriptor();
 
 export const sqliteDatetimeColumn = () =>
-  column(
-    sqliteDatetimeDescriptorClass.factory(),
-    sqliteDatetimeDescriptorClass.codecId,
-    undefined,
-    'text',
-  );
+  column(sqliteDatetimeDescriptor.factory(), sqliteDatetimeDescriptor.codecId, undefined, 'text');
 
 sqliteDatetimeColumn satisfies ColumnHelperFor<SqliteDatetimeDescriptor>;
 sqliteDatetimeColumn satisfies ColumnHelperForStrict<SqliteDatetimeDescriptor>;
@@ -324,10 +314,10 @@ export class SqliteJsonDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteJsonDescriptorClass = new SqliteJsonDescriptor();
+export const sqliteJsonDescriptor = new SqliteJsonDescriptor();
 
 export const sqliteJsonColumn = () =>
-  column(sqliteJsonDescriptorClass.factory(), sqliteJsonDescriptorClass.codecId, undefined, 'text');
+  column(sqliteJsonDescriptor.factory(), sqliteJsonDescriptor.codecId, undefined, 'text');
 
 sqliteJsonColumn satisfies ColumnHelperFor<SqliteJsonDescriptor>;
 sqliteJsonColumn satisfies ColumnHelperForStrict<SqliteJsonDescriptor>;
@@ -370,15 +360,10 @@ export class SqliteBigintDescriptor extends CodecDescriptorImpl<void> {
   }
 }
 
-export const sqliteBigintDescriptorClass = new SqliteBigintDescriptor();
+export const sqliteBigintDescriptor = new SqliteBigintDescriptor();
 
 export const sqliteBigintColumn = () =>
-  column(
-    sqliteBigintDescriptorClass.factory(),
-    sqliteBigintDescriptorClass.codecId,
-    undefined,
-    'integer',
-  );
+  column(sqliteBigintDescriptor.factory(), sqliteBigintDescriptor.codecId, undefined, 'integer');
 
 sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
@@ -394,15 +379,15 @@ sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
 // ---------------------------------------------------------------------------
 
 export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
-  sqlCharDescriptorClass,
-  sqlVarcharDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqliteTextDescriptorClass,
-  sqliteIntegerDescriptorClass,
-  sqliteRealDescriptorClass,
-  sqliteBlobDescriptorClass,
-  sqliteDatetimeDescriptorClass,
-  sqliteJsonDescriptorClass,
-  sqliteBigintDescriptorClass,
+  sqlCharDescriptor,
+  sqlVarcharDescriptor,
+  sqlIntDescriptor,
+  sqlFloatDescriptor,
+  sqliteTextDescriptor,
+  sqliteIntegerDescriptor,
+  sqliteRealDescriptor,
+  sqliteBlobDescriptor,
+  sqliteDatetimeDescriptor,
+  sqliteJsonDescriptor,
+  sqliteBigintDescriptor,
 ];

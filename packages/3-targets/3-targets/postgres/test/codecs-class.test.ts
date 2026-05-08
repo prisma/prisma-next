@@ -20,24 +20,24 @@ import {
   PG_VARBIT_CODEC_ID,
 } from '../src/core/codec-ids';
 import {
-  pgBitDescriptorClass,
-  pgBoolDescriptorClass,
-  pgEnumDescriptorClass,
-  pgFloat4DescriptorClass,
-  pgFloat8DescriptorClass,
-  pgInt2DescriptorClass,
-  pgInt4DescriptorClass,
-  pgInt8DescriptorClass,
-  pgIntervalDescriptorClass,
-  pgJsonbDescriptorClass,
-  pgJsonDescriptorClass,
-  pgNumericDescriptorClass,
-  pgTextDescriptorClass,
-  pgTimeDescriptorClass,
-  pgTimestampDescriptorClass,
-  pgTimestamptzDescriptorClass,
-  pgTimetzDescriptorClass,
-  pgVarbitDescriptorClass,
+  pgBitDescriptor,
+  pgBoolDescriptor,
+  pgEnumDescriptor,
+  pgFloat4Descriptor,
+  pgFloat8Descriptor,
+  pgInt2Descriptor,
+  pgInt4Descriptor,
+  pgInt8Descriptor,
+  pgIntervalDescriptor,
+  pgJsonbDescriptor,
+  pgJsonDescriptor,
+  pgNumericDescriptor,
+  pgTextDescriptor,
+  pgTimeDescriptor,
+  pgTimestampDescriptor,
+  pgTimestamptzDescriptor,
+  pgTimetzDescriptor,
+  pgVarbitDescriptor,
 } from '../src/core/codecs-class';
 
 const instanceCtx = { name: '<test>' };
@@ -45,7 +45,7 @@ const callCtx = {};
 
 describe('codecs-class', () => {
   describe('pg/text@1', () => {
-    const codec = pgTextDescriptorClass.factory()(instanceCtx);
+    const codec = pgTextDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_TEXT_CODEC_ID);
@@ -63,7 +63,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/int4@1', () => {
-    const codec = pgInt4DescriptorClass.factory()(instanceCtx);
+    const codec = pgInt4Descriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_INT4_CODEC_ID);
     });
@@ -74,7 +74,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/int2@1', () => {
-    const codec = pgInt2DescriptorClass.factory()(instanceCtx);
+    const codec = pgInt2Descriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_INT2_CODEC_ID);
     });
@@ -85,7 +85,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/int8@1', () => {
-    const codec = pgInt8DescriptorClass.factory()(instanceCtx);
+    const codec = pgInt8Descriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_INT8_CODEC_ID);
     });
@@ -96,7 +96,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/float4@1', () => {
-    const codec = pgFloat4DescriptorClass.factory()(instanceCtx);
+    const codec = pgFloat4Descriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_FLOAT4_CODEC_ID);
     });
@@ -107,7 +107,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/float8@1', () => {
-    const codec = pgFloat8DescriptorClass.factory()(instanceCtx);
+    const codec = pgFloat8Descriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_FLOAT8_CODEC_ID);
     });
@@ -118,7 +118,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/bool@1', () => {
-    const codec = pgBoolDescriptorClass.factory()(instanceCtx);
+    const codec = pgBoolDescriptor.factory()(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_BOOL_CODEC_ID);
     });
@@ -129,7 +129,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/numeric@1', () => {
-    const codec = pgNumericDescriptorClass.factory({ precision: 10, scale: 2 })(instanceCtx);
+    const codec = pgNumericDescriptor.factory({ precision: 10, scale: 2 })(instanceCtx);
 
     it('id proxies through the descriptor (independent of params)', () => {
       expect(codec.id).toBe(PG_NUMERIC_CODEC_ID);
@@ -145,18 +145,18 @@ describe('codecs-class', () => {
     });
 
     it('renderOutputType returns Numeric<precision, scale>', () => {
-      expect(pgNumericDescriptorClass.renderOutputType?.({ precision: 10, scale: 2 })).toBe(
+      expect(pgNumericDescriptor.renderOutputType?.({ precision: 10, scale: 2 })).toBe(
         'Numeric<10, 2>',
       );
     });
 
     it('renderOutputType returns Numeric<precision> when scale absent', () => {
-      expect(pgNumericDescriptorClass.renderOutputType?.({ precision: 10 })).toBe('Numeric<10>');
+      expect(pgNumericDescriptor.renderOutputType?.({ precision: 10 })).toBe('Numeric<10>');
     });
   });
 
   describe('pg/timestamp@1', () => {
-    const codec = pgTimestampDescriptorClass.factory({ precision: 3 })(instanceCtx);
+    const codec = pgTimestampDescriptor.factory({ precision: 3 })(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_TIMESTAMP_CODEC_ID);
@@ -180,16 +180,16 @@ describe('codecs-class', () => {
     });
 
     it('renderOutputType returns Timestamp<precision>', () => {
-      expect(pgTimestampDescriptorClass.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
+      expect(pgTimestampDescriptor.renderOutputType?.({ precision: 3 })).toBe('Timestamp<3>');
     });
 
     it('renderOutputType returns bare Timestamp when precision absent', () => {
-      expect(pgTimestampDescriptorClass.renderOutputType?.({})).toBe('Timestamp');
+      expect(pgTimestampDescriptor.renderOutputType?.({})).toBe('Timestamp');
     });
   });
 
   describe('pg/timestamptz@1', () => {
-    const codec = pgTimestamptzDescriptorClass.factory({ precision: 6 })(instanceCtx);
+    const codec = pgTimestamptzDescriptor.factory({ precision: 6 })(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_TIMESTAMPTZ_CODEC_ID);
@@ -213,7 +213,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/time@1', () => {
-    const codec = pgTimeDescriptorClass.factory({ precision: 2 })(instanceCtx);
+    const codec = pgTimeDescriptor.factory({ precision: 2 })(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_TIME_CODEC_ID);
     });
@@ -222,12 +222,12 @@ describe('codecs-class', () => {
       expect(await codec.decode('10:30:00', callCtx)).toBe('10:30:00');
     });
     it('renderOutputType formats Time<precision>', () => {
-      expect(pgTimeDescriptorClass.renderOutputType?.({ precision: 2 })).toBe('Time<2>');
+      expect(pgTimeDescriptor.renderOutputType?.({ precision: 2 })).toBe('Time<2>');
     });
   });
 
   describe('pg/timetz@1', () => {
-    const codec = pgTimetzDescriptorClass.factory({})(instanceCtx);
+    const codec = pgTimetzDescriptor.factory({})(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_TIMETZ_CODEC_ID);
     });
@@ -238,7 +238,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/bit@1', () => {
-    const codec = pgBitDescriptorClass.factory({ length: 8 })(instanceCtx);
+    const codec = pgBitDescriptor.factory({ length: 8 })(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_BIT_CODEC_ID);
     });
@@ -247,15 +247,15 @@ describe('codecs-class', () => {
       expect(await codec.decode('10101010', callCtx)).toBe('10101010');
     });
     it('renderOutputType returns Bit<length>', () => {
-      expect(pgBitDescriptorClass.renderOutputType?.({ length: 8 })).toBe('Bit<8>');
+      expect(pgBitDescriptor.renderOutputType?.({ length: 8 })).toBe('Bit<8>');
     });
     it('renderOutputType returns undefined when length absent', () => {
-      expect(pgBitDescriptorClass.renderOutputType?.({})).toBeUndefined();
+      expect(pgBitDescriptor.renderOutputType?.({})).toBeUndefined();
     });
   });
 
   describe('pg/varbit@1', () => {
-    const codec = pgVarbitDescriptorClass.factory({ length: 16 })(instanceCtx);
+    const codec = pgVarbitDescriptor.factory({ length: 16 })(instanceCtx);
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_VARBIT_CODEC_ID);
     });
@@ -264,12 +264,12 @@ describe('codecs-class', () => {
       expect(await codec.decode('1010', callCtx)).toBe('1010');
     });
     it('renderOutputType returns VarBit<length>', () => {
-      expect(pgVarbitDescriptorClass.renderOutputType?.({ length: 16 })).toBe('VarBit<16>');
+      expect(pgVarbitDescriptor.renderOutputType?.({ length: 16 })).toBe('VarBit<16>');
     });
   });
 
   describe('pg/interval@1', () => {
-    const codec = pgIntervalDescriptorClass.factory({})(instanceCtx);
+    const codec = pgIntervalDescriptor.factory({})(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_INTERVAL_CODEC_ID);
@@ -289,7 +289,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/enum@1', () => {
-    const codec = pgEnumDescriptorClass.factory({ values: ['red', 'green', 'blue'] })(instanceCtx);
+    const codec = pgEnumDescriptor.factory({ values: ['red', 'green', 'blue'] })(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_ENUM_CODEC_ID);
@@ -301,14 +301,14 @@ describe('codecs-class', () => {
     });
 
     it("renderOutputType returns 'a' | 'b' | 'c' literal union", () => {
-      expect(pgEnumDescriptorClass.renderOutputType?.({ values: ['red', 'green', 'blue'] })).toBe(
+      expect(pgEnumDescriptor.renderOutputType?.({ values: ['red', 'green', 'blue'] })).toBe(
         "'red' | 'green' | 'blue'",
       );
     });
   });
 
   describe('pg/json@1', () => {
-    const codec = pgJsonDescriptorClass.factory()(instanceCtx);
+    const codec = pgJsonDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_JSON_CODEC_ID);
@@ -328,7 +328,7 @@ describe('codecs-class', () => {
   });
 
   describe('pg/jsonb@1', () => {
-    const codec = pgJsonbDescriptorClass.factory()(instanceCtx);
+    const codec = pgJsonbDescriptor.factory()(instanceCtx);
 
     it('id proxies through the descriptor', () => {
       expect(codec.id).toBe(PG_JSONB_CODEC_ID);
@@ -349,61 +349,61 @@ describe('codecs-class', () => {
 
   describe('descriptor metadata', () => {
     it('codec ids match the PG_*_CODEC_ID constants', () => {
-      expect(pgTextDescriptorClass.codecId).toBe(PG_TEXT_CODEC_ID);
-      expect(pgInt4DescriptorClass.codecId).toBe(PG_INT4_CODEC_ID);
-      expect(pgInt2DescriptorClass.codecId).toBe(PG_INT2_CODEC_ID);
-      expect(pgInt8DescriptorClass.codecId).toBe(PG_INT8_CODEC_ID);
-      expect(pgFloat4DescriptorClass.codecId).toBe(PG_FLOAT4_CODEC_ID);
-      expect(pgFloat8DescriptorClass.codecId).toBe(PG_FLOAT8_CODEC_ID);
-      expect(pgBoolDescriptorClass.codecId).toBe(PG_BOOL_CODEC_ID);
-      expect(pgNumericDescriptorClass.codecId).toBe(PG_NUMERIC_CODEC_ID);
-      expect(pgTimestampDescriptorClass.codecId).toBe(PG_TIMESTAMP_CODEC_ID);
-      expect(pgTimestamptzDescriptorClass.codecId).toBe(PG_TIMESTAMPTZ_CODEC_ID);
-      expect(pgTimeDescriptorClass.codecId).toBe(PG_TIME_CODEC_ID);
-      expect(pgTimetzDescriptorClass.codecId).toBe(PG_TIMETZ_CODEC_ID);
-      expect(pgBitDescriptorClass.codecId).toBe(PG_BIT_CODEC_ID);
-      expect(pgVarbitDescriptorClass.codecId).toBe(PG_VARBIT_CODEC_ID);
-      expect(pgIntervalDescriptorClass.codecId).toBe(PG_INTERVAL_CODEC_ID);
-      expect(pgEnumDescriptorClass.codecId).toBe(PG_ENUM_CODEC_ID);
-      expect(pgJsonDescriptorClass.codecId).toBe(PG_JSON_CODEC_ID);
-      expect(pgJsonbDescriptorClass.codecId).toBe(PG_JSONB_CODEC_ID);
+      expect(pgTextDescriptor.codecId).toBe(PG_TEXT_CODEC_ID);
+      expect(pgInt4Descriptor.codecId).toBe(PG_INT4_CODEC_ID);
+      expect(pgInt2Descriptor.codecId).toBe(PG_INT2_CODEC_ID);
+      expect(pgInt8Descriptor.codecId).toBe(PG_INT8_CODEC_ID);
+      expect(pgFloat4Descriptor.codecId).toBe(PG_FLOAT4_CODEC_ID);
+      expect(pgFloat8Descriptor.codecId).toBe(PG_FLOAT8_CODEC_ID);
+      expect(pgBoolDescriptor.codecId).toBe(PG_BOOL_CODEC_ID);
+      expect(pgNumericDescriptor.codecId).toBe(PG_NUMERIC_CODEC_ID);
+      expect(pgTimestampDescriptor.codecId).toBe(PG_TIMESTAMP_CODEC_ID);
+      expect(pgTimestamptzDescriptor.codecId).toBe(PG_TIMESTAMPTZ_CODEC_ID);
+      expect(pgTimeDescriptor.codecId).toBe(PG_TIME_CODEC_ID);
+      expect(pgTimetzDescriptor.codecId).toBe(PG_TIMETZ_CODEC_ID);
+      expect(pgBitDescriptor.codecId).toBe(PG_BIT_CODEC_ID);
+      expect(pgVarbitDescriptor.codecId).toBe(PG_VARBIT_CODEC_ID);
+      expect(pgIntervalDescriptor.codecId).toBe(PG_INTERVAL_CODEC_ID);
+      expect(pgEnumDescriptor.codecId).toBe(PG_ENUM_CODEC_ID);
+      expect(pgJsonDescriptor.codecId).toBe(PG_JSON_CODEC_ID);
+      expect(pgJsonbDescriptor.codecId).toBe(PG_JSONB_CODEC_ID);
     });
 
     it('exposes nativeType meta keyed under db.sql.postgres', () => {
-      expect(pgTextDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('text');
-      expect(pgInt4DescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('integer');
-      expect(pgInt2DescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('smallint');
-      expect(pgInt8DescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('bigint');
-      expect(pgFloat4DescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('real');
-      expect(pgFloat8DescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('double precision');
-      expect(pgBoolDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('boolean');
-      expect(pgNumericDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('numeric');
-      expect(pgTimestampDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe(
+      expect(pgTextDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('text');
+      expect(pgInt4Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('integer');
+      expect(pgInt2Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('smallint');
+      expect(pgInt8Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bigint');
+      expect(pgFloat4Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('real');
+      expect(pgFloat8Descriptor.meta?.db?.sql?.postgres?.nativeType).toBe('double precision');
+      expect(pgBoolDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('boolean');
+      expect(pgNumericDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('numeric');
+      expect(pgTimestampDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe(
         'timestamp without time zone',
       );
-      expect(pgTimestamptzDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe(
+      expect(pgTimestamptzDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe(
         'timestamp with time zone',
       );
-      expect(pgTimeDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('time');
-      expect(pgTimetzDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('timetz');
-      expect(pgBitDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('bit');
-      expect(pgVarbitDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('bit varying');
-      expect(pgIntervalDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('interval');
-      expect(pgJsonDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('json');
-      expect(pgJsonbDescriptorClass.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
+      expect(pgTimeDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('time');
+      expect(pgTimetzDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('timetz');
+      expect(pgBitDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bit');
+      expect(pgVarbitDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('bit varying');
+      expect(pgIntervalDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('interval');
+      expect(pgJsonDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('json');
+      expect(pgJsonbDescriptor.meta?.db?.sql?.postgres?.nativeType).toBe('jsonb');
     });
 
     it('exposes traits and targetTypes for each codec', () => {
-      expect(pgTextDescriptorClass.traits).toEqual(['equality', 'order', 'textual']);
-      expect(pgInt4DescriptorClass.traits).toEqual(['equality', 'order', 'numeric']);
-      expect(pgBoolDescriptorClass.traits).toEqual(['equality', 'boolean']);
-      expect(pgJsonDescriptorClass.traits).toEqual([]);
-      expect(pgJsonbDescriptorClass.traits).toEqual(['equality']);
+      expect(pgTextDescriptor.traits).toEqual(['equality', 'order', 'textual']);
+      expect(pgInt4Descriptor.traits).toEqual(['equality', 'order', 'numeric']);
+      expect(pgBoolDescriptor.traits).toEqual(['equality', 'boolean']);
+      expect(pgJsonDescriptor.traits).toEqual([]);
+      expect(pgJsonbDescriptor.traits).toEqual(['equality']);
 
-      expect(pgTextDescriptorClass.targetTypes).toEqual(['text']);
-      expect(pgNumericDescriptorClass.targetTypes).toEqual(['numeric', 'decimal']);
-      expect(pgBitDescriptorClass.targetTypes).toEqual(['bit']);
-      expect(pgVarbitDescriptorClass.targetTypes).toEqual(['bit varying']);
+      expect(pgTextDescriptor.targetTypes).toEqual(['text']);
+      expect(pgNumericDescriptor.targetTypes).toEqual(['numeric', 'decimal']);
+      expect(pgBitDescriptor.targetTypes).toEqual(['bit']);
+      expect(pgVarbitDescriptor.targetTypes).toEqual(['bit varying']);
     });
   });
 });

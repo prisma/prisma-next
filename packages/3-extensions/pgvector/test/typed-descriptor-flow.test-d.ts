@@ -9,7 +9,7 @@ import { expectTypeOf, test } from 'vitest';
 import {
   codecDescriptorClassList,
   type PgVectorDescriptor,
-  pgVectorDescriptorClass,
+  pgVectorDescriptor,
 } from '../src/core/codecs-class';
 import type { CodecTypes } from '../src/exports/codec-types';
 
@@ -36,7 +36,7 @@ test('pgVectorDescriptor.traits is the readonly literal tuple', () => {
 });
 
 test('pgVectorDescriptor.codecId is the literal `pg/vector@1`', () => {
-  expectTypeOf(pgVectorDescriptorClass.codecId).toEqualTypeOf<'pg/vector@1'>();
+  expectTypeOf(pgVectorDescriptor.codecId).toEqualTypeOf<'pg/vector@1'>();
 });
 
 // ---------------------------------------------------------------------------

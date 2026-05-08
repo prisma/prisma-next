@@ -30,13 +30,13 @@ import {
   type SqliteIntegerCodec,
   type SqliteIntegerDescriptor,
   sqliteBigintColumn,
-  sqliteBigintDescriptorClass,
+  sqliteBigintDescriptor,
   sqliteBlobColumn,
-  sqliteBlobDescriptorClass,
+  sqliteBlobDescriptor,
   sqliteDatetimeColumn,
-  sqliteDatetimeDescriptorClass,
+  sqliteDatetimeDescriptor,
   sqliteIntegerColumn,
-  sqliteIntegerDescriptorClass,
+  sqliteIntegerDescriptor,
 } from '../src/core/codecs-class';
 
 // ---------------------------------------------------------------------------
@@ -44,7 +44,7 @@ import {
 // ---------------------------------------------------------------------------
 
 test('sqliteInteger: descriptor.factory() returns typed (ctx) => SqliteIntegerCodec', () => {
-  const factory = sqliteIntegerDescriptorClass.factory();
+  const factory = sqliteIntegerDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteIntegerCodec>();
 });
 
@@ -55,7 +55,7 @@ test('sqliteInteger: column helper preserves typed codecFactory + undefined type
 });
 
 test('sqliteDatetime: column preserves the wire-string / input-Date split', () => {
-  const factory = sqliteDatetimeDescriptorClass.factory();
+  const factory = sqliteDatetimeDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteDatetimeCodec>();
   const col = sqliteDatetimeColumn();
   expectTypeOf(col.codecFactory).toEqualTypeOf<
@@ -64,14 +64,14 @@ test('sqliteDatetime: column preserves the wire-string / input-Date split', () =
 });
 
 test('sqliteBlob: column preserves Uint8Array codec type', () => {
-  const factory = sqliteBlobDescriptorClass.factory();
+  const factory = sqliteBlobDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBlobCodec>();
   const col = sqliteBlobColumn();
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBlobCodec>();
 });
 
 test('sqliteBigint: column preserves the (number|bigint) wire / bigint input split', () => {
-  const factory = sqliteBigintDescriptorClass.factory();
+  const factory = sqliteBigintDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
   const col = sqliteBigintColumn();
   expectTypeOf(col.codecFactory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqliteBigintCodec>();
@@ -99,12 +99,7 @@ test('strict satisfies catches wrong codec wired in', () => {
   // satisfies fails because the codec types differ
   // (SqliteIntegerCodec ≠ SqliteBigintCodec).
   const wrongCodecHelper = () =>
-    column(
-      sqliteIntegerDescriptorClass.factory(),
-      sqliteBigintDescriptorClass.codecId,
-      undefined,
-      'integer',
-    );
+    column(sqliteIntegerDescriptor.factory(), sqliteBigintDescriptor.codecId, undefined, 'integer');
   wrongCodecHelper satisfies ColumnHelperFor<SqliteBigintDescriptor>;
   // @ts-expect-error -- codec is SqliteIntegerCodec, not SqliteBigintCodec
   wrongCodecHelper satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;

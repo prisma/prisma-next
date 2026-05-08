@@ -33,11 +33,11 @@ import {
   type SqlTimestampCodec,
   type SqlTimestampDescriptor,
   sqlCharColumn,
-  sqlCharDescriptorClass,
+  sqlCharDescriptor,
   sqlTextColumn,
-  sqlTextDescriptorClass,
+  sqlTextDescriptor,
   sqlTimestampColumn,
-  sqlTimestampDescriptorClass,
+  sqlTimestampDescriptor,
 } from '../../src/ast/sql-codecs-class';
 
 // ---------------------------------------------------------------------------
@@ -45,7 +45,7 @@ import {
 // ---------------------------------------------------------------------------
 
 test('sqlText: descriptor.factory() returns typed (ctx) => SqlTextCodec', () => {
-  const factory = sqlTextDescriptorClass.factory();
+  const factory = sqlTextDescriptor.factory();
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqlTextCodec>();
 });
 
@@ -56,7 +56,7 @@ test('sqlText: column helper preserves typed codecFactory + undefined typeParams
 });
 
 test('sqlChar: descriptor.factory(params) returns typed (ctx) => SqlCharCodec', () => {
-  const factory = sqlCharDescriptorClass.factory({ length: 36 });
+  const factory = sqlCharDescriptor.factory({ length: 36 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqlCharCodec>();
 });
 
@@ -73,7 +73,7 @@ test('sqlChar: column helper accepts no-args call (default params)', () => {
 });
 
 test('sqlTimestamp: descriptor.factory(params) returns typed (ctx) => SqlTimestampCodec', () => {
-  const factory = sqlTimestampDescriptorClass.factory({ precision: 3 });
+  const factory = sqlTimestampDescriptor.factory({ precision: 3 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => SqlTimestampCodec>();
 });
 
@@ -99,8 +99,8 @@ sqlTimestampColumn satisfies ColumnHelperForStrict<SqlTimestampDescriptor>;
 test('coarse satisfies catches wrong typeParams shape on sqlCharColumn', () => {
   const brokenHelper = (length: number) =>
     column(
-      sqlCharDescriptorClass.factory({ length }),
-      sqlCharDescriptorClass.codecId,
+      sqlCharDescriptor.factory({ length }),
+      sqlCharDescriptor.codecId,
       { wrongKey: length },
       'char',
     );
@@ -117,7 +117,7 @@ test('strict satisfies catches wrong codec wired in', () => {
   // `{ readonly length?: number }`), so this exercises both axes; we
   // assert the strict failure for the codec mismatch.
   const wrongCodecHelper = (length: number) =>
-    column(sqlTextDescriptorClass.factory(), sqlCharDescriptorClass.codecId, { length }, 'char');
+    column(sqlTextDescriptor.factory(), sqlCharDescriptor.codecId, { length }, 'char');
   wrongCodecHelper satisfies ColumnHelperFor<SqlCharDescriptor>;
   // @ts-expect-error -- codec is SqlTextCodec, not SqlCharCodec
   wrongCodecHelper satisfies ColumnHelperForStrict<SqlCharDescriptor>;

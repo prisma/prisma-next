@@ -38,7 +38,7 @@ import {
   type ArktypeJsonDescriptor,
   type ArktypeJsonTypeParams,
   arktypeJsonColumn,
-  arktypeJsonDescriptorClass,
+  arktypeJsonDescriptor,
 } from '../src/core/arktype-json-codec-class';
 
 // ---------------------------------------------------------------------------
@@ -89,7 +89,7 @@ test('ColumnInputType extracts the schema-inferred TS type', () => {
 // ---------------------------------------------------------------------------
 
 test('arktypeJsonDescriptor: factory(params) returns erased ArktypeJsonCodecClass<unknown>', () => {
-  const factory = arktypeJsonDescriptorClass.factory({ expression: 'string', jsonIr: {} });
+  const factory = arktypeJsonDescriptor.factory({ expression: 'string', jsonIr: {} });
   expectTypeOf(factory).toEqualTypeOf<
     (ctx: CodecInstanceContext) => ArktypeJsonCodecClass<unknown>
   >();
@@ -120,7 +120,7 @@ test('coarse satisfies catches wrong typeParams shape on arktypeJsonColumn', () 
             return undefined;
           }
         })(),
-      arktypeJsonDescriptorClass.codecId,
+      arktypeJsonDescriptor.codecId,
       { wrongKey: 'oops' },
       'jsonb',
     );

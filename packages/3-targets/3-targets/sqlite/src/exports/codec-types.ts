@@ -10,34 +10,34 @@
 
 import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
 import {
-  sqlCharDescriptorClass,
-  sqlFloatDescriptorClass,
-  sqlIntDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlCharDescriptor,
+  sqlFloatDescriptor,
+  sqlIntDescriptor,
+  sqlVarcharDescriptor,
 } from '@prisma-next/sql-relational-core/ast';
 import type { JsonValue } from '../core/codecs';
 import {
-  sqliteBigintDescriptorClass,
-  sqliteBlobDescriptorClass,
-  sqliteDatetimeDescriptorClass,
-  sqliteIntegerDescriptorClass,
-  sqliteJsonDescriptorClass,
-  sqliteRealDescriptorClass,
-  sqliteTextDescriptorClass,
+  sqliteBigintDescriptor,
+  sqliteBlobDescriptor,
+  sqliteDatetimeDescriptor,
+  sqliteIntegerDescriptor,
+  sqliteJsonDescriptor,
+  sqliteRealDescriptor,
+  sqliteTextDescriptor,
 } from '../core/codecs-class';
 
 const codecDescriptorMap = {
-  char: sqlCharDescriptorClass,
-  varchar: sqlVarcharDescriptorClass,
-  int: sqlIntDescriptorClass,
-  float: sqlFloatDescriptorClass,
-  text: sqliteTextDescriptorClass,
-  integer: sqliteIntegerDescriptorClass,
-  real: sqliteRealDescriptorClass,
-  blob: sqliteBlobDescriptorClass,
-  datetime: sqliteDatetimeDescriptorClass,
-  json: sqliteJsonDescriptorClass,
-  bigint: sqliteBigintDescriptorClass,
+  char: sqlCharDescriptor,
+  varchar: sqlVarcharDescriptor,
+  int: sqlIntDescriptor,
+  float: sqlFloatDescriptor,
+  text: sqliteTextDescriptor,
+  integer: sqliteIntegerDescriptor,
+  real: sqliteRealDescriptor,
+  blob: sqliteBlobDescriptor,
+  datetime: sqliteDatetimeDescriptor,
+  json: sqliteJsonDescriptor,
+  bigint: sqliteBigintDescriptor,
 } as const;
 
 type Resolve<T> = { readonly [K in keyof T]: { readonly [P in keyof T[K]]: T[K][P] } };

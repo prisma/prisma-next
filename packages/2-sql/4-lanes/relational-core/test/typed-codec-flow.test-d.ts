@@ -37,8 +37,8 @@ import { expectTypeOf, test } from 'vitest';
 import type {
   SqlIntCodec,
   SqlVarcharCodec,
-  sqlIntDescriptorClass,
-  sqlVarcharDescriptorClass,
+  sqlIntDescriptor,
+  sqlVarcharDescriptor,
 } from '../src/ast/sql-codecs-class';
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ type ResolvedCodec<D> = D extends {
 // ---------------------------------------------------------------------------
 
 test('non-parameterized SQL base codec — sqlInt round-trips to typed Codec', () => {
-  type Resolved = ResolvedCodec<typeof sqlIntDescriptorClass>;
+  type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;
   expectTypeOf<Resolved>().toEqualTypeOf<SqlIntCodec>();
   expectTypeOf<Resolved>().toExtend<
     Codec<'sql/int@1', readonly ['equality', 'order', 'numeric'], number, number>
@@ -64,7 +64,7 @@ test('non-parameterized SQL base codec — sqlInt round-trips to typed Codec', (
 });
 
 test('parameterized SQL base codec — sqlVarchar round-trips to typed Codec', () => {
-  type Resolved = ResolvedCodec<typeof sqlVarcharDescriptorClass>;
+  type Resolved = ResolvedCodec<typeof sqlVarcharDescriptor>;
   expectTypeOf<Resolved>().toEqualTypeOf<SqlVarcharCodec>();
   expectTypeOf<Resolved>().toExtend<
     Codec<'sql/varchar@1', readonly ['equality', 'order', 'textual'], string, string>
@@ -116,7 +116,7 @@ test('extension-style descriptor round-trips with custom Wire/Input', () => {
 // ---------------------------------------------------------------------------
 
 test('wrong codec id breaks the round-trip equality', () => {
-  type Resolved = ResolvedCodec<typeof sqlIntDescriptorClass>;
+  type Resolved = ResolvedCodec<typeof sqlIntDescriptor>;
   expectTypeOf<Resolved['id']>().toEqualTypeOf<'sql/int@1'>();
   // @ts-expect-error -- resolved codec id is `sql/int@1`, not `sql/varchar@1`
   expectTypeOf<Resolved['id']>().toEqualTypeOf<'sql/varchar@1'>();
@@ -125,7 +125,7 @@ test('wrong codec id breaks the round-trip equality', () => {
 test('wrong wire type breaks the round-trip equality', () => {
   type ExtractWire<C> =
     C extends Codec<string, readonly CodecTrait[], infer W, unknown> ? W : never;
-  type ResolvedWire = ExtractWire<ResolvedCodec<typeof sqlIntDescriptorClass>>;
+  type ResolvedWire = ExtractWire<ResolvedCodec<typeof sqlIntDescriptor>>;
   expectTypeOf<ResolvedWire>().toEqualTypeOf<number>();
   // @ts-expect-error -- sqlInt wire is `number`, not `string`
   expectTypeOf<ResolvedWire>().toEqualTypeOf<string>();
@@ -134,7 +134,7 @@ test('wrong wire type breaks the round-trip equality', () => {
 test('widened trait union breaks the round-trip equality', () => {
   // Read traits off the descriptor — the codec instance carries them on
   // an optional phantom slot which is not always preserved by inference.
-  type DescTraits = (typeof sqlIntDescriptorClass)['traits'];
+  type DescTraits = (typeof sqlIntDescriptor)['traits'];
   expectTypeOf<DescTraits>().toEqualTypeOf<readonly ['equality', 'order', 'numeric']>();
   // @ts-expect-error -- sqlInt traits include `numeric`, not just `['equality']`
   expectTypeOf<DescTraits>().toEqualTypeOf<readonly ['equality']>();

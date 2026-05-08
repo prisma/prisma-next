@@ -25,7 +25,7 @@ import {
   type PgVectorCodec,
   type PgVectorDescriptor,
   pgVectorColumn,
-  pgVectorDescriptorClass,
+  pgVectorDescriptor,
 } from '../src/core/codecs-class';
 
 // ---------------------------------------------------------------------------
@@ -33,7 +33,7 @@ import {
 // ---------------------------------------------------------------------------
 
 test('pgVector: descriptor.factory(params) returns typed (ctx) => PgVectorCodec', () => {
-  const factory = pgVectorDescriptorClass.factory({ length: 1536 });
+  const factory = pgVectorDescriptor.factory({ length: 1536 });
   expectTypeOf(factory).toEqualTypeOf<(ctx: CodecInstanceContext) => PgVectorCodec>();
 });
 
@@ -64,8 +64,8 @@ pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
 test('coarse satisfies catches wrong typeParams shape on pgVectorColumn', () => {
   const brokenHelper = (length: number) =>
     column(
-      pgVectorDescriptorClass.factory({ length }),
-      pgVectorDescriptorClass.codecId,
+      pgVectorDescriptor.factory({ length }),
+      pgVectorDescriptor.codecId,
       { wrongKey: length },
       'vector',
     );

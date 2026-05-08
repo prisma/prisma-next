@@ -23,7 +23,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ARKTYPE_JSON_CODEC_ID,
   arktypeJsonColumn,
-  arktypeJsonDescriptorClass,
+  arktypeJsonDescriptor,
 } from '../src/core/arktype-json-codec-class';
 
 const SYNTH_CTX: CodecInstanceContext = { name: '<arktype-json-class-test>' };
@@ -122,10 +122,10 @@ describe('arktypeJsonColumn encode/encodeJson agreement', () => {
   });
 });
 
-describe('arktypeJsonDescriptorClass.factory(params)', () => {
+describe('arktypeJsonDescriptor.factory(params)', () => {
   it('rehydrates the schema from typeParams.jsonIr and produces a working codec', async () => {
     const col = arktypeJsonColumn(productSchema);
-    const factory = arktypeJsonDescriptorClass.factory(col.typeParams);
+    const factory = arktypeJsonDescriptor.factory(col.typeParams);
     const codec = factory(SYNTH_CTX);
     expect(codec.id).toBe(ARKTYPE_JSON_CODEC_ID);
 
@@ -136,20 +136,20 @@ describe('arktypeJsonDescriptorClass.factory(params)', () => {
   });
 
   it('descriptor metadata: traits, targetTypes', () => {
-    expect(arktypeJsonDescriptorClass.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
-    expect(arktypeJsonDescriptorClass.traits).toEqual(['equality']);
-    expect(arktypeJsonDescriptorClass.targetTypes).toEqual(['jsonb']);
+    expect(arktypeJsonDescriptor.codecId).toBe(ARKTYPE_JSON_CODEC_ID);
+    expect(arktypeJsonDescriptor.traits).toEqual(['equality']);
+    expect(arktypeJsonDescriptor.targetTypes).toEqual(['jsonb']);
   });
 
   it('renderOutputType returns the eager-extracted expression', () => {
     const col = arktypeJsonColumn(productSchema);
-    const rendered = arktypeJsonDescriptorClass.renderOutputType(col.typeParams);
+    const rendered = arktypeJsonDescriptor.renderOutputType(col.typeParams);
     expect(rendered).toBe(productSchema.expression);
   });
 
   it('throws on corrupt jsonIr at factory time', () => {
     expect(() =>
-      arktypeJsonDescriptorClass.factory({
+      arktypeJsonDescriptor.factory({
         expression: 'string',
         jsonIr: { not: 'a-valid-arktype-ir' },
       }),
