@@ -37,6 +37,8 @@ export {
   CIPHERSTASH_STRING_CODEC_ID,
   createCipherstashStringCodec,
 } from '../core/codec-runtime';
+export type { DecryptAllOptions } from '../core/decrypt-all';
+export { decryptAll } from '../core/decrypt-all';
 export type { EncryptedStringFromInternalArgs } from '../core/envelope';
 export { EncryptedString } from '../core/envelope';
 export type { CipherstashStringParams } from '../core/parameterized';
