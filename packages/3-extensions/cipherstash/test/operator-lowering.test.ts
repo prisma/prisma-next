@@ -4,18 +4,27 @@
  * Snapshot tests pin the SQL shape that cipherstash-typed columns lower
  * to under each user-facing predicate the project surfaces in M3:
  *
- *   - **AC-OP1 (T3.1).** `email.eq(value)` on a `cipherstash/string@1`
- *     column lowers to `eql_v2.eq("email", $1::eql_v2_encrypted)`. The
- *     `$1` parameter is bound to an `EncryptedString` envelope that the
- *     bulk-encrypt middleware (M2 R3) populates with ciphertext before
- *     the Postgres codec encodes the wire payload — not asserted here
- *     (live-Postgres exercise lives in M3 R2 / T3.5); this round only
- *     pins the SQL shape.
+ *   - **AC-OP1 (T3.1).** `email.cipherstashEq(value)` on a
+ *     `cipherstash/string@1` column lowers to
+ *     `eql_v2.eq("email", $1::eql_v2_encrypted)`. The `$1` parameter
+ *     is bound to an `EncryptedString` envelope that the bulk-encrypt
+ *     middleware (M2 R3) populates with ciphertext before the Postgres
+ *     codec encodes the wire payload — not asserted here (live-Postgres
+ *     exercise lives in M3 R2 / T3.5); this round only pins the SQL
+ *     shape.
  *
- *   - **AC-OP2 (T3.2).** `email.ilike(pattern)` lowers to
+ *   - **AC-OP2 (T3.2).** `email.cipherstashIlike(pattern)` lowers to
  *     `eql_v2.ilike("email", $1::eql_v2_encrypted)`. EQL's `ilike`
  *     function takes an encrypted match-term (the pattern is encrypted
  *     just like an `eq` value).
+ *
+ *   The user-facing method names are cipherstash-prefixed
+ *   (`cipherstashEq` / `cipherstashIlike`) so the registrations
+ *   coexist with the framework`s built-in `eq` / `ilike` rather than
+ *   overriding them — the framework registry rejects same-method
+ *   collisions and we don`t override operators. See `src/core/operators.ts`
+ *   for the trade-off rationale and the gap that follow-up framework
+ *   work (per-codec where-binding rewrite SPI) would close.
  *
  *   - **AC-OP3 (T3.3).** `WHERE email IS NULL` lowers to
  *     `WHERE "user"."email" IS NULL` — no EQL function call. Null
@@ -205,9 +214,9 @@ function selectWithWhere(whereExpr: AnyExpression) {
     .withWhere(whereExpr);
 }
 
-describe('cipherstash operator lowering — eq (T3.1, AC-OP1)', () => {
-  it('lowers email.eq(plaintext) to eql_v2.eq("email", $1::eql_v2_encrypted)', () => {
-    const op = getOperator('eq');
+describe('cipherstash operator lowering — cipherstashEq (T3.1, AC-OP1)', () => {
+  it('lowers email.cipherstashEq(plaintext) to eql_v2.eq("email", $1::eql_v2_encrypted)', () => {
+    const op = getOperator('cipherstashEq');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'alice@example.com');
     const ast = selectWithWhere(predicate);
 
@@ -219,7 +228,7 @@ describe('cipherstash operator lowering — eq (T3.1, AC-OP1)', () => {
   });
 
   it('binds the plaintext as an EncryptedString envelope tagged with the cipherstash routing key', () => {
-    const op = getOperator('eq');
+    const op = getOperator('cipherstashEq');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), 'alice@example.com');
     const ast = selectWithWhere(predicate);
 
@@ -242,7 +251,7 @@ describe('cipherstash operator lowering — eq (T3.1, AC-OP1)', () => {
   });
 
   it('passes a pre-built EncryptedString envelope through unchanged (advanced caller path)', () => {
-    const op = getOperator('eq');
+    const op = getOperator('cipherstashEq');
     const userEnvelope = EncryptedString.from('alice@example.com');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), userEnvelope);
     const ast = selectWithWhere(predicate);
@@ -259,9 +268,9 @@ describe('cipherstash operator lowering — eq (T3.1, AC-OP1)', () => {
   });
 });
 
-describe('cipherstash operator lowering — ilike (T3.2, AC-OP2)', () => {
-  it('lowers email.ilike(pattern) to eql_v2.ilike("email", $1::eql_v2_encrypted)', () => {
-    const op = getOperator('ilike');
+describe('cipherstash operator lowering — cipherstashIlike (T3.2, AC-OP2)', () => {
+  it('lowers email.cipherstashIlike(pattern) to eql_v2.ilike("email", $1::eql_v2_encrypted)', () => {
+    const op = getOperator('cipherstashIlike');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), '%alice%');
     const ast = selectWithWhere(predicate);
 
@@ -273,7 +282,7 @@ describe('cipherstash operator lowering — ilike (T3.2, AC-OP2)', () => {
   });
 
   it('binds the pattern as an EncryptedString envelope tagged with the cipherstash routing key', () => {
-    const op = getOperator('ilike');
+    const op = getOperator('cipherstashIlike');
     const predicate = callOperator(op, columnAccessor(TABLE, COLUMN), '%alice%');
     const ast = selectWithWhere(predicate);
 
@@ -324,11 +333,15 @@ describe('cipherstash operator lowering — null short-circuit (T3.3, AC-OP3 / A
 });
 
 describe('createCipherstashRuntimeDescriptor — queryOperations registration', () => {
-  it('exposes eq + ilike via the runtime descriptor (M3 R1 wiring)', () => {
+  it('exposes cipherstashEq + cipherstashIlike via the runtime descriptor (M3 R1 wiring)', () => {
+    // Names are cipherstash-prefixed so they coexist with the
+    // framework`s built-in `eq` / `ilike` registrations rather than
+    // overriding them. The trade-off is documented in
+    // `src/core/operators.ts`'s top-level docblock.
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const ops = descriptor.queryOperations?.() ?? [];
     const methods = ops.map((op) => op.method).sort();
-    expect(methods).toEqual(['eq', 'ilike']);
+    expect(methods).toEqual(['cipherstashEq', 'cipherstashIlike']);
     for (const op of ops) {
       expect(op.self).toEqual({ codecId: CIPHERSTASH_STRING_CODEC_ID });
     }
