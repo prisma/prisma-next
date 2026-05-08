@@ -45,8 +45,12 @@ packages/3-extensions/cipherstash/
   and forwards the caller-supplied `AbortSignal` by identity via
   `ifDefined` from `@prisma-next/utils/defined`.
 - `cipherstash/string@1` codec with target type `eql_v2_encrypted`,
-  traits `['equality']`, and `renderOutputType` returning
-  `EncryptedString`.
+  no codec traits, and `renderOutputType` returning `EncryptedString`.
+  Equality search is delivered via the cipherstash-namespaced
+  `cipherstashEq` / `cipherstashIlike` operators (see `src/core/operators.ts`)
+  rather than the framework's trait-gated built-in `eq` — declaring
+  `equality` here would expose a wrong-SQL footgun on cipherstash
+  columns because EQL ciphers contain randomized nonces.
 - `RuntimeParameterizedCodecDescriptor<{ equality, freeTextSearch }>`
   with arktype `paramsSchema` validated at the contract boundary.
 - `SqlControlExtensionDescriptor` carrying the contract-space

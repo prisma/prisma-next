@@ -50,7 +50,11 @@ export function createParameterizedCodecDescriptors(
   return [
     {
       codecId: CIPHERSTASH_STRING_CODEC_ID,
-      traits: ['equality'] as const,
+      // Empty traits — equality search on cipherstash columns goes
+      // through the cipherstash-namespaced operator (`cipherstashEq`
+      // in `./operators.ts`), not the framework`s trait-gated built-in
+      // `eq`. See `./codec-runtime.ts` for the full rationale.
+      traits: [] as const,
       targetTypes: ['eql_v2_encrypted'] as const,
       paramsSchema: encryptedStringParamsSchema,
       renderOutputType: renderEncryptedStringOutputType,

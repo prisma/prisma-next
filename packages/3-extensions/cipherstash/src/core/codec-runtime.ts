@@ -38,7 +38,26 @@ import { EncryptedString, getInternalHandle } from './envelope';
 import type { CipherstashSdk } from './sdk';
 
 const CIPHERSTASH_STRING_TARGET_TYPE = 'eql_v2_encrypted' as const;
-const CIPHERSTASH_STRING_TRAITS = ['equality'] as const;
+// Cipherstash columns intentionally declare no codec traits.
+//
+// The framework's `equality` trait gates the built-in `eq` / `neq` /
+// `in` / `notIn` comparison methods (see `COMPARISON_METHODS_META` in
+// `packages/3-extensions/sql-orm-client/src/types.ts`). Those built-
+// ins lower to standard SQL `=` / `!=` / `IN`, which is wrong for
+// cipherstash columns because EQL ciphers contain randomized nonces
+// and do not byte-equal under `=`. Declaring `equality` here would
+// silently expose the wrong-SQL footgun; declaring `[]` makes
+// `email.eq(...)` undefined at the column accessor and forces callers
+// onto the cipherstash-namespaced operator surface
+// (`email.cipherstashEq(...)` — see `./operators.ts`). The trait
+// declaration is regression-pinned by `test/equality-trait-removal.test.ts`.
+//
+// The user-visible `EncryptedString({ equality: true })` flag in PSL
+// / TS authoring is unrelated to this codec trait — it controls
+// whether the codec lifecycle hook contributes a per-column search-
+// config migration op for the column's `unique` index. The two
+// `equality` concepts share only their name.
+const CIPHERSTASH_STRING_TRAITS = [] as const;
 
 /**
  * Encode the SDK ciphertext payload as a Postgres composite literal

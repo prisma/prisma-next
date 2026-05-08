@@ -1,104 +1,117 @@
 # @prisma-next/extension-cipherstash
 
-[CipherStash](https://cipherstash.com) extension for Prisma Next: searchable
-application-layer encryption for Postgres via the EQL bundle.
+[CipherStash](https://cipherstash.com) extension for Prisma Next: searchable application-layer encryption for Postgres via the EQL bundle.
 
 ## Status
 
-Authored as a **contract space** per
-[ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
-(Linear: [TML-2397](https://linear.app/prisma/issue/TML-2397)).
+In development. The currently-implemented surface is the **storage path**:
 
-This package authors CipherStash's database scaffolding (the
-`eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite
-types, the `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, and the
-EQL bundle SQL) as a contract space, so the Prisma Next framework can
-plan, apply, and verify it the same way it manages an application's own
-schema.
+- `EncryptedString` envelope and `cipherstash/string@1` codec runtime,
+- `cipherstash.EncryptedString({...})` PSL constructor and the `encryptedString({...})` TS contract factory (byte-identical lowering),
+- `SqlControlExtensionDescriptor` carrying the EQL contract space (eql_v2_configuration table, eql_v2_encrypted / ore_* composite types, eql_v2 domains) plus a baseline migration that installs the vendored EQL bundle SQL.
 
-The codec runtime (encoding/decoding `Encrypted<string>` payloads) and the
-`searchable: true` codec lifecycle hook for `add_search_config` /
-`remove_search_config` ops (see
-[ADR 212 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md))
-are intentionally **not** in this round.
+The bulk-encrypt middleware, the live-Postgres storage round-trip, and the search operators (`cipherstashEq`, `cipherstashIlike`) have shipped on the cipherstash storage path. `decryptAll` and the live-Postgres + EQL bundle exercise of the lowered search SQL ship in subsequent releases. See [`DEVELOPING.md`](./DEVELOPING.md) — forthcoming surface.
 
-## What this package contributes
+Search operators are deliberately exposed under the cipherstash-namespaced names `cipherstashEq` and `cipherstashIlike` rather than the framework's built-in `eq` / `ilike`. The cipherstash codec declares no `equality` codec trait, so the framework's trait-gated `eq` is not reachable on cipherstash columns — calling `email.eq(...)` on a cipherstash column is `undefined`. Equality search uses `email.cipherstashEq(value)`, which lowers to `eql_v2.eq(...)`; free-text search uses `email.cipherstashIlike(pattern)` lowering to `eql_v2.ilike(...)`. The user-facing `EncryptedString({ equality: true })` flag is unrelated to the codec trait — it controls whether the codec lifecycle hook emits an `add_search_config` op for the column's `unique` index at migration time.
 
-- `contractSpace.contractJson` — the typed objects EQL exposes that user
-  columns can name as `nativeType`. Per the IR vocabulary boundary in
-  the project spec, this carries tables / enums / composite types /
-  domains only; functions / operators / casts / op classes live below
-  the boundary as opaque DDL inside the `installEqlBundle` migration op.
-- `contractSpace.migrations` — the baseline migration that installs the
-  vendored EQL bundle SQL (one `cipherstash:install-eql-bundle-v1` op
-  carrying the bundle byte-for-byte) plus the structural ops that create
-  the typed objects above. Each op carries a `cipherstash:*` invariantId.
-- `contractSpace.headRef` — `(hash, invariants)` describing the current
-  target state of the contract space. The framework consumes this at
-  `migrate` time to materialise pinned per-space artefacts under
-  `migrations/cipherstash/` in the user's repo.
+## Subpath exports
 
-## Usage (preview)
+
+| Subpath          | Purpose                                                       |
+| ---------------- | ------------------------------------------------------------- |
+| `./control`      | `SqlControlExtensionDescriptor` (contract space + pack meta)  |
+| `./runtime`      | `EncryptedString` envelope + `CipherstashSdk` + codec runtime |
+| `./pack`         | `cipherstashPackMeta` for TS contract authoring               |
+| `./column-types` | `encryptedString({ equality?, freeTextSearch? })` TS factory  |
+
+
+## Configuration
+
+Add the extension to your `prisma-next.config.ts`:
 
 ```ts
-import { defineConfig } from 'prisma-next';
+import { defineConfig } from '@prisma-next/cli/config-types';
+import postgresAdapter from '@prisma-next/adapter-postgres/control';
+import sql from '@prisma-next/family-sql/control';
+import postgres from '@prisma-next/target-postgres/control';
 import cipherstash from '@prisma-next/extension-cipherstash/control';
 
 export default defineConfig({
+  family: sql,
+  target: postgres,
+  adapter: postgresAdapter,
   extensionPacks: [cipherstash],
 });
 ```
 
-After `prisma-next migrate`, the user's repo gains
-`migrations/cipherstash/contract.json`,
-`migrations/cipherstash/contract.d.ts`,
-`migrations/cipherstash/refs/head.json`, and
-`migrations/cipherstash/<name>/` migration directories. `db apply` then
-runs CipherStash's migrations against the live database in the same
-transaction as any application-space migration emitted in the same
-`migrate` invocation.
+## Authoring
 
-## Authoring (maintainers)
+### PSL
 
-The extension's contract + baseline migration are emitted on-disk inside
-this package using the same pipeline application authors use:
+```prisma
+model User {
+  id    Int @id @default(autoincrement())
+  email cipherstash.EncryptedString({ equality: true })
+  notes cipherstash.EncryptedString({})?
+}
+```
 
-- `pnpm build:contract-space` — runs `prisma-next contract emit` to
-  produce `<package>/contract.{json,d.ts}` from the TS source at
-  `src/contract-source.ts`.
-- `pnpm exec prisma-next migration plan --name <slug>` (run from this
-  package directory) — scaffolds a new migration directory under
-  `migrations/cipherstash/<dirName>/`. **Not chained into
-  `pnpm build`**: `migration plan` is non-idempotent (each invocation
-  generates a new timestamped directory), so it runs manually when the
-  contract source changes — same convention application authors
-  follow. The baseline migration's `migration.ts` is then hand-edited
-  so that its `operations` getter installs the EQL bundle byte-for-byte
-  plus the structural `cipherstash:*` no-op ops that register
-  invariantIds for typed objects the bundle creates (see the comment
-  in `migrations/cipherstash/20260601T0000_install_eql_bundle/migration.ts`).
-- `pnpm tsx migrations/cipherstash/<dirName>/migration.ts` (run from
-  this package directory) — re-emits `ops.json` + `migration.json`
-  from the hand-edited subclass. Use `tsx`, not bare `node`, because
-  the Migration subclass imports relative TypeScript siblings
-  (`../../../src/core/constants`, `../../../src/core/eql-bundle`)
-  which Node's native loader can't resolve without a TS-aware loader.
-- `refs/head.json` is hand-pinned with the latest migration's `to`
-  hash + `providedInvariants`.
+### TypeScript
 
-The descriptor at `src/exports/control.ts` then JSON-imports those
-artefacts and synthesises the framework's `MigrationPackage` shape
-(with `dirPath` resolved from `import.meta.url`).
+```ts
+import { encryptedString } from '@prisma-next/extension-cipherstash/column-types';
+import cipherstash from '@prisma-next/extension-cipherstash/pack';
+import sqlFamily from '@prisma-next/family-sql/pack';
+import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
+import postgres from '@prisma-next/target-postgres/pack';
 
-See [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
-("On-disk-in-package authoring convention") for the full rationale and
-[`packages/3-extensions/test-contract-space`](../test-contract-space)
-for the reference model.
+export const contract = defineContract({
+  family: sqlFamily,
+  target: postgres,
+  extensionPacks: { cipherstash },
+  models: {
+    User: model('User', {
+      fields: {
+        id: field.column({ codecId: 'pg/int4@1', nativeType: 'int4' })
+          .defaultSql('autoincrement()').id(),
+        email: field.column(encryptedString({ equality: true })),
+        notes: field.column(encryptedString({})).optional(),
+      },
+    }).sql({ table: 'user' }),
+  },
+});
+```
 
-## See also
+Both authoring forms emit byte-identical `contract.json`. The codec registers under the `cipherstash/string@1` codec id and maps to the EQL `eql_v2_encrypted` Postgres native type. Per-column search-mode parameters (`equality`, `freeTextSearch`) are validated at the contract boundary by an arktype schema and threaded through the parameterized-codec descriptor model — see [ADR 208 — Higher-order codecs for parameterized types](../../../docs/architecture%20docs/adrs/ADR%20208%20-%20Higher-order%20codecs%20for%20parameterized%20types.md). The codec's `decode` site reads the cell's `(table, column)` from the per-call codec context — see [ADR 207 — Codec call context per-query AbortSignal and column metadata](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
 
-- [ADR 211 — Contract spaces](../../../docs/architecture%20docs/adrs/ADR%20211%20-%20Contract%20spaces.md)
-- [ADR 212 — Codec lifecycle hooks](../../../docs/architecture%20docs/adrs/ADR%20212%20-%20Codec%20lifecycle%20hooks.md)
-- [Subsystem doc — Ecosystem Extensions & Packs](../../../docs/architecture%20docs/subsystems/6.%20Ecosystem%20Extensions%20%26%20Packs.md)
-- Reference fixture: [`packages/3-extensions/test-contract-space`](../test-contract-space)
-- Reference shape: [`packages/3-extensions/pgvector`](../pgvector)
+## Database setup
+
+The extension contributes its database scaffolding (the `eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite types, the `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, and the EQL bundle SQL) as a **contract space** so the Prisma Next framework can plan, apply, and verify it the same way it manages an application's own schema.
+
+After `prisma-next migrate plan`, the user's repo gains:
+
+- `migrations/cipherstash/contract.json`,
+- `migrations/cipherstash/contract.d.ts`,
+- `migrations/cipherstash/refs/head.json`,
+- `migrations/cipherstash/<name>/` migration directories.
+
+`db apply` then runs CipherStash's migrations against the live database in the same transaction as any application-space migration emitted in the same `migrate` invocation.
+
+## Runtime usage
+
+```ts
+import { EncryptedString } from '@prisma-next/extension-cipherstash/runtime';
+
+const envelope = EncryptedString.from('alice@example.com');
+const plaintext = await envelope.decrypt();
+```
+
+## Contributing
+
+See [`DEVELOPING.md`](./DEVELOPING.md) for source layout, in-progress milestones, and design choices.
+
+## References
+
+- [CipherStash](https://cipherstash.com) — managed application-layer encryption for Postgres.
+- [Prisma Next Architecture Overview](../../../docs/Architecture%20Overview.md).
+- [Extension Packs Naming and Layout](../../../docs/reference/Extension-Packs-Naming-and-Layout.md).

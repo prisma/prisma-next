@@ -49,9 +49,18 @@ describe('createCipherstashStringCodec — registration shape — AC-CODEC1', ()
     expect(codec.meta?.db?.sql?.postgres?.nativeType).toBe('eql_v2_encrypted');
   });
 
-  it('declares the equality trait', () => {
+  it('declares no codec traits — equality search routes through cipherstashEq', () => {
+    // Regression test for the M3 R1 follow-up decision: cipherstash
+    // columns do NOT advertise the framework`s `equality` trait at the
+    // codec level. The framework`s built-in `eq` is gated on
+    // `equality` and lowers to standard SQL `=`, which is wrong for
+    // EQL ciphers (randomized nonces). Equality search on cipherstash
+    // columns is delivered exclusively via the cipherstash-namespaced
+    // `cipherstashEq` operator (see `src/core/operators.ts`). Re-adding
+    // a trait here without re-routing through the namespaced operator
+    // would silently re-introduce the wrong-SQL footgun.
     const codec = createCipherstashStringCodec(emptySdk());
-    expect(codec.traits).toEqual(['equality']);
+    expect(codec.traits).toEqual([]);
   });
 });
 
@@ -161,7 +170,10 @@ describe('createParameterizedCodecDescriptors — AC-CODEC5', () => {
     const [descriptor] = descriptors;
     expect(descriptor?.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
     expect(descriptor?.targetTypes).toEqual(['eql_v2_encrypted']);
-    expect(descriptor?.traits).toEqual(['equality']);
+    // No codec traits — see the `declares no codec traits` test
+    // above for the rationale (mirrors the runtime codec`s trait
+    // declaration so contract emit and runtime agree).
+    expect(descriptor?.traits).toEqual([]);
     expect(descriptor?.renderOutputType?.({ equality: true, freeTextSearch: true })).toBe(
       'EncryptedString',
     );

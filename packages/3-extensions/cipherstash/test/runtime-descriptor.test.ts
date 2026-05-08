@@ -66,13 +66,16 @@ describe('createCipherstashRuntimeDescriptor — codecs() registry', () => {
 });
 
 describe('createCipherstashRuntimeDescriptor — parameterizedCodecs() descriptors', () => {
-  it('returns a single descriptor for cipherstash/string@1 with the equality trait and eql_v2_encrypted target', () => {
+  it('returns a single descriptor for cipherstash/string@1 with no codec traits and eql_v2_encrypted target', () => {
     const descriptor = createCipherstashRuntimeDescriptor({ sdk: emptySdk() });
     const descriptors = descriptor.parameterizedCodecs();
     expect(descriptors).toHaveLength(1);
     const only = descriptors[0]!;
     expect(only.codecId).toBe(CIPHERSTASH_STRING_CODEC_ID);
-    expect(only.traits).toEqual(['equality']);
+    // Empty traits — equality search routes through the cipherstash-
+    // namespaced `cipherstashEq` operator (see codec-runtime.test.ts
+    // for the regression assertion + rationale).
+    expect(only.traits).toEqual([]);
     expect(only.targetTypes).toEqual(['eql_v2_encrypted']);
   });
 });

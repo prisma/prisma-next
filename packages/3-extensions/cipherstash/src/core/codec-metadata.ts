@@ -22,7 +22,14 @@
 import { codec } from '@prisma-next/sql-relational-core/ast';
 import { CIPHERSTASH_STRING_CODEC_ID, EQL_V2_ENCRYPTED_TYPE } from './constants';
 
-const CIPHERSTASH_STRING_TRAITS = ['equality'] as const;
+// Empty traits — cipherstash columns expose equality search via the
+// cipherstash-namespaced operator surface (`cipherstashEq` /
+// `cipherstashIlike` in `./operators.ts`), not via the framework`s
+// trait-gated built-in `eq`. See `./codec-runtime.ts` for the full
+// rationale; the metadata codec mirrors the runtime codec`s trait
+// declaration so contract emit (which reads pack-meta) and runtime
+// (which reads the parameterized descriptor) agree.
+const CIPHERSTASH_STRING_TRAITS = [] as const;
 
 export const cipherstashStringCodecMetadata = codec({
   typeId: CIPHERSTASH_STRING_CODEC_ID,

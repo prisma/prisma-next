@@ -18,42 +18,32 @@
  * (`unique` / `match`) emitted by the codec lifecycle hook (T2.9) and
  * produce correct results.
  *
- * **Why unique method names (`cipherstashEq`, `cipherstashIlike`)
- * rather than overriding the framework`s `eq` / `ilike`.** The
- * framework`s `OperationRegistry` is a flat method-keyed map and the
- * project decision is to disallow same-method registrations across
- * extensions (we don`t allow operator overriding). Cipherstash
- * therefore registers under names that don`t collide with any
- * framework- or adapter-shipped operator. User-facing call shape on a
- * cipherstash column is:
+ * **Why cipherstash-namespaced method names (`cipherstashEq`,
+ * `cipherstashIlike`) rather than reusing the framework`s `eq` /
+ * `ilike`.** The framework`s `OperationRegistry` is a flat method-keyed
+ * map and operator overriding is disallowed by project decision. Equally
+ * importantly, cipherstash`s search operators are semantically distinct
+ * from the framework built-ins — they take encrypted-aware envelope
+ * arguments and lower to `eql_v2.eq` / `eql_v2.ilike`, which short-
+ * circuit through EQL`s per-column index — so they belong under a
+ * cipherstash-prefixed surface that flags the divergence at the call
+ * site. The supported user-facing call shape on a cipherstash column is:
  *
  *     model.users.where((u) => u.email.cipherstashEq('alice@example.com'))
  *     model.users.where((u) => u.email.cipherstashIlike('%alice%'))
  *
- * Calling the framework`s built-in `email.eq(...)` on a cipherstash
- * column would produce standard SQL `=` against an `eql_v2_encrypted`
- * value — wrong, because EQL ciphers contain randomized nonces and do
- * not byte-equal under `=`. Two follow-ups remain orchestrator
- * decisions and are deliberately NOT addressed here:
- *
- *   1. Whether to surface the wrong-SQL footgun loudly by stripping
- *      the `equality` codec trait so `email.eq` is undefined on
- *      cipherstash columns. The cipherstash codec currently declares
- *      `traits: ['equality']` in `parameterized.ts:53` /
- *      `codec-runtime.ts:41` / `codec-metadata.ts:25`, which is what
- *      makes the framework`s built-in `eq` reachable on cipherstash
- *      columns.
- *
- *   2. Whether to add a per-codec where-binding rewrite SPI so the
- *      spec`s user-facing API (`model.users.where((u) => u.email.eq(...))`
- *      producing the correct EQL SQL) becomes deliverable without
- *      method-name collisions. The natural seam is
- *      `packages/3-extensions/sql-orm-client/src/where-binding.ts`'s
- *      `binary` visitor at line 60-65, which already binds `BinaryExpr`
- *      using the left column`s metadata; rewriting `BinaryExpr eq` →
- *      `OperationExpr eql_v2.eq` for cipherstash columns would close
- *      the gap, but it`s a new framework SPI and out of scope for
- *      M3 R1.
+ * The framework`s built-in `email.eq(...)` is **not reachable** on
+ * cipherstash columns: the cipherstash codec declares no `equality`
+ * trait (see `codec-runtime.ts` / `codec-metadata.ts` / `parameterized.ts`),
+ * and the model-accessor synthesis in `sql-orm-client` gates
+ * `COMPARISON_METHODS_META.eq` on the `equality` trait being present in
+ * the column codec`s trait set. Calling `email.eq(...)` on a cipherstash
+ * column is therefore `undefined` — the wrong-SQL footgun (where the
+ * built-in `eq` would lower to standard SQL `=` against an
+ * `eql_v2_encrypted` value, silently returning zero rows because EQL
+ * ciphers contain randomized nonces) is closed at the codec layer, not
+ * the operator layer. The trait declaration is regression-pinned by
+ * `test/equality-trait-removal.test.ts`.
  *
  * The encrypted-arg path: the operator wraps the user-supplied value
  * in an `EncryptedString` envelope and stamps the column`s
