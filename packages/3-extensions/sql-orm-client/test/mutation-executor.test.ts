@@ -556,6 +556,40 @@ describe('mutation-executor', () => {
     );
   });
 
+  it('executeNestedUpdateMutation() rejects nested update on id-less tables when every unique constraint has a NULL column in the row', async () => {
+    const idless = withoutPrimaryKey(getTestContract(), 'users');
+    const idlessNullableUnique = {
+      ...idless,
+      storage: {
+        ...idless.storage,
+        tables: {
+          ...idless.storage.tables,
+          users: {
+            ...idless.storage.tables.users,
+            uniques: [{ columns: ['invited_by_id'] }],
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    const runtime = createMockRuntime();
+    runtime.setNextResults([
+      [{ id: 1, name: 'Alice', email: 'alice@example.com', invited_by_id: null }],
+    ]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract: idlessNullableUnique },
+        runtime,
+        modelName: 'User',
+        filters: [userIdFilter],
+        data: { name: 'Alice Updated' } as never,
+      }),
+    ).rejects.toThrow(
+      /every unique constraint has at least one NULL-valued column in the targeted row/,
+    );
+  });
+
   it('executeNestedUpdateMutation() applies parent-owned disconnect updates', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();

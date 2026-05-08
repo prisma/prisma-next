@@ -48,12 +48,12 @@ Evidence:
 
 ## Acceptance Criteria
 
-- [ ] Unit test: `updateCount` on a contract without `returning` throws `updateCount() requires contract capability "returning"`.
-- [ ] Same for `deleteCount`.
+- [x] Unit test: `updateCount` on a contract without `returning` throws `updateCount() requires contract capability "returning"`.
+- [x] Same for `deleteCount`.
 
 ## Work Log
 
-(pending)
+- **2026-05-08** — Added unit tests in `packages/3-extensions/sql-orm-client/test/collection-mutation-defaults.test.ts` (`updateCount` block at lines 264-282 and `deleteCount` block at lines 285-303). Each rebuilds the `Tag` collection on a contract whose `capabilities` slot is replaced with `{}` and asserts that the chained call rejects with `/<helper>\(\) requires contract capability "returning"/`, locking the new behavior introduced by `assertReturningCapability(this.contract, '<helper>()')` at `collection.ts:1115` and `:1177`.
 
 ## Resources
 

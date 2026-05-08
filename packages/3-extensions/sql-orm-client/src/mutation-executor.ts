@@ -278,6 +278,30 @@ async function updateFirstGraph(
           'updates and may broaden to all rows matching the row tuple.',
       );
     }
+    if (!hasPrimaryKey) {
+      // buildRowIdentityCriterion drops null-valued mapped fields, so a unique
+      // constraint whose columns are NULL in this row is not enforced by the
+      // criterion. Postgres unique indexes default to NULLS DISTINCT — multiple
+      // rows can share NULL on the unique column with identical other-column
+      // tuples, broadening the UPDATE.
+      const hasFullyDefinedUnique =
+        table?.uniques?.some((unique) =>
+          unique.columns.every((column) => {
+            const fieldName = toFieldName(contract, modelName, column);
+            const value = existingRow[fieldName];
+            return value !== undefined && value !== null;
+          }),
+        ) ?? false;
+      if (!hasFullyDefinedUnique) {
+        throw new Error(
+          `update() of model "${modelName}" cannot guarantee single-row identity ` +
+            `for table "${tableName}": every unique constraint has at least one ` +
+            'NULL-valued column in the targeted row. Declare a primary key, add a ' +
+            'unique constraint covering NOT NULL columns, or refine the filter to a ' +
+            'row whose unique-constraint columns are all non-null.',
+        );
+      }
+    }
     const appliedUpdateDefaults = context.applyMutationDefaults({
       op: 'update',
       table: tableName,

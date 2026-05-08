@@ -57,13 +57,14 @@ Evidence:
 
 ## Acceptance Criteria
 
-- [ ] An id-less table with NO unique constraints either: (a) errors at mutation time, or (b) is documented + tested to broaden writes intentionally.
-- [ ] Integration test exercises a duplicate-tuple scenario (requires fixture without a `UNIQUE (name)` constraint — current `tags` PG schema has one).
-- [ ] Test asserts the chosen behavior (error or broadening), not silent multi-row mutation under the single-row API.
+- [x] An id-less table with NO unique constraints either: (a) errors at mutation time, or (b) is documented + tested to broaden writes intentionally.
+- [ ] Integration test exercises a duplicate-tuple scenario (requires fixture without a `UNIQUE (name)` constraint — current `tags` PG schema has one). _Deferred: tracked as a follow-up; the unit-test path covers the error contract end-to-end through `executeNestedUpdateMutation`. A duplicate-tuple integration fixture would require a new id-less PG schema without a backing unique, and is not load-bearing for the chosen "error at mutation time" behavior._
+- [x] Test asserts the chosen behavior (error or broadening), not silent multi-row mutation under the single-row API.
 
 ## Work Log
 
 - **2026-05-08** — Implemented guard in `updateFirstGraph` (`mutation-executor.ts:269-283`): when the table has neither a primary key nor any unique constraint, the function throws `update() of model "X" requires table "T" to declare a primary key or at least one unique constraint when nested mutations are used. ...`. Added unit test in `mutation-executor.test.ts` covering the throw path with an id-less + no-uniques User contract. Updated `Query Lanes.md` § "Id-less tables" to document the requirement.
+- **2026-05-08** — Tightened the guard to also reject the nullable-unique edge case: when a unique constraint exists but every constraint has at least one NULL-valued column in the RETURNING'd row, `buildRowIdentityCriterion` would silently drop the unique column (Postgres unique indexes default to NULLS DISTINCT, so the broadened tuple-match could hit multiple rows). The guard now throws `update() of model "X" cannot guarantee single-row identity for table "T": every unique constraint has at least one NULL-valued column in the targeted row`. Added a dedicated unit test in `mutation-executor.test.ts` exercising this path against `users.uniques = [{ columns: ['invited_by_id'] }]` with `invitedById: null`.
 
 ## Resources
 
