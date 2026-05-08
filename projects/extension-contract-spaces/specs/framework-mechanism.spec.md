@@ -20,35 +20,39 @@ Implementation order follows the plan's task ordering ([T1.1…T1.10, T2.1…T2.
 
 ## 1. Extension descriptor: `contractSpace` field
 
-Add an optional `contractSpace` field to `SqlControlExtensionDescriptor`. The shape that landed in T1.2 (`5733d8e18`):
+Add an optional `contractSpace` field to `SqlControlExtensionDescriptor`. The contract-space identity types live in `@prisma-next/framework-components/control` (M1-cleanup F4): the concept is family-agnostic — a Mongo descriptor would consume the same types specialized to a Mongo contract — so the framework owns them, and the SQL family's descriptor field merely specialises the generic.
 
 ```ts
-// packages/2-sql/9-family/src/core/migrations/types.ts
+// packages/1-framework/1-core/framework-components/src/control/control-spaces.ts
 import type { Contract } from '@prisma-next/contract/types';
-import type { SqlStorage } from '@prisma-next/sql-contract/types';
-import type { MigrationMetadata, MigrationOps } from '@prisma-next/migration-tools/package';
+import type { MigrationMetadata, MigrationPlanOperation } from './control-migration-types';
 
-export interface ExtensionContractRef {
+export interface ContractSpaceHeadRef {
   readonly hash: string;
   readonly invariants: readonly string[];
 }
 
-export interface ExtensionMigrationPackage {
-  readonly dirName: string;            // emit-time directory name; preserved from the extension author
+export interface AuthoredMigrationPackage {
+  readonly dirName: string;            // emit-time directory name; preserved from the author
   readonly metadata: MigrationMetadata; // ADR 197 metadata; carries `toContract` snapshot
-  readonly ops: MigrationOps;
+  readonly ops: readonly MigrationPlanOperation[];
 }
 
-export interface ExtensionContractSpace {
-  readonly contractJson: Contract<SqlStorage>;                  // typed in-memory contract
-  readonly migrations: readonly ExtensionMigrationPackage[];
-  readonly headRef: ExtensionContractRef;
+export interface AuthoredContractSpace<TContract extends Contract = Contract> {
+  readonly contractJson: TContract;                              // typed in-memory contract
+  readonly migrations: readonly AuthoredMigrationPackage[];
+  readonly headRef: ContractSpaceHeadRef;
 }
+```
+
+```ts
+// packages/2-sql/9-family/src/core/migrations/types.ts
+import type { AuthoredContractSpace } from '@prisma-next/framework-components/control';
 
 export interface SqlControlExtensionDescriptor<TTargetId extends string>
   extends ControlExtensionDescriptor<'sql', TTargetId> {
   // existing fields …
-  readonly contractSpace?: ExtensionContractSpace;
+  readonly contractSpace?: AuthoredContractSpace<Contract<SqlStorage>>;
 }
 ```
 
@@ -57,11 +61,11 @@ Behaviour:
 - An extension descriptor without `contractSpace` is treated as a non-schema extension (codec-only, query-ops-only). Today's behaviour preserved.
 - A descriptor with `contractSpace` is loaded into the per-space pipeline at authoring time only (see § 3).
 
-Notes on the resolved shape (resolved during T1.2 implementation; supersedes earlier draft text in this section):
+Notes on the resolved shape (resolved during T1.2 implementation; type names hoisted under M1-cleanup F4 — formerly `ExtensionContractRef` / `ExtensionMigrationPackage` / `ExtensionContractSpace` in `@prisma-next/family-sql/control`):
 
-- **`ExtensionMigrationPackage` is a new in-memory type**, distinct from `@prisma-next/migration-tools/package`'s on-disk `MigrationPackage` (`{ dirName, dirPath, metadata, ops }`). The on-disk type carries `dirPath` because it is post-emission; the in-memory descriptor type omits `dirPath` because at descriptor-construction time the package has not been emitted to a user repo yet. The framework's emitter (T1.7) materializes `ExtensionMigrationPackage` to disk and constructs the corresponding on-disk `MigrationPackage` lazily.
-- **`contractJson` is typed as `Contract<SqlStorage>`**, not a loose JSON value. The descriptor lives in the SQL family and the typed shape is more useful at composition time. Serialization to JSON for hashing / on-disk emission is the framework's job (already implemented for app-space contracts), not the descriptor author's.
-- **No `contractSnapshot` field on `ExtensionContractSpace`.** Per ADR 197, each migration package's `metadata.toContract` *is* the snapshot; there's no separate snapshot field.
+- **`AuthoredMigrationPackage` is the in-memory authoring form**, distinct from `@prisma-next/migration-tools/package`'s on-disk `MigrationPackage` (`{ dirName, dirPath, metadata, ops }`). The on-disk type carries `dirPath` because it is post-emission; the in-memory authoring type omits `dirPath` because at descriptor / planner construction time the package has not been emitted to a user repo yet. The framework's emitter (T1.7) materialises `AuthoredMigrationPackage` to disk and constructs the corresponding on-disk `MigrationPackage` lazily.
+- **`AuthoredContractSpace` is generic over the contract** so each family pins a typed contract value at descriptor authoring time. The SQL family specialises to `AuthoredContractSpace<Contract<SqlStorage>>` so descriptor authors continue to see a typed contract; serialisation to JSON for hashing / on-disk emission is the framework's job (already implemented for app-space contracts), not the descriptor author's.
+- **No `contractSnapshot` field on `AuthoredContractSpace`.** Per ADR 197, each migration package's `metadata.toContract` *is* the snapshot; there's no separate snapshot field.
 
 ## 2. Marker schema migration (T1.1)
 

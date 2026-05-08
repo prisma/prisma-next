@@ -1,4 +1,8 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import type {
+  AuthoredMigrationPackage,
+  MigrationMetadata,
+} from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
 import { canonicalizeJson } from './canonicalize-json';
@@ -14,7 +18,6 @@ import {
 } from './errors';
 import { verifyMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
-import type { MigrationMetadata } from './metadata';
 import { MigrationOpsSchema } from './op-schema';
 import type { MigrationOps, MigrationPackage } from './package';
 
@@ -76,23 +79,8 @@ export async function writeMigrationPackage(
 }
 
 /**
- * Shape of an in-memory authored migration package — same as
- * `MigrationPackage` minus `dirPath` (the package has not yet been
- * emitted to disk so there is no path to record). Mirrors the
- * `ExtensionMigrationPackage` type that ships from
- * `@prisma-next/family-sql/control` for `SqlControlExtensionDescriptor`
- * authors. Defined locally to keep `migration-tools` framework-neutral.
- *
- * @see specs/framework-mechanism.spec.md § 1, § 3.
- */
-export interface MigrationPackageContents {
-  readonly dirName: string;
-  readonly metadata: MigrationMetadata;
-  readonly ops: MigrationOps;
-}
-
-/**
- * Materialise an in-memory migration package to a per-space directory.
+ * Materialise an in-memory authored migration package to a per-space
+ * directory.
  *
  * Writes three files under `<targetDir>/<pkg.dirName>/`:
  *
@@ -109,14 +97,14 @@ export interface MigrationPackageContents {
  * The function fails (via `writeMigrationPackage`'s underlying check)
  * if the target directory already exists, mirroring the strictness of
  * the app-space emit path. Callers wanting "create-or-overwrite"
- * semantics handle that at a higher level (e.g. T1.8's pinned-artefact
- * emission, which lives outside the per-package writer).
+ * semantics handle that at a higher level (e.g. the pinned-artefact
+ * emission step, which lives outside the per-package writer).
  *
  * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
  */
-export async function writeExtensionMigrationPackage(
+export async function writeAuthoredMigrationPackage(
   targetDir: string,
-  pkg: MigrationPackageContents,
+  pkg: AuthoredMigrationPackage,
 ): Promise<void> {
   const dir = join(targetDir, pkg.dirName);
   await writeMigrationPackage(dir, pkg.metadata, pkg.ops);

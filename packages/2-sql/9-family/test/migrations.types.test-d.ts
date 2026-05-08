@@ -8,19 +8,19 @@
 
 import type { Contract } from '@prisma-next/contract/types';
 import type {
+  AuthoredContractSpace,
+  AuthoredMigrationPackage,
+  ContractSpaceHeadRef,
+  MigrationMetadata,
   MigrationPlan,
   MigrationPlannerConflict,
   MigrationPlanOperation,
   MigrationRunnerFailure,
   MigrationRunnerSuccessValue,
 } from '@prisma-next/framework-components/control';
-import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import { expectTypeOf } from 'vitest';
 import type {
-  ExtensionContractRef,
-  ExtensionContractSpace,
-  ExtensionMigrationPackage,
   SqlControlExtensionDescriptor,
   SqlMigrationPlan,
   SqlMigrationPlanOperation,
@@ -66,23 +66,29 @@ expectTypeOf<SqlMigrationRunnerFailure['summary']>().toExtend<MigrationRunnerFai
 // only at authoring time (`migrate`) — apply / verify paths read the user's
 // repo. The shape locks down here so downstream emission, planning, and
 // runner code can rely on it.
-expectTypeOf<ExtensionContractRef>().toEqualTypeOf<{
+//
+// The contract-space identity types live in
+// `@prisma-next/framework-components/control` (post M1-cleanup F4); the
+// SQL family specialises `AuthoredContractSpace` to a SQL contract while
+// the framework-level type stays family-agnostic.
+expectTypeOf<ContractSpaceHeadRef>().toEqualTypeOf<{
   readonly hash: string;
   readonly invariants: readonly string[];
 }>();
 
-expectTypeOf<ExtensionMigrationPackage['dirName']>().toEqualTypeOf<string>();
-expectTypeOf<ExtensionMigrationPackage['metadata']>().toEqualTypeOf<MigrationMetadata>();
-expectTypeOf<ExtensionMigrationPackage['ops']>().toEqualTypeOf<MigrationOps>();
+expectTypeOf<AuthoredMigrationPackage['dirName']>().toEqualTypeOf<string>();
+expectTypeOf<AuthoredMigrationPackage['metadata']>().toEqualTypeOf<MigrationMetadata>();
+expectTypeOf<AuthoredMigrationPackage['ops']>().toEqualTypeOf<MigrationOps>();
 
-expectTypeOf<ExtensionContractSpace>().toExtend<{
+expectTypeOf<AuthoredContractSpace>().toExtend<{
   readonly contractJson: Contract;
-  readonly migrations: readonly ExtensionMigrationPackage[];
-  readonly headRef: ExtensionContractRef;
+  readonly migrations: readonly AuthoredMigrationPackage[];
+  readonly headRef: ContractSpaceHeadRef;
 }>();
 
 // `contractSpace` is optional on the descriptor (additive change — existing
 // extensions without a contract space continue to typecheck unchanged).
+// SQL family specialises the framework type to `Contract<SqlStorage>`.
 expectTypeOf<SqlControlExtensionDescriptor<'postgres'>['contractSpace']>().toEqualTypeOf<
-  ExtensionContractSpace | undefined
+  AuthoredContractSpace<Contract<import('@prisma-next/sql-contract/types').SqlStorage>> | undefined
 >();
