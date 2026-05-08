@@ -87,6 +87,43 @@ function makeOp(args: {
   };
 }
 
+/**
+ * SQL body the structural `cipherstash:create-*-v1` ops run.
+ *
+ * The vendored EQL bundle (executed by `installEqlBundleOp`) creates
+ * every typed object CipherStash needs (the `eql_v2` schema, the
+ * `eql_v2_configuration` table in `public`, the
+ * `eql_v2_configuration_state` enum, the `eql_v2_encrypted` composite,
+ * the `eql_v2.bloom_filter` / `hmac_256` / `blake3` domains, and the
+ * `ore_*` composites). The structural ops that follow it would
+ * therefore *conflict* with the bundle's CREATEs if they ran any
+ * concrete DDL — Postgres rejects duplicate `CREATE TYPE` /
+ * `CREATE TABLE` against the same name.
+ *
+ * Resolution (M3 R3 — sub-spec § 3 amendment): the structural ops
+ * keep their stable `cipherstash:*` invariantIds (so the marker's
+ * `applied_invariants` matches `cipherstashHeadRef.invariants` and the
+ * verifier's `invariantsMismatch` gate passes) but their `execute[]`
+ * is a no-op `SELECT 1`. The bundle owns the typed-object DDL; the
+ * structural ops own the invariantId ledger entry. Clean separation:
+ *
+ *   - Adding a new typed object = add to `installEqlBundleOp`'s SQL
+ *     (via a vendored-bundle bump) **and** mint a new
+ *     `cipherstash:create-<name>-v1` structural op here, with this
+ *     same no-op body.
+ *   - Removing a typed object = remove from the bundle bump, and
+ *     deprecate the structural op (its invariantId is immutable per
+ *     project spec FR11; deprecation is a future-rounds concern).
+ *
+ * Future extension (deferred to IR vocabulary expansion — see
+ * `./contract.ts`'s `cipherstashFutureIR` block): once the IR models
+ * enums / composite types / domains as first-class storage objects,
+ * the structural ops will gain real verification work and `precheck`
+ * SQL that probes `pg_type` / `information_schema` for the typed
+ * object's existence. Today they are pure ledger-only entries.
+ */
+const STRUCTURAL_OP_NOOP_SQL = 'SELECT 1';
+
 const installEqlBundleOp = makeOp({
   id: 'cipherstash.install-eql-bundle',
   label: 'Install EQL bundle (functions, operators, casts, op classes, schema, types)',
@@ -97,64 +134,55 @@ const installEqlBundleOp = makeOp({
 
 const createConfigurationStateEnumOp = makeOp({
   id: `cipherstash.create-${EQL_V2_CONFIGURATION_STATE_TYPE}`,
-  label: `Create enum ${EQL_V2_CONFIGURATION_STATE_TYPE}`,
+  label: `Register invariant for enum ${EQL_V2_CONFIGURATION_STATE_TYPE} (created by EQL bundle)`,
   invariantId: CIPHERSTASH_INVARIANTS.createConfigurationState,
   target: { schema: 'public', objectType: 'enum', name: EQL_V2_CONFIGURATION_STATE_TYPE },
-  executeSql: `CREATE TYPE "${EQL_V2_CONFIGURATION_STATE_TYPE}" AS ENUM ('pending', 'active')`,
+  executeSql: STRUCTURAL_OP_NOOP_SQL,
 });
 
 const createConfigurationTableOp = makeOp({
   id: `cipherstash.create-${EQL_V2_CONFIGURATION_TABLE}`,
-  label: `Create table ${EQL_V2_CONFIGURATION_TABLE}`,
+  label: `Register invariant for table ${EQL_V2_CONFIGURATION_TABLE} (created by EQL bundle)`,
   invariantId: CIPHERSTASH_INVARIANTS.createConfiguration,
   target: { schema: 'public', objectType: 'table', name: EQL_V2_CONFIGURATION_TABLE },
-  executeSql: `CREATE TABLE "${EQL_V2_CONFIGURATION_TABLE}" (
-  "id" text PRIMARY KEY,
-  "state" "${EQL_V2_CONFIGURATION_STATE_TYPE}" NOT NULL,
-  "data" jsonb NOT NULL
-)`,
+  executeSql: STRUCTURAL_OP_NOOP_SQL,
 });
 
 const createEncryptedCompositeOp = makeOp({
   id: `cipherstash.create-${EQL_V2_ENCRYPTED_TYPE}`,
-  label: `Create composite type ${EQL_V2_ENCRYPTED_TYPE}`,
+  label: `Register invariant for composite type ${EQL_V2_ENCRYPTED_TYPE} (created by EQL bundle)`,
   invariantId: CIPHERSTASH_INVARIANTS.createEncrypted,
   target: { schema: 'public', objectType: 'type', name: EQL_V2_ENCRYPTED_TYPE },
-  executeSql: `CREATE TYPE "${EQL_V2_ENCRYPTED_TYPE}" AS (data jsonb)`,
+  executeSql: STRUCTURAL_OP_NOOP_SQL,
 });
 
 const createDomainOps = EQL_V2_DOMAIN_TYPES.map((name) =>
   makeOp({
     id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
-    label: `Create domain ${EQL_V2_SCHEMA}.${name}`,
+    label: `Register invariant for domain ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
     invariantId: CIPHERSTASH_INVARIANTS.createDomain(name),
     target: { schema: EQL_V2_SCHEMA, objectType: 'domain', name },
-    executeSql: `CREATE DOMAIN "${EQL_V2_SCHEMA}"."${name}" AS bytea`,
+    executeSql: STRUCTURAL_OP_NOOP_SQL,
   }),
 );
 
 const createOreCompositeOps = EQL_V2_ORE_COMPOSITE_TYPES.map((name) =>
   makeOp({
     id: `cipherstash.create-${EQL_V2_SCHEMA}-${name}`,
-    label: `Create composite type ${EQL_V2_SCHEMA}.${name}`,
+    label: `Register invariant for composite type ${EQL_V2_SCHEMA}.${name} (created by EQL bundle)`,
     invariantId: CIPHERSTASH_INVARIANTS.createOreComposite(name),
     target: { schema: EQL_V2_SCHEMA, objectType: 'type', name },
-    executeSql: `CREATE TYPE "${EQL_V2_SCHEMA}"."${name}" AS (payload bytea)`,
+    executeSql: STRUCTURAL_OP_NOOP_SQL,
   }),
 );
 
 /**
- * Ordered op list. The `installEqlBundle` op runs first because the
- * vendored bundle creates the `eql_v2` schema, the bundle's own
- * functions/operators/casts/op classes, and (in production) most of the
- * composite/enum/domain types. The structural ops that follow are
- * idempotent-shaped (they would conflict with the bundle's CREATEs if
- * both fired against the same database) and exist to keep the manifest
- * faithful to the M3 sub-spec § 3 op list — and to give the runner an
- * explicit invariantId-keyed record of every typed object CipherStash
- * is responsible for. R2's e2e test will exercise the actual ordering
- * against a live database; R1 keeps the structural shape correct for
- * the descriptor-self-consistency and emit-cleanly checks.
+ * Ordered op list. `installEqlBundleOp` runs first and creates every
+ * typed object CipherStash needs. The structural `create-*` ops that
+ * follow are no-ops at the database level (`SELECT 1`) and exist
+ * purely to register their `cipherstash:*` invariantIds against the
+ * marker — see the {@link STRUCTURAL_OP_NOOP_SQL} block above for the
+ * conflict-resolution rationale.
  *
  * The framework's `ExtensionMigrationPackage.ops` type is
  * `readonly MigrationPlanOperation[]` — wider than the SQL-family
