@@ -1,3 +1,4 @@
+import type { CodecDescriptor } from '@prisma-next/framework-components/codec';
 import { describe, expect, it } from 'vitest';
 import {
   AndExpr,
@@ -9,9 +10,23 @@ import {
   TableSource,
 } from '../../src/ast/types';
 import { validateParamRefRefs } from '../../src/ast/validate-param-refs';
+import type { CodecDescriptorRegistry } from '../../src/query-lane-context';
 
-const isParameterized = (codecId: string): boolean =>
-  codecId === 'sql/varchar@1' || codecId === 'pgvector/vector@1';
+const PARAMETERIZED_IDS = new Set(['sql/varchar@1', 'pgvector/vector@1']);
+
+const stubDescriptor = (codecId: string): CodecDescriptor<unknown> =>
+  ({
+    codecId,
+    isParameterized: PARAMETERIZED_IDS.has(codecId),
+  }) as unknown as CodecDescriptor<unknown>;
+
+const registry: CodecDescriptorRegistry = {
+  descriptorFor: (codecId) => stubDescriptor(codecId),
+  *values() {
+    for (const id of PARAMETERIZED_IDS) yield stubDescriptor(id);
+  },
+  byTargetType: () => Object.freeze([]),
+};
 
 function selectWithWhere(...where: Parameters<typeof AndExpr.of>[0]): SelectAst {
   return SelectAst.from(TableSource.named('user'))
@@ -28,30 +43,30 @@ describe('validateParamRefRefs', () => {
     });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
 
-    expect(() => validateParamRefRefs(ast, isParameterized)).not.toThrow();
+    expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
   it('passes when codecId is a non-parameterized id and refs are absent', () => {
     const ref = ParamRef.of(42, { name: 'p1', codecId: 'sql/int@1' });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'age'), ref));
 
-    expect(() => validateParamRefRefs(ast, isParameterized)).not.toThrow();
+    expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
   it('passes when codecId is undefined (untyped ParamRef)', () => {
     const ref = ParamRef.of('whatever');
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'name'), ref));
 
-    expect(() => validateParamRefRefs(ast, isParameterized)).not.toThrow();
+    expect(() => validateParamRefRefs(ast, registry)).not.toThrow();
   });
 
   it('throws RUNTIME.PARAM_REF_REFS_REQUIRED when a parameterized-codec ParamRef lacks refs', () => {
     const ref = ParamRef.of('hello', { name: 'p1', codecId: 'sql/varchar@1' });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('user', 'email'), ref));
 
-    expect(() => validateParamRefRefs(ast, isParameterized)).toThrowError(/sql\/varchar@1/);
+    expect(() => validateParamRefRefs(ast, registry)).toThrowError(/sql\/varchar@1/);
     try {
-      validateParamRefRefs(ast, isParameterized);
+      validateParamRefRefs(ast, registry);
     } catch (err) {
       const error = err as {
         code: string;
@@ -70,6 +85,6 @@ describe('validateParamRefRefs', () => {
     const ref = ParamRef.of([1, 2], { codecId: 'pgvector/vector@1' });
     const ast = selectWithWhere(BinaryExpr.eq(ColumnRef.of('post', 'embedding'), ref));
 
-    expect(() => validateParamRefRefs(ast, isParameterized)).toThrowError(/<anonymous>/);
+    expect(() => validateParamRefRefs(ast, registry)).toThrowError(/<anonymous>/);
   });
 });

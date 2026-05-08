@@ -109,6 +109,7 @@ function descriptorFor<Id extends string>(
     traits: metadata.traits,
     targetTypes: metadata.targetTypes,
     paramsSchema: voidParamsSchema as CodecDescriptor['paramsSchema'],
+    isParameterized: false,
     factory: (() => () => codec) as CodecDescriptor['factory'],
     ...(renderOutputType !== undefined ? { renderOutputType } : {}),
   };

@@ -61,6 +61,7 @@ function createVectorExtensionDescriptor(): SqlRuntimeExtensionDescriptor<'postg
         validate: (value) => ({ value: value as { length: number } }),
       },
     },
+    isParameterized: true,
     factory,
   };
 
@@ -96,6 +97,7 @@ function createNonParameterizedExtensionDescriptor(): SqlRuntimeExtensionDescrip
     traits: [],
     targetTypes: ['scalar'],
     paramsSchema: voidParamsSchema,
+    isParameterized: false,
     factory: () => () => scalarCodec,
   };
 

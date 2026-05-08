@@ -23,7 +23,12 @@
 
 import type { StandardSchemaV1 } from '@standard-schema/spec';
 import type { Codec } from './codec';
-import type { CodecInstanceContext, CodecMeta, CodecTrait } from './codec-types';
+import {
+  type CodecInstanceContext,
+  type CodecMeta,
+  type CodecTrait,
+  voidParamsSchema,
+} from './codec-types';
 
 /**
  * Unified codec descriptor. Every codec in the framework registers through
@@ -67,6 +72,14 @@ export interface CodecDescriptor<P = void> {
    * call boundary.
    */
   readonly paramsSchema: StandardSchemaV1<P>;
+  /**
+   * Whether this descriptor is parameterized — i.e. its `paramsSchema`
+   * is something other than the singleton `voidParamsSchema`. Consumers
+   * that need to gate column-aware dispatch (e.g. the
+   * `validateParamRefRefs` AST-builder pass) read this directly rather
+   * than threading a free-floating `(codecId) => boolean` callback.
+   */
+  readonly isParameterized: boolean;
   /**
    * Emit-path string renderer for `contract.d.ts`. Returns the TypeScript
    * output type expression for given params (e.g. `Vector<1536>`).
@@ -117,6 +130,17 @@ export abstract class CodecDescriptorImpl<TParams = void> implements CodecDescri
   readonly meta?: CodecMeta;
 
   abstract readonly paramsSchema: StandardSchemaV1<TParams>;
+
+  /**
+   * Boolean derived from `paramsSchema`: `true` whenever the schema is
+   * not the singleton `voidParamsSchema`. The framework registry's
+   * `validateParamRefRefs` pass reads this through
+   * `descriptorFor(codecId).isParameterized` to gate column-ref
+   * enforcement.
+   */
+  get isParameterized(): boolean {
+    return this.paramsSchema !== voidParamsSchema;
+  }
 
   /**
    * Optional emit-path string renderer for `contract.d.ts`. Returns the

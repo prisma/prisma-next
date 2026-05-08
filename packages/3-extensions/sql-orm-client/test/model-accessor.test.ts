@@ -79,6 +79,7 @@ describe('createModelAccessor', () => {
               validate: (_value: unknown) => ({ value: undefined }),
             },
           },
+          isParameterized: false,
           // The trait-gating tests don't materialize codecs; the
           // factory is shape-only and never invoked.
           factory: () => () => {

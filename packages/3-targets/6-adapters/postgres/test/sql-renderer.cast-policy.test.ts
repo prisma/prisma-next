@@ -210,6 +210,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
       targetTypes: ['geography'],
       meta: { db: { sql: { postgres: { nativeType: 'geography' } } } },
       paramsSchema: voidParamsSchema,
+      isParameterized: false,
       factory: () => () => geographyCodec,
     } as const;
 

@@ -134,6 +134,7 @@ describe('parameterized types', () => {
           traits: [],
           targetTypes: ['vector'],
           paramsSchema: options?.paramsSchema ?? vectorParamsSchema,
+          isParameterized: true,
           factory: (_params) => (_ctx) => sharedCodec,
         },
       ];
@@ -260,6 +261,7 @@ describe('parameterized types', () => {
           traits: [],
           targetTypes: ['vector'],
           paramsSchema,
+          isParameterized: true,
           factory,
         },
       ];
@@ -393,6 +395,7 @@ describe('parameterized types', () => {
           traits: [],
           targetTypes: ['vector'],
           paramsSchema: arktype({ length: 'number' }),
+          isParameterized: true,
           factory: (_params) => () => sharedCodec,
         },
       ];
@@ -481,6 +484,7 @@ describe('parameterized types', () => {
               traits: [],
               targetTypes: ['vector'],
               paramsSchema: vectorParamsSchema,
+              isParameterized: true,
               factory: (_params) => () => sharedCodec,
             },
           ];

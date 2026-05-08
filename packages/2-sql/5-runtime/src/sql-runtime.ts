@@ -1,5 +1,4 @@
 import type { Contract } from '@prisma-next/contract/types';
-import { voidParamsSchema } from '@prisma-next/framework-components/codec';
 import type {
   ExecutionStackInstance,
   RuntimeDriverInstance,
@@ -210,18 +209,13 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
     plan: SqlQueryPlan,
     ctx: SqlCodecCallContext,
   ): Promise<SqlExecutionPlan> {
-    validateParamRefRefs(plan.ast, this.isParameterizedCodecId);
+    validateParamRefRefs(plan.ast, this.codecDescriptors);
     const lowered = lowerSqlPlan(this.adapter, this.contract, plan);
     return Object.freeze({
       ...lowered,
       params: await encodeParams(lowered, this.codecRegistry, ctx, this.contractCodecs),
     });
   }
-
-  private readonly isParameterizedCodecId = (codecId: string): boolean => {
-    const descriptor = this.codecDescriptors.descriptorFor(codecId);
-    return descriptor !== undefined && descriptor.paramsSchema !== voidParamsSchema;
-  };
 
   /**
    * Default driver invocation. Production execution paths override the
@@ -286,7 +280,7 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
       let exec: SqlExecutionPlan;
       if (isExecutionPlan(plan)) {
         if (plan.ast) {
-          validateParamRefRefs(plan.ast, self.isParameterizedCodecId);
+          validateParamRefRefs(plan.ast, self.codecDescriptors);
         }
         exec = Object.freeze({
           ...plan,

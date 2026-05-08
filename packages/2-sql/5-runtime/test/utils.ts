@@ -177,6 +177,7 @@ export function descriptorsFromCodecRegistry(
       traits: legacy.traits ?? [],
       targetTypes: legacy.targetTypes ?? [],
       paramsSchema: voidParamsSchema,
+      isParameterized: false,
       factory: () => () => instance,
       ...(legacy.meta !== undefined ? { meta: legacy.meta } : {}),
     });

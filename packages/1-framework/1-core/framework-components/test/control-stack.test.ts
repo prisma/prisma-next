@@ -272,6 +272,7 @@ describe('extractCodecLookup', () => {
         validate: () => ({ value: undefined }),
       },
     } as unknown as import('@standard-schema/spec').StandardSchemaV1<void>,
+    isParameterized: false,
     factory: () => () => stubCodec(id),
   });
 

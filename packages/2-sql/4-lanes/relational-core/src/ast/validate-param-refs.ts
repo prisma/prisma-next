@@ -18,16 +18,9 @@
  */
 
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { CodecDescriptorRegistry } from '../query-lane-context';
 import type { AnyQueryAst, ParamRef } from './types';
 import { collectOrderedParamRefs } from './util';
-
-/**
- * Lookup function returning `true` when the given `codecId` is bound to a
- * parameterized descriptor (i.e. its `paramsSchema` is not the singleton
- * `voidParamsSchema`). The runtime supplies this from the unified codec
- * descriptor registry built at `ExecutionContext` construction.
- */
-export type IsParameterizedCodecId = (codecId: string) => boolean;
 
 /**
  * Validate that every parameterized-codec `ParamRef` in `plan` carries
@@ -35,19 +28,22 @@ export type IsParameterizedCodecId = (codecId: string) => boolean;
  * naming the codec id and the binding label when the invariant is
  * violated. Returns the plan unchanged on success — callers that prefer
  * a side-effecting assertion can ignore the return value.
+ *
+ * The `registry` is consulted via `descriptorFor(codecId).isParameterized`
+ * — `true` whenever the descriptor's `paramsSchema` is not the singleton
+ * `voidParamsSchema`.
  */
-export function validateParamRefRefs(
-  plan: AnyQueryAst,
-  isParameterized: IsParameterizedCodecId,
-): void {
+export function validateParamRefRefs(plan: AnyQueryAst, registry: CodecDescriptorRegistry): void {
   for (const ref of collectOrderedParamRefs(plan)) {
-    diagnoseRef(ref, isParameterized);
+    diagnoseRef(ref, registry);
   }
 }
 
-function diagnoseRef(ref: ParamRef, isParameterized: IsParameterizedCodecId): void {
+function diagnoseRef(ref: ParamRef, registry: CodecDescriptorRegistry): void {
   if (!ref.codecId) return;
-  if (!isParameterized(ref.codecId)) return;
+  const descriptor = registry.descriptorFor(ref.codecId);
+  if (descriptor === undefined) return;
+  if (!descriptor.isParameterized) return;
   if (ref.refs) return;
 
   const label = ref.name ?? '<anonymous>';
