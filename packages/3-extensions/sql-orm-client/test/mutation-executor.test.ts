@@ -555,6 +555,39 @@ describe('mutation-executor', () => {
     expect(updated).toBeNull();
   });
 
+  it('executeNestedUpdateMutation() rejects nested update on id-less tables without unique constraints', async () => {
+    const contract = getTestContract();
+    const idlessNoUnique = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          users: {
+            ...contract.storage.tables.users,
+            primaryKey: undefined,
+            uniques: [],
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    const runtime = createMockRuntime();
+    runtime.setNextResults([[{ id: 1, name: 'Alice', email: 'alice@example.com' }]]);
+
+    await expect(
+      executeNestedUpdateMutation({
+        context: { ...getTestContext(), contract: idlessNoUnique },
+        runtime,
+        modelName: 'User',
+        filters: [userIdFilter],
+        data: { name: 'Alice Updated' } as never,
+      }),
+    ).rejects.toThrow(
+      /requires table "users" to declare a primary key or at least one unique constraint/,
+    );
+  });
+
   it('executeNestedUpdateMutation() applies parent-owned disconnect updates', async () => {
     const contract = getTestContract();
     const runtime = createMockRuntime();

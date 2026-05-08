@@ -268,6 +268,22 @@ async function updateFirstGraph(
   const mappedUpdateData = mapModelDataToStorageRow(contract, modelName, scalarData);
   if (Object.keys(mappedUpdateData).length > 0) {
     const tableName = resolveModelTableName(contract, modelName);
+    // Single-row update needs a stable identity column. The PK fast path provides
+    // it; an id-less table needs at least one unique constraint so the criterion
+    // built from the RETURNING row is forced single-row by SQL semantics.
+    // Without either, the criterion's full-tuple AND match can broaden the
+    // UPDATE to every duplicate-tuple row, silently violating the single-row API.
+    const table = contract.storage.tables[tableName];
+    const hasPrimaryKey = (table?.primaryKey?.columns?.length ?? 0) > 0;
+    const hasUnique = (table?.uniques?.length ?? 0) > 0;
+    if (!hasPrimaryKey && !hasUnique) {
+      throw new Error(
+        `update() of model "${modelName}" requires table "${tableName}" to declare ` +
+          'a primary key or at least one unique constraint when nested mutations are ' +
+          'used. Without one, the row-identity criterion cannot guarantee single-row ' +
+          'updates and may broaden to all rows matching the row tuple.',
+      );
+    }
     const appliedUpdateDefaults = context.applyMutationDefaults({
       op: 'update',
       table: tableName,
