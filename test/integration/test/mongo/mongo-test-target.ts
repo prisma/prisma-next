@@ -16,6 +16,7 @@ import {
   MongoMigrationRunner,
   serializeMongoOps,
 } from '@prisma-next/target-mongo/control';
+import { verifyMongoSchema } from '@prisma-next/target-mongo/schema-verify';
 import type { TestTargetAdapter } from '@prisma-next/test-utils/migration-harness';
 
 const ALL_POLICY: MigrationOperationPolicy = {
@@ -109,16 +110,13 @@ export function createMongoTestTarget(
       return introspectSchema(driver.db);
     },
 
-    verify(_input) {
-      // The mongo verify wiring (verifyMongoSchema) lives in
-      // @prisma-next/target-mongo/schema-verify; importing it here would pull
-      // a runtime dep into this spike file. Returning a synthetic OK result is
-      // enough to prove the type signature flows; wire the real call when
-      // promoting the adapter out of spike status.
-      return {
-        ok: true,
-        schema: { issues: [] },
-      };
+    verify({ contract, schema, strict = false }) {
+      return verifyMongoSchema({
+        contract,
+        schema,
+        strict,
+        frameworkComponents: [],
+      });
     },
 
     filterUserSchema(schema) {

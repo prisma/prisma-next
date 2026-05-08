@@ -31,6 +31,10 @@
       "types": "./dist/exports/column-descriptors.d.mts",
       "import": "./dist/exports/column-descriptors.mjs"
     },
+    "./migration-fanout": {
+      "types": "./dist/exports/migration-fanout.d.mts",
+      "import": "./dist/exports/migration-fanout.mjs"
+    },
     "./migration-harness": {
       "types": "./dist/exports/migration-harness.d.mts",
       "import": "./dist/exports/migration-harness.mjs"
