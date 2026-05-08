@@ -318,6 +318,13 @@ export function createSqlFamilyInstance<TTargetId extends string>(
         extensionId: extension.id,
         target: contractJson.target,
         targetFamily: contractJson.targetFamily,
+        // `SqlStorage` is structurally a record of named storage entries
+        // (tables, types, etc.) but TS cannot narrow the family-bound
+        // type to the framework helper's `Record<string, unknown>` shape
+        // without a cast. The helper canonicalises through `JSON.stringify`
+        // and only needs the structural-record shape — the cast scopes
+        // the loss-of-precision to this single argument rather than
+        // widening the descriptor type at the call site.
         storage: contractJson.storage as unknown as Record<string, unknown>,
         headRefHash: headRef.hash,
       });

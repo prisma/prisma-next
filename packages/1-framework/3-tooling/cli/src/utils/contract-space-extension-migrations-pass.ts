@@ -62,9 +62,9 @@ export interface ContractSpaceExtensionMigrationsPassResult {
  *
  * Idempotent: an existing `migrations/<spaceId>/<dirName>/` is left
  * untouched and reported in `result.skipped` — the helper never
- * overwrites authored migration content. This is what AC-7 ("re-running
- * `migrate` does not corrupt or churn extension migration packages")
- * locks in.
+ * overwrites authored migration content. This is what AM12
+ * (sub-spec § 4 — Acceptance Criteria, "re-running `migrate` does not
+ * corrupt or churn extension migration packages") locks in.
  *
  * Pinned per-space artefacts (`contract.json`, `contract.d.ts`,
  * `refs/head.json`) are emitted by
