@@ -1,6 +1,6 @@
 import type { CodecLookup } from '@prisma-next/framework-components/codec';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
-import { codecDescriptorClassList } from '@prisma-next/target-postgres/codecs';
+import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 
 /**
  * Build a {@link CodecLookup} populated with the Postgres-builtin codec
@@ -20,7 +20,7 @@ export function createPostgresBuiltinCodecLookup(): CodecLookup {
   return extractCodecLookup([
     {
       id: 'postgres-builtin-codecs',
-      types: { codecTypes: { codecDescriptors: codecDescriptorClassList } },
+      types: { codecTypes: { codecDescriptors: Array.from(postgresCodecRegistry.values()) } },
     },
   ]);
 }

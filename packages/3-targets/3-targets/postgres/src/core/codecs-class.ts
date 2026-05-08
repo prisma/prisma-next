@@ -1130,16 +1130,15 @@ export const pgFloatColumn = () =>
 pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor map (TML-2357). Keyed by scalar name
-// so {@link CodecTypes} resolves through `ExtractCodecTypes`,
-// preserving the input/output/traits shape downstream consumers
-// (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths
-// rely on. The list view (`codecDescriptorClassList`) iterates these in the
-// emit-stable order via `Object.values` — the runtime contributor pack
-// (`pack.ts` / `runtime.ts`) consumes the list shape.
+// Internal descriptor list. The list view iterates descriptors in
+// emit-stable order; the package's public consumer surface
+// (`postgresCodecRegistry`, exposed via `core/registry.ts`) wraps this
+// list in a `CodecDescriptorRegistry`. The codec-id-keyed
+// `codecDescriptorMap` in `exports/codec-types.ts` is the type-level
+// counterpart used by `ExtractCodecTypes` to derive `CodecTypes`.
 // ---------------------------------------------------------------------------
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
+export const codecDescriptors: readonly AnyCodecDescriptor[] = [
   sqlCharDescriptor,
   sqlVarcharDescriptor,
   sqlIntDescriptor,

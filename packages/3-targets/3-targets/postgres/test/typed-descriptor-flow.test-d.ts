@@ -3,7 +3,7 @@
  * layer (TML-2357).
  *
  * Coverage:
- *   - the public descriptor list (`codecDescriptorClassList`) narrows to
+ *   - the internal descriptor list (`codecDescriptors`) narrows to
  *     `readonly AnyCodecDescriptor[]`, so heterogeneous descriptor
  *     storage works without per-codec branching;
  *   - trait literals survive on each descriptor class — the M0 R5
@@ -21,7 +21,7 @@
 import type { AnyCodecDescriptor, CodecTrait } from '@prisma-next/framework-components/codec';
 import { expectTypeOf, test } from 'vitest';
 import {
-  codecDescriptorClassList,
+  codecDescriptors,
   type PgInt4Descriptor,
   type PgNumericDescriptor,
   pgInt4Descriptor,
@@ -33,12 +33,12 @@ import type { CodecTypes } from '../src/exports/codec-types';
 // Heterogeneous descriptor storage narrows to AnyCodecDescriptor.
 // ---------------------------------------------------------------------------
 
-test('codecDescriptorClassList narrows to readonly AnyCodecDescriptor[]', () => {
-  expectTypeOf(codecDescriptorClassList).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
+test('codecDescriptors narrows to readonly AnyCodecDescriptor[]', () => {
+  expectTypeOf(codecDescriptors).toEqualTypeOf<readonly AnyCodecDescriptor[]>();
 });
 
 test('list entries extend AnyCodecDescriptor', () => {
-  expectTypeOf<(typeof codecDescriptorClassList)[number]>().toExtend<AnyCodecDescriptor>();
+  expectTypeOf<(typeof codecDescriptors)[number]>().toExtend<AnyCodecDescriptor>();
 });
 
 // ---------------------------------------------------------------------------

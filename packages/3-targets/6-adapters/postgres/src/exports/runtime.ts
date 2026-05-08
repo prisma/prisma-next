@@ -6,7 +6,7 @@ import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
 import type { Adapter, AnyQueryAst } from '@prisma-next/sql-relational-core/ast';
 import type { SqlRuntimeAdapterDescriptor } from '@prisma-next/sql-runtime';
-import { codecDescriptorClassList } from '@prisma-next/target-postgres/codecs';
+import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { createPostgresAdapter } from '../core/adapter';
 import { postgresAdapterDescriptorMeta, postgresQueryOperations } from '../core/descriptor-meta';
 import type { PostgresContract, PostgresLoweredStatement } from '../core/types';
@@ -32,7 +32,7 @@ function createPostgresMutationDefaultGenerators() {
 const postgresRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<'postgres', SqlRuntimeAdapter> =
   {
     ...postgresAdapterDescriptorMeta,
-    codecs: () => codecDescriptorClassList,
+    codecs: () => Array.from(postgresCodecRegistry.values()),
     queryOperations: () => postgresQueryOperations(),
     mutationDefaultGenerators: createPostgresMutationDefaultGenerators,
     create(stack): SqlRuntimeAdapter {
