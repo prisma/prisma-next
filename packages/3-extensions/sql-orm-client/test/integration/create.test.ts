@@ -21,25 +21,37 @@ function expectInsertBatchAst(
 ): asserts ast is InsertAst {
   expect(ast).toBeInstanceOf(InsertAst);
 
+  const usersRefs = (column: string) => ({ table: 'users', column });
   expect((ast as InsertAst).rows).toEqual([
     {
-      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1' }),
-      name: ParamRef.of(rows[0]!.name, { name: 'name', codecId: 'pg/text@1' }),
+      id: ParamRef.of(rows[0]!.id, { name: 'id', codecId: 'pg/int4@1', refs: usersRefs('id') }),
+      name: ParamRef.of(rows[0]!.name, {
+        name: 'name',
+        codecId: 'pg/text@1',
+        refs: usersRefs('name'),
+      }),
       email: ParamRef.of(rows[0]!.email, {
         name: 'email',
         codecId: 'pg/text@1',
+        refs: usersRefs('email'),
       }),
       invited_by_id: ParamRef.of(rows[0]!.invitedById ?? null, {
         name: 'invited_by_id',
         codecId: 'pg/int4@1',
+        refs: usersRefs('invited_by_id'),
       }),
     },
     {
-      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1' }),
-      name: ParamRef.of(rows[1]!.name, { name: 'name', codecId: 'pg/text@1' }),
+      id: ParamRef.of(rows[1]!.id, { name: 'id', codecId: 'pg/int4@1', refs: usersRefs('id') }),
+      name: ParamRef.of(rows[1]!.name, {
+        name: 'name',
+        codecId: 'pg/text@1',
+        refs: usersRefs('name'),
+      }),
       email: ParamRef.of(rows[1]!.email, {
         name: 'email',
         codecId: 'pg/text@1',
+        refs: usersRefs('email'),
       }),
       invited_by_id:
         rows[1]!.invitedById === undefined
@@ -47,6 +59,7 @@ function expectInsertBatchAst(
           : ParamRef.of(rows[1]!.invitedById, {
               name: 'invited_by_id',
               codecId: 'pg/int4@1',
+              refs: usersRefs('invited_by_id'),
             }),
     },
   ]);

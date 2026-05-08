@@ -24,7 +24,7 @@ describe('filters', () => {
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
     const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+    return codecId ? ParamRef.of(value, { codecId, refs: { table, column } }) : ParamRef.of(value);
   }
 
   it('and(), or(), not(), and all() use rich where objects', () => {

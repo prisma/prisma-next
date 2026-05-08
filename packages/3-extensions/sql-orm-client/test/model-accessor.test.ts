@@ -31,7 +31,7 @@ describe('createModelAccessor', () => {
       { columns: Record<string, { codecId?: string }> } | undefined
     >;
     const codecId = tables[table]?.columns[column]?.codecId;
-    return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+    return codecId ? ParamRef.of(value, { codecId, refs: { table, column } }) : ParamRef.of(value);
   }
 
   function expectBinaryParam(
@@ -598,7 +598,12 @@ describe('createModelAccessor', () => {
       const opExpr = binary.left as unknown as OperationExpr;
       expect(opExpr.method).toBe('cosineDistance');
       expect(opExpr.self).toEqual(ColumnRef.of('posts', 'embedding'));
-      expect(opExpr.args[0]).toEqual(ParamRef.of([1, 2, 3], { codecId: 'pg/vector@1' }));
+      expect(opExpr.args[0]).toEqual(
+        ParamRef.of([1, 2, 3], {
+          codecId: 'pg/vector@1',
+          refs: { table: 'posts', column: 'embedding' },
+        }),
+      );
     });
 
     it('cosineDistance().asc() produces OrderByItem', () => {

@@ -41,11 +41,19 @@ function buildParamValues(
   const params: Record<string, ParamRef> = {};
   for (const [col, value] of Object.entries(values)) {
     const column = table.columns[col];
-    params[col] = ParamRef.of(value, column ? { codecId: column.codecId } : undefined);
+    params[col] = ParamRef.of(
+      value,
+      column ? { codecId: column.codecId, refs: { table: tableName, column: col } } : undefined,
+    );
   }
   for (const def of ctx.applyMutationDefaults({ op, table: tableName, values })) {
     const column = table.columns[def.column];
-    params[def.column] = ParamRef.of(def.value, column ? { codecId: column.codecId } : undefined);
+    params[def.column] = ParamRef.of(
+      def.value,
+      column
+        ? { codecId: column.codecId, refs: { table: tableName, column: def.column } }
+        : undefined,
+    );
   }
   return params;
 }

@@ -12,7 +12,7 @@ import {
   OrExpr,
   SubqueryExpr,
 } from '@prisma-next/sql-relational-core/ast';
-import { toExpr } from '@prisma-next/sql-relational-core/expression';
+import { refsOf, toExpr } from '@prisma-next/sql-relational-core/expression';
 import type {
   AggregateFunctions,
   AggregateOnlyFunctions,
@@ -37,6 +37,48 @@ type ExprOrVal<CodecId extends string = string, N extends boolean = boolean> = C
 const BOOL_FIELD: BooleanCodecType = { codecId: 'pg/bool@1', nullable: false };
 
 const resolve = toExpr;
+
+/**
+ * Resolve a binary-comparison operand into an AST expression, threading
+ * the column-bound side's `codecId` + `refs` to the raw-value side.
+ *
+ * For `fns.eq(f.email, 'alice@example.com')`, `f.email` is the column-
+ * bound expression carrying a `ColumnRef` AST and a `returnType.codecId`
+ * (`pg/varchar@1`); the raw string operand has no codec context. By
+ * deriving the codec context from the column-bound side and forwarding
+ * it via `toExpr(value, codecId, refs)`, the resulting `ParamRef` carries
+ * the column refs that encode-side `forColumn` dispatch needs (and that
+ * the validator pass requires for parameterized codec ids like
+ * `pg/varchar@1` with a length parameter).
+ */
+function resolveOperand(
+  operand: ExprOrVal,
+  otherCodecId?: string,
+  otherRefs?: { table: string; column: string },
+): AstExpression {
+  if (isExpressionLike(operand)) return operand.buildAst();
+  return toExpr(operand, otherCodecId, otherRefs);
+}
+
+function isExpressionLike(
+  value: unknown,
+): value is { buildAst: () => AstExpression; returnType?: { codecId: string } } {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'buildAst' in value &&
+    typeof (value as { buildAst: unknown }).buildAst === 'function'
+  );
+}
+
+function operandCodecId(operand: ExprOrVal): string | undefined {
+  if (!isExpressionLike(operand)) return undefined;
+  return (operand as { returnType?: { codecId: string } }).returnType?.codecId;
+}
+
+function operandRefs(operand: ExprOrVal): { table: string; column: string } | undefined {
+  return refsOf(operand);
+}
 
 /**
  * Resolves an Expression via `buildAst()`, or wraps a raw value as a
@@ -66,20 +108,34 @@ function boolExpr(astNode: AstExpression): ExpressionImpl<BooleanCodecType> {
   return new ExpressionImpl(astNode, BOOL_FIELD);
 }
 
+function binaryWithSharedCodec(
+  a: ExprOrVal,
+  b: ExprOrVal,
+  build: (left: AstExpression, right: AstExpression) => AstExpression,
+): AstExpression {
+  const aCodecId = operandCodecId(a);
+  const bCodecId = operandCodecId(b);
+  const aRefs = operandRefs(a);
+  const bRefs = operandRefs(b);
+  const left = resolveOperand(a, bCodecId, bRefs);
+  const right = resolveOperand(b, aCodecId, aRefs);
+  return build(left, right);
+}
+
 function eq(a: ExprOrVal, b: ExprOrVal): ExpressionImpl<BooleanCodecType> {
   if (b === null) return boolExpr(NullCheckExpr.isNull(resolve(a)));
   if (a === null) return boolExpr(NullCheckExpr.isNull(resolve(b)));
-  return boolExpr(new BinaryExpr('eq', resolve(a), resolve(b)));
+  return boolExpr(binaryWithSharedCodec(a, b, (l, r) => new BinaryExpr('eq', l, r)));
 }
 
 function ne(a: ExprOrVal, b: ExprOrVal): ExpressionImpl<BooleanCodecType> {
   if (b === null) return boolExpr(NullCheckExpr.isNotNull(resolve(a)));
   if (a === null) return boolExpr(NullCheckExpr.isNotNull(resolve(b)));
-  return boolExpr(new BinaryExpr('neq', resolve(a), resolve(b)));
+  return boolExpr(binaryWithSharedCodec(a, b, (l, r) => new BinaryExpr('neq', l, r)));
 }
 
 function comparison(a: ExprOrVal, b: ExprOrVal, op: BinaryOp): ExpressionImpl<BooleanCodecType> {
-  return boolExpr(new BinaryExpr(op, resolve(a), resolve(b)));
+  return boolExpr(binaryWithSharedCodec(a, b, (l, r) => new BinaryExpr(op, l, r)));
 }
 
 function inOrNotIn(
@@ -88,10 +144,12 @@ function inOrNotIn(
   op: 'in' | 'notIn',
 ): ExpressionImpl<BooleanCodecType> {
   const left = expr.buildAst();
+  const leftCodecId = expr.returnType.codecId;
+  const leftRefs = refsOf(expr);
   const binaryFn = op === 'in' ? BinaryExpr.in : BinaryExpr.notIn;
 
   if (Array.isArray(valuesOrSubquery)) {
-    const refs = valuesOrSubquery.map((v) => resolve(v));
+    const refs = valuesOrSubquery.map((v) => resolveOperand(v, leftCodecId, leftRefs));
     return boolExpr(binaryFn(left, ListExpression.of(refs)));
   }
   return boolExpr(binaryFn(left, SubqueryExpr.of(valuesOrSubquery.buildAst())));

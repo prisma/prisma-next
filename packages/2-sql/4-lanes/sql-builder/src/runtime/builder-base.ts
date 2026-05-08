@@ -110,6 +110,24 @@ export function combineWhereExprs(exprs: readonly AstExpression[]): AstExpressio
   return AndExpr.of(exprs);
 }
 
+/**
+ * Same uniqueness rule as the field-proxy's `findUniqueNamespaceFor`:
+ * when exactly one namespace owns a top-level field, the binding is
+ * unambiguous. Used by `select('col', ...)` to attach `refs` metadata to
+ * the resulting `ProjectionItem` while keeping the AST as `IdentifierRef`
+ * (so SQL renders unchanged).
+ */
+function findUniqueNamespaceFor(scope: Scope, fieldName: string): string | undefined {
+  let found: string | undefined;
+  for (const [namespace, fields] of Object.entries(scope.namespaces)) {
+    if (Object.hasOwn(fields, fieldName)) {
+      if (found !== undefined) return undefined;
+      found = namespace;
+    }
+  }
+  return found;
+}
+
 export function buildSelectAst(state: BuilderState): SelectAst {
   const where = combineWhereExprs(state.where);
   return new SelectAst({
@@ -225,7 +243,9 @@ export function resolveSelectArgs(
     for (const colName of args as string[]) {
       const field = scope.topLevel[colName];
       if (!field) throw new Error(`Column "${colName}" not found in scope`);
-      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName), field.codecId));
+      const namespace = findUniqueNamespaceFor(scope, colName);
+      const refs = namespace ? { table: namespace, column: colName } : undefined;
+      projections.push(ProjectionItem.of(colName, IdentifierRef.of(colName), field.codecId, refs));
       newRowFields[colName] = field;
     }
     return { projections, newRowFields };

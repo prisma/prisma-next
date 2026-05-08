@@ -4,6 +4,7 @@ import {
   buildOperation,
   type CodecExpression,
   type Expression,
+  refsOf,
   type TraitExpression,
   toExpr,
 } from '@prisma-next/sql-relational-core/expression';
@@ -148,13 +149,15 @@ export function postgresQueryOperations<
       impl: (
         self: TraitExpression<readonly ['textual'], false, CT>,
         pattern: CodecExpression<'pg/text@1', false, CT>,
-      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> =>
-        buildOperation({
+      ): Expression<{ codecId: 'pg/bool@1'; nullable: false }> => {
+        const selfRefs = refsOf(self);
+        return buildOperation({
           method: 'ilike',
-          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID)],
+          args: [toExpr(self), toExpr(pattern, PG_TEXT_CODEC_ID, selfRefs)],
           returns: { codecId: PG_BOOL_CODEC_ID, nullable: false },
           lowering: { targetFamily: 'sql', strategy: 'infix', template: '{{self}} ILIKE {{arg0}}' },
-        }),
+        });
+      },
     },
   ];
 }

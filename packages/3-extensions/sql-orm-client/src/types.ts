@@ -289,12 +289,28 @@ type FieldOperations<
 // COMPARISON_METHODS_META — single source of truth for traits + factories
 // ---------------------------------------------------------------------------
 
-function param(codecId: string | undefined, value: unknown): ParamRef {
-  return codecId ? ParamRef.of(value, { codecId }) : ParamRef.of(value);
+function refsFromLeft(left: AnyExpression): { table: string; column: string } | undefined {
+  return left.kind === 'column-ref' ? { table: left.table, column: left.column } : undefined;
 }
 
-function paramList(codecId: string | undefined, values: readonly unknown[]): ListExpression {
-  return ListExpression.of(values.map((value) => param(codecId, value)));
+function param(
+  codecId: string | undefined,
+  value: unknown,
+  refs: { table: string; column: string } | undefined,
+): ParamRef {
+  if (codecId === undefined && refs === undefined) return ParamRef.of(value);
+  return ParamRef.of(value, {
+    ...(codecId !== undefined ? { codecId } : {}),
+    ...(refs !== undefined ? { refs } : {}),
+  });
+}
+
+function paramList(
+  codecId: string | undefined,
+  values: readonly unknown[],
+  refs: { table: string; column: string } | undefined,
+): ListExpression {
+  return ListExpression.of(values.map((value) => param(codecId, value, refs)));
 }
 
 // never[] is intentional: factories have heterogeneous signatures (value: unknown,
@@ -312,12 +328,16 @@ type ComparisonMethodMeta = {
 
 function scalarComparisonMethod(op: BinaryOp) {
   return ((left, codecId) => (value: unknown) =>
-    new BinaryExpr(op, left, param(codecId, value))) satisfies MethodFactory;
+    new BinaryExpr(op, left, param(codecId, value, refsFromLeft(left)))) satisfies MethodFactory;
 }
 
 function listComparisonMethod(op: BinaryOp) {
   return ((left, codecId) => (values: readonly unknown[]) =>
-    new BinaryExpr(op, left, paramList(codecId, values))) satisfies MethodFactory;
+    new BinaryExpr(
+      op,
+      left,
+      paramList(codecId, values, refsFromLeft(left)),
+    )) satisfies MethodFactory;
 }
 
 /**

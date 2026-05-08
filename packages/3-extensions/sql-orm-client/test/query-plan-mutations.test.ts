@@ -34,6 +34,7 @@ function usersColParam(
   return ParamRef.of(value, {
     name: column,
     codecId: columnMeta?.codecId ?? 'unknown',
+    refs: { table: 'users', column },
   });
 }
 

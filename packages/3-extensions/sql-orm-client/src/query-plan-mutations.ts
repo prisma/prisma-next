@@ -51,7 +51,11 @@ function toParamAssignments(
     if (!codecId) {
       throw new Error(`Unknown column "${column}" in table "${tableName}"`);
     }
-    assignments[column] = ParamRef.of(value, { name: column, codecId });
+    assignments[column] = ParamRef.of(value, {
+      name: column,
+      codecId,
+      refs: { table: tableName, column },
+    });
   }
 
   return { assignments };
@@ -97,7 +101,11 @@ function normalizeInsertRows(
         if (!codecId) {
           throw new Error(`Unknown column "${column}" in table "${tableName}"`);
         }
-        normalizedRow[column] = ParamRef.of(row[column], { name: column, codecId });
+        normalizedRow[column] = ParamRef.of(row[column], {
+          name: column,
+          codecId,
+          refs: { table: tableName, column },
+        });
         continue;
       }
       normalizedRow[column] = new DefaultValueExpr();
