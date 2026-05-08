@@ -1,12 +1,11 @@
 /**
- * Verification mode tests: strict mode, dependency missing.
+ * Verification mode tests: strict mode.
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   defineContract,
   field,
   int4Column,
-  legacyDatabaseDependencyExtension,
   model,
   postgresPack,
   runSchemaVerify,
@@ -19,55 +18,6 @@ import {
 
 describe('family instance schemaVerify - modes', () => {
   const { getConnectionString } = useDevDatabase();
-
-  describe('dependency missing', () => {
-    beforeEach(async () => {
-      await withClient(getConnectionString(), async (client) => {
-        await client.query('DROP TABLE IF EXISTS "user"');
-        await client.query(`
-          CREATE TABLE "user" (
-            id SERIAL PRIMARY KEY,
-            email TEXT NOT NULL
-          )
-        `);
-      });
-    }, timeouts.spinUpPpgDev);
-
-    it(
-      'returns ok=false with dependency_missing issue',
-      async () => {
-        const contract = defineContract({
-          family: sqlFamily,
-          target: postgresPack,
-          extensionPacks: { 'legacy-vector': legacyDatabaseDependencyExtension },
-          models: {
-            User: model('User', {
-              fields: {
-                id: field.column(int4Column).id(),
-                email: field.column(textColumn),
-              },
-            }).sql({ table: 'user' }),
-          },
-        });
-
-        const result = await runSchemaVerify(getConnectionString(), contract, {
-          extensions: [legacyDatabaseDependencyExtension],
-        });
-
-        expect(result).toMatchObject({
-          ok: false,
-          schema: {
-            counts: { fail: expect.any(Number) },
-            issues: expect.arrayContaining([
-              expect.objectContaining({ kind: 'dependency_missing' }),
-            ]),
-          },
-        });
-        expect(result.schema.counts.fail).toBeGreaterThan(0);
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
 
   describe('strict mode: extra columns', () => {
     beforeEach(async () => {

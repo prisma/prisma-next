@@ -15,7 +15,6 @@ Provides the SQL family descriptor (`ControlFamilyDescriptor`) that includes:
 - **Planner & Runner SPI**: Owns the `MigrationPlanner` / `MigrationRunner` interfaces plus the `SqlControlTargetDescriptor` helper so targets can expose planners and runners (e.g., Postgres init planner/runner)
 - **Family Hook Integration**: Integrates the SQL target family hook (`sqlEmission`) from `@prisma-next/sql-contract-emitter`
 - **Control Plane Entry Point**: Serves as the control plane entry point for the SQL family, enabling the CLI to select the family hook and create family instances
-- **Component Database Dependencies**: Consumes database dependencies declared by framework components (target/adapter/extension packs). Callers pass the active `frameworkComponents` list into planning/execution/verification; SQL layers structurally narrow to components that declare `databaseDependencies` and use their pure verification hooks (no fuzzy matching against `contract.extensionPacks`).
 - **Contract-to-SchemaIR Conversion**: Converts `SqlStorage` from a contract into `SqlSchemaIR` for offline migration planning, enabling `migration plan` to work without a database connection
 - **Destructive Change Detection**: Compares two `SqlStorage` values and identifies destructive changes (dropped tables/columns) for migration policy enforcement
 - **Storage Type Control Hooks**: Extracts codec-owned control hooks for planning/verification/introspection of `storage.types` without adding enum-specific fields to shared IR
