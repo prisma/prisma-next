@@ -757,7 +757,7 @@ export class PipelineChain<
     updaterFn: (fields: FieldAccessor<Shape, N>) => UpdaterResult,
     opts: { readonly upsert?: boolean; readonly returnDocument?: 'before' | 'after' } = {},
   ): MongoQueryPlan<
-    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>, TContract> | null,
     FindOneAndUpdateCommand
   > {
     const { filter, sort } = deconstructFindAndModifyChain(this.#state.stages);
@@ -787,7 +787,7 @@ export class PipelineChain<
   findOneAndDelete(
     this: PipelineChain<TContract, Shape, U, 'fam-ok', L, N>,
   ): MongoQueryPlan<
-    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>> | null,
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>, TContract> | null,
     FindOneAndDeleteCommand
   > {
     const { filter, sort } = deconstructFindAndModifyChain(this.#state.stages);
@@ -805,7 +805,10 @@ export class PipelineChain<
   /**
    * Materialise the chain as a `MongoQueryPlan` wrapping an `AggregateCommand`.
    */
-  build(): MongoQueryPlan<ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>, AggregateCommand> {
+  build(): MongoQueryPlan<
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>, TContract>,
+    AggregateCommand
+  > {
     const command = new AggregateCommand(this.#state.collection, this.#state.stages);
     const meta: PlanMeta = {
       target: 'mongo',
@@ -835,7 +838,7 @@ export class PipelineChain<
    * Alias for `build()` — surfaces the read intent at the call site.
    */
   aggregate(): MongoQueryPlan<
-    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>>,
+    ResolveRow<Shape, ExtractMongoCodecTypes<TContract>, TContract>,
     AggregateCommand
   > {
     return this.build();

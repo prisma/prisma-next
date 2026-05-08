@@ -100,4 +100,23 @@ describe('state machine', () => {
     expectTypeOf<GetU<typeof grouped>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
     expectTypeOf<GetF<typeof grouped>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
   });
+
+  // AC-4 / TC-5: lookup() clears both markers (consistent with the legacy
+  // shape; see ADR 201 marker table). Asserted directly on the marker
+  // parameters here; the runtime / shape behaviour is asserted in
+  // builder.test-d.ts.
+  it('marker table: lookup() clears both markers', () => {
+    const looked = mongoQuery<TContract>({ contractJson })
+      .from('orders')
+      .lookup((from) =>
+        from('users')
+          .on((local, foreign) => ({
+            local: local.customerId,
+            foreign: foreign._id,
+          }))
+          .as('customer'),
+      );
+    expectTypeOf<GetU<typeof looked>>().toEqualTypeOf<'update-cleared' & UpdateEnabled>();
+    expectTypeOf<GetF<typeof looked>>().toEqualTypeOf<'fam-cleared' & FindAndModifyEnabled>();
+  });
 });

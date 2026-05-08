@@ -78,12 +78,14 @@ describe('builder shape tests', () => {
 
   it('lookup() adds array field and preserves existing fields', () => {
     const p = mongoQuery<TContract>({ contractJson });
-    const withLookup = p.from('orders').lookup({
-      from: 'users',
-      localField: 'customerId',
-      foreignField: '_id',
-      as: 'customer',
-    });
+    const withLookup = p.from('orders').lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          local: local.customerId,
+          foreign: foreign._id,
+        }))
+        .as('customer'),
+    );
 
     withLookup.sort({ status: 1 });
     withLookup.sort({ amount: -1 });
@@ -92,6 +94,50 @@ describe('builder shape tests', () => {
     // @ts-expect-error -- 'bogus' is not in shape
     withLookup.sort({ bogus: 1 });
   });
+
+  it('lookup() rejects bad local field at type level (AC-1 TC-1)', () => {
+    const p = mongoQuery<TContract>({ contractJson });
+    p.from('orders').lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          // @ts-expect-error -- '_idxx' is not a field on the Order shape
+          local: local._idxx,
+          foreign: foreign._id,
+        }))
+        .as('customer'),
+    );
+  });
+
+  it('lookup() rejects bad foreign field at type level (AC-1 TC-2)', () => {
+    const p = mongoQuery<TContract>({ contractJson });
+    p.from('orders').lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          local: local.customerId,
+          // @ts-expect-error -- '_idxx' is not a field on the User shape
+          foreign: foreign._idxx,
+        }))
+        .as('customer'),
+    );
+  });
+
+  it('lookup() rejects non-leaf returns from on() (AC-2 TC-3)', () => {
+    const p = mongoQuery<TContract>({ contractJson });
+    p.from('orders').lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          // @ts-expect-error -- fn.toUpper(...) returns TypedAggExpr<StringField>, not LeafExpression
+          local: fn.toUpper(local.customerId),
+          foreign: foreign._id,
+        }))
+        .as('customer'),
+    );
+  });
+
+  // Bad-from(name) typo rejection is intentionally not tested here — it is
+  // deferred to TML-2400 (Contract.roots: Record<string, string> widens
+  // keyof under intersection, identical to today's mongoQuery.from('bad')
+  // behaviour). See spec § Open Questions / Resolved decisions.
 
   it('replaceRoot() replaces entire shape', () => {
     const p = mongoQuery<TContract>({ contractJson });
@@ -227,15 +273,17 @@ describe('resolved row types', () => {
     }>();
   });
 
-  it('lookup() adds as field as unknown[], preserves existing at correct types', () => {
+  it('lookup() resolves the as-named field to Array<ForeignRow> with concrete leaf types (AC-3 TC-4)', () => {
     const plan = mongoQuery<TContract>({ contractJson })
       .from('orders')
-      .lookup({
-        from: 'users',
-        localField: 'customerId',
-        foreignField: '_id',
-        as: 'customer',
-      })
+      .lookup((from) =>
+        from('users')
+          .on((local, foreign) => ({
+            local: local.customerId,
+            foreign: foreign._id,
+          }))
+          .as('customer'),
+      )
       .build();
     expectTypeOf<PlanRow<typeof plan>>().toEqualTypeOf<{
       _id: string;
@@ -244,7 +292,12 @@ describe('resolved row types', () => {
       customerId: string;
       notes: string | null;
       tags: unknown[];
-      customer: unknown[];
+      customer: Array<{
+        _id: string;
+        firstName: string;
+        lastName: string;
+        email: string;
+      }>;
     }>();
   });
 
