@@ -1,0 +1,209 @@
+import { describe, expect, it } from 'vitest';
+import { decodeEWKBHex, encodeEWKT } from '../src/core/ewkb';
+
+describe('postgis EWKB / EWKT', () => {
+  describe('encodeEWKT', () => {
+    it('Point without SRID', () => {
+      expect(encodeEWKT({ type: 'Point', coordinates: [1, 2] })).toBe('POINT(1 2)');
+    });
+
+    it('Point with SRID', () => {
+      expect(encodeEWKT({ type: 'Point', coordinates: [1, 2], srid: 4326 })).toBe(
+        'SRID=4326;POINT(1 2)',
+      );
+    });
+
+    it('LineString', () => {
+      expect(
+        encodeEWKT({
+          type: 'LineString',
+          coordinates: [
+            [0, 0],
+            [1, 1],
+          ],
+        }),
+      ).toBe('LINESTRING(0 0,1 1)');
+    });
+
+    it('Polygon with multiple rings', () => {
+      expect(
+        encodeEWKT({
+          type: 'Polygon',
+          coordinates: [
+            [
+              [0, 0],
+              [10, 0],
+              [10, 10],
+              [0, 10],
+              [0, 0],
+            ],
+            [
+              [2, 2],
+              [4, 2],
+              [4, 4],
+              [2, 4],
+              [2, 2],
+            ],
+          ],
+        }),
+      ).toBe('POLYGON((0 0,10 0,10 10,0 10,0 0),(2 2,4 2,4 4,2 4,2 2))');
+    });
+
+    it('MultiLineString', () => {
+      expect(
+        encodeEWKT({
+          type: 'MultiLineString',
+          coordinates: [
+            [
+              [0, 0],
+              [1, 0],
+            ],
+            [
+              [2, 2],
+              [3, 3],
+            ],
+          ],
+        }),
+      ).toBe('MULTILINESTRING((0 0,1 0),(2 2,3 3))');
+    });
+
+    it('MultiPolygon', () => {
+      expect(
+        encodeEWKT({
+          type: 'MultiPolygon',
+          coordinates: [
+            [
+              [
+                [0, 0],
+                [1, 0],
+                [1, 1],
+                [0, 0],
+              ],
+            ],
+          ],
+        }),
+      ).toBe('MULTIPOLYGON(((0 0,1 0,1 1,0 0)))');
+    });
+
+    it('rejects non-finite coordinates', () => {
+      expect(() =>
+        encodeEWKT({ type: 'Point', coordinates: [Number.POSITIVE_INFINITY, 0] }),
+      ).toThrow('coordinates must be finite numbers');
+    });
+  });
+
+  describe('decodeEWKBHex', () => {
+    it('decodes a Point with SRID 4326', () => {
+      // 01 byte-order LE
+      // 01000020 type Point|SRID
+      // E6100000 srid 4326
+      // 000000000000F03F x=1.0
+      // 0000000000000040 y=2.0
+      expect(decodeEWKBHex('0101000020E6100000000000000000F03F0000000000000040')).toEqual({
+        type: 'Point',
+        coordinates: [1, 2],
+        srid: 4326,
+      });
+    });
+
+    it('decodes a LineString without SRID', () => {
+      // 01 LE
+      // 02000000 type LineString
+      // 02000000 numPoints=2
+      // x=0, y=0
+      // x=1, y=1
+      const hex =
+        '01' +
+        '02000000' +
+        '02000000' +
+        '0000000000000000' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '000000000000F03F';
+      expect(decodeEWKBHex(hex)).toEqual({
+        type: 'LineString',
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+      });
+    });
+
+    it('decodes a Polygon with a single ring (LE)', () => {
+      // LE Polygon: ring [(0,0),(1,0),(1,1),(0,0)]
+      const hex =
+        '01' +
+        '03000000' + // type Polygon
+        '01000000' + // numRings = 1
+        '04000000' + // numPoints = 4
+        '0000000000000000' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '0000000000000000' +
+        '000000000000F03F' +
+        '000000000000F03F' +
+        '0000000000000000' +
+        '0000000000000000';
+      expect(decodeEWKBHex(hex)).toEqual({
+        type: 'Polygon',
+        coordinates: [
+          [
+            [0, 0],
+            [1, 0],
+            [1, 1],
+            [0, 0],
+          ],
+        ],
+      });
+    });
+
+    it('decodes big-endian point', () => {
+      // BE byte-order, type Point (00000001), x=1.0, y=2.0
+      const hex = '00' + '00000001' + '3FF0000000000000' + '4000000000000000';
+      expect(decodeEWKBHex(hex)).toEqual({ type: 'Point', coordinates: [1, 2] });
+    });
+
+    it('decodes a MultiPoint with SRID', () => {
+      // Outer: LE MultiPoint with SRID, then 2 sub-Points (each LE Point without
+      // its own SRID — sub-records inherit the parent SRID in EWKB).
+      const hex =
+        '01' +
+        '04000020' + // MultiPoint | SRID
+        'E6100000' + // 4326
+        '02000000' + // 2 points
+        '01' +
+        '01000000' + // sub Point LE
+        '0000000000000000' +
+        '0000000000000000' +
+        '01' +
+        '01000000' + // sub Point LE
+        '000000000000F03F' +
+        '000000000000F03F';
+      expect(decodeEWKBHex(hex)).toEqual({
+        type: 'MultiPoint',
+        coordinates: [
+          [0, 0],
+          [1, 1],
+        ],
+        srid: 4326,
+      });
+    });
+
+    it('throws on Z/M coordinates', () => {
+      // LE Point with Z flag (0x80000000) set
+      const hex = '01' + '01000080' + '0000000000000000' + '0000000000000000' + '0000000000000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('Z/M coordinates are not supported');
+    });
+
+    it('throws on unsupported geometry type', () => {
+      // LE typeCode = 7 (GeometryCollection), no SRID
+      const hex = '01' + '07000000' + '00000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('unsupported geometry type');
+    });
+
+    it('throws on invalid byte order marker', () => {
+      const hex = '02' + '01000000';
+      expect(() => decodeEWKBHex(hex)).toThrow('invalid byte order');
+    });
+  });
+});

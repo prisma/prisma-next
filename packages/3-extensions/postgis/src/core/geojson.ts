@@ -1,0 +1,106 @@
+/**
+ * GeoJSON-shaped value types used by the PostGIS codec.
+ *
+ * The codec speaks GeoJSON-style objects to JavaScript callers and
+ * EWKT/EWKB on the wire. This file is the single source of truth for the
+ * value shapes; the public type re-export lives in `exports/geojson.ts`.
+ */
+
+export type Position = readonly [number, number];
+
+export type GeometryPoint = {
+  readonly type: 'Point';
+  readonly coordinates: Position;
+  readonly srid?: number;
+};
+
+export type GeometryLineString = {
+  readonly type: 'LineString';
+  readonly coordinates: ReadonlyArray<Position>;
+  readonly srid?: number;
+};
+
+export type GeometryPolygon = {
+  readonly type: 'Polygon';
+  readonly coordinates: ReadonlyArray<ReadonlyArray<Position>>;
+  readonly srid?: number;
+};
+
+export type GeometryMultiPoint = {
+  readonly type: 'MultiPoint';
+  readonly coordinates: ReadonlyArray<Position>;
+  readonly srid?: number;
+};
+
+export type GeometryMultiLineString = {
+  readonly type: 'MultiLineString';
+  readonly coordinates: ReadonlyArray<ReadonlyArray<Position>>;
+  readonly srid?: number;
+};
+
+export type GeometryMultiPolygon = {
+  readonly type: 'MultiPolygon';
+  readonly coordinates: ReadonlyArray<ReadonlyArray<ReadonlyArray<Position>>>;
+  readonly srid?: number;
+};
+
+export type Geometry =
+  | GeometryPoint
+  | GeometryLineString
+  | GeometryPolygon
+  | GeometryMultiPoint
+  | GeometryMultiLineString
+  | GeometryMultiPolygon;
+
+/**
+ * Construct a Point. Convenience for the common "lng/lat" case.
+ *
+ * @example
+ *   point(-122.4194, 37.7749, 4326)
+ */
+export function point(longitude: number, latitude: number, srid?: number): GeometryPoint {
+  return srid !== undefined
+    ? { type: 'Point', coordinates: [longitude, latitude], srid }
+    : { type: 'Point', coordinates: [longitude, latitude] };
+}
+
+/**
+ * Construct a Polygon from a single outer ring of `[lng, lat]` pairs.
+ * If the first and last positions differ, the ring is closed automatically.
+ */
+export function polygon(ring: ReadonlyArray<Position>, srid?: number): GeometryPolygon {
+  if (ring.length < 3) {
+    throw new Error('polygon: ring must contain at least 3 positions');
+  }
+  const first = ring[0];
+  const last = ring[ring.length - 1];
+  if (!first || !last) {
+    throw new Error('polygon: ring positions cannot be undefined');
+  }
+  const closed = first[0] === last[0] && first[1] === last[1] ? ring : [...ring, first];
+  return srid !== undefined
+    ? { type: 'Polygon', coordinates: [closed], srid }
+    : { type: 'Polygon', coordinates: [closed] };
+}
+
+/**
+ * Construct a rectangular Polygon from a bounding box.
+ *
+ * @param bbox - `[minLng, minLat, maxLng, maxLat]`
+ */
+export function bboxPolygon(
+  bbox: readonly [number, number, number, number],
+  srid?: number,
+): GeometryPolygon {
+  const [minX, minY, maxX, maxY] = bbox;
+  return polygon(
+    [
+      [minX, minY],
+      [maxX, minY],
+      [maxX, maxY],
+      [minX, maxY],
+      [minX, minY],
+    ],
+    srid,
+  );
+}
