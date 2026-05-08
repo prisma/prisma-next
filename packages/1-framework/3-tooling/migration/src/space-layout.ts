@@ -13,6 +13,15 @@ import { errorInvalidSpaceId } from './errors';
 export const APP_SPACE_ID = 'app' as const;
 
 /**
+ * Branded string carrying a compile-time guarantee that the value has
+ * been validated by {@link assertValidSpaceId}. Downstream filesystem
+ * helpers (e.g. {@link spaceMigrationDirectory}) accept this type to
+ * make "validated" tracking visible at the type level rather than
+ * relying purely on a runtime check.
+ */
+export type ValidSpaceId = string & { readonly __brand: 'ValidSpaceId' };
+
+/**
  * Pattern a contract-space identifier must match. The constraint is
  * filesystem-friendly: lowercase letters / digits / hyphen / underscore,
  * starts with a letter, max 64 characters.
@@ -21,11 +30,11 @@ export const APP_SPACE_ID = 'app' as const;
  */
 const SPACE_ID_PATTERN = /^[a-z][a-z0-9_-]{0,63}$/;
 
-export function isValidSpaceId(spaceId: string): boolean {
+export function isValidSpaceId(spaceId: string): spaceId is ValidSpaceId {
   return SPACE_ID_PATTERN.test(spaceId);
 }
 
-export function assertValidSpaceId(spaceId: string): asserts spaceId is string {
+export function assertValidSpaceId(spaceId: string): asserts spaceId is ValidSpaceId {
   if (!isValidSpaceId(spaceId)) {
     throw errorInvalidSpaceId(spaceId);
   }

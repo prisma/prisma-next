@@ -23,6 +23,7 @@ export {
   assertValidSpaceId,
   isValidSpaceId,
   spaceMigrationDirectory,
+  type ValidSpaceId,
 } from '../space-layout';
 export {
   listPinnedSpaceDirectories,
