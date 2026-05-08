@@ -30,6 +30,8 @@
     "@prisma-next/adapter-postgres": "workspace:*",
     "@prisma-next/cli": "workspace:*",
     "@prisma-next/driver-postgres": "workspace:*",
+    "@prisma-next/psl-parser": "workspace:*",
+    "@prisma-next/sql-contract-psl": "workspace:*",
     "@prisma-next/sql-contract-ts": "workspace:*",
     "@prisma-next/sql-schema-ir": "workspace:*",
     "@prisma-next/target-postgres": "workspace:*",
@@ -46,6 +48,7 @@
   ],
   "exports": {
     "./control": "./dist/control.mjs",
+    "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
     "./package.json": "./package.json"
   },

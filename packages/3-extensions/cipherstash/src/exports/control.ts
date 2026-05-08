@@ -56,6 +56,7 @@ import {
   CIPHERSTASH_SPACE_ID,
   CIPHERSTASH_STRING_CODEC_ID,
 } from '../core/constants';
+import { cipherstashPackMeta } from '../core/descriptor-meta';
 
 /**
  * Resolve a migration package's on-disk path from this descriptor module's
@@ -71,13 +72,6 @@ function resolveMigrationDirPath(dirName: string): string {
   );
 }
 
-// JSON-imported values lose the workspace's branded types
-// (e.g. `StorageHashBase<string>`, `MigrationPlanOperation` discriminants),
-// so we cast through `unknown` here. The values themselves are the same
-// canonical artefacts the application's contract / migration runners
-// produce and re-validate at runtime — the descriptor is just a
-// pass-through wiring layer between the on-disk JSON and the framework's
-// typed surface.
 const baselinePackage: MigrationPackage = {
   dirName: CIPHERSTASH_BASELINE_MIGRATION_NAME,
   dirPath: resolveMigrationDirPath(CIPHERSTASH_BASELINE_MIGRATION_NAME),
@@ -92,21 +86,25 @@ const cipherstashContractSpace: ExtensionContractSpace = {
 };
 
 const cipherstashExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
-  kind: 'extension' as const,
-  id: CIPHERSTASH_SPACE_ID,
-  familyId: 'sql' as const,
-  targetId: 'postgres' as const,
-  version: '0.0.1',
+  // Spread pack-meta first so it contributes `kind` / `id` / `familyId`
+  // / `targetId` / `version` / `authoring` / `types.{codecTypes,storage}`
+  // — then overlay the contract-space block (TML-2397) and the codec
+  // lifecycle hook (TML-2397) on top. The two `types.codecTypes` slots
+  // (`codecInstances` from pack-meta, `controlPlaneHooks` from this
+  // descriptor) coexist on the same path and are merged below.
+  ...cipherstashPackMeta,
   contractSpace: cipherstashContractSpace,
   /**
    * Free-form `types.codecTypes.controlPlaneHooks` block — the SQL
    * family's `extractCodecControlHooks` (in `@prisma-next/family-sql/
    * control`) finds hooks via duck-typing on this exact path. Mirrors
    * pgvector's wiring at `packages/3-extensions/pgvector/src/exports/
-   * control.ts` (which carries a fuller `pack-meta`).
+   * control.ts`.
    */
   types: {
+    ...cipherstashPackMeta.types,
     codecTypes: {
+      ...cipherstashPackMeta.types.codecTypes,
       controlPlaneHooks: {
         [CIPHERSTASH_STRING_CODEC_ID]: cipherstashStringCodecHooks,
       },
