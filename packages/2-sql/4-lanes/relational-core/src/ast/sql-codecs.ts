@@ -20,7 +20,7 @@
  * carriers retired with the deletion sweep.
  */
 
-import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type CodecCallContext,
   CodecDescriptorImpl,
@@ -60,21 +60,22 @@ import {
 } from './sql-codec-helpers';
 
 // ---------------------------------------------------------------------------
-// Params schemas. Reconstructed locally so the legacy `sql-codecs.ts`
-// content stays untouched; the validators are JSON-boundary metadata,
-// not runtime conversion behaviour.
+// Params schemas — JSON-boundary metadata, not runtime conversion
+// behaviour. Optional keys (`'length?'` / `'precision?'`) match the
+// matching `TParams` type so each schema is structurally assignable to
+// `StandardSchemaV1<TParams>` directly (no cast helper needed).
 // ---------------------------------------------------------------------------
-
-const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
-
-const precisionParamsSchema = arktype({
-  'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
+
+const lengthParamsSchema = arktype({
+  'length?': 'number.integer > 0',
+}) satisfies StandardSchemaV1<LengthParams>;
+
+const precisionParamsSchema = arktype({
+  'precision?': 'number.integer >= 0 & number.integer <= 6',
+}) satisfies StandardSchemaV1<PrecisionParams>;
 
 // ---------------------------------------------------------------------------
 // sql/text@1 — non-parameterized, JSON-safe (string).
@@ -232,7 +233,7 @@ export class SqlCharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly codecId = SQL_CHAR_CODEC_ID;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['char'] as const;
-  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
+  override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlCharRenderOutputType(params);
   }
@@ -277,7 +278,7 @@ export class SqlVarcharDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly codecId = SQL_VARCHAR_CODEC_ID;
   override readonly traits = ['equality', 'order', 'textual'] as const;
   override readonly targetTypes = ['varchar'] as const;
-  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
+  override readonly paramsSchema: StandardSchemaV1<LengthParams> = lengthParamsSchema;
   override renderOutputType(params: LengthParams): string | undefined {
     return sqlVarcharRenderOutputType(params);
   }
@@ -323,7 +324,7 @@ export class SqlTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams>
   override readonly codecId = SQL_TIMESTAMP_CODEC_ID;
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['timestamp'] as const;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema: StandardSchemaV1<PrecisionParams> = precisionParamsSchema;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return sqlTimestampRenderOutputType(params);
   }

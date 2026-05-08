@@ -21,6 +21,7 @@
     "@prisma-next/framework-components": "workspace:*",
     "@prisma-next/sql-relational-core": "workspace:*",
     "@prisma-next/sql-runtime": "workspace:*",
+    "@standard-schema/spec": "^1.1.0",
     "arktype": "^2.1.29"
   },
   "devDependencies": {

@@ -32,7 +32,7 @@
  * and constructs a fresh codec from `this`.
  */
 
-import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type AnyCodecDescriptor,
   type CodecCallContext,
@@ -44,12 +44,15 @@ import {
   column,
 } from '@prisma-next/framework-components/codec';
 import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { type as arktype } from 'arktype';
 import { VECTOR_CODEC_ID, VECTOR_MAX_DIM } from './constants';
 
 // ---------------------------------------------------------------------------
 // Params schema + types.
 // ---------------------------------------------------------------------------
+
+type VectorParams = { readonly length: number };
 
 const vectorParamsSchema = arktype({
   length: 'number',
@@ -62,9 +65,7 @@ const vectorParamsSchema = arktype({
     return ctx.mustBe(`in the range [1, ${VECTOR_MAX_DIM}]`);
   }
   return true;
-});
-
-type VectorParams = { readonly length: number };
+}) satisfies StandardSchemaV1<VectorParams>;
 
 const PG_VECTOR_META = { db: { sql: { postgres: { nativeType: 'vector' } } } } as const;
 
@@ -123,7 +124,7 @@ export class PgVectorDescriptor extends CodecDescriptorImpl<VectorParams> {
   override readonly traits = ['equality'] as const;
   override readonly targetTypes = ['vector'] as const;
   override readonly meta = PG_VECTOR_META;
-  override readonly paramsSchema = arktypeParamsSchema<VectorParams>(vectorParamsSchema);
+  override readonly paramsSchema: StandardSchemaV1<VectorParams> = vectorParamsSchema;
   override renderOutputType(params: VectorParams): string {
     return `Vector<${params.length}>`;
   }

@@ -2430,6 +2430,9 @@ importers:
       '@prisma-next/sql-runtime':
         specifier: workspace:*
         version: link:../../2-sql/5-runtime
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: ^2.1.29
         version: 2.1.29
@@ -2602,6 +2605,9 @@ importers:
       '@prisma-next/sql-schema-ir':
         specifier: workspace:*
         version: link:../../2-sql/1-core/schema-ir
+      '@standard-schema/spec':
+        specifier: ^1.1.0
+        version: 1.1.0
       arktype:
         specifier: ^2.0.0
         version: 2.1.29

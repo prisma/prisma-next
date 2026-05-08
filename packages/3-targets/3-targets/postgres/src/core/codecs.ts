@@ -34,7 +34,7 @@
  * codec constructed solely from `this` (the descriptor).
  */
 
-import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type AnyCodecDescriptor,
   type CodecCallContext,
@@ -103,28 +103,30 @@ import {
 } from './codec-ids';
 
 // ---------------------------------------------------------------------------
-// Params schemas + types. Reconstructed locally so the legacy `codecs.ts`
-// content stays untouched. The validators are JSON-boundary metadata,
-// not runtime conversion behaviour.
+// Params schemas + types — JSON-boundary metadata, not runtime conversion
+// behaviour. Optional keys (`'length?'` / `'precision?'` / `'scale?'`)
+// match the matching `TParams` type so each schema is structurally
+// assignable to `StandardSchemaV1<TParams>` directly (no cast helper
+// needed).
 // ---------------------------------------------------------------------------
-
-const lengthParamsSchema = arktype({
-  length: 'number.integer > 0',
-});
-
-const numericParamsSchema = arktype({
-  precision: 'number.integer > 0 & number.integer <= 1000',
-  'scale?': 'number.integer >= 0',
-});
-
-const precisionParamsSchema = arktype({
-  'precision?': 'number.integer >= 0 & number.integer <= 6',
-});
 
 type LengthParams = { readonly length?: number };
 type PrecisionParams = { readonly precision?: number };
 type NumericParams = { readonly precision: number; readonly scale?: number };
 type EnumParams = { readonly values?: readonly unknown[] };
+
+const lengthParamsSchema = arktype({
+  'length?': 'number.integer > 0',
+}) satisfies StandardSchemaV1<LengthParams>;
+
+const numericParamsSchema = arktype({
+  precision: 'number.integer > 0 & number.integer <= 1000',
+  'scale?': 'number.integer >= 0',
+}) satisfies StandardSchemaV1<NumericParams>;
+
+const precisionParamsSchema = arktype({
+  'precision?': 'number.integer >= 0 & number.integer <= 6',
+}) satisfies StandardSchemaV1<PrecisionParams>;
 
 const PG_TEXT_META = { db: { sql: { postgres: { nativeType: 'text' } } } } as const;
 const PG_INT4_META = { db: { sql: { postgres: { nativeType: 'integer' } } } } as const;
@@ -482,7 +484,7 @@ export class PgNumericDescriptor extends CodecDescriptorImpl<NumericParams> {
   override readonly traits = ['equality', 'order', 'numeric'] as const;
   override readonly targetTypes = ['numeric', 'decimal'] as const;
   override readonly meta = PG_NUMERIC_META;
-  override readonly paramsSchema = arktypeParamsSchema<NumericParams>(numericParamsSchema);
+  override readonly paramsSchema = numericParamsSchema satisfies StandardSchemaV1<NumericParams>;
   override renderOutputType(params: NumericParams): string | undefined {
     return pgNumericRenderOutputType(params);
   }
@@ -531,7 +533,8 @@ export class PgTimestampDescriptor extends CodecDescriptorImpl<PrecisionParams> 
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['timestamp'] as const;
   override readonly meta = PG_TIMESTAMP_META;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema =
+    precisionParamsSchema satisfies StandardSchemaV1<PrecisionParams>;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return renderPrecision('Timestamp', params as Record<string, unknown>);
   }
@@ -577,7 +580,8 @@ export class PgTimestamptzDescriptor extends CodecDescriptorImpl<PrecisionParams
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['timestamptz'] as const;
   override readonly meta = PG_TIMESTAMPTZ_META;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema =
+    precisionParamsSchema satisfies StandardSchemaV1<PrecisionParams>;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return renderPrecision('Timestamptz', params as Record<string, unknown>);
   }
@@ -628,7 +632,8 @@ export class PgTimeDescriptor extends CodecDescriptorImpl<PrecisionParams> {
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['time'] as const;
   override readonly meta = PG_TIME_META;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema =
+    precisionParamsSchema satisfies StandardSchemaV1<PrecisionParams>;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return renderPrecision('Time', params as Record<string, unknown>);
   }
@@ -674,7 +679,8 @@ export class PgTimetzDescriptor extends CodecDescriptorImpl<PrecisionParams> {
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['timetz'] as const;
   override readonly meta = PG_TIMETZ_META;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema =
+    precisionParamsSchema satisfies StandardSchemaV1<PrecisionParams>;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return renderPrecision('Timetz', params as Record<string, unknown>);
   }
@@ -721,7 +727,7 @@ export class PgBitDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['bit'] as const;
   override readonly meta = PG_BIT_META;
-  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
+  override readonly paramsSchema = lengthParamsSchema satisfies StandardSchemaV1<LengthParams>;
   override renderOutputType(params: LengthParams): string | undefined {
     return renderLength('Bit', params as Record<string, unknown>);
   }
@@ -767,7 +773,7 @@ export class PgVarbitDescriptor extends CodecDescriptorImpl<LengthParams> {
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['bit varying'] as const;
   override readonly meta = PG_VARBIT_META;
-  override readonly paramsSchema = arktypeParamsSchema<LengthParams>(lengthParamsSchema);
+  override readonly paramsSchema = lengthParamsSchema satisfies StandardSchemaV1<LengthParams>;
   override renderOutputType(params: LengthParams): string | undefined {
     return renderLength('VarBit', params as Record<string, unknown>);
   }
@@ -869,7 +875,8 @@ export class PgIntervalDescriptor extends CodecDescriptorImpl<PrecisionParams> {
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['interval'] as const;
   override readonly meta = PG_INTERVAL_META;
-  override readonly paramsSchema = arktypeParamsSchema<PrecisionParams>(precisionParamsSchema);
+  override readonly paramsSchema =
+    precisionParamsSchema satisfies StandardSchemaV1<PrecisionParams>;
   override renderOutputType(params: PrecisionParams): string | undefined {
     return renderPrecision('Interval', params as Record<string, unknown>);
   }
@@ -922,7 +929,7 @@ export class PgEnumDescriptor extends CodecDescriptorImpl<EnumParams> {
   override readonly codecId = PG_ENUM_CODEC_ID;
   override readonly traits = ['equality', 'order'] as const;
   override readonly targetTypes = ['enum'] as const;
-  override readonly paramsSchema = arktypeParamsSchema<EnumParams>(enumParamsSchema);
+  override readonly paramsSchema = enumParamsSchema satisfies StandardSchemaV1<EnumParams>;
   override renderOutputType(params: EnumParams): string | undefined {
     return pgEnumRenderOutputType(params);
   }

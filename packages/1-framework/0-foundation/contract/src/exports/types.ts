@@ -18,7 +18,6 @@ export type {
   UnionFieldType,
   ValueObjectFieldType,
 } from '../domain-types';
-export { arktypeParamsSchema } from '../standard-schema-utils';
 export type {
   $,
   Brand,

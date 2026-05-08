@@ -41,7 +41,7 @@
  * preservation property the strict variant would otherwise enforce.
  */
 
-import { arktypeParamsSchema, type JsonValue } from '@prisma-next/contract/types';
+import type { JsonValue } from '@prisma-next/contract/types';
 import {
   type AnyCodecDescriptor,
   type CodecCallContext,
@@ -53,6 +53,7 @@ import {
   column,
 } from '@prisma-next/framework-components/codec';
 import { runtimeError } from '@prisma-next/framework-components/runtime';
+import type { StandardSchemaV1 } from '@standard-schema/spec';
 import { ArkErrors, ark, type Type, type } from 'arktype';
 
 // ---------------------------------------------------------------------------
@@ -198,14 +199,13 @@ export class ArktypeJsonCodecClass<TInferred> extends CodecImpl<
 const arktypeJsonParamsSchema = type({
   expression: 'string',
   jsonIr: 'object',
-});
+}) satisfies StandardSchemaV1<ArktypeJsonTypeParams>;
 
 export class ArktypeJsonDescriptor extends CodecDescriptorImpl<ArktypeJsonTypeParams> {
   override readonly codecId = ARKTYPE_JSON_CODEC_ID;
   override readonly traits = ['equality'] as const;
   override readonly targetTypes = [ARKTYPE_JSON_NATIVE_TYPE] as const;
-  override readonly paramsSchema =
-    arktypeParamsSchema<ArktypeJsonTypeParams>(arktypeJsonParamsSchema);
+  override readonly paramsSchema: StandardSchemaV1<ArktypeJsonTypeParams> = arktypeJsonParamsSchema;
   override renderOutputType(params: ArktypeJsonTypeParams): string {
     return renderArktypeJsonOutputType(params);
   }
