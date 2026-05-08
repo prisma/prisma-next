@@ -57,22 +57,12 @@ packages/3-extensions/cipherstash/
   artefacts (TML-2397) plus pack-meta authoring contributions and
   the codec lifecycle hook.
 
-## Forthcoming surface (in-flight work)
+## Tracked follow-ups
 
-Tracked under the `cipherstash-integration / project-1` plan:
-
-| Surface                                                  | Round  |
-| -------------------------------------------------------- | ------ |
-| `bulkEncryptMiddleware(sdk)` factory                     | M2 R3  |
-| `createCipherstashRuntimeDescriptor({ sdk })` wrapper    | M2 R3  |
-| Real EQL install bundle (replaces placeholder)           | M2 R3  |
-| Live-Postgres + live-EQL storage round-trip e2e          | M2 R3  |
-| `eq` / `ilike` operator lowering                         | M3     |
-| `decryptAll(rows, opts?)` walker                         | M3     |
-
-The shipping package surface — subpath exports, codec id, descriptor
-shapes — is stable across these milestones; new surfaces ship as
-separate subpath exports rather than restructuring existing ones.
+| Linear ticket                                                                                                                                          | Surface                                                                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| [TML-2435](https://linear.app/prisma-company/issue/TML-2435/cipherstash-ship-queryoperationtypes-export-so-cipherstasheq)                              | Ship `QueryOperationTypes` export so `cipherstashEq` / `cipherstashIlike` appear at the type level on cipherstash column accessors (mirrors `@prisma-next/extension-pgvector/operation-types`). Until this lands consumers (e.g. `examples/cipherstash-integration/src/index.ts`) bridge with a small local `CipherstashColumnSurface` cast. |
+| [TML-2388](https://linear.app/prisma-company/issue/TML-2388)                                                                                           | Codec-SDK binding refactor — pull the per-tenant SDK binding out of the codec factory closure into the descriptor seam so multi-tenant deployments don't re-author the codec per tenant.                                                                              |
 
 ## Design choices worth knowing
 
@@ -134,6 +124,95 @@ column }` so each ZeroKMS round-trip handles one homogeneous batch.
 The envelope's read-side handle carries the same `(table, column)`
 captured from `SqlCodecCallContext.column` at decode time so
 `decrypt({ signal? })` can issue the right routing.
+
+### Cipherstash-namespaced operator API + no-equality-trait
+
+Encrypted equality and free-text search are exposed as
+`email.cipherstashEq(value)` / `email.cipherstashIlike(pattern)` on
+cipherstash columns — not as the framework's built-in `eq` / `ilike`.
+The codec also declares **zero traits** at all three sites
+(`core/codec-runtime.ts`, `core/codec-metadata.ts`,
+`core/parameterized.ts`), so the framework's built-in `eq` (gated on
+the `equality` trait per `COMPARISON_METHODS_META`) is *not
+synthesized* on cipherstash columns — `email.eq(...)` is a type
+error at the model accessor.
+
+The combination is deliberate: an EQL `eql_v2_encrypted` payload
+contains a randomized nonce, so a stock `=` lowering against the
+JSONB column would always return `false` even on equal plaintexts.
+Exposing equality only via the cipherstash-namespaced operator (which
+lowers to `eql_v2.eq(...)`) closes a wrong-SQL footgun by
+construction — at the type level for direct authoring, and at the
+operator-registry level for any extension that might otherwise have
+synthesized a built-in `=` lowering against the column. The
+`equality-trait-removal.test.ts` regression test pins the
+loud-failure invariant (the codec carries `traits: []` at all three
+declarations + the three declarations agree).
+
+This is a framework-vs-extension boundary worth recording: the
+framework's built-in operator handlers live in operations whose
+`required-trait` set the codec opts into; extensions whose codec
+output cannot back the trait's wire semantics must (i) declare zero
+traits, and (ii) ship namespaced replacement operators — which
+should NOT shadow the framework's built-in name. See `core/operators.ts`
+for the `cipherstashEq` / `cipherstashIlike` handler shape.
+
+### Control vs runtime tree-shaking architecture
+
+The package publishes three runtime-relevant subpath entries —
+`./control` (contract-space authoring + the codec lifecycle hook),
+`./runtime` (envelope + SDK + codec runtime + `decryptAll`), and
+`./middleware` (bulk-encrypt middleware) — and each composes
+tree-shakably so a consumer pulling `./runtime` does not drag in the
+EQL bundle SQL or the codec lifecycle hook (which would defeat the
+runtime-bundle size budget and leak control-plane behavior into
+runtime call paths) and a consumer pulling `./control` does not drag
+in the runtime envelope, the SDK interface, the codec runtime, or
+the bulk-encrypt middleware.
+
+The split lives in the source layout: `src/exports/control.ts` only
+imports from `src/core/{cipherstash-codec, contract, migrations,
+descriptor-meta, eql-bundle, constants}.ts` and never from
+`src/core/{envelope, codec-runtime, codec-metadata, sdk, decrypt-all}.ts`,
+nor from `src/middleware/`. `src/exports/runtime.ts` /
+`src/exports/middleware.ts` only import from the runtime-side core
+modules (and the shared `constants.ts`). The
+`test/bundling-isolation.test.ts` guard pins this byte-level —
+asserting the entry `.mjs` files don't carry forbidden symbols and
+that the transitively-reached chunk-file sets are disjoint modulo
+the shared `constants-*.mjs` chunk.
+
+The shared `constants-*.mjs` chunk is structurally permitted to live
+in both planes — it carries pure literal constants (codec id, native
+types, invariant ids) and no executable behavior.
+
+### `decryptAll(rows, opts?)` is opt-in read-side amortization
+
+The codec's `decode` returns `EncryptedString` envelopes that defer
+their SDK round-trip until `envelope.decrypt(...)` is awaited; this
+keeps SELECT plans cheap when consumers only need a subset of
+encrypted columns or when consumers want to forward envelopes to a
+downstream service without ever reading the plaintext.
+
+`decryptAll(rows)` is the read-side amortization for the case where
+the consumer DOES want plaintexts: it walks the result-set graph
+(arrays, plain objects, nested envelopes; cycle-safe; skips already-
+decrypted envelopes; passes over exotic containers like `Date` /
+`Map` / `Set` / `Uint8Array`), partitions the discovered envelopes
+by `(sdk identity, table, column)`, and issues one `bulkDecrypt` SDK
+call per partition. The resolved plaintexts are cached back onto
+each envelope's handle so subsequent `envelope.decrypt()` calls
+return synchronously. Already-decrypted envelopes (write-side
+envelopes from `EncryptedString.from(plaintext)`, or read-side
+envelopes that already cached a plaintext) are not re-decrypted —
+a re-run of `decryptAll` over a previously-decrypted result set is
+a no-op.
+
+The walker is intentionally narrow: traversing arbitrary graphs
+(JS-side `Map` / `Set` / `Date` containers) is out of scope and
+loud-skipped — embedding an `EncryptedString` inside a `Map` value
+will not be discovered by the walker. Consumers needing such shapes
+should call `envelope.decrypt(...)` directly.
 
 ## Acceptance criteria
 

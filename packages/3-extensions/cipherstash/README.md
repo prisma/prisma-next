@@ -2,17 +2,16 @@
 
 [CipherStash](https://cipherstash.com) extension for Prisma Next: searchable application-layer encryption for Postgres via the EQL bundle.
 
-## Status
+## What this package provides
 
-In development. The currently-implemented surface is the **storage path**:
+- `EncryptedString` envelope + `cipherstash/string@1` codec runtime — the runtime side of the field-level encryption.
+- `cipherstash.EncryptedString({...})` PSL constructor and the `encryptedString({...})` TS contract factory (byte-identical lowering).
+- `SqlControlExtensionDescriptor` carrying the EQL contract space (the `eql_v2_configuration` table, the `eql_v2_encrypted` / `ore_*` composite types, the `eql_v2` domains) plus a baseline migration that installs the vendored EQL bundle SQL.
+- `bulkEncryptMiddleware(sdk)` — coalesces `EncryptedString` parameters into one `bulkEncrypt` SDK call per `(table, column)` before the wire encode.
+- `cipherstashEq(value)` / `cipherstashIlike(pattern)` query operations — lower to `eql_v2.eq(...)` / `eql_v2.ilike(...)` on cipherstash columns.
+- `decryptAll(rows, opts?)` — opt-in read-side amortization that walks a result set, coalesces every `EncryptedString` it finds into one `bulkDecrypt` SDK call per `(table, column)` group, and caches the resolved plaintexts back onto each envelope so subsequent `envelope.decrypt()` calls return synchronously without consulting the SDK.
 
-- `EncryptedString` envelope and `cipherstash/string@1` codec runtime,
-- `cipherstash.EncryptedString({...})` PSL constructor and the `encryptedString({...})` TS contract factory (byte-identical lowering),
-- `SqlControlExtensionDescriptor` carrying the EQL contract space (eql_v2_configuration table, eql_v2_encrypted / ore_* composite types, eql_v2 domains) plus a baseline migration that installs the vendored EQL bundle SQL.
-
-The bulk-encrypt middleware, the live-Postgres storage round-trip, and the search operators (`cipherstashEq`, `cipherstashIlike`) have shipped on the cipherstash storage path. `decryptAll` and the live-Postgres + EQL bundle exercise of the lowered search SQL ship in subsequent releases. See [`DEVELOPING.md`](./DEVELOPING.md) — forthcoming surface.
-
-Search operators are deliberately exposed under the cipherstash-namespaced names `cipherstashEq` and `cipherstashIlike` rather than the framework's built-in `eq` / `ilike`. The cipherstash codec declares no `equality` codec trait, so the framework's trait-gated `eq` is not reachable on cipherstash columns — calling `email.eq(...)` on a cipherstash column is `undefined`. Equality search uses `email.cipherstashEq(value)`, which lowers to `eql_v2.eq(...)`; free-text search uses `email.cipherstashIlike(pattern)` lowering to `eql_v2.ilike(...)`. The user-facing `EncryptedString({ equality: true })` flag is unrelated to the codec trait — it controls whether the codec lifecycle hook emits an `add_search_config` op for the column's `unique` index at migration time.
+Search operators are deliberately exposed under the cipherstash-namespaced names `cipherstashEq` and `cipherstashIlike` rather than the framework's built-in `eq` / `ilike`. The cipherstash codec declares no `equality` codec trait, so the framework's trait-gated `eq` is not reachable on cipherstash columns — calling `email.eq(...)` on a cipherstash column is `undefined` (typechecks as a no-such-method error). Equality search uses `email.cipherstashEq(value)`, which lowers to `eql_v2.eq(...)`; free-text search uses `email.cipherstashIlike(pattern)` lowering to `eql_v2.ilike(...)`. The user-facing `EncryptedString({ equality: true })` flag is unrelated to the codec trait — it controls whether the codec lifecycle hook emits an `add_search_config` op for the column's `unique` index at migration time.
 
 ## Subpath exports
 
@@ -20,9 +19,12 @@ Search operators are deliberately exposed under the cipherstash-namespaced names
 | Subpath          | Purpose                                                       |
 | ---------------- | ------------------------------------------------------------- |
 | `./control`      | `SqlControlExtensionDescriptor` (contract space + pack meta)  |
-| `./runtime`      | `EncryptedString` envelope + `CipherstashSdk` + codec runtime |
+| `./runtime`      | `EncryptedString` envelope + `CipherstashSdk` + codec runtime + `decryptAll` |
+| `./middleware`   | `bulkEncryptMiddleware(sdk)`                                  |
 | `./pack`         | `cipherstashPackMeta` for TS contract authoring               |
 | `./column-types` | `encryptedString({ equality?, freeTextSearch? })` TS factory  |
+
+The `./control` and `./runtime` / `./middleware` planes are tree-shakable: a runtime consumer never pulls the EQL bundle SQL or the codec lifecycle hook, and a control-plane consumer never pulls the SDK interface, the codec runtime, or the bulk-encrypt middleware. See [`DEVELOPING.md`](./DEVELOPING.md) — design choices.
 
 
 ## Configuration
@@ -99,16 +101,52 @@ After `prisma-next migrate plan`, the user's repo gains:
 
 ## Runtime usage
 
-```ts
-import { EncryptedString } from '@prisma-next/extension-cipherstash/runtime';
+A worked end-to-end example lives at [`examples/cipherstash-integration/`](../../../examples/cipherstash-integration/) — schema, runtime composition, demo SDK stub, and an `insert` → `cipherstashEq` → `cipherstashIlike` → `decryptAll` flow against a real Postgres database.
 
-const envelope = EncryptedString.from('alice@example.com');
-const plaintext = await envelope.decrypt();
+The minimal runtime composition wires the cipherstash runtime descriptor and the bulk-encrypt middleware into the SQL runtime (sharing one SDK binding):
+
+```ts
+import { bulkEncryptMiddleware } from '@prisma-next/extension-cipherstash/middleware';
+import {
+  createCipherstashRuntimeDescriptor,
+  decryptAll,
+  EncryptedString,
+} from '@prisma-next/extension-cipherstash/runtime';
+import postgres from '@prisma-next/postgres/runtime';
+import type { Contract } from './prisma/contract.d';
+import contractJson from './prisma/contract.json' with { type: 'json' };
+
+const sdk = /* your CipherstashSdk implementation */;
+
+const db = postgres<Contract>({
+  contractJson,
+  extensions: [createCipherstashRuntimeDescriptor({ sdk })],
+  middleware: [bulkEncryptMiddleware(sdk)],
+});
+
+await db.orm.User.create({ id: 'u1', email: EncryptedString.from('alice@example.com') });
+
+const rows = await db.orm.User.where((u) => u.email.cipherstashEq('alice@example.com')).all();
+await decryptAll(rows);
+console.log(await rows[0]?.email.decrypt());
 ```
+
+`EncryptedString.from(plaintext)` creates a write-side envelope; the bulk-encrypt middleware fills in the ciphertext at execute time. Read-side envelopes are constructed by the codec's `decode` and carry their `(table, column)` routing key for `decrypt` / `decryptAll`.
+
+## Security model
+
+- **Plaintext lifetime**. The write-side handle retains its plaintext slot post-encrypt — JS strings are immutable and zeroing is best-effort, so the GC-driven lifecycle is the sufficient bound. Practical implication: the original `EncryptedString.from(plaintext)` envelope's `decrypt()` returns the plaintext synchronously without consulting the SDK. Treat envelope objects as plaintext-equivalent for the lifetime of the variable.
+- **Ciphertext routing**. Every read-side envelope carries the `(table, column)` it was decoded from; `decrypt` / `decryptAll` route their bulk SDK calls by that key so the SDK can pick the right key material per column.
+- **Operator semantics**. Encrypted equality uses `eql_v2.eq` (deterministic-index lookup); encrypted free-text uses `eql_v2.ilike` (bloom-filter lookup). The framework's built-in `eq` / `ilike` are unreachable on cipherstash columns — the codec declares zero traits so no wrong-SQL footgun can exist where a randomized EQL ciphertext is compared with `=` directly.
+- **Cancellation**. Every cipherstash-internal SDK call accepts an `AbortSignal`; mid-flight cancellation surfaces a `RUNTIME.ABORTED` envelope with a phase tag (`bulk-encrypt`, `decrypt`, or `decrypt-all`) mirroring the framework's envelope shape from [ADR 207](../../../docs/architecture%20docs/adrs/ADR%20207%20-%20Codec%20call%20context%20per-query%20AbortSignal%20and%20column%20metadata.md).
 
 ## Contributing
 
-See [`DEVELOPING.md`](./DEVELOPING.md) for source layout, in-progress milestones, and design choices.
+See [`DEVELOPING.md`](./DEVELOPING.md) for source layout, design choices, and the canonical Acceptance Criteria list.
+
+### Known surface gap
+
+The runtime registers `cipherstashEq` / `cipherstashIlike` on cipherstash columns via `context.queryOperations`, but the package does not yet ship a static `QueryOperationTypes` surface analogous to [`@prisma-next/extension-pgvector/operation-types`](../pgvector/src/exports/). Tracked under [TML-2435](https://linear.app/prisma-company/issue/TML-2435/cipherstash-ship-queryoperationtypes-export-so-cipherstasheq) — until it lands, consumers cast the column accessor through a small local shape so `where(...)` callbacks typecheck (the runtime call works regardless). The example app at [`examples/cipherstash-integration/`](../../../examples/cipherstash-integration/README.md) demonstrates the cast and documents the same gap.
 
 ## References
 
