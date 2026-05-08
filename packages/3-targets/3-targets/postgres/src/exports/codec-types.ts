@@ -1,91 +1,23 @@
 /**
  * Codec type definitions for the Postgres target.
  *
- * This file is the public origin of `CodecTypes`. Defining it here
- * (rather than re-exporting from `core/codecs`) keeps the
- * tsdown DTS bundler from emitting a private chunk path in
- * downstream `.d.mts` files: consumers see `CodecTypes` resolved via
- * this public entry point rather than via a hash-named internal
- * chunk (TML-2357).
+ * This file is the public origin of `CodecTypes`. The `Resolve<...>`
+ * materialisation happens here (rather than in `core/codec-type-map.ts`)
+ * so the tsdown DTS bundler resolves consumer-side `.d.mts` references
+ * via this public entry point rather than a hash-named internal chunk
+ * — the same `TS2742` family the F8 fix closed (TML-2357).
  *
  * Lives in `target-postgres` because codec types describe the target's
- * value space - both the control adapter (introspection / schema
+ * value space — both the control adapter (introspection / schema
  * verification) and the runtime adapter (encode/decode) share the same
  * definitions, and the target package is the natural home that both
  * adapters depend on.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
-import {
-  sqlCharDescriptor,
-  sqlFloatDescriptor,
-  sqlIntDescriptor,
-  sqlTextDescriptor,
-  sqlTimestampDescriptor,
-  sqlVarcharDescriptor,
-} from '@prisma-next/sql-relational-core/ast';
-import {
-  pgBitDescriptor,
-  pgBoolDescriptor,
-  pgByteaDescriptor,
-  pgCharDescriptor,
-  pgEnumDescriptor,
-  pgFloat4Descriptor,
-  pgFloat8Descriptor,
-  pgFloatDescriptor,
-  pgInt2Descriptor,
-  pgInt4Descriptor,
-  pgInt8Descriptor,
-  pgIntDescriptor,
-  pgIntervalDescriptor,
-  pgJsonbDescriptor,
-  pgJsonDescriptor,
-  pgNumericDescriptor,
-  pgTextDescriptor,
-  pgTimeDescriptor,
-  pgTimestampDescriptor,
-  pgTimestamptzDescriptor,
-  pgTimetzDescriptor,
-  pgVarbitDescriptor,
-  pgVarcharDescriptor,
-} from '../core/codecs';
+import type { ExtractedCodecTypes, Resolve } from '../core/codec-type-map';
 
-const codecDescriptorMap = {
-  char: sqlCharDescriptor,
-  varchar: sqlVarcharDescriptor,
-  int: sqlIntDescriptor,
-  float: sqlFloatDescriptor,
-  'sql-text': sqlTextDescriptor,
-  'sql-timestamp': sqlTimestampDescriptor,
-  text: pgTextDescriptor,
-  character: pgCharDescriptor,
-  'character varying': pgVarcharDescriptor,
-  integer: pgIntDescriptor,
-  'double precision': pgFloatDescriptor,
-  int4: pgInt4Descriptor,
-  int2: pgInt2Descriptor,
-  int8: pgInt8Descriptor,
-  float4: pgFloat4Descriptor,
-  float8: pgFloat8Descriptor,
-  numeric: pgNumericDescriptor,
-  timestamp: pgTimestampDescriptor,
-  timestamptz: pgTimestamptzDescriptor,
-  time: pgTimeDescriptor,
-  timetz: pgTimetzDescriptor,
-  bool: pgBoolDescriptor,
-  bit: pgBitDescriptor,
-  'bit varying': pgVarbitDescriptor,
-  bytea: pgByteaDescriptor,
-  interval: pgIntervalDescriptor,
-  enum: pgEnumDescriptor,
-  json: pgJsonDescriptor,
-  jsonb: pgJsonbDescriptor,
-} as const;
-
-type Resolve<T> = { readonly [K in keyof T]: { readonly [P in keyof T[K]]: T[K][P] } };
-
-export type CodecTypes = Resolve<ExtractCodecTypes<typeof codecDescriptorMap>>;
+export type CodecTypes = Resolve<ExtractedCodecTypes>;
 
 export type { JsonValue };
 
