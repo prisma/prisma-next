@@ -37,6 +37,28 @@ const fw = [postgresTargetDescriptor, postgresAdapterDescriptor, postgresDriverD
 const CONTROL_TABLES = new Set(['_prisma_marker', '_prisma_ledger']);
 const emptySchema: SqlSchemaIR = { tables: {}, dependencies: [] };
 
+/**
+ * Translate `?` placeholders to `$1`, `$2`, … so test SQL written for
+ * sqlite-style placeholders runs unchanged on Postgres. The wrapper preserves
+ * the `PostgresControlDriver` shape so it remains a `ControlDriverInstance<'sql', 'postgres'>`
+ * for `PostgresControlAdapter.introspect`. Introspection queries use `$N`
+ * already and contain no `?`, so they pass through unchanged.
+ */
+function wrapPostgresDriverForTests(inner: PostgresControlDriver): PostgresControlDriver {
+  return {
+    familyId: 'sql',
+    targetId: 'postgres',
+    async query<Row = Record<string, unknown>>(sql: string, params?: readonly unknown[]) {
+      let i = 0;
+      const translated = sql.replace(/\?/g, () => `$${++i}`);
+      return inner.query<Row>(translated, params);
+    },
+    async close() {
+      return inner.close();
+    },
+  } as PostgresControlDriver;
+}
+
 function formatFailure(f: SqlMigrationRunnerFailure): string {
   const parts = [`[${f.code}] ${f.summary}`];
   if (f.why) parts.push(`  why: ${f.why}`);
@@ -56,7 +78,11 @@ export const postgresTestTarget: TestTargetAdapter<
 
   async setup() {
     const dev = await createDevDatabase();
-    const driver = await postgresDriverDescriptor.create(dev.connectionString);
+    const inner = await postgresDriverDescriptor.create(dev.connectionString);
+    // Wrap so test SQL written with `?` placeholders works on Postgres without
+    // each test having to dispatch on target. Introspection queries use `$N`
+    // already and pass through unchanged.
+    const driver = wrapPostgresDriverForTests(inner);
     return {
       driver,
       async cleanup() {

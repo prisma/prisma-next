@@ -1,77 +1,165 @@
 import { datetimeColumn } from '@prisma-next/adapter-sqlite/column-types';
 import { defineContract, field, model } from '@prisma-next/sql-contract-ts/contract-builder';
 import { describe, expect, it } from 'vitest';
+import { describeSqlMigration } from '../../migration-targets/sql-fanout';
 import { applyMigration, int, pack, text } from './harness';
 
-describe('SQLite Migration E2E - Widening operations (recreate-table)', () => {
-  const WIDENING = { allowedOperationClasses: ['additive', 'widening'] } as const;
+// ---------------------------------------------------------------------------
+// Widening operations (fanned out)
+// ---------------------------------------------------------------------------
 
-  it('relaxes NOT NULL to nullable', async () => {
-    await applyMigration(
-      {
-        origin: defineContract({
-          ...pack,
-          models: { User: model('User', { fields: { id: int.id(), name: text, bio: text } }) },
-        }),
-        destination: defineContract({
-          ...pack,
-          models: {
-            User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
-          },
-        }),
-        policy: WIDENING,
-      },
-      async ({ schema, driver }) => {
-        expect(schema.tables['User']!.columns['bio']!.nullable).toBe(true);
-        await driver.query('INSERT INTO "User" (id, name, bio) VALUES (?, ?, ?)', [
-          1,
-          'Alice',
-          null,
-        ]);
-        expect(
-          (await driver.query<{ bio: string | null }>('SELECT bio FROM "User" WHERE id = ?', [1]))
-            .rows[0]!.bio,
-        ).toBeNull();
-      },
-    );
-  });
+describeSqlMigration(
+  'Migration E2E - Widening operations',
+  ({ int, text, defineContract, runMigration }) => {
+    const WIDENING = { allowedOperationClasses: ['additive', 'widening'] } as const;
 
-  it('changes a column default', async () => {
-    await applyMigration(
-      {
-        origin: defineContract({
-          ...pack,
-          models: {
-            Setting: model('Setting', { fields: { id: int.id(), status: text.default('draft') } }),
-          },
-        }),
-        destination: defineContract({
-          ...pack,
-          models: {
-            Setting: model('Setting', { fields: { id: int.id(), status: text.default('active') } }),
-          },
-        }),
-        policy: WIDENING,
-      },
-      async ({ driver }) => {
-        await driver.query('INSERT INTO "Setting" (id) VALUES (?)', [1]);
-        expect(
-          (await driver.query<{ status: string }>('SELECT status FROM "Setting" WHERE id = ?', [1]))
-            .rows[0]!.status,
-        ).toBe('active');
-      },
-    );
-  });
+    it('relaxes NOT NULL to nullable', async () => {
+      await runMigration(
+        {
+          origin: defineContract({
+            models: { User: model('User', { fields: { id: int.id(), name: text, bio: text } }) },
+          }),
+          destination: defineContract({
+            models: {
+              User: model('User', { fields: { id: int.id(), name: text, bio: text.optional() } }),
+            },
+          }),
+          policy: WIDENING,
+        },
+        async ({ schema, driver }) => {
+          expect(schema.tables['User']!.columns['bio']!.nullable).toBe(true);
+          await driver.query('INSERT INTO "User" (id, name, bio) VALUES (?, ?, ?)', [
+            1,
+            'Alice',
+            null,
+          ]);
+          expect(
+            (await driver.query<{ bio: string | null }>('SELECT bio FROM "User" WHERE id = ?', [1]))
+              .rows[0]!.bio,
+          ).toBeNull();
+        },
+      );
+    });
 
+    it('changes a column default', async () => {
+      await runMigration(
+        {
+          origin: defineContract({
+            models: {
+              Setting: model('Setting', {
+                fields: { id: int.id(), status: text.default('draft') },
+              }),
+            },
+          }),
+          destination: defineContract({
+            models: {
+              Setting: model('Setting', {
+                fields: { id: int.id(), status: text.default('active') },
+              }),
+            },
+          }),
+          policy: WIDENING,
+        },
+        async ({ driver }) => {
+          await driver.query('INSERT INTO "Setting" (id) VALUES (?)', [1]);
+          expect(
+            (
+              await driver.query<{ status: string }>(
+                'SELECT status FROM "Setting" WHERE id = ?',
+                [1],
+              )
+            ).rows[0]!.status,
+          ).toBe('active');
+        },
+      );
+    });
+
+    it('round-trips a string default with an apostrophe', async () => {
+      await runMigration(
+        {
+          origin: defineContract({
+            models: {
+              User: model('User', {
+                fields: { id: int.id(), nickname: text.default('old') },
+              }),
+            },
+          }),
+          destination: defineContract({
+            models: {
+              User: model('User', {
+                fields: { id: int.id(), nickname: text.default("It's") },
+              }),
+            },
+          }),
+          policy: WIDENING,
+        },
+        async ({ schema, driver }) => {
+          expect(schema.tables['User']!.columns['nickname']!.default).toBe("'It''s'");
+
+          await driver.query('INSERT INTO "User" (id) VALUES (?)', [1]);
+          const row = (
+            await driver.query<{ nickname: string }>(
+              'SELECT nickname FROM "User" WHERE id = ?',
+              [1],
+            )
+          ).rows[0];
+          expect(row?.nickname).toBe("It's");
+        },
+      );
+    });
+
+    it('preserves existing data through column-set widening', async () => {
+      await runMigration(
+        {
+          origin: defineContract({
+            models: { User: model('User', { fields: { id: int.id(), name: text, email: text } }) },
+          }),
+          destination: defineContract({
+            models: {
+              User: model('User', {
+                fields: { id: int.id(), name: text, email: text.optional() },
+              }),
+            },
+          }),
+          policy: WIDENING,
+          seed: async (driver) => {
+            await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
+              1,
+              'Alice',
+              'alice@example.com',
+            ]);
+            await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
+              2,
+              'Bob',
+              'bob@example.com',
+            ]);
+          },
+        },
+        async ({ driver }) => {
+          const rows = await driver.query<{ id: number; name: string; email: string }>(
+            'SELECT * FROM "User" ORDER BY id',
+          );
+          expect(rows.rows).toHaveLength(2);
+          expect(rows.rows[0]).toMatchObject({ id: 1, name: 'Alice', email: 'alice@example.com' });
+          expect(rows.rows[1]).toMatchObject({ id: 2, name: 'Bob', email: 'bob@example.com' });
+        },
+      );
+    });
+  },
+);
+
+// ---------------------------------------------------------------------------
+// SQLite-specific (now() canonicalization through datetime() spelling)
+// ---------------------------------------------------------------------------
+
+describe('Migration E2E - SQLite-specific widening', () => {
   // Round-trip regression for the canonical `now()` default. SQLite has
   // several spellings for "wall-clock now" (`CURRENT_TIMESTAMP`,
   // `datetime('now')`, the bare `now()` form): `parseSqliteDefault`
   // canonicalizes the schema side, and `lowerDbgenerated` canonicalizes
   // the contract side. As long as both sides converge on `now()`, the
   // additive apply must verify clean and the column's stored default
-  // must be one of the SQLite-native spellings (the runner's
-  // post-execute `verifySqlSchema` already proves the canonical
-  // equivalence; this assertion just pins the storage form).
+  // must be one of the SQLite-native spellings.
   it('round-trips a `now()` default through apply + introspect without drift', async () => {
     await applyMigration(
       {
@@ -99,77 +187,6 @@ describe('SQLite Migration E2E - Widening operations (recreate-table)', () => {
           )
         ).rows[0];
         expect(typeof row?.createdAt).toBe('string');
-      },
-    );
-  });
-
-  it('round-trips a string default with an apostrophe through recreate-table', async () => {
-    await applyMigration(
-      {
-        origin: defineContract({
-          ...pack,
-          models: {
-            User: model('User', {
-              fields: { id: int.id(), nickname: text.default('old') },
-            }),
-          },
-        }),
-        destination: defineContract({
-          ...pack,
-          models: {
-            User: model('User', {
-              fields: { id: int.id(), nickname: text.default("It's") },
-            }),
-          },
-        }),
-        policy: WIDENING,
-      },
-      async ({ schema, driver }) => {
-        expect(schema.tables['User']!.columns['nickname']!.default).toBe("'It''s'");
-
-        await driver.query('INSERT INTO "User" (id) VALUES (?)', [1]);
-        const row = (
-          await driver.query<{ nickname: string }>('SELECT nickname FROM "User" WHERE id = ?', [1])
-        ).rows[0];
-        expect(row?.nickname).toBe("It's");
-      },
-    );
-  });
-
-  it('preserves existing data through recreate-table', async () => {
-    await applyMigration(
-      {
-        origin: defineContract({
-          ...pack,
-          models: { User: model('User', { fields: { id: int.id(), name: text, email: text } }) },
-        }),
-        destination: defineContract({
-          ...pack,
-          models: {
-            User: model('User', { fields: { id: int.id(), name: text, email: text.optional() } }),
-          },
-        }),
-        policy: WIDENING,
-        seed: async (driver) => {
-          await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
-            1,
-            'Alice',
-            'alice@example.com',
-          ]);
-          await driver.query('INSERT INTO "User" (id, name, email) VALUES (?, ?, ?)', [
-            2,
-            'Bob',
-            'bob@example.com',
-          ]);
-        },
-      },
-      async ({ driver }) => {
-        const rows = await driver.query<{ id: number; name: string; email: string }>(
-          'SELECT * FROM "User" ORDER BY id',
-        );
-        expect(rows.rows).toHaveLength(2);
-        expect(rows.rows[0]).toMatchObject({ id: 1, name: 'Alice', email: 'alice@example.com' });
-        expect(rows.rows[1]).toMatchObject({ id: 2, name: 'Bob', email: 'bob@example.com' });
       },
     );
   });
