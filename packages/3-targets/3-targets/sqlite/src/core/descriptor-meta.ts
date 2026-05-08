@@ -1,5 +1,5 @@
+import type { CodecTypes } from '../exports/codec-types';
 import { sqliteAuthoringFieldPresets } from './authoring';
-import type { CodecTypes } from './codecs-class';
 
 const sqliteTargetDescriptorMetaBase = {
   kind: 'target',

@@ -47,7 +47,6 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
-  type ExtractCodecTypes,
   SqlCharCodec,
   SqlFloatCodec,
   SqlIntCodec,
@@ -1165,39 +1164,34 @@ pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 // (`pack.ts` / `runtime.ts`) consumes the list shape.
 // ---------------------------------------------------------------------------
 
-const codecDescriptorMap = {
-  char: sqlCharDescriptorClass,
-  varchar: sqlVarcharDescriptorClass,
-  int: sqlIntDescriptorClass,
-  float: sqlFloatDescriptorClass,
-  'sql-text': sqlTextDescriptorClass,
-  'sql-timestamp': sqlTimestampDescriptorClass,
-  text: pgTextDescriptorClass,
-  character: pgCharDescriptor,
-  'character varying': pgVarcharDescriptor,
-  integer: pgIntDescriptor,
-  'double precision': pgFloatDescriptor,
-  int4: pgInt4DescriptorClass,
-  int2: pgInt2DescriptorClass,
-  int8: pgInt8DescriptorClass,
-  float4: pgFloat4DescriptorClass,
-  float8: pgFloat8DescriptorClass,
-  numeric: pgNumericDescriptorClass,
-  timestamp: pgTimestampDescriptorClass,
-  timestamptz: pgTimestamptzDescriptorClass,
-  time: pgTimeDescriptorClass,
-  timetz: pgTimetzDescriptorClass,
-  bool: pgBoolDescriptorClass,
-  bit: pgBitDescriptorClass,
-  'bit varying': pgVarbitDescriptorClass,
-  bytea: pgByteaDescriptorClass,
-  interval: pgIntervalDescriptorClass,
-  enum: pgEnumDescriptorClass,
-  json: pgJsonDescriptorClass,
-  jsonb: pgJsonbDescriptorClass,
-} as const;
-
-export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;
-
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
-  Object.values(codecDescriptorMap);
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
+  sqlCharDescriptorClass,
+  sqlVarcharDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlTextDescriptorClass,
+  sqlTimestampDescriptorClass,
+  pgTextDescriptorClass,
+  pgCharDescriptor,
+  pgVarcharDescriptor,
+  pgIntDescriptor,
+  pgFloatDescriptor,
+  pgInt4DescriptorClass,
+  pgInt2DescriptorClass,
+  pgInt8DescriptorClass,
+  pgFloat4DescriptorClass,
+  pgFloat8DescriptorClass,
+  pgNumericDescriptorClass,
+  pgTimestampDescriptorClass,
+  pgTimestamptzDescriptorClass,
+  pgTimeDescriptorClass,
+  pgTimetzDescriptorClass,
+  pgBoolDescriptorClass,
+  pgBitDescriptorClass,
+  pgVarbitDescriptorClass,
+  pgByteaDescriptorClass,
+  pgIntervalDescriptorClass,
+  pgEnumDescriptorClass,
+  pgJsonDescriptorClass,
+  pgJsonbDescriptorClass,
+];

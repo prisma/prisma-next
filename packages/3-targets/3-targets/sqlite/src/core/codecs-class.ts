@@ -43,7 +43,6 @@ import {
   voidParamsSchema,
 } from '@prisma-next/framework-components/codec';
 import {
-  type ExtractCodecTypes,
   sqlCharDescriptorClass,
   sqlFloatDescriptorClass,
   sqlIntDescriptorClass,
@@ -394,21 +393,16 @@ sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
 // consumes the list shape.
 // ---------------------------------------------------------------------------
 
-const codecDescriptorMap = {
-  char: sqlCharDescriptorClass,
-  varchar: sqlVarcharDescriptorClass,
-  int: sqlIntDescriptorClass,
-  float: sqlFloatDescriptorClass,
-  text: sqliteTextDescriptorClass,
-  integer: sqliteIntegerDescriptorClass,
-  real: sqliteRealDescriptorClass,
-  blob: sqliteBlobDescriptorClass,
-  datetime: sqliteDatetimeDescriptorClass,
-  json: sqliteJsonDescriptorClass,
-  bigint: sqliteBigintDescriptorClass,
-} as const;
-
-export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;
-
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
-  Object.values(codecDescriptorMap);
+export const codecDescriptorClassList: readonly AnyCodecDescriptor[] = [
+  sqlCharDescriptorClass,
+  sqlVarcharDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqliteTextDescriptorClass,
+  sqliteIntegerDescriptorClass,
+  sqliteRealDescriptorClass,
+  sqliteBlobDescriptorClass,
+  sqliteDatetimeDescriptorClass,
+  sqliteJsonDescriptorClass,
+  sqliteBigintDescriptorClass,
+];

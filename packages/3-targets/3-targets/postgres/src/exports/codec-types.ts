@@ -1,23 +1,91 @@
 /**
  * Codec type definitions for the Postgres target.
  *
- * This file exports type-only definitions for codec input/output types.
- * These types are imported by generated `contract.d.ts` files for compile-time
- * type inference.
+ * This file is the public origin of `CodecTypes`. Defining it here
+ * (rather than re-exporting from `core/codecs-class`) keeps the
+ * tsdown DTS bundler from emitting a private chunk path in
+ * downstream `.d.mts` files: consumers see `CodecTypes` resolved via
+ * this public entry point rather than via a hash-named internal
+ * chunk (TML-2357 M0 R6 / F8).
  *
- * Lives in `target-postgres` because codec types describe the target's value
- * space - both the control adapter (introspection / schema verification) and
- * the runtime adapter (encode/decode) share the same definitions, and the
- * target package is the natural home that both adapters depend on.
- *
- * Runtime codec implementations are provided by the runtime adapter's
- * codec registry, which is built from `core/codecs.ts`.
+ * Lives in `target-postgres` because codec types describe the target's
+ * value space - both the control adapter (introspection / schema
+ * verification) and the runtime adapter (encode/decode) share the same
+ * definitions, and the target package is the natural home that both
+ * adapters depend on.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';
-import type { CodecTypes as CoreCodecTypes } from '../core/codecs-class';
+import type { ExtractCodecTypes } from '@prisma-next/sql-relational-core/ast';
+import {
+  sqlCharDescriptorClass,
+  sqlFloatDescriptorClass,
+  sqlIntDescriptorClass,
+  sqlTextDescriptorClass,
+  sqlTimestampDescriptorClass,
+  sqlVarcharDescriptorClass,
+} from '@prisma-next/sql-relational-core/ast';
+import {
+  pgBitDescriptorClass,
+  pgBoolDescriptorClass,
+  pgByteaDescriptorClass,
+  pgCharDescriptor,
+  pgEnumDescriptorClass,
+  pgFloat4DescriptorClass,
+  pgFloat8DescriptorClass,
+  pgFloatDescriptor,
+  pgInt2DescriptorClass,
+  pgInt4DescriptorClass,
+  pgInt8DescriptorClass,
+  pgIntDescriptor,
+  pgIntervalDescriptorClass,
+  pgJsonbDescriptorClass,
+  pgJsonDescriptorClass,
+  pgNumericDescriptorClass,
+  pgTextDescriptorClass,
+  pgTimeDescriptorClass,
+  pgTimestampDescriptorClass,
+  pgTimestamptzDescriptorClass,
+  pgTimetzDescriptorClass,
+  pgVarbitDescriptorClass,
+  pgVarcharDescriptor,
+} from '../core/codecs-class';
 
-export type CodecTypes = CoreCodecTypes;
+const codecDescriptorMap = {
+  char: sqlCharDescriptorClass,
+  varchar: sqlVarcharDescriptorClass,
+  int: sqlIntDescriptorClass,
+  float: sqlFloatDescriptorClass,
+  'sql-text': sqlTextDescriptorClass,
+  'sql-timestamp': sqlTimestampDescriptorClass,
+  text: pgTextDescriptorClass,
+  character: pgCharDescriptor,
+  'character varying': pgVarcharDescriptor,
+  integer: pgIntDescriptor,
+  'double precision': pgFloatDescriptor,
+  int4: pgInt4DescriptorClass,
+  int2: pgInt2DescriptorClass,
+  int8: pgInt8DescriptorClass,
+  float4: pgFloat4DescriptorClass,
+  float8: pgFloat8DescriptorClass,
+  numeric: pgNumericDescriptorClass,
+  timestamp: pgTimestampDescriptorClass,
+  timestamptz: pgTimestamptzDescriptorClass,
+  time: pgTimeDescriptorClass,
+  timetz: pgTimetzDescriptorClass,
+  bool: pgBoolDescriptorClass,
+  bit: pgBitDescriptorClass,
+  'bit varying': pgVarbitDescriptorClass,
+  bytea: pgByteaDescriptorClass,
+  interval: pgIntervalDescriptorClass,
+  enum: pgEnumDescriptorClass,
+  json: pgJsonDescriptorClass,
+  jsonb: pgJsonbDescriptorClass,
+} as const;
+
+type Resolve<T> = { readonly [K in keyof T]: { readonly [P in keyof T[K]]: T[K][P] } };
+
+export type CodecTypes = Resolve<ExtractCodecTypes<typeof codecDescriptorMap>>;
 
 export type { JsonValue };
 
