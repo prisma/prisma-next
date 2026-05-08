@@ -1,6 +1,8 @@
 # Project 1 — Searchable-encryption MVP — Handover
 
-> Written 2026-05-05 by the previous driver. Read this first, then [`spec.md`](spec.md), [`plan.md`](plan.md), and [`reviews/code-review.md`](reviews/code-review.md) in that order.
+> **STALE — kept for archaeology only.** Written 2026-05-05 by the previous driver of `tml-2373-project-1-searchable-encryption-mvp` (PR #416), to hand off to a successor. Project 1 was subsequently rebased onto `tml-2397-cipherstash-contract-space` on 2026-05-08 (this branch: `tml-2373-project-1-on-2397`). The rebase collapsed the original M2.a/M2.b/M2.c/M3/M4 milestones into the new M2/M3 against the contract-spaces foundation. **For current state, read [`plan.md`](plan.md) (rewritten) and [`spec.md`](spec.md) (rewritten) instead — the table below is a historical snapshot.** What survived the rebase: the M1 framework SPIs (cherry-picked clean) and the runtime layer (envelope, codec runtime, bulk middleware, PSL constructor, TS factory, wire-format fix) which is being re-authored onto the new package shape during M2. What died: the `databaseDependencies.init` EQL bundle install (replaced by the contract-space baseline migration) and the migration factories (`addSearchConfig` / `activatePendingSearches`, replaced by the codec lifecycle hook on TML-2397).
+
+> Read this first only if you want the historical view of how things stood pre-rebase, then [`spec.md`](spec.md), [`plan.md`](plan.md), and [`reviews/code-review.md`](reviews/code-review.md) in that order.
 
 ## TL;DR
 

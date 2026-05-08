@@ -2,7 +2,7 @@
 
 > **Audience.** The CipherStash engineering team. This document describes the design of `@prisma-next/extension-cipherstash` — the first-party Prisma Next extension for searchable encryption, backed by ZeroKMS for encryption and EQL for query lowering. It covers what we are building, how it integrates with your products, and the design decisions where we'd value your input.
 >
-> **Status.** Project 1 of the cipherstash-integration umbrella. The framework SPI we needed (raw-SQL AST, middleware param-mutator seam, per-execute `AbortSignal`) and the extension's authoring + codec scaffolding are landing now in [PR #416](https://github.com/prisma/prisma-next/pull/416) (Phase 1, ready-for-review). The runtime hookup (bulk-encrypt middleware, real EQL bundle, live integration tests) and the user-facing query/migration surfaces (operator lowering, migration factories, `decryptAll`) follow over the next few weeks. This document describes the **end-state** — what the extension looks like with Project 1 complete.
+> **Status.** Project 1 of the cipherstash-integration umbrella, now rebased onto **contract spaces** ([TML-2397](https://linear.app/prisma-company/issue/TML-2397)). Contract spaces is a framework-level mechanism that lets extensions contribute schema objects to the user's database as first-class participants — same planner, same runner, same migration shape as application authoring. TML-2397 already shipped the cipherstash control plane (descriptor, codec lifecycle hook, contract-space artefacts, EQL bundle install). Project 1 now delivers only the runtime layer on top: envelope, SDK interface, codec encode/decode, bulk-encrypt middleware, PSL constructor, TS factory, operator lowering, end-to-end tests. This document describes the **end-state** — what the extension looks like with Project 1 complete.
 >
 > **Related material.** Two specific design defaults we'd like you to validate are framed in detail in `[cipherstash-team-questions.md](cipherstash-team-questions.md)` — routing-key derivation and plaintext-zeroing post-encrypt. Both are summarized in § Open design questions below; the questions doc is the deep-dive companion.
 
@@ -17,8 +17,7 @@
 - A codec (`cipherstash/string@1`) that handles wire encoding/decoding of encrypted values.
 - A bulk-encrypt middleware that coalesces ZeroKMS calls on the write side.
 - A `decryptAll(rows)` utility that coalesces ZeroKMS calls on the read side.
-- Migration factories (`cipherstash.addSearchConfig`, `cipherstash.activatePendingSearches`) that produce real, parameterized SQL plans for EQL search-config registration.
-- A control descriptor that declares the EQL bundle as a database dependency, installed once per database via `databaseDependencies.init`.
+- A **contract space** that declares the EQL schema (`eql_v2_configuration` and friends), installs the EQL bundle as the body of one baseline migration op, and emits per-column `add_search_config` / `remove_search_config` ops automatically as the user adds, drops, or alters `Encrypted<string>` columns. Users do not write `addSearchConfig(...)` calls in migration files — the codec lifecycle hook on the extension does that for them.
 
 The extension exposes searchable-encryption as a first-class column type, while keeping all CipherStash-specific behavior (encryption, decryption, EQL operator lowering, search-config registration) opt-in to that single column type. Non-encrypted columns and queries are unaffected.
 
@@ -115,50 +114,54 @@ console.log(rows[0].email.decrypt());   // synchronous; cached plaintext
 
 ### Migrating
 
-```ts
-// migration.ts
-import { Migration, MigrationCLI } from '@prisma-next/target-postgres/migration';
-import {
-  addSearchConfig,
-  activatePendingSearches,
-} from '@prisma-next/extension-cipherstash/migration';
-import endContract from './end-contract.json' with { type: 'json' };
+There is no hand-authored `migration.ts` for cipherstash columns. The user runs the standard Prisma Next migrate workflow:
 
-export default class M_001_add_encrypted_email_search extends Migration {
-  override describe() {
-    return { from: 'sha256:...', to: 'sha256:...' };
-  }
-
-  override get operations() {
-    return [
-      addSearchConfig(
-        { table: 'user', column: 'email', equality: true, freeTextSearch: true },
-        endContract,
-      ),
-      addSearchConfig(
-        { table: 'order', column: 'shippingAddress', equality: true },
-        endContract,
-      ),
-      activatePendingSearches(endContract),
-    ];
-  }
-}
-
-MigrationCLI.run(import.meta.url, M_001_add_encrypted_email_search);
+```
+$ prisma-next migrate            # produces migrations for the user's app space
+                                 # AND the cipherstash extension's space
+$ prisma-next db apply           # runs both spaces' migrations against the DB
 ```
 
-A migration is a class extending `Migration` whose `operations` getter returns an array of operation objects; `MigrationCLI.run(...)` at the bottom is the standard runner shim. DDL ops (`createTable`, `addColumn`, etc.) — when present — sit alongside the cipherstash entries in the same array.
+What happens behind the scenes:
 
-Each factory returns **one** operation:
+1. **`prisma-next migrate` (emit time).** The framework emits a fresh `contract.json` for the user's application space. As part of that emit, every codec referenced in the contract gets its `onFieldEvent` lifecycle hook called once per changed field (added / dropped / altered). Cipherstash's hook (the part of `@prisma-next/extension-cipherstash` shipped under `./control`) inspects the field's typeParams. For an `Encrypted<string>` field with `searchable: true` (or with the equivalent `equality` / `freeTextSearch` typeParams), it emits an op into the user's app-space migration:
 
-- `addSearchConfig({ table, column, equality?, freeTextSearch? }, endContract)` returns a single op for that `(table, column)` pair. When applied, the op executes one EQL `add_search_config` statement per enabled mode flag — so the `email` call above runs two `add_search_config` statements (`unique` + `match`) within one op. Operations model their `execute` payload as an array of SQL statements, so multi-statement work fits naturally inside a single op without manual unrolling.
-- `activatePendingSearches(endContract)` returns a single op invoking EQL's pending-activation function once for the whole migration.
+   ```jsonc
+   // user's app-space migrations/<id>/ops.json
+   [
+     { "op": "create_table", "table": "user", … },                        // user's structural op
+     {                                                                     // codec-emitted op
+       "op": "data",
+       "invariantId": "cipherstash-codec:user.email:add-search-config@v1",
+       "execute": [
+         "SELECT eql_v2.add_search_config('user', 'email', 'unique', 'text');",
+         "SELECT eql_v2.add_search_config('user', 'email', 'match', 'text');"
+       ]
+     }
+   ]
+   ```
 
-The op carries a deterministic `invariantId` (e.g. `cipherstash.search-config.user.email`) for invariant-aware migration ref routing per [PR #404](https://github.com/prisma/prisma-next/pull/404), so future migrations can encode "depends on the user.email search config existing" via a ref against that id.
+   The cipherstash extension space gets its own migration set — the extension declares an `eql_v2_configuration` table (and the schemas/types EQL needs in `meta.cipherstashFutureIR`) and a baseline migration whose ops include a `cipherstash:install-eql-bundle-v1` op carrying the full EQL bundle SQL byte-for-byte. The framework writes both spaces' migration directories under the user's `migrations/` tree:
 
-This shape is deliberately **planner-friendly**. In Project 2, the migration planner walks the contract diff and emits one literal `addSearchConfig({...}, endContract)` line per model field that has search modes declared — the planner doesn't need to emit loops, control flow, or per-mode unrolling. In Project 1 the same lines are hand-written; the surface is identical.
+   ```
+   migrations/
+   ├── app/                                  # user's application contract space
+   │   └── 001-add-encrypted-user-email/
+   │       ├── ops.json
+   │       └── …
+   └── cipherstash/                          # cipherstash's contract space
+       └── 001-baseline/
+           ├── ops.json                       # install-eql-bundle-v1 + structural ops
+           └── …
+   ```
 
-Bootstrap (the EQL extension install, `cs_configuration_v2` table creation, etc.) is handled by Prisma Next's `databaseDependencies.init` machinery — the user runs `db init` once per database and the EQL bundle is applied. Re-running `db init` short-circuits via the precheck (`information_schema.tables` lookup for `cs_configuration_v2`).
+2. **`prisma-next db apply`.** The runner walks both spaces' DAGs from each space's marker row (one row per space in `prisma_contract.marker`), applies the ops it needs to reach each space's head, and updates the marker. Both spaces are applied in a single transaction; ordering between spaces is governed by the framework's invariant-aware path resolver — the cipherstash space's `eql_v2_configuration` table must exist before the codec-emitted `add_search_config` op runs, which the path resolver guarantees because the codec-emitted op declares an invariant on `cipherstash:eql-v2-configuration@v1`.
+
+3. **Re-running `db apply` is idempotent.** Both spaces' marker rows record the applied head; applying again with no change is a no-op. The strict per-space verifier confirms the live database matches each space's contract; an extra column added by hand to `eql_v2_configuration` would fail strict mode loudly.
+
+The user never writes a migration file for cipherstash columns. That's the central architectural promise of contract spaces: extensions contribute to the user's schema through the same authoring → emit → migrate → apply pipeline the user uses for their own tables, but with the extension owning its own space and its own migrations rather than installing schema via a side-channel.
+
+**For Project 2:** when `dbInit` / `dbUpdate` evolves to handle structural type changes (e.g. flipping a column's flags after rows exist, or migrating a plain `string` column to `Encrypted<string>`), the same codec lifecycle hook handles them — `onFieldEvent('altered', …)` already exists on the SPI. Project 1 covers added / dropped / typeParams-altered.
 
 ---
 
@@ -214,7 +217,7 @@ We treat the wire shape as opaque. Whatever your EQL install puts on disk (the `
 
 ### 3. EQL search-config registration via raw SQL
 
-The migration factories `addSearchConfig` and `activatePendingSearches` produce one operation each whose execution lowers to your EQL function calls (`eql_v2.add_search_config`, `eql_v2.activate_pending_searches`, etc.) via parameterized raw SQL. An `addSearchConfig({...})` call covering both `equality: true` and `freeTextSearch: true` runs two `eql_v2.add_search_config` statements within one operation (`unique` index for equality, `match` index for free-text); the index-name and `cast_as` mapping flows through unchanged.
+The codec lifecycle hook (`onFieldEvent` on the cipherstash codec descriptor) emits `add_search_config` / `remove_search_config` ops automatically as the user adds, drops, or alters `Encrypted<string>` fields. A flagged `equality: true` emits an `add_search_config('table', 'column', 'unique', 'text')` op; `freeTextSearch: true` emits one for `'match'`. The op's `execute[]` payload may carry both statements when both flags are enabled — implementation can choose one op with multi-statement execute or two separate ops; either fits the runner. The framework's `activate_pending_searches` semantics (whether it needs to be invoked once per migration, or whether the per-field ops handle activation themselves) is one of the open questions we'd like your input on — see § Open design questions.
 
 We plan to defer to your existing `operation-templates.ts` from the `cipherstash/stack` reference repo as the source of truth for the exact SQL function calls. If you've evolved that surface since the first-attempt repo, point us at the current canonical reference.
 
@@ -226,16 +229,27 @@ The package is organized along the boundaries Prisma Next's extension protocol e
 
 ```
 @prisma-next/extension-cipherstash
-├── EncryptedString       (envelope class, public surface)
-├── encryptedString({...}) (TS authoring factory, public surface)
-├── cipherstash.EncryptedString({...}) (PSL constructor, registered in pack meta)
-├── cipherstash/string@1  (codec — target type eql_v2_encrypted, traits ['equality'])
-├── bulkEncryptMiddleware (SQL middleware, write-side coalescing)
-├── decryptAll            (read-side coalescing utility)
-├── addSearchConfig       (migration factory — one op per (table, column))
-├── activatePendingSearches (migration factory — one op per migration)
-└── control descriptor    (declares EQL install via databaseDependencies.init)
+│
+├── ./control                                      (consumed at migration time)
+│   ├── cipherstashContractSpace                   (own contract.json + baseline migration with EQL bundle)
+│   ├── cipherstash.EncryptedString({...})         (PSL constructor, registered in pack meta)
+│   ├── cipherstash/string@1 codec descriptor      (codec id + targetTypes + traits)
+│   └── onFieldEvent lifecycle hook                (emits add_search_config/remove_search_config/rotate ops
+│                                                   into the user's app-space migration)
+│
+├── ./runtime                                      (consumed at query time)
+│   ├── EncryptedString                            (envelope class, public surface)
+│   ├── cipherstash/string@1 codec runtime         (encode/decode for eql_v2_encrypted)
+│   └── decryptAll(rows)                           (read-side coalescing utility)
+│
+├── ./middleware                                   (consumed at query time)
+│   └── bulkEncryptMiddleware                      (SQL middleware, write-side coalescing)
+│
+└── ./column-types                                 (consumed at TS authoring time)
+    └── encryptedString({...})                     (TS authoring factory)
 ```
+
+The split between `./control` and `./runtime` is load-bearing for tree shaking — apps that only emit migrations (CLI tooling, schema verification, codegen) never load the runtime; apps that only run queries never load the contract-space artefacts.
 
 The envelope class is the load-bearing abstraction. It owns its internal handle privately (no exported handle type, no public accessors leak the plaintext or ciphertext slots), and it is the only object that crosses both directions of the codec boundary. On the write side, the envelope is constructed by the user with plaintext; the middleware mutates its handle to install the ciphertext; the codec reads the ciphertext and emits to wire. On the read side, the codec constructs the envelope with the wire ciphertext + routing context + SDK reference; the user later calls `decrypt()` or `decryptAll()` to materialize plaintext.
 
@@ -272,8 +286,8 @@ Encryption happens at **encode time**, not commit time. The middleware runs in t
 
 A user adopting the extension goes through three phases:
 
-1. **Bootstrap.** `db init` runs once per database. Our control descriptor's `databaseDependencies.init` declares EQL as a dependency; Prisma Next's init machinery executes the bundled EQL install SQL (vendored from your reference repo) inside a transaction, gated on a precheck. Re-running `db init` short-circuits via the precheck — if `cs_configuration_v2` already exists, the init step is a no-op.
-2. **Schema evolution.** When the user adds an `EncryptedString` column or changes its mode flags, they author a migration calling `addSearchConfig({...})` for the new configuration and `activatePendingSearches()` once at the end. Our factories produce parameterized SQL plans the migration runner applies normally; the EQL extension's pending/active model handles the actual rollout. Re-applying a migration is idempotent.
+1. **Bootstrap.** `prisma-next db apply` runs once per database (or as part of every deploy). The cipherstash extension contributes its own contract space; the framework's runner walks that space's migration DAG from its marker row and applies what's missing. The first run executes the cipherstash baseline migration, which includes the `cipherstash:install-eql-bundle-v1` op carrying your `eql-bundle.ts` SQL byte-for-byte. Subsequent runs are idempotent — the marker row records the applied head; re-running with no change is a no-op.
+2. **Schema evolution.** When the user adds an `EncryptedString` column or changes its mode flags, they run `prisma-next migrate`. The codec lifecycle hook fires per-field-delta during emit and produces the `add_search_config` / `remove_search_config` / rotate ops in the **app-space** migration's `ops.json` automatically. The user does not author the migration file — they edit their PSL/TS contract and run `migrate`. `db apply` then runs both spaces' migrations.
 3. **Runtime.** The user's app runs queries normally. The bulk-encrypt middleware runs on every query but no-ops when no cipherstash params are present. Operator lowering is gated by codec id — `eq`/`ilike` against an `eql_v2_encrypted` column produces EQL function calls; the same operators against ordinary text columns are unaffected.
 
 EQL bundle versioning: today our plan is to vendor the install SQL and ship updates via new extension package releases. If you have a maintained source we should pull from instead (a versioned npm package, a release artifact, an upstream repo we can pin to a tag), we'd prefer that — see § Open design questions below.
@@ -311,7 +325,7 @@ Your existing `cipherstash/stack/packages/stack/src/prisma/` plugin integrates w
 
 Concretely, the things that map cleanly:
 
-- Your `eql-bundle.ts` install script → our `databaseDependencies.init` declaration of the same SQL.
+- Your `eql-bundle.ts` install script → our cipherstash contract space's baseline migration, which carries the same SQL byte-for-byte as the body of one op.
 - Your `operation-templates.ts` for EQL operator SQL shapes → our operator-lowering implementation in M3 (we'll consume the same templates).
 - Your `EncryptionClient` (lazy-init, schemas, etc.) → we wrap it in our minimal three-method `CipherstashSdk` interface, leaving your client's lifecycle and schema management untouched.
 
@@ -319,7 +333,7 @@ The things that differ structurally:
 
 - Authoring: PSL constructor + TS factory parity, with a single canonical `cipherstash.EncryptedString({...})` shape that both lower to. Your Prisma plugin extends Prisma's schema language; we extend ours.
 - Runtime: a pluggable middleware chain in `beforeExecute` (the bulk-encrypt middleware is one such middleware), versus your plugin's hooks into Prisma's own client lifecycle.
-- Migrations: factories produce explicit `DataTransformOperation`s the user composes in their migration file, versus your plugin's hand-authored migration scripts. The factory output is contract-aware (carries `invariantId`s for ref routing) and produces parameterized SQL plans rather than templated strings.
+- Migrations: contract spaces. The cipherstash extension owns its own slice of the user's database (contract.json + baseline migration on disk, marker row in `prisma_contract.marker`), and a codec lifecycle hook emits per-column EQL ops into the user's app-space migration as they edit their schema. The user never hand-authors `addSearchConfig` calls — the framework derives them from the contract diff.
 
 Project 1 deliberately keeps the surface narrow so the integration shape is reviewable. Once it lands, your team can fork the extension's runtime layer to track CipherStash's evolution — the framework SPI it consumes (raw-SQL AST, param-mutator middleware seam) is stable; the cipherstash-specific layers (envelope, codec, middleware, factories) can evolve at your cadence.
 
@@ -335,7 +349,7 @@ If we get a few minutes with you:
 If we get longer:
 
 - Talk through the EQL bundle vendoring strategy. We'd rather pull from a versioned source than vendor a snapshot, but only if a stable source exists.
-- Talk through live-EQL integration testing. We have a Postgres-in-containers harness; we plan to install EQL on container boot via `databaseDependencies.init`. If you have a recommended test setup we should mirror, we'd take that over inventing our own.
+- Talk through live-EQL integration testing. We have a Postgres-in-containers harness; the cipherstash contract space's baseline migration installs EQL on first apply, so test setups don't need a separate bootstrap step. If you have a recommended test setup we should mirror, we'd take that over inventing our own.
 - Talk through the operator-lowering shape (M3, not currently in flight). We're planning to defer to `operation-templates.ts` as the source of truth — confirm that's still canonical.
 
-Project 1 ships the framework SPI + extension scaffolding now; the runtime hookup, query/migration surfaces, and live tests follow over the next few weeks. Once Project 1 ships, the cipherstash extension is something your team can iterate on directly. This conversation is about making sure the defaults we ship don't paint your team into a corner when you take ownership.
+Project 1 ships the runtime layer (envelope, SDK interface, codec encode/decode, bulk-encrypt middleware, PSL constructor, TS factory, operator lowering) on top of the contract-spaces foundation already shipped in TML-2397. Once Project 1 ships, the cipherstash extension is something your team can iterate on directly. This conversation is about making sure the defaults we ship don't paint your team into a corner when you take ownership.

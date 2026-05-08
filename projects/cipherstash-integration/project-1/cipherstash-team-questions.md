@@ -134,7 +134,7 @@ We're currently planning to vendor the EQL install SQL bundle from your referenc
 
 ### Live-EQL integration testing
 
-Project 1's M2.c milestone needs a Postgres database with EQL installed, reachable from our test runner. We have a working pattern for live-Postgres tests (`pnpm test:integration` spins up containers); we plan to extend it to install the EQL bundle on container boot via our `databaseDependencies.init` machinery. Two questions:
+Project 1's M2 milestone needs a Postgres database with EQL installed, reachable from our test runner. We have a working pattern for live-Postgres tests (`pnpm test:integration` spins up containers); the cipherstash contract space's baseline migration installs the EQL bundle on first apply, so test setups don't need a separate bootstrap — `prisma-next db apply` brings the cipherstash space up the same way it brings the user's app space up. Two questions:
 
 - **Is there a recommended Postgres + EQL test image / docker-compose setup you use internally?** If yes, we'd rather mirror it than reinvent. If no, we'll publish what we end up with.
 - **Are there gotchas in EQL install we should know about?** Required Postgres extensions, role/privilege requirements beyond superuser, ordering constraints with other extensions, anything that's bitten you. The reference `eql-bundle.ts` looks self-contained but we'd appreciate "watch out for X" notes if you have them.
