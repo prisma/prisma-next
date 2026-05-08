@@ -171,7 +171,14 @@ describe('Mongo runtime decode integration via query-builder', () => {
 
       const plan = q
         .from('users')
-        .lookup({ from: 'posts', localField: '_id', foreignField: 'userId', as: 'posts' })
+        .lookup((from) =>
+          from('posts')
+            .on((local, foreign) => ({
+              local: local._id,
+              foreign: foreign.userId,
+            }))
+            .as('posts'),
+        )
         .match((f) => f._id.eq(MongoParamRef.of(userId, { codecId: 'mongo/objectId@1' })))
         .build();
 

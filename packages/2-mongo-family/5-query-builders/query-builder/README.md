@@ -83,6 +83,34 @@ The general-purpose aggregation chain. Reached after calling any pipeline stage 
 | `findOneAndUpdate(fn)` | Deconstructs `$match`/`$sort`/`$skip` into command slots |
 | `findOneAndDelete()` | Same deconstruction |
 
+## Typed `lookup`
+
+`$lookup` is expressed as a single chained callback so the foreign-root literal is grounded into the inner builder before the `on(...)` callback's accessors are typed:
+
+```typescript
+q.from('orders')
+  .lookup((from) =>
+    from('users')
+      .on((local, foreign) => ({
+        local: local.customerId,
+        foreign: foreign._id,
+      }))
+      .as('customer'),
+  )
+  .build();
+// row: { _id, status, amount, customerId, notes, tags, customer: Array<UserRow> }
+```
+
+The chain has three steps:
+
+- `from(name)` selects the foreign root. `name` must be a literal in `keyof TContract['roots']`. The returned `LookupBuilder` carries the foreign model's `FieldAccessor` so `foreign.<field>` is checked against the foreign model's storage-name fields.
+- `on((local, foreign) => ({ local, foreign }))` captures the equality fields. `local` is the current pipeline's `FieldAccessor`; `foreign` is the foreign root's `FieldAccessor`. Each side must be a `LeafExpression` (a property access like `local._id`); aggregation expressions like `fn.toUpper(local._id)` are a compile-time error.
+- `.as(name)` finalises with the user-chosen output field name.
+
+The result-row encoding uses a `ModelArrayField<ModelName>` marker so `ResolveRow` produces `Array<ForeignRow>` — the field is **not** `unknown[]`. Marker behaviour is unchanged from the legacy shape: clears `UpdateEnabled` and `FindAndModifyEnabled`, sets `LeadingMatch` to `'past-leading'`, preserves the nested-shape parameter `N`.
+
+**Limitation.** Typoed root names (`from('usexxxrs')`) are currently accepted at compile time and rejected at runtime. The constraint is a pre-existing limitation of `Contract.roots: Record<string, string>` (shared with `mongoQuery.from('badname')`); compile-time rejection is tracked under [TML-2400](https://linear.app/prisma-company/issue/TML-2400).
+
 ## Field accessor
 
 Stage callbacks receive a `FieldAccessor<Shape, Nested>` (typically named `f`):
