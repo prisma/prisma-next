@@ -20,6 +20,7 @@ import {
   getFieldToColumnMap,
   isToOneCardinality,
   type PolymorphismInfo,
+  pickCountReturningColumn,
   resolveFieldToColumn,
   resolveIncludeRelation,
   resolveModelTableName,
@@ -1124,14 +1125,16 @@ export class Collection<
       this.tableName,
       mappedData,
       this.state.filters,
-      undefined,
+      [pickCountReturningColumn(this.contract, this.tableName)],
     );
-    const updatedRows = await executeQueryPlan<Record<string, unknown>>(
+    let count = 0;
+    for await (const _row of executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       compiled,
-    ).toArray();
-
-    return updatedRows.length;
+    )) {
+      count++;
+    }
+    return count;
   }
 
   async delete(
@@ -1174,18 +1177,17 @@ export class Collection<
   ): Promise<number> {
     assertReturningCapability(this.contract, 'deleteCount()');
 
-    const compiled = compileDeleteReturning(
-      this.contract,
-      this.tableName,
-      this.state.filters,
-      undefined,
-    );
-    const deletedRows = await executeQueryPlan<Record<string, unknown>>(
+    const compiled = compileDeleteReturning(this.contract, this.tableName, this.state.filters, [
+      pickCountReturningColumn(this.contract, this.tableName),
+    ]);
+    let count = 0;
+    for await (const _row of executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
       compiled,
-    ).toArray();
-
-    return deletedRows.length;
+    )) {
+      count++;
+    }
+    return count;
   }
 
   #buildUpsertConflictCriterion(

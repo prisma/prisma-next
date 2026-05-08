@@ -283,17 +283,3 @@ export function compileDeleteReturning(
   const { params } = deriveParamsFromAst(ast);
   return buildOrmQueryPlan(contract, ast, params);
 }
-
-export function compileDeleteCount(
-  contract: Contract<SqlStorage>,
-  tableName: string,
-  filters: readonly AnyExpression[],
-): SqlQueryPlan<Record<string, unknown>> {
-  const where = combineWhereExprs(filters);
-  let ast = DeleteAst.from(TableSource.named(tableName));
-  if (where) {
-    ast = ast.withWhere(where);
-  }
-  const { params } = deriveParamsFromAst(ast);
-  return buildOrmQueryPlan(contract, ast, params);
-}

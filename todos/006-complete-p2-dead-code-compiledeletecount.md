@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: 6
 tags: [code-review, cleanup, sql, orm]

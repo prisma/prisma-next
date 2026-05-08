@@ -3,7 +3,6 @@ export {
   compileGroupedAggregate,
 } from './query-plan-aggregate';
 export {
-  compileDeleteCount,
   compileDeleteReturning,
   compileInsertCount,
   compileInsertCountSplit,

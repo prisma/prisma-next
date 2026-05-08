@@ -73,6 +73,31 @@ export function createIdlessTagsCollection(runtime: PgIntegrationRuntime) {
   return new Collection({ runtime, context }, 'Tag');
 }
 
+// Users collection bound to a contract where `users.primaryKey` has been
+// stripped. Retains the existing `UNIQUE (email)` constraint so the id-less
+// nested-update guard passes — exercises the id-less reload path through
+// `buildRowIdentityCriterion` while keeping single-row identity guaranteed
+// by the unique index.
+export function createIdlessUsersCollection(runtime: PgIntegrationRuntime) {
+  const base = withReturningCapability(getTestContract());
+  const usersTable = base.storage.tables.users;
+  const idlessContract = {
+    ...base,
+    storage: {
+      ...base.storage,
+      tables: {
+        ...base.storage.tables,
+        users: { ...usersTable, primaryKey: undefined },
+      },
+    },
+  } as unknown as TestContract;
+  const context = {
+    ...getTestContext(),
+    contract: idlessContract,
+  } as ExecutionContext<TestContract>;
+  return new Collection({ runtime, context }, 'User');
+}
+
 export async function withCollectionRuntime(
   fn: (runtime: PgIntegrationRuntime) => Promise<void>,
 ): Promise<void> {

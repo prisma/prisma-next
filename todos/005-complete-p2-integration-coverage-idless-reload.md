@@ -1,5 +1,5 @@
 ---
-status: pending
+status: complete
 priority: p2
 issue_id: 5
 tags: [code-review, testing, sql, orm, idless]

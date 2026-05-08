@@ -260,6 +260,47 @@ describe('@updatedAt mutation defaults via Collection', () => {
       expect(count).toBe(0);
       expect(runtime.executions).toHaveLength(0);
     });
+
+    it('throws when the contract does not declare the returning capability', async () => {
+      // setupTagCollection wires `withReturningCapability`; rebuild without it.
+      const contract = buildTagWithUpdatedAtContract();
+      const stripped = { ...contract, capabilities: {} } as TestContract;
+      const context = createExecutionContext({
+        contract: stripped,
+        stack: createSqlExecutionStack({
+          target: postgresTarget,
+          adapter: postgresAdapter,
+          extensionPacks: [pgvectorRuntime],
+        }),
+      });
+      const runtime: MockRuntime = createMockRuntime();
+      const collection = new Collection({ context, runtime }, 'Tag');
+
+      await expect(
+        collection.where({ id: tagId(TAG_ID_1) }).updateCount({ name: 'x' }),
+      ).rejects.toThrow(/updateCount\(\) requires contract capability "returning"/);
+    });
+  });
+
+  describe('deleteCount', () => {
+    it('throws when the contract does not declare the returning capability', async () => {
+      const contract = buildTagWithUpdatedAtContract();
+      const stripped = { ...contract, capabilities: {} } as TestContract;
+      const context = createExecutionContext({
+        contract: stripped,
+        stack: createSqlExecutionStack({
+          target: postgresTarget,
+          adapter: postgresAdapter,
+          extensionPacks: [pgvectorRuntime],
+        }),
+      });
+      const runtime: MockRuntime = createMockRuntime();
+      const collection = new Collection({ context, runtime }, 'Tag');
+
+      await expect(collection.where({ id: tagId(TAG_ID_1) }).deleteCount()).rejects.toThrow(
+        /deleteCount\(\) requires contract capability "returning"/,
+      );
+    });
   });
 
   describe('upsert', () => {

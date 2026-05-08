@@ -1,5 +1,4 @@
 import {
-  type DeleteAst,
   type DoUpdateSetConflictAction,
   type InsertAst,
   ParamRef,
@@ -7,7 +6,6 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import {
-  compileDeleteCount,
   compileInsertCount,
   compileInsertCountSplit,
   compileInsertReturning,
@@ -275,17 +273,12 @@ describe('query plan mutations', () => {
     });
   });
 
-  it('compileUpdateCount() and compileDeleteCount() omit WHERE when filters are empty', () => {
+  it('compileUpdateCount() omits WHERE when filters are empty', () => {
     const contract = getTestContract();
 
     const updatePlan = compileUpdateCount(contract, 'users', { name: 'Alice' }, []);
     expect(updatePlan.ast.kind).toBe('update');
     expect((updatePlan.ast as UpdateAst).where).toBeUndefined();
     expect(updatePlan.params).toEqual(['Alice']);
-
-    const deletePlan = compileDeleteCount(contract, 'users', []);
-    expect(deletePlan.ast.kind).toBe('delete');
-    expect((deletePlan.ast as DeleteAst).where).toBeUndefined();
-    expect(deletePlan.params).toEqual([]);
   });
 });
