@@ -106,20 +106,20 @@ Introduce the framework's per-space planner/runner/verifier and the extension de
 - `pnpm lint:deps`
 - `pnpm build`
 
-### Milestone 1-cleanup: M1 design-review remediation — **SATISFIED-candidate at R4** (HEAD `f8649ba43`; reviewer verification pending)
+### Milestone 1-cleanup: M1 design-review remediation — **SATISFIED** (HEAD `ac2157d72`)
 
 Addresses the design-quality findings surfaced in `reviews/code-review.md` (post-M1, pre-PR-merge). M1's functional acceptance was already met; this milestone is the remediation pass for design-quality concerns that didn't surface during the implementation rounds. Each task below maps to one or more findings (F0–F6) recorded in the review log; closure of every linked GitHub PR thread is part of "done."
 
-**Status:** R4 implementer landed F6 cleanly at commit `f8649ba43`; all validation gates (typecheck, build, lint:deps, test:packages, test:integration, test:e2e, AC-D6 rg post-condition) pass. Awaiting R4 reviewer verification before flipping to SATISFIED. The milestone reached SATISFIED at `15e0534e1` post-R3, was reopened post-close for F6 (`a9697ba52`), and now reaches SATISFIED-candidate at R4 (`f8649ba43`).
+**Trajectory:** Reached SATISFIED at `15e0534e1` post-R3 (F0–F5 closed); reopened by `a9697ba52` for F6 (Authored* prefix flatten — surfaced in interactive review of R2's output); re-reached SATISFIED at `ac2157d72` post-R4 (reviewer verdict). 7/7 ACs PASS; 15/15 GH PR threads closed; validation gates green.
 
-**Round outcomes (4 implementer rounds; reviewer R1–R3 done, R4 pending):**
+**Round outcomes (4 implementer rounds + 4 reviewer rounds):**
 
 - **R1 (closed F0/F1/F5):** verifier learned to detect migration directories by `migration.json` presence rather than by name shape (commits `2473c9611` + `c19086d90`); test fixture relocated out of `packages/3-extensions/test-contract-space/` to `test/integration/test/contract-space-fixture/` (commit `db33795e3`); CodeRabbit's tsdown nitpick made moot.
 - **R2 (closed F3/F4):** `APP_SPACE_ID` canonicalised under `framework-components/control` with `scripts/lint-app-space-id.mjs` enforcing single-source + no-raw-literal invariants (commit `9e39382e4`); contract-space identity types hoisted and renamed (`ContractSpaceHeadRef`, `AuthoredMigrationPackage`, `AuthoredContractSpace<TContract>`); `MigrationMetadata` + `MigrationHints` hoisted to `framework-components/control` with re-export shim preserving the 12 existing `migration-tools/metadata` consumers (commit `68ebbeb25`).
 - **R3 (closed F2):** transitional `migrateMarkerSchema*` helpers deleted; replaced with structured `LEGACY_MARKER_SHAPE` runtime detection that fails non-mutatingly with a `dbInit` remediation hint (commit `15e0534e1`).
-- **R4 (closed F6 — SATISFIED-candidate):** flattened the contract-space typology — `Authored*` prefix dropped (commit `f8649ba43`). Canonical `ContractSpace<TContract>` and `MigrationPackage` (structural) live in `framework-components/control`; `OnDiskMigrationPackage extends MigrationPackage` lives in `migration-tools/src/package.ts` carrying `dirPath`; struct-taking emitter renamed `writeAuthoredMigrationPackage` → `materialiseMigrationPackage` (kept, not deleted — M3 cipherstash branch consumes it). 22 files changed; spec § 1 by implementer, § 3 + § 7 by orchestrator. AC-D6 PASS — `rg --type ts "Authored(ContractSpace|MigrationPackage)|writeAuthoredMigrationPackage" packages/ test/` returns no matches. **Reviewer verification pending.**
+- **R4 (closed F6 — SATISFIED):** flattened the contract-space typology — `Authored*` prefix dropped (implementer commit `f8649ba43`; orchestrator pickups for spec § 3 + § 7 and plan T-cleanup.5 in `ac2157d72`). Canonical `ContractSpace<TContract>` and `MigrationPackage` (structural) live in `framework-components/control`; `OnDiskMigrationPackage extends MigrationPackage` lives in `migration-tools/src/package.ts` carrying `dirPath`; struct-taking emitter renamed `writeAuthoredMigrationPackage` → `materialiseMigrationPackage` (kept, not deleted — M3 cipherstash branch consumes it on its next rebase). AC-D6 PASS. Reviewer R4 verdict SATISFIED at `ac2157d72`. F6 had no GH-thread dimension (surfaced in interactive design review).
 
-**ACs PASS so far (7/7 candidate):** AC-D0 / AC-D1 / AC-D2 / AC-D3 / AC-D4 / AC-D5 / AC-D6 (last one pending reviewer confirmation).
+**ACs PASS (7/7):** AC-D0 / AC-D1 / AC-D2 / AC-D3 / AC-D4 / AC-D5 / AC-D6.
 
 The original task list and validation gates are preserved below for the audit trail; T-cleanup.5 is the new addition for R4.
 
