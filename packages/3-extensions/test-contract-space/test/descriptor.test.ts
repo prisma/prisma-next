@@ -4,9 +4,9 @@ import {
   TEST_BASELINE_INVARIANT_ID,
   TEST_BASELINE_MIGRATION_NAME,
   TEST_BOX_TABLE,
-  TEST_HEAD_HASH,
   TEST_SPACE_ID,
 } from '../src/core/constants';
+import { TEST_HEAD_HASH } from '../src/core/contract';
 import testContractSpaceExtensionDescriptor from '../src/exports/control';
 
 describe('test-contract-space descriptor', () => {
