@@ -1,7 +1,7 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type {
-  AuthoredContractSpace,
+  ContractSpace,
   ControlAdapterDescriptor,
   ControlDriverInstance,
   ControlExtensionDescriptor,
@@ -135,14 +135,14 @@ export interface SqlControlExtensionDescriptor<TTargetId extends string>
    * query-ops-only — today's behaviour preserved.
    *
    * The shape comes from `@prisma-next/framework-components/control`
-   * (`AuthoredContractSpace`) — contract-space identity is a framework
-   * concept, not a SQL-specific one. The SQL family specialises the
-   * generic to `Contract<SqlStorage>` so descriptor authors continue to
-   * see a typed contract value.
+   * (`ContractSpace`) — contract-space identity is a framework concept,
+   * not a SQL-specific one. The SQL family specialises the generic to
+   * `Contract<SqlStorage>` so descriptor authors continue to see a
+   * typed contract value.
    *
    * @see specs/framework-mechanism.spec.md § 1.
    */
-  readonly contractSpace?: AuthoredContractSpace<Contract<SqlStorage>>;
+  readonly contractSpace?: ContractSpace<Contract<SqlStorage>>;
 }
 
 export interface SqlControlAdapterDescriptor<TTargetId extends string>

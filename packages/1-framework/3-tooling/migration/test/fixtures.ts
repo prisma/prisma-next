@@ -5,7 +5,7 @@ import { computeMigrationHash } from '../src/hash';
 import { deriveProvidedInvariants } from '../src/invariants';
 import { writeMigrationPackage } from '../src/io';
 import type { MigrationMetadata } from '../src/metadata';
-import type { MigrationOps, MigrationPackage } from '../src/package';
+import type { MigrationOps, OnDiskMigrationPackage } from '../src/package';
 
 export function createTestContract(overrides: Partial<Contract> = {}): Contract {
   return createContract(overrides);
@@ -54,7 +54,7 @@ export function createAttestedPackage(
   dirName: string,
   metadataOverrides: Omit<Partial<MigrationMetadata>, 'migrationHash'> = {},
   ops: MigrationOps = createTestOps(),
-): MigrationPackage {
+): OnDiskMigrationPackage {
   return {
     dirName,
     dirPath: `/tmp/migrations/${dirName}`,

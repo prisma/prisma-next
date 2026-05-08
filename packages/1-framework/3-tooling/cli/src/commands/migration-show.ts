@@ -8,7 +8,7 @@ import {
   findLatestMigration,
   reconstructGraph,
 } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { notOk, ok, type Result } from '@prisma-next/utils/result';
 import { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -64,9 +64,9 @@ function looksLikePath(target: string): boolean {
 }
 
 export function resolveByHashPrefix(
-  packages: readonly MigrationPackage[],
+  packages: readonly OnDiskMigrationPackage[],
   prefix: string,
-): Result<MigrationPackage, CliStructuredError> {
+): Result<OnDiskMigrationPackage, CliStructuredError> {
   const normalizedPrefix = prefix.startsWith('sha256:') ? prefix : `sha256:${prefix}`;
   const matches = packages.filter((p) => p.metadata.migrationHash.startsWith(normalizedPrefix));
 
@@ -126,7 +126,7 @@ async function executeMigrationShowCommand(
     ui.stderr(header);
   }
 
-  let pkg: MigrationPackage;
+  let pkg: OnDiskMigrationPackage;
 
   try {
     if (target && looksLikePath(target)) {

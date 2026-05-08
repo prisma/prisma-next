@@ -77,9 +77,9 @@ export type {
 } from '../control/control-schema-view';
 export { SchemaTreeNode } from '../control/control-schema-view';
 export type {
-  AuthoredContractSpace,
-  AuthoredMigrationPackage,
+  ContractSpace,
   ContractSpaceHeadRef,
+  MigrationPackage,
 } from '../control/control-spaces';
 export { APP_SPACE_ID } from '../control/control-spaces';
 export type {

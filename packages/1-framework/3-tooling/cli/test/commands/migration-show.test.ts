@@ -12,7 +12,7 @@ import {
   writeMigrationPackage,
 } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import stripAnsi from 'strip-ansi';
 import { describe, expect, it } from 'vitest';
 import { resolveByHashPrefix } from '../../src/commands/migration-show';
@@ -146,7 +146,7 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('returns error for no matches', () => {
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
@@ -174,7 +174,7 @@ describe('resolveByHashPrefix', () => {
 
   it('returns error for ambiguous prefix', () => {
     const contract = createContract();
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_first',
         dirPath: '/tmp/first',
@@ -217,7 +217,7 @@ describe('resolveByHashPrefix', () => {
   });
 
   it('resolves prefix without sha256: scheme', () => {
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_test',
         dirPath: '/tmp/test',
@@ -248,7 +248,7 @@ describe('resolveByHashPrefix', () => {
     // `migrationHash` — there is no longer a "skip draft" branch. The
     // prefix lookup simply returns no-match if nothing in the chain
     // shares the requested prefix.
-    const packages: MigrationPackage[] = [
+    const packages: OnDiskMigrationPackage[] = [
       {
         dirName: '20260101_100000_only',
         dirPath: '/tmp/only',

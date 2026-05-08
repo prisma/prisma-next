@@ -1,7 +1,7 @@
 import { copyFile, mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import type {
-  AuthoredMigrationPackage,
   MigrationMetadata,
+  MigrationPackage,
 } from '@prisma-next/framework-components/control';
 import { type } from 'arktype';
 import { basename, dirname, join } from 'pathe';
@@ -19,7 +19,7 @@ import {
 import { verifyMigrationHash } from './hash';
 import { deriveProvidedInvariants } from './invariants';
 import { MigrationOpsSchema } from './op-schema';
-import type { MigrationOps, MigrationPackage } from './package';
+import type { MigrationOps, OnDiskMigrationPackage } from './package';
 
 export const MANIFEST_FILE = 'migration.json';
 const OPS_FILE = 'ops.json';
@@ -79,8 +79,8 @@ export async function writeMigrationPackage(
 }
 
 /**
- * Materialise an in-memory authored migration package to a per-space
- * directory.
+ * Materialise an in-memory {@link MigrationPackage} to a per-space
+ * directory on disk.
  *
  * Writes three files under `<targetDir>/<pkg.dirName>/`:
  *
@@ -94,6 +94,11 @@ export async function writeMigrationPackage(
  *   re-emitting the same package across machines / runs produces an
  *   identical file.
  *
+ * Distinct verb from the lower-level {@link writeMigrationPackage}
+ * (which takes constituent `(metadata, ops)`): callers reading
+ * `materialise…` know they are persisting a struct-typed package
+ * including its contract-snapshot side car.
+ *
  * The function fails (via `writeMigrationPackage`'s underlying check)
  * if the target directory already exists, mirroring the strictness of
  * the app-space emit path. Callers wanting "create-or-overwrite"
@@ -102,9 +107,9 @@ export async function writeMigrationPackage(
  *
  * @see specs/framework-mechanism.spec.md § 3 — Emission helper (T1.7).
  */
-export async function writeAuthoredMigrationPackage(
+export async function materialiseMigrationPackage(
   targetDir: string,
-  pkg: AuthoredMigrationPackage,
+  pkg: MigrationPackage,
 ): Promise<void> {
   const dir = join(targetDir, pkg.dirName);
   await writeMigrationPackage(dir, pkg.metadata, pkg.ops);
@@ -148,7 +153,7 @@ export async function writeMigrationOps(dir: string, ops: MigrationOps): Promise
   await writeFile(join(dir, OPS_FILE), `${JSON.stringify(ops, null, 2)}\n`);
 }
 
-export async function readMigrationPackage(dir: string): Promise<MigrationPackage> {
+export async function readMigrationPackage(dir: string): Promise<OnDiskMigrationPackage> {
   const manifestPath = join(dir, MANIFEST_FILE);
   const opsPath = join(dir, OPS_FILE);
 
@@ -200,7 +205,7 @@ export async function readMigrationPackage(dir: string): Promise<MigrationPackag
     );
   }
 
-  const pkg: MigrationPackage = {
+  const pkg: OnDiskMigrationPackage = {
     dirName: basename(dir),
     dirPath: dir,
     metadata,
@@ -242,7 +247,7 @@ function validateOps(ops: unknown, filePath: string): asserts ops is MigrationOp
 
 export async function readMigrationsDir(
   migrationsRoot: string,
-): Promise<readonly MigrationPackage[]> {
+): Promise<readonly OnDiskMigrationPackage[]> {
   let entries: string[];
   try {
     entries = await readdir(migrationsRoot);
@@ -253,7 +258,7 @@ export async function readMigrationsDir(
     throw error;
   }
 
-  const packages: MigrationPackage[] = [];
+  const packages: OnDiskMigrationPackage[] = [];
 
   for (const entry of entries.sort()) {
     const entryPath = join(migrationsRoot, entry);

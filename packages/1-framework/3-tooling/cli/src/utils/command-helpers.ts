@@ -6,7 +6,7 @@ import type { MigrationEdge, MigrationGraph } from '@prisma-next/migration-tools
 import { readMigrationsDir } from '@prisma-next/migration-tools/io';
 import type { PathDecision } from '@prisma-next/migration-tools/migration-graph';
 import { reconstructGraph } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Command } from 'commander';
 import { relative, resolve } from 'pathe';
@@ -188,7 +188,7 @@ export function getTargetMigrations(target: ControlTargetDescriptor<string, stri
  * string); there is no draft state to filter out.
  */
 export async function loadMigrationPackages(migrationsDir: string): Promise<{
-  bundles: readonly MigrationPackage[];
+  bundles: readonly OnDiskMigrationPackage[];
   graph: MigrationGraph;
 }> {
   const bundles = await readMigrationsDir(migrationsDir);

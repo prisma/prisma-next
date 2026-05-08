@@ -5,7 +5,7 @@ import {
   MigrationToolsError,
 } from '@prisma-next/migration-tools/errors';
 import { findPathWithDecision } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { RefEntry } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -92,7 +92,7 @@ function mapApplyFailure(failure: MigrationApplyFailure): CliStructuredErrorType
   });
 }
 
-function packageToStep(pkg: MigrationPackage): MigrationApplyStep {
+function packageToStep(pkg: OnDiskMigrationPackage): MigrationApplyStep {
   return {
     dirName: pkg.dirName,
     from: pkg.metadata.from,

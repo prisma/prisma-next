@@ -1,18 +1,21 @@
-import type { MigrationPlanOperation } from '@prisma-next/framework-components/control';
-import type { MigrationMetadata } from './metadata';
+import type {
+  MigrationPackage,
+  MigrationPlanOperation,
+} from '@prisma-next/framework-components/control';
 
 export type MigrationOps = readonly MigrationPlanOperation[];
 
 /**
- * An on-disk migration directory (a "package") with its parsed metadata and
- * operations. Returned from `readMigrationPackage` / `readMigrationsDir` only
- * after the loader has verified the package's integrity (hash recomputation
- * against the stored `migrationHash`); holding a `MigrationPackage` value
- * therefore implies the package is internally consistent.
+ * Augmented form of the canonical {@link MigrationPackage} returned by
+ * the on-disk readers (`readMigrationPackage`, `readMigrationsDir`).
+ * Adds `dirPath` — the absolute path the package was loaded from — so
+ * downstream diagnostics can point operators at a concrete directory.
+ *
+ * Holding an `OnDiskMigrationPackage` value implies the loader verified
+ * the package's integrity (hash recomputation against the stored
+ * `migrationHash`); the canonical structural shape carries no such
+ * guarantee on its own.
  */
-export interface MigrationPackage {
-  readonly dirName: string;
+export interface OnDiskMigrationPackage extends MigrationPackage {
   readonly dirPath: string;
-  readonly metadata: MigrationMetadata;
-  readonly ops: MigrationOps;
 }

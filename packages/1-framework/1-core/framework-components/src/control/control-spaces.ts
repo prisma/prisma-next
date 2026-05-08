@@ -38,42 +38,45 @@ export interface ContractSpaceHeadRef {
 }
 
 /**
- * In-memory authored migration package as published by an extension's
- * descriptor module (or by the app-space planner before emission).
- * Mirrors the on-disk
- * {@link import('@prisma-next/migration-tools/package').MigrationPackage}
- * shape minus `dirPath` — at descriptor / planner construction time the
- * package has not yet been materialised to the user's repo, so there is
- * no path to record.
+ * Canonical structural shape of a migration package — the unit a planner
+ * produces and a runner consumes: a directory name, the ADR 197 metadata
+ * envelope (which carries the `toContract` snapshot), and the operation
+ * list.
  *
- * The framework's pinned-artefact emission step
- * (`writeAuthoredMigrationPackage` in `@prisma-next/migration-tools/io`)
- * materialises each package into `migrations/<space-id>/<dirName>/`.
+ * In-memory by default. Readers in `@prisma-next/migration-tools`
+ * (`readMigrationPackage` / `readMigrationsDir`) return the augmented
+ * {@link import('@prisma-next/migration-tools/package').OnDiskMigrationPackage}
+ * variant which adds `dirPath`; everything else operates against the
+ * canonical shape so the same value flows through pre-emission
+ * authoring, on-disk loading, and runner execution without conversion.
  *
- * @see specs/framework-mechanism.spec.md § 1, § 3.
+ * @see specs/framework-mechanism.spec.md § 1.
  */
-export interface AuthoredMigrationPackage {
+export interface MigrationPackage {
   readonly dirName: string;
   readonly metadata: MigrationMetadata;
   readonly ops: readonly MigrationPlanOperation[];
 }
 
 /**
- * In-memory contract-space view a schema-contributing extension
- * publishes through its descriptor module: the canonical contract value,
- * the migration graph authored against it, and the pinned head ref. The
- * framework reads this value only at authoring time (during `migrate`);
- * apply / verify paths read the user's repo
- * (`migrations/<space-id>/...`) instead.
+ * Canonical structural shape of a contract space — one disjoint
+ * `(contractJson, migration-graph)` unit the per-space planner / runner
+ * / verifier operates on. The application owns one well-known space
+ * ({@link APP_SPACE_ID}); each loaded extension that contributes schema
+ * owns a uniquely-named space. Whether a value is the app's space or an
+ * extension's space is a control-plane concern; the type carries no
+ * such distinction.
  *
- * Generic over the storage block so SQL extensions can specialise
- * `AuthoredContractSpace<SqlStorage>` while the framework type stays
- * family-agnostic.
+ * Generic over the contract so each family pins a typed contract value
+ * at consumption time. The SQL family specialises to
+ * `ContractSpace<Contract<SqlStorage>>` at the descriptor surface;
+ * Mongo's symmetrical `ContractSpace<Contract<MongoStorage>>` will land
+ * with that family.
  *
  * @see specs/framework-mechanism.spec.md § 1.
  */
-export interface AuthoredContractSpace<TContract extends Contract = Contract> {
+export interface ContractSpace<TContract extends Contract = Contract> {
   readonly contractJson: TContract;
-  readonly migrations: readonly AuthoredMigrationPackage[];
+  readonly migrations: readonly MigrationPackage[];
   readonly headRef: ContractSpaceHeadRef;
 }

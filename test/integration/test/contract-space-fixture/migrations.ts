@@ -1,6 +1,6 @@
 import type {
-  AuthoredMigrationPackage,
   ContractSpaceHeadRef,
+  MigrationPackage,
 } from '@prisma-next/framework-components/control';
 import {
   TEST_BASELINE_INVARIANT_ID,
@@ -20,7 +20,7 @@ const baselineMetadata = {
   labels: [],
   providedInvariants: [TEST_BASELINE_INVARIANT_ID],
   createdAt: '2026-01-01T00:00:00.000Z',
-} as const satisfies AuthoredMigrationPackage['metadata'];
+} as const satisfies MigrationPackage['metadata'];
 
 /**
  * Single baseline migration: creates the `test_box` table from the empty
@@ -28,7 +28,7 @@ const baselineMetadata = {
  * so a runner that walks this migration graph from a fresh marker reaches
  * the head ref in one step.
  */
-export const testContractSpaceBaselineMigration: AuthoredMigrationPackage = {
+export const testContractSpaceBaselineMigration: MigrationPackage = {
   dirName: TEST_BASELINE_MIGRATION_NAME,
   metadata: baselineMetadata,
   ops: [

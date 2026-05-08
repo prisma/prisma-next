@@ -11,7 +11,7 @@ import {
   findPathWithDecision,
   findReachableLeaves,
 } from '@prisma-next/migration-tools/migration-graph';
-import type { MigrationPackage } from '@prisma-next/migration-tools/package';
+import type { OnDiskMigrationPackage } from '@prisma-next/migration-tools/package';
 import type { RefEntry, Refs } from '@prisma-next/migration-tools/refs';
 import { readRefs, resolveRef } from '@prisma-next/migration-tools/refs';
 import { ifDefined } from '@prisma-next/utils/defined';
@@ -118,7 +118,7 @@ export interface MigrationStatusResult {
   readonly summary: string;
   readonly diagnostics: readonly StatusDiagnostic[];
   readonly graph?: MigrationGraph;
-  readonly bundles?: readonly MigrationPackage[];
+  readonly bundles?: readonly OnDiskMigrationPackage[];
   readonly edgeStatuses?: readonly EdgeStatus[];
   readonly activeRefHash?: string;
   readonly activeRefName?: string;
@@ -249,7 +249,7 @@ export function deriveEdgeStatuses(
  */
 function buildMigrationEntries(
   chain: readonly MigrationEdge[],
-  packages: readonly MigrationPackage[],
+  packages: readonly OnDiskMigrationPackage[],
   mode: 'online' | 'offline',
   markerHash: string | undefined,
   edgeStatuses?: readonly EdgeStatus[],
@@ -451,7 +451,7 @@ async function executeMigrationStatusCommand(
     });
   }
 
-  let bundles: readonly MigrationPackage[];
+  let bundles: readonly OnDiskMigrationPackage[];
   let graph: MigrationGraph;
   try {
     ({ bundles, graph } = await loadMigrationPackages(migrationsDir));
