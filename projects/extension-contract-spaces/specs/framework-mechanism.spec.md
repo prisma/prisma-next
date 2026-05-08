@@ -208,7 +208,11 @@ Before computing `priorContract` for a space:
 - On `kind === 'drift'`: SQL-family consumption site surfaces a non-fatal warning naming the extension and the diff direction. The migration emit proceeds normally — the warning is informational. (`migrate` is the canonical way to materialise extension bumps; the warning just confirms the bump is being captured this run.)
 - On `kind === 'firstEmit'` or `kind === 'noDrift'`: no warning.
 
-**Note for M2 R1 wiring:** at descriptor load time, the SQL family should also verify descriptor self-consistency by recomputing `hash(canonicalize(descriptor.contractSpace.contractJson))` and asserting equality with `descriptor.contractSpace.headRef.hash`. Mismatch indicates the extension author published an inconsistent descriptor (e.g. `headRef.hash` not regenerated after `contractJson` changed); fail fast with a clear error (suggested code: `MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`).
+**Descriptor self-consistency check (M2 R2).** Shipped as `assertDescriptorSelfConsistency({ extensionId, target, targetFamily, storage, headRefHash })` in `@prisma-next/migration-tools/exports/spaces`. Runs at family-create time (not lazily). Recomputes `hash(canonicalize(...))` over the descriptor's contract content and asserts equality with `headRef.hash`. The implementation strips `storage.storageHash` before recomputing the canonical hash because the authoring-side hash function does not consume its own output (the hash is an *output* of canonicalisation, not an input). Mismatch surfaces `MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH` with the offending extension id named in the message — indicates the extension author published an inconsistent descriptor (e.g. `headRef.hash` not regenerated after `contractJson` changed).
+
+**Companion read-side helper (M2 R2).** `readPinnedHeadRef(projectMigrationsDir, spaceId)` returns the full `(hash, invariants)` pair from `refs/head.json` — complements the existing hash-only `readPinnedContractHash`. Same ENOENT-as-null + corrupt-file-error semantics. Used by any verifier path that needs invariants.
+
+**Migrate-time wiring (M2 R2).** Shipped as `runContractSpaceMigratePass(...)` + `formatContractSpaceDriftWarning(...)` in `@prisma-next/cli`. Wired into the SQL-family `migration-plan.ts` flow *before* the app-space no-op check (so an extension bump alone re-pins and warns even when the user's schema hasn't changed). The migrate pass: detects drift per space via `detectSpaceContractDrift`, formats user-facing warnings naming the extension and diff direction, then re-emits pinned artefacts via `emitPinnedSpaceArtefacts`. Locks AM7 end-to-end.
 
 ## 4. Per-space runner (T1.4) and verifier (T1.5)
 
@@ -241,7 +245,14 @@ Cross-space ordering: extensions alphabetical-by-spaceId first, app-space last. 
 - `hashMismatch`: marker row's hash differs from pinned contract's hash.
 - `invariantsMismatch`: pinned contract's required invariants are not all in the marker row's applied invariants set.
 
-`listPinnedSpaceDirectories` filters dot-prefixed and timestamp-prefixed (`/^\d{8}T\d{4}_/`) directories so it correctly distinguishes pinned space directories from app-space migration directories. The SQL-family verifier wires `verifyContractSpaces` into its existing `verify` / `dbInit` paths and decides fail-vs-warn semantics per violation kind (M2).
+`listPinnedSpaceDirectories` filters dot-prefixed and timestamp-prefixed (`/^\d{8}T\d{4}_/`) directories so it correctly distinguishes pinned space directories from app-space migration directories.
+
+**SQL-family wiring (M2 R2 + R3 split).** The SQL family wires `verifyContractSpaces` into its existing `verify` / `dbInit` paths via:
+
+- **`gatherDiskContractSpaceState(projectMigrationsDir)`** (in `@prisma-next/migration-tools/exports/spaces`) — composes `listPinnedSpaceDirectories` + `readPinnedHeadRef` to produce the input shape `verifyContractSpaces` expects from on-disk state.
+- **`runContractSpaceVerifierPrecheck(...)`** (in `@prisma-next/cli`) — target-specific composition that gathers disk state, runs the verifier, and surfaces every offending kind in a single `CliStructuredError` envelope before any database I/O happens. Wired into `db init`, `db verify`, and `db schema --verify` paths.
+
+**Structural-half / marker-half split.** M2 R2 wires the precheck for the three structural violation kinds (`declaredButUnmigrated`, `orphanPinnedDir`, descriptor-vs-pinned `hashMismatch`) — locks AC-16 end-to-end at the CLI surface. The marker-dependent kinds (`orphanMarker`, marker-vs-pinned `hashMismatch`, `invariantsMismatch`) require threading marker rows through the precheck; this lands in M2 R3 alongside the per-space runner wiring (which is the natural reader of marker rows). Once R3 lands, AC-13 promotes from structural-half PASS to full PASS.
 
 **Verifier algorithm** (the conceptual flow the consumption site wires together):
 
