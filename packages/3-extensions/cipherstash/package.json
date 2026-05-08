@@ -47,6 +47,7 @@
     "src"
   ],
   "exports": {
+    "./column-types": "./dist/column-types.mjs",
     "./control": "./dist/control.mjs",
     "./pack": "./dist/pack.mjs",
     "./runtime": "./dist/runtime.mjs",
