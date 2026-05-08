@@ -3,22 +3,24 @@
  *
  * Exposes a `contractSpace` so the framework's per-space planner / runner /
  * verifier (project: extension-contract-spaces, M1) can be exercised
- * end-to-end against a real workspace package — without taking on the
- * baggage (vendored bundle SQL, codec hooks, native extension installs)
- * that real consumers like cipherstash or pgvector carry.
+ * end-to-end against a fixture — without taking on the baggage (vendored
+ * bundle SQL, codec hooks, native extension installs) that real consumers
+ * like cipherstash or pgvector carry.
  *
- * The descriptor lives behind `./control` mirroring pgvector's package
- * shape, so integration tests load it via the same module-graph
- * `import` path a real extension descriptor would flow through.
+ * Hosted as a fixture under the integration-tests workspace rather than as
+ * a top-level `@prisma-next/extension-*` package: the package shape is
+ * incidental, not load-bearing for the test surface, and the
+ * `extension-` prefix is reserved for production extensions (see project
+ * review F1).
  */
 
 import type {
   ExtensionContractSpace,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
-import { TEST_SPACE_ID } from '../core/constants';
-import { testContractSpaceContract } from '../core/contract';
-import { testContractSpaceBaselineMigration, testContractSpaceHeadRef } from '../core/migrations';
+import { TEST_SPACE_ID } from './constants';
+import { testContractSpaceContract } from './contract';
+import { testContractSpaceBaselineMigration, testContractSpaceHeadRef } from './migrations';
 
 const testContractSpace: ExtensionContractSpace = {
   contractJson: testContractSpaceContract,

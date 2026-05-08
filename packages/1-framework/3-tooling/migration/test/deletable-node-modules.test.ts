@@ -12,7 +12,8 @@
  * (`emitPinnedSpaceArtefacts` + `listPinnedSpaceDirectories` +
  * `verifyContractSpaces` + `concatenateSpaceApplyInputs`). The test
  * intentionally **does not import** the synthetic
- * `@prisma-next/extension-test-contract-space` package — that is the
+ * `test-contract-space` fixture (today hosted under
+ * `test/integration/test/contract-space-fixture/`) — that is the
  * point. The test invents a `'test-contract-space'` space id inline
  * and runs the helpers against pinned files on disk plus a fake set of
  * marker rows.
@@ -63,7 +64,7 @@ async function setupProjectWithPinnedTestSpace(): Promise<ProjectFixture> {
   // this directory before invoking the verifier to model the AC-15 case
   // ("verifier + runner succeed when extension descriptor not
   // importable, e.g. node_modules removed").
-  await mkdir(join(nodeModulesPath, '@prisma-next', 'extension-test-contract-space'), {
+  await mkdir(join(nodeModulesPath, '@prisma-next', 'synthetic-extension-stand-in'), {
     recursive: true,
   });
 
