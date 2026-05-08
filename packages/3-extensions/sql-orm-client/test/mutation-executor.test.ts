@@ -6,7 +6,7 @@ import {
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  buildPrimaryKeyFilterFromRow,
+  buildRowIdentityCriterion,
   executeNestedCreateMutation,
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
@@ -130,20 +130,20 @@ describe('mutation-executor', () => {
     ).toBe(false);
   });
 
-  it('buildPrimaryKeyFilterFromRow() resolves mapped keys and throws when missing', () => {
+  it('buildRowIdentityCriterion() PK fast path: resolves single-column PK and throws when missing', () => {
     const contract = getTestContract();
 
-    expect(buildPrimaryKeyFilterFromRow(contract, 'User', { id: 7 })).toEqual({ id: 7 });
+    expect(buildRowIdentityCriterion(contract, 'User', { id: 7 })).toEqual({ id: 7 });
 
-    expect(() => buildPrimaryKeyFilterFromRow(contract, 'User', {})).toThrow(
+    expect(() => buildRowIdentityCriterion(contract, 'User', {})).toThrow(
       /Missing primary key field "id"/,
     );
   });
 
-  it('buildPrimaryKeyFilterFromRow() resolves custom primary key columns', () => {
+  it('buildRowIdentityCriterion() PK fast path: composite primary keys include every PK column', () => {
     const contract = getTestContract();
 
-    const withCustomPk = {
+    const withCompositePk = {
       ...contract,
       storage: {
         ...contract.storage,
@@ -152,16 +152,68 @@ describe('mutation-executor', () => {
           users: {
             ...contract.storage.tables.users,
             primaryKey: {
-              columns: ['pk_id'],
+              columns: ['email', 'name'],
             },
           },
         },
       },
     } as unknown as TestContract;
 
-    expect(buildPrimaryKeyFilterFromRow(withCustomPk, 'User', { pk_id: 99 })).toEqual({
-      pk_id: 99,
-    });
+    expect(
+      buildRowIdentityCriterion(withCompositePk, 'User', {
+        email: 'a@b.test',
+        name: 'Alice',
+        id: 1,
+      }),
+    ).toEqual({ email: 'a@b.test', name: 'Alice' });
+  });
+
+  it('buildRowIdentityCriterion() id-less path: builds non-null mapped column criterion', () => {
+    const contract = getTestContract();
+
+    const idlessUsers = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          users: {
+            ...contract.storage.tables.users,
+            primaryKey: undefined,
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    expect(
+      buildRowIdentityCriterion(idlessUsers, 'User', {
+        id: 5,
+        email: 'a@b.test',
+        name: null,
+      }),
+    ).toEqual({ id: 5, email: 'a@b.test' });
+  });
+
+  it('buildRowIdentityCriterion() id-less path: throws when the row has no non-null mapped fields', () => {
+    const contract = getTestContract();
+
+    const idlessUsers = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          users: {
+            ...contract.storage.tables.users,
+            primaryKey: undefined,
+          },
+        },
+      },
+    } as unknown as TestContract;
+
+    expect(() => buildRowIdentityCriterion(idlessUsers, 'User', { id: null, email: null })).toThrow(
+      /no non-null mapped fields/,
+    );
   });
 
   it('executeNestedCreateMutation() commits transactions on success', async () => {

@@ -65,7 +65,7 @@ import {
 } from './include-descriptors';
 import { createModelAccessor } from './model-accessor';
 import {
-  buildPrimaryKeyFilterFromRow,
+  buildRowIdentityCriterion,
   executeNestedCreateMutation,
   executeNestedUpdateMutation,
   hasNestedMutationCallbacks,
@@ -708,8 +708,8 @@ export class Collection<
         data: data as MutationCreateInput<Contract<SqlStorage>, string>,
       });
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, createdRow);
-      const reloaded = await this.#reloadMutationRowByPrimaryKey(pkCriterion);
+      const rowCriterion = buildRowIdentityCriterion(this.contract, this.modelName, createdRow);
+      const reloaded = await this.#reloadMutationRowByCriterion(rowCriterion, 'row identity');
       if (!reloaded) {
         throw new Error(`create() for model "${this.modelName}" did not return a row`);
       }
@@ -1059,8 +1059,8 @@ export class Collection<
         return null;
       }
 
-      const pkCriterion = buildPrimaryKeyFilterFromRow(this.contract, this.modelName, updatedRow);
-      return this.#reloadMutationRowByPrimaryKey(pkCriterion);
+      const rowCriterion = buildRowIdentityCriterion(this.contract, this.modelName, updatedRow);
+      return this.#reloadMutationRowByCriterion(rowCriterion, 'row identity');
     }
 
     const rows = await this.updateAll(
@@ -1207,10 +1207,6 @@ export class Collection<
     }
 
     return criterion;
-  }
-
-  async #reloadMutationRowByPrimaryKey(criterion: Record<string, unknown>): Promise<Row | null> {
-    return this.#reloadMutationRowByCriterion(criterion, 'primary key');
   }
 
   async #reloadMutationRowByCriterion(

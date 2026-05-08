@@ -10,10 +10,10 @@ import type { ExecutionContext } from '@prisma-next/sql-relational-core/query-la
 import type { RuntimeScope } from '@prisma-next/sql-relational-core/types';
 import {
   getColumnToFieldMap,
+  getFieldToColumnMap,
   resolveFieldToColumn,
   resolveModelRelations,
   resolveModelTableName,
-  resolvePrimaryKeyColumn,
 } from './collection-contract';
 import {
   acquireRuntimeScope,
@@ -106,28 +106,55 @@ export async function executeNestedUpdateMutation(options: {
   );
 }
 
-export function buildPrimaryKeyFilterFromRow(
+export function buildRowIdentityCriterion(
   contract: Contract<SqlStorage>,
   modelName: string,
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumn = resolvePrimaryKeyColumn(
-    contract,
-    tableName,
-    `Mutation reload for model "${modelName}"`,
-  );
-  const fieldName = toFieldName(contract, modelName, primaryKeyColumn);
-  const value = row[fieldName];
-  if (value === undefined) {
+  const primaryKeyColumns = contract.storage.tables[tableName]?.primaryKey?.columns ?? [];
+
+  if (primaryKeyColumns.length > 0) {
+    const criterion: Record<string, unknown> = {};
+    for (const pkColumn of primaryKeyColumns) {
+      const fieldName = toFieldName(contract, modelName, pkColumn);
+      const value = row[fieldName];
+      if (value === undefined) {
+        throw new Error(
+          `Missing primary key field "${fieldName}" while reloading model "${modelName}"`,
+        );
+      }
+      criterion[fieldName] = value;
+    }
+    return criterion;
+  }
+
+  // Id-less path: build a criterion from the row's mapped non-null column
+  // values. The row was just produced by RETURNING in the open mutation
+  // transaction, so the criterion matches the row by construction. Tables
+  // without a primary key and without unique constraints may have duplicate
+  // tuples, in which case the criterion can match additional rows; declare
+  // at least one unique constraint for single-row identity. SQLite caveat:
+  // RETURNING does not reflect AFTER-trigger column rewrites on SQLite, so
+  // a criterion built from RETURNING values may fail to match if AFTER
+  // triggers rewrote columns present in the criterion.
+  const criterion: Record<string, unknown> = {};
+  const fieldToColumn = getFieldToColumnMap(contract, modelName);
+  for (const fieldName of Object.keys(fieldToColumn)) {
+    if (!(fieldName in row)) continue;
+    const value = row[fieldName];
+    if (value === undefined || value === null) continue;
+    criterion[fieldName] = value;
+  }
+
+  if (Object.keys(criterion).length === 0) {
     throw new Error(
-      `Missing primary key field "${fieldName}" while reloading model "${modelName}"`,
+      `Cannot build row identity criterion for id-less model "${modelName}": ` +
+        'the returned row has no non-null mapped fields',
     );
   }
 
-  return {
-    [fieldName]: value,
-  };
+  return criterion;
 }
 
 export async function withMutationScope<T>(
@@ -249,21 +276,21 @@ async function updateFirstGraph(
     for (const def of appliedUpdateDefaults) {
       mappedUpdateData[def.column] = def.value;
     }
-    const pkFilter = buildPrimaryKeyFilterFromRow(contract, modelName, existingRow);
-    const pkWhere = shorthandToWhereExpr(
+    const rowCriterion = buildRowIdentityCriterion(contract, modelName, existingRow);
+    const rowWhere = shorthandToWhereExpr(
       context,
       modelName,
-      pkFilter as MutationUpdateInput<Contract<SqlStorage>, string>,
+      rowCriterion as MutationUpdateInput<Contract<SqlStorage>, string>,
     );
-    if (!pkWhere) {
-      throw new Error(`Failed to build primary key filter for model "${modelName}"`);
+    if (!rowWhere) {
+      throw new Error(`Failed to build row identity filter for model "${modelName}"`);
     }
 
     const compiled = compileUpdateReturning(
       contract,
       tableName,
       mappedUpdateData,
-      [pkWhere],
+      [rowWhere],
       undefined,
     );
     const updatedRowsRaw = await executeQueryPlan<Record<string, unknown>>(
