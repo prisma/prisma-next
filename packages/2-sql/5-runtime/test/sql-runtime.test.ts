@@ -15,9 +15,9 @@ import type {
 } from '@prisma-next/sql-relational-core/ast';
 import {
   BinaryExpr,
+  buildCodecRegistry,
   ColumnRef,
   LiteralExpr,
-  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -67,19 +67,15 @@ interface DriverMockSpies {
 type MockSqlDriver = SqlDriver & { __spies: DriverMockSpies };
 
 function createStubCodecs(extraCodecs: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = newCodecRegistry();
-  registry.register(
+  return buildCodecRegistry([
     defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (v: number) => v,
       decode: (w: number) => w,
     }),
-  );
-  for (const extraCodec of extraCodecs) {
-    registry.register(extraCodec);
-  }
-  return registry;
+    ...extraCodecs,
+  ]);
 }
 
 function createStubAdapter(extraCodecs: readonly Codec<string>[] = []) {

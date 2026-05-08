@@ -4,12 +4,12 @@ import type { CodecRegistry, CodecTrait } from '@prisma-next/sql-relational-core
 import {
   AndExpr,
   BinaryExpr,
+  buildCodecRegistry,
   ColumnRef,
   ExistsExpr,
   ListExpression,
   NotExpr,
   NullCheckExpr,
-  newCodecRegistry,
   OperationExpr,
   OrderByItem,
   ParamRef,
@@ -47,19 +47,16 @@ describe('createModelAccessor', () => {
   }
 
   function makeRegistry(entries: Record<string, readonly CodecTrait[]>): CodecRegistry {
-    const registry = newCodecRegistry();
-    for (const [id, traits] of Object.entries(entries)) {
-      registry.register(
-        defineTestCodec({
-          typeId: id,
-          targetTypes: [],
-          traits,
-          encode: (v: JsonValue) => v,
-          decode: (v: JsonValue) => v,
-        }),
-      );
-    }
-    return registry;
+    const codecs = Object.entries(entries).map(([id, traits]) =>
+      defineTestCodec({
+        typeId: id,
+        targetTypes: [],
+        traits,
+        encode: (v: JsonValue) => v,
+        decode: (v: JsonValue) => v,
+      }),
+    );
+    return buildCodecRegistry(codecs);
   }
 
   function makeDescriptors(

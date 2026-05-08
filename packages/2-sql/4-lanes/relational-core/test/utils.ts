@@ -1,30 +1,9 @@
 import type { Contract } from '@prisma-next/contract/types';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { createSqlOperationRegistry } from '@prisma-next/sql-operations';
-import type {
-  Adapter,
-  Codec,
-  CodecRegistry,
-  LoweredStatement,
-  SelectAst,
-} from '../src/exports/ast';
+import type { Adapter, LoweredStatement, SelectAst } from '../src/exports/ast';
+import { buildCodecRegistry } from '../src/exports/ast';
 import type { ExecutionContext } from '../src/exports/query-lane-context';
-
-function emptyCodecRegistry(): CodecRegistry {
-  const byId = new Map<string, Codec<string>>();
-  return {
-    get: (id) => byId.get(id),
-    has: (id) => byId.has(id),
-    register: (c) => {
-      if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
-      byId.set(c.id, c);
-    },
-    values: () => byId.values(),
-    [Symbol.iterator]: function* () {
-      yield* byId.values();
-    },
-  };
-}
 
 /**
  * Creates a stub adapter for testing.
@@ -36,7 +15,7 @@ function emptyCodecRegistry(): CodecRegistry {
  * registry per call would make tests order-dependent.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
-  const codecRegistry = emptyCodecRegistry();
+  const codecRegistry = buildCodecRegistry([]);
   return {
     profile: {
       id: 'stub-profile',
@@ -67,7 +46,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
 export function createTestContext<TContract extends Contract<SqlStorage>>(
   contract: TContract,
 ): ExecutionContext<TContract> {
-  const codecRegistry = emptyCodecRegistry();
+  const codecRegistry = buildCodecRegistry([]);
 
   return {
     contract,

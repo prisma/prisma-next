@@ -16,29 +16,11 @@ import { generateId } from '@prisma-next/ids/runtime';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import type {
   Adapter,
-  Codec,
   CodecRegistry,
   LoweredStatement,
   SelectAst,
 } from '@prisma-next/sql-relational-core/ast';
-import { defineTestCodec } from './test-codec';
-
-function emptyCodecRegistry(): CodecRegistry {
-  const byId = new Map<string, Codec<string>>();
-  return {
-    get: (id) => byId.get(id),
-    has: (id) => byId.has(id),
-    register: (c) => {
-      if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
-      byId.set(c.id, c);
-    },
-    values: () => byId.values(),
-    [Symbol.iterator]: function* () {
-      yield* byId.values();
-    },
-  };
-}
-
+import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import type { SqlExecutionPlan, SqlQueryPlan } from '@prisma-next/sql-relational-core/plan';
 import { collectAsync, drainAsyncIterable } from '@prisma-next/test-utils';
 import type { Client } from 'pg';
@@ -60,6 +42,7 @@ import type {
   SqlRuntimeExtensionDescriptor,
   SqlRuntimeTargetDescriptor,
 } from '../src/sql-context';
+import { defineTestCodec } from './test-codec';
 
 function createTestMutationDefaultGenerators() {
   return builtinGeneratorIds.map((id) => ({
@@ -271,30 +254,22 @@ export function createTestStackInstance(options?: {
  * to enable type inference in tests without requiring the postgres adapter package.
  */
 export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, LoweredStatement> {
-  const codecRegistry = emptyCodecRegistry();
-
-  // Register stub codecs for common test types
-  // These match the codec IDs used in test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1)
-  // but don't require importing from the postgres adapter package
-  codecRegistry.register(
+  // Stub codecs for common test types — match the codec IDs used in
+  // test contracts (pg/int4@1, pg/text@1, pg/timestamptz@1) without
+  // importing from the postgres adapter package.
+  const codecRegistry = buildCodecRegistry([
     defineTestCodec({
       typeId: 'pg/int4@1',
       targetTypes: ['int4'],
       encode: (value: number) => value,
       decode: (wire: number) => wire,
     }),
-  );
-
-  codecRegistry.register(
     defineTestCodec({
       typeId: 'pg/text@1',
       targetTypes: ['text'],
       encode: (value: string) => value,
       decode: (wire: string) => wire,
     }),
-  );
-
-  codecRegistry.register(
     defineTestCodec({
       typeId: 'pg/timestamptz@1',
       targetTypes: ['timestamptz'],
@@ -308,7 +283,7 @@ export function createStubAdapter(): Adapter<SelectAst, Contract<SqlStorage>, Lo
         return new Date(json);
       },
     }),
-  );
+  ]);
 
   return {
     profile: {

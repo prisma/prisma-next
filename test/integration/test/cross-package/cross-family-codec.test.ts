@@ -1,6 +1,6 @@
 import { newMongoCodecRegistry } from '@prisma-next/mongo-codec';
 import { MongoParamRef } from '@prisma-next/mongo-value';
-import { newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
+import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
 import { resolveValue } from '../../../../packages/3-mongo-target/2-mongo-adapter/src/resolve-value';
 import { defineTestCodec } from './test-codec';
@@ -25,8 +25,7 @@ describe('cross-family codec parity (T4.1)', () => {
   });
 
   it('produces identical wire output through both family registries', async () => {
-    const sqlRegistry = newCodecRegistry();
-    sqlRegistry.register(objectIdLikeCodec);
+    const sqlRegistry = buildCodecRegistry([objectIdLikeCodec]);
     const mongoRegistry = newMongoCodecRegistry();
     mongoRegistry.register(objectIdLikeCodec);
 
@@ -45,8 +44,7 @@ describe('cross-family codec parity (T4.1)', () => {
   });
 
   it('encoding through Mongo resolveValue matches SQL codec.encode result', async () => {
-    const sqlRegistry = newCodecRegistry();
-    sqlRegistry.register(objectIdLikeCodec);
+    const sqlRegistry = buildCodecRegistry([objectIdLikeCodec]);
     const mongoRegistry = newMongoCodecRegistry();
     mongoRegistry.register(objectIdLikeCodec);
 
@@ -65,8 +63,7 @@ describe('cross-family codec parity (T4.1)', () => {
   });
 
   it('round-trips: SQL decode is the inverse of SQL encode', async () => {
-    const sqlRegistry = newCodecRegistry();
-    sqlRegistry.register(objectIdLikeCodec);
+    const sqlRegistry = buildCodecRegistry([objectIdLikeCodec]);
 
     const sqlCodec = sqlRegistry.get('shared/object-id-like@1');
     if (!sqlCodec) throw new Error('SQL codec missing');

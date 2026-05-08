@@ -11,6 +11,7 @@ import type {
   CodecRegistry,
   LowererContext,
 } from '@prisma-next/sql-relational-core/ast';
+import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { postgresCodecRegistry } from '@prisma-next/target-postgres/codecs';
 import { createPostgresBuiltinCodecLookup } from './codec-lookup';
@@ -42,7 +43,6 @@ class PostgresAdapterImpl
 
   readonly profile: AdapterProfile<'postgres'>;
   private readonly codecRegistry: CodecRegistry = (() => {
-    const byId = new Map<string, Codec<string>>();
     // Materialize a canonical codec instance per descriptor.
     // Parameterized postgres codecs are parameter-stateless at runtime
     // (params only inform emit-path metadata + renderOutputType), so a
@@ -50,27 +50,16 @@ class PostgresAdapterImpl
     // runtime encode/decode path. The descriptors come from the
     // package-scoped `postgresCodecRegistry`.
     const synthCtx: CodecInstanceContext = { name: 'postgres-builtin-adapter' };
+    const codecs: Codec<string>[] = [];
     for (const descriptor of postgresCodecRegistry.values()) {
       const factory = (
         descriptor as AnyCodecDescriptor & {
           factory: (params: unknown) => (ctx: CodecInstanceContext) => Codec<string>;
         }
       ).factory(undefined);
-      const codec = factory(synthCtx);
-      byId.set(codec.id, codec);
+      codecs.push(factory(synthCtx));
     }
-    return {
-      get: (id) => byId.get(id),
-      has: (id) => byId.has(id),
-      register: (c) => {
-        if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
-        byId.set(c.id, c);
-      },
-      values: () => byId.values(),
-      [Symbol.iterator]: function* () {
-        yield* byId.values();
-      },
-    };
+    return buildCodecRegistry(codecs);
   })();
   private readonly codecLookup: CodecLookup;
 

@@ -31,6 +31,7 @@ import type {
   SubqueryExpr,
   UpdateAst,
 } from '@prisma-next/sql-relational-core/ast';
+import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { parseContractMarkerRow } from '@prisma-next/sql-runtime';
 import { sqliteCodecRegistry } from '@prisma-next/target-sqlite/codecs';
 import { escapeLiteral, quoteIdentifier } from '@prisma-next/target-sqlite/sql-utils';
@@ -53,34 +54,22 @@ class SqliteAdapterImpl implements Adapter<AnyQueryAst, SqliteContract, SqliteLo
 
   readonly profile: AdapterProfile<'sqlite'>;
   private readonly codecRegistry: CodecRegistry = (() => {
-    const byId = new Map<string, Codec<string>>();
     // Materialize a canonical codec instance per descriptor. SQLite
     // codecs are all non-parameterized today (audit confirms `factory()`
     // takes no params), so `factory(undefined)(synthCtx)` yields the
     // runtime instance the encode/decode path needs. The descriptors
     // come from the package-scoped `sqliteCodecRegistry`.
     const synthCtx: CodecInstanceContext = { name: 'sqlite-builtin-adapter' };
+    const codecs: Codec<string>[] = [];
     for (const descriptor of sqliteCodecRegistry.values()) {
       const factory = (
         descriptor as AnyCodecDescriptor & {
           factory: (params: unknown) => (ctx: CodecInstanceContext) => Codec<string>;
         }
       ).factory(undefined);
-      const codec = factory(synthCtx);
-      byId.set(codec.id, codec);
+      codecs.push(factory(synthCtx));
     }
-    return {
-      get: (id) => byId.get(id),
-      has: (id) => byId.has(id),
-      register: (c) => {
-        if (byId.has(c.id)) throw new Error(`Codec with ID '${c.id}' is already registered`);
-        byId.set(c.id, c);
-      },
-      values: () => byId.values(),
-      [Symbol.iterator]: function* () {
-        yield* byId.values();
-      },
-    };
+    return buildCodecRegistry(codecs);
   })();
 
   constructor(options?: SqliteAdapterOptions) {

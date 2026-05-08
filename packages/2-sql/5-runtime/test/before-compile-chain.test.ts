@@ -3,9 +3,9 @@ import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import {
   AndExpr,
   BinaryExpr,
+  buildCodecRegistry,
   ColumnRef,
   LiteralExpr,
-  newCodecRegistry,
   ParamRef,
   ProjectionItem,
   SelectAst,
@@ -342,15 +342,14 @@ describe('runBeforeCompileChain', () => {
   it(
     'beforeCompile alias-swap rewrites the AST and the decoder reads from it',
     async () => {
-      const decoderRegistry = newCodecRegistry();
-      decoderRegistry.register(
+      const decoderRegistry = buildCodecRegistry([
         defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),
-      );
+      ]);
 
       const initialAst = SelectAst.from(TableSource.named('users')).withProjection([
         ProjectionItem.of('id', ColumnRef.of('users', 'id'), 'pg/int4@1'),
@@ -395,15 +394,14 @@ describe('runBeforeCompileChain', () => {
     async () => {
       const { InsertAst } = await import('@prisma-next/sql-relational-core/ast');
 
-      const decoderRegistry = newCodecRegistry();
-      decoderRegistry.register(
+      const decoderRegistry = buildCodecRegistry([
         defineTestCodec({
           typeId: 'pg/int4@1',
           targetTypes: ['int4'],
           encode: (v: number) => v,
           decode: (w: number) => w + 100,
         }),
-      );
+      ]);
 
       const insert = InsertAst.into(TableSource.named('users'))
         .withRows([{ id: ParamRef.of(1, { name: 'id', codecId: 'pg/int4@1' }) }])

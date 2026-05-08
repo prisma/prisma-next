@@ -31,6 +31,7 @@ import type {
   SqlCodecInstanceContext,
   SqlDriver,
 } from '@prisma-next/sql-relational-core/ast';
+import { buildCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type {
   AppliedMutationDefault,
@@ -748,21 +749,7 @@ export function createExecutionContext<
   // parameter encoding); descriptors whose factory needs real params
   // (arktype-json) raise — skip them and let the per-column dispatch
   // path handle materialization lazily.
-  const codecMap = new Map<string, Codec<string>>();
-  const codecRegistry: CodecRegistry = {
-    get: (id) => codecMap.get(id),
-    has: (id) => codecMap.has(id),
-    register: (c) => {
-      if (codecMap.has(c.id)) {
-        throw new Error(`Codec with ID '${c.id}' is already registered`);
-      }
-      codecMap.set(c.id, c);
-    },
-    values: () => codecMap.values(),
-    [Symbol.iterator]: function* () {
-      yield* codecMap.values();
-    },
-  };
+  const codecs: Codec<string>[] = [];
   for (const descriptor of allCodecDescriptors) {
     const ctx: SqlCodecInstanceContext = {
       name: `<shared:${descriptor.codecId}>`,
@@ -778,12 +765,13 @@ export function createExecutionContext<
       params: unknown,
     ) => (ctx: SqlCodecInstanceContext) => Codec;
     try {
-      codecRegistry.register(factory(undefined)(ctx));
+      codecs.push(factory(undefined)(ctx));
     } catch {
       // Parameterized descriptor whose factory needs real params; skip
       // here and let the per-column dispatch path materialize lazily.
     }
   }
+  const codecRegistry = buildCodecRegistry(codecs);
 
   const queryOperationRegistry = createSqlOperationRegistry();
   for (const contributor of contributors) {

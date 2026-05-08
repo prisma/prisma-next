@@ -1,7 +1,7 @@
 import {
+  buildCodecRegistry,
   type Codec,
   type ContractCodecRegistry,
-  newCodecRegistry,
   type SqlCodecCallContext,
 } from '@prisma-next/sql-relational-core/ast';
 import { describe, expect, it } from 'vitest';
@@ -44,7 +44,7 @@ describe('encodeParam — column-aware dispatch', () => {
       },
     };
 
-    const registry = newCodecRegistry();
+    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wireDoc = await encodeParam(
@@ -102,7 +102,7 @@ describe('encodeParam — column-aware dispatch', () => {
       },
     };
 
-    const registry = newCodecRegistry();
+    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wire = await encodeParam(
@@ -135,7 +135,7 @@ describe('encodeParam — column-aware dispatch', () => {
       forCodecId: () => fallbackCodec,
     };
 
-    const registry = newCodecRegistry();
+    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const wire = await encodeParam(
@@ -170,7 +170,7 @@ describe('encodeParam — column-aware dispatch', () => {
       forCodecId: () => codec,
     };
 
-    const registry = newCodecRegistry();
+    const registry = buildCodecRegistry([]);
     const ctx: SqlCodecCallContext = { signal: new AbortController().signal };
 
     const result = await encodeParam(

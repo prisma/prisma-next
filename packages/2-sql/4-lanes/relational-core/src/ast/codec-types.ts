@@ -148,36 +148,44 @@ export interface ContractCodecRegistry {
 }
 
 /**
- * Registry interface for codecs organized by namespaced id.
+ * Read-only registry of codecs organized by namespaced id.
  *
- * The registry allows looking up codecs by their namespaced ID.
- * Codec-id is the single dispatch key (with adapter-first / packs /
- * app-overrides registration preference enforced at compose time).
+ * Built once via {@link buildCodecRegistry} from a complete array of
+ * resolved {@link Codec} instances; mutation post-construction is not
+ * supported. The previous `register(codec)` mutation surface was a
+ * build-then-read pattern with the build step exposed externally
+ * (every consumer assembled a fresh registry once, then read from it),
+ * so the surface was retired in favour of a single-shot builder.
+ *
+ * Codec-id is the single dispatch key. Adapter-first / packs /
+ * app-overrides registration preference is enforced at compose time
+ * (the input array's order encodes precedence; duplicates raise).
  */
 export interface CodecRegistry {
   get(id: string): Codec<string> | undefined;
   has(id: string): boolean;
-  register(codec: Codec<string>): void;
   [Symbol.iterator](): Iterator<Codec<string>>;
   values(): IterableIterator<Codec<string>>;
 }
 
 /**
- * Create a new codec registry. Inline object literal — no class
- * implementation; the registry is just a private `Map<string, Codec>`
- * with the documented surface methods.
+ * Build a {@link CodecRegistry} from a complete array of resolved
+ * codecs. The returned registry is read-only — mutation is not
+ * exposed. Duplicate codec ids in the input array raise; callers
+ * deduplicate (or define precedence) at the call site by ordering /
+ * filtering the input array.
  */
-export function newCodecRegistry(): CodecRegistry {
+export function buildCodecRegistry(codecs: readonly Codec<string>[]): CodecRegistry {
   const byId = new Map<string, Codec<string>>();
+  for (const codec of codecs) {
+    if (byId.has(codec.id)) {
+      throw new Error(`Codec with ID '${codec.id}' is already registered`);
+    }
+    byId.set(codec.id, codec);
+  }
   return {
     get: (id) => byId.get(id),
     has: (id) => byId.has(id),
-    register: (codec) => {
-      if (byId.has(codec.id)) {
-        throw new Error(`Codec with ID '${codec.id}' is already registered`);
-      }
-      byId.set(codec.id, codec);
-    },
     values: () => byId.values(),
     [Symbol.iterator]: function* () {
       yield* byId.values();

@@ -15,8 +15,8 @@ import type {
   SqlExecuteRequest,
 } from '@prisma-next/sql-relational-core/ast';
 import {
+  buildCodecRegistry,
   ColumnRef,
-  newCodecRegistry,
   ProjectionItem,
   SelectAst,
   TableSource,
@@ -61,9 +61,7 @@ function deferred<T>(): {
 }
 
 function createStubCodecs(extras: readonly Codec<string>[] = []): CodecRegistry {
-  const registry = newCodecRegistry();
-  for (const c of extras) registry.register(c);
-  return registry;
+  return buildCodecRegistry([...extras]);
 }
 
 interface DriverOptions {

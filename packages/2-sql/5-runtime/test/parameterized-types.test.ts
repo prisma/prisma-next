@@ -6,7 +6,6 @@ import type {
 } from '@prisma-next/framework-components/codec';
 import type { SqlStorage, StorageTypeInstance } from '@prisma-next/sql-contract/types';
 import type { Codec, SqlCodecInstanceContext } from '@prisma-next/sql-relational-core/ast';
-import { newCodecRegistry } from '@prisma-next/sql-relational-core/ast';
 import { ifDefined } from '@prisma-next/utils/defined';
 import type { Type } from 'arktype';
 import { type as arktype } from 'arktype';
@@ -139,9 +138,6 @@ describe('parameterized types', () => {
         },
       ];
 
-      const registry = newCodecRegistry();
-      registry.register(sharedCodec);
-
       return {
         kind: 'extension' as const,
         id: 'pgvector',
@@ -265,8 +261,6 @@ describe('parameterized types', () => {
           factory,
         },
       ];
-      const registry = newCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
@@ -399,8 +393,6 @@ describe('parameterized types', () => {
           factory: (_params) => () => sharedCodec,
         },
       ];
-      const registry = newCodecRegistry();
-      registry.register(sharedCodec);
       return {
         kind: 'extension' as const,
         id: 'pgvector',
