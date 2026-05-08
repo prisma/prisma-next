@@ -318,8 +318,21 @@ export function resolveModelTableName(contract: Contract<SqlStorage>, modelName:
   throw new Error(`Model "${modelName}" has invalid or missing storage.table in the contract`);
 }
 
-export function resolvePrimaryKeyColumn(contract: Contract<SqlStorage>, tableName: string): string {
-  return contract.storage.tables[tableName]?.primaryKey?.columns[0] ?? 'id';
+export function resolvePrimaryKeyColumn(
+  contract: Contract<SqlStorage>,
+  tableName: string,
+  operation: string,
+): string {
+  const pkColumn = contract.storage.tables[tableName]?.primaryKey?.columns[0];
+  if (pkColumn === undefined) {
+    throw new Error(
+      `${operation} requires table "${tableName}" to declare a primary key. ` +
+        'Id-less tables can be queried via the SQL DSL or predicate-based ORM operations ' +
+        '(e.g. where(...).updateAll(), where(...).deleteAll()), but ORM helpers that fall ' +
+        'back to a primary key are unsupported on id-less models.',
+    );
+  }
+  return pkColumn;
 }
 
 export function assertReturningCapability(contract: Contract<SqlStorage>, action: string): void {

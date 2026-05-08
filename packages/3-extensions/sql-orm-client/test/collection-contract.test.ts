@@ -160,8 +160,29 @@ describe('collection-contract capability detection', () => {
     expect(() => resolveModelTableName(contract, 'UnknownModel')).toThrow(
       'Model "UnknownModel" not found in contract',
     );
-    expect(resolvePrimaryKeyColumn(contract, 'users')).toBe('id');
-    expect(resolvePrimaryKeyColumn(contract, 'unknown_table')).toBe('id');
+    expect(resolvePrimaryKeyColumn(contract, 'users', 'op')).toBe('id');
+    expect(() => resolvePrimaryKeyColumn(contract, 'unknown_table', 'op')).toThrow(
+      'op requires table "unknown_table" to declare a primary key',
+    );
+  });
+
+  it('resolvePrimaryKeyColumn() throws when the table omits primaryKey (id-less)', () => {
+    const contract = getTestContract();
+    const idless = {
+      ...contract,
+      storage: {
+        ...contract.storage,
+        tables: {
+          ...contract.storage.tables,
+          // Build an id-less storage table by stripping the primaryKey property.
+          users: { ...contract.storage.tables.users, primaryKey: undefined },
+        },
+      },
+    } as unknown as typeof contract;
+
+    expect(() =>
+      resolvePrimaryKeyColumn(idless, 'users', 'updateCount() for model "User"'),
+    ).toThrow('updateCount() for model "User" requires table "users" to declare a primary key');
   });
 
   it('resolveModelTableName() reads from storage.table and throws for invalid values', () => {

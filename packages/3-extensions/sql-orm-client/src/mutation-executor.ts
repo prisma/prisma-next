@@ -112,7 +112,11 @@ export function buildPrimaryKeyFilterFromRow(
   row: Record<string, unknown>,
 ): Record<string, unknown> {
   const tableName = resolveModelTableName(contract, modelName);
-  const primaryKeyColumn = resolvePrimaryKeyColumn(contract, tableName);
+  const primaryKeyColumn = resolvePrimaryKeyColumn(
+    contract,
+    tableName,
+    `Mutation reload for model "${modelName}"`,
+  );
   const fieldName = toFieldName(contract, modelName, primaryKeyColumn);
   const value = row[fieldName];
   if (value === undefined) {

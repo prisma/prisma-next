@@ -809,7 +809,11 @@ export class Collection<
 
     const baseFieldToColumn = getFieldToColumnMap(this.contract, this.modelName);
     const variantFieldToColumn = getFieldToColumnMap(this.contract, variant.modelName);
-    const pkColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const pkColumn = resolvePrimaryKeyColumn(
+      this.contract,
+      this.tableName,
+      `MTI create() for model "${this.modelName}"`,
+    );
 
     return {
       polyInfo,
@@ -1116,7 +1120,11 @@ export class Collection<
 
     applyUpdateDefaults(this.ctx, this.tableName, mappedData);
 
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(
+      this.contract,
+      this.tableName,
+      `updateCount() for model "${this.modelName}"`,
+    );
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,
@@ -1177,7 +1185,11 @@ export class Collection<
   async deleteCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): Promise<number> {
-    const primaryKeyColumn = resolvePrimaryKeyColumn(this.contract, this.tableName);
+    const primaryKeyColumn = resolvePrimaryKeyColumn(
+      this.contract,
+      this.tableName,
+      `deleteCount() for model "${this.modelName}"`,
+    );
     const countState: CollectionState = {
       ...emptyState(),
       filters: this.state.filters,

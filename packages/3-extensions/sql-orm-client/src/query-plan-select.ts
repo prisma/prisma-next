@@ -387,7 +387,11 @@ function buildMtiJoins(
 ): { joins: JoinAst[]; projection: ProjectionItem[] } {
   const joins: JoinAst[] = [];
   const projection: ProjectionItem[] = [];
-  const pkColumn = resolvePrimaryKeyColumn(contract, polyInfo.baseTable);
+  const pkColumn = resolvePrimaryKeyColumn(
+    contract,
+    polyInfo.baseTable,
+    `MTI polymorphism on base table "${polyInfo.baseTable}"`,
+  );
 
   const variantsToJoin = variantName
     ? polyInfo.mtiVariants.filter((v) => v.modelName === variantName)
