@@ -1,8 +1,10 @@
 import type {
   ColumnDefault,
   ColumnDefaultLiteralInputValue,
+  ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
 } from '@prisma-next/contract/types';
+import { isColumnDefault } from '@prisma-next/contract/types';
 import type {
   ColumnTypeDescriptor,
   ForeignKeyDefaultsState,
@@ -46,7 +48,7 @@ export type ScalarFieldState<
   readonly nullable: Nullable;
   readonly columnName?: ColumnName | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
 } & (IdSpec extends NamedConstraintSpec ? { readonly id: IdSpec } : { readonly id?: undefined }) &
   (UniqueSpec extends NamedConstraintSpec
     ? { readonly unique: UniqueSpec }
@@ -59,7 +61,7 @@ type AnyScalarFieldState = {
   readonly nullable: boolean;
   readonly columnName?: string | undefined;
   readonly default?: ColumnDefault | undefined;
-  readonly executionDefault?: ExecutionMutationDefaultValue | undefined;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases | undefined;
   readonly id?: NamedConstraintSpec | undefined;
   readonly unique?: NamedConstraintSpec | undefined;
 };
@@ -135,12 +137,6 @@ export type GeneratedFieldSpec = {
   readonly typeParams?: Record<string, unknown>;
   readonly generated: ExecutionMutationDefaultValue;
 };
-
-function isColumnDefault(value: unknown): value is ColumnDefault {
-  if (typeof value !== 'object' || value === null) return false;
-  const kind = (value as { kind?: unknown }).kind;
-  return kind === 'literal' || kind === 'function';
-}
 
 function toColumnDefault(value: ColumnDefaultLiteralInputValue | ColumnDefault): ColumnDefault {
   if (isColumnDefault(value)) {
@@ -348,7 +344,7 @@ function generatedField<Descriptor extends ColumnTypeDescriptor>(
       ...(spec.typeParams ? { typeParams: spec.typeParams } : {}),
     },
     nullable: false,
-    executionDefault: spec.generated,
+    executionDefaults: { onCreate: spec.generated },
   });
 }
 
@@ -379,11 +375,8 @@ export function buildFieldPreset(
     kind: 'scalar',
     descriptor: preset.descriptor,
     nullable: preset.nullable,
-    ...ifDefined('default', preset.default as ColumnDefault | undefined),
-    ...ifDefined(
-      'executionDefault',
-      preset.executionDefault as ExecutionMutationDefaultValue | undefined,
-    ),
+    ...ifDefined('default', preset.default),
+    ...ifDefined('executionDefaults', preset.executionDefaults),
     ...(preset.id
       ? {
           id: namedConstraintOptions?.name ? { name: namedConstraintOptions.name } : {},

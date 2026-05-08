@@ -5,8 +5,10 @@ import type {
   AuthoringTypeNamespace,
 } from '@prisma-next/framework-components/authoring';
 import {
+  assertNoCrossRegistryCollisions,
   isAuthoringFieldPresetDescriptor,
   isAuthoringTypeConstructorDescriptor,
+  mergeAuthoringNamespaces,
 } from '@prisma-next/framework-components/authoring';
 import type {
   ExtensionPackRef,
@@ -121,54 +123,6 @@ function extractFieldNamespace<Pack>(pack: Pack): ExtractFieldNamespaceFromPack<
     {}) as ExtractFieldNamespaceFromPack<Pack>;
 }
 
-function mergeHelperNamespaces(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>,
-  path: readonly string[],
-  leafGuard: (value: unknown) => boolean,
-  label: string,
-): void {
-  const assertSafePath = (currentPath: readonly string[]) => {
-    const blockedSegment = currentPath.find(
-      (segment) => segment === '__proto__' || segment === 'constructor' || segment === 'prototype',
-    );
-    if (blockedSegment) {
-      throw new Error(
-        `Invalid authoring ${label} helper "${currentPath.join('.')}". Helper path segments must not use "${blockedSegment}".`,
-      );
-    }
-  };
-
-  for (const [key, sourceValue] of Object.entries(source)) {
-    const currentPath = [...path, key];
-    assertSafePath(currentPath);
-    const hasExistingValue = Object.hasOwn(target, key);
-    const existingValue = hasExistingValue ? target[key] : undefined;
-
-    if (!hasExistingValue) {
-      target[key] = sourceValue;
-      continue;
-    }
-
-    const existingIsLeaf = leafGuard(existingValue);
-    const sourceIsLeaf = leafGuard(sourceValue);
-
-    if (existingIsLeaf || sourceIsLeaf) {
-      throw new Error(
-        `Duplicate authoring ${label} helper "${currentPath.join('.')}". Helper names must be unique across composed packs.`,
-      );
-    }
-
-    mergeHelperNamespaces(
-      existingValue as Record<string, unknown>,
-      sourceValue as Record<string, unknown>,
-      currentPath,
-      leafGuard,
-      label,
-    );
-  }
-}
-
 type AuthoringComponent = {
   readonly authoring?: { readonly type?: unknown; readonly field?: unknown };
 };
@@ -178,7 +132,7 @@ function composeTypeNamespace(components: readonly AuthoringComponent[]): Author
   for (const component of components) {
     const ns = extractTypeNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeHelperNamespaces(merged, ns, [], isAuthoringTypeConstructorDescriptor, 'type');
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringTypeConstructorDescriptor, 'type');
     }
   }
   return merged as AuthoringTypeNamespace;
@@ -189,17 +143,17 @@ function composeFieldNamespace(components: readonly AuthoringComponent[]): Autho
   for (const component of components) {
     const ns = extractFieldNamespace(component);
     if (Object.keys(ns).length > 0) {
-      mergeHelperNamespaces(merged, ns, [], isAuthoringFieldPresetDescriptor, 'field');
+      mergeAuthoringNamespaces(merged, ns, [], isAuthoringFieldPresetDescriptor, 'field');
     }
   }
   return merged as AuthoringFieldNamespace;
 }
 
 function createComposedFieldHelpers(
-  components: readonly AuthoringComponent[],
+  fieldNamespace: AuthoringFieldNamespace,
 ): CoreFieldHelpers & Record<string, unknown> {
   const helperNamespace = createFieldHelpersFromNamespace(
-    composeFieldNamespace(components),
+    fieldNamespace,
     ({ helperPath, descriptor }) =>
       createFieldPresetHelper({
         helperPath,
@@ -247,10 +201,16 @@ export function createComposedAuthoringHelpers<
     ...extensionValues,
   ];
 
+  const typeNamespace = composeTypeNamespace(components);
+  const fieldNamespace = composeFieldNamespace(components);
+  // Mirrors the call in `assembleAuthoringContributions`: PSL composes via
+  // `createControlStack`, the TS DSL composes here. Both seams need the guard.
+  assertNoCrossRegistryCollisions(typeNamespace, fieldNamespace);
+
   return {
-    field: createComposedFieldHelpers(components),
+    field: createComposedFieldHelpers(fieldNamespace),
     model,
     rel,
-    type: createTypeHelpersFromNamespace(composeTypeNamespace(components)),
+    type: createTypeHelpersFromNamespace(typeNamespace),
   } as ComposedAuthoringHelpers<Family, Target, ExtensionPacks>;
 }

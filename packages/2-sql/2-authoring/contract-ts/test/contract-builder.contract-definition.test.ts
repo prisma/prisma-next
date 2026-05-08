@@ -36,7 +36,7 @@ describe('shared contract definition lowering', () => {
                 typeParams: { length: 36 },
               },
               nullable: false,
-              executionDefault: { kind: 'generator', id: 'uuidv4' },
+              executionDefaults: { onCreate: { kind: 'generator', id: 'uuidv4' } },
             },
             {
               fieldName: 'role',
@@ -230,6 +230,41 @@ describe('shared contract definition lowering', () => {
     });
   });
 
+  it('builds phase-specific execution defaults', () => {
+    const contract = buildSqlContractFromDefinition({
+      target: postgresTargetPack,
+      models: [
+        {
+          modelName: 'User',
+          tableName: 'app_user',
+          fields: [
+            {
+              fieldName: 'updatedAt',
+              columnName: 'updated_at',
+              descriptor: {
+                codecId: 'pg/timestamptz@1',
+                nativeType: 'timestamptz',
+              },
+              nullable: false,
+              executionDefaults: {
+                onCreate: { kind: 'generator', id: 'timestampNow' },
+                onUpdate: { kind: 'generator', id: 'timestampNow' },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(contract.execution?.mutations.defaults).toEqual([
+      {
+        ref: { table: 'app_user', column: 'updated_at' },
+        onCreate: { kind: 'generator', id: 'timestampNow' },
+        onUpdate: { kind: 'generator', id: 'timestampNow' },
+      },
+    ]);
+  });
+
   it('rejects generated fields that also declare storage defaults', () => {
     expect(() =>
       buildSqlContractFromDefinition({
@@ -251,16 +286,18 @@ describe('shared contract definition lowering', () => {
                   kind: 'function',
                   expression: 'gen_random_uuid()',
                 },
-                executionDefault: {
-                  kind: 'generator',
-                  id: 'uuidv4',
+                executionDefaults: {
+                  onCreate: {
+                    kind: 'generator',
+                    id: 'uuidv4',
+                  },
                 },
               },
             ],
           },
         ],
       }),
-    ).toThrow('Field "User.id" cannot define both default and executionDefault.');
+    ).toThrow('Field "User.id" cannot define both default and executionDefaults.');
   });
 
   it('rejects generated fields that are still marked nullable', () => {
@@ -280,16 +317,18 @@ describe('shared contract definition lowering', () => {
                   nativeType: 'text',
                 },
                 nullable: true,
-                executionDefault: {
-                  kind: 'generator',
-                  id: 'uuidv4',
+                executionDefaults: {
+                  onCreate: {
+                    kind: 'generator',
+                    id: 'uuidv4',
+                  },
                 },
               },
             ],
           },
         ],
       }),
-    ).toThrow('Field "User.id" cannot be nullable when executionDefault is present.');
+    ).toThrow('Field "User.id" cannot be nullable when executionDefaults are present.');
   });
 
   it('rejects nullable identity fields', () => {
@@ -317,6 +356,8 @@ describe('shared contract definition lowering', () => {
           },
         ],
       }),
-    ).toThrow('Model "User" uses nullable field "id" in its identity.');
+    ).toThrow(
+      /Contract semantic validation failed:.*primary key column "id".*primary key columns must be NOT NULL/,
+    );
   });
 });

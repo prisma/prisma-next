@@ -1,4 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
+import { timestampNowRuntimeGenerator } from '@prisma-next/family-sql/runtime';
 import { extractCodecLookup } from '@prisma-next/framework-components/control';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
@@ -27,13 +28,17 @@ function createPostgresCodecRegistry(): CodecRegistry {
 }
 
 function createPostgresMutationDefaultGenerators() {
-  return builtinGeneratorIds.map((id) => ({
-    id,
-    generate: (params?: Record<string, unknown>) => {
-      const spec: GeneratedValueSpec = params ? { id, params } : { id };
-      return generateId(spec);
-    },
-  }));
+  return [
+    ...builtinGeneratorIds.map((id) => ({
+      id,
+      generate: (params?: Record<string, unknown>) => {
+        const spec: GeneratedValueSpec = params ? { id, params } : { id };
+        return generateId(spec);
+      },
+      stability: 'field' as const,
+    })),
+    timestampNowRuntimeGenerator(),
+  ];
 }
 
 /**

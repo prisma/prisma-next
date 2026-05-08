@@ -108,12 +108,15 @@ export const contract = defineContract(
 }
 
 function starterSchemaPslPostgres(): string {
-  return `model User {
+  return `// use prisma-next
+
+model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String?
   posts     Post[]
   createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
 }
 
 model Post {
@@ -123,12 +126,15 @@ model Post {
   author    User     @relation(fields: [authorId], references: [id])
   authorId  Int
   createdAt DateTime @default(now())
+  updatedAt temporal.updatedAt()
 }
 `;
 }
 
 function starterSchemaPslMongo(): string {
-  return `model User {
+  return `// use prisma-next
+
+model User {
   id    ObjectId @id @map("_id")
   email String   @unique
   name  String?
@@ -161,7 +167,8 @@ export const contract = defineContract(
           id: field.id.uuidv7(),
           email: field.text().unique(),
           name: field.text().optional(),
-          createdAt: field.createdAt(),
+          createdAt: field.temporal.createdAt(),
+          updatedAt: field.temporal.updatedAt(),
         },
         relations: {
           posts: rel.hasMany('Post', { by: 'authorId' }),
@@ -174,7 +181,8 @@ export const contract = defineContract(
           title: field.text(),
           content: field.text().optional(),
           authorId: field.uuid(),
-          createdAt: field.createdAt(),
+          createdAt: field.temporal.createdAt(),
+          updatedAt: field.temporal.updatedAt(),
         },
         relations: {
           author: rel.belongsTo('User', { from: 'authorId', to: 'id' }),

@@ -1,4 +1,5 @@
 import type { GeneratedValueSpec } from '@prisma-next/contract/types';
+import { timestampNowRuntimeGenerator } from '@prisma-next/family-sql/runtime';
 import type { RuntimeAdapterInstance } from '@prisma-next/framework-components/execution';
 import { builtinGeneratorIds } from '@prisma-next/ids';
 import { generateId } from '@prisma-next/ids/runtime';
@@ -21,13 +22,17 @@ function createSqliteCodecRegistry(): CodecRegistry {
 }
 
 function createSqliteMutationDefaultGenerators() {
-  return builtinGeneratorIds.map((id) => ({
-    id,
-    generate: (params?: Record<string, unknown>) => {
-      const spec: GeneratedValueSpec = params ? { id, params } : { id };
-      return generateId(spec);
-    },
-  }));
+  return [
+    ...builtinGeneratorIds.map((id) => ({
+      id,
+      generate: (params?: Record<string, unknown>) => {
+        const spec: GeneratedValueSpec = params ? { id, params } : { id };
+        return generateId(spec);
+      },
+      stability: 'field' as const,
+    })),
+    timestampNowRuntimeGenerator(),
+  ];
 }
 
 const sqliteRuntimeAdapterDescriptor: SqlRuntimeAdapterDescriptor<

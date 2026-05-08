@@ -1,3 +1,5 @@
+// use prisma-next
+
 model User {
   id Int @id
   badUuid String @default(uuid(5))

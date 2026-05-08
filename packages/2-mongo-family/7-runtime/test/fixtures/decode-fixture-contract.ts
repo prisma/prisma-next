@@ -39,7 +39,6 @@ export type DecodeFixtureContract = MongoContract & {
         readonly embeddings: {
           readonly type: { readonly kind: 'scalar'; readonly codecId: 'mongo/vector@1' };
           readonly nullable: false;
-          readonly many: true;
         };
       };
       readonly relations: Record<string, never>;
@@ -120,7 +119,6 @@ export const decodeFixtureContractJson = {
         embeddings: {
           type: { kind: 'scalar' as const, codecId: 'mongo/vector@1' },
           nullable: false,
-          many: true,
         },
       },
     },

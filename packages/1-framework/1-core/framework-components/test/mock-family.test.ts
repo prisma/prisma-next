@@ -81,6 +81,7 @@ const ctx: RuntimeMiddlewareContext = {
   mode: 'strict',
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
+  contentHash: async () => 'mock-hash',
 };
 
 const meta: PlanMeta = {

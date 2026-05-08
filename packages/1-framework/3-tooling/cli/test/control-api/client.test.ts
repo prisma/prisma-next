@@ -17,7 +17,7 @@ import type { EmissionSpi } from '@prisma-next/framework-components/emission';
 import { timeouts } from '@prisma-next/test-utils';
 import { ifDefined } from '@prisma-next/utils/defined';
 import { notOk, ok } from '@prisma-next/utils/result';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@prisma-next/emitter', () => ({
   emit: vi.fn(
@@ -35,6 +35,20 @@ import { createControlClient } from '../../src/control-api/client';
 import type { ControlProgressEvent } from '../../src/control-api/types';
 
 const mockEmit = vi.mocked(emitFn);
+
+function createMockEmitResult(): EmitResult {
+  return {
+    storageHash: 'test-core-hash',
+    profileHash: 'test-profile-hash',
+    contractJson: '{"test": true}',
+    contractDts: 'export interface Contract {}',
+  };
+}
+
+beforeEach(() => {
+  mockEmit.mockReset();
+  mockEmit.mockResolvedValue(createMockEmitResult());
+});
 
 function createSourceProvider(
   load: ContractSourceProvider['load'] = async () => ok({ test: true } as unknown as Contract),

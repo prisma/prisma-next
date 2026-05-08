@@ -57,12 +57,14 @@ export async function getAuthorLeaderboard(query: Db['query'], runtime: Db['runt
       latestPost: acc.max(f.createdAt),
     }))
     .sort({ postCount: -1 })
-    .lookup({
-      from: 'users',
-      localField: '_id',
-      foreignField: '_id',
-      as: 'author',
-    })
+    .lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          local: local._id,
+          foreign: foreign._id,
+        }))
+        .as('author'),
+    )
     .build();
 
   return runtime.execute(plan);
@@ -85,12 +87,14 @@ export async function getRecentPostSummaries(query: Db['query'], runtime: Db['ru
 export async function getPostsWithAuthors(query: Db['query'], runtime: Db['runtime']) {
   const plan = query
     .from('posts')
-    .lookup({
-      from: 'users',
-      localField: 'authorId',
-      foreignField: '_id',
-      as: 'authorInfo',
-    })
+    .lookup((from) =>
+      from('users')
+        .on((local, foreign) => ({
+          local: local.authorId,
+          foreign: foreign._id,
+        }))
+        .as('authorInfo'),
+    )
     .sort({ createdAt: -1 })
     .build();
 

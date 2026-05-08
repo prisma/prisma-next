@@ -29,6 +29,7 @@ export type {
   DocIndex,
   ExecutionHashBase,
   ExecutionMutationDefault,
+  ExecutionMutationDefaultPhases,
   ExecutionMutationDefaultValue,
   ExecutionSection,
   Expr,
@@ -42,4 +43,11 @@ export type {
   StorageBase,
   StorageHashBase,
 } from '../types';
-export { coreHash, executionHash, profileHash } from '../types';
+export {
+  coreHash,
+  executionHash,
+  isColumnDefault,
+  isColumnDefaultLiteralInputValue,
+  isExecutionMutationDefaultValue,
+  profileHash,
+} from '../types';

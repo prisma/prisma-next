@@ -35,6 +35,7 @@ import { ifDefined } from '@prisma-next/utils/defined';
 import { decodeRow } from './codecs/decoding';
 import { encodeParams } from './codecs/encoding';
 import { validateCodecRegistryCompleteness } from './codecs/validation';
+import { computeSqlContentHash } from './content-hash';
 import { computeSqlFingerprint } from './fingerprint';
 import { lowerSqlPlan } from './lower-sql-plan';
 import { runBeforeCompileChain } from './middleware/before-compile-chain';
@@ -169,6 +170,9 @@ class SqlRuntimeImpl<TContract extends Contract<SqlStorage> = Contract<SqlStorag
         warn: () => {},
         error: () => {},
       },
+      // ctx is only invoked by runWithMiddleware with execs this runtime lowered;
+      // the framework parameter type is the cross-family base.
+      contentHash: (exec) => computeSqlContentHash(exec as SqlExecutionPlan),
     };
 
     super({ middleware: middleware ?? [], ctx: sqlCtx });

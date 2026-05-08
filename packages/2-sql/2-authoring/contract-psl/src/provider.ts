@@ -10,8 +10,8 @@ import type { ColumnDescriptor } from './psl-column-resolution';
 
 export interface PrismaContractOptions {
   readonly output?: string;
-  readonly target: TargetPackRef<'sql', 'postgres'>;
-  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', 'postgres'>[];
+  readonly target: TargetPackRef<'sql', string>;
+  readonly composedExtensionPackRefs?: readonly ExtensionPackRef<'sql', string>[];
 }
 
 function buildColumnDescriptorMap(

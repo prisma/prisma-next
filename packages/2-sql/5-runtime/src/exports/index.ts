@@ -24,6 +24,7 @@ export type {
 } from '../runtime-spi';
 export type {
   ExecutionContext,
+  GeneratorStability,
   RuntimeMutationDefaultGenerator,
   RuntimeParameterizedCodecDescriptor,
   SqlExecutionStack,

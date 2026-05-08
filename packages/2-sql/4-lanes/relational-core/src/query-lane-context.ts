@@ -90,6 +90,17 @@ export type MutationDefaultsOptions = {
   readonly op: MutationDefaultsOp;
   readonly table: string;
   readonly values: Record<string, unknown>;
+  /**
+   * Per-ORM-operation cache for generators that declare
+   * `stability: 'query'`. The caller passes the same `Map` across every
+   * `applyMutationDefaults` invocation in one bulk operation; the
+   * framework keys by `generatorId` so the same value is reused across
+   * all rows and columns. Generators with `stability: 'row'` use a
+   * fresh per-call cache the framework manages internally; generators
+   * with `stability: 'field'` skip caching entirely. Omit to make every
+   * call independent (degrades `'query'` to per-call behavior).
+   */
+  readonly defaultValueCache?: Map<string, unknown>;
 };
 
 /**

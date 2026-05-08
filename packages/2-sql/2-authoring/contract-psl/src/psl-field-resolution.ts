@@ -1,5 +1,5 @@
 import type { ContractSourceDiagnostic } from '@prisma-next/config/config-types';
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type { ColumnDefault, ExecutionMutationDefaultPhases } from '@prisma-next/contract/types';
 import type { AuthoringContributions } from '@prisma-next/framework-components/authoring';
 import type {
   ControlMutationDefaultRegistry,
@@ -13,7 +13,7 @@ import {
   parseConstraintMapArgument,
   parseMapName,
 } from './psl-attribute-parsing';
-import type { ColumnDescriptor } from './psl-column-resolution';
+import type { ColumnDescriptor, FieldPresetContributions } from './psl-column-resolution';
 import {
   checkUncomposedNamespace,
   lowerDefaultForField,
@@ -26,7 +26,7 @@ export type ResolvedField = {
   readonly columnName: string;
   readonly descriptor: ColumnDescriptor;
   readonly defaultValue?: ColumnDefault;
-  readonly executionDefault?: ExecutionMutationDefaultValue;
+  readonly executionDefaults?: ExecutionMutationDefaultPhases;
   readonly isId: boolean;
   readonly isUnique: boolean;
   readonly idName?: string;
@@ -68,10 +68,54 @@ const BUILTIN_FIELD_ATTRIBUTE_NAMES: ReadonlySet<string> = new Set([
   'map',
 ]);
 
+/**
+ * Per-attribute migration rule for attributes that have been removed
+ * from PSL in favor of the field-preset surface. The `hint` text is
+ * appended to the `PSL_UNSUPPORTED_FIELD_ATTRIBUTE` message so users
+ * porting Prisma 6 schemas see "use this preset instead" inline; the
+ * `suppressWhen` predicate skips the hint when the user has already
+ * migrated (so they don't get told to do what they just did).
+ *
+ * Pairing the suppression predicate with the hint makes each entry
+ * self-contained: a future entry for, say, `@id` ↔ `id.uuidv7()` cannot
+ * silently inherit the wrong predicate when added.
+ */
+interface RemovedAttributeRule {
+  readonly hint: string;
+  readonly suppressWhen: (field: PslField) => boolean;
+}
+
+const REMOVED_ATTRIBUTE_RULES: ReadonlyMap<string, RemovedAttributeRule> = new Map([
+  [
+    'updatedAt',
+    {
+      hint: 'Use `temporal.updatedAt()` as a field-preset call instead.',
+      suppressWhen: (field) => field.typeConstructor?.path[0] === 'temporal',
+    },
+  ],
+]);
+
+// `validateFieldAttributes` short-circuits on `BUILTIN_FIELD_ATTRIBUTE_NAMES`
+// before consulting `REMOVED_ATTRIBUTE_RULES`. A name appearing in both sets
+// would silently suppress its migration hint, defeating the purpose of the
+// hint table. Fail at module load with a clear message — the table is
+// designed to grow and this is the cheap insurance against future drift.
+{
+  const overlap = [...REMOVED_ATTRIBUTE_RULES.keys()].filter((name) =>
+    BUILTIN_FIELD_ATTRIBUTE_NAMES.has(name),
+  );
+  if (overlap.length > 0) {
+    throw new Error(
+      `BUILTIN_FIELD_ATTRIBUTE_NAMES and REMOVED_ATTRIBUTE_RULES must not overlap. Names in both: ${overlap.join(', ')}`,
+    );
+  }
+}
+
 function validateFieldAttributes(input: {
   readonly model: PslModel;
   readonly field: PslField;
   readonly composedExtensions: ReadonlySet<string>;
+  readonly authoringContributions: AuthoringContributions | undefined;
   readonly diagnostics: ContractSourceDiagnostic[];
   readonly sourceId: string;
   readonly familyId: string;
@@ -85,6 +129,7 @@ function validateFieldAttributes(input: {
     const uncomposedNamespace = checkUncomposedNamespace(attribute.name, input.composedExtensions, {
       familyId: input.familyId,
       targetId: input.targetId,
+      authoringContributions: input.authoringContributions,
     });
     if (uncomposedNamespace) {
       reportUncomposedNamespace({
@@ -97,9 +142,16 @@ function validateFieldAttributes(input: {
       continue;
     }
 
+    const baseMessage = `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`;
+    const removedRule = REMOVED_ATTRIBUTE_RULES.get(attribute.name);
+    const message =
+      removedRule && !removedRule.suppressWhen(input.field)
+        ? `${baseMessage}. ${removedRule.hint}`
+        : baseMessage;
+
     input.diagnostics.push({
       code: 'PSL_UNSUPPORTED_FIELD_ATTRIBUTE',
-      message: `Field "${input.model.name}.${input.field.name}" uses unsupported attribute "@${attribute.name}"`,
+      message,
       sourceId: input.sourceId,
       span: attribute.span,
     });
@@ -159,7 +211,9 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
   const resolvedFields: ResolvedField[] = [];
 
   for (const field of model.fields) {
-    if (field.list && modelNames.has(field.typeName)) {
+    const isModelField = modelNames.has(field.typeName);
+
+    if (field.list && isModelField) {
       continue;
     }
 
@@ -167,6 +221,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       model,
       field,
       composedExtensions,
+      authoringContributions,
       diagnostics,
       sourceId,
       familyId,
@@ -174,7 +229,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
     });
 
     const relationAttribute = getAttribute(field.attributes, 'relation');
-    if (relationAttribute && modelNames.has(field.typeName)) {
+    if (isModelField && relationAttribute) {
       continue;
     }
 
@@ -183,6 +238,7 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
 
     let descriptor: ColumnDescriptor | undefined;
     let scalarCodecId: string | undefined;
+    let presetContributions: FieldPresetContributions | undefined;
     const resolveInput = {
       field,
       enumTypeDescriptors,
@@ -212,6 +268,17 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         }
         continue;
       }
+      // Field presets are complete declarations — they carry their own codec
+      // and do not compose with `[]` list-of semantics. Reject early.
+      if (resolved.presetContributions) {
+        diagnostics.push({
+          code: 'PSL_PRESET_NOT_LIST',
+          message: `Field "${model.name}.${field.name}" uses a field-preset call as a list element type. Presets cannot be list elements; remove "[]" or use a scalar type.`,
+          sourceId,
+          span: field.span,
+        });
+        continue;
+      }
       scalarCodecId = resolved.descriptor.codecId;
       descriptor = scalarTypeDescriptors.get('Json');
     } else {
@@ -228,13 +295,37 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
         continue;
       }
       descriptor = resolved.descriptor;
+      presetContributions = resolved.presetContributions;
     }
 
     if (!descriptor) {
       continue;
     }
 
+    // Field presets are complete declarations: the preset names its own codec
+    // and contributes any combination of default / executionDefaults / id /
+    // unique. Optional and `@default(...)` modifiers contradict that, so they
+    // are hard errors per spec FR7.
+    if (presetContributions && field.optional) {
+      diagnostics.push({
+        code: 'PSL_PRESET_NOT_OPTIONAL',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot be optional. Remove "?" or use a different field type.`,
+        sourceId,
+        span: field.span,
+      });
+      continue;
+    }
+
     const defaultAttribute = getAttribute(field.attributes, 'default');
+    if (presetContributions && defaultAttribute) {
+      diagnostics.push({
+        code: 'PSL_PRESET_AND_DEFAULT_CONFLICT',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @default(...). The preset already specifies the default value.`,
+        sourceId,
+        span: defaultAttribute.span,
+      });
+      continue;
+    }
     const loweredDefault = defaultAttribute
       ? lowerDefaultForField({
           modelName: model.name,
@@ -247,11 +338,10 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
           diagnostics,
         })
       : {};
-    if (field.optional && loweredDefault.executionDefault) {
+    const loweredOnCreate = loweredDefault.executionDefaults?.onCreate;
+    if (field.optional && loweredOnCreate) {
       const generatorDescription =
-        loweredDefault.executionDefault.kind === 'generator'
-          ? `"${loweredDefault.executionDefault.id}"`
-          : 'for this field';
+        loweredOnCreate.kind === 'generator' ? `"${loweredOnCreate.id}"` : 'for this field';
       diagnostics.push({
         code: 'PSL_INVALID_DEFAULT_FUNCTION_ARGUMENT',
         message: `Field "${model.name}.${field.name}" cannot be optional when using execution default ${generatorDescription}. Remove "?" or use a storage default.`,
@@ -260,10 +350,10 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       });
       continue;
     }
-    if (loweredDefault.executionDefault) {
-      const generatorDescriptor = generatorDescriptorById.get(loweredDefault.executionDefault.id);
+    if (loweredOnCreate) {
+      const generatorDescriptor = generatorDescriptorById.get(loweredOnCreate.id);
       const generatedDescriptor = generatorDescriptor?.resolveGeneratedColumnDescriptor?.({
-        generated: loweredDefault.executionDefault,
+        generated: loweredOnCreate,
       });
       if (generatedDescriptor) {
         descriptor = generatedDescriptor;
@@ -276,15 +366,46 @@ export function collectResolvedFields(input: CollectResolvedFieldsInput): Resolv
       sourceId,
       diagnostics,
     });
+    let isIdField = Boolean(idAttribute);
+    if (idAttribute && field.optional) {
+      diagnostics.push({
+        code: 'PSL_INVALID_ATTRIBUTE_ARGUMENT',
+        message: `Field "${model.name}.${field.name}" @id cannot be optional; primary key columns must be NOT NULL`,
+        sourceId,
+        span: idAttribute.span,
+      });
+      isIdField = false;
+    }
 
+    // Field presets contribute their own default / executionDefaults / id /
+    // unique. They take precedence over attribute-derived contributions for
+    // this field, since a preset *is* the field declaration. Conflicts with
+    // `@default` and optional are already rejected above; explicit `@id`
+    // would be redundant noise on the resolved field, so we surface it as
+    // a hard error here for symmetry.
+    if (presetContributions && idAttribute && !presetContributions.id) {
+      diagnostics.push({
+        code: 'PSL_PRESET_AND_ID_CONFLICT',
+        message: `Field "${model.name}.${field.name}" uses a field-preset call and cannot also declare @id. Use a preset that contributes id semantics, or drop @id.`,
+        sourceId,
+        span: idAttribute.span,
+      });
+      continue;
+    }
+
+    // Field-preset contributions take precedence over attribute-derived
+    // sources when present.
+    const fieldExecutionDefaults =
+      presetContributions?.executionDefaults ?? loweredDefault.executionDefaults;
+    const fieldDefaultValue = presetContributions?.default ?? loweredDefault.defaultValue;
     resolvedFields.push({
       field,
       columnName: mappedColumnName,
       descriptor,
-      ...ifDefined('defaultValue', loweredDefault.defaultValue),
-      ...ifDefined('executionDefault', loweredDefault.executionDefault),
-      isId: Boolean(idAttribute),
-      isUnique: Boolean(uniqueAttribute),
+      ...ifDefined('defaultValue', fieldDefaultValue),
+      ...ifDefined('executionDefaults', fieldExecutionDefaults),
+      isId: isIdField || Boolean(presetContributions?.id),
+      isUnique: Boolean(uniqueAttribute) || Boolean(presetContributions?.unique),
       ...ifDefined('idName', idName),
       ...ifDefined('uniqueName', uniqueName),
       ...ifDefined('many', isListField ? (true as const) : undefined),

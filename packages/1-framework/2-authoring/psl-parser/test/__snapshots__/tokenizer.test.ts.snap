@@ -132,7 +132,10 @@ Eof            """
 `;
 
 exports[`Tokenizer > fixture: realistic schema > token output matches snapshot 1`] = `
-"Ident          "types"
+"Comment        "// use prisma-next"
+Newline        "\\n"
+Newline        "\\n"
+Ident          "types"
 Whitespace     " "
 LBrace         "{"
 Newline        "\\n"

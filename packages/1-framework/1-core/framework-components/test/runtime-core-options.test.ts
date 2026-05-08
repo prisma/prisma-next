@@ -49,6 +49,7 @@ const ctxValue: RuntimeMiddlewareContext = {
   mode: 'strict',
   now: () => Date.now(),
   log: { info: () => {}, warn: () => {}, error: () => {} },
+  contentHash: async () => 'mock-hash',
 };
 
 const plan: MockPlan = { draftId: 'd', meta };

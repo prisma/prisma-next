@@ -61,6 +61,7 @@ describe('composed runtime mutation default generators', () => {
         {
           id: 'slugid',
           generate: () => 'slug-from-pack',
+          stability: 'field',
         },
       ],
       create() {
@@ -103,6 +104,7 @@ describe('composed runtime mutation default generators', () => {
         {
           id: 'slugid',
           generate: () => 'slug-from-pack',
+          stability: 'field',
         },
       ],
       create() {
@@ -145,7 +147,9 @@ describe('composed runtime mutation default generators', () => {
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
       parameterizedCodecs: () => [],
-      mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'first' }],
+      mutationDefaultGenerators: () => [
+        { id: 'duplicate', generate: () => 'first', stability: 'field' },
+      ],
       create() {
         return { familyId: 'sql', targetId: 'postgres' };
       },
@@ -158,7 +162,9 @@ describe('composed runtime mutation default generators', () => {
       targetId: 'postgres',
       codecs: () => createCodecRegistry(),
       parameterizedCodecs: () => [],
-      mutationDefaultGenerators: () => [{ id: 'duplicate', generate: () => 'second' }],
+      mutationDefaultGenerators: () => [
+        { id: 'duplicate', generate: () => 'second', stability: 'field' },
+      ],
       create() {
         return { familyId: 'sql', targetId: 'postgres' };
       },
@@ -180,34 +186,31 @@ describe('composed runtime mutation default generators', () => {
     );
   });
 
-  it('throws stable error when generator id implementation is missing', () => {
-    const context = createExecutionContext({
-      contract: {
-        ...testContract,
-        execution: {
-          executionHash: executionHash('sha256:test'),
-          mutations: {
-            defaults: [
-              {
-                ref: { table: 'user', column: 'id' },
-                onCreate: { kind: 'generator', id: 'unknown-generator' },
-              },
-            ],
+  it('throws RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR at context creation when generator id is missing', () => {
+    expect(() =>
+      createExecutionContext({
+        contract: {
+          ...testContract,
+          execution: {
+            executionHash: executionHash('sha256:test'),
+            mutations: {
+              defaults: [
+                {
+                  ref: { table: 'user', column: 'id' },
+                  onCreate: { kind: 'generator', id: 'unknown-generator' },
+                },
+              ],
+            },
           },
         },
-      },
-      stack: createStack([]),
-    });
-
-    expect(() =>
-      context.applyMutationDefaults({
-        op: 'create',
-        table: 'user',
-        values: {},
+        stack: createStack([]),
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
+        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        details: expect.objectContaining({
+          ids: ['unknown-generator'],
+        }),
       }),
     );
   });
@@ -217,37 +220,35 @@ describe('composed runtime mutation default generators', () => {
       ...createTestAdapterDescriptor(createStubAdapter()),
       mutationDefaultGenerators: () => [],
     };
-    const context = createExecutionContext({
-      contract: {
-        ...testContract,
-        execution: {
-          executionHash: executionHash('sha256:test'),
-          mutations: {
-            defaults: [
-              {
-                ref: { table: 'user', column: 'id' },
-                onCreate: { kind: 'generator', id: 'uuidv4' },
-              },
-            ],
-          },
-        },
-      },
-      stack: {
-        target: createTestTargetDescriptor(),
-        adapter: adapterWithoutMutationDefaultGenerators,
-        extensionPacks: [],
-      },
-    });
 
     expect(() =>
-      context.applyMutationDefaults({
-        op: 'create',
-        table: 'user',
-        values: {},
+      createExecutionContext({
+        contract: {
+          ...testContract,
+          execution: {
+            executionHash: executionHash('sha256:test'),
+            mutations: {
+              defaults: [
+                {
+                  ref: { table: 'user', column: 'id' },
+                  onCreate: { kind: 'generator', id: 'uuidv4' },
+                },
+              ],
+            },
+          },
+        },
+        stack: {
+          target: createTestTargetDescriptor(),
+          adapter: adapterWithoutMutationDefaultGenerators,
+          extensionPacks: [],
+        },
       }),
     ).toThrow(
       expect.objectContaining({
-        code: 'RUNTIME.MUTATION_DEFAULT_GENERATOR_MISSING',
+        code: 'RUNTIME.MISSING_MUTATION_DEFAULT_GENERATOR',
+        details: expect.objectContaining({
+          ids: ['uuidv4'],
+        }),
       }),
     );
   });

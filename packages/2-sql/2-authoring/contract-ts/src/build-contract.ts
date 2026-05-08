@@ -13,7 +13,6 @@ import {
   type ContractValueObject,
   coreHash,
   type ExecutionMutationDefault,
-  type ExecutionMutationDefaultValue,
   type JsonValue,
   type StorageHashBase,
 } from '@prisma-next/contract/types';
@@ -198,15 +197,19 @@ export function buildSqlContractFromDefinition(
     const domainFieldRefs: Record<string, DomainFieldRef> = {};
 
     for (const field of semanticModel.fields) {
-      if (field.executionDefault) {
+      const executionDefaultPhases =
+        field.executionDefaults?.onCreate || field.executionDefaults?.onUpdate
+          ? field.executionDefaults
+          : undefined;
+      if (executionDefaultPhases) {
         if (field.default !== undefined) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefault.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot define both default and executionDefaults.`,
           );
         }
         if (field.nullable) {
           throw new Error(
-            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefault is present.`,
+            `Field "${semanticModel.modelName}.${field.fieldName}" cannot be nullable when executionDefaults are present.`,
           );
         }
       }
@@ -227,25 +230,12 @@ export function buildSqlContractFromDefinition(
         domainFieldRefs[field.fieldName] = { kind: 'scalar', many: true };
       }
 
-      if ('executionDefault' in field && field.executionDefault) {
+      if (executionDefaultPhases) {
         executionDefaults.push({
           ref: { table: tableName, column: field.columnName },
-          onCreate: field.executionDefault as ExecutionMutationDefaultValue,
+          ...ifDefined('onCreate', executionDefaultPhases.onCreate),
+          ...ifDefined('onUpdate', executionDefaultPhases.onUpdate),
         });
-      }
-    }
-
-    if (semanticModel.id) {
-      const fieldsByColumnName = new Map(
-        semanticModel.fields.map((field) => [field.columnName, field]),
-      );
-      for (const columnName of semanticModel.id.columns) {
-        const field = fieldsByColumnName.get(columnName);
-        if (field?.nullable) {
-          throw new Error(
-            `Model "${semanticModel.modelName}" uses nullable field "${field.fieldName}" in its identity.`,
-          );
-        }
       }
     }
 

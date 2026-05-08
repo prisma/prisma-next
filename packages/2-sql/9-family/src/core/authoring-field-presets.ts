@@ -99,9 +99,11 @@ export const sqlFamilyAuthoringFieldPresets = {
         typeParams: {
           length: 36,
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'uuidv4',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'uuidv4',
+          },
         },
         id: true,
       },
@@ -114,9 +116,11 @@ export const sqlFamilyAuthoringFieldPresets = {
         typeParams: {
           length: 36,
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'uuidv7',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'uuidv7',
+          },
         },
         id: true,
       },
@@ -129,9 +133,11 @@ export const sqlFamilyAuthoringFieldPresets = {
         typeParams: {
           length: 26,
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'ulid',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'ulid',
+          },
         },
         id: true,
       },
@@ -150,14 +156,16 @@ export const sqlFamilyAuthoringFieldPresets = {
             default: 21,
           },
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'nanoid',
-          params: {
-            size: {
-              kind: 'arg',
-              index: 0,
-              path: ['size'],
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'nanoid',
+            params: {
+              size: {
+                kind: 'arg',
+                index: 0,
+                path: ['size'],
+              },
             },
           },
         },
@@ -172,9 +180,11 @@ export const sqlFamilyAuthoringFieldPresets = {
         typeParams: {
           length: 24,
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'cuid2',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'cuid2',
+          },
         },
         id: true,
       },
@@ -187,9 +197,11 @@ export const sqlFamilyAuthoringFieldPresets = {
         typeParams: {
           length: 27,
         },
-        executionDefault: {
-          kind: 'generator',
-          id: 'ksuid',
+        executionDefaults: {
+          onCreate: {
+            kind: 'generator',
+            id: 'ksuid',
+          },
         },
         id: true,
       },

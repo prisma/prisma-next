@@ -1,4 +1,8 @@
-import type { ColumnDefault, ExecutionMutationDefaultValue } from '@prisma-next/contract/types';
+import type {
+  ColumnDefault,
+  ExecutionMutationDefaultPhases,
+  ExecutionMutationDefaultValue,
+} from '@prisma-next/contract/types';
 
 interface SourcePosition {
   readonly offset: number;
@@ -60,7 +64,16 @@ export type DefaultFunctionRegistry = ReadonlyMap<string, DefaultFunctionRegistr
 
 export interface MutationDefaultGeneratorDescriptor {
   readonly id: string;
-  readonly applicableCodecIds: readonly string[];
+  /**
+   * Codec ids the generator is compatible with when the codec choice
+   * and the generator choice are made independently by the contract
+   * author. Set when the registry-coherence check is meaningful
+   * (the codec and the generator can be paired arbitrarily by the
+   * caller); omitted when the generator is only reachable through a
+   * descriptor that co-registers a fixed codec, so coherence is
+   * structural and the list would be tautological.
+   */
+  readonly applicableCodecIds?: readonly string[];
   readonly resolveGeneratedColumnDescriptor?: (input: {
     readonly generated: ExecutionMutationDefaultValue;
   }) =>
@@ -71,6 +84,13 @@ export interface MutationDefaultGeneratorDescriptor {
         readonly typeParams?: Record<string, unknown>;
       }
     | undefined;
+  /**
+   * Construct the `onCreate`/`onUpdate` phases value owned by this
+   * generator. Authoring layers (PSL `temporal.updatedAt()`, TS field presets) call
+   * this instead of building the literal inline so PSL/TS-authored
+   * contracts stay byte-equivalent for any future params-bearing generator.
+   */
+  readonly buildPhases?: (args?: Record<string, unknown>) => ExecutionMutationDefaultPhases;
 }
 
 export interface ControlMutationDefaultEntry {
