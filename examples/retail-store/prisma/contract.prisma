@@ -1,3 +1,5 @@
+// use prisma-next
+
 type Price {
   amount   Float
   currency String

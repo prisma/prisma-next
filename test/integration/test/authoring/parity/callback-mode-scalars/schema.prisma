@@ -1,3 +1,5 @@
+// use prisma-next
+
 types {
   Embedding = pgvector.Vector(1536)
 }

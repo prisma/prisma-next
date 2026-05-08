@@ -108,7 +108,9 @@ export const contract = defineContract(
 }
 
 function starterSchemaPslPostgres(): string {
-  return `model User {
+  return `// use prisma-next
+
+model User {
   id        Int      @id @default(autoincrement())
   email     String   @unique
   name      String?
@@ -130,7 +132,9 @@ model Post {
 }
 
 function starterSchemaPslMongo(): string {
-  return `model User {
+  return `// use prisma-next
+
+model User {
   id    ObjectId @id @map("_id")
   email String   @unique
   name  String?
