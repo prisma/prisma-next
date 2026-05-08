@@ -232,6 +232,8 @@ Before computing `priorContract` for a space:
 
 **Schema-verification scope.** `introspect` + `verifySqlSchema` restricted to the `'app'` space only. Extension contract spaces don't own user-facing tables in the live schema; calling `verifySqlSchema` against an extension contract would flag every app-space table as "extra". Per-space verifier integrity (the orphan-marker / hash-mismatch / invariants-mismatch kinds) is covered by `verifyContractSpaces` independently — see § 4 § Verifier.
 
+**`deriveProvidedInvariants` × operationClass orthogonality (M3 R3 amendment).** `deriveProvidedInvariants(ops)` (in `@prisma-next/migration-tools/exports/invariants`) collects invariantIds from **every** op that carries one, regardless of `operationClass`. The original implementation gated on `operationClass === 'data'` because the M1 pass-thinking framed invariants as the post-condition of data ops; M3 R3's first real consumer (cipherstash baseline ops with `operationClass: 'additive'`) made it clear that `operationClass` (planner-policy gate — additive / widening / destructive / data) and `invariantId` (cross-space marker bookkeeping) are orthogonal concerns. Widening to "any op with an invariantId" aligns the framework with this sub-spec's § 7.5 description and keeps the validator (`readMigrationPackage` checks that `metadata.providedInvariants` matches the re-derived set) coherent across both single-space app migrations and per-space extension migrations.
+
 **Runner ordering helper (T1.4).** Shipped as `concatenateSpaceApplyInputs<TOp>(inputs)` in `@prisma-next/migration-tools/exports/spaces`. Pure, generic over per-target op type:
 
 ```ts
@@ -269,6 +271,18 @@ Cross-space ordering: extensions alphabetical-by-spaceId first, app-space last. 
 **Structural-half / marker-half split.** M2 R2 wires the precheck for the three structural violation kinds (`declaredButUnmigrated`, `orphanPinnedDir`, descriptor-vs-pinned `hashMismatch`) — locks AC-16 end-to-end at the CLI surface. M2 R3 wires the marker-dependent kinds (`orphanMarker`, marker-vs-pinned `hashMismatch`, `invariantsMismatch`) via a new `SqlControlAdapter.readAllMarkers(driver)` SPI method (implemented for both Postgres and SQLite; mirrors `readMarker`'s existence-probe-then-select pattern), surfaced through `ControlFamilyInstance.readAllMarkers(...)` (cross-family interface — Mongo bridge surfaces the single legacy marker keyed at `'app'` until per-space Mongo is in scope per spec § Non-goals). New CLI utility `runContractSpaceVerifierMarkerCheck` runs after the `db verify` connection is established and threads marker rows through `verifyContractSpaces`, locking AC-13 to full PASS end-to-end.
 
 **Extension migration-package materialisation (M2 R3).** Shipped as `runContractSpaceExtensionMigrationsPass(...)` in `@prisma-next/cli`. Writes descriptor-shipped packages (`DescriptorMigrationPackage` shape) to `migrations/<spaceId>/<dirName>/` for any package not yet on disk. **Idempotent by existence-check** (skips existing dirs without writing-and-comparing — pre-existing manifest content is byte-untouched). Routed through `planAllSpaces<unknown, DescriptorMigrationPackage>` for deterministic alphabetical ordering + `MIGRATION.DUPLICATE_SPACE_ID` rejection. Closes the M2 R2 deferred `planAllSpaces` consumer-site item. Locks **AM12 (materialisation idempotency)** below.
+
+**Per-package materialisation primitive (M3 R4).** The existence-check + write-if-missing pattern was lifted out of the CLI pass and the cipherstash AM11/AM12 regression test into a single primitive on `@prisma-next/migration-tools/io`:
+
+```ts
+// @prisma-next/migration-tools/exports/io
+function materialiseExtensionMigrationPackageIfMissing(
+  targetDir: string,
+  pkg: MigrationPackageContents,
+): Promise<{ readonly written: boolean }>;
+```
+
+Returns `{ written: true }` on first run (writes manifest + ops + canonical contract.json via `writeExtensionMigrationPackage`), `{ written: false }` when `<targetDir>/<pkg.dirName>/` already exists. Both `runContractSpaceExtensionMigrationsPass` and the cipherstash AM12 test now call this primitive directly — the AC-7 / AM12 by-existence skip semantic lives in one place. The framework-side test suite for the primitive (4 unit tests in `@prisma-next/migration-tools`) covers the same idempotency property the CLI / extension layers used to mirror inline.
 
 **Verifier algorithm** (the conceptual flow the consumption site wires together):
 
@@ -320,6 +334,8 @@ Hook contract:
 - **App-space scope only.** `priorTable` and `newTable` are scoped to the application's contract; the hook never sees extension-space IR. This is enforced by API shape — the hook signature has no parameter for cross-space context.
 - **`'altered'` semantics.** Fires when a field exists in both `priorTable` and `newTable` and any field property has changed *except* `codecId`. Codec-id changes are a v1 non-goal (see project spec § Non-goals).
 - **Return value.** `MigrationPlanOperation<TTargetDetails>[]`. Each op must carry its own `invariantId`. Returned ops are inlined into the app-space migration's `ops.json`, alongside the user's own structural ops.
+
+**SQLite raw-SQL op factory (M2 R2 amendment).** Codec hooks emit ops at plan time that sit alongside structural DDL. The Postgres adapter already exposes a `rawSql(...)` helper for this; SQLite gained a parallel `RawSqlCall` op shape + `rawSql({ id, label, sql, target })` factory in `@prisma-next/target-sqlite/exports/op-factory-call`. Both factories produce ops with stable shape (`operationClass: 'data'` by default — overridable when the codec needs `additive` / `widening` semantics) so the per-target planner can route them through the same emit path as structural ops. Cipherstash's `cipherstash:string@1` codec consumes the Postgres factory in M3 R2.
 
 **Wiring helper (T2.1).** Shipped as `planFieldEventOperations(options)` in `@prisma-next/family-sql/control` (alongside the codec-control surface). The helper's return type is `SqlMigrationPlanOperation<unknown>[]` — non-generic at the helper boundary because `extractCodecControlHooks` erases target-details to `unknown` at the codec-extraction boundary (pre-existing behaviour). Each target's planner casts the helper's `unknown` results back to its target-details specialisation at the integration site (scoped per-line `.map(...)` cast with an explanatory comment, per `AGENTS.md` typesafety rules); mirrors the existing `storageTypePlanCallStrategy`'s lift pattern. **No public-API surface change for codec authors** — they still type their `onFieldEvent` hook against their lane's target-details.
 
