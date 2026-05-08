@@ -7,9 +7,9 @@
  * `SqliteMigrationPlanner`) so codec-emitted ops are inlined alongside
  * structural DDL in the app-space migration's `ops.json`. Pure, target-
  * agnostic, and only ever invoked at the app-space emitter; extension-space
- * planning never reaches this helper.
+ * planning never reaches this helper (sub-spec § 5).
  *
- * Ordering rules:
+ * Ordering rules (sub-spec § 5):
  *
  * - Events are grouped by phase: `'added'` → `'dropped'` → `'altered'`.
  * - Within each phase, entries are sorted alphabetically by
@@ -18,6 +18,8 @@
  *
  * `'altered'` is suppressed when only `codecId` differs (codec rotation is a
  * v1 non-goal).
+ *
+ * See: `docs/architecture docs/adrs/ADR 212 - Codec lifecycle hooks.md`.
  */
 
 import type { Contract } from '@prisma-next/contract/types';
@@ -121,7 +123,7 @@ function appendCalls(
 }
 
 /**
- * The context's prior/new sides are scoped to the event:
+ * Per sub-spec § 5, the context's prior/new sides are scoped to the event:
  *
  * - `'added'`   — only `newTable` / `newField` populated.
  * - `'dropped'` — only `priorTable` / `priorField` populated.
