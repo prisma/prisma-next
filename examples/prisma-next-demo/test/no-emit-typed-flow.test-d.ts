@@ -29,6 +29,17 @@ test('field.id.uuidv4() produces a string-typed id field on User', () => {
   expectTypeOf<UserStorageFields>().toHaveProperty('id');
   type IdField = UserStorageFields['id'];
   expectTypeOf<IdField>().toHaveProperty('column');
+  // AC-CB-6 leaf-type assertion: the column resolves to a string at the
+  // typed-leaf boundary, not just "has a column property". Without this
+  // assertion the test would pass for any field whose IR carries a
+  // `column` slot, defeating the no-emit-chain evidence claim. Use
+  // `toExtend` rather than `toEqualTypeOf` because the storage field
+  // type narrows the column to `string` at the leaf — a stricter codec
+  // type that resolves to a string-extending shape is acceptable.
+  expectTypeOf<IdField['column']>().toExtend<string>();
+  // Confirm the column is *not* `never` (which is the failure mode if
+  // the codec lookup mis-resolves and the type system widens to bottom).
+  expectTypeOf<IdField['column']>().not.toBeNever();
 });
 
 // ---------------------------------------------------------------------------
