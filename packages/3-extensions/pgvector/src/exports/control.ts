@@ -1,9 +1,34 @@
+/**
+ * Control-plane descriptor for the pgvector extension.
+ *
+ * Exposes a `contractSpace` so the framework's per-space planner /
+ * runner / verifier (project: extension-contract-spaces, M1+M2)
+ * manages the pgvector extension's database scaffolding the same way
+ * it manages an application's own schema. The descriptor is consumed
+ * by the framework only at authoring time (`migrate`); apply / verify
+ * paths read the user's repo (`migrations/pgvector/...`) instead — see
+ * project spec NFR3 / FR2 / FR10.
+ *
+ * `databaseDependencies` is intentionally absent — pgvector was
+ * migrated off the legacy `databaseDependencies.init` mechanism in M4
+ * (project spec FR13). The `CREATE EXTENSION IF NOT EXISTS vector`
+ * DDL the legacy entry carried now lives as the body of the
+ * `installVectorExtension` op inside the baseline migration package
+ * (`../core/migrations.ts`). Presence of `contractSpace` is the
+ * shipping-strategy gate: the framework loads the contract space and
+ * ignores any `databaseDependencies` block (project plan §
+ * "Shipping Strategy"). M5 removes the field at the framework level.
+ */
+
 import type {
   CodecControlHooks,
-  ComponentDatabaseDependencies,
+  ExtensionContractSpace,
   SqlControlExtensionDescriptor,
 } from '@prisma-next/family-sql/control';
+import { pgvectorContract } from '../core/contract';
+import { PGVECTOR_SPACE_ID } from '../core/contract-space-constants';
 import { pgvectorPackMeta, pgvectorQueryOperations } from '../core/descriptor-meta';
+import { pgvectorBaselineMigration, pgvectorHeadRef } from '../core/migrations';
 
 const PGVECTOR_CODEC_ID = 'pg/vector@1' as const;
 
@@ -28,44 +53,16 @@ const vectorControlPlaneHooks: CodecControlHooks = {
   resolveIdentityValue: ({ typeParams }) => buildVectorIdentityValue(typeParams),
 };
 
-const pgvectorDatabaseDependencies: ComponentDatabaseDependencies<unknown> = {
-  init: [
-    {
-      id: 'postgres.extension.vector',
-      label: 'Enable vector extension',
-      install: [
-        {
-          id: 'extension.vector',
-          label: 'Enable extension "vector"',
-          summary: 'Ensures the vector extension is available for pgvector operations',
-          operationClass: 'additive',
-          target: { id: 'postgres' },
-          precheck: [
-            {
-              description: 'verify extension "vector" is not already enabled',
-              sql: "SELECT NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-            },
-          ],
-          execute: [
-            {
-              description: 'create extension "vector"',
-              sql: 'CREATE EXTENSION IF NOT EXISTS vector',
-            },
-          ],
-          postcheck: [
-            {
-              description: 'confirm extension "vector" is enabled',
-              sql: "SELECT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'vector')",
-            },
-          ],
-        },
-      ],
-    },
-  ],
+const pgvectorContractSpace: ExtensionContractSpace = {
+  contractJson: pgvectorContract,
+  migrations: [pgvectorBaselineMigration],
+  headRef: pgvectorHeadRef,
 };
 
 const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
   ...pgvectorPackMeta,
+  id: PGVECTOR_SPACE_ID,
+  contractSpace: pgvectorContractSpace,
   types: {
     ...pgvectorPackMeta.types,
     codecTypes: {
@@ -76,7 +73,6 @@ const pgvectorExtensionDescriptor: SqlControlExtensionDescriptor<'postgres'> = {
     },
   },
   queryOperations: () => pgvectorQueryOperations(),
-  databaseDependencies: pgvectorDatabaseDependencies,
   create: () => ({
     familyId: 'sql' as const,
     targetId: 'postgres' as const,

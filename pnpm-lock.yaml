@@ -2581,6 +2581,12 @@ importers:
       '@prisma-next/framework-components':
         specifier: workspace:*
         version: link:../../1-framework/1-core/framework-components
+      '@prisma-next/migration-tools':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/migration
+      '@prisma-next/sql-contract':
+        specifier: workspace:*
+        version: link:../../2-sql/1-core/contract
       '@prisma-next/sql-operations':
         specifier: workspace:*
         version: link:../../2-sql/1-core/operations
@@ -2597,15 +2603,24 @@ importers:
         specifier: ^2.0.0
         version: 2.1.29
     devDependencies:
+      '@prisma-next/adapter-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/6-adapters/postgres
+      '@prisma-next/cli':
+        specifier: workspace:*
+        version: link:../../1-framework/3-tooling/cli
+      '@prisma-next/driver-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/7-drivers/postgres
       '@prisma-next/operations':
         specifier: workspace:*
         version: link:../../1-framework/1-core/operations
-      '@prisma-next/sql-contract':
-        specifier: workspace:*
-        version: link:../../2-sql/1-core/contract
       '@prisma-next/sql-contract-ts':
         specifier: workspace:*
         version: link:../../2-sql/2-authoring/contract-ts
+      '@prisma-next/target-postgres':
+        specifier: workspace:*
+        version: link:../../3-targets/3-targets/postgres
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../../../test/utils
