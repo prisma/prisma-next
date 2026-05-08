@@ -26,10 +26,13 @@
  * verify-time code path would regress here.
  */
 
-import { mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import {
+  materialiseExtensionMigrationPackageIfMissing,
+  writeExtensionMigrationPackage,
+} from '@prisma-next/migration-tools/io';
 import {
   emitPinnedSpaceArtefacts,
   listPinnedSpaceDirectories,
@@ -90,16 +93,6 @@ async function setupProject(): Promise<ProjectFixture> {
     cipherstashBaselineDir: join(cipherstashSpaceDir, cipherstashBaselineMigration.dirName),
     nodeModulesPkgDir,
   };
-}
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch (error) {
-    if ((error as { code?: string }).code === 'ENOENT') return false;
-    throw error;
-  }
 }
 
 async function readBytesAt(p: string): Promise<Buffer> {
@@ -202,21 +195,20 @@ describe('cipherstash AM11 + AM12 — verify / re-materialise without descriptor
   describe('AM12 — extension migration-package materialisation is idempotent', () => {
     /**
      * The CLI's `runContractSpaceExtensionMigrationsPass` (in `@prisma-
-     * next/cli`) wraps the per-package write in an existence check and
-     * skips already-materialised dirs without writing-and-comparing. We
-     * mirror that semantic locally to keep the test inside the
-     * cipherstash package's dependency cone (cipherstash should not
-     * import the CLI). The property under test is identical: re-running
-     * the materialisation pass leaves on-disk content byte-untouched.
+     * next/cli`) calls
+     * `materialiseExtensionMigrationPackageIfMissing(spaceDir, pkg)` from
+     * `@prisma-next/migration-tools/io` per package — an existence check
+     * that skips already-materialised dirs without writing-and-comparing.
+     * Calling the same primitive directly here exercises the *exact*
+     * code path the CLI uses, without taking a CLI dependency from a
+     * leaf extension package (cipherstash must not import the CLI).
      */
     async function rematerialiseSkippingExisting(): Promise<{ readonly skipped: boolean }> {
-      const pkgPath = join(fixture.cipherstashSpaceDir, cipherstashBaselineMigration.dirName);
-      if (await pathExists(pkgPath)) return { skipped: true };
-      await writeExtensionMigrationPackage(
+      const result = await materialiseExtensionMigrationPackageIfMissing(
         fixture.cipherstashSpaceDir,
         cipherstashBaselineMigration,
       );
-      return { skipped: false };
+      return { skipped: !result.written };
     }
 
     it('skips an already-materialised baseline directory on re-run', async () => {

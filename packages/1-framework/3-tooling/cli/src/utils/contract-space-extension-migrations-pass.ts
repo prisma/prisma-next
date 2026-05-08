@@ -1,5 +1,4 @@
-import { stat } from 'node:fs/promises';
-import { writeExtensionMigrationPackage } from '@prisma-next/migration-tools/io';
+import { materialiseExtensionMigrationPackageIfMissing } from '@prisma-next/migration-tools/io';
 import type { MigrationMetadata } from '@prisma-next/migration-tools/metadata';
 import type { MigrationOps } from '@prisma-next/migration-tools/package';
 import {
@@ -7,7 +6,6 @@ import {
   type SpacePlanOutput,
   spaceMigrationDirectory,
 } from '@prisma-next/migration-tools/spaces';
-import { join } from 'pathe';
 
 /**
  * In-memory authored migration package shipped by an extension descriptor.
@@ -113,26 +111,14 @@ export async function runContractSpaceExtensionMigrationsPass(
   for (const space of planned) {
     const spaceDir = spaceMigrationDirectory(inputs.migrationsDir, space.spaceId);
     for (const pkg of space.migrationPackages) {
-      const pkgPath = join(spaceDir, pkg.dirName);
-      const exists = await pathExists(pkgPath);
-      if (exists) {
+      const { written } = await materialiseExtensionMigrationPackageIfMissing(spaceDir, pkg);
+      if (written) {
+        emitted.push({ spaceId: space.spaceId, dirName: pkg.dirName });
+      } else {
         skipped.push({ spaceId: space.spaceId, dirName: pkg.dirName });
-        continue;
       }
-      await writeExtensionMigrationPackage(spaceDir, pkg);
-      emitted.push({ spaceId: space.spaceId, dirName: pkg.dirName });
     }
   }
 
   return { emitted, skipped };
-}
-
-async function pathExists(p: string): Promise<boolean> {
-  try {
-    await stat(p);
-    return true;
-  } catch (error) {
-    if ((error as { code?: string }).code === 'ENOENT') return false;
-    throw error;
-  }
 }
