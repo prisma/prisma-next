@@ -86,6 +86,65 @@ describe('SqliteMigrationPlanner - codec onFieldEvent wiring', () => {
     expect(ids).toContain('table.User');
   });
 
+  it('fires on field drop in app-space (verifies M2 R1 wiring across event kinds)', () => {
+    const events: string[] = [];
+    const hooks: CodecControlHooks = {
+      onFieldEvent: (event, ctx) => {
+        events.push(`${event}:${ctx.tableName}.${ctx.fieldName}`);
+        return [
+          {
+            id: `codec.${event}.${ctx.tableName}.${ctx.fieldName}`,
+            label: 'hook',
+            operationClass: event === 'dropped' ? 'destructive' : 'additive',
+            invariantId: `cs:${ctx.tableName}.${ctx.fieldName}@${event}`,
+            target: { id: 'sqlite' },
+            precheck: [],
+            execute: [{ description: 'side', sql: '-- side' }],
+            postcheck: [],
+          },
+        ];
+      },
+    };
+
+    const fromContract = contract(
+      {
+        User: table({
+          id: col({ codecId: 'sqlite/text@1' }),
+          email: col({ codecId: HOOKED_CODEC }),
+        }),
+      },
+      'sha256:from',
+    );
+    const toContract = contract(
+      {
+        User: table({ id: col({ codecId: 'sqlite/text@1' }) }),
+      },
+      'sha256:to',
+    );
+
+    const result = planner.plan({
+      contract: toContract,
+      schema: {
+        tables: {
+          User: table({
+            id: col({ codecId: 'sqlite/text@1' }),
+            email: col({ codecId: HOOKED_CODEC }),
+          }),
+        },
+        dependencies: [],
+      },
+      policy: { allowedOperationClasses: ['additive', 'widening', 'destructive'] },
+      fromContract,
+      frameworkComponents: makeFrameworkComponents(hooks),
+    });
+
+    expect(result.kind).toBe('success');
+    if (result.kind !== 'success') return;
+    expect(events).toContain('dropped:User.email');
+    const ids = result.plan.operations.map((op) => op.id);
+    expect(ids).toContain('codec.dropped.User.email');
+  });
+
   it('does not fire when no codec has an onFieldEvent hook', () => {
     const result = planner.plan({
       contract: contract(
