@@ -65,14 +65,59 @@ export type TraitExpression<
  *
  * When `value` is an Expression (duck-typed by its `buildAst` method), the AST
  * it wraps is returned. Otherwise the value is embedded as a ParamRef tagged
- * with `codecId` (if given). Pass `codecId` to encode the literal with a
- * specific codec — most operations do.
+ * with `codecId` (if given) and optionally `refs: { table, column }` (if the
+ * caller knows the column-bound site).
+ *
+ * For parameterized codec ids (e.g. `pg/vector@1`), encode-side dispatch
+ * requires `refs` to select the per-instance codec — so operation
+ * implementations that compare a column to a user-supplied value should
+ * derive `refs` from the column-bound side and pass it down. Non-
+ * parameterized codec ids (e.g. `pg/int4@1`) tolerate refs-less ParamRefs;
+ * the validator pass enforces refs only for parameterized ids.
  */
-export function toExpr(value: unknown, codecId?: string): AstExpression {
+export function toExpr(
+  value: unknown,
+  codecId?: string,
+  refs?: { table: string; column: string },
+): AstExpression {
   if (isExpressionLike(value)) {
     return value.buildAst();
   }
-  return ParamRef.of(value, codecId ? { codecId } : undefined);
+  if (codecId === undefined && refs === undefined) return ParamRef.of(value);
+  return ParamRef.of(value, {
+    ...(codecId !== undefined ? { codecId } : {}),
+    ...(refs !== undefined ? { refs } : {}),
+  });
+}
+
+/**
+ * Derive `(table, column)` refs from an expression-like value when it
+ * carries column-bound metadata. Returns `undefined` for non-column-
+ * bound expressions and for raw scalar values.
+ *
+ * Two sources are consulted, in order:
+ * 1. An optional `refs` slot on the `Expression` wrapper (the SQL
+ *    builder's `ExpressionImpl` records `(table, column)` for top-level
+ *    fields whose AST is `IdentifierRef` — the AST stays bare to
+ *    preserve SQL rendering, the metadata lives on the wrapper).
+ * 2. The wrapped AST when it's already a `ColumnRef` (the namespaced
+ *    field-proxy form, or operation impls passing column-bound exprs
+ *    directly).
+ *
+ * Operation implementations call this on the column-bound side of a
+ * comparison and forward the refs to {@link toExpr} on the user-value
+ * side, so the resulting `ParamRef` carries the table+column required by
+ * encode-side `forColumn` dispatch.
+ */
+export function refsOf(value: unknown): { table: string; column: string } | undefined {
+  if (!isExpressionLike(value)) return undefined;
+  const wrapperRefs = (value as { refs?: { table: string; column: string } }).refs;
+  if (wrapperRefs) return { table: wrapperRefs.table, column: wrapperRefs.column };
+  const ast = value.buildAst();
+  if (ast.kind === 'column-ref') {
+    return { table: ast.table, column: ast.column };
+  }
+  return undefined;
 }
 
 function isExpressionLike(value: unknown): value is Expression<ScopeField> {

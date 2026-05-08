@@ -156,7 +156,7 @@ function rewriteProjectionItem(item: ProjectionItem, rewriter: AstRewriter): Pro
         ? rewriter.literal(item.expr)
         : item.expr
       : item.expr.rewrite(rewriter);
-  return new ProjectionItem(item.alias, rewrittenExpr, item.codecId);
+  return new ProjectionItem(item.alias, rewrittenExpr, item.codecId, item.refs);
 }
 
 function rewriteInsertValue(value: InsertValue, rewriter: AstRewriter): InsertValue {
@@ -392,23 +392,45 @@ export class IdentifierRef extends Expression {
   }
 }
 
+/**
+ * Column ref carried by a {@link ParamRef} that was constructed at a
+ * column-bound site (e.g. an INSERT/UPDATE column assignment, a `WHERE
+ * column = $param` comparison). The encode-side dispatch path uses
+ * `refs` to call `contractCodecs.forColumn(refs.table, refs.column)`,
+ * which selects the per-instance parameterized codec for the column —
+ * required when a parameterized codec id is shared by multiple columns
+ * with distinct typeParams (e.g. `vector(1024)` vs. `vector(1536)`).
+ *
+ * `refs` may legitimately be `undefined` for `ParamRef`s constructed
+ * without a column context — the validator pass
+ * (`validateParamRefRefs`) treats refs-less ParamRefs as a hard error
+ * only when their codec id is parameterized.
+ */
+export interface ParamRefBindingRefs {
+  readonly table: string;
+  readonly column: string;
+}
+
 export class ParamRef extends Expression {
   readonly kind = 'param-ref' as const;
   readonly value: unknown;
   readonly name: string | undefined;
   readonly codecId: string | undefined;
+  readonly refs: ParamRefBindingRefs | undefined;
 
   constructor(
     value: unknown,
     options?: {
       name?: string;
       codecId?: string;
+      refs?: ParamRefBindingRefs;
     },
   ) {
     super();
     this.value = value;
     this.name = options?.name;
     this.codecId = options?.codecId;
+    this.refs = options?.refs ? Object.freeze({ ...options.refs }) : undefined;
     this.freeze();
   }
 
@@ -417,6 +439,7 @@ export class ParamRef extends Expression {
     options?: {
       name?: string;
       codecId?: string;
+      refs?: ParamRefBindingRefs;
     },
   ): ParamRef {
     return new ParamRef(value, options);
@@ -1069,21 +1092,40 @@ export class ProjectionItem extends AstNode {
   readonly alias: string;
   readonly expr: ProjectionExpr;
   readonly codecId: string | undefined;
+  /**
+   * Column-bound metadata for the projection. Populated by builder paths
+   * that promote a top-level field shortcut (`select('email', ...)`) into
+   * a bare `IdentifierRef` AST while still knowing the originating
+   * `(table, column)`. Decode-side dispatch consults `refs` to call
+   * `forColumn(table, column)` so parameterized codec ids resolve to the
+   * per-instance codec — required when multiple columns share a codec id
+   * with distinct typeParams (e.g. `varchar(36)` vs. `varchar(255)`).
+   * Stays `undefined` for `column-ref` projections (the AST already
+   * carries the binding) and for non-column-bound projections (computed
+   * expressions, subqueries, raw aliases).
+   */
+  readonly refs: ParamRefBindingRefs | undefined;
 
-  constructor(alias: string, expr: ProjectionExpr, codecId?: string) {
+  constructor(alias: string, expr: ProjectionExpr, codecId?: string, refs?: ParamRefBindingRefs) {
     super();
     this.alias = alias;
     this.expr = expr;
     this.codecId = codecId;
+    this.refs = refs ? Object.freeze({ ...refs }) : undefined;
     this.freeze();
   }
 
-  static of(alias: string, expr: ProjectionExpr, codecId?: string): ProjectionItem {
-    return new ProjectionItem(alias, expr, codecId);
+  static of(
+    alias: string,
+    expr: ProjectionExpr,
+    codecId?: string,
+    refs?: ParamRefBindingRefs,
+  ): ProjectionItem {
+    return new ProjectionItem(alias, expr, codecId, refs);
   }
 
   withCodecId(codecId: string | undefined): ProjectionItem {
-    return new ProjectionItem(this.alias, this.expr, codecId);
+    return new ProjectionItem(this.alias, this.expr, codecId, this.refs);
   }
 }
 
@@ -1241,6 +1283,7 @@ export class SelectAst extends QueryAst {
                 : projection.expr
               : projection.expr.rewrite(rewriter),
             projection.codecId,
+            projection.refs,
           ),
       ),
       where: this.where?.rewrite(rewriter),
