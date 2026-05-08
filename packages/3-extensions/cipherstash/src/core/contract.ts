@@ -91,12 +91,17 @@ const cipherstashFutureIR = {
     { schema: null, name: EQL_V2_ENCRYPTED_TYPE },
     ...EQL_V2_ORE_COMPOSITE_TYPES.map((name) => ({ schema: EQL_V2_SCHEMA, name })),
   ],
-  /** Enum types (will move to `storage.enums` post-IR-expansion). */
+  /**
+   * Enum types (will move to `storage.enums` post-IR-expansion). The
+   * value list mirrors the vendored EQL bundle's
+   * `CREATE TYPE public.eql_v2_configuration_state AS ENUM (...)`
+   * declaration verbatim — synced in M3 R4 (item 22).
+   */
   enums: [
     {
       schema: null,
       name: EQL_V2_CONFIGURATION_STATE_TYPE,
-      values: ['pending', 'active'],
+      values: ['active', 'inactive', 'encrypting', 'pending'],
     },
   ],
   /** Domain types (will move to `storage.domains` post-IR-expansion). */

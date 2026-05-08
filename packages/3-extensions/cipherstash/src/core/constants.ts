@@ -42,14 +42,25 @@ export const EQL_V2_DOMAIN_TYPES = ['bloom_filter', 'hmac_256', 'blake3'] as con
 
 /**
  * Composite types backing the various ORE (Order-Revealing Encryption)
- * search-mode payloads. The exact set is defined by the EQL bundle SQL;
- * extending this list as the bundle grows is straightforward.
+ * search-mode payloads, enumerated from the vendored EQL bundle's
+ * `CREATE TYPE eql_v2.<name>` statements:
  *
- * R1 lists the two canonical composites named in the M3 sub-spec.
- * Subsequent rounds will enumerate the full set mechanically from the
- * vendored bundle's `CREATE TYPE` statements (sub-spec § 2 Open Question 2).
+ *   - `ore_block_u64_8_256_term` — single ORE block term (bytea wrapper).
+ *   - `ore_block_u64_8_256` — array of ORE block terms; backs `ore` index.
+ *   - `ore_cllw_u64_8` — fixed-width Comparable Linear Wide.
+ *   - `ore_cllw_var_8` — variable-width Comparable Linear Wide.
+ *
+ * Synced with the bundle in M3 R4 (item 22, FR11 cleanup). Subsequent
+ * bundle bumps that add ORE shapes must extend this list and mint a new
+ * `cipherstash:create-eql_v2_<name>-v1` invariantId via
+ * {@link CIPHERSTASH_INVARIANTS.createOreComposite}.
  */
-export const EQL_V2_ORE_COMPOSITE_TYPES = ['ore_block_u64_8_256', 'ore_cclw_u64_8'] as const;
+export const EQL_V2_ORE_COMPOSITE_TYPES = [
+  'ore_block_u64_8_256_term',
+  'ore_block_u64_8_256',
+  'ore_cllw_u64_8',
+  'ore_cllw_var_8',
+] as const;
 
 /**
  * Migration directory name for the baseline.
