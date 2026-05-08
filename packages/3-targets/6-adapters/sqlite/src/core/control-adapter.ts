@@ -300,7 +300,6 @@ export class SqliteControlAdapter implements SqlControlAdapter<'sqlite'> {
 
     return {
       tables,
-      dependencies: [],
     };
   }
 }

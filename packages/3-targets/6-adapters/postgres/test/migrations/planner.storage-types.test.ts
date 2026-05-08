@@ -12,7 +12,6 @@ import { describe, expect, it } from 'vitest';
 
 const emptySchema: SqlSchemaIR = {
   tables: {},
-  dependencies: [],
 };
 
 describe('PostgresMigrationPlanner - storage types', () => {

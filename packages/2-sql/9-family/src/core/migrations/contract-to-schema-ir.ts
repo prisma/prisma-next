@@ -1,5 +1,4 @@
 import type { ColumnDefault, Contract } from '@prisma-next/contract/types';
-import type { TargetBoundComponentDescriptor } from '@prisma-next/framework-components/components';
 import type { MigrationPlannerConflict } from '@prisma-next/framework-components/control';
 import type {
   ForeignKey,
@@ -12,7 +11,6 @@ import type {
 } from '@prisma-next/sql-contract/types';
 import { defaultIndexName } from '@prisma-next/sql-schema-ir/naming';
 import type {
-  DependencyIR,
   SqlAnnotations,
   SqlColumnIR,
   SqlForeignKeyIR,
@@ -22,7 +20,6 @@ import type {
   SqlUniqueIR,
 } from '@prisma-next/sql-schema-ir/types';
 import { ifDefined } from '@prisma-next/utils/defined';
-import { collectInitDependencies } from './types';
 
 /**
  * Target-specific callback that expands a column's base `nativeType` and optional
@@ -224,16 +221,14 @@ export interface ContractToSchemaIROptions {
   readonly annotationNamespace: string;
   readonly expandNativeType?: NativeTypeExpander;
   readonly renderDefault?: DefaultRenderer;
-  readonly frameworkComponents?: ReadonlyArray<TargetBoundComponentDescriptor<'sql', string>>;
 }
 
 /**
  * Converts a `Contract` to `SqlSchemaIR`.
  *
- * Reads `contract.storage` for tables, `contract.storage.types` for type
- * annotations, and derives database dependencies from `frameworkComponents`
- * (each component's `databaseDependencies.init[].id`).
- * Storage-type annotations are written under `options.annotationNamespace`.
+ * Reads `contract.storage` for tables and `contract.storage.types` for type
+ * annotations. Storage-type annotations are written under
+ * `options.annotationNamespace`.
  *
  * Drops codec metadata (`codecId`, `typeRef`) since the schema IR only represents
  * structural information. When `expandNativeType` is provided, parameterized types
@@ -251,7 +246,7 @@ export function contractToSchemaIR(
   }
 
   if (!contract) {
-    return { tables: {}, dependencies: [] };
+    return { tables: {} };
   }
 
   const storage = contract.storage;
@@ -267,32 +262,12 @@ export function contractToSchemaIR(
     );
   }
 
-  const dependencies = deduplicateDependencyIRs(
-    collectInitDependencies(options.frameworkComponents ?? []),
-  );
   const annotations = deriveAnnotations(storage, options.annotationNamespace);
 
   return {
     tables,
-    dependencies,
     ...ifDefined('annotations', annotations),
   };
-}
-
-function deduplicateDependencyIRs(
-  deps: readonly { readonly id: string }[],
-): readonly DependencyIR[] {
-  const seen = new Set<string>();
-  const result: DependencyIR[] = [];
-  for (const dep of deps) {
-    if (dep.id.trim().length === 0) {
-      throw new Error('Dependency id must be a non-empty string');
-    }
-    if (seen.has(dep.id)) continue;
-    seen.add(dep.id);
-    result.push({ id: dep.id });
-  }
-  return result;
 }
 
 function deriveAnnotations(

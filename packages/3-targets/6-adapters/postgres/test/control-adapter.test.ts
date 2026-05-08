@@ -48,7 +48,6 @@ describe('PostgresControlAdapter', () => {
 
       expect(result).toEqual({
         tables: {},
-        dependencies: [],
         annotations: {
           pg: {
             schema: 'public',
@@ -1141,38 +1140,6 @@ describe('PostgresControlAdapter', () => {
 
       expect(result.tables['user']?.indexes).toHaveLength(1);
       expect(result.tables['user']?.indexes[0]?.columns).toEqual(['id']);
-    });
-
-    it('handles extensions', async () => {
-      const adapter = new PostgresControlAdapter();
-      const mockDriver: ControlDriverInstance<'sql', 'postgres'> = {
-        familyId: 'sql',
-        targetId: 'postgres',
-        query: async <Row = Record<string, unknown>>(sql: string) => {
-          if (sql.includes('information_schema.tables')) {
-            return { rows: [] as Row[] };
-          }
-          if (sql.includes('pg_extension')) {
-            return {
-              rows: [{ extname: 'uuid-ossp' }, { extname: 'pgcrypto' }] as Row[],
-            };
-          }
-          if (sql.includes('version()')) {
-            return {
-              rows: [{ version: 'PostgreSQL 15.1' }] as Row[],
-            };
-          }
-          return { rows: [] as Row[] };
-        },
-        close: async () => {},
-      };
-
-      const result = await adapter.introspect(mockDriver);
-
-      expect(result.dependencies).toEqual([
-        { id: 'postgres.extension.uuid-ossp' },
-        { id: 'postgres.extension.pgcrypto' },
-      ]);
     });
 
     it('handles custom schema name', async () => {
