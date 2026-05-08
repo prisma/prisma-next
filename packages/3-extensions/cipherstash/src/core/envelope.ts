@@ -73,6 +73,30 @@ export function setHandlePlaintextCache(envelope: EncryptedString, plaintext: st
 }
 
 /**
+ * Stamp the encrypt-side `(table, column)` routing context onto a
+ * write-side envelope's handle. Called by the bulk-encrypt middleware
+ * before grouping envelopes into per-routing-key bulk-encrypt batches.
+ *
+ * Idempotent and write-once-wins: if the handle already carries
+ * `(table, column)` (e.g. the envelope was constructed via
+ * `fromInternal` on the read side and is being re-inserted), the
+ * existing values are preserved.
+ */
+export function setHandleRoutingKey(
+  envelope: EncryptedString,
+  table: string,
+  column: string,
+): void {
+  const handle = getInternalHandle(envelope);
+  if (handle.table === undefined) {
+    handle.table = table;
+  }
+  if (handle.column === undefined) {
+    handle.column = column;
+  }
+}
+
+/**
  * `true` when the handle already carries a usable plaintext (write-side
  * construction or post-`decrypt` caching). Used by `decryptAll` to skip
  * envelopes that don't need a round-trip.

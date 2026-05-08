@@ -6,5 +6,6 @@ export default defineConfig({
     'src/exports/runtime.ts',
     'src/exports/pack.ts',
     'src/exports/column-types.ts',
+    'src/exports/middleware.ts',
   ],
 });
