@@ -25,6 +25,7 @@ function makeCtx(signal?: AbortSignal): RuntimeMiddlewareContext {
     mode: 'strict',
     now: () => Date.now(),
     log: { info: () => {}, warn: () => {}, error: () => {} },
+    contentHash: async () => 'mock-content-hash',
     ...(signal ? { signal } : {}),
   };
 }
