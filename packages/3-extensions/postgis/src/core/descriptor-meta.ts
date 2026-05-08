@@ -1,0 +1,198 @@
+import type { SqlOperationDescriptor } from '@prisma-next/sql-operations';
+import {
+  buildOperation,
+  type CodecExpression,
+  type Expression,
+  toExpr,
+} from '@prisma-next/sql-relational-core/expression';
+import type { CodecTypes } from '../types/codec-types';
+import { postgisAuthoringTypes } from './authoring';
+import { codecDefinitions } from './codecs';
+
+const postgisTypeId = 'pg/geometry@1' as const;
+
+type CodecTypesBase = Record<string, { readonly input: unknown; readonly output: unknown }>;
+
+/**
+ * Build the PostGIS query operations exposed on `geometry` columns.
+ *
+ * Each operation lowers to a function-template that the SQL renderer
+ * stitches into the surrounding statement (`{{self}}` is the receiver,
+ * `{{argN}}` are the call arguments). All templates rely on the implicit
+ * `geometry`/`float8`/`bool` casts already wired up by the SQL family —
+ * we only add the PostGIS-specific function names.
+ */
+export function postgisQueryOperations<
+  CT extends CodecTypesBase,
+>(): readonly SqlOperationDescriptor[] {
+  type GeoExpr = CodecExpression<'pg/geometry@1', boolean, CT>;
+  type FloatExpr = CodecExpression<'pg/float8@1', boolean, CT>;
+  type Float = Expression<{ codecId: 'pg/float8@1'; nullable: false }>;
+  type Bool = Expression<{ codecId: 'pg/bool@1'; nullable: false }>;
+
+  return [
+    {
+      method: 'distance',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Float =>
+        buildOperation({
+          method: 'distance',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/float8@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_Distance({{self}}, {{arg0}})',
+          },
+        }),
+    },
+    {
+      method: 'distanceSphere',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Float =>
+        buildOperation({
+          method: 'distanceSphere',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/float8@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_DistanceSphere({{self}}, {{arg0}})',
+          },
+        }),
+    },
+    {
+      method: 'dwithin',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr, distance: FloatExpr): Bool =>
+        buildOperation({
+          method: 'dwithin',
+          args: [
+            toExpr(self, postgisTypeId),
+            toExpr(other, postgisTypeId),
+            toExpr(distance, 'pg/float8@1'),
+          ],
+          returns: { codecId: 'pg/bool@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_DWithin({{self}}, {{arg0}}, {{arg1}})',
+          },
+        }),
+    },
+    {
+      method: 'contains',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Bool =>
+        buildOperation({
+          method: 'contains',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/bool@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_Contains({{self}}, {{arg0}})',
+          },
+        }),
+    },
+    {
+      method: 'within',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Bool =>
+        buildOperation({
+          method: 'within',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/bool@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_Within({{self}}, {{arg0}})',
+          },
+        }),
+    },
+    {
+      method: 'intersects',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Bool =>
+        buildOperation({
+          method: 'intersects',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/bool@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: 'ST_Intersects({{self}}, {{arg0}})',
+          },
+        }),
+    },
+    {
+      method: 'intersectsBbox',
+      self: { codecId: postgisTypeId },
+      impl: (self: GeoExpr, other: GeoExpr): Bool =>
+        buildOperation({
+          method: 'intersectsBbox',
+          args: [toExpr(self, postgisTypeId), toExpr(other, postgisTypeId)],
+          returns: { codecId: 'pg/bool@1', nullable: false },
+          lowering: {
+            targetFamily: 'sql',
+            strategy: 'function',
+            template: '({{self}} && {{arg0}})',
+          },
+        }),
+    },
+  ];
+}
+
+const postgisPackMetaBase = {
+  kind: 'extension',
+  id: 'postgis',
+  familyId: 'sql',
+  targetId: 'postgres',
+  version: '0.0.1',
+  capabilities: {
+    postgres: {
+      'postgis.geometry': true,
+    },
+  },
+  authoring: {
+    type: postgisAuthoringTypes,
+  },
+  types: {
+    codecTypes: {
+      codecInstances: Object.values(codecDefinitions).map((def) => def.codec),
+      import: {
+        package: '@prisma-next/extension-postgis/codec-types',
+        named: 'CodecTypes',
+        alias: 'PostgisTypes',
+      },
+      typeImports: [
+        {
+          package: '@prisma-next/extension-postgis/codec-types',
+          named: 'Geometry',
+          alias: 'Geometry',
+        },
+      ],
+    },
+    operationTypes: {
+      import: {
+        package: '@prisma-next/extension-postgis/operation-types',
+        named: 'OperationTypes',
+        alias: 'PostgisOperationTypes',
+      },
+    },
+    queryOperationTypes: {
+      import: {
+        package: '@prisma-next/extension-postgis/operation-types',
+        named: 'QueryOperationTypes',
+        alias: 'PostgisQueryOperationTypes',
+      },
+    },
+    storage: [
+      { typeId: postgisTypeId, familyId: 'sql', targetId: 'postgres', nativeType: 'geometry' },
+    ],
+  },
+} as const;
+
+export const postgisPackMeta: typeof postgisPackMetaBase & {
+  readonly __codecTypes?: CodecTypes;
+} = postgisPackMetaBase;

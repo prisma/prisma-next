@@ -1,0 +1,251 @@
+/**
+ * Minimal EWKB (Extended Well-Known Binary) reader for the PostGIS codec.
+ *
+ * `node-postgres` returns geometry columns as hex-encoded EWKB strings by
+ * default. This reader parses the subset we ship with the extension —
+ * Point, LineString, Polygon, and the Multi* counterparts — into GeoJSON
+ * objects. Z and M coordinates are not supported; if a wire value carries
+ * them, decoding throws so the caller can detect the mismatch instead of
+ * silently dropping data.
+ */
+
+import type {
+  Geometry,
+  GeometryLineString,
+  GeometryMultiLineString,
+  GeometryMultiPoint,
+  GeometryMultiPolygon,
+  GeometryPoint,
+  GeometryPolygon,
+  Position,
+} from './geojson';
+
+const FLAG_Z = 0x80000000;
+const FLAG_M = 0x40000000;
+const FLAG_SRID = 0x20000000;
+const TYPE_MASK = 0x1fffffff;
+
+const TYPE_POINT = 1;
+const TYPE_LINESTRING = 2;
+const TYPE_POLYGON = 3;
+const TYPE_MULTIPOINT = 4;
+const TYPE_MULTILINESTRING = 5;
+const TYPE_MULTIPOLYGON = 6;
+
+function hexToBytes(hex: string): Uint8Array {
+  if (hex.length % 2 !== 0) {
+    throw new Error('Geometry wire value: odd-length hex string');
+  }
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    const byte = Number.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+    if (Number.isNaN(byte)) {
+      throw new Error(`Geometry wire value: invalid hex byte at offset ${i * 2}`);
+    }
+    bytes[i] = byte;
+  }
+  return bytes;
+}
+
+class Reader {
+  private offset = 0;
+  private readonly view: DataView;
+
+  constructor(bytes: Uint8Array) {
+    this.view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  }
+
+  readUint8(): number {
+    const v = this.view.getUint8(this.offset);
+    this.offset += 1;
+    return v;
+  }
+
+  readUint32(littleEndian: boolean): number {
+    const v = this.view.getUint32(this.offset, littleEndian);
+    this.offset += 4;
+    return v >>> 0;
+  }
+
+  readFloat64(littleEndian: boolean): number {
+    const v = this.view.getFloat64(this.offset, littleEndian);
+    this.offset += 8;
+    return v;
+  }
+}
+
+type Header = {
+  readonly geomType: number;
+  readonly littleEndian: boolean;
+  readonly srid?: number;
+};
+
+function readHeader(reader: Reader): Header {
+  const byteOrder = reader.readUint8();
+  if (byteOrder !== 0 && byteOrder !== 1) {
+    throw new Error(`Geometry wire value: invalid byte order ${byteOrder}`);
+  }
+  const littleEndian = byteOrder === 1;
+  const typeCode = reader.readUint32(littleEndian);
+  if ((typeCode & FLAG_Z) !== 0 || (typeCode & FLAG_M) !== 0) {
+    throw new Error('Geometry wire value: Z/M coordinates are not supported');
+  }
+  const hasSRID = (typeCode & FLAG_SRID) !== 0;
+  const srid = hasSRID ? reader.readUint32(littleEndian) : undefined;
+  return { geomType: typeCode & TYPE_MASK, littleEndian, srid };
+}
+
+function readPosition(reader: Reader, littleEndian: boolean): Position {
+  const x = reader.readFloat64(littleEndian);
+  const y = reader.readFloat64(littleEndian);
+  return [x, y];
+}
+
+function readPoint(reader: Reader, header: Header): GeometryPoint {
+  const coords = readPosition(reader, header.littleEndian);
+  return header.srid !== undefined
+    ? { type: 'Point', coordinates: coords, srid: header.srid }
+    : { type: 'Point', coordinates: coords };
+}
+
+function readLineString(reader: Reader, header: Header): GeometryLineString {
+  const n = reader.readUint32(header.littleEndian);
+  const coords: Position[] = [];
+  for (let i = 0; i < n; i++) coords.push(readPosition(reader, header.littleEndian));
+  return header.srid !== undefined
+    ? { type: 'LineString', coordinates: coords, srid: header.srid }
+    : { type: 'LineString', coordinates: coords };
+}
+
+function readPolygon(reader: Reader, header: Header): GeometryPolygon {
+  const numRings = reader.readUint32(header.littleEndian);
+  const rings: Position[][] = [];
+  for (let r = 0; r < numRings; r++) {
+    const n = reader.readUint32(header.littleEndian);
+    const ring: Position[] = [];
+    for (let i = 0; i < n; i++) ring.push(readPosition(reader, header.littleEndian));
+    rings.push(ring);
+  }
+  return header.srid !== undefined
+    ? { type: 'Polygon', coordinates: rings, srid: header.srid }
+    : { type: 'Polygon', coordinates: rings };
+}
+
+function readSubGeometry(reader: Reader): Geometry {
+  // Multi* geometries embed sub-WKB records; each carries its own header.
+  const header = readHeader(reader);
+  switch (header.geomType) {
+    case TYPE_POINT:
+      return readPoint(reader, header);
+    case TYPE_LINESTRING:
+      return readLineString(reader, header);
+    case TYPE_POLYGON:
+      return readPolygon(reader, header);
+    default:
+      throw new Error(`Geometry wire value: unsupported sub-type ${header.geomType}`);
+  }
+}
+
+function readMultiPoint(reader: Reader, header: Header): GeometryMultiPoint {
+  const n = reader.readUint32(header.littleEndian);
+  const coords: Position[] = [];
+  for (let i = 0; i < n; i++) {
+    const sub = readSubGeometry(reader);
+    if (sub.type !== 'Point') {
+      throw new Error('Geometry wire value: MultiPoint contains non-Point sub-geometry');
+    }
+    coords.push(sub.coordinates);
+  }
+  return header.srid !== undefined
+    ? { type: 'MultiPoint', coordinates: coords, srid: header.srid }
+    : { type: 'MultiPoint', coordinates: coords };
+}
+
+function readMultiLineString(reader: Reader, header: Header): GeometryMultiLineString {
+  const n = reader.readUint32(header.littleEndian);
+  const lines: ReadonlyArray<Position>[] = [];
+  for (let i = 0; i < n; i++) {
+    const sub = readSubGeometry(reader);
+    if (sub.type !== 'LineString') {
+      throw new Error('Geometry wire value: MultiLineString contains non-LineString sub-geometry');
+    }
+    lines.push(sub.coordinates);
+  }
+  return header.srid !== undefined
+    ? { type: 'MultiLineString', coordinates: lines, srid: header.srid }
+    : { type: 'MultiLineString', coordinates: lines };
+}
+
+function readMultiPolygon(reader: Reader, header: Header): GeometryMultiPolygon {
+  const n = reader.readUint32(header.littleEndian);
+  const polys: ReadonlyArray<ReadonlyArray<Position>>[] = [];
+  for (let i = 0; i < n; i++) {
+    const sub = readSubGeometry(reader);
+    if (sub.type !== 'Polygon') {
+      throw new Error('Geometry wire value: MultiPolygon contains non-Polygon sub-geometry');
+    }
+    polys.push(sub.coordinates);
+  }
+  return header.srid !== undefined
+    ? { type: 'MultiPolygon', coordinates: polys, srid: header.srid }
+    : { type: 'MultiPolygon', coordinates: polys };
+}
+
+export function decodeEWKBHex(hex: string): Geometry {
+  const reader = new Reader(hexToBytes(hex));
+  const header = readHeader(reader);
+  switch (header.geomType) {
+    case TYPE_POINT:
+      return readPoint(reader, header);
+    case TYPE_LINESTRING:
+      return readLineString(reader, header);
+    case TYPE_POLYGON:
+      return readPolygon(reader, header);
+    case TYPE_MULTIPOINT:
+      return readMultiPoint(reader, header);
+    case TYPE_MULTILINESTRING:
+      return readMultiLineString(reader, header);
+    case TYPE_MULTIPOLYGON:
+      return readMultiPolygon(reader, header);
+    default:
+      throw new Error(`Geometry wire value: unsupported geometry type ${header.geomType}`);
+  }
+}
+
+/**
+ * Encode a GeoJSON-shaped geometry to an EWKT string PostGIS understands
+ * via `'<ewkt>'::geometry`. We use EWKT (not EWKB) on the way in so the
+ * generated SQL stays human-readable.
+ */
+export function encodeEWKT(value: Geometry): string {
+  const sridPrefix = value.srid !== undefined ? `SRID=${value.srid};` : '';
+  switch (value.type) {
+    case 'Point':
+      return `${sridPrefix}POINT(${formatPosition(value.coordinates)})`;
+    case 'LineString':
+      return `${sridPrefix}LINESTRING(${value.coordinates.map(formatPosition).join(',')})`;
+    case 'Polygon':
+      return `${sridPrefix}POLYGON(${formatRings(value.coordinates)})`;
+    case 'MultiPoint':
+      return `${sridPrefix}MULTIPOINT(${value.coordinates.map(formatPosition).join(',')})`;
+    case 'MultiLineString':
+      return `${sridPrefix}MULTILINESTRING(${value.coordinates
+        .map((line) => `(${line.map(formatPosition).join(',')})`)
+        .join(',')})`;
+    case 'MultiPolygon':
+      return `${sridPrefix}MULTIPOLYGON(${value.coordinates
+        .map((poly) => `(${formatRings(poly)})`)
+        .join(',')})`;
+  }
+}
+
+function formatPosition(p: Position): string {
+  if (!Number.isFinite(p[0]) || !Number.isFinite(p[1])) {
+    throw new Error('Geometry encode: coordinates must be finite numbers');
+  }
+  return `${p[0]} ${p[1]}`;
+}
+
+function formatRings(rings: ReadonlyArray<ReadonlyArray<Position>>): string {
+  return rings.map((ring) => `(${ring.map(formatPosition).join(',')})`).join(',');
+}
