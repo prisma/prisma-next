@@ -143,8 +143,9 @@ function serializeToJsonSafe<TInferred>(
 }
 
 function rehydrateSchema(jsonIr: object): ArktypeSchemaLike {
+  let rehydrated: unknown;
   try {
-    return ark.schema(jsonIr) as unknown as ArktypeSchemaLike;
+    rehydrated = ark.schema(jsonIr);
   } catch (error) {
     throw runtimeError(
       'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
@@ -152,6 +153,14 @@ function rehydrateSchema(jsonIr: object): ArktypeSchemaLike {
       { codecId: ARKTYPE_JSON_CODEC_ID, jsonIr },
     );
   }
+  if (!isArktypeSchemaLike(rehydrated)) {
+    throw runtimeError(
+      'RUNTIME.JSON_SCHEMA_VALIDATION_FAILED',
+      `Rehydrated arktype schema does not have the expected callable + 'expression: string' shape (codecId: ${ARKTYPE_JSON_CODEC_ID})`,
+      { codecId: ARKTYPE_JSON_CODEC_ID, jsonIr },
+    );
+  }
+  return rehydrated;
 }
 
 function renderArktypeJsonOutputType(params: ArktypeJsonTypeParams): string {

@@ -137,7 +137,7 @@ test('coarse satisfies catches wrong typeParams shape on arktypeJsonColumn', () 
 test('arktypeJsonColumn: result is ColumnSpec with typed codecFactory', () => {
   const ProductSchema = type({ name: 'string', price: 'number' });
   const col = arktypeJsonColumn(ProductSchema);
-  expectTypeOf(col).toMatchTypeOf<
+  expectTypeOf(col).toExtend<
     ColumnSpec<ArktypeJsonCodecClass<{ name: string; price: number }>, ArktypeJsonTypeParams>
   >();
 });

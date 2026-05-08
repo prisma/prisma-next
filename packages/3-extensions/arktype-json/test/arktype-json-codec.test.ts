@@ -73,8 +73,8 @@ describe('arktypeJsonColumn(schema)', () => {
 
   it('rejects non-callable schema lookalikes at the call site', () => {
     const notASchema = { foo: 'bar' };
-    // biome-ignore lint/suspicious/noExplicitAny: deliberately malformed input for the call-site guard
-    expect(() => arktypeJsonColumn(notASchema as any)).toThrow(/callable arktype Type/);
+    // @ts-expect-error -- deliberately malformed input for the call-site guard
+    expect(() => arktypeJsonColumn(notASchema)).toThrow(/callable arktype Type/);
   });
 });
 
