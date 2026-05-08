@@ -1,7 +1,7 @@
 /**
- * Class-based form of the native SQLite target codecs (TML-2357 M0
- * Phase B3). Mirrors the Postgres codec class form added in Phase B2
- * (`packages/3-targets/3-targets/postgres/src/core/codecs-class.ts`).
+ * Class-based form of the native SQLite target codecs (TML-2357).
+ * Mirrors the Postgres codec class form in
+ * `packages/3-targets/3-targets/postgres/src/core/codecs-class.ts`.
  *
  * Each codec ships as three artifacts:
  *
@@ -20,7 +20,7 @@
  *    + `ColumnHelperForStrict` (every SQLite codec's resolved type is
  *    well-defined).
  *
- * After TML-2357 M0 Phase C this is the canonical source of SQLite codec
+ * After TML-2357 this is the canonical source of SQLite codec
  * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
  * carriers (and the parallel `byScalar` / `codecDescriptorDefinitions`
  * collection exports) retired with the deletion sweep.
@@ -384,7 +384,7 @@ sqliteBigintColumn satisfies ColumnHelperFor<SqliteBigintDescriptor>;
 sqliteBigintColumn satisfies ColumnHelperForStrict<SqliteBigintDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor map (TML-2357 M0 Phase B5/C). Keyed by scalar name
+// Class-form descriptor map (TML-2357). Keyed by scalar name
 // so {@link CodecTypes} resolves through `ExtractCodecTypes`,
 // preserving the input/output/traits shape downstream consumers
 // (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths

@@ -1,5 +1,5 @@
 /**
- * Class-based form of the arktype-json codec (TML-2357 M0 Phase B4/C).
+ * Class-based form of the arktype-json codec (TML-2357).
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
  * The schema's TypeScript-level inferred type `S['infer']` is only

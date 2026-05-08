@@ -7,7 +7,7 @@
  * literal preservation through per-codec helpers' direct calls; satisfies
  * shape catches typeParams-shape and codec-wiring mistakes.
  *
- * Refs: TML-2357 M0 Phase A.
+ * Refs: TML-2357.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

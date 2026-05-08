@@ -4,7 +4,7 @@
  * `sql/float@1`, `sql/text@1`, `sql/timestamp@1`).
  *
  * The class-form codec implementations live in `sql-codecs-class.ts`
- * (TML-2357 M0 Phase B1/C). This module retains only the conversion
+ * (TML-2357). This module retains only the conversion
  * helpers + emit-path renderers the class methods compose with — keeping
  * a single source of truth for non-trivial conversions while the class
  * methods provide the framework-required `Promise<…>` boundary.

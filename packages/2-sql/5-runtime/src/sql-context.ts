@@ -54,8 +54,8 @@ export type RuntimeParameterizedCodecDescriptor<P = Record<string, unknown>> = C
 
 /**
  * Contributor protocol for SQL components (target, adapter, extension
- * pack). Per TML-2357 M2 Phase A, the unified `codecs:` slot returns the
- * full {@link CodecDescriptor} list — non-parameterized and parameterized
+ * pack). The unified `codecs:` slot returns the full
+ * {@link CodecDescriptor} list — non-parameterized and parameterized
  * descriptors live side-by-side in the same array. The framework
  * dispatches every codec id through the unified descriptor map without
  * branching on parameterization.
@@ -312,9 +312,9 @@ function collectCodecDescriptors(contributors: ReadonlyArray<SqlStaticContributi
 
 /**
  * Build the unified descriptor map. Every codec contributor ships
- * native {@link CodecDescriptor}s through the unified `codecs:` slot
- * (TML-2357 M2 Phase A), so the registry construction is now a pure
- * indexing pass — no synthesis, no parameterized-vs-not branching.
+ * native {@link CodecDescriptor}s through the unified `codecs:` slot,
+ * so the registry construction is a pure indexing pass — no synthesis,
+ * no parameterized-vs-not branching.
  *
  * Codec-registry-unification spec § Decision: every codec resolves
  * through one descriptor map; reads are non-branching.
@@ -458,8 +458,8 @@ function isResolvedCodec(candidate: unknown): candidate is Codec {
  * Codec-registry-unification spec § AC-4: every column resolves through
  * one descriptor map without branching on parameterization. JSON-Schema
  * validation, when required, lives inside the resolved codec's `decode`
- * body (see `arktype-json`'s `ArktypeJsonCodecClass`); the framework no
- * longer maintains a parallel validator registry (TML-2357 M4).
+ * body (see `arktype-json`'s `ArktypeJsonCodecClass`); the framework
+ * no longer maintains a parallel validator registry.
  */
 function buildContractCodecRegistry(
   contract: Contract<SqlStorage>,
@@ -471,12 +471,14 @@ function buildContractCodecRegistry(
   const byColumn = new Map<string, Codec>();
   const byCodecId = new Map<string, Codec>();
   // Codec ids whose `byCodecId` entry is ambiguous — multiple distinct
-  // resolved instances landed under the same parameterized codec id (e.g.
-  // `Vector<1024>` and `Vector<1536>` both registering under
-  // `pg/vector@1`). The encode-side `forCodecId` fallback rejects these
-  // ids so a DSL-param without a column ref cannot silently bind to the
-  // wrong instance. Retires when AC-5's `ParamRef.refs` plumbing lands
-  // (TML-2357).
+  // resolved instances landed under the same parameterized codec id
+  // (e.g. `Vector<1024>` and `Vector<1536>` both registering under
+  // `pg/vector@1`). The refs-less `forCodecId` fallback rejects these
+  // ids so a DSL-param without a column ref cannot silently bind to
+  // the wrong instance. The validator pass enforces refs on every
+  // parameterized `ParamRef`, so this branch is reachable only as a
+  // defensive guard for non-parameterized columns whose `byCodecId`
+  // entry is unique by construction.
   const ambiguousCodecIds = new Set<string>();
 
   for (const [tableName, table] of Object.entries(contract.storage.tables)) {
@@ -536,13 +538,12 @@ function buildContractCodecRegistry(
           }
           resolvedCodec = cached;
         }
-        // else: parameterized codec id with no typeRef and no typeParams
-        // — this is the legitimate "undimensioned" form for codecs that
-        // ship a no-params column variant alongside a parameterized one
-        // (e.g. pgvector's `vectorColumn` vs. `vector(N)`). Leave
-        // `resolvedCodec` undefined; encode/decode for this column flows
-        // through `forCodecId` (the AC-5-deferred carve-out documented
-        // in `relational-core/src/ast/codec-types.ts`). The fallback
+        // else: parameterized codec id with no typeRef and no
+        // typeParams — this is the legitimate "undimensioned" form for
+        // codecs that ship a no-params column variant alongside a
+        // parameterized one (e.g. pgvector's `vectorColumn` vs.
+        // `vector(N)`). Leave `resolvedCodec` undefined; encode/decode
+        // for this column flows through `forCodecId`. The fallback
         // works for these cases because their wire format is
         // params-independent (vector formats `[v1,v2,...]` regardless
         // of declared length).
@@ -565,13 +566,14 @@ function buildContractCodecRegistry(
       return byColumn.get(`${table}.${column}`);
     },
     forCodecId(codecId) {
-      // Codec-id-only fallback for sites without a column ref (encode-
-      // side DSL params whose `ParamRef.refs` isn't populated). Prefer
-      // the contract-walk-derived shared codec; fall back to the legacy
+      // Codec-id-only fallback for refs-less sites. The validator pass
+      // (`validateParamRefRefs`) enforces refs on every parameterized
+      // `ParamRef` before encode, so this path is only legitimately
+      // reachable for non-parameterized codec ids. Prefer the
+      // contract-walk-derived shared codec; fall back to the legacy
       // `codecRegistry.get` for parameterized codec ids whose contracts
       // don't have a typeRef/typeParams column the walk could resolve
-      // through. The legacy fallback retires once `ParamRef.refs` is
-      // threaded everywhere (TML-2357).
+      // through.
       //
       // Reject ambiguous parameterized fallbacks: if the contract walk
       // resolved more than one distinct codec instance under this id

@@ -1,8 +1,8 @@
 /**
- * Runtime tests for the class-based arktype-json codec (TML-2357 M0
- * Phase B4/C). After the Phase C deletion sweep, this is the canonical
- * test suite for arktype-json codec behavior — the legacy
- * `arktypeJson(schema)` form retired with the class-form swap.
+ * Runtime tests for the class-based arktype-json codec (TML-2357).
+ * Canonical test suite for arktype-json codec behavior after the
+ * legacy `arktypeJson(schema)` form retired alongside the class-form
+ * swap.
  *
  * Coverage:
  *

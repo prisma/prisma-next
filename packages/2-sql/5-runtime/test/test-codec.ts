@@ -1,7 +1,7 @@
 /**
  * Test-only helper that constructs a SQL-family `Codec` instance from
  * author-side encode/decode functions. Replaces the legacy public
- * `mkCodec()` factory (deleted in TML-2357 M0 Phase C); tests that need a
+ * `mkCodec()` factory (deleted under TML-2357); tests that need a
  * stub codec for behavioural assertions instantiate one through this
  * helper rather than going through `descriptor.factory(...)`.
  *

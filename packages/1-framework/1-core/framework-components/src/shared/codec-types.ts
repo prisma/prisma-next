@@ -37,7 +37,7 @@ export interface CodecCallContext {
  *   id (used by `validateContract` for `decodeJson` of literal column
  *   defaults).
  * - `targetTypesFor(id)` exposes the codec-id-keyed `targetTypes`
- *   metadata the runtime instance no longer carries (TML-2357 AC-3).
+ *   metadata the runtime instance no longer carries (TML-2357).
  *   Returns the same array `CodecDescriptor.targetTypes` would; for
  *   Mongo (whose registration doesn't yet resolve through the unified
  *   descriptor map — TML-2324) the family-side assembly populates this

@@ -127,7 +127,7 @@ const renderVectorOutputType = (typeParams: Record<string, unknown>): string | u
  * Mongo wire-type codec descriptors. Static metadata for `traits`,
  * `targetTypes`, and `renderOutputType` lives here (the descriptor
  * shape) — `MongoCodec` itself is narrow and only carries the four
- * conversion methods (TML-2357 M2 Phase B).
+ * conversion methods (TML-2357).
  */
 export const mongoCodecDescriptors: ReadonlyArray<CodecDescriptor> = [
   descriptorFor(mongoObjectIdCodec, { traits: ['equality'], targetTypes: ['objectId'] }),

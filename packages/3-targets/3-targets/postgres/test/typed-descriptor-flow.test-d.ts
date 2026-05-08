@@ -1,6 +1,6 @@
 /**
  * Constructive type tests for the postgres per-target descriptor record
- * layer (TML-2357 M0 R6 / Phase D — T0.D.2).
+ * layer (TML-2357).
  *
  * Coverage:
  *   - the public descriptor list (`codecDescriptorClassList`) narrows to

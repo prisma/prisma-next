@@ -1,7 +1,7 @@
 /**
- * Class-based form of the native Postgres target codecs (TML-2357 M0
- * Phase B2). Mirrors the SQL base codec class form added in Phase B1
- * (`packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs-class.ts`).
+ * Class-based form of the native Postgres target codecs (TML-2357).
+ * Mirrors the SQL base codec class form in
+ * `packages/2-sql/4-lanes/relational-core/src/ast/sql-codecs-class.ts`.
  *
  * Each codec ships as three artifacts:
  *
@@ -19,7 +19,7 @@
  *    (and `ColumnHelperForStrict` where the resolved codec type is
  *    well-defined).
  *
- * After TML-2357 M0 Phase C this is the canonical source of Postgres codec
+ * After TML-2357 this is the canonical source of Postgres codec
  * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
  * carriers (and the parallel `byScalar`/`codecDescriptorDefinitions`/
  * `codecDescriptorList` collection exports) retired with the deletion
@@ -1155,7 +1155,7 @@ export const pgFloatColumn = () =>
 pgFloatColumn satisfies ColumnHelperFor<PgFloatDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor map (TML-2357 M0 Phase B5/C). Keyed by scalar name
+// Class-form descriptor map (TML-2357). Keyed by scalar name
 // so {@link CodecTypes} resolves through `ExtractCodecTypes`,
 // preserving the input/output/traits shape downstream consumers
 // (`descriptor-meta.ts`, `exports/codec-types.ts`) and contract emit paths

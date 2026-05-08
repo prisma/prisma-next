@@ -24,7 +24,7 @@ import {
 } from '../src/core/codecs-class';
 
 // `renderOutputType` is a `CodecDescriptor`-side concern after the SQL
-// `Codec` narrow (TML-2357 M2 Phase B). Tests read the renderer from
+// `Codec` narrow (TML-2357). Tests read the renderer from
 // the class-form descriptor directly.
 function rendererFor(
   descriptor: AnyCodecDescriptor,

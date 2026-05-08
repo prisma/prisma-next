@@ -37,7 +37,7 @@ function makeVectorCodec(meta?: Record<string, unknown>): Codec {
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // The narrow `Codec` shape is conversion-only (TML-2357 M2 Phase B);
+  // The narrow `Codec` shape is conversion-only (TML-2357);
   // the `meta` sentinel here is test-side bookkeeping that downstream
   // assertions read off the exact instance handed back by the factory.
   return { ...baseCodec, meta } as unknown as Codec;

@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based pgvector codec (TML-2357 M0 Phase B4).
+ * Type tests for the class-based pgvector codec (TML-2357).
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *

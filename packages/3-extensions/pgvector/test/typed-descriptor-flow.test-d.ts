@@ -1,6 +1,6 @@
 /**
  * Constructive type tests for the pgvector per-extension descriptor
- * record layer (TML-2357 M0 R6 / Phase D — T0.D.2). Mirrors the per-
+ * record layer (TML-2357). Mirrors the per-
  * target tests in postgres / sqlite.
  */
 

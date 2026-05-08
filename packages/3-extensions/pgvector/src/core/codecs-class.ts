@@ -1,8 +1,8 @@
 /**
- * Class-based form of the pgvector extension codec (TML-2357 M0 Phase B4).
+ * Class-based form of the pgvector extension codec (TML-2357).
  *
- * Mirrors the Phase B2/B3 patterns (postgres/codecs-class.ts,
- * sqlite/codecs-class.ts) for the single `pg/vector@1` codec. Three
+ * Mirrors the patterns in `postgres/codecs-class.ts` and
+ * `sqlite/codecs-class.ts` for the single `pg/vector@1` codec. Three
  * artifacts:
  *
  * 1. `PgVectorCodec` extends {@link CodecImpl} with the runtime
@@ -21,7 +21,7 @@
  *    (`vector(1536)`) at emit/verify time from `nativeType` +
  *    `typeParams`.
  *
- * After TML-2357 M0 Phase C this is the canonical source of pgvector codec
+ * After TML-2357 this is the canonical source of pgvector codec
  * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
  * carriers retired with the deletion sweep.
  *
@@ -156,7 +156,7 @@ pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor map (TML-2357 M0 Phase B5/C). Single entry today:
+// Class-form descriptor map (TML-2357). Single entry today:
 // `pg/vector@1`. Keyed by scalar name so {@link CodecTypes} resolves through
 // `ExtractCodecTypes`, preserving the input/output/traits shape
 // downstream consumers (`descriptor-meta.ts`, `exports/codec-types.ts`)

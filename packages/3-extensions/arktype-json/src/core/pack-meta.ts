@@ -6,7 +6,7 @@
  * imports into emitted `contract.d.ts`, and `types.storage` declares the
  * codec id's storage backing (`jsonb` on Postgres).
  *
- * Per TML-2357 M2/M0, runtime materialization flows through the unified
+ * Per TML-2357 runtime materialization flows through the unified
  * descriptor map (`arktypeJsonDescriptorClass`) and the emit path
  * consults `descriptorFor('arktype/json@1').renderOutputType` directly —
  * no per-library "emit-only Codec" stub.

@@ -25,7 +25,7 @@ const emptyLookup: CodecLookup = {
 };
 
 // `Codec`-side static metadata (`targetTypes` / `meta` / `renderOutputType`)
-// retired with the SQL `Codec` narrow (TML-2357 M2 Phase B); these tests
+// retired with the SQL `Codec` narrow (TML-2357); these tests
 // supply the metadata side-by-side with the codec instance to build the
 // `CodecLookup` directly.
 interface CodecMetadata {
@@ -202,7 +202,7 @@ describe('renderLoweredSql cast policy via stack-derived lookup', () => {
     });
 
     // Codec-side static metadata (`targetTypes` / `meta`) lives on
-    // the codec descriptor (TML-2357 M2 Phase B); contributors expose
+    // the codec descriptor (TML-2357); contributors expose
     // it via `types.codecTypes.codecDescriptors`.
     const geographyDescriptor = {
       codecId: 'app/geography@1',

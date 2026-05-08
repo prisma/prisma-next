@@ -1,6 +1,5 @@
 /**
- * Type tests for the class-based arktype-json codec (TML-2357 M0
- * Phase B4).
+ * Type tests for the class-based arktype-json codec (TML-2357).
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
  * Coverage focuses on the literal-preservation property — `S['infer']`

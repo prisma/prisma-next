@@ -1,6 +1,6 @@
 /**
- * Constructive type tests at the descriptor round-trip layer (TML-2357
- * M0 R6 / Phase D — T0.D.1).
+ * Constructive type tests at the descriptor round-trip layer
+ * (TML-2357).
  *
  * The class-form descriptor surface is the canonical path from a
  * `CodecDescriptor<P>` instance to its resolved `Codec` shape. These

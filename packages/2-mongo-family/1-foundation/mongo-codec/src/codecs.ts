@@ -60,7 +60,7 @@ type JsonRoundTripConfig<TInput> = [TInput] extends [JsonValue]
  *
  * Codec-id-keyed static metadata (`traits`, `targetTypes`,
  * `renderOutputType`) lives on the unified `CodecDescriptor` rather
- * than on the codec instance itself (TML-2357 M2 Phase B).
+ * than on the codec instance itself (TML-2357).
  */
 export function mongoCodec<
   Id extends string,

@@ -5,7 +5,7 @@ import { mongoCodec } from '../src/codecs';
 
 // MongoCodec extends `BaseCodec` and carries the same four generics in
 // the same order. Trait/targetType/renderOutputType metadata moved to
-// the unified `CodecDescriptor` (TML-2357 M2 Phase B); the codec
+// the unified `CodecDescriptor` (TML-2357); the codec
 // instance is now a pure conversion record.
 test('MongoCodec is assignable to BaseCodec (4 generics, same order)', () => {
   expectTypeOf<MongoCodec<'id/x@1', readonly ['equality'], number, string>>().toExtend<

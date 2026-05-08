@@ -8,9 +8,9 @@ import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
 describe('arktypeJsonRuntimeDescriptor', () => {
   // The runtime descriptor is the SQL runtime's entry point for
-  // arktype-json. M2 Phase A unified the contributor protocol: every
-  // codec — parameterized or not — flows through the single `codecs:`
-  // slot returning a `CodecDescriptor` list. arktype-json contributes
+  // arktype-json. The contributor protocol is unified: every codec —
+  // parameterized or not — flows through the single `codecs:` slot
+  // returning a `CodecDescriptor` list. arktype-json contributes
   // exactly one descriptor: `arktypeJsonDescriptorClass`.
   it('declares family, target, and version aligned with pack-meta', () => {
     expect(arktypeJsonRuntimeDescriptor.familyId).toBe('sql');
@@ -20,8 +20,8 @@ describe('arktypeJsonRuntimeDescriptor', () => {
   });
 
   it('contributes the arktype-json descriptor through the unified codecs slot', () => {
-    // Phase B5 swap: contributor reads from the class-form descriptor
-    // list. The single entry is the canonical `arktypeJsonDescriptorClass`.
+    // The contributor reads from the class-form descriptor list. The
+    // single entry is the canonical `arktypeJsonDescriptorClass`.
     const descriptors = arktypeJsonRuntimeDescriptor.codecs();
     expect(descriptors).toEqual([arktypeJsonDescriptorClass]);
     expect(descriptors[0]?.codecId).toBe(ARKTYPE_JSON_CODEC_ID);

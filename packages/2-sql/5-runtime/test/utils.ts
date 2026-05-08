@@ -153,15 +153,14 @@ export async function writeTestContractMarker(
  */
 /**
  * Synthesize `CodecDescriptor`s from a legacy {@link CodecRegistry} of
- * non-parameterized codec instances. M2 Phase A retired the production
- * synthesis bridge; this test-only equivalent lets the existing
- * `createTestAdapterDescriptor` pattern keep wrapping a raw `Adapter`
- * (whose `profile.codecs()` still returns a `CodecRegistry`) into the
- * descriptor-list shape that `SqlStaticContributions.codecs:` now
- * expects. The legacy `Codec` instances carry `traits`/`targetTypes`/
- * `meta` via the SQL family extension; the structural narrow reads
- * those fields directly. Retires alongside the family-extension narrow
- * in M2 Phase B.
+ * non-parameterized codec instances. The production synthesis bridge
+ * was retired under TML-2357; this test-only equivalent lets the
+ * existing `createTestAdapterDescriptor` pattern keep wrapping a raw
+ * `Adapter` (whose `profile.codecs()` still returns a `CodecRegistry`)
+ * into the descriptor-list shape that `SqlStaticContributions.codecs:`
+ * now expects. The legacy `Codec` instances carry `traits`/
+ * `targetTypes`/`meta` via the SQL family extension; the structural
+ * narrow reads those fields directly.
  */
 export function descriptorsFromCodecRegistry(
   registry: CodecRegistry,

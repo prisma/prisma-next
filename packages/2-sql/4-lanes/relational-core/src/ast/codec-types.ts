@@ -96,7 +96,7 @@ export interface CodecMeta {
  * `paramsSchema`, `renderOutputType`) lives on the unified
  * {@link import('@prisma-next/framework-components/codec').CodecDescriptor}
  * — the codec instance itself only carries `id` plus the four
- * conversion methods (TML-2357 M2 Phase B).
+ * conversion methods.
  *
  * See `Codec` in `@prisma-next/framework-components/codec` for the codec
  * contract that this interface extends.
@@ -116,29 +116,17 @@ export interface Codec<
  *
  * The dispatch interface for encode/decode at runtime: built once at
  * `ExecutionContext` construction time by walking the contract's
- * `storage.tables[].columns[]` and resolving each column to either a per-
- * instance parameterized codec (via `descriptor.factory(typeParams)(ctx)`)
- * or the shared codec instance from the legacy `CodecRegistry` (for non-
- * parameterized codecs). The dispatch path calls
- * `forColumn(table, column).encode/decode(...)` and doesn't know whether
- * the codec is parameterized.
+ * `storage.tables[].columns[]` and resolving each column through its
+ * descriptor's factory (per-instance for parameterized columns; the
+ * cached shared codec for non-parameterized columns). The dispatch
+ * path calls `forColumn(table, column).encode/decode(...)` and doesn't
+ * know whether the codec is parameterized.
  *
- * `forCodecId(codecId)` is a fallback for sites that don't carry the
- * `(table, column)` ref through to the encode/decode call site —
- * primarily the param-encoding path, where `ParamRef.refs` is not
- * populated by the SQL builder today (every `ParamRef` carries `codecId`
- * but not the column it relates to). For the parameterized codecs shipped
- * at Phase B, encode is per-instance-stateless (pgvector formats
- * `[v1,v2,v3]` regardless of length; JSON's `encode` is `JSON.stringify`
- * regardless of schema), so a codec-id-keyed lookup yields a structurally
- * equivalent encoder; the fallback is the bridge that lets the legacy
- * `codecs:` registration retire from the dispatch path while staying as
- * the codec-id-only source for now.
- *
- * The encode-side fallback is the AC-5-deferred carve-out documented in
- * the codec-registry-unification spec § Non-functional constraints.
- * TML-2357 retires the fallback by threading `ParamRef.refs` through
- * column-bound construction sites.
+ * `forCodecId(codecId)` is the refs-less fallback. Every column-bound
+ * `ParamRef` carries `refs: { table; column }` and the builder-pipeline
+ * `validateParamRefRefs` pass enforces refs on every parameterized
+ * `ParamRef` before encode runs, so this fallback is only reached for
+ * non-parameterized codec ids.
  */
 export interface ContractCodecRegistry {
   /**
@@ -152,10 +140,9 @@ export interface ContractCodecRegistry {
   /**
    * Resolve a codec by id. Returns the same codec instance the legacy
    * `CodecRegistry.get(codecId)` would return — for non-parameterized
-   * codecs that's the shared instance; for parameterized codecs that's
-   * a representative resolved instance. Used by sites that don't carry
-   * `(table, column)` through to the encode/decode call site (the AC-5
-   * carve-out path).
+   * codecs that's the shared instance. Used by refs-less call sites;
+   * the validator pass guarantees the call site's `codecId` is
+   * non-parameterized at this boundary.
    */
   forCodecId(codecId: string): Codec | undefined;
 }
@@ -163,11 +150,9 @@ export interface ContractCodecRegistry {
 /**
  * Registry interface for codecs organized by namespaced id.
  *
- * The registry allows looking up codecs by their namespaced ID. After
- * TML-2357 M0 Phase C the legacy scalar-name-keyed `byScalar` lookup
- * retired with the carrier deletion sweep — codec-id is the single
- * dispatch key (with adapter-first / packs / app-overrides registration
- * preference enforced at compose time).
+ * The registry allows looking up codecs by their namespaced ID.
+ * Codec-id is the single dispatch key (with adapter-first / packs /
+ * app-overrides registration preference enforced at compose time).
  */
 export interface CodecRegistry {
   get(id: string): Codec<string> | undefined;
@@ -246,9 +231,9 @@ export type DescriptorCodecTraits<D> = D extends {
  * onto the codec-id-keyed `CodecTypes` shape consumed by emit and no-
  * emit type pipelines (`{ readonly [codecId]: { input; output; traits } }`).
  *
- * After the TML-2357 M0 Phase C deletion sweep this is the canonical
- * extractor — the legacy instance-keyed `ExtractCodecTypes` (and its
- * `mkCodec`-bound builder) retired alongside the carrier deletion.
+ * Canonical extractor for the descriptor-keyed type pipeline; the
+ * legacy instance-keyed extractor and its `mkCodec`-bound builder
+ * retired alongside the carrier deletion.
  */
 export type ExtractCodecTypes<
   ScalarNames extends {

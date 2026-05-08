@@ -25,7 +25,7 @@ function vectorCodecInstance(meta?: Record<string, unknown>): Codec {
     decode: (w: number[]) => w,
   });
   if (!meta) return baseCodec;
-  // The narrow `Codec` shape is conversion-only (TML-2357 M2 Phase B).
+  // The narrow `Codec` shape is conversion-only (TML-2357).
   // The `meta` here is a test-side sentinel attached to the codec object
   // so a downstream assertion can verify that the runtime materialization
   // path threads the *exact same instance* the factory returned (via

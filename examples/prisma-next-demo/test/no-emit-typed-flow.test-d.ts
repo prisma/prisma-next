@@ -1,6 +1,6 @@
 /**
  * AC-CB-6: end-to-end no-emit authoring chain type tests
- * (TML-2357 M0 R6 / Phase D — T0.D.3).
+ * (TML-2357).
  *
  * The no-emit chain is the strongest evidence M0's typed flow works as
  * designed: authoring a contract via the TS callback surface

@@ -6,7 +6,7 @@
  * tsdown DTS bundler from emitting a private chunk path in
  * downstream `.d.mts` files: consumers see `CodecTypes` resolved via
  * this public entry point rather than via a hash-named internal
- * chunk (TML-2357 M0 R6 / F8).
+ * chunk (TML-2357).
  *
  * Lives in `target-postgres` because codec types describe the target's
  * value space - both the control adapter (introspection / schema

@@ -1,6 +1,5 @@
 /**
- * Type tests for the class-based Postgres target codecs (TML-2357 M0
- * Phase B2).
+ * Type tests for the class-based Postgres target codecs (TML-2357).
  *
  * Mirrors `packages/2-sql/4-lanes/relational-core/test/ast/sql-codecs-class.types.test-d.ts`.
  *

@@ -1,6 +1,6 @@
 /**
  * Constructive type tests for the sqlite per-target descriptor record
- * layer (TML-2357 M0 R6 / Phase D — T0.D.2). Mirrors the postgres
+ * layer (TML-2357). Mirrors the postgres
  * test (`packages/3-targets/3-targets/postgres/test/typed-descriptor-flow.test-d.ts`).
  */
 

@@ -1,8 +1,8 @@
 /**
  * Shared encode/decode/render constants for the Postgres target codecs.
  *
- * The class-form codec implementations live in `codecs-class.ts` (TML-2357
- * M0 Phase B2/C). This file retains the conversion helpers + emit-path
+ * The class-form codec implementations live in `codecs-class.ts`
+ * (TML-2357). This file retains the conversion helpers + emit-path
  * type renderers that the class-form codec methods compose with — keeping
  * a single source of truth for non-trivial conversions while the class
  * methods provide the framework-required `Promise<…>` boundary.

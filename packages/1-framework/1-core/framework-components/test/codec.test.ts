@@ -15,7 +15,7 @@
  * hierarchy aliasing). The third test below specifically exercises
  * this regression vector.
  *
- * Refs: TML-2357 M0 R2 F7.
+ * Refs: TML-2357.
  */
 
 import type { JsonValue } from '@prisma-next/contract/types';

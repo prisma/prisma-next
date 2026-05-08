@@ -1,5 +1,5 @@
 /**
- * Class-based form of the six SQL base codecs (TML-2357 M0 Phase B1/C).
+ * Class-based form of the six SQL base codecs (TML-2357).
  *
  * Each codec ships as three artifacts:
  *
@@ -14,7 +14,7 @@
  *    {@link ColumnSpec} via the framework {@link column} packager. The
  *    helper is tied to its descriptor with `satisfies ColumnHelperFor`.
  *
- * After Phase C, this file is the canonical source of SQL base codec
+ * After TML-2357 this file is the canonical source of SQL base codec
  * metadata and runtime behaviour — the legacy `mkCodec` / `defineCodec`
  * carriers in `sql-codecs.ts` retired with the deletion sweep.
  */

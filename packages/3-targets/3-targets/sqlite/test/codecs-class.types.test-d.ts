@@ -1,6 +1,5 @@
 /**
- * Type tests for the class-based SQLite target codecs (TML-2357 M0
- * Phase B3).
+ * Type tests for the class-based SQLite target codecs (TML-2357).
  *
  * Mirrors `packages/3-targets/3-targets/postgres/test/codecs-class.types.test-d.ts`.
  *

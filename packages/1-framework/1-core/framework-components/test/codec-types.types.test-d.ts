@@ -33,7 +33,7 @@ test('decodeJson is required and synchronous', () => {
 });
 
 test('Codec instance carries only id + the four conversion methods', () => {
-  // The runtime instance is narrowed to id + behavior (TML-2357 AC-3);
+  // The runtime instance is narrowed to id + behavior (TML-2357);
   // codec-id-keyed static metadata (`traits`, `targetTypes`, `meta`,
   // `renderOutputType`) lives on `CodecDescriptor` keyed by codecId.
   // The phantom `TTraits` carrier is keyed by a non-public unique
