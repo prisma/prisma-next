@@ -381,6 +381,16 @@ export interface SqlMigrationRunnerExecuteOptions<TTargetDetails> {
   readonly plan: SqlMigrationPlan<TTargetDetails>;
   readonly driver: ControlDriverInstance<'sql', string>;
   /**
+   * Logical contract space this plan applies to. Defaults to
+   * `'app'` so existing single-space callers keep working without
+   * modification. Multi-space callers (the per-space runner wiring
+   * landed in M2 R4) supply each space's id explicitly so the marker
+   * write goes against the right row.
+   *
+   * @see specs/framework-mechanism.spec.md § 6 — Per-space runner.
+   */
+  readonly space?: string;
+  /**
    * Destination contract IR.
    * Must correspond to `plan.destination` and is used for schema verification and marker/ledger writes.
    */
@@ -431,10 +441,66 @@ export type SqlMigrationRunnerResult = Result<
 >;
 
 export interface SqlMigrationRunner<TTargetDetails> {
+  /**
+   * Apply a single migration plan, opening and managing its own
+   * transaction (and any target-specific connection-level setup, e.g.
+   * SQLite's `PRAGMA foreign_keys` toggle). Existing single-space
+   * callers route through here.
+   */
   execute(
     options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
   ): Promise<SqlMigrationRunnerResult>;
+
+  /**
+   * Apply a single migration plan against an already-open connection
+   * **without** opening a transaction. The caller is responsible for
+   * wrapping the call (and any siblings) in `BEGIN` / `COMMIT` /
+   * `ROLLBACK`. Used by the per-space runner wiring (sub-spec § 6) to
+   * fan out across contract spaces inside one outer transaction so a
+   * mid-apply failure rolls back every space's writes (AM4-rollback).
+   *
+   * Idempotent control-table setup (`prisma_contract.*`) and marker
+   * writes use `options.space` to address the per-space marker row.
+   *
+   * @see specs/framework-mechanism.spec.md § "R4 design choice".
+   */
+  executeOnConnection(
+    options: SqlMigrationRunnerExecuteOptions<TTargetDetails>,
+  ): Promise<SqlMigrationRunnerResult>;
+
+  /**
+   * Apply per-space plans across multiple contract spaces inside a
+   * single outer transaction. The caller orders the input list
+   * (typically via {@link import('@prisma-next/migration-tools/spaces').concatenateSpaceApplyInputs});
+   * the runner is responsible for opening / committing the outer
+   * transaction (and any target-specific connection-level setup such
+   * as the SQLite FK pragma toggle). A failure on any space rolls
+   * back every space's writes — the AM4-rollback guarantee.
+   *
+   * Each space's `SqlMigrationRunnerExecuteOptions` must reference the
+   * same `driver` (the connection the outer transaction is open on).
+   * Per-space marker writes use `options.space` to address the row.
+   *
+   * @see specs/framework-mechanism.spec.md § 4 — Runner; § "R4 design choice".
+   */
+  executeAcrossSpaces(options: {
+    readonly driver: ControlDriverInstance<'sql', string>;
+    readonly perSpaceOptions: ReadonlyArray<SqlMigrationRunnerExecuteOptions<TTargetDetails>>;
+  }): Promise<MultiSpaceRunnerResult>;
 }
+
+export interface MultiSpaceRunnerSuccessValue {
+  readonly perSpaceResults: ReadonlyArray<{
+    readonly space: string;
+    readonly value: SqlMigrationRunnerSuccessValue;
+  }>;
+}
+
+export interface MultiSpaceRunnerFailure extends SqlMigrationRunnerFailure {
+  readonly failingSpace: string;
+}
+
+export type MultiSpaceRunnerResult = Result<MultiSpaceRunnerSuccessValue, MultiSpaceRunnerFailure>;
 
 export interface SqlControlTargetDescriptor<TTargetId extends string, TTargetDetails>
   extends MigratableTargetDescriptor<'sql', TTargetId, SqlControlFamilyInstance> {
