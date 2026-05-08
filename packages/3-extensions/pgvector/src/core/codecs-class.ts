@@ -151,12 +151,11 @@ pgVectorColumn satisfies ColumnHelperFor<PgVectorDescriptor>;
 pgVectorColumn satisfies ColumnHelperForStrict<PgVectorDescriptor>;
 
 // ---------------------------------------------------------------------------
-// Class-form descriptor map (TML-2357). Single entry today:
-// `pg/vector@1`. Keyed by scalar name so {@link CodecTypes} resolves through
-// `ExtractCodecTypes`, preserving the input/output/traits shape
-// downstream consumers (`descriptor-meta.ts`, `exports/codec-types.ts`)
-// rely on. The list view (`codecDescriptorClassList`) iterates these in
-// the emit-stable order via `Object.values`.
+// Internal descriptor registration. Single entry today: `pg/vector@1`.
+// The codec-id-keyed type-level map drives `ExtractCodecTypes` to derive
+// `CodecTypes` (input/output/traits projection used by downstream
+// consumers). The list view feeds the package-scoped
+// `pgvectorCodecRegistry` exposed via `core/registry.ts`.
 // ---------------------------------------------------------------------------
 
 const codecDescriptorMap = {
@@ -165,5 +164,4 @@ const codecDescriptorMap = {
 
 export type CodecTypes = ExtractCodecTypes<typeof codecDescriptorMap>;
 
-export const codecDescriptorClassList: readonly AnyCodecDescriptor[] =
-  Object.values(codecDescriptorMap);
+export const codecDescriptors: readonly AnyCodecDescriptor[] = Object.values(codecDescriptorMap);
