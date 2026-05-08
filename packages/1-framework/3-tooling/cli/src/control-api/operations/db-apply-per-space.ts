@@ -634,7 +634,7 @@ function buildExtensionPathFailure(
  * them — defeating the whole point of disjoint per-space ownership
  * (sub-spec § 1, AM2).
  */
-function pruneSchemaByOtherSpaceContracts(
+export function pruneSchemaByOtherSpaceContracts(
   schema: unknown,
   otherSpaceContracts: ReadonlyArray<unknown>,
 ): unknown {
