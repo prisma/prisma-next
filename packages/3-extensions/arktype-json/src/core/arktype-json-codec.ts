@@ -1,5 +1,5 @@
 /**
- * Class-based form of the arktype-json codec (TML-2357).
+ * Arktype-json codec (TML-2357).
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
  * The schema's TypeScript-level inferred type `S['infer']` is only
@@ -37,7 +37,7 @@
  * invariant (used contravariantly in `encode`, covariantly in
  * `decode`/`encodeJson`/`decodeJson`). Strict assignment fails by
  * design; the explicit `expectTypeOf` tests in
- * `test/arktype-json-codec-class.types.test-d.ts` cover the literal-
+ * `test/arktype-json-codec.types.test-d.ts` cover the literal-
  * preservation property the strict variant would otherwise enforce.
  */
 

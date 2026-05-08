@@ -1,6 +1,6 @@
 import { buildCodecDescriptorRegistry } from '@prisma-next/sql-relational-core/codec-descriptor-registry';
 import type { CodecDescriptorRegistry } from '@prisma-next/sql-relational-core/query-lane-context';
-import { codecDescriptors } from './arktype-json-codec-class';
+import { codecDescriptors } from './arktype-json-codec';
 
 /**
  * Registry of every codec descriptor shipped by `@prisma-next/extension-arktype-json`.

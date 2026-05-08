@@ -1,5 +1,5 @@
 /**
- * Type tests for the class-based arktype-json codec (TML-2357).
+ * Type tests for the arktype-json codec (TML-2357).
  *
  * Spec § Case 3: method-level generic over `S extends Type<unknown>`.
  * Coverage focuses on the literal-preservation property — `S['infer']`
@@ -39,7 +39,7 @@ import {
   type ArktypeJsonTypeParams,
   arktypeJsonColumn,
   arktypeJsonDescriptor,
-} from '../src/core/arktype-json-codec-class';
+} from '../src/core/arktype-json-codec';
 
 // ---------------------------------------------------------------------------
 // Method-level S generic flows from column-author site through helper.

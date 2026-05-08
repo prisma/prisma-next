@@ -1,8 +1,7 @@
 /**
- * Runtime tests for the class-based arktype-json codec (TML-2357).
+ * Runtime tests for the arktype-json codec (TML-2357).
  * Canonical test suite for arktype-json codec behavior after the
- * legacy `arktypeJson(schema)` form retired alongside the class-form
- * swap.
+ * legacy `arktypeJson(schema)` form retired.
  *
  * Coverage:
  *
@@ -24,7 +23,7 @@ import {
   ARKTYPE_JSON_CODEC_ID,
   arktypeJsonColumn,
   arktypeJsonDescriptor,
-} from '../src/core/arktype-json-codec-class';
+} from '../src/core/arktype-json-codec';
 
 const SYNTH_CTX: CodecInstanceContext = { name: '<arktype-json-class-test>' };
 const CALL_CTX: SqlCodecCallContext = {};

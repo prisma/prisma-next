@@ -13,7 +13,7 @@
  */
 
 import type { CodecTypes } from '../types/codec-types';
-import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec-class';
+import { ARKTYPE_JSON_CODEC_ID } from './arktype-json-codec';
 import { arktypeJsonCodecRegistry } from './registry';
 
 const arktypeJsonPackMetaBase = {

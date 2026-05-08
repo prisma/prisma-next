@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ARKTYPE_JSON_CODEC_ID, arktypeJsonDescriptor } from '../src/core/arktype-json-codec-class';
+import { ARKTYPE_JSON_CODEC_ID, arktypeJsonDescriptor } from '../src/core/arktype-json-codec';
 import { arktypeJsonExtensionDescriptor } from '../src/exports/control';
 import { arktypeJsonRuntimeDescriptor } from '../src/exports/runtime';
 
@@ -17,7 +17,7 @@ describe('arktypeJsonRuntimeDescriptor', () => {
   });
 
   it('contributes the arktype-json descriptor through the unified codecs slot', () => {
-    // The contributor reads from the class-form descriptor list. The
+    // The contributor reads from the descriptor registry. The
     // single entry is the canonical `arktypeJsonDescriptor`.
     const descriptors = arktypeJsonRuntimeDescriptor.codecs();
     expect(descriptors).toEqual([arktypeJsonDescriptor]);
