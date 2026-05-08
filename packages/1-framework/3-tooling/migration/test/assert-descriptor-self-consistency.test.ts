@@ -1,0 +1,118 @@
+import { computeStorageHash } from '@prisma-next/contract/hashing';
+import { describe, expect, it } from 'vitest';
+import { assertDescriptorSelfConsistency } from '../src/assert-descriptor-self-consistency';
+import { MigrationToolsError } from '../src/errors';
+
+const STORAGE_BODY = {
+  tables: {
+    test_box: {
+      columns: {
+        x: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+        y: { codecId: 'pg/int4@1', nativeType: 'integer', nullable: false },
+      },
+      uniques: [],
+      indexes: [],
+      foreignKeys: [],
+    },
+  },
+};
+
+const TARGET = 'postgres';
+const FAMILY = 'sql';
+const REAL_HASH = computeStorageHash({
+  target: TARGET,
+  targetFamily: FAMILY,
+  storage: STORAGE_BODY,
+});
+
+// Production-shape storage carries `storageHash` alongside the body; the
+// helper must strip it before recomputing or it would feed its own
+// output into its input and never match.
+const STORAGE = { ...STORAGE_BODY, storageHash: REAL_HASH };
+
+describe('assertDescriptorSelfConsistency', () => {
+  it('returns silently when headRef.hash matches recomputed hash', () => {
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: STORAGE,
+        headRefHash: REAL_HASH,
+      }),
+    ).not.toThrow();
+  });
+
+  it('throws MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH on stale headRef.hash', () => {
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: STORAGE,
+        headRefHash: 'sha256:stale-hash',
+      }),
+    ).toThrowError(MigrationToolsError);
+  });
+
+  it('error names the extension and includes both hashes in details', () => {
+    let captured: MigrationToolsError | undefined;
+    try {
+      assertDescriptorSelfConsistency({
+        extensionId: 'cipherstash',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: STORAGE,
+        headRefHash: 'sha256:stale-hash',
+      });
+    } catch (error) {
+      if (MigrationToolsError.is(error)) captured = error;
+    }
+    expect(captured?.code).toBe('MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH');
+    expect(captured?.why).toContain('"cipherstash"');
+    expect(captured?.why).toContain('sha256:stale-hash');
+    expect(captured?.why).toContain(REAL_HASH);
+    expect(captured?.details).toEqual({
+      extensionId: 'cipherstash',
+      recomputedHash: REAL_HASH,
+      headRefHash: 'sha256:stale-hash',
+    });
+  });
+
+  it('canonicalises storage before hashing — key order in input does not matter', () => {
+    const reorderedStorage = {
+      tables: STORAGE.tables,
+      storageHash: STORAGE.storageHash,
+    };
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: reorderedStorage,
+        headRefHash: REAL_HASH,
+      }),
+    ).not.toThrow();
+  });
+
+  it('strips storageHash from storage before recomputing (avoids self-referential hashing)', () => {
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: { ...STORAGE_BODY, storageHash: REAL_HASH },
+        headRefHash: REAL_HASH,
+      }),
+    ).not.toThrow();
+    expect(() =>
+      assertDescriptorSelfConsistency({
+        extensionId: 'test-extension',
+        target: TARGET,
+        targetFamily: FAMILY,
+        storage: STORAGE_BODY,
+        headRefHash: REAL_HASH,
+      }),
+    ).not.toThrow();
+  });
+});

@@ -1,4 +1,8 @@
 export {
+  assertDescriptorSelfConsistency,
+  type DescriptorSelfConsistencyInputs,
+} from '../assert-descriptor-self-consistency';
+export {
   concatenateSpaceApplyInputs,
   type SpaceApplyInput,
 } from '../concatenate-space-apply-inputs';

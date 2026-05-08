@@ -27,6 +27,7 @@ import {
 } from '@prisma-next/framework-components/control';
 import type { TypesImportSpec } from '@prisma-next/framework-components/emission';
 import type { PslDocumentAst } from '@prisma-next/framework-components/psl-ast';
+import { assertDescriptorSelfConsistency } from '@prisma-next/migration-tools/spaces';
 import type { SqlStorage } from '@prisma-next/sql-contract/types';
 import { validateContract as sqlValidateContract } from '@prisma-next/sql-contract/validate';
 import {
@@ -299,6 +300,29 @@ export function createSqlFamilyInstance<TTargetId extends string>(
   const extensions =
     stack.extensionPacks as unknown as readonly (SqlControlExtensionDescriptor<TTargetId> &
       DescriptorWithStorageTypes)[];
+
+  // Descriptor self-consistency check (sub-spec § 3 — note for M2 wiring).
+  // Each extension that exposes a `contractSpace` must publish a
+  // `headRef.hash` that matches the canonical hash recomputed from its
+  // `contractJson`. A stale value would silently corrupt every downstream
+  // boundary that trusts `headRef.hash` as the canonical identity (drift
+  // detection, pinned artefact emission, runner marker writes). Failing
+  // fast at descriptor-load time turns "extension author shipped an
+  // inconsistent descriptor" into an explicit, actionable error
+  // (`MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH`) rather than a confusing
+  // mismatch surfacing several layers downstream.
+  for (const extension of extensions) {
+    if (extension.contractSpace) {
+      const { contractJson, headRef } = extension.contractSpace;
+      assertDescriptorSelfConsistency({
+        extensionId: extension.id,
+        target: contractJson.target,
+        targetFamily: contractJson.targetFamily,
+        storage: contractJson.storage as unknown as Record<string, unknown>,
+        headRefHash: headRef.hash,
+      });
+    }
+  }
 
   const { codecTypeImports, operationTypeImports, extensionIds } = stack;
 

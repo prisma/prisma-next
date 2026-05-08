@@ -171,6 +171,23 @@ export function errorPinnedArtefactsAppSpace(): MigrationToolsError {
   );
 }
 
+export function errorDescriptorHeadHashMismatch(args: {
+  readonly extensionId: string;
+  readonly recomputedHash: string;
+  readonly headRefHash: string;
+}): MigrationToolsError {
+  const { extensionId, recomputedHash, headRefHash } = args;
+  return new MigrationToolsError(
+    'MIGRATION.DESCRIPTOR_HEAD_HASH_MISMATCH',
+    "Extension descriptor's headRef.hash does not match its contractJson",
+    {
+      why: `Extension "${extensionId}" publishes a \`contractSpace\` whose \`headRef.hash\` (${headRefHash}) does not match the canonical hash recomputed from \`contractSpace.contractJson\` (${recomputedHash}). This means the extension descriptor was published with stale \`headRef.hash\` — typically because the contract was bumped without rerunning the extension's emit pipeline.`,
+      fix: 'Re-run the extension authoring pipeline so `contractJson.storage.storageHash` and `headRef.hash` agree, then republish the extension. If you are the extension author and you intentionally bumped `contractJson`, recompute and update `headRef.hash` (and refresh any pinned migration metadata that derives from it).',
+      details: { extensionId, recomputedHash, headRefHash },
+    },
+  );
+}
+
 export function errorDuplicateSpaceId(spaceId: string): MigrationToolsError {
   return new MigrationToolsError(
     'MIGRATION.DUPLICATE_SPACE_ID',
