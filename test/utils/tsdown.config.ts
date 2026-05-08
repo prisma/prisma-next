@@ -4,6 +4,7 @@ export default defineConfig({
   entry: {
     index: 'src/exports/index.ts',
     'column-descriptors': 'src/column-descriptors.ts',
+    'migration-harness': 'src/migration-harness.ts',
     'operation-descriptors': 'src/operation-descriptors.ts',
     'semantic-lines': 'src/semantic-lines.ts',
     timeouts: 'src/timeouts.ts',

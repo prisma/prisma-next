@@ -3594,6 +3594,9 @@ importers:
       '@prisma-next/mongo-lowering':
         specifier: workspace:*
         version: link:../../packages/2-mongo-family/6-transport/mongo-lowering
+      '@prisma-next/mongo-schema-ir':
+        specifier: workspace:*
+        version: link:../../packages/2-mongo-family/3-tooling/mongo-schema-ir
       '@prisma-next/test-utils':
         specifier: workspace:*
         version: link:../utils
