@@ -53,6 +53,8 @@ packages/3-extensions/cipherstash/
 
 `contract.json` and `migrations/*/ops.json` are committed source-of-truth. The build step (`tsdown`) inlines `eql-bundle.sql` into the `installEqlBundle` op's body so the published package's descriptor exposes self-contained migration JSON values to the framework's emit pipeline (per FR1).
 
+**M3 R1 amendment — TS-authored layout convention.** The package as it landed authors the contract + migrations directly in TypeScript under `src/core/{contract.ts, migrations.ts, eql-bundle.ts, cipherstash-codec.ts, constants.ts}` rather than committing pre-rendered `contract.json` / `migrations/*/{manifest,ops,contract}.json` files. The build step still produces self-contained descriptor values — they're just constructed in-process via `computeStorageHash` + `computeMigrationHash` rather than read from disk. Two reasons: (a) co-locating the constants (`CIPHERSTASH_INVARIANTS`, type names, future-IR placeholders) with the values that consume them keeps the FR11 invariantId immutability constraint visible in code review; (b) the EQL bundle is byte-for-byte vendored as a TS string literal in `src/core/eql-install.generated.ts`, which is a more honest source-of-truth than a copy under `src/core/contract-space/migrations/.../ops.json`. Future extensions are free to author either way — both produce the same `ExtensionMigrationPackage` shape at descriptor-construction time.
+
 ## 2. Contract IR contents
 
 `contract.json` declares the typed objects EQL exposes that user columns can name as `nativeType`. Per the project spec § "IR vocabulary boundary":
@@ -107,6 +109,17 @@ Recommendation: **(a)** — keeps `ops.json` reviewable and the bundle reviewabl
 ```
 
 Invariants array is sorted alphabetically per the framework-mechanism sub-spec § 3 canonicalization rule.
+
+**M3 R3 amendment — structural-ops × bundle-CREATEs conflict resolution (option (c)).** The vendored EQL bundle's body issues `CREATE` statements for every typed object cipherstash needs: the `eql_v2` schema, `public.eql_v2_configuration` table, the `public.eql_v2_configuration_state` enum, `public.eql_v2_encrypted` composite, `eql_v2.{bloom_filter, hmac_256, blake3}` domains, and the `eql_v2.ore_*` composites. The structural `cipherstash:create-*-v1` ops in `cipherstashBaselineMigration.ops` would *conflict* with these CREATEs if both fired the same DDL — Postgres rejects duplicate `CREATE TYPE` / `CREATE TABLE` against the same name.
+
+Resolution (M3 R3): the bundle owns the typed-object DDL. Each structural op keeps its stable `cipherstash:*` invariantId (so the marker's `applied_invariants` matches `cipherstashHeadRef.invariants` and the verifier's `invariantsMismatch` gate passes) but its `execute[]` is a no-op `SELECT 1`. Clean separation: bundle = real DDL; structural ops = invariantId ledger entries. Future extension (deferred to IR vocabulary expansion): once the IR models enums / composites / domains as first-class storage objects, the structural ops gain real verification work + `precheck` SQL probing `pg_type` / `information_schema` for the typed object's existence.
+
+**M3 R4 amendment — constants drift cleanup (item 22, FR11 pre-publication).** Two corrections to the structural op set landed pre-publication:
+
+  1. `EQL_V2_ORE_COMPOSITE_TYPES` was incomplete (missed `ore_block_u64_8_256_term` + `ore_cllw_var_8`) and carried a typo (`ore_cclw_u64_8` → `ore_cllw_u64_8`). Final list synced verbatim with the bundle's `CREATE TYPE eql_v2.<name>` statements: `[ore_block_u64_8_256_term, ore_block_u64_8_256, ore_cllw_u64_8, ore_cllw_var_8]`.
+  2. `meta.cipherstashFutureIR.enums.eql_v2_configuration_state.values` was a 2-entry stub (`[pending, active]`); the bundle's actual `CREATE TYPE` declares 4 values: `[active, inactive, encrypting, pending]`. The documentary placeholder now mirrors the bundle.
+
+Both changes happened pre-publication so FR11's "once published, invariantIds are immutable" constraint is not violated. Net effect on the marker ledger: `cipherstashHeadRef.invariants` gains 2 ids (term, var_8) and corrects 1 id (cclw → cllw); `CIPHERSTASH_STORAGE_HASH` is unchanged (the meta block is documentary and excluded from the storage hash).
 
 ## 4. Codec lifecycle hook (`cipherstash:string@1`)
 
@@ -199,11 +212,19 @@ Test file: `packages/3-extensions/cipherstash/test/cipherstash.e2e.test.ts` (or 
 6. Assert new `migrations/cipherstash/20260615T0000_add_audit_column/` directory created.
 7. Run `db apply`. Assert cipherstash marker row advances; app-space marker unchanged.
 
-**Scenario D (revert workaround — T3.7, T3.8):**
+**Scenario D (revert workaround — T3.8):**
 
 1. Audit `packages/` and `examples/` for `strictVerification: false` flags introduced under the cipherstash project's first attempt.
 2. Remove all such flags.
 3. Confirm `pnpm test:e2e` (or the cipherstash test) still passes — strict mode now succeeds because cipherstash's typed objects are recognized as expected via its contract space.
+
+**M3 R4 amendment — Scenario D vacuously satisfied.** The audit ran in M3 R4 (T3.8). Result: **no cipherstash-specific `strictVerification: false` workaround exists in `packages/` or `examples/` today.** All extant `strictVerification: false` matches fall into one of three orthogonal categories:
+
+  - The intentional M2 R5 framework mechanism (`packages/1-framework/3-tooling/cli/src/control-api/operations/db-apply-per-space.ts`) — disjoint per-space ownership at the runner-side per-space verifier (§ 4 of the framework-mechanism sub-spec). This is the per-space pipeline's own design and must remain.
+  - Mongo-related test fixtures (`@prisma-next/mongo-target/*`, `examples/{mongo-demo,retail-store}`, `test/integration/test/mongo/...`) — orthogonal to cipherstash; pre-existing for synthetic-contract test fixtures (`mongo-runner-schema-verify` project).
+  - SQL-adapter pre-existing test fixtures (`packages/3-targets/6-adapters/{postgres,sqlite}/test/migrations/...`, `test/e2e/framework/test/sqlite/migrations/harness.ts`) — pre-date cipherstash; introduced in PR #386 (sqlite migrations) and #404 (self-edge runner coverage) for unrelated synthetic-schema reasons.
+
+The "first attempt" workaround NFR1 wanted to revert lived only in the abandoned `projects/cipherstash-integration/` design and never landed in workspace packages. Cipherstash was authored greenfield in M3 directly on the contract-space mechanism; it never *needed* the workaround. NFR1 / TC-23 / AC-13 are vacuously satisfied — the property "no cipherstash-specific `strictVerification: false` flag exists" holds, and the new cipherstash descriptor is structurally incompatible with the workaround pattern (its typed objects are declared in the contract IR, so strict mode recognises them).
 
 ## 7. Bump-cipherstash diff test (T3.7 in plan / Scenario C above)
 
