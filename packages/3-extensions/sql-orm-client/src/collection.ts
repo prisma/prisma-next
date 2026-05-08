@@ -73,14 +73,11 @@ import {
 } from './mutation-executor';
 import {
   compileAggregate,
-  compileDeleteCount,
   compileDeleteReturning,
   compileInsertCount,
   compileInsertCountSplit,
   compileInsertReturning,
   compileInsertReturningSplit,
-  compileSelect,
-  compileUpdateCount,
   compileUpdateReturning,
   compileUpsertReturning,
 } from './query-plan';
@@ -1113,6 +1110,8 @@ export class Collection<
   async updateCount(
     data: State['hasWhere'] extends true ? Partial<DefaultModelRow<TContract, ModelName>> : never,
   ): Promise<number> {
+    assertReturningCapability(this.contract, 'updateCount()');
+
     const mappedData = mapModelDataToStorageRow(this.contract, this.modelName, data);
     if (Object.keys(mappedData).length === 0) {
       return 0;
@@ -1120,31 +1119,19 @@ export class Collection<
 
     applyUpdateDefaults(this.ctx, this.tableName, mappedData);
 
-    const primaryKeyColumn = resolvePrimaryKeyColumn(
-      this.contract,
-      this.tableName,
-      `updateCount() for model "${this.modelName}"`,
-    );
-    const countState: CollectionState = {
-      ...emptyState(),
-      filters: this.state.filters,
-      selectedFields: [primaryKeyColumn],
-    };
-    const countCompiled = compileSelect(this.contract, this.tableName, countState);
-    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
-      this.ctx.runtime,
-      countCompiled,
-    ).toArray();
-
-    const compiled = compileUpdateCount(
+    const compiled = compileUpdateReturning(
       this.contract,
       this.tableName,
       mappedData,
       this.state.filters,
+      undefined,
     );
-    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
+    const updatedRows = await executeQueryPlan<Record<string, unknown>>(
+      this.ctx.runtime,
+      compiled,
+    ).toArray();
 
-    return matchingRows.length;
+    return updatedRows.length;
   }
 
   async delete(
@@ -1185,26 +1172,20 @@ export class Collection<
   async deleteCount(
     this: State['hasWhere'] extends true ? Collection<TContract, ModelName, Row, State> : never,
   ): Promise<number> {
-    const primaryKeyColumn = resolvePrimaryKeyColumn(
+    assertReturningCapability(this.contract, 'deleteCount()');
+
+    const compiled = compileDeleteReturning(
       this.contract,
       this.tableName,
-      `deleteCount() for model "${this.modelName}"`,
+      this.state.filters,
+      undefined,
     );
-    const countState: CollectionState = {
-      ...emptyState(),
-      filters: this.state.filters,
-      selectedFields: [primaryKeyColumn],
-    };
-    const countCompiled = compileSelect(this.contract, this.tableName, countState);
-    const matchingRows = await executeQueryPlan<Record<string, unknown>>(
+    const deletedRows = await executeQueryPlan<Record<string, unknown>>(
       this.ctx.runtime,
-      countCompiled,
+      compiled,
     ).toArray();
 
-    const compiled = compileDeleteCount(this.contract, this.tableName, this.state.filters);
-    await executeQueryPlan<Record<string, unknown>>(this.ctx.runtime, compiled).toArray();
-
-    return matchingRows.length;
+    return deletedRows.length;
   }
 
   #buildUpsertConflictCriterion(
