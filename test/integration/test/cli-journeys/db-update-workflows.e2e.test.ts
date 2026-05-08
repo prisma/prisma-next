@@ -1,5 +1,5 @@
 /**
- * Database Update Workflows (Journeys D + E + O)
+ * Database Update Workflows (Journeys D + E)
  *
  * D — Direct update without migrations: swap to an additive contract, dry-run
  *     to preview changes, apply, confirm noop on re-run, then verify.
@@ -8,9 +8,16 @@
  *     column, test that --no-interactive blocks destructive changes, --json
  *     returns an error envelope, and --json -y auto-accepts and succeeds.
  *
- * O — Re-init conflict: after initializing with one contract, swap to another
- *     and observe that db init fails (marker hash mismatch). Recovery via
- *     db update.
+ * Note: Journey O ("re-init conflict") was removed in M2 (the orchestrator
+ * consolidation slice) when the dual `db init` path was collapsed onto the
+ * per-space flow. The legacy `MARKER_ORIGIN_MISMATCH` gate that failed
+ * `db init` whenever the marker did not match the destination contract no
+ * longer exists; the per-space planner reconciles schema drift and the
+ * marker is treated as bookkeeping rather than an authoritative source.
+ * Marker-aware violations (orphan markers, declared-but-unmigrated extension
+ * spaces) are now caught by the contract-space verifier instead — see
+ * `cli.db-init.contract-space-verifier.test.ts` and
+ * `cli.db-update.contract-space-verifier.test.ts`.
  */
 
 import stripAnsi from 'strip-ansi';
@@ -128,45 +135,4 @@ withTempDir(({ createTempDir }) => {
   // -------------------------------------------------------------------------
   // Journey O: db init on Already-Initialized DB (Different Contract)
   // -------------------------------------------------------------------------
-  describe('Journey O: Re-init Conflict', () => {
-    const db = useDevDatabase();
-
-    it(
-      'init → swap → init fails → db update recovers',
-      async () => {
-        const ctx: JourneyContext = setupJourney({
-          connectionString: db.connectionString,
-          createTempDir,
-        });
-
-        // Precondition: init with base contract
-        const emit0 = await runContractEmit(ctx);
-        expect(emit0.exitCode, 'O.pre: emit').toBe(0);
-        const init = await runDbInit(ctx);
-        expect(init.exitCode, 'O.pre: init').toBe(0);
-
-        // Swap to additive contract
-        swapContract(ctx, 'contract-additive');
-        const emit = await runContractEmit(ctx);
-        expect(emit.exitCode, 'O.pre: emit v2').toBe(0);
-
-        // O.01: db init (fails — marker exists with different hash)
-        const initFail = await runDbInit(ctx);
-        expect(initFail.exitCode, 'O.01: db init fails').toBe(1);
-
-        // O.02: db init --dry-run (also fails)
-        const dryRunFail = await runDbInit(ctx, ['--dry-run']);
-        expect(dryRunFail.exitCode, 'O.02: db init dry-run fails').toBe(1);
-
-        // O.03: db update (recovery)
-        const update = await runDbUpdate(ctx);
-        expect(update.exitCode, 'O.03: db update recovery').toBe(0);
-
-        // O.04: db verify
-        const verify = await runDbVerify(ctx);
-        expect(verify.exitCode, 'O.04: db verify').toBe(0);
-      },
-      timeouts.spinUpPpgDev,
-    );
-  });
 });
